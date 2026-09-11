@@ -109,39 +109,6 @@ jobs:
       # Windows test and lint job instead of extending its critical path.
       - run: cargo build --locked --release -p pdc --bin pdc
 
-  tree-sitter:
-    name: Tree-sitter and Zed language assets
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: |
-            grammars/tree-sitter-eu4/package-lock.json
-            grammars/tree-sitter-localisation/package-lock.json
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: bash scripts/check-grammars.sh
-
-  zed:
-    name: Zed extension package
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-          targets: wasm32-wasip1
-      - run: cargo fmt --manifest-path editors/zed/Cargo.toml -- --check
-      - run: cargo test --locked --manifest-path editors/zed/Cargo.toml
-      - run: cargo check --locked --manifest-path editors/zed/Cargo.toml --target wasm32-wasip1
-      - run: cargo build --locked --manifest-path editors/zed/Cargo.toml --target wasm32-wasip1 --release
-      - run: cargo clippy --locked --manifest-path editors/zed/Cargo.toml --all-targets -- -D warnings
-
   vscode:
     name: VS Code extension package
     runs-on: ubuntu-latest

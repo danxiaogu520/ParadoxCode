@@ -7,7 +7,7 @@
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/paradoxcode.paradoxcode-vscode)](https://marketplace.visualstudio.com/items?itemName=paradoxcode.paradoxcode-vscode)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-ParadoxCode 是一个独立、开源的 P 社（Paradox）模组语言工具包。它以「泛型 PDX 语言引擎、EU4 优先」为产品方向：引擎层（工作区、索引、分析、LSP）保持跨游戏可复用，而《欧陆风云 IV》的路径、作用域、命令、符号与特殊语义全部收拢在 EU4 profile 中。当前版本面向 VS Code 与 Zed 中的 EU4 模组开发。
+ParadoxCode 是一个独立、开源的 P 社（Paradox）模组语言工具包。它以「泛型 PDX 语言引擎、EU4 优先」为产品方向：引擎层（工作区、索引、分析、LSP）保持跨游戏可复用，而《欧陆风云 IV》的路径、作用域、命令、符号与特殊语义全部收拢在 EU4 profile 中。当前版本面向 VS Code 中的 EU4 模组开发。
 
 ParadoxCode **与 Paradox Interactive 无任何关联，也未获得其背书**。《欧陆风云 IV》与 Paradox Interactive 均为其各自权利人的商标。
 
@@ -32,7 +32,6 @@ ParadoxCode **与 Paradox Interactive 无任何关联，也未获得其背书**�
 - 跨「未保存缓冲区 → 当前 Mod → 有序依赖 Mod → 本地持久化 Vanilla 索引」的工作区解析。
 - stdio 语言服务器（`pdc`），支持取消、过期结果保护与不可变分析快照，并能对活跃 Mod 根做定向文件监听更新。
 - VS Code 扩展：零配置、带校验和的服务器自动安装，首次使用引导（walkthrough），以及实时任务树预览（贴图节点、缩放、源码跳转、PNG/JSON 导出）。
-- 轻量 Zed 扩展，提供 Tree-sitter 高亮；编辑器高亮是 Tree-sitter 的唯一用途——运行时解析器是纯 Rust 实现，不链接 Tree-sitter C。
 - 精确版本服务器下载：SHA-256 校验、受限解压、有界流式传输与自校验可执行缓存。
 
 ## 快速开始
@@ -48,10 +47,6 @@ ParadoxCode **与 Paradox Interactive 无任何关联，也未获得其背书**�
 
 VS Code 的 **Get Started** 页面提供 **Start using ParadoxCode** 引导，覆盖上述全部流程。
 
-### Zed
-
-Zed 扩展在本仓库中开发（`editors/zed`），正在等待 [`zed-industries/extensions`](https://github.com/zed-industries/extensions) 注册表的审核。在它上架之前，请以开发扩展方式安装：指向本仓库检出目录的 `editors/zed` 子目录。推荐的语言设置见 `editors/zed/recommended-settings.json`。
-
 ### pdc 独立二进制
 
 Linux（x86_64、aarch64）、macOS（x86_64、aarch64）与 Windows（x86_64）的独立 `pdc` 二进制以 `.tar.gz` / `.zip` 归档形式附在每个 [GitHub Release](https://github.com/danxiaogu520/ParadoxCode/releases) 上，并带有 `.sha256` 校验文件。语言服务器内嵌第一方 EU4 规则源，绝不导入外部规则文件。
@@ -63,7 +58,6 @@ Linux（x86_64、aarch64）、macOS（x86_64、aarch64）与 Windows（x86_64）
 当前范围的已知限制：
 
 - CSV 文件仅作为语法占位/不透明资源处理，尚未提供 CSV 解析器。
-- Zed 扩展尚未上架 Zed 扩展画廊（注册表审核中）。
 - EU4 是唯一已实现的游戏 profile。引擎按设计保持游戏中立，但尚不存在第二个 profile，因此不对其他游戏的时间表做任何承诺。
 
 ## 架构
@@ -76,7 +70,7 @@ Linux（x86_64、aarch64）、macOS（x86_64、aarch64）与 Windows（x86_64）
     -> 不可变工作区快照
     -> 编辑器中立的分析
     -> LSP 适配层
-    -> Zed / VS Code
+    -> VS Code
 ```
 
 引擎/profile 边界保证工作区、索引、分析、LSP 与发布基础设施保持游戏中立，而 EU4 的路径、作用域、命令、符号与特殊语义留在 EU4 profile 中。crate 依赖方向是严格单向的：
@@ -91,7 +85,7 @@ rules + game -> engine / ide
 
 ## 从源码构建
 
-前置条件：**Rust 1.98 或更新版本**，以及 **Node.js 24 LTS**（用于 Tree-sitter 语料检查）。
+前置条件：**Rust 1.98 或更新版本**，以及 **Node.js 24 LTS**（用于 VS Code 扩展工具链）。
 
 ```bash
 git clone https://github.com/danxiaogu520/ParadoxCode.git
@@ -100,7 +94,7 @@ cargo build --locked --workspace
 cargo test --locked --workspace --all-targets
 ```
 
-显式运行质量门禁套件，或只诊断某个分组（`core`、`grammars`、`zed`、`vscode`、`release`、`fuzz`、`core-fast`、`perf`）。仓库不使用提交钩子；CI 会在每个 pull request 上运行同样的门禁：
+显式运行质量门禁套件，或只诊断某个分组（`core`、`vscode`、`release`、`fuzz`、`core-fast`、`perf`）。仓库不使用提交钩子；CI 会在每个 pull request 上运行同样的门禁：
 
 ```bash
 bash scripts/check-quality-gates.sh
@@ -108,7 +102,7 @@ bash scripts/check-quality-gates.sh
 
 Pull Request CI 使用 `core-fast` 分组：保留正确性检查，但不编译或运行 benchmark 目标。
 优化后的 benchmark 套件仍保留在 `perf` 分组中，由定时或手动触发的 Performance workflow 运行。
-CI 还会根据变更路径选择编辑器、语法、fuzz 和依赖检查；fuzz 只绑定其直接运行时依赖，
+CI 还会运行编辑器、fuzz 与依赖检查；fuzz 只绑定其直接运行时依赖，
 Windows release 构建则与 Windows 测试和 clippy 并行执行。分支保护应将 `Required CI checks`
 作为稳定的聚合必需检查。
 
@@ -134,32 +128,13 @@ effect、trigger、modifier、on_action 以及 event、decision、mission、hist
 
 ## 开发环境
 
-可从配置路径或 `PATH` 启动 `pdc`。编辑器配置彼此独立：VS Code 使用 `paradoxcode.*` 设置，
-Zed 使用 `.zed/settings.json` 中的 `lsp.pdc.initialization_options`。两者不会读取共享项目文件。
+可从配置路径或 `PATH` 启动 `pdc`。编辑器配置位于 VS Code 扩展的 `paradoxcode.*` 设置中。
 本文档所述方式面向贡献者，并非最终安装体验。
 
 `pdc` 会自动发现、校验、索引并记住本地 EU4 安装。首次启动时，若没有显式缓存或之前的尝试记录，会执行一次非阻塞的快速探测：读取启动器元数据（Steam 库清单、Epic 清单、GOG 注册表）和常见位置，只执行一次。若未产生候选，请将游戏目录设置指向安装位置（VS Code：`paradoxcode.gameDirectory`）并重新加载；缓存随后自动构建并保持更新，安装变更时后台重建索引。
 
 大型依赖 Mod 可以只索引一次，然后在每次启动时从持久缓存加载，而无需重新扫描。
-`id` 必须与编辑器中配置的依赖 id 一致。在 Zed 中，缓存在 `.zed/settings.json` 中声明；`pdc` 会在后台加载它，并在文件缺失时自动重建（规则哈希变化时与 Vanilla 缓存一样重新生成）：
-
-```json
-{
-  "lsp": {
-    "pdc": {
-      "initialization_options": {
-        "dependencies": [
-          {
-            "id": "gui-xu",
-            "path": "/path/to/dependency-mod",
-            "index": "/path/to/dependency.pdcindex"
-          }
-        ]
-      }
-    }
-  }
-}
-```
+`id` 必须与编辑器中配置的依赖 id 一致。
 
 在设置了 `index` 时，依赖不会实时扫描；修改依赖后，删除过期的缓存文件并重启语言服务器（命令面板 `pdc: restart`），缓存会自动重建。删除 `index` 字段可回退到实时扫描。
 
@@ -189,8 +164,6 @@ bash scripts/diagnose-current-mod.sh \
 | `crates/pdc` | `pdc` 语言服务器：LSP 生命周期与协议边界 |
 | `crates/tools` | 仓库工具链（`check`、`release`、缓存构建），供 CI 与维护者使用 |
 | `editors/vscode/` | VS Code 扩展：服务器引导、引导流程、任务树预览 |
-| `editors/zed/` | 轻量 Zed 扩展、语言元数据与查询 |
-| `grammars/` | 仅编辑用的 Tree-sitter 语法与语料测试 |
 | `rules/eu4/` | 权威第一方 EU4 规则树（catalog、semantic、支撑表与 profile） |
 | `fuzz/` | 解析、编辑、格式化与 HIR 模糊测试目标 |
 | `scripts/` | 可复现的质量检查与诊断工作流 |

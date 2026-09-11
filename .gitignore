@@ -5,7 +5,7 @@
 *.profraw
 *.profdata
 
-# Tree-sitter / JavaScript tooling
+# JavaScript tooling
 **/node_modules/
 npm-debug.log*
 yarn-debug.log*
@@ -16,16 +16,10 @@ pnpm-debug.log*
 
 # Machine-local editor and agent state
 /.cargo/
-/.zed/
 /.agents/
 /.codex/
 /.codex-toml-check/
 /.mimocode/
-
-# Generated Zed extension assets
-/editors/zed/extension.wasm
-/editors/zed/grammars/
-/editors/zed/bundled-rules/*.pdcrules
 
 # Generated VS Code extension assets
 /editors/vscode/out/

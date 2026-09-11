@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const CONTRACT_PATH: &str = "editors/zed/server-distribution.json";
+const CONTRACT_PATH: &str = "editors/vscode/server-distribution.json";
 
 /// One target's archive and executable naming contract.
 #[derive(Clone, Debug, Eq, PartialEq)]

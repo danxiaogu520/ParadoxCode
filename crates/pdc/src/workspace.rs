@@ -164,7 +164,7 @@ pub(crate) fn resolve_source_roots(
     if inline.project_config.is_some() {
         return Err(RpcError::new(
             INVALID_PARAMS,
-            "projectConfig is no longer supported; configure pdc separately in VS Code or Zed",
+            "projectConfig is no longer supported; configure pdc in your editor settings instead",
         ));
     }
     if let Some(workspace_root) = base.as_deref()
@@ -172,7 +172,7 @@ pub(crate) fn resolve_source_roots(
     {
         return Err(RpcError::new(
             INVALID_PARAMS,
-            "the shared .pdx/project.toml configuration is no longer supported; remove it and configure VS Code or Zed separately",
+            "the shared .pdx/project.toml configuration is no longer supported; remove it and configure your editor settings instead",
         ));
     }
     let project = inline;

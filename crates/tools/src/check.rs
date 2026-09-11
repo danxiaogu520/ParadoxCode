@@ -1,9 +1,8 @@
 //! Quality-gate checks for the ParadoxCode repository.
 //!
 //! These checks replace the former Python scripts (`check-project-policy.py`,
-//! `check-zed-extension.py`, `check-phase6a.py`, `check-release-version.py`,
-//! `check-phase1-grammar-deletions.py`). Run via `cargo test` or
-//! `cargo run -p tools -- check (policy|zed|release|grammar-fuzz|all)`.
+//! `check-phase6a.py`, `check-release-version.py`). Run via `cargo test` or
+//! `cargo run -p tools -- check (policy|release|all)`.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -77,11 +76,8 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     results.push(requires_file(".github/workflows/ci.yml"));
     results.push(requires_file(".github/workflows/release.yml"));
     results.push(requires_file("deny.toml"));
-    results.push(requires_file("editors/zed/extension.toml"));
     results.push(requires_file("editors/vscode/package.json"));
     results.push(requires_file("editors/vscode/package-lock.json"));
-    results.push(requires_dir("grammars/tree-sitter-eu4"));
-    results.push(requires_dir("grammars/tree-sitter-localisation"));
     results.push(requires_dir("fuzz"));
 
     // README content checks.
@@ -200,26 +196,8 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
         }
     }
 
-    // Version agreement across workspace and Zed.
+    // Version agreement across workspace and editor extension.
     if let Ok(workspace_version) = read_workspace_version(root) {
-        if let Ok(ext_version) =
-            read_toml_value::<String>(root.join("editors/zed/extension.toml"), &["version"])
-        {
-            results.push(check(
-                ext_version == workspace_version,
-                "Zed extension version",
-                format!("Zed extension version {ext_version} != workspace {workspace_version}"),
-            ));
-        }
-        if let Ok(zc_version) =
-            read_toml_value::<String>(root.join("editors/zed/Cargo.toml"), &["package", "version"])
-        {
-            results.push(check(
-                zc_version == workspace_version,
-                "Zed Cargo version",
-                format!("Zed Cargo version {zc_version} != workspace {workspace_version}"),
-            ));
-        }
         if let Ok(text) = fs::read_to_string(root.join("editors/vscode/package.json"))
             && let Ok(package) = serde_json::from_str::<serde_json::Value>(&text)
         {
@@ -258,50 +236,11 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
         }
     }
 
-    // Zed extension metadata.
-    if let Ok(ext_id) = read_toml_value::<String>(root.join("editors/zed/extension.toml"), &["id"])
-    {
-        results.push(check(
-            ext_id == "paradoxcode",
-            "Zed extension id",
-            "published Zed extension id must remain stable",
-        ));
-    }
-    if let Ok(ext_name) =
-        read_toml_value::<String>(root.join("editors/zed/extension.toml"), &["name"])
-    {
-        results.push(check(
-            ext_name == "ParadoxCode - EU4 Language Tools",
-            "Zed extension name",
-            "unexpected Zed display name",
-        ));
-    }
-    if let Ok(ext_desc) =
-        read_toml_value::<String>(root.join("editors/zed/extension.toml"), &["description"])
-    {
-        results.push(check(
-            ext_desc.to_lowercase().contains("unofficial"),
-            "Zed extension description",
-            "Zed description must identify the extension as unofficial",
-        ));
-    }
-    if let Ok(languages) = read_toml_value::<Vec<String>>(
-        root.join("editors/zed/extension.toml"),
-        &["language_servers", "pdc", "languages"],
-    ) {
-        results.push(check(
-            languages
-                == [
-                    "Europa Universalis IV".to_owned(),
-                    "Localisation".to_owned(),
-                ],
-            "Zed language-server bindings",
-            "pdc must serve both Europa Universalis IV and Localisation",
-        ));
-    }
-
     // Server distribution contract.
-    if root.join("editors/zed/server-distribution.json").is_file() {
+    if root
+        .join("editors/vscode/server-distribution.json")
+        .is_file()
+    {
         match crate::release::load_contract(root) {
             Ok((limits, artifacts)) => {
                 results.push(check(
@@ -391,358 +330,6 @@ fn contains_extension_recursive(root: &Path, extension: &str) -> bool {
     })
 }
 
-/// Validates the Zed extension manifest, grammar config, and query files.
-pub fn check_zed_extension(root: &Path) -> Vec<CheckResult> {
-    let mut results = Vec::new();
-    let ext_dir = root.join("editors/zed");
-
-    if let Ok(ext_schema) =
-        read_toml_value::<i64>(ext_dir.join("extension.toml"), &["schema_version"])
-    {
-        results.push(check(
-            ext_schema == 1,
-            "Zed extension schema",
-            "unsupported Zed extension schema",
-        ));
-    }
-
-    let grammar_root = root.join("grammars");
-    let languages = [
-        (
-            "eu4",
-            "tree-sitter-eu4",
-            "Europa Universalis IV",
-            "test/corpus/eu4.txt",
-            &["highlights.scm", "brackets.scm", "indents.scm"][..],
-        ),
-        (
-            "localisation",
-            "tree-sitter-localisation",
-            "Localisation",
-            "test/corpus/localisation.txt",
-            &["highlights.scm", "outline.scm"][..],
-        ),
-    ];
-
-    for (lang_dir_name, grammar_dir_name, language_name, sample_relative, query_names) in languages
-    {
-        let lang_dir = ext_dir.join("languages").join(lang_dir_name);
-        let grammar_path = grammar_root.join(grammar_dir_name);
-
-        if let Ok(name) = read_toml_value::<String>(lang_dir.join("config.toml"), &["name"]) {
-            results.push(if name == language_name {
-                CheckResult::pass(format!("{lang_dir_name}: language name"))
-            } else {
-                CheckResult::fail(
-                    format!("{lang_dir_name}: language name"),
-                    format!(
-                        "{lang_dir_name}: expected language name {language_name}, found {name}"
-                    ),
-                )
-            });
-        }
-
-        results.push(check(
-            grammar_path.join("grammar.js").is_file(),
-            &format!("{grammar_dir_name}: grammar.js"),
-            format!("{grammar_dir_name}: grammar.js missing"),
-        ));
-        results.push(check(
-            grammar_path.join("src/parser.c").is_file(),
-            &format!("{grammar_dir_name}: parser.c"),
-            format!("{grammar_dir_name}: generated parser missing"),
-        ));
-
-        for query_name in query_names {
-            let query_path = lang_dir.join(query_name);
-            results.push(check(
-                query_path.is_file(),
-                &format!("{lang_dir_name}: {query_name}"),
-                format!("{lang_dir_name}: {query_name} missing"),
-            ));
-            if query_path.is_file()
-                && let Ok(contents) = fs::read_to_string(&query_path)
-            {
-                results.push(check(
-                    !contents.contains("Phase 0 query placeholder"),
-                    &format!("{lang_dir_name}: {query_name} real"),
-                    format!(
-                        "{query_path}: placeholder query",
-                        query_path = query_path.display()
-                    ),
-                ));
-            }
-        }
-
-        // Validate queries load against the sample corpus.
-        let sample = grammar_path.join(sample_relative);
-        if sample.is_file() {
-            let tree_sitter = find_tree_sitter(&grammar_root);
-            for query_name in query_names {
-                let query_path = lang_dir.join(query_name);
-                if query_path.is_file()
-                    && let Some(ref cli) = tree_sitter
-                {
-                    let output = Command::new(cli)
-                        .args([
-                            "query",
-                            &query_path.to_string_lossy(),
-                            &sample.to_string_lossy(),
-                            "--quiet",
-                        ])
-                        .current_dir(&grammar_path)
-                        .output();
-                    match output {
-                        Ok(out) if out.status.success() => {
-                            results.push(CheckResult::pass(format!(
-                                "{lang_dir_name}: {query_name} query loads"
-                            )));
-                        }
-                        Ok(out) => {
-                            results.push(CheckResult::fail(
-                                format!("{lang_dir_name}: {query_name}"),
-                                format!("query failed: {}", String::from_utf8_lossy(&out.stderr)),
-                            ));
-                        }
-                        Err(error) => results.push(CheckResult::fail(
-                            format!("{lang_dir_name}: {query_name}"),
-                            format!("tree-sitter query could not run: {error}"),
-                        )),
-                    }
-                }
-            }
-        }
-    }
-
-    // Recommended settings.
-    let settings_path = ext_dir.join("recommended-settings.json");
-    if settings_path.is_file()
-        && let Ok(text) = fs::read_to_string(&settings_path)
-        && let Ok(settings) = serde_json::from_str::<serde_json::Value>(&text)
-    {
-        let file_types: BTreeSet<String> = settings
-            .get("file_types")
-            .and_then(|v| v.as_object())
-            .map(|obj| obj.keys().cloned().collect())
-            .unwrap_or_default();
-        let expected: BTreeSet<String> = [
-            "Europa Universalis IV".to_owned(),
-            "Localisation".to_owned(),
-        ]
-        .into_iter()
-        .collect();
-        results.push(check(
-            file_types == expected,
-            "recommended settings",
-            "recommended settings are incomplete",
-        ));
-        let expected_eu4_patterns: BTreeSet<String> = [
-            "common/achievements.txt",
-            "common/alerts.txt",
-            "common/graphicalculturetype.txt",
-            "common/historial_lucky.txt",
-            "common/technology.txt",
-            "common/advisortypes/*.txt",
-            "common/ages/*.txt",
-            "common/ai_army/*.txt",
-            "common/ai_attitudes/*.txt",
-            "common/ai_personalities/*.txt",
-            "common/ancestor_personalities/*.txt",
-            "common/bookmarks/*.txt",
-            "common/buildings/*.txt",
-            "common/cb_types/*.txt",
-            "common/centers_of_trade/*.txt",
-            "common/church_aspects/*.txt",
-            "common/client_states/*.txt",
-            "common/colonial_regions/*.txt",
-            "common/countries/*.txt",
-            "common/country_colors/*.txt",
-            "common/country_tags/*.txt",
-            "common/cultures/*.txt",
-            "common/custom_country_colors/*.txt",
-            "common/custom_gui/*.txt",
-            "common/custom_ideas/*.txt",
-            "common/decrees/*.txt",
-            "common/defender_of_faith/*.txt",
-            "common/defines/*.txt",
-            "common/diplomatic_actions/*.txt",
-            "common/disasters/*.txt",
-            "common/dynasty_colors/*.txt",
-            "common/estate_agendas/*.txt",
-            "common/estate_crown_land/*.txt",
-            "common/estate_privileges/*.txt",
-            "common/estates/*.txt",
-            "common/estates_preload/*.txt",
-            "common/event_modifiers/*.txt",
-            "common/factions/*.txt",
-            "common/federation_advancements/*.txt",
-            "common/fervor/*.txt",
-            "common/fetishist_cults/*.txt",
-            "common/flagship_modifications/*.txt",
-            "common/golden_bulls/*.txt",
-            "common/government_mechanics/*.txt",
-            "common/government_names/*.txt",
-            "common/government_ranks/*.txt",
-            "common/government_reforms/*.txt",
-            "common/governments/*.txt",
-            "common/great_projects/*.txt",
-            "common/hegemons/*.txt",
-            "common/holy_orders/*.txt",
-            "common/ideas/*.txt",
-            "common/imperial_incidents/*.txt",
-            "common/imperial_reforms/*.txt",
-            "common/incidents/*.txt",
-            "common/institutions/*.txt",
-            "common/insults/*.txt",
-            "common/isolationism/*.txt",
-            "common/leader_personalities/*.txt",
-            "common/mercenary_companies/*.txt",
-            "common/natives/*.txt",
-            "common/naval_doctrines/*.txt",
-            "common/new_diplomatic_actions/*.txt",
-            "common/on_actions/*.txt",
-            "common/opinion_modifiers/*.txt",
-            "common/parliament_bribes/*.txt",
-            "common/parliament_issues/*.txt",
-            "common/peace_treaties/*.txt",
-            "common/personal_deities/*.txt",
-            "common/policies/*.txt",
-            "common/powerprojection/*.txt",
-            "common/prices/*.txt",
-            "common/professionalism/*.txt",
-            "common/province_names/*.txt",
-            "common/province_triggered_modifiers/*.txt",
-            "common/rebel_types/*.txt",
-            "common/region_colors/*.txt",
-            "common/religions/*.txt",
-            "common/religious_conversions/*.txt",
-            "common/religious_reforms/*.txt",
-            "common/revolt_triggers/*.txt",
-            "common/revolution/*.txt",
-            "common/ruler_personalities/*.txt",
-            "common/scripted_effects/*.txt",
-            "common/scripted_functions/*.txt",
-            "common/scripted_triggers/*.txt",
-            "common/state_edicts/*.txt",
-            "common/static_modifiers/*.txt",
-            "common/subject_type_upgrades/*.txt",
-            "common/subject_types/*.txt",
-            "common/technologies/*.txt",
-            "common/timed_modifiers/*.txt",
-            "common/trade_companies/*.txt",
-            "common/tradecompany_investments/*.txt",
-            "common/tradegoods/*.txt",
-            "common/tradenodes/*.txt",
-            "common/trading_policies/*.txt",
-            "common/triggered_modifiers/*.txt",
-            "common/units/*.txt",
-            "common/units_display/*.txt",
-            "common/wargoal_types/*.txt",
-            "customizable_localization/*.txt",
-            "decisions/*.txt",
-            "events/*.txt",
-            "hints/*.txt",
-            "history/advisors/*.txt",
-            "history/countries/*.txt",
-            "history/diplomacy/*.txt",
-            "history/provinces/*.txt",
-            "history/wars/*.txt",
-            "map/ambient_object.txt",
-            "map/area.txt",
-            "map/climate.txt",
-            "map/continent.txt",
-            "map/lakes/00_lakes.txt",
-            "map/positions.txt",
-            "map/provincegroup.txt",
-            "map/random/RNWScenarios.txt",
-            "map/random/RandomLakeNames.txt",
-            "map/random/RandomLandNames.txt",
-            "map/random/RandomSeaNames.txt",
-            "map/region.txt",
-            "map/seasons.txt",
-            "map/superregion.txt",
-            "map/terrain.txt",
-            "map/trade_winds.txt",
-            "music/*.txt",
-            "missions/*.txt",
-            "sound/*.txt",
-            "sound/amb/*.txt",
-            "sound/battle/*.txt",
-            "sound/battle/naval/*.txt",
-            "tutorial/*.txt",
-            "gfx/*.txt",
-            "gfx/combat_result/*.txt",
-            "gfx/sprite_packs/*.txt",
-            "gfx/sprite_packs_order/*.txt",
-            "interface/*.txt",
-            "interface/*.gui",
-            "interface/*.gfx",
-            "interface/assets/*.gfx",
-            "interface/government_mechanics/*.txt",
-            "interface/government_mechanics/*.gui",
-            "interface/government_mechanics/*.gfx",
-            "interface/state_view/*.txt",
-        ]
-        .into_iter()
-        .map(str::to_owned)
-        .collect();
-        let eu4_patterns: BTreeSet<String> = settings
-            .get("file_types")
-            .and_then(|v| v.get("Europa Universalis IV"))
-            .and_then(serde_json::Value::as_array)
-            .map(|patterns| {
-                patterns
-                    .iter()
-                    .filter_map(serde_json::Value::as_str)
-                    .map(str::to_owned)
-                    .collect()
-            })
-            .unwrap_or_default();
-        results.push(check(
-            expected_eu4_patterns.is_subset(&eu4_patterns),
-            "EU4 profile file associations",
-            "recommended settings do not cover every configured EU4 source directory",
-        ));
-        let unexpected_common_patterns = eu4_patterns.iter().any(|pattern| {
-            pattern.starts_with("common/") && !expected_eu4_patterns.contains(pattern)
-        });
-        results.push(check(
-            !unexpected_common_patterns,
-            "fixed common file associations",
-            "recommended settings contain an unconfigured common file pattern",
-        ));
-        results.push(check(
-            !eu4_patterns.contains("common/*.txt") && !eu4_patterns.contains("common/**/*.txt"),
-            "bounded common file associations",
-            "recommended settings must use the fixed common file whitelist",
-        ));
-        let recursive_script_patterns = eu4_patterns.iter().any(|pattern| pattern.contains("/**"));
-        results.push(check(
-            !recursive_script_patterns,
-            "bounded EU4 script associations",
-            "recommended settings must not recursively associate EU4 script directories",
-        ));
-        let localisation_patterns = settings
-            .get("file_types")
-            .and_then(|v| v.get("Localisation"))
-            .and_then(serde_json::Value::as_array)
-            .map(|patterns| {
-                patterns
-                    .iter()
-                    .filter_map(serde_json::Value::as_str)
-                    .any(|pattern| pattern == "localisation/**/*")
-            })
-            .unwrap_or(false);
-        results.push(check(
-            localisation_patterns,
-            "localisation recursive file association",
-            "Localisation must claim localisation/**/* recursively",
-        ));
-    }
-
-    results
-}
-
 /// Reads `{open, close}` object pairs from the canonical profile JSON.
 fn syntax_bracket_pairs(value: Option<&serde_json::Value>) -> Option<Vec<(String, String)>> {
     object_bracket_pairs(value)
@@ -779,17 +366,14 @@ fn object_bracket_pairs(value: Option<&serde_json::Value>) -> Option<Vec<(String
     Some(pairs)
 }
 
-/// Validates that the per-editor syntax artefacts (Zed `.scm` queries and the VSCode
-/// `language-configuration.json`) still match the canonical `editors/syntax-profile.json`.
-/// Bracket pairs, auto-closing pairs, the line comment marker, and indentation rules exist in
-/// two editors with no LSP protocol to share them, so drift here silently breaks parity.
+/// Validates that the VS Code `language-configuration.json` still matches the canonical
+/// `editors/syntax-profile.json`. Bracket pairs, auto-closing pairs, the line comment marker,
+/// and indentation rules have no LSP protocol to share them, so drift here silently breaks
+/// parity with the engine's syntax profile.
 pub fn check_editor_syntax_parity(root: &Path) -> Vec<CheckResult> {
     let mut results = Vec::new();
     let profile_path = root.join("editors/syntax-profile.json");
     let vscode_config_path = root.join("editors/vscode/language-configuration.json");
-    let brackets_scm = root.join("editors/zed/languages/eu4/brackets.scm");
-    let indents_scm = root.join("editors/zed/languages/eu4/indents.scm");
-    let highlights_scm = root.join("editors/zed/languages/eu4/highlights.scm");
 
     let Ok(profile) = fs::read_to_string(&profile_path) else {
         results.push(CheckResult::fail(
@@ -854,45 +438,6 @@ pub fn check_editor_syntax_parity(root: &Path) -> Vec<CheckResult> {
             "editors/vscode/language-configuration.json missing or invalid",
         ));
     }
-
-    // Zed `.scm` queries must recognize every bracket pair from the profile and keep the
-    // indentation captures that mirror the profile's indentation rules.
-    let bracket_captures = fs::read_to_string(&brackets_scm).unwrap_or_default();
-    let profile_brackets = brackets
-        .and_then(|value| value.as_array())
-        .map(|pairs| {
-            pairs
-                .iter()
-                .map(|pair| pair.get("open").and_then(serde_json::Value::as_str))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    results.push(check(
-        profile_brackets.iter().all(|open| {
-            open.is_some_and(|open| bracket_captures.contains(&format!("\"{open}\" @open")))
-        }),
-        "zed: bracket parity",
-        "Zed brackets.scm does not cover every syntax-profile bracket pair",
-    ));
-    let indents = fs::read_to_string(&indents_scm).unwrap_or_default();
-    results.push(check(
-        indents.contains("(block") && indents.contains("@indent"),
-        "zed: block indent capture",
-        "Zed indents.scm lost the block indent capture",
-    ));
-    results.push(check(
-        indents.contains("(parameter_block") && indents.contains("@end"),
-        "zed: parameter block indent capture",
-        "Zed indents.scm lost the parameter block indent capture",
-    ));
-
-    // Semantic classification moved to pdc; the fallback query must stay syntax-only.
-    let highlights = fs::read_to_string(&highlights_scm).unwrap_or_default();
-    results.push(check(
-        !highlights.contains("#match?") && !highlights.contains("variable.special"),
-        "zed: syntax-only fallback",
-        "Zed highlights.scm still carries semantic regex captures that belong to pdc",
-    ));
 
     results
 }
@@ -1031,187 +576,6 @@ pub fn check_release_artifact(root: &Path) -> Vec<CheckResult> {
     }
     let _ = fs::remove_dir_all(&temporary_directory);
 
-    // Zed extension: no --rules override.
-    let zed_src = root.join("editors/zed/src/lib.rs");
-    if let Ok(source) = fs::read_to_string(&zed_src) {
-        results.push(check(
-            !source.contains("--rules"),
-            "Zed no --rules override",
-            "Zed command still exposes a rules override",
-        ));
-    }
-
-    results
-}
-
-/// Single-character deletion fuzz test for grammar corpora.
-pub fn check_grammar_fuzz(root: &Path) -> Vec<CheckResult> {
-    ["tree-sitter-eu4", "tree-sitter-localisation"]
-        .into_iter()
-        .flat_map(|grammar_name| check_one_grammar_fuzz(root, grammar_name))
-        .collect()
-}
-
-fn check_one_grammar_fuzz(root: &Path, grammar_name: &str) -> Vec<CheckResult> {
-    let mut results = Vec::new();
-    let grammar_root = root.join("grammars").join(grammar_name);
-    if !grammar_root.is_dir() {
-        results.push(CheckResult::fail(
-            format!("{grammar_name} grammar fuzz"),
-            format!("grammars/{grammar_name} missing"),
-        ));
-        return results;
-    }
-
-    let tree_sitter = match find_tree_sitter(&root.join("grammars")) {
-        Some(cli) => cli,
-        None => {
-            results.push(CheckResult::fail(
-                format!("{grammar_name} grammar fuzz"),
-                "tree-sitter CLI not found",
-            ));
-            return results;
-        }
-    };
-
-    let corpus_dir = grammar_root.join("test/corpus");
-    if !corpus_dir.is_dir() {
-        results.push(CheckResult::fail(
-            format!("{grammar_name} grammar fuzz"),
-            "corpus directory missing",
-        ));
-        return results;
-    }
-
-    let crash_markers = ["panic", "aborted", "segmentation fault", "stack overflow"];
-    let mut total = 0usize;
-    let separator = "==================\n";
-
-    let Ok(entries) = fs::read_dir(&corpus_dir) else {
-        results.push(CheckResult::fail(
-            format!("{grammar_name} grammar fuzz"),
-            "cannot read corpus directory",
-        ));
-        return results;
-    };
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|ext| ext.to_str()) != Some("txt") {
-            continue;
-        }
-        let Ok(text) = fs::read_to_string(&path) else {
-            continue;
-        };
-        let mut sources = Vec::new();
-        let mut rest = text.as_str();
-        while let Some(case_start) = rest.find(separator) {
-            let after_first = &rest[case_start + separator.len()..];
-            let Some(name_end) = after_first.find('\n') else {
-                break;
-            };
-            let after_name = &after_first[name_end + 1..];
-            let Some(second_sep) = after_name.find(separator) else {
-                break;
-            };
-            let input_start = second_sep + separator.len();
-            let after_input = &after_name[input_start..];
-            let Some(dash_end) = after_input.find("\n---\n") else {
-                break;
-            };
-            let input = &after_input[..dash_end];
-            for (offset, _) in input.char_indices() {
-                let mut mutated = input.to_owned();
-                mutated.remove(offset);
-                sources.push(mutated);
-                total += 1;
-            }
-            rest = &after_input[dash_end + "\n---\n".len()..];
-        }
-        if sources.is_empty() {
-            continue;
-        }
-        let nonce = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0);
-        let temp_dir =
-            std::env::temp_dir().join(format!("pdc-grammar-fuzz-{}-{}", std::process::id(), nonce));
-        if fs::create_dir_all(&temp_dir).is_err() {
-            results.push(CheckResult::fail(
-                format!("{grammar_name} grammar fuzz"),
-                "cannot create temp directory",
-            ));
-            return results;
-        }
-        let paths_file = temp_dir.join("paths.txt");
-        let mut paths_content = String::new();
-        for (i, source) in sources.iter().enumerate() {
-            let source_path = temp_dir.join(format!("mutation-{i}.txt"));
-            if fs::write(&source_path, source).is_err() {
-                continue;
-            }
-            paths_content.push_str(&source_path.to_string_lossy());
-            paths_content.push('\n');
-        }
-        if fs::write(&paths_file, &paths_content).is_err() {
-            let _ = fs::remove_dir_all(&temp_dir);
-            continue;
-        }
-
-        let output = Command::new(&tree_sitter)
-            .args([
-                "parse",
-                "--no-ranges",
-                "--paths",
-                &paths_file.to_string_lossy(),
-            ])
-            .current_dir(&grammar_root)
-            .output();
-
-        // Clean up temp directory regardless of outcome.
-        let _ = fs::remove_dir_all(&temp_dir);
-
-        match output {
-            Ok(out) => {
-                if out.status.code().is_some_and(|code| code > 1) {
-                    results.push(CheckResult::fail(
-                        format!("{grammar_name} grammar fuzz"),
-                        format!(
-                            "parser process failed with exit {}:\n{}",
-                            out.status.code().unwrap_or(-1),
-                            String::from_utf8_lossy(&out.stderr)
-                        ),
-                    ));
-                    return results;
-                }
-                let combined = format!(
-                    "{}\n{}",
-                    String::from_utf8_lossy(&out.stdout),
-                    String::from_utf8_lossy(&out.stderr)
-                )
-                .to_lowercase();
-                if crash_markers.iter().any(|marker| combined.contains(marker)) {
-                    results.push(CheckResult::fail(
-                        format!("{grammar_name} grammar fuzz"),
-                        "parser crash marker found in output",
-                    ));
-                    return results;
-                }
-            }
-            Err(error) => {
-                results.push(CheckResult::fail(
-                    format!("{grammar_name} grammar fuzz"),
-                    format!("cannot run tree-sitter: {error}"),
-                ));
-                return results;
-            }
-        }
-    }
-
-    results.push(CheckResult::pass(format!(
-        "{grammar_name} grammar fuzz: {total} single-char deletions"
-    )));
     results
 }
 
@@ -1325,28 +689,6 @@ fn read_toml_value<T: for<'de> serde::Deserialize<'de>>(
     })
 }
 
-fn find_tree_sitter(grammar_root: &Path) -> Option<String> {
-    // Check local node_modules first.
-    for candidate in [
-        grammar_root.join("tree-sitter-eu4/node_modules/.bin/tree-sitter.cmd"),
-        grammar_root.join("tree-sitter-eu4/node_modules/.bin/tree-sitter"),
-        grammar_root.join("tree-sitter-localisation/node_modules/.bin/tree-sitter.cmd"),
-        grammar_root.join("tree-sitter-localisation/node_modules/.bin/tree-sitter"),
-    ] {
-        if candidate.is_file() {
-            return Some(candidate.to_string_lossy().into_owned());
-        }
-    }
-    // Check PATH.
-    let name = "tree-sitter";
-    if let Ok(output) = Command::new(name).arg("--version").output()
-        && output.status.success()
-    {
-        return Some(name.to_owned());
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1364,21 +706,6 @@ mod tests {
             }
         }
         assert!(all_pass, "project policy checks must pass");
-    }
-
-    #[test]
-    fn zed_extension_passes_on_this_repository() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let results = check_zed_extension(&root);
-        let all_pass = results
-            .iter()
-            .all(|r| matches!(r.outcome, CheckOutcome::Passed));
-        for result in &results {
-            if let CheckOutcome::Failed(ref msg) = result.outcome {
-                eprintln!("FAIL {}: {msg}", result.name);
-            }
-        }
-        assert!(all_pass, "Zed extension checks must pass");
     }
 
     #[test]

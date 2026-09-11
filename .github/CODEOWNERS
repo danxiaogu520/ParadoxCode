@@ -24,15 +24,13 @@
 /rules/ @danxiaogu520
 
 # Editor integrations
-/editors/zed/ @danxiaogu520
 /editors/vscode/ @danxiaogu520
 
 # Tooling, quality gates, and releases
 /scripts/ @danxiaogu520
 /.github/ @danxiaogu520
 
-# Grammar assets and fuzz targets
-/grammars/ @danxiaogu520
+# Fuzz targets
 /fuzz/ @danxiaogu520
 
 # Contributing and release process documentation

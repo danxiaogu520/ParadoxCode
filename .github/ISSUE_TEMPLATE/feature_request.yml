@@ -17,7 +17,6 @@ body:
         - Parser / HIR / analysis
         - Rules database (rules/eu4)
         - VS Code extension
-        - Zed extension
         - Release / build / CI
         - Other
     validations:

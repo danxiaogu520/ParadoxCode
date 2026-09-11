@@ -494,7 +494,7 @@ pub(crate) fn apply_user_vanilla_configuration(
     }
     if game.auto_discovery_attempted && auto_vanilla.source_override.is_none() {
         warnings.push(format!(
-            "Automatic {} discovery was already attempted without a usable cache; set the game directory in your editor settings (VS Code: `paradoxcode.gameDirectory`, Zed: `lsp.pdc.initialization_options.vanillaSource`) and reload",
+            "Automatic {} discovery was already attempted without a usable cache; set the game directory in your editor settings (VS Code: `paradoxcode.gameDirectory`) and reload",
             auto_vanilla.descriptor.display_name
         ));
         None

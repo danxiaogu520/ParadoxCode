@@ -11,7 +11,7 @@ ParadoxCode is an independent, open-source language toolkit for Paradox modding.
 game-neutral PDX language engine with an EU4-first product scope: the engine layers (workspace,
 indexing, analysis, LSP) stay reusable across games, while Europa Universalis IV paths, scopes,
 commands, symbols, and special semantics live in the EU4 profile. The current releases target EU4
-modding in VS Code and Zed.
+modding in VS Code.
 
 ParadoxCode is **not affiliated with or endorsed by Paradox Interactive**. Europa Universalis IV
 and Paradox Interactive are trademarks of their respective owners.
@@ -46,8 +46,6 @@ and Paradox Interactive are trademarks of their respective owners.
 - A VS Code extension with zero-configuration, checksum-verified server setup, a first-run
   walkthrough, and a live mission-tree preview (texture-backed nodes, zoom, source navigation,
   PNG/JSON export).
-- A thin Zed extension that adds Tree-sitter highlighting; editor highlighting is the only
-  Tree-sitter usage — the runtime parser is pure Rust and does not link Tree-sitter C.
 - Exact-version server downloads with SHA-256 verification, restricted extraction, bounded
   streaming, and self-validating executable caches.
 
@@ -70,17 +68,6 @@ Install **ParadoxCode - EU4 Language Tools** from the
    `decisions`, and `localisation`.
 
 The **Get Started** page includes a **Start using ParadoxCode** walkthrough covering all of this.
-
-### Zed
-
-The Zed extension is developed in this repository (`editors/zed`) and awaits review in the
-[`zed-industries/extensions`](https://github.com/zed-industries/extensions) registry. Until it is
-listed there, install it as a dev extension pointing at a checkout of this repository
-(`editors/zed`). Recommended language settings are in `editors/zed/recommended-settings.json`.
-They associate every file under `localisation/` (recursively) with the separate `Localisation`
-language while keeping the profile's configured EU4 script directories on the `Europa Universalis IV`
-language. Script directories are matched only at their configured directory level; `map` uses
-fixed vanilla/reference-mod file names, and `localisation/` is the only recursive source tree.
 
 ### pdc standalone
 
@@ -108,7 +95,6 @@ release.
 Known limitations of the current scope:
 
 - CSV files are handled as syntax-only/opaque resources; there is no CSV parser yet.
-- The Zed extension is not yet listed in the Zed Extension Gallery (registry review pending).
 - EU4 is the only implemented game profile. The engine is game-neutral by design, but no second
   profile exists yet, so no commitment is made about other games' timelines.
 
@@ -122,7 +108,7 @@ source text
     -> immutable workspace snapshot
     -> editor-neutral analysis
     -> LSP adapter
-    -> Zed / VS Code
+    -> VS Code
 ```
 
 The engine/profile boundary keeps workspace, indexing, analysis, LSP, and release infrastructure
@@ -139,7 +125,7 @@ rules + game -> engine / ide / index
 
 ## Building from source
 
-Prerequisites: **Rust 1.98 or newer** and **Node.js 24 LTS** (for Tree-sitter corpus checks).
+Prerequisites: **Rust 1.98 or newer** and **Node.js 24 LTS** (for the VS Code extension).
 
 ```bash
 git clone https://github.com/danxiaogu520/ParadoxCode.git
@@ -148,8 +134,8 @@ cargo build --locked --workspace
 cargo test --locked --workspace --all-targets
 ```
 
-Run the quality gates explicitly (or diagnose one group: `core`, `grammars`, `zed`, `vscode`,
-`release`, `fuzz`, `core-fast`, `perf`). There are no commit hooks; CI runs the same gates on
+Run the quality gates explicitly (or diagnose one group: `core`, `vscode`, `release`, `fuzz`,
+`core-fast`, `perf`). There are no commit hooks; CI runs the same gates on
 every pull request:
 
 ```bash
@@ -158,8 +144,8 @@ bash scripts/check-quality-gates.sh
 
 The pull-request CI uses the `core-fast` group, which keeps correctness checks but excludes
 benchmark targets. The optimized benchmark suite is retained under the `perf` group and runs in
-the scheduled/manual Performance workflow. CI also selects editor, grammar, fuzz, and dependency
-jobs from changed paths; fuzz is limited to its direct runtime dependencies, while the Windows
+the scheduled/manual Performance workflow. CI also runs the editor, fuzz, and dependency jobs on
+every pull request; fuzz is limited to its direct runtime dependencies, while the Windows
 release build runs in parallel with the Windows test/lint job. The `Required CI checks` job is the
 stable aggregate for branch protection.
 
@@ -187,10 +173,9 @@ same canonical `rule_hash` covers both semantic data and profile data.
 
 ## Development setup
 
-Launch `pdc` from a configured path or from `PATH`. Editor configuration is intentionally
-separate: VS Code uses its `paradoxcode.*` settings, while Zed uses
-`lsp.pdc.initialization_options` in `.zed/settings.json`. The two editors do not read a shared
-project file. The documented setup is for contributors, not the final installation experience.
+Launch `pdc` from a configured path or from `PATH`. Editor configuration lives in the VS Code
+extension's `paradoxcode.*` settings. The documented setup is for contributors, not the final
+installation experience.
 
 `pdc` discovers, validates, indexes, and remembers the local EU4 installation on its own. The
 first launch performs one non-blocking quick attempt when no explicit cache or previous attempt
@@ -207,113 +192,46 @@ writes the ordered entry to the workspace `paradoxcode.dependencies` setting. Th
 and Open Dependency Settings commands are available from the Command Palette; new entries are
 appended as the highest-priority dependency.
 
-In Zed, the cache is declared in `.zed/settings.json`; `pdc` loads it in the background and
-builds or rebuilds it automatically when the file is missing (a rules-hash change regenerates it
-like the Vanilla cache):
-
-```json
-{
-  "lsp": {
-    "pdc": {
-      "initialization_options": {
-        "dependencies": [
-          {
-            "id": "gui-xu",
-            "path": "/path/to/dependency-mod",
-            "index": "/path/to/dependency.pdcindex"
-          }
-        ]
-      }
-    }
-  }
-}
-```
-
 While `index` is set, the dependency is not scanned live; after changing the dependency, delete
 the stale cache file and restart the language server (command palette `pdc: restart`) so it is
 rebuilt. Remove the `index` field to fall back to live scanning.
 
-Long-running sessions can opt into a quiet, idle-gated source-root re-scan. The default is off.
-In VS Code, set `paradoxcode.backgroundReindexIntervalMinutes` and
-`paradoxcode.backgroundReindexIdleSeconds`; in Zed, pass the camelCase keys through its
-`initialization_options`:
-
-```json
-{
-  "backgroundReindexIntervalMinutes": 30,
-  "backgroundReindexIdleSeconds": 15
-}
-```
-
-The pass never replaces a newer edit or watched-file refresh, and changing either setting through
+Long-running sessions can opt into a quiet, idle-gated source-root re-scan. The default is off;
+set `paradoxcode.backgroundReindexIntervalMinutes` and
+`paradoxcode.backgroundReindexIdleSeconds` to enable it. The pass never replaces a newer edit or
+watched-file refresh, and changing either setting through
 `workspace/didChangeConfiguration` takes effect without restarting the server.
 
-Large workspaces can prune generated files or directories before they consume the scan budget.
-Configure `paradoxcode.ignoreFilePatterns` and `paradoxcode.ignoreDirectories` in VS Code, or pass
-`ignoreFilePatterns` and `ignoreDirectories` through Zed's `initialization_options`:
-
-```json
-{
-  "ignoreFilePatterns": ["**/*.generated.txt"],
-  "ignoreDirectories": ["generated", "build/cache"]
-}
-```
-
+Large workspaces can prune generated files or directories before they consume the scan budget;
+configure `paradoxcode.ignoreFilePatterns` and `paradoxcode.ignoreDirectories` for that.
 Patterns are bounded to 200 entries per list and 1024 characters per entry. `*` and `?` stay
 within one path component; `**` spans directories; a pattern without `/` matches a basename at
 any depth. The same filters apply to watched-file updates.
 
-To hide a known diagnostic category, configure `paradoxcode.diagnosticIgnoreCodes` in VS Code, or
-pass `ignoredErrorCodes` through Zed's `initialization_options` (the setting also updates live
-through `workspace/didChangeConfiguration`):
-
-```json
-{
-  "ignoredErrorCodes": ["LogicalContainer", "ModifierScopeMismatch"]
-}
-```
-
-Codes use the stable LSP names shown in diagnostics. Unknown codes are rejected so a misspelled
+To hide a known diagnostic category, configure `paradoxcode.diagnosticIgnoreCodes`; the setting
+also updates live through `workspace/didChangeConfiguration`. Codes use the stable LSP names
+shown in diagnostics. Unknown codes are rejected so a misspelled
 setting cannot silently suppress nothing.
 
 Diagnostic categories can also be remapped without changing the analysis result. Configure
-`paradoxcode.diagnostics.severityOverrides` in VS Code, or `diagnosticSeverityOverrides` in Zed,
-with stable codes and `error`, `warning`, `info`, `hint`, or `off`; the effective severity is
-applied before publication limits and `validateWorkspace` aggregation:
+`paradoxcode.diagnostics.severityOverrides` with stable codes and `error`, `warning`, `info`,
+`hint`, or `off` values; the effective severity is applied before publication limits and
+`validateWorkspace` aggregation.
 
-```json
-{
-  "diagnosticSeverityOverrides": {
-    "WrongScope": "warning",
-    "UnknownLocalisationKey": "info"
-  }
-}
-```
-
-Use `paradoxcode.vanilla.mode = "cacheOnly"` in VS Code, or `vanillaMode: "cacheOnly"` in Zed,
-to require an already available Vanilla cache. The `disabled` value omits the Vanilla source root
-entirely. The default `auto` keeps the normal explicit-cache and one-time discovery behavior.
-`performance.profile` / `performanceProfile` accepts `conservative`, `balanced`, or `fast` and
-changes only bounded scan concurrency.
+Use `paradoxcode.vanilla.mode = "cacheOnly"` to require an already available Vanilla cache. The
+`disabled` value omits the Vanilla source root entirely. The default `auto` keeps the normal
+explicit-cache and one-time discovery behavior. `paradoxcode.performance.profile` accepts
+`conservative`, `balanced`, or `fast` and changes only bounded scan concurrency.
 
 Completion sources can be narrowed independently of fixed source resolution priority with
-`paradoxcode.completion.sourceLayers` in VS Code or `completionSourceLayers` in Zed. Localisation
-hover and mission titles use the ordered preferred-language list, falling back to English when no
-preferred language is present:
-
-```json
-{
-  "preferredLocalisationLanguages": ["french", "english"],
-  "completionSourceLayers": ["currentMod", "dependencies"],
-  "performanceProfile": "conservative"
-}
-```
+`paradoxcode.completion.sourceLayers`. Localisation hover and mission titles use the ordered
+`paradoxcode.localisation.preferredLanguages` list, falling back to English when no preferred
+language is present.
 
 Initialization completion, watched-file refreshes, quiet background re-scans, and explicit
 workspace refreshes publish diagnostics for closed Current Mod files by default, bounded to 2,000
-files per pass. Set `paradoxcode.workspaceWideDiagnostics = false` in VS Code, or send
-`workspaceWideDiagnostics: false` in Zed initialization/configuration settings, when the Problems
-view should remain limited to open documents. `validateWorkspace` still computes its complete
+files per pass. `paradoxcode.workspaceWideDiagnostics` controls this; turned off, the Problems
+view remains limited to open documents. `validateWorkspace` still computes its complete
 summary when publication is disabled.
 
 For a one-off suppression beside a piece of source, add `# cwtools-ignore <code>` to the same
@@ -358,8 +276,6 @@ change the automation threshold. Use `--help` for all options.
 | `crates/pdc` | The `pdc` language server: LSP lifecycle and protocol boundary |
 | `crates/tools` | Repository tooling (`check`, `release`, cache building) for CI and maintainers |
 | `editors/vscode/` | VS Code extension: server bootstrap, walkthrough, mission-tree preview |
-| `editors/zed/` | Thin Zed extension, language metadata, and queries |
-| `grammars/` | Editor-only Tree-sitter grammars and corpus tests |
 | `rules/eu4/` | Authoritative first-party EU4 rule tree (catalog, semantic, supporting tables, profile) |
 | `fuzz/` | Parser, edit, formatter, and HIR fuzz targets |
 | `scripts/` | Reproducible quality checks and diagnostic workflows |

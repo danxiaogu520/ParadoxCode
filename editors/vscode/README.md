@@ -35,8 +35,7 @@ EU4 script associations follow the profile's configured source directories, incl
 `map` uses its fixed vanilla/reference-mod file names, while `localisation/` is the only recursive
 source tree.
 
-VS Code settings are independent from Zed's `.zed/settings.json`; no project file is shared between
-the editors. The first server start may build or load the Vanilla index; progress is visible in the
+The first server start may build or load the Vanilla index; progress is visible in the
 status bar and ParadoxCode output.
 
 The bundled server requires a modern LSP client that sends `workspaceFolders` during initialize.

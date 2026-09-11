@@ -18,7 +18,7 @@ List exactly what you ran and its result. Examples:
 
 - [ ] Local quality gates passed (`bash scripts/check-quality-gates.sh`).
 - [ ] New behavior is covered by tests or fixtures in this PR.
-- [ ] CI is expected to pass for the touched groups (core / grammars / zed / vscode / release).
+- [ ] CI is expected to pass for the touched groups (core / vscode / release).
 
 ## Design and invariants
 
