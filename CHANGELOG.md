@@ -77,6 +77,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Whole-workspace validation no longer pegs every worker core indefinitely when a document is
+  open (the "open a file, CPU jumps to 4 cores and all language features freeze" failure mode
+  on large EU4 workspaces). Three defects compounded: staging a document open wiped the whole
+  query cache instead of only the documents domain (`stage_open_document` used the full
+  revision advance), the cache's single global revision gate then dropped every insert from
+  the pass's base revision — so each per-property rule-view lookup rebuilt from scratch and
+  every file recomputed the workspace-wide dynamic-contract report — and the pass kept
+  grinding on a superseded snapshot whose results the completion handler was guaranteed to
+  discard. The cache now tracks revisions per domain (index-derived entries serve every
+  reader whose revision observes the same index state), document staging advances only the
+  documents domain, hosts expose a clone-shared `live_revision` so the pass aborts as soon as
+  its base revision is superseded (the existing mismatch path reschedules it), and dynamic
+  contract inference consults its memo before re-resolving a callee definition, which also
+  removes a per-property template deep-clone. On the 12-file reproducing workspace the pass
+  went from never completing to finishing in ~1.5 seconds with zero idle CPU.
 - The five engine-parameterized modifier families actually validate now. They were exact-key
   rows with literal spellings such as `<estate>_loyalty_modifier` that never match a real key,
   so every concrete spelling (`nobles_loyalty_modifier = 0.1`,

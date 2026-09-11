@@ -724,3 +724,56 @@ fn roots_overlay_and_shards_preserve_shadowed_semantic_definitions() {
     assert!(resolved.first().is_some_and(|candidate| candidate.active));
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn staged_opens_keep_index_cache_entries_across_revisions() {
+    let mut host = eu4_host();
+    let base = host.snapshot().revision();
+    host.snapshot().query_cache().insert(
+        base,
+        crate::CacheDomain::Index,
+        "context-rule-view:effect".to_owned(),
+        std::sync::Arc::new(vec![1_u32]),
+    );
+    host.stage_open_document(
+        DocumentId::new("file:///tmp/staged-open.txt"),
+        1,
+        "country_event = {}".to_owned(),
+        None,
+    )
+    .expect("stage open");
+    let advanced = host.snapshot().revision();
+    assert!(advanced > base);
+    // Staging swaps in an unparsed overlay: document state only. The index-domain
+    // entry must stay visible to readers at both revisions — staging used to wipe
+    // the whole cache and starve workspace passes still reading the base revision.
+    for revision in [base, advanced] {
+        assert!(
+            host.snapshot()
+                .query_cache()
+                .get::<Vec<u32>>(revision, "context-rule-view:effect")
+                .is_some(),
+            "index entry must survive a staged open for revision {revision}"
+        );
+    }
+}
+
+#[test]
+fn cloned_hosts_observe_live_revisions() {
+    let mut host = eu4_host();
+    let worker = host.clone();
+    let base = worker.snapshot().revision();
+    assert_eq!(worker.live_revision(), base);
+    host.open_document(
+        DocumentId::new("file:///tmp/live-revision.txt"),
+        1,
+        "country_event = {}".to_owned(),
+        None,
+    )
+    .expect("open");
+    // A cloned host's own snapshot revision stays frozen at the clone point while
+    // the shared live counter advances, so background workers can detect that
+    // their base revision was superseded.
+    assert_eq!(worker.snapshot().revision(), base);
+    assert!(worker.live_revision() > base);
+}

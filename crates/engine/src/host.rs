@@ -52,6 +52,10 @@ pub struct AnalysisHost {
     scan_limits: WorkspaceScanLimits,
     preferred_localisation_languages: Arc<[String]>,
     completion_source_layers: Arc<[SourceRootKind]>,
+    /// Live revision shared across host clones. `revision` itself is cloned by
+    /// value, so a worker holding a cloned host would otherwise observe a frozen
+    /// counter and never notice that the originating host advanced past it.
+    revision_watch: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl AnalysisHost {
@@ -95,6 +99,7 @@ impl AnalysisHost {
                 SourceRootKind::Dependency,
                 SourceRootKind::Vanilla,
             ]),
+            revision_watch: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
     }
 
@@ -206,6 +211,8 @@ impl AnalysisHost {
 
     fn advance_revision(&mut self) {
         self.revision = self.revision.saturating_add(1);
+        self.revision_watch
+            .store(self.revision, std::sync::atomic::Ordering::Release);
         self.query_cache.advance_to(self.revision);
     }
 
@@ -216,7 +223,21 @@ impl AnalysisHost {
     /// being rebuilt per edit.
     fn advance_document_revision(&mut self) {
         self.revision = self.revision.saturating_add(1);
+        self.revision_watch
+            .store(self.revision, std::sync::atomic::Ordering::Release);
         self.query_cache.advance_documents(self.revision);
+    }
+
+    /// The originating host's current revision, visible from every clone.
+    ///
+    /// A worker that cloned the host observes a frozen `snapshot().revision()` of
+    /// its clone point; this value moves as the live host commits changes, so
+    /// long-running background work can detect that its base revision was
+    /// superseded and stop early.
+    #[must_use]
+    pub fn live_revision(&self) -> u64 {
+        self.revision_watch
+            .load(std::sync::atomic::Ordering::Acquire)
     }
 
     /// Installs a validated persistent index cache for any configured source root.
@@ -905,7 +926,11 @@ impl AnalysisHost {
         }
         let document = staged_overlay_document(id.clone(), version, text, path);
         Arc::make_mut(&mut self.documents).insert(id, document);
-        self.advance_revision();
+        // Staging swaps in an unparsed overlay snapshot: only document state
+        // changes, so index-derived cache entries must survive. A full advance
+        // here would wipe the index domain on every document open and starve
+        // workspace-wide passes still reading the previous revision.
+        self.advance_document_revision();
         Ok(())
     }
 
