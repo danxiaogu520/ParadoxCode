@@ -107,7 +107,7 @@ pub fn gate_actions(group: &str) -> Option<Vec<GateAction>> {
         }]),
         "release" => Some(vec![
             cargo_step(
-                &["build", "--locked", "-p", "pdc", "--bin", "pdc"],
+                &["build", "--locked", "-p", "pdc", "--bin", "paradoxcode"],
                 Vec::new(),
             ),
             GateAction::ReleaseChecks,

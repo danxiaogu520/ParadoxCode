@@ -97,7 +97,7 @@ pub fn load_contract(root: &Path) -> Result<(ServerLimits, Vec<ServerArtifact>),
             contract.schema_version
         )));
     }
-    if contract.binary != "pdc" {
+    if contract.binary != "paradoxcode" {
         return Err(ReleaseError::Contract(format!(
             "unexpected binary name: {}",
             contract.binary
@@ -558,7 +558,7 @@ mod tests {
 
     use super::*;
 
-    const PAYLOAD: &[u8] = b"portable pdc fixture\n";
+    const PAYLOAD: &[u8] = b"portable paradoxcode fixture\n";
 
     fn fixture_limits() -> ServerLimits {
         ServerLimits {
@@ -572,15 +572,16 @@ mod tests {
         match target {
             "x86_64-unknown-linux-gnu" => ServerArtifact {
                 target: target.to_owned(),
-                archive_template: "pdc-v{version}-x86_64-unknown-linux-gnu.tar.gz".to_owned(),
+                archive_template: "paradoxcode-v{version}-x86_64-unknown-linux-gnu.tar.gz"
+                    .to_owned(),
                 checksum_template: "{archive}.sha256".to_owned(),
-                binary: "pdc".to_owned(),
+                binary: "paradoxcode".to_owned(),
             },
             "x86_64-pc-windows-msvc" => ServerArtifact {
                 target: target.to_owned(),
-                archive_template: "pdc-v{version}-x86_64-pc-windows-msvc.zip".to_owned(),
+                archive_template: "paradoxcode-v{version}-x86_64-pc-windows-msvc.zip".to_owned(),
                 checksum_template: "{archive}.sha256".to_owned(),
-                binary: "pdc.exe".to_owned(),
+                binary: "paradoxcode.exe".to_owned(),
             },
             _ => unimplemented!("test target: {target}"),
         }

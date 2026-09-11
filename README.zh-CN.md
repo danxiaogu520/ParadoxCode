@@ -30,7 +30,7 @@ ParadoxCode **与 Paradox Interactive 无任何关联，也未获得其背书**�
 - 冲突感知的重命名（仅限可写的 Mod 源）。
 - 保守的格式化器，拒绝改写不安全或残缺的文件。
 - 跨「未保存缓冲区 → 当前 Mod → 有序依赖 Mod → 本地持久化 Vanilla 索引」的工作区解析。
-- stdio 语言服务器（`pdc`），支持取消、过期结果保护与不可变分析快照，并能对活跃 Mod 根做定向文件监听更新。
+- stdio 语言服务器（`paradoxcode`），支持取消、过期结果保护与不可变分析快照，并能对活跃 Mod 根做定向文件监听更新。
 - VS Code 扩展：零配置、带校验和的服务器自动安装，首次使用引导（walkthrough），以及实时任务树预览（贴图节点、缩放、源码跳转、PNG/JSON 导出）。
 - 精确版本服务器下载：SHA-256 校验、受限解压、有界流式传输与自校验可执行缓存。
 
@@ -42,14 +42,14 @@ ParadoxCode **与 Paradox Interactive 无任何关联，也未获得其背书**�
 
 1. 打开（或新建）一个工作区并**信任**它。
 2. 打开 EU4 Mod 中的文件，例如 `common/`、`events/`、`decisions/`、`missions/`、`history/`、`interface/`。
-3. 首次使用时，扩展会自动下载与你平台匹配的 `pdc` 发布版本，校验其 SHA-256 校验和，缓存并启动它。无需任何语言服务器配置。
+3. 首次使用时，扩展会自动下载与你平台匹配的 ParadoxCode 服务器发布版本，校验其 SHA-256 校验和，缓存并启动它。无需任何语言服务器配置。
 4. 如果未自动发现你的 EU4 安装目录，请使用 **Choose EU4 Installation / Vanilla Data**，选择包含 `eu4.exe` 以及 `common`、`events`、`missions`、`decisions`、`localisation` 的文件夹。
 
 VS Code 的 **Get Started** 页面提供 **Start using ParadoxCode** 引导，覆盖上述全部流程。
 
-### pdc 独立二进制
+### 独立二进制
 
-Linux（x86_64、aarch64）、macOS（x86_64、aarch64）与 Windows（x86_64）的独立 `pdc` 二进制以 `.tar.gz` / `.zip` 归档形式附在每个 [GitHub Release](https://github.com/danxiaogu520/ParadoxCode/releases) 上，并带有 `.sha256` 校验文件。语言服务器内嵌第一方 EU4 规则源，绝不导入外部规则文件。
+Linux（x86_64、aarch64）、macOS（x86_64、aarch64）与 Windows（x86_64）的独立 `paradoxcode` 二进制以 `.tar.gz` / `.zip` 归档形式附在每个 [GitHub Release](https://github.com/danxiaogu520/ParadoxCode/releases) 上，并带有 `.sha256` 校验文件。语言服务器内嵌第一方 EU4 规则源，绝不导入外部规则文件。
 
 ## 项目状态
 
@@ -117,7 +117,7 @@ cargo run -p rules --bin bake -- build \
   --manifest target/rules/manifest.json
 ```
 
-官方 `pdc` 二进制内嵌第一方 JSON 规则源，并在首次使用或源 `rule_hash` 变化时，在用户缓存中生成经过校验的 SQLite 规则工件。生成工件不会提交到仓库。
+官方 `paradoxcode` 二进制内嵌第一方 JSON 规则源，并在首次使用或源 `rule_hash` 变化时，在用户缓存中生成经过校验的 SQLite 规则工件。生成工件不会提交到仓库。
 
 EU4 规则源按职责拆分：`catalog/` 保存文件类别、符号描述符与规范化记录，`semantic/` 按
 effect、trigger、modifier、on_action 以及 event、decision、mission、history 等目录语义组织规则，
@@ -125,22 +125,22 @@ effect、trigger、modifier、on_action 以及 event、decision、mission、hist
 动态值和语义继承配置。`rules/eu4/manifest.json` 显式列出全部片段；编译器把它们合并成一个
 逻辑模型，profile 与语义规则共同参与同一个规范 `rule_hash`。
 
-`pdc` 要求现代 LSP 客户端在 initialize 请求中提供至少一个 `workspaceFolders` 条目。仅发送已弃用
+`paradoxcode` 要求现代 LSP 客户端在 initialize 请求中提供至少一个 `workspaceFolders` 条目。仅发送已弃用
 `rootUri` 的旧客户端不受支持，并会收到 `INVALID_PARAMS`；请升级编辑器或语言客户端。
 
 ## 开发环境
 
-可从配置路径或 `PATH` 启动 `pdc`。编辑器配置位于 VS Code 扩展的 `paradoxcode.*` 设置中。
+可从配置路径或 `PATH` 启动 `paradoxcode`。编辑器配置位于 VS Code 扩展的 `paradoxcode.*` 设置中。
 本文档所述方式面向贡献者，并非最终安装体验。
 
-`pdc` 会自动发现、校验、索引并记住本地 EU4 安装。首次启动时，若没有显式缓存或之前的尝试记录，会执行一次非阻塞的快速探测：读取启动器元数据（Steam 库清单、Epic 清单、GOG 注册表）和常见位置，只执行一次。若未产生候选，请将游戏目录设置指向安装位置（VS Code：`paradoxcode.gameDirectory`）并重新加载；缓存随后自动构建并保持更新，安装变更时后台重建索引。
+`paradoxcode` 会自动发现、校验、索引并记住本地 EU4 安装。首次启动时，若没有显式缓存或之前的尝试记录，会执行一次非阻塞的快速探测：读取启动器元数据（Steam 库清单、Epic 清单、GOG 注册表）和常见位置，只执行一次。若未产生候选，请将游戏目录设置指向安装位置（VS Code：`paradoxcode.gameDirectory`）并重新加载；缓存随后自动构建并保持更新，安装变更时后台重建索引。
 
 大型依赖 Mod 可以只索引一次，然后在每次启动时从持久缓存加载，而无需重新扫描。
 `id` 必须与编辑器中配置的依赖 id 一致。
 
-在设置了 `index` 时，依赖不会实时扫描；修改依赖后，删除过期的缓存文件并重启语言服务器（命令面板 `pdc: restart`），缓存会自动重建。删除 `index` 字段可回退到实时扫描。
+在设置了 `index` 时，依赖不会实时扫描；修改依赖后，删除过期的缓存文件并重启语言服务器（命令面板 **Reload ParadoxCode Language Server**），缓存会自动重建。删除 `index` 字段可回退到实时扫描。
 
-使用下面的开发脚本，对照该 Vanilla 缓存对完整 Current Mod 做一次可重复的诊断遍历。它会通过真实的 `pdc` 传输逐文件打开相关资源，并把 JSON 与 Markdown 报告写入被忽略的 `diagnostic-reports/` 目录：
+使用下面的开发脚本，对照该 Vanilla 缓存对完整 Current Mod 做一次可重复的诊断遍历。它会通过真实的服务器传输逐文件打开相关资源，并把 JSON 与 Markdown 报告写入被忽略的 `diagnostic-reports/` 目录：
 
 ```bash
 node editors/vscode/scripts/diagnose-current-mod.mjs \
@@ -163,19 +163,18 @@ node editors/vscode/scripts/diagnose-current-mod.mjs \
 | `crates/index` | 工作区符号索引分片与逐文件分析管线 |
 | `crates/engine` | 分析宿主、不可变快照、查询缓存与 `.pdcindex` 持久化 |
 | `crates/ide` | 编辑器中立的分析查询（诊断、补全、导航、重命名） |
-| `crates/pdc` | `pdc` 语言服务器：LSP 生命周期与协议边界 |
+| `crates/pdc` | 语言服务器 crate：LSP 生命周期与协议边界（以 `paradoxcode` 二进制形式发布） |
 | `crates/tools` | 仓库工具链（`check`、`release`、缓存构建），供 CI 与维护者使用 |
 | `editors/vscode/` | VS Code 扩展：服务器引导、引导流程、任务树预览 |
 | `rules/eu4/` | 权威第一方 EU4 规则树（catalog、semantic、支撑表与 profile） |
 | `fuzz/` | 解析、编辑、格式化与 HIR 模糊测试目标 |
-| `scripts/` | 可复现的质量检查与诊断工作流 |
 
 当前第一方 EU4 规则面向游戏版本 **1.37.5**（8,525 条语义规则、121 个文件类别、2,667 个符号描述符）。
 `rules/manifest.json` 记录 schema/source 版本、规范 `rule_hash` 与工件校验和。
 
 ## 发布
 
-发布由标签驱动：推送 `v0.x.y` 标签后，流水线会构建并验证全部五个原生 `pdc` 归档、创建不可变的 GitHub Release，并打包和附加 VSIX。Visual Studio Marketplace 发布暂时改为手动：从 Release 下载附加的 VSIX，再通过发布者管理页面上传。版本历史与各版本变更记录在 [CHANGELOG.md](CHANGELOG.md)；完整发布检查清单见 [RELEASING.md](RELEASING.md)。
+发布由标签驱动：推送 `v0.x.y` 标签后，流水线会构建并验证全部五个原生 `paradoxcode` 归档、创建不可变的 GitHub Release，并打包和附加 VSIX。Visual Studio Marketplace 发布暂时改为手动：从 Release 下载附加的 VSIX，再通过发布者管理页面上传。版本历史与各版本变更记录在 [CHANGELOG.md](CHANGELOG.md)；完整发布检查清单见 [RELEASING.md](RELEASING.md)。
 
 ## 贡献
 

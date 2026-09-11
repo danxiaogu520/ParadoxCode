@@ -41,7 +41,7 @@ and Paradox Interactive are trademarks of their respective owners.
 - A conservative formatter that refuses to rewrite unsafe or malformed files.
 - Workspace resolution across unsaved buffers, the current Mod, ordered dependency Mods, and a
   persistent local Vanilla index.
-- A stdio language server (`pdc`) with cancellation, stale-result protection, and immutable
+- A stdio language server (`paradoxcode`) with cancellation, stale-result protection, and immutable
   analysis snapshots, including targeted watched-file updates for live Mod roots.
 - A VS Code extension with zero-configuration, checksum-verified server setup, a first-run
   walkthrough, and a live mission-tree preview (texture-backed nodes, zoom, source navigation,
@@ -60,7 +60,7 @@ Install **ParadoxCode - EU4 Language Tools** from the
 1. Open (or create) a workspace and **trust** it.
 2. Open a file from an EU4 Mod — e.g. `common/`, `events/`, `decisions/`, `missions/`,
    `history/`, `interface/`, or any file below `localisation/` (including nested files).
-3. On first use the extension downloads the matching `pdc` release for your platform,
+3. On first use the extension downloads the matching ParadoxCode server release for your platform,
    verifies its SHA-256 checksum, caches it, and starts it automatically. No language-server
    configuration is required.
 4. If your EU4 installation is not discovered automatically, use **Choose EU4 Installation /
@@ -69,14 +69,14 @@ Install **ParadoxCode - EU4 Language Tools** from the
 
 The **Get Started** page includes a **Start using ParadoxCode** walkthrough covering all of this.
 
-### pdc standalone
+### Standalone binaries
 
-Standalone `pdc` binaries for Linux (x86_64, aarch64), macOS (x86_64, aarch64), and
+Standalone `paradoxcode` binaries for Linux (x86_64, aarch64), macOS (x86_64, aarch64), and
 Windows (x86_64) are attached to each [GitHub Release](https://github.com/danxiaogu520/ParadoxCode/releases)
 as `.tar.gz`/`.zip` archives with `.sha256` sidecars. The language server embeds the first-party
 EU4 rule source and never imports external rule files.
 
-`pdc` requires modern LSP initialization with at least one `workspaceFolders` entry. Clients
+`paradoxcode` requires modern LSP initialization with at least one `workspaceFolders` entry. Clients
 that send only the deprecated `rootUri` field are intentionally unsupported and receive an
 `INVALID_PARAMS` response; use a current LSP client or upgrade the editor integration.
 
@@ -160,7 +160,7 @@ cargo run -p rules --bin bake -- build \
   --manifest target/rules/manifest.json
 ```
 
-Official `pdc` binaries embed the first-party JSON source and generate a validated SQLite rules
+Official `paradoxcode` binaries embed the first-party JSON source and generate a validated SQLite rules
 artifact in the user cache on first use or when the source `rule_hash` changes. The generated
 artifact is not committed to the repository.
 
@@ -174,11 +174,11 @@ same canonical `rule_hash` covers both semantic data and profile data.
 
 ## Development setup
 
-Launch `pdc` from a configured path or from `PATH`. Editor configuration lives in the VS Code
+Launch `paradoxcode` from a configured path or from `PATH`. Editor configuration lives in the VS Code
 extension's `paradoxcode.*` settings. The documented setup is for contributors, not the final
 installation experience.
 
-`pdc` discovers, validates, indexes, and remembers the local EU4 installation on its own. The
+`paradoxcode` discovers, validates, indexes, and remembers the local EU4 installation on its own. The
 first launch performs one non-blocking quick attempt when no explicit cache or previous attempt
 exists: launcher metadata (Steam libraries, Epic manifests, GOG registry entries) and common
 locations are probed once. If that produces no candidate, point the game directory setting at
@@ -194,7 +194,8 @@ and Open Dependency Settings commands are available from the Command Palette; ne
 appended as the highest-priority dependency.
 
 While `index` is set, the dependency is not scanned live; after changing the dependency, delete
-the stale cache file and restart the language server (command palette `pdc: restart`) so it is
+the stale cache file and restart the language server (command palette
+**Reload ParadoxCode Language Server**) so it is
 rebuilt. Remove the `index` field to fall back to live scanning.
 
 Long-running sessions can opt into a quiet, idle-gated source-root re-scan. The default is off;
@@ -249,7 +250,7 @@ refresh and returns bounded counts for discovered/validated files and diagnostic
 and `totalHints`).
 
 Run a repeatable whole-Current-Mod diagnostic pass against that Vanilla cache with the development
-script below. It opens each relevant file through the real `pdc` transport and writes ignored
+script below. It opens each relevant file through the real server transport and writes ignored
 JSON and Markdown reports under `diagnostic-reports/`:
 
 ```bash
@@ -274,12 +275,11 @@ change the automation threshold. Use `--help` for all options.
 | `crates/index` | Workspace symbol index shards and the per-file analysis pipeline |
 | `crates/engine` | Analysis host, immutable snapshots, query caching, and the `.pdcindex` persistence |
 | `crates/ide` | Editor-neutral analysis queries (diagnostics, completion, navigation, rename) |
-| `crates/pdc` | The `pdc` language server: LSP lifecycle and protocol boundary |
+| `crates/pdc` | The language-server crate: LSP lifecycle and protocol boundary (ships as the `paradoxcode` binary) |
 | `crates/tools` | Repository tooling (`check`, `release`, cache building) for CI and maintainers |
 | `editors/vscode/` | VS Code extension: server bootstrap, walkthrough, mission-tree preview |
 | `rules/eu4/` | Authoritative first-party EU4 rule tree (catalog, semantic, supporting tables, profile) |
 | `fuzz/` | Parser, edit, formatter, and HIR fuzz targets |
-| `scripts/` | Reproducible quality checks and diagnostic workflows |
 
 The current first-party EU4 rules target game version **1.37.5** (8,525 semantic rules, 121 file
 categories, 2,667 symbol descriptors). The generated release manifest in `rules/manifest.json`
@@ -287,8 +287,8 @@ records the schema version, source format, canonical `rule_hash`, and artifact c
 
 ## Releases
 
-Releases are tag-driven: pushing a `v0.x.y` tag builds and verifies all five native `pdc`
-archives, creates the immutable GitHub Release, and packages and attaches the VSIX. Visual Studio
+Releases are tag-driven: pushing a `v0.x.y` tag builds and verifies all five native
+`paradoxcode` archives, creates the immutable GitHub Release, and packages and attaches the VSIX. Visual Studio
 Marketplace publication is temporarily manual; download the attached VSIX and upload it from the
 publisher management page. Version history and per-release changes are tracked in
 [CHANGELOG.md](CHANGELOG.md); the full release checklist lives in [RELEASING.md](RELEASING.md).

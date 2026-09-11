@@ -1,24 +1,24 @@
 fn main() -> Result<(), pdc::LspError> {
     let started = std::time::Instant::now();
-    let process_message = format!("pdc process started (pid {})", std::process::id());
-    eprintln!("pdc: {process_message}");
+    let process_message = format!("paradoxcode process started (pid {})", std::process::id());
+    eprintln!("paradoxcode: {process_message}");
     let mut startup_messages = vec![process_message];
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args
         .iter()
         .any(|argument| argument == "--version" || argument == "-V")
     {
-        println!("pdc {}", env!("CARGO_PKG_VERSION"));
+        println!("paradoxcode {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
     if !args.is_empty() {
         return Err(pdc::LspError::Protocol(format!(
-            "unknown pdc argument: {}",
+            "unknown paradoxcode argument: {}",
             args[0]
         )));
     }
     let profile_message = format!("game profile selected: {}", pdc::INSTALL_DESCRIPTOR.game_id);
-    eprintln!("pdc: {profile_message}");
+    eprintln!("paradoxcode: {profile_message}");
     startup_messages.push(profile_message);
     match game::UserPaths::platform() {
         Ok(user_paths) => {
@@ -27,7 +27,7 @@ fn main() -> Result<(), pdc::LspError> {
                 user_paths.config_file.display(),
                 user_paths.cache_root.display()
             );
-            eprintln!("pdc: {paths_message}");
+            eprintln!("paradoxcode: {paths_message}");
             startup_messages.push(paths_message);
 
             let rules_path = user_paths.rules_cache(pdc::INSTALL_DESCRIPTOR.game_id);
@@ -37,7 +37,7 @@ fn main() -> Result<(), pdc::LspError> {
                 pdc::INSTALL_DESCRIPTOR.game_id,
                 rules_path.display()
             );
-            eprintln!("pdc: {loading_message}");
+            eprintln!("paradoxcode: {loading_message}");
             startup_messages.push(loading_message);
             let rules = match pdc::first_party_rules_cached(&rules_path) {
                 Ok(rules) => {
@@ -46,7 +46,7 @@ fn main() -> Result<(), pdc::LspError> {
                         rules_started.elapsed().as_secs_f64() * 1000.0,
                         rules.rule_hash().to_hex()
                     );
-                    eprintln!("pdc: {ready_message}");
+                    eprintln!("paradoxcode: {ready_message}");
                     startup_messages.push(ready_message);
                     rules
                 }
@@ -61,7 +61,7 @@ fn main() -> Result<(), pdc::LspError> {
             let profile = rules.profile().clone();
             let transport_message =
                 "stdio JSON-RPC transport starting; waiting for initialize".to_owned();
-            eprintln!("pdc: {transport_message}");
+            eprintln!("paradoxcode: {transport_message}");
             startup_messages.push(transport_message);
             let server = pdc::LspServer::run_stdio_with_profile_and_auto_vanilla_with_startup_log(
                 pdc::InitializeOptions,
@@ -97,7 +97,7 @@ fn main() -> Result<(), pdc::LspError> {
                         rules_started.elapsed().as_secs_f64() * 1000.0,
                         rules.rule_hash().to_hex()
                     );
-                    eprintln!("pdc: {ready_message}");
+                    eprintln!("paradoxcode: {ready_message}");
                     startup_messages.push(ready_message);
                     rules
                 }
@@ -112,7 +112,7 @@ fn main() -> Result<(), pdc::LspError> {
             let profile = rules.profile().clone();
             let transport_message =
                 "stdio JSON-RPC transport starting; waiting for initialize".to_owned();
-            eprintln!("pdc: {transport_message}");
+            eprintln!("paradoxcode: {transport_message}");
             startup_messages.push(transport_message);
             let result = pdc::LspServer::run_stdio_with_profile_and_startup_log(
                 pdc::InitializeOptions,

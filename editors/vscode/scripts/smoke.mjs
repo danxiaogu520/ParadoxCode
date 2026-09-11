@@ -1,16 +1,16 @@
 // Smoke test for the VSCode mission-preview data contract: drives the real
-// pdc over stdio JSON-RPC and validates the `pdc/missionPreview` payload
+// ParadoxCode server over stdio JSON-RPC and validates the `pdc/missionPreview` payload
 // shape the webview renderer consumes. Exit code 1 on any mismatch.
 //
-// Usage: node scripts/smoke.mjs [path-to-pdc-binary]
-// Default: `cargo run --quiet -p pdc --bin pdc` (repo checkout).
+// Usage: node scripts/smoke.mjs [path-to-paradoxcode-binary]
+// Default: `cargo run --quiet -p pdc --bin paradoxcode` (repo checkout).
 
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { delimiter, dirname, join } from 'node:path';
-// The extension's PATH fallback must detect a missing `pdc` before launch,
+// The extension's PATH fallback must detect a missing `paradoxcode` before launch,
 // so the user gets an actionable warning instead of a bare spawn ENOENT. The
 // helper lives in the compiled `out/` tree (check runs compile first).
 import { findExecutableOnPath } from '../out/serverPath.js';
@@ -67,7 +67,7 @@ function run(serverArgs) {
     child.on('error', reject);
     child.on('exit', (code) => {
       if (code !== 0 && responses.length === 0) {
-        reject(new Error(`pdc exited with code ${code}`));
+        reject(new Error(`paradoxcode exited with code ${code}`));
       } else {
         resolve(responses);
       }
@@ -126,7 +126,7 @@ const ARROW_GLYPHS = new Set([
 
 const serverArgs = process.argv.length > 2
   ? process.argv.slice(2)
-  : ['cargo', 'run', '--quiet', '-p', 'pdc', '--bin', 'pdc'];
+  : ['cargo', 'run', '--quiet', '-p', 'pdc', '--bin', 'paradoxcode'];
 
 const responses = await run(serverArgs);
 

@@ -260,11 +260,11 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
                     ),
                 ));
                 let expected_binaries: BTreeSet<(&str, &str)> = [
-                    ("tar.gz", "pdc"),
-                    ("tar.gz", "pdc"),
-                    ("tar.gz", "pdc"),
-                    ("tar.gz", "pdc"),
-                    ("zip", "pdc.exe"),
+                    ("tar.gz", "paradoxcode"),
+                    ("tar.gz", "paradoxcode"),
+                    ("tar.gz", "paradoxcode"),
+                    ("tar.gz", "paradoxcode"),
+                    ("zip", "paradoxcode.exe"),
                 ]
                 .into_iter()
                 .collect();
