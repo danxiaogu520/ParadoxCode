@@ -16,7 +16,7 @@ prerequisites before pushing it.
 
 1. Confirm `Cargo.toml`, `editors/vscode/package.json`, and `editors/vscode/package-lock.json`
    all carry the intended version.
-2. Run `bash scripts/check-quality-gates.sh`. Do not tag if any group fails.
+2. Run `cargo tools gates`. Do not tag if any group fails.
 3. Package the VSIX with `npm --prefix editors/vscode run package`, install it into a clean VS Code
    profile, trust an EU4 Mod workspace, and open an EU4 file. Verify that `PDC ●` appears without
    configuring `pdc`, completion/diagnostics work, and the output reports a checksum-verified

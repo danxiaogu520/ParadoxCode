@@ -188,7 +188,10 @@ jobs:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: bash scripts/check-release.sh
+      # Inline like rust-analyzer: build the shipped binary, then re-run the
+      # release checks maintainers use locally (`cargo tools check release`).
+      - run: cargo build --locked -p pdc --bin pdc
+      - run: cargo run --locked -p tools -- check release --root .
 
   dependencies:
     name: Dependency policy

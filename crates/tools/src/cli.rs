@@ -16,11 +16,12 @@ use game::{
 
 use pdc::stable_dependency_root_id;
 
-const USAGE: &str = "usage (cargo run -p tools -- <command> ...):
+const USAGE: &str = "usage (cargo tools <command> ... or: cargo run -p tools -- <command> ...):
   index [vanilla] --source <EU4 directory> --output <cache.pdcindex>
   index dependency --id <id> --source <directory> --output <cache.pdcindex>
   setup vanilla [--game eu4] [--root <directory>]... [--source <game directory>]
   check policy|release|all [--root <repository root>]
+  gates [core|core-fast|perf|vscode|release|fuzz|all]... [--root <repository root>]
   release package --version <semver> --target <target> --binary <path> --output-dir <path> [--root <repository root>]
   release verify --version <semver> --directory <path> [--root <repository root>]";
 const SUPPORTED_GAME_INSTALLATIONS: &[GameInstallDescriptor] = &[game::eu4::INSTALL_DESCRIPTOR];
@@ -45,9 +46,51 @@ pub fn execute(args: &[String]) -> Result<String, CliError> {
             setup_vanilla(rest, &paths)
         }
         [check, sub, rest @ ..] if check == "check" => execute_check(sub, rest),
+        [gates, rest @ ..] if gates == "gates" => execute_gates(rest),
         [release, sub, rest @ ..] if release == "release" => execute_release(sub, rest),
         _ => Err(CliError::Usage(USAGE.to_owned())),
     }
+}
+
+/// Parses `gates` arguments: zero or more group names plus an optional
+/// `--root`, defaulting to the `all` group when no group is named.
+fn execute_gates(args: &[String]) -> Result<String, CliError> {
+    let mut groups = Vec::new();
+    let mut root = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--root" => {
+                let value = args.get(index + 1).ok_or_else(|| {
+                    CliError::Usage(format!("missing value for --root\n\n{USAGE}"))
+                })?;
+                if root.replace(PathBuf::from(value)).is_some() {
+                    return Err(CliError::Usage(
+                        "option supplied more than once: --root".to_owned(),
+                    ));
+                }
+                index += 2;
+            }
+            group => {
+                groups.push(group.to_owned());
+                index += 1;
+            }
+        }
+    }
+    let unknown = groups
+        .iter()
+        .find(|group| crate::gates::gate_actions(group).is_none());
+    if let Some(group) = unknown {
+        return Err(CliError::Usage(format!(
+            "unknown gate group: {group}\n\n{USAGE}"
+        )));
+    }
+    if groups.is_empty() {
+        groups.push("all".to_owned());
+    }
+    let root = crate::gates::resolve_root(root.as_deref())?;
+    crate::gates::run_gates(&groups, &root)
+        .map(|executed| format!("tools gates passed ({executed} gates run)"))
 }
 
 fn setup_vanilla(args: &[String], paths: &UserPaths) -> Result<String, CliError> {
@@ -446,6 +489,8 @@ pub enum CliError {
     Cache(IndexCacheError),
     /// Installation discovery or candidate selection did not produce a usable source.
     Discovery(String),
+    /// A spawned quality-gate command could not be executed.
+    Exec(String),
     /// User-local discovery configuration failed.
     UserConfig(UserConfigError),
     /// Quality-gate checks found failures.
@@ -463,6 +508,7 @@ impl CliError {
             | Self::Workspace(_)
             | Self::Cache(_)
             | Self::Discovery(_)
+            | Self::Exec(_)
             | Self::UserConfig(_)
             | Self::CheckFailed => 1,
         }
@@ -484,6 +530,7 @@ impl fmt::Display for CliError {
             Self::Workspace(error) => write!(formatter, "Vanilla indexing error: {error}"),
             Self::Cache(error) => write!(formatter, "{error}"),
             Self::Discovery(message) => formatter.write_str(message),
+            Self::Exec(message) => write!(formatter, "gate execution failed: {message}"),
             Self::UserConfig(error) => write!(formatter, "{error}"),
             Self::CheckFailed => formatter.write_str("one or more checks failed"),
         }
@@ -498,7 +545,7 @@ impl std::error::Error for CliError {
             Self::Workspace(error) => Some(error),
             Self::Cache(error) => Some(error),
             Self::UserConfig(error) => Some(error),
-            Self::Usage(_) | Self::Discovery(_) | Self::CheckFailed => None,
+            Self::Usage(_) | Self::Discovery(_) | Self::Exec(_) | Self::CheckFailed => None,
         }
     }
 }
