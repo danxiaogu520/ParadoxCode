@@ -9,7 +9,7 @@
   "walkthrough.openMod.title": "Open your Mod folder",
   "walkthrough.openMod.description": "Open the folder that contains your Mod's common, events, decisions, history, missions, or localisation directories with [Open Folder](command:workbench.action.files.openFolder). You do not need to create a project file first.",
   "walkthrough.prepareServer.title": "Let ParadoxCode prepare pdc",
-  "walkthrough.prepareServer.description": "The extension downloads and checksum-verifies the matching ParadoxCode server release automatically. Wait for the ParadoxCode ● status item. If it stays ○, retry [Install or Update the server](command:paradoxcode.installServer) or inspect [Output](command:paradoxcode.openOutput).",
+  "walkthrough.prepareServer.description": "The extension downloads and checksum-verifies the matching ParadoxCode server release automatically. Wait until the ParadoxCode status item shows its check mark (server ready). If it keeps showing the disconnected plug, retry [Install or Update the server](command:paradoxcode.installServer) or inspect [Output](command:paradoxcode.openOutput).",
   "walkthrough.vanillaData.title": "Enable Vanilla symbols",
   "walkthrough.vanillaData.description": "ParadoxCode builds a local Vanilla index in the background so completion, hover, and navigation can see the base game. Automatic discovery is tried first. If it cannot find EU4, choose [EU4 Installation / Vanilla Data](command:paradoxcode.selectGameDirectory) and select the folder containing eu4.exe plus common, events, missions, decisions, and localisation. The server validates the folder and retries without another setup file.",
   "walkthrough.checkDiagnostics.title": "Check your first diagnostics",
