@@ -1,0 +1,17 @@
+[package]
+name = "pdx-codec"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "EU4 CJK localisation transcoder (utf8eu4 / latin1eu4 profiles) for the EU4dll double-byte patch ecosystem."
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish = false
+
+[dependencies]
+
+[lints]
+workspace = true
