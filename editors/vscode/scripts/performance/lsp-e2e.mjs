@@ -27,13 +27,13 @@ import { LspClient } from '../lib/lsp-client.mjs';
 
 const execFileAsync = promisify(execFile);
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '..', '..');
+const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '..', '..', '..', '..');
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_MEMORY_INTERVAL_MS = 250;
 const FIXTURE_TEXT = 'country_event = {\n    id = my_perf_event\n}\n';
 const NO_CACHE_NAME = `pdc-perf-no-cache-${process.pid}.pdcindex`;
 
-const USAGE = `Usage: node scripts/performance/lsp-e2e.mjs [options]
+const USAGE = `Usage: node editors/vscode/scripts/performance/lsp-e2e.mjs [options]
 
 Options:
   --server PATH             pdc executable (default target/release/pdc[.exe])

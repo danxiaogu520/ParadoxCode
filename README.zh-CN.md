@@ -143,7 +143,7 @@ effect、trigger、modifier、on_action 以及 event、decision、mission、hist
 使用下面的开发脚本，对照该 Vanilla 缓存对完整 Current Mod 做一次可重复的诊断遍历。它会通过真实的 `pdc` 传输逐文件打开相关资源，并把 JSON 与 Markdown 报告写入被忽略的 `diagnostic-reports/` 目录：
 
 ```bash
-node scripts/diagnose-current-mod.mjs \
+node editors/vscode/scripts/diagnose-current-mod.mjs \
   --mod /path/to/current-mod \
   --vanilla-cache /path/to/vanilla.pdcindex
 ```

@@ -25,7 +25,7 @@ import { TextDecoder } from 'node:util';
 import { LspClient } from './lib/lsp-client.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '..');
+const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '..', '..', '..');
 const DEFAULT_OUTPUT_DIR = join(REPOSITORY_ROOT, 'diagnostic-reports');
 const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_FILE_TIMEOUT_MS = 60_000;
@@ -56,7 +56,7 @@ process.once('SIGTERM', () => {
   process.exit(143);
 });
 
-const USAGE = `Usage: node scripts/diagnose-current-mod.mjs (--mod PATH | --vanilla-source PATH) [options]
+const USAGE = `Usage: node editors/vscode/scripts/diagnose-current-mod.mjs (--mod PATH | --vanilla-source PATH) [options]
 
 Diagnose every EU4 source file in a Current Mod using the embedded first-party rules and a local
 Vanilla index cache. The default output is diagnostic-reports/current-mod-<timestamp>.{json,md}.

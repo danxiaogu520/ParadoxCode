@@ -12,11 +12,11 @@
  * wall-time + allocated-bytes report.
  *
  * Usage:
- *   node scripts/performance/head-to-head.mjs --workspace <mod> --cache <vanilla.pdcindex> \
+ *   node editors/vscode/scripts/performance/head-to-head.mjs --workspace <mod> --cache <vanilla.pdcindex> \
  *       --label baseline --out performance-results/baseline.json
- *   node scripts/performance/head-to-head.mjs --workspace <mod> --cache <vanilla.pdcindex> \
+ *   node editors/vscode/scripts/performance/head-to-head.mjs --workspace <mod> --cache <vanilla.pdcindex> \
  *       --dependency EDG=/path/to/reference-mod --label with-reference-mod
- *   node scripts/performance/head-to-head.mjs --compare performance-results/baseline.json \
+ *   node editors/vscode/scripts/performance/head-to-head.mjs --compare performance-results/baseline.json \
  *       performance-results/candidate.json
  */
 
@@ -29,7 +29,7 @@ import { LspClient } from '../lib/lsp-client.mjs';
 import { ProcessSampler, formatBytes } from '../lib/process-stats.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '..', '..');
+const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '..', '..', '..', '..');
 const DEFAULT_TIMEOUT_MS = 300_000;
 const REQUEST_TIMEOUT_MS = 120_000;
 const DEFAULT_SAMPLE_INTERVAL_MS = 250;
@@ -39,7 +39,7 @@ const DEFAULT_CLOSE_SETTLE_MS = 2_500;
 const DEFAULT_EDIT_GRACE_MS = 2_000;
 const SCRIPT_DIRECTORIES = ['common', 'events', 'missions', 'decisions'];
 
-const USAGE = `Usage: node scripts/performance/head-to-head.mjs [options]
+const USAGE = `Usage: node editors/vscode/scripts/performance/head-to-head.mjs [options]
 
 Options:
   --server PATH              pdc executable (default target/release/pdc[.exe])
