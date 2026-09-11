@@ -13,10 +13,10 @@
 <!--
 List exactly what you ran and its result. Examples:
 - `bash scripts/check-quality-gates.sh core` — passed
-- `cargo test -p pdx-analysis rename` — passed
+- `cargo test -p ide rename` — passed
 -->
 
-- [ ] Local quality gates passed (the pre-commit hook runs them automatically).
+- [ ] Local quality gates passed (`bash scripts/check-quality-gates.sh`).
 - [ ] New behavior is covered by tests or fixtures in this PR.
 - [ ] CI is expected to pass for the touched groups (core / grammars / zed / vscode / release).
 

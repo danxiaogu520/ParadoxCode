@@ -159,6 +159,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "engine"
+version = "0.3.2"
+dependencies = [
+ "encoding_rs",
+ "game",
+ "hir",
+ "ide",
+ "index",
+ "parser",
+ "postcard",
+ "rules",
+ "rusqlite",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "sha2",
+ "text",
+ "transcode",
+ "vfs",
+ "zstd",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -235,6 +258,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
+name = "game"
+version = "0.3.2"
+dependencies = [
+ "parser",
+ "rules",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "text",
+ "toml",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -273,12 +309,53 @@ dependencies = [
 ]
 
 [[package]]
+name = "hir"
+version = "0.3.2"
+dependencies = [
+ "game",
+ "parser",
+ "rules",
+ "rustc-hash",
+ "text",
+]
+
+[[package]]
 name = "hybrid-array"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "707114b52a152fa7bdb290cd7cd5912d9467273b6d74e21b8d81aca1f8533f6b"
 dependencies = [
  "typenum",
+]
+
+[[package]]
+name = "ide"
+version = "0.3.2"
+dependencies = [
+ "engine",
+ "game",
+ "hir",
+ "parser",
+ "rules",
+ "rustc-hash",
+ "text",
+ "transcode",
+]
+
+[[package]]
+name = "index"
+version = "0.3.2"
+dependencies = [
+ "hir",
+ "parser",
+ "postcard",
+ "rules",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "text",
+ "transcode",
+ "vfs",
 ]
 
 [[package]]
@@ -382,105 +459,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
-name = "pdx-analysis"
+name = "parser"
 version = "0.3.2"
 dependencies = [
- "pdx-codec",
- "pdx-engine",
- "pdx-game",
- "pdx-parser",
- "pdx-rules",
- "pdx-text",
- "rustc-hash",
-]
-
-[[package]]
-name = "pdx-codec"
-version = "0.3.2"
-
-[[package]]
-name = "pdx-engine"
-version = "0.3.2"
-dependencies = [
- "encoding_rs",
- "pdx-analysis",
- "pdx-codec",
- "pdx-game",
- "pdx-parser",
- "pdx-rules",
- "pdx-text",
- "postcard",
- "rusqlite",
- "rustc-hash",
  "serde",
- "serde_json",
- "sha2",
- "zstd",
-]
-
-[[package]]
-name = "pdx-game"
-version = "0.3.2"
-dependencies = [
- "pdx-parser",
- "pdx-rules",
- "pdx-text",
- "serde",
- "serde_json",
- "tempfile",
- "toml",
-]
-
-[[package]]
-name = "pdx-lsp"
-version = "0.3.2"
-dependencies = [
- "flate2",
- "lsp-types",
- "pdx-analysis",
- "pdx-engine",
- "pdx-game",
- "pdx-parser",
- "pdx-rules",
- "pdx-text",
- "semver",
- "serde",
- "serde_json",
- "sha2",
- "tar",
- "tempfile",
- "toml",
- "zip",
-]
-
-[[package]]
-name = "pdx-parser"
-version = "0.3.2"
-dependencies = [
- "pdx-text",
- "serde",
+ "text",
  "unicode-width",
 ]
 
 [[package]]
-name = "pdx-rules"
+name = "pdc"
 version = "0.3.2"
 dependencies = [
- "pdx-parser",
- "pdx-text",
- "rayon",
- "rusqlite",
- "rustc-hash",
+ "engine",
+ "game",
+ "hir",
+ "ide",
+ "lsp-types",
+ "parser",
+ "rules",
  "serde",
  "serde_json",
  "sha2",
-]
-
-[[package]]
-name = "pdx-text"
-version = "0.3.2"
-dependencies = [
- "serde",
+ "tempfile",
+ "text",
+ "toml",
 ]
 
 [[package]]
@@ -553,6 +556,20 @@ checksum = "c51c9ae4df8a7fba42103df5c621fa3c37eccf3a3c650879e90fc48b11cc192c"
 dependencies = [
  "hashbrown 0.16.1",
  "thiserror",
+]
+
+[[package]]
+name = "rules"
+version = "0.3.2"
+dependencies = [
+ "parser",
+ "rayon",
+ "rusqlite",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "sha2",
+ "text",
 ]
 
 [[package]]
@@ -752,6 +769,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "text"
+version = "0.3.2"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "thiserror"
 version = "2.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -811,6 +835,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d56353a2a665ad0f41a421187180aab746c8c325620617ad883a99a1cbe66d2"
 
 [[package]]
+name = "tools"
+version = "0.3.2"
+dependencies = [
+ "engine",
+ "flate2",
+ "game",
+ "pdc",
+ "rules",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tar",
+ "tempfile",
+ "toml",
+ "zip",
+]
+
+[[package]]
+name = "transcode"
+version = "0.3.2"
+
+[[package]]
 name = "typed-path"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -839,6 +886,22 @@ name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
+
+[[package]]
+name = "vfs"
+version = "0.3.2"
+dependencies = [
+ "encoding_rs",
+ "parser",
+ "postcard",
+ "rules",
+ "rustc-hash",
+ "serde",
+ "sha2",
+ "text",
+ "transcode",
+ "zstd",
+]
 
 [[package]]
 name = "wasm-bindgen"

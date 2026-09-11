@@ -1,10 +1,10 @@
 // Transparent localisation read/write for EU4dll-transcoded files
 // (`docs/eu4-cjk-localisation-design.md` §4).
 //
-// The `pdxloc://` scheme mirrors a `file://` URI over the same real path:
+// The `pdcloc://` scheme mirrors a `file://` URI over the same real path:
 // readFile decodes EU4dll escape triples to readable CJK text, writeFile
 // re-encodes before the bytes touch disk, and the language server receives
-// the decoded text through normal document sync (it resolves `pdxloc://`
+// the decoded text through normal document sync (it resolves `pdcloc://`
 // URIs to the backing path, so the virtual document hides the on-disk shard
 // and every position is a decoded-view position — no offset mapping).
 //
@@ -17,23 +17,23 @@ import * as fs from 'node:fs/promises';
 import * as nodePath from 'node:path';
 import * as vscode from 'vscode';
 import {
-    PdxCodec,
+    Transcoder,
     PROFILE_LOCALISATION,
     PROFILE_SCRIPT,
     type Classification,
     type LocalisationProfile,
-} from './pdxCodec';
+} from './transcode';
 
-export const PDXLOC_SCHEME = 'pdxloc';
+export const PDCLOC_SCHEME = 'pdcloc';
 
-/** The `pdxloc://` twin of a real `file://` URI. */
+/** The `pdcloc://` twin of a real `file://` URI. */
 export function decodedUriOf(real: vscode.Uri): vscode.Uri {
-    return real.with({ scheme: PDXLOC_SCHEME });
+    return real.with({ scheme: PDCLOC_SCHEME });
 }
 
-/** The real `file://` URI behind a `pdxloc://` view, if any. */
+/** The real `file://` URI behind a `pdcloc://` view, if any. */
 export function realUriOf(uri: vscode.Uri): vscode.Uri | undefined {
-    if (uri.scheme !== PDXLOC_SCHEME) {
+    if (uri.scheme !== PDCLOC_SCHEME) {
         return undefined;
     }
     return uri.with({ scheme: 'file' });
@@ -98,12 +98,12 @@ interface ReadOutcome {
     broken: number;
 }
 
-class PdxlocFileSystemProvider implements vscode.FileSystemProvider {
+class PdclocFileSystemProvider implements vscode.FileSystemProvider {
     private readonly emitter = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
     private readonly watchers = new Set<vscode.FileSystemWatcher>();
 
     constructor(
-        private readonly codec: PdxCodec,
+        private readonly codec: Transcoder,
         private readonly diagnostics: vscode.DiagnosticCollection,
         private readonly log: vscode.OutputChannel,
     ) {}
@@ -184,7 +184,7 @@ class PdxlocFileSystemProvider implements vscode.FileSystemProvider {
             // transcoded text, and encoding it again would double-encode.
             const message =
                 'Refused to save: the editor buffer already contains EU4dll escape sequences. ' +
-                'Undo the paste (or decode the text first); transcoded files must be edited via their pdxloc:// view.';
+                'Undo the paste (or decode the text first); transcoded files must be edited via their pdcloc:// view.';
             this.log.appendLine(
                 `transparentLoc: refused save of ${real.fsPath} (${classification} buffer)`,
             );
@@ -209,32 +209,32 @@ class PdxlocFileSystemProvider implements vscode.FileSystemProvider {
     }
 
     async readDirectory(): Promise<[string, vscode.FileType][]> {
-        throw vscode.FileSystemError.NoPermissions('pdxloc:// exposes individual files only');
+        throw vscode.FileSystemError.NoPermissions('pdcloc:// exposes individual files only');
     }
 
     async createDirectory(): Promise<void> {
-        throw vscode.FileSystemError.NoPermissions('pdxloc:// exposes individual files only');
+        throw vscode.FileSystemError.NoPermissions('pdcloc:// exposes individual files only');
     }
 
     async delete(uri: vscode.Uri): Promise<void> {
         throw vscode.FileSystemError.NoPermissions(
-            `delete is not supported for pdxloc:// views (${realUriOf(uri)?.fsPath ?? uri.toString()})`,
+            `delete is not supported for pdcloc:// views (${realUriOf(uri)?.fsPath ?? uri.toString()})`,
         );
     }
 
     async rename(): Promise<void> {
-        throw vscode.FileSystemError.NoPermissions('rename is not supported for pdxloc:// views');
+        throw vscode.FileSystemError.NoPermissions('rename is not supported for pdcloc:// views');
     }
 
     async copy(): Promise<void> {
-        throw vscode.FileSystemError.NoPermissions('copy is not supported for pdxloc:// views');
+        throw vscode.FileSystemError.NoPermissions('copy is not supported for pdcloc:// views');
     }
 
     private requireReal(uri: vscode.Uri): vscode.Uri {
         const real = realUriOf(uri);
         if (!real) {
             throw vscode.FileSystemError.FileNotFound(
-                `${PDXLOC_SCHEME}:// requires a real backing path`,
+                `${PDCLOC_SCHEME}:// requires a real backing path`,
             );
         }
         return real;
@@ -340,7 +340,7 @@ async function revealOriginal(): Promise<void> {
  * the file first.
  */
 async function transcodeFile(
-    codec: PdxCodec,
+    codec: Transcoder,
     uri: vscode.Uri | undefined,
     log: vscode.OutputChannel,
 ): Promise<void> {
@@ -397,7 +397,7 @@ async function transcodeFile(
  * Each file is only asked once per session.
  */
 async function maybePromptDecodedView(
-    codec: PdxCodec,
+    codec: Transcoder,
     document: vscode.TextDocument,
     prompted: Set<string>,
 ): Promise<void> {
@@ -438,10 +438,10 @@ export async function activateTransparentLocalisation(
     context: vscode.ExtensionContext,
     log: vscode.OutputChannel,
 ): Promise<vscode.Disposable> {
-    const codec = new PdxCodec();
+    const codec = new Transcoder();
 
     const diagnostics = vscode.languages.createDiagnosticCollection('paradoxcode.transparent');
-    const provider = new PdxlocFileSystemProvider(codec, diagnostics, log);
+    const provider = new PdclocFileSystemProvider(codec, diagnostics, log);
 
     const statusItem = vscode.window.createStatusBarItem(
         'paradoxcode.transparentLoc',
@@ -454,7 +454,7 @@ export async function activateTransparentLocalisation(
 
     const updateStatus = (): void => {
         const active = vscode.window.activeTextEditor?.document.uri;
-        if (active?.scheme === PDXLOC_SCHEME) {
+        if (active?.scheme === PDCLOC_SCHEME) {
             const real = realUriOf(active);
             statusItem.tooltip = new vscode.MarkdownString(
                 `Decoded EU4 view over \`${real?.fsPath ?? 'unknown'}\` — click to open the raw file.`,
@@ -470,7 +470,7 @@ export async function activateTransparentLocalisation(
     const configuration = vscode.workspace.getConfiguration('paradoxcode.localisation');
     if (configuration.get<boolean>('transparentEncoding', true)) {
         disposables.push(
-            vscode.workspace.registerFileSystemProvider(PDXLOC_SCHEME, provider, {
+            vscode.workspace.registerFileSystemProvider(PDCLOC_SCHEME, provider, {
                 isCaseSensitive: true,
             }),
             vscode.commands.registerCommand('paradoxcode.localisation.openDecoded', (uri) =>
@@ -488,7 +488,7 @@ export async function activateTransparentLocalisation(
             ),
         );
         updateStatus();
-        log.appendLine('transparent localisation enabled (pdxloc:// provider active)');
+        log.appendLine('transparent localisation enabled (pdcloc:// provider active)');
     } else {
         log.appendLine('transparent localisation disabled by configuration');
     }

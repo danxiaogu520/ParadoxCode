@@ -12,7 +12,7 @@ import {
 import { LoadedFilesProvider } from './fileExplorer';
 import { MissionPreviewPanel } from './previewPanel';
 import {
-    PDXLOC_SCHEME,
+    PDCLOC_SCHEME,
     activateTransparentLocalisation,
 } from './transparentLoc';
 import {
@@ -24,13 +24,14 @@ import {
     DEFAULT_SERVER_REPOSITORY,
     cachedServerPath,
     defaultInstallDirectory,
-    installPdxLs,
+    installServerRelease,
 } from './serverInstaller';
 
 const EU4_LANGUAGE_ID = 'eu4';
 const LOCALISATION_LANGUAGE_ID = 'localisation';
 const SERVER_SETTING_KEYS = [
-    'pdxLsPath',
+    'serverPath',
+    'serverPath',
     'modDirectory',
     'vanillaIndexCache',
     'dependencies',
@@ -69,8 +70,8 @@ const statusBar = vscode.window.createStatusBarItem(
 );
 statusBar.name = 'ParadoxCode Language Server';
 statusBar.command = 'paradoxcode.openOutput';
-statusBar.text = 'PDX ○';
-statusBar.tooltip = 'ParadoxCode: pdx-ls not running';
+statusBar.text = 'PDC ○';
+statusBar.tooltip = 'ParadoxCode: pdc not running';
 
 let client: LanguageClient | undefined;
 let missingServerWarningShown = false;
@@ -142,7 +143,7 @@ function updateVanillaContext(message: string): void {
     }
 }
 
-/** Maps VS Code's `paradoxcode.*` settings onto pdx-ls initialization options. */
+/** Maps VS Code's `paradoxcode.*` settings onto pdc initialization options. */
 function readInitializationOptions(): Record<string, unknown> {
     const config = vscode.workspace.getConfiguration('paradoxcode');
     const options: Record<string, unknown> = {};
@@ -350,7 +351,7 @@ async function addDependency(): Promise<void> {
         },
         {
             label: 'Persistent index cache',
-            description: 'Load/build a .pdxindex instead of scanning on every launch.',
+            description: 'Load/build a .pdcindex instead of scanning on every launch.',
             value: 'index',
         },
     ], {
@@ -368,11 +369,11 @@ async function addDependency(): Promise<void> {
     };
     if (cacheChoice.value === 'index') {
         const defaultIndex = vscode.Uri.file(
-            path.join(workspaceRoot, '.pdx', 'indexes', `${entry.id}.pdxindex`),
+            path.join(workspaceRoot, '.pdc', 'indexes', `${entry.id}.pdcindex`),
         );
         const index = await vscode.window.showSaveDialog({
             defaultUri: defaultIndex,
-            filters: { 'ParadoxCode index': ['pdxindex'] },
+            filters: { 'ParadoxCode index': ['pdcindex'] },
             saveLabel: 'Use Index Path',
             title: 'Choose the dependency index cache path',
         });
@@ -479,16 +480,18 @@ function installOptions(context: vscode.ExtensionContext) {
     };
 }
 
-/** Resolves the pdx-ls binary. Explicit user/workspace configuration always wins over the
- * optional downloaded cache and PATH fallback. */
+/** Resolves the pdc server binary. Explicit user/workspace configuration always wins over the
+ * optional downloaded cache and PATH fallback. The legacy `serverPath` key is still honoured so
+ * existing setups keep working after the rename. */
 function resolveServerCommand(context: vscode.ExtensionContext): ServerResolution {
-    const configuredPath = vscode.workspace
-        .getConfiguration('paradoxcode')
-        .get<string>('pdxLsPath', '');
+    const configuration = vscode.workspace.getConfiguration('paradoxcode');
+    const configuredPath =
+        configuration.get<string>('serverPath', '') ||
+        configuration.get<string>('serverPath', '');
     if (configuredPath) {
         return {
             command: configuredPath,
-            source: 'setting paradoxcode.pdxLsPath',
+            source: 'setting paradoxcode.serverPath',
             missingOnPath: false,
         };
     }
@@ -502,9 +505,9 @@ function resolveServerCommand(context: vscode.ExtensionContext): ServerResolutio
         };
     }
     return {
-        command: 'pdx-ls',
-        source: '$PATH (pdx-ls)',
-        missingOnPath: findExecutableOnPath('pdx-ls') === undefined,
+        command: 'pdc',
+        source: '$PATH (pdc)',
+        missingOnPath: findExecutableOnPath('pdc') === undefined,
     };
 }
 
@@ -580,10 +583,10 @@ function clientMiddleware(): NonNullable<LanguageClientOptions['middleware']> {
                     .get<string[]>('diagnosticIgnoreCodes', [])
                     .filter((value): value is string => typeof value === 'string'),
             );
-            // A decoded pdxloc view intentionally shows readable CJK; the backing
+            // A decoded pdcloc view intentionally shows readable CJK; the backing
             // shard is re-encoded on save, so the server's NotTranscoded warning
             // for release paths would always be a false alarm in that view.
-            if (uri.scheme === PDXLOC_SCHEME) {
+            if (uri.scheme === PDCLOC_SCHEME) {
                 ignoredCodes.add('LocalisationNotTranscoded');
             }
             const patterns = diagnosticIgnorePatterns().map(globToRegExp);
@@ -611,17 +614,17 @@ function showMissingServerActions(automaticInstallError?: string): void {
     }
     missingServerWarningShown = true;
     const message = automaticInstallError
-        ? `The automatic pdx-ls installation failed: ${automaticInstallError}`
-        : 'pdx-ls was not found. Install it from the ParadoxCode release cache, select a binary, ' +
-          'set paradoxcode.pdxLsPath, or add pdx-ls to PATH.';
+        ? `The automatic pdc installation failed: ${automaticInstallError}`
+        : 'pdc was not found. Install it from the ParadoxCode release cache, select a binary, ' +
+          'set paradoxcode.serverPath, or add pdc to PATH.';
     log.appendLine(`WARNING: ${message}`);
     void vscode.window.showWarningMessage(
         `ParadoxCode: ${message}`,
-        'Install pdx-ls',
+        'Install pdc',
         'Select binary',
         'Open Output',
     ).then((choice) => {
-        if (choice === 'Install pdx-ls') {
+        if (choice === 'Install pdc') {
             void vscode.commands.executeCommand('paradoxcode.installServer');
         } else if (choice === 'Select binary') {
             void vscode.commands.executeCommand('paradoxcode.selectServer');
@@ -632,7 +635,7 @@ function showMissingServerActions(automaticInstallError?: string): void {
 }
 
 function createClient({ command, source }: ServerResolution): LanguageClient {
-    log.appendLine(`pdx-ls binary: ${command} (from ${source})`);
+    log.appendLine(`pdc binary: ${command} (from ${source})`);
     missingServerWarningShown = false;
     const serverOptions: ServerOptions = { command };
     const clientOptions: LanguageClientOptions = {
@@ -640,10 +643,10 @@ function createClient({ command, source }: ServerResolution): LanguageClient {
             { language: EU4_LANGUAGE_ID },
             { language: LOCALISATION_LANGUAGE_ID },
             // Decoded views over transcoded files: the provider syncs decoded
-            // text under the pdxloc:// scheme; the server resolves these URIs
-            // to the backing path (see crates/pdx-lsp/src/uri.rs).
-            { scheme: PDXLOC_SCHEME, language: EU4_LANGUAGE_ID },
-            { scheme: PDXLOC_SCHEME, language: LOCALISATION_LANGUAGE_ID },
+            // text under the pdcloc:// scheme; the server resolves these URIs
+            // to the backing path (see crates/pdc/src/uri.rs).
+            { scheme: PDCLOC_SCHEME, language: EU4_LANGUAGE_ID },
+            { scheme: PDCLOC_SCHEME, language: LOCALISATION_LANGUAGE_ID },
             { pattern: '**/common/achievements.txt' },
             { pattern: '**/common/alerts.txt' },
             { pattern: '**/common/graphicalculturetype.txt' },
@@ -799,7 +802,7 @@ function createClient({ command, source }: ServerResolution): LanguageClient {
         middleware: clientMiddleware(),
     };
     return new LanguageClient(
-        'pdx-ls',
+        'pdc',
         'ParadoxCode Language Server',
         serverOptions,
         clientOptions,
@@ -809,20 +812,20 @@ function createClient({ command, source }: ServerResolution): LanguageClient {
 function updateStatus(state: State): void {
     switch (state) {
         case State.Running:
-            statusBar.text = serverReady ? 'PDX ●' : 'PDX ◐';
+            statusBar.text = serverReady ? 'PDC ●' : 'PDC ◐';
             statusBar.tooltip = serverReady
-                ? 'ParadoxCode: pdx-ls ready (click to open output)'
-                : 'ParadoxCode: pdx-ls running; indexes are loading…';
+                ? 'ParadoxCode: pdc ready (click to open output)'
+                : 'ParadoxCode: pdc running; indexes are loading…';
             void vscode.commands.executeCommand('setContext', 'paradoxcodeServerRunning', true);
             break;
         case State.Starting:
-            statusBar.text = 'PDX ◐';
-            statusBar.tooltip = 'ParadoxCode: pdx-ls starting…';
+            statusBar.text = 'PDC ◐';
+            statusBar.tooltip = 'ParadoxCode: pdc starting…';
             void vscode.commands.executeCommand('setContext', 'paradoxcodeServerRunning', false);
             break;
         default:
-            statusBar.text = 'PDX ○';
-            statusBar.tooltip = 'ParadoxCode: pdx-ls not running (click to open output)';
+            statusBar.text = 'PDC ○';
+            statusBar.tooltip = 'ParadoxCode: pdc not running (click to open output)';
             void vscode.commands.executeCommand('setContext', 'paradoxcodeServerRunning', false);
     }
 }
@@ -850,8 +853,8 @@ async function resolveOrInstallServer(context: vscode.ExtensionContext): Promise
     }
 
     const options = installOptions(context);
-    log.appendLine(`pdx-ls was not found; installing the matching ${options.version} release automatically`);
-    statusBar.text = 'PDX ↓';
+    log.appendLine(`pdc was not found; installing the matching ${options.version} release automatically`);
+    statusBar.text = 'PDC ↓';
     statusBar.tooltip = 'ParadoxCode: installing the language server…';
     try {
         const binary = await vscode.window.withProgress(
@@ -860,9 +863,9 @@ async function resolveOrInstallServer(context: vscode.ExtensionContext): Promise
                 title: 'ParadoxCode: preparing language support',
                 cancellable: false,
             },
-            (progress) => installPdxLs(context, options, progress),
+            (progress) => installServerRelease(context, options, progress),
         );
-        log.appendLine(`pdx-ls ${options.version} installed and verified: ${binary}`);
+        log.appendLine(`pdc ${options.version} installed and verified: ${binary}`);
         return {
             command: binary,
             source: 'automatic checksum-verified ParadoxCode installation',
@@ -870,7 +873,7 @@ async function resolveOrInstallServer(context: vscode.ExtensionContext): Promise
         };
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        log.appendLine(`ERROR installing pdx-ls automatically: ${message}`);
+        log.appendLine(`ERROR installing pdc automatically: ${message}`);
         updateStatus(State.Stopped);
         showMissingServerActions(message);
         return undefined;
@@ -925,11 +928,11 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
             if (client !== currentClient) {
                 return;
             }
-            log.appendLine(`[pdx-ls] ${params.message}`);
+            log.appendLine(`[pdc] ${params.message}`);
             statusBar.tooltip = `ParadoxCode: ${params.message}`;
             updateVanillaContext(params.message);
         });
-        currentClient.onNotification('pdx/ready', () => {
+        currentClient.onNotification('pdc/ready', () => {
             if (client !== currentClient) {
                 return;
             }
@@ -957,7 +960,7 @@ async function stopClient(loadedFiles?: LoadedFilesProvider): Promise<void> {
             await previous.stop();
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            log.appendLine(`WARNING stopping pdx-ls: ${message}`);
+            log.appendLine(`WARNING stopping pdc: ${message}`);
         }
     }
     loadedFiles?.clear();
@@ -968,7 +971,7 @@ async function chooseServerPath(): Promise<void> {
         canSelectFiles: true,
         canSelectFolders: false,
         canSelectMany: false,
-        openLabel: 'Use pdx-ls',
+        openLabel: 'Use pdc',
         filters: process.platform === 'win32' ? { Executable: ['exe', 'com', 'cmd', 'bat'] } : undefined,
     });
     if (!selected?.[0]) {
@@ -978,7 +981,7 @@ async function chooseServerPath(): Promise<void> {
         ? vscode.ConfigurationTarget.Workspace
         : vscode.ConfigurationTarget.Global;
     await vscode.workspace.getConfiguration('paradoxcode').update(
-        'pdxLsPath',
+        'serverPath',
         selected[0].fsPath,
         target,
     );
@@ -1015,7 +1018,7 @@ async function exportDiagnostics(): Promise<void> {
         return;
     }
     try {
-        const report = await client.sendRequest<unknown>('pdx/workspaceDiagnostics', {
+        const report = await client.sendRequest<unknown>('pdc/workspaceDiagnostics', {
             offset: 0,
             limit: 128,
         });
@@ -1039,19 +1042,19 @@ async function installServer(context: vscode.ExtensionContext): Promise<boolean>
         const binary = await vscode.window.withProgress(
             {
                 location: vscode.ProgressLocation.Notification,
-                title: 'ParadoxCode: installing pdx-ls',
+                title: 'ParadoxCode: installing pdc',
                 cancellable: false,
             },
-            (progress) => installPdxLs(context, options, progress),
+            (progress) => installServerRelease(context, options, progress),
         );
-        log.appendLine(`pdx-ls ${options.version} installed and verified: ${binary}`);
-        void vscode.window.showInformationMessage(`ParadoxCode: pdx-ls ${options.version} is ready.`);
+        log.appendLine(`pdc ${options.version} installed and verified: ${binary}`);
+        void vscode.window.showInformationMessage(`ParadoxCode: pdc ${options.version} is ready.`);
         return true;
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        log.appendLine(`ERROR installing pdx-ls: ${message}`);
+        log.appendLine(`ERROR installing pdc: ${message}`);
         const choice = await vscode.window.showErrorMessage(
-            `ParadoxCode could not install pdx-ls: ${message}`,
+            `ParadoxCode could not install pdc: ${message}`,
             'Open Releases',
             'Open Output',
         );
@@ -1079,9 +1082,9 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.registerTreeDataProvider('paradoxcode.loadedFiles', loadedFilesProvider),
     );
 
-    // Transparent localisation (pdxloc:// decoded views) is independent of the
-    // language server lifecycle: register it up front so a pdxloc editor can
-    // be restored from a previous session even while pdx-ls is still starting.
+    // Transparent localisation (pdcloc:// decoded views) is independent of the
+    // language server lifecycle: register it up front so a pdcloc editor can
+    // be restored from a previous session even while pdc is still starting.
     void activateTransparentLocalisation(context, log);
 
     const refresh = debounce(() => {
@@ -1094,7 +1097,7 @@ export function activate(context: vscode.ExtensionContext): void {
         restartTask = restartTask
             .catch((error: unknown) => {
                 const message = error instanceof Error ? error.message : String(error);
-                log.appendLine(`WARNING previous pdx-ls restart failed: ${message}`);
+                log.appendLine(`WARNING previous pdc restart failed: ${message}`);
             })
             .then(async () => {
                 await stopClient(loadedFilesProvider);

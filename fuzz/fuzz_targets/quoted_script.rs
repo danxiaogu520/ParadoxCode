@@ -1,7 +1,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use pdx_parser::{encode_quoted_script_text, parse_quoted_script};
+use parser::{encode_quoted_script_text, parse_quoted_script};
 
 fuzz_target!(|data: &[u8]| {
     let Ok(payload) = std::str::from_utf8(data) else {

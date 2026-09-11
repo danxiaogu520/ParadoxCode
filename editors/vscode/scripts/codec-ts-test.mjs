@@ -1,15 +1,15 @@
-// Contract test for the TypeScript codec twin (src/pdxCodec.ts) against the
-// Rust implementation (crates/pdx-codec).
+// Contract test for the TypeScript codec twin (src/transcode.ts) against the
+// Rust implementation (crates/transcode).
 //
 // Three layers of protection, in increasing strength:
 //   1. Behavioural cases ported from the native suite (round trips, iron
 //      rule ② refusals, orphan markers, CP1252 single bytes).
 //   2. The EDG-KTP golden corpus, byte for byte in both directions — the
 //      same ground truth paratranz certified for the Rust crate.
-//   3. Differential vectors: `cargo run -p pdx-codec --bin pdx-codec-vectors`
+//   3. Differential vectors: `cargo run -p transcode --bin transcode-vectors`
 //      emits an exhaustive per-code-point encode sweep plus deterministic
 //      random byte/text sequences; every vector is replayed through the TS
-//      implementation and compared exactly. Set PDX_SKIP_VECTORS=1 to skip
+//      implementation and compared exactly. Set PDC_SKIP_VECTORS=1 to skip
 //      this layer when no Rust toolchain is available (CI never does).
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -21,10 +21,10 @@ import assert from 'node:assert/strict';
 const require = createRequire(import.meta.url);
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, '..', '..', '..');
-const corpusRoot = join(repoRoot, 'crates', 'pdx-codec', 'tests', 'corpus');
+const corpusRoot = join(repoRoot, 'crates', 'transcode', 'tests', 'corpus');
 
-// The TS module compiles to out/pdxCodec.js; run after `npm run compile`.
-const codec = require(join(scriptDir, '..', 'out', 'pdxCodec.js'));
+// The TS module compiles to out/transcode.js; run after `npm run compile`.
+const codec = require(join(scriptDir, '..', 'out', 'transcode.js'));
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
@@ -57,7 +57,7 @@ function textToCps(text) {
 // --- module surface ----------------------------------------------------------
 assert.equal(codec.CODEC_VERSION, 1, 'codec version must match the native crate');
 
-const facade = new codec.PdxCodec();
+const facade = new codec.Transcoder();
 
 // --- Localisation profile round trip (BOM + CRLF kept structural) -------------
 const ymlText = '﻿l_english:\r\n edg_key:0 "发行本"\r\n other: "Straße Ära"\r\n';
@@ -149,13 +149,13 @@ assert.equal(
 );
 
 // --- Differential vectors against the Rust implementation ---------------------
-if (process.env.PDX_SKIP_VECTORS !== '1') {
+if (process.env.PDC_SKIP_VECTORS !== '1') {
     // Windows does not resolve PATH executables without an extension, so the
     // shell form is used there; the fixed argument string is concatenation-safe.
     const windows = process.platform === 'win32';
     const command = windows
-        ? ['cargo run -q --locked -p pdx-codec --bin pdx-codec-vectors', []]
-        : ['cargo', ['run', '-q', '--locked', '-p', 'pdx-codec', '--bin', 'pdx-codec-vectors']];
+        ? ['cargo run -q --locked -p transcode --bin transcode-vectors', []]
+        : ['cargo', ['run', '-q', '--locked', '-p', 'transcode', '--bin', 'transcode-vectors']];
     const child = spawn(command[0], command[1], {
         cwd: repoRoot,
         stdio: ['ignore', 'pipe', 'inherit'],
@@ -301,7 +301,7 @@ if (process.env.PDX_SKIP_VECTORS !== '1') {
         lines.on('error', reject);
         child.on('exit', (code) => {
             if (code !== 0) {
-                reject(new Error(`pdx-codec-vectors exited with ${code}`));
+                reject(new Error(`transcode-vectors exited with ${code}`));
             }
         });
     });

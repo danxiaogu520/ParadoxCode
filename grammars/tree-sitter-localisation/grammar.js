@@ -66,7 +66,7 @@ module.exports = grammar({
     colour_tag: $ => token.immediate(/§[A-Za-z0-9]/),
 
     // Keep malformed or legacy unquoted values visible for recovery; semantic
-    // validation remains the responsibility of pdx-ls.
+    // validation remains the responsibility of pdc.
     unquoted_value: $ => token(prec(-1, /[^ \t\r\n#][^\r\n#]*/)),
 
     comment: $ => token(/#[^\r\n]*/),

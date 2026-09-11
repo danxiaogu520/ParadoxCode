@@ -30,7 +30,7 @@ ParadoxCode **与 Paradox Interactive 无任何关联，也未获得其背书**�
 - 冲突感知的重命名（仅限可写的 Mod 源）。
 - 保守的格式化器，拒绝改写不安全或残缺的文件。
 - 跨「未保存缓冲区 → 当前 Mod → 有序依赖 Mod → 本地持久化 Vanilla 索引」的工作区解析。
-- stdio 语言服务器（`pdx-ls`），支持取消、过期结果保护与不可变分析快照，并能对活跃 Mod 根做定向文件监听更新。
+- stdio 语言服务器（`pdc`），支持取消、过期结果保护与不可变分析快照，并能对活跃 Mod 根做定向文件监听更新。
 - VS Code 扩展：零配置、带校验和的服务器自动安装，首次使用引导（walkthrough），以及实时任务树预览（贴图节点、缩放、源码跳转、PNG/JSON 导出）。
 - 轻量 Zed 扩展，提供 Tree-sitter 高亮；编辑器高亮是 Tree-sitter 的唯一用途——运行时解析器是纯 Rust 实现，不链接 Tree-sitter C。
 - 精确版本服务器下载：SHA-256 校验、受限解压、有界流式传输与自校验可执行缓存。
@@ -43,7 +43,7 @@ ParadoxCode **与 Paradox Interactive 无任何关联，也未获得其背书**�
 
 1. 打开（或新建）一个工作区并**信任**它。
 2. 打开 EU4 Mod 中的文件，例如 `common/`、`events/`、`decisions/`、`missions/`、`history/`、`interface/`。
-3. 首次使用时，扩展会自动下载与你平台匹配的 `pdx-ls` 发布版本，校验其 SHA-256 校验和，缓存并启动它。无需任何语言服务器配置。
+3. 首次使用时，扩展会自动下载与你平台匹配的 `pdc` 发布版本，校验其 SHA-256 校验和，缓存并启动它。无需任何语言服务器配置。
 4. 如果未自动发现你的 EU4 安装目录，请使用 **Choose EU4 Installation / Vanilla Data**，选择包含 `eu4.exe` 以及 `common`、`events`、`missions`、`decisions`、`localisation` 的文件夹。
 
 VS Code 的 **Get Started** 页面提供 **Start using ParadoxCode** 引导，覆盖上述全部流程。
@@ -52,9 +52,9 @@ VS Code 的 **Get Started** 页面提供 **Start using ParadoxCode** 引导，�
 
 Zed 扩展在本仓库中开发（`editors/zed`），正在等待 [`zed-industries/extensions`](https://github.com/zed-industries/extensions) 注册表的审核。在它上架之前，请以开发扩展方式安装：指向本仓库检出目录的 `editors/zed` 子目录。推荐的语言设置见 `editors/zed/recommended-settings.json`。
 
-### pdx-ls 独立二进制
+### pdc 独立二进制
 
-Linux（x86_64、aarch64）、macOS（x86_64、aarch64）与 Windows（x86_64）的独立 `pdx` / `pdx-ls` 二进制以 `.tar.gz` / `.zip` 归档形式附在每个 [GitHub Release](https://github.com/danxiaogu520/ParadoxCode/releases) 上，并带有 `.sha256` 校验文件。语言服务器内嵌第一方 EU4 规则源，绝不导入外部规则文件。
+Linux（x86_64、aarch64）、macOS（x86_64、aarch64）与 Windows（x86_64）的独立 `pdc` 二进制以 `.tar.gz` / `.zip` 归档形式附在每个 [GitHub Release](https://github.com/danxiaogu520/ParadoxCode/releases) 上，并带有 `.sha256` 校验文件。语言服务器内嵌第一方 EU4 规则源，绝不导入外部规则文件。
 
 ## 项目状态
 
@@ -82,11 +82,11 @@ Linux（x86_64、aarch64）、macOS（x86_64、aarch64）与 Windows（x86_64）
 引擎/profile 边界保证工作区、索引、分析、LSP 与发布基础设施保持游戏中立，而 EU4 的路径、作用域、命令、符号与特殊语义留在 EU4 profile 中。crate 依赖方向是严格单向的：
 
 ```text
-pdx-text
-  -> pdx-parser -> pdx-engine -> pdx-analysis -> pdx-lsp
-pdx-game（EU4 profile）-> pdx-parser + pdx-text + pdx-rules
-pdx-rules -> pdx-bake
-pdx-rules + pdx-game -> pdx-engine / pdx-analysis
+text
+  -> parser -> engine -> ide -> pdc
+game（EU4 profile）-> parser + text + rules
+rules -> bake
+rules + game -> engine / ide
 ```
 
 ## 从源码构建
@@ -100,13 +100,7 @@ cargo build --locked --workspace
 cargo test --locked --workspace --all-targets
 ```
 
-安装一次仓库 Git 钩子（此后每次提交都会运行质量门禁）：
-
-```bash
-bash scripts/install-git-hooks.sh
-```
-
-显式运行质量门禁套件，或只诊断某个分组（`core`、`grammars`、`zed`、`vscode`、`release`、`fuzz`、`core-fast`、`perf`）：
+显式运行质量门禁套件，或只诊断某个分组（`core`、`grammars`、`zed`、`vscode`、`release`、`fuzz`、`core-fast`、`perf`）。仓库不使用提交钩子；CI 会在每个 pull request 上运行同样的门禁：
 
 ```bash
 bash scripts/check-quality-gates.sh
@@ -118,16 +112,16 @@ CI 还会根据变更路径选择编辑器、语法、fuzz 和依赖检查；fuz
 Windows release 构建则与 Windows 测试和 clippy 并行执行。分支保护应将 `Required CI checks`
 作为稳定的聚合必需检查。
 
-使用 `pdx-bake` 校验并编译开发者维护的第一方规则源；产物可放入被忽略的构建目录以供检视：
+使用 `bake` 校验并编译开发者维护的第一方规则源；产物可放入被忽略的构建目录以供检视：
 
 ```bash
-cargo run -p pdx-rules --bin pdx-bake -- build \
+cargo run -p rules --bin bake -- build \
   --source rules/eu4 \
-  --output target/rules/eu4.pdxrules \
+  --output target/rules/eu4.pdcrules \
   --manifest target/rules/manifest.json
 ```
 
-官方 `pdx-ls` 二进制内嵌第一方 JSON 规则源，并在首次使用或源 `rule_hash` 变化时，在用户缓存中生成经过校验的 SQLite 规则工件。生成工件不会提交到仓库。
+官方 `pdc` 二进制内嵌第一方 JSON 规则源，并在首次使用或源 `rule_hash` 变化时，在用户缓存中生成经过校验的 SQLite 规则工件。生成工件不会提交到仓库。
 
 EU4 规则源按职责拆分：`catalog/` 保存文件类别、符号描述符与规范化记录，`semantic/` 按
 effect、trigger、modifier、on_action 以及 event、decision、mission、history 等目录语义组织规则，
@@ -135,52 +129,30 @@ effect、trigger、modifier、on_action 以及 event、decision、mission、hist
 动态值和语义继承配置。`rules/eu4/manifest.json` 显式列出全部片段；编译器把它们合并成一个
 逻辑模型，profile 与语义规则共同参与同一个规范 `rule_hash`。
 
-`pdx-ls` 要求现代 LSP 客户端在 initialize 请求中提供至少一个 `workspaceFolders` 条目。仅发送已弃用
+`pdc` 要求现代 LSP 客户端在 initialize 请求中提供至少一个 `workspaceFolders` 条目。仅发送已弃用
 `rootUri` 的旧客户端不受支持，并会收到 `INVALID_PARAMS`；请升级编辑器或语言客户端。
 
 ## 开发环境
 
-可从配置路径或 `PATH` 启动 `pdx-ls`。编辑器配置彼此独立：VS Code 使用 `paradoxcode.*` 设置，
-Zed 使用 `.zed/settings.json` 中的 `lsp.pdx-ls.initialization_options`。两者不会读取共享项目文件。
+可从配置路径或 `PATH` 启动 `pdc`。编辑器配置彼此独立：VS Code 使用 `paradoxcode.*` 设置，
+Zed 使用 `.zed/settings.json` 中的 `lsp.pdc.initialization_options`。两者不会读取共享项目文件。
 本文档所述方式面向贡献者，并非最终安装体验。
 
-让 ParadoxCode 自动发现、校验、索引并记住本地 EU4 安装：
+`pdc` 会自动发现、校验、索引并记住本地 EU4 安装。首次启动时，若没有显式缓存或之前的尝试记录，会执行一次非阻塞的快速探测：读取启动器元数据（Steam 库清单、Epic 清单、GOG 注册表）和常见位置，只执行一次。若未产生候选，请将游戏目录设置指向安装位置（VS Code：`paradoxcode.gameDirectory`）并重新加载；缓存随后自动构建并保持更新，安装变更时后台重建索引。
 
-```bash
-pdx setup vanilla
-```
-
-首次 `pdx-ls` 启动时，若没有显式缓存或之前的尝试记录，也会执行一次非阻塞的快速探测。探测会读取启动器元数据（Steam 库清单、Epic 清单、GOG 注册表）和常见位置，只执行一次；若未产生候选，请用 `--source` 显式指定目录（或用 `--root` 探测指定文件夹）。正常启动时不会重复搜索。
-
-使用底层命令在显式位置构建或手动刷新缓存：
-
-```bash
-pdx index vanilla \
-  --source /path/to/eu4 \
-  --output /path/to/vanilla.pdxindex
-```
-
-大型依赖 Mod 可以只索引一次，然后在每次启动时从持久缓存加载，而无需重新扫描：
-
-```bash
-pdx index dependency \
-  --id gui-xu \
-  --source /path/to/dependency-mod \
-  --output /path/to/dependency.pdxindex
-```
-
-`id` 必须与编辑器中配置的依赖 id 一致。在 Zed 中，缓存在 `.zed/settings.json` 中声明；`pdx-ls` 会在后台加载它，并在文件缺失时自动重建（规则哈希变化时与 Vanilla 缓存一样重新生成）：
+大型依赖 Mod 可以只索引一次，然后在每次启动时从持久缓存加载，而无需重新扫描。
+`id` 必须与编辑器中配置的依赖 id 一致。在 Zed 中，缓存在 `.zed/settings.json` 中声明；`pdc` 会在后台加载它，并在文件缺失时自动重建（规则哈希变化时与 Vanilla 缓存一样重新生成）：
 
 ```json
 {
   "lsp": {
-    "pdx-ls": {
+    "pdc": {
       "initialization_options": {
         "dependencies": [
           {
             "id": "gui-xu",
             "path": "/path/to/dependency-mod",
-            "index": "/path/to/dependency.pdxindex"
+            "index": "/path/to/dependency.pdcindex"
           }
         ]
       }
@@ -189,14 +161,14 @@ pdx index dependency \
 }
 ```
 
-在设置了 `index` 时，依赖不会实时扫描；修改依赖后，请用 `pdx index dependency` 重建缓存并重启语言服务器（命令面板 `pdx-ls: restart`）。删除 `index` 字段可回退到实时扫描。
+在设置了 `index` 时，依赖不会实时扫描；修改依赖后，删除过期的缓存文件并重启语言服务器（命令面板 `pdc: restart`），缓存会自动重建。删除 `index` 字段可回退到实时扫描。
 
-使用下面的开发脚本，对照该 Vanilla 缓存对完整 Current Mod 做一次可重复的诊断遍历。它会通过真实的 `pdx-ls` 传输逐文件打开相关资源，并把 JSON 与 Markdown 报告写入被忽略的 `diagnostic-reports/` 目录：
+使用下面的开发脚本，对照该 Vanilla 缓存对完整 Current Mod 做一次可重复的诊断遍历。它会通过真实的 `pdc` 传输逐文件打开相关资源，并把 JSON 与 Markdown 报告写入被忽略的 `diagnostic-reports/` 目录：
 
 ```bash
 bash scripts/diagnose-current-mod.sh \
   --mod /path/to/current-mod \
-  --vanilla-cache /path/to/vanilla.pdxindex
+  --vanilla-cache /path/to/vanilla.pdcindex
 ```
 
 发现错误时命令以非零码退出；使用 `--fail-on warning` 或 `--fail-on none` 调整自动化阈值。全部选项见 `--help`。
@@ -205,13 +177,17 @@ bash scripts/diagnose-current-mod.sh \
 
 | 路径 | 用途 |
 | --- | --- |
-| `crates/pdx-text` | 文本、范围、位置与路径原语 |
-| `crates/pdx-parser` | 损失感知解析器与规范化格式化器 |
-| `crates/pdx-rules` | 泛型规则 schema、运行时与第一方编译器（`pdx-bake`） |
-| `crates/pdx-game` | EU4 profile：游戏发现、本地配置与 EU4 任务模型 |
-| `crates/pdx-engine` | VFS、源根、索引分片与不可变快照 |
-| `crates/pdx-analysis` | 编辑器中立的分析查询（诊断、补全、导航、重命名） |
-| `crates/pdx-lsp` | LSP 生命周期、协议边界与 CLI 入口（`pdx`、`pdx-ls`） |
+| `crates/text` | 文本、范围、位置与路径原语 |
+| `crates/parser` | 损失感知解析器与规范化格式化器 |
+| `crates/rules` | 泛型规则 schema、运行时与第一方编译器（`bake`） |
+| `crates/game` | EU4 profile：游戏发现、本地配置与 EU4 任务模型 |
+| `crates/vfs` | 源根、工作区扫描与稳定的文档数据模型 |
+| `crates/hir` | 规则感知的语义降阶（定义、作用域、模板） |
+| `crates/index` | 工作区符号索引分片与逐文件分析管线 |
+| `crates/engine` | 分析宿主、不可变快照、查询缓存与 `.pdcindex` 持久化 |
+| `crates/ide` | 编辑器中立的分析查询（诊断、补全、导航、重命名） |
+| `crates/pdc` | `pdc` 语言服务器：LSP 生命周期与协议边界 |
+| `crates/tools` | 仓库工具链（`check`、`release`、缓存构建），供 CI 与维护者使用 |
 | `editors/vscode/` | VS Code 扩展：服务器引导、引导流程、任务树预览 |
 | `editors/zed/` | 轻量 Zed 扩展、语言元数据与查询 |
 | `grammars/` | 仅编辑用的 Tree-sitter 语法与语料测试 |
@@ -224,7 +200,7 @@ bash scripts/diagnose-current-mod.sh \
 
 ## 发布
 
-发布由标签驱动：推送 `v0.x.y` 标签后，流水线会构建并验证全部五个原生 `pdx-ls` 归档、创建不可变的 GitHub Release，并打包和附加 VSIX。Visual Studio Marketplace 发布暂时改为手动：从 Release 下载附加的 VSIX，再通过发布者管理页面上传。版本历史与各版本变更记录在 [CHANGELOG.md](CHANGELOG.md)；完整发布检查清单见 [RELEASING.md](RELEASING.md)。
+发布由标签驱动：推送 `v0.x.y` 标签后，流水线会构建并验证全部五个原生 `pdc` 归档、创建不可变的 GitHub Release，并打包和附加 VSIX。Visual Studio Marketplace 发布暂时改为手动：从 Release 下载附加的 VSIX，再通过发布者管理页面上传。版本历史与各版本变更记录在 [CHANGELOG.md](CHANGELOG.md)；完整发布检查清单见 [RELEASING.md](RELEASING.md)。
 
 ## 贡献
 
@@ -236,4 +212,4 @@ bash scripts/diagnose-current-mod.sh \
 
 ## 许可
 
-ParadoxCode 源代码以 [MIT 许可证](LICENSE) 发布。仓库不重新分发 EU4 游戏文件、用户 Vanilla 缓存或外部规则语料。规则维护与再分发边界由 `pdx-bake` 校验与仓库质量门禁保证。
+ParadoxCode 源代码以 [MIT 许可证](LICENSE) 发布。仓库不重新分发 EU4 游戏文件、用户 Vanilla 缓存或外部规则语料。规则维护与再分发边界由 `bake` 校验与仓库质量门禁保证。

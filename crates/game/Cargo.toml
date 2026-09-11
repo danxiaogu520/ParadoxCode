@@ -1,0 +1,24 @@
+[package]
+name = "game"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Game-independent installation discovery and local configuration for ParadoxCode."
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish = false
+
+[dependencies]
+rules = { path = "../rules" }
+text = { path = "../text" }
+parser = { path = "../parser" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "1.1.3"
+tempfile = "3"
+
+[lints]
+workspace = true

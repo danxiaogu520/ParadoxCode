@@ -20,8 +20,8 @@ prerequisites before pushing it.
    `editors/zed/Cargo.toml`, and `editors/zed/extension.toml` all carry the intended version.
 2. Run `bash scripts/check-quality-gates.sh`. Do not tag if any group fails.
 3. Package the VSIX with `npm --prefix editors/vscode run package`, install it into a clean VS Code
-   profile, trust an EU4 Mod workspace, and open an EU4 file. Verify that `PDX ●` appears without
-   configuring `pdx-ls`, completion/diagnostics work, and the output reports a checksum-verified
+   profile, trust an EU4 Mod workspace, and open an EU4 file. Verify that `PDC ●` appears without
+   configuring `pdc`, completion/diagnostics work, and the output reports a checksum-verified
    automatic installation.
 4. Install `editors/zed` as a Zed dev extension in a clean profile and verify that it downloads the
    same release version and starts the server without editor settings.
@@ -37,7 +37,7 @@ git tag -a v0.3.2 -m "ParadoxCode 0.3.2"
 git push origin v0.3.2
 ```
 
-The tag workflow builds and verifies all five native `pdx-ls` archives, creates the immutable
+The tag workflow builds and verifies all five native `pdc` archives, creates the immutable
 GitHub Release, packages the VSIX, and attaches it to that release. It deliberately does not publish
 to the Visual Studio Marketplace for now. Download `paradoxcode-vscode-<version>.vsix` from the
 release and upload it manually from the publisher management page. The VS Code job still waits for

@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 
 /**
- * Head-to-head performance harness for pdx-ls against a real mod corpus.
+ * Head-to-head performance harness for pdc against a real mod corpus.
  *
  * Unlike `lsp-e2e.mjs` (a synthetic single-file smoke), this drives the full
  * lifecycle on a real workspace: initialize (which today performs the whole
- * scan), `pdx/ready`, an idle window, then a sampled set of files measured
+ * scan), `pdc/ready`, an idle window, then a sampled set of files measured
  * for open->diagnostics, hover, completion, and edit->diagnostics latency.
  * Child CPU time (user+kernel) and working set are sampled throughout so
  * results are comparable with the CWTools performance CLI's
  * wall-time + allocated-bytes report.
  *
  * Usage:
- *   node scripts/performance/head-to-head.mjs --workspace <mod> --cache <vanilla.pdxindex> \
+ *   node scripts/performance/head-to-head.mjs --workspace <mod> --cache <vanilla.pdcindex> \
  *       --label baseline --out performance-results/baseline.json
- *   node scripts/performance/head-to-head.mjs --workspace <mod> --cache <vanilla.pdxindex> \
+ *   node scripts/performance/head-to-head.mjs --workspace <mod> --cache <vanilla.pdcindex> \
  *       --dependency EDG=/path/to/reference-mod --label with-reference-mod
  *   node scripts/performance/head-to-head.mjs --compare performance-results/baseline.json \
  *       performance-results/candidate.json
@@ -42,9 +42,9 @@ const SCRIPT_DIRECTORIES = ['common', 'events', 'missions', 'decisions'];
 const USAGE = `Usage: node scripts/performance/head-to-head.mjs [options]
 
 Options:
-  --server PATH              pdx-ls executable (default target/release/pdx-ls[.exe])
+  --server PATH              pdc executable (default target/release/pdc[.exe])
   --workspace DIR            mod/workspace root to measure (required unless --compare)
-  --cache FILE               Vanilla .pdxindex cache (required unless --no-cache)
+  --cache FILE               Vanilla .pdcindex cache (required unless --no-cache)
   --no-cache                 run without a Vanilla cache (explicit; numbers not comparable)
   --dependency ID=PATH       live dependency root added to initializationOptions
                              (repeatable; mirrors the editor's paradoxcode.dependencies)
@@ -61,14 +61,14 @@ Options:
   --compare A.json B.json    print a delta table between two results and exit
   --help                     show this help
 
-Environment equivalents: PDX_PERF_SERVER, PDX_PERF_CACHE, PDX_PERF_SAMPLES.
+Environment equivalents: PDC_PERF_SERVER, PDC_PERF_CACHE, PDC_PERF_SAMPLES.
 `;
 
 function parseArguments(argv) {
   const options = {
-    server: process.env.PDX_PERF_SERVER,
-    cache: process.env.PDX_PERF_CACHE,
-    samples: process.env.PDX_PERF_SAMPLES ? Number(process.env.PDX_PERF_SAMPLES) : DEFAULT_SAMPLES,
+    server: process.env.PDC_PERF_SERVER,
+    cache: process.env.PDC_PERF_CACHE,
+    samples: process.env.PDC_PERF_SAMPLES ? Number(process.env.PDC_PERF_SAMPLES) : DEFAULT_SAMPLES,
     idleWindowMs: DEFAULT_IDLE_WINDOW_MS,
     closeSettleMs: DEFAULT_CLOSE_SETTLE_MS,
     editGraceMs: DEFAULT_EDIT_GRACE_MS,
@@ -262,9 +262,9 @@ async function waitForDiagnostic(client, uri, timeoutMs) {
 async function waitForReady(client, timeoutMs) {
   const started = performance.now();
   await client.waitFor(
-    (candidate) => candidate.method === 'pdx/ready',
+    (candidate) => candidate.method === 'pdc/ready',
     timeoutMs,
-    'pdx/ready',
+    'pdc/ready',
   );
   return performance.now() - started;
 }
@@ -295,10 +295,10 @@ async function runMeasurement(options) {
   }
   const serverPath = inputPath(
     options.server ??
-      join('target', 'release', process.platform === 'win32' ? 'pdx-ls.exe' : 'pdx-ls'),
+      join('target', 'release', process.platform === 'win32' ? 'pdc.exe' : 'pdc'),
     REPOSITORY_ROOT,
   );
-  requireFile(serverPath, 'pdx-ls executable');
+  requireFile(serverPath, 'pdc executable');
 
   let cache;
   if (options.noCache) {
@@ -334,7 +334,7 @@ async function runMeasurement(options) {
     }));
   }
   if (cache) initializationOptions.vanillaIndexCache = cache;
-  else initializationOptions.vanillaIndexCache = join(process.env.TMPDIR ?? '/tmp', `pdx-h2h-no-cache-${process.pid}.pdxindex`);
+  else initializationOptions.vanillaIndexCache = join(process.env.TMPDIR ?? '/tmp', `pdc-h2h-no-cache-${process.pid}.pdcindex`);
 
   const measurement = {
     label,
@@ -368,7 +368,7 @@ async function runMeasurement(options) {
       'initialize',
       {
         processId: null,
-        workspaceFolders: [{ uri: pathToFileURL(options.workspace).href, name: 'pdx-h2h' }],
+        workspaceFolders: [{ uri: pathToFileURL(options.workspace).href, name: 'pdc-h2h' }],
         capabilities: {},
         initializationOptions,
       },
@@ -387,7 +387,7 @@ async function runMeasurement(options) {
     measurement.startup.readyMs = readyMs;
     measurement.startup.readyCpuSeconds = readyCpu;
     measurement.startup.readyTotalCpuSeconds = readyCpu;
-    console.log(`pdx/ready: +${readyMs.toFixed(0)} ms (cpu ${readyCpu?.toFixed(1) ?? 'n/a'} s total)`);
+    console.log(`pdc/ready: +${readyMs.toFixed(0)} ms (cpu ${readyCpu?.toFixed(1) ?? 'n/a'} s total)`);
 
     const idleStartCpu = sampler.cpuSeconds;
     await sleep(options.idleWindowMs);

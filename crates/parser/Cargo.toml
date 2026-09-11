@@ -1,0 +1,20 @@
+[package]
+name = "parser"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Loss-aware parser and canonical formatter for ParadoxCode."
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish = false
+
+[dependencies]
+text = { path = "../text" }
+serde = { version = "1", features = ["derive", "rc"] }
+unicode-width = "0.2"
+
+[lints]
+workspace = true

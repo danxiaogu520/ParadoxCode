@@ -1,5 +1,5 @@
 [package]
-name = "pdx-fuzz"
+name = "pdc-fuzz"
 version = "0.1.0"
 edition = "2024"
 publish = false
@@ -11,11 +11,12 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-pdx-game = { path = "../crates/pdx-game" }
-pdx-engine = { path = "../crates/pdx-engine" }
-pdx-rules = { path = "../crates/pdx-rules" }
-pdx-parser = { path = "../crates/pdx-parser" }
-pdx-text = { path = "../crates/pdx-text" }
+game = { path = "../crates/game" }
+engine = { path = "../crates/engine" }
+hir = { path = "../crates/hir" }
+rules = { path = "../crates/rules" }
+parser = { path = "../crates/parser" }
+text = { path = "../crates/text" }
 
 [[bin]]
 name = "parse-script"

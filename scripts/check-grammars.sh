@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-tree_sitter_home="$(mktemp -d "${TMPDIR:-/tmp}/pdx-tree-sitter-home.XXXXXX")"
+tree_sitter_home="$(mktemp -d "${TMPDIR:-/tmp}/pdc-tree-sitter-home.XXXXXX")"
 tree_sitter_config="$tree_sitter_home/config"
 trap 'rm -r -- "$tree_sitter_home"' EXIT
 mkdir -p "$tree_sitter_config"
@@ -47,5 +47,5 @@ for grammar in \
     )
 done
 
-cargo run --locked --manifest-path "$root/Cargo.toml" --bin pdx -- check grammar-fuzz --root "$root"
+cargo run --locked --manifest-path "$root/Cargo.toml" -p tools -- check grammar-fuzz --root "$root"
 echo "Grammar checks passed."

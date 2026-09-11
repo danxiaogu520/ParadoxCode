@@ -17,7 +17,7 @@ const localisationConfiguration = readJson('localisation-language-configuration.
 if (!manifest.files?.includes('node_modules/**')) {
   fail('production node_modules must be included in the VSIX file allowlist');
 }
-if (manifest.activationEvents?.includes('workspaceContains:.pdx/project.toml')) {
+if (manifest.activationEvents?.includes('workspaceContains:.pdc/project.toml')) {
   fail('the extension must not activate from the removed shared project configuration');
 }
 if (manifest.contributes?.configuration?.properties?.['paradoxcode.projectConfig']) {
@@ -211,7 +211,7 @@ if (!localisationLanguage.filenamePatterns?.includes('**/localisation/**/*')) {
   fail('Localisation must claim all files recursively below localisation/');
 }
 if (manifest.activationEvents?.includes('onStartupFinished')) {
-  fail('the extension must not activate and download pdx-ls in unrelated workspaces');
+  fail('the extension must not activate and download pdc in unrelated workspaces');
 }
 if (!manifest.activationEvents?.includes('onLanguage:eu4')) {
   fail('opening an EU4 document must activate the zero-configuration startup path');
@@ -288,7 +288,7 @@ for (const key of [
   'walkthrough.gettingStarted.title',
   'walkthrough.vanillaData.description',
   'commands.showMissionPreview.title',
-  'configuration.pdxLsPath.description',
+  'configuration.serverPath.description',
 ]) {
   if (typeof nls[key] !== 'string' || typeof zh[key] !== 'string') {
     fail(`English and Chinese NLS entries are required for ${key}`);
@@ -333,7 +333,7 @@ if (unexpectedCommonSelectors.length > 0) {
 for (const marker of [
   'context.extension.packageJSON.version',
   'context.extensionMode !== vscode.ExtensionMode.Production',
-  'installPdxLs(context, options, progress)',
+  'installServerRelease(context, options, progress)',
   'automatic checksum-verified ParadoxCode installation',
   'paradoxcodeVanillaReady',
   "const LOCALISATION_LANGUAGE_ID = 'localisation';",

@@ -12,29 +12,23 @@ commands, symbols, and special semantics stay in the EU4 profile. Contributions 
 these boundaries:
 
 ```text
-pdx-text
-  -> pdx-parser -> pdx-engine -> pdx-analysis -> pdx-lsp
-pdx-game (EU4 profile) -> pdx-parser + pdx-text + pdx-rules
-pdx-rules -> pdx-bake
-pdx-rules + pdx-game -> pdx-engine / pdx-analysis
+text
+  -> parser -> engine -> ide -> pdc
+game (EU4 profile) -> parser + text + rules
+rules -> bake
+rules + game -> engine / ide
 ```
 
 Each layer has a strict responsibility list; details live in [`AGENTS.md`](AGENTS.md#4-architecture-boundaries).
-As a rule of thumb: EU4 name tables, scope lists, and special semantics belong in `pdx-game` (the
+As a rule of thumb: EU4 name tables, scope lists, and special semantics belong in `game` (the
 EU4 profile), never in the generic engine, LSP layer, or editor extensions.
 
 ## Prerequisites
 
 - Rust **1.98 or newer** (see `.github/workflows/ci.yml` for the enforced MSRV).
 - Node.js **24 LTS** for Tree-sitter corpus checks and the VS Code extension.
-- Git. Install the repository hooks once after cloning:
-
-```bash
-bash scripts/install-git-hooks.sh
-```
-
-The hooks run `scripts/check-quality-gates.sh` on every `git commit`, scoped to the staged paths
-(core, grammars, zed, or vscode). Set `PDX_PRECOMMIT_ALL=1` to force the full suite.
+- Git. There are no commit hooks; run the quality gates before pushing and let CI verify
+  the rest (`bash scripts/check-quality-gates.sh` with no arguments runs the full suite).
 
 ## Building and testing
 
@@ -65,12 +59,12 @@ its direct runtime dependencies, and the Windows release build runs in parallel 
 tests and clippy. Branch protection should require the stable `Required CI checks` aggregate rather
 than every conditional job.
 
-Validate and compile the first-party EU4 rule source with `pdx-bake`:
+Validate and compile the first-party EU4 rule source with `bake`:
 
 ```bash
-cargo run -p pdx-rules --bin pdx-bake -- build \
+cargo run -p rules --bin bake -- build \
   --source rules/eu4 \
-  --output target/rules/eu4.pdxrules \
+  --output target/rules/eu4.pdcrules \
   --manifest target/rules/manifest.json
 ```
 
@@ -154,12 +148,12 @@ These are the invariants the repository enforces; please keep them in mind in ev
 
 Pick the level that matches the change:
 
-- `pdx-text`: offsets, line endings, UTF-16, URI/path.
-- `pdx-parser`: typed CST, error recovery, incremental edits, formatter safety, token preservation.
-- `pdx-rules` / `pdx-bake`: schema, foreign keys, stable identity, deterministic hash, round-trip.
-- `pdx-engine`: scope transitions, unknown context, source-root order, overlay, shard replacement.
-- `pdx-analysis`: diagnostics, completion, definition, references, hover, rename.
-- `pdx-lsp`: real JSON-RPC transport, out-of-order versions, cancellation, stale diagnostics.
+- `text`: offsets, line endings, UTF-16, URI/path.
+- `parser`: typed CST, error recovery, incremental edits, formatter safety, token preservation.
+- `rules` / `bake`: schema, foreign keys, stable identity, deterministic hash, round-trip.
+- `engine`: scope transitions, unknown context, source-root order, overlay, shard replacement.
+- `ide`: diagnostics, completion, definition, references, hover, rename.
+- `pdc`: real JSON-RPC transport, out-of-order versions, cancellation, stale diagnostics.
 - Editors: manifest/build smoke tests and file recognition tests.
 
 Fuzz targets live in `fuzz/`. Any crash discovered in fuzzing must be added to the regression

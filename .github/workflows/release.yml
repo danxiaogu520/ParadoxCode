@@ -45,19 +45,19 @@ jobs:
         include:
           - runner: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
-            binary: pdx-ls
+            binary: pdc
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            binary: pdx-ls
+            binary: pdc
           - runner: macos-15-intel
             target: x86_64-apple-darwin
-            binary: pdx-ls
+            binary: pdc
           - runner: macos-15
             target: aarch64-apple-darwin
-            binary: pdx-ls
+            binary: pdc
           - runner: windows-2025
             target: x86_64-pc-windows-msvc
-            binary: pdx-ls.exe
+            binary: pdc.exe
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     steps:
@@ -72,19 +72,19 @@ jobs:
           key: release-${{ matrix.target }}
       - name: Build server
         shell: bash
-        run: cargo build --locked --release -p pdx-lsp --bin pdx-ls --target "${{ matrix.target }}"
+        run: cargo build --locked --release -p pdc --bin pdc --target "${{ matrix.target }}"
       - name: Verify release version
         shell: bash
         run: |
           version="${RELEASE_TAG#v}"
-          cargo run --locked --bin pdx -- check policy --root .
+          cargo run --locked -p tools -- check policy --root .
           binary="target/${{ matrix.target }}/release/${{ matrix.binary }}"
-          test "$("$binary" --version)" = "pdx-ls $version"
+          test "$("$binary" --version)" = "pdc $version"
       - name: Package server and checksum
         shell: bash
         run: |
           version="${RELEASE_TAG#v}"
-          cargo run --locked --bin pdx -- release package \
+          cargo run --locked -p tools -- release package \
             --version "$version" \
             --target "${{ matrix.target }}" \
             --binary "target/${{ matrix.target }}/release/${{ matrix.binary }}" \
@@ -118,7 +118,7 @@ jobs:
       - name: Verify complete matrix and checksums
         shell: bash
         run: |
-          cargo run --locked --bin pdx -- release verify \
+          cargo run --locked -p tools -- release verify \
             --version "${RELEASE_TAG#v}" \
             --directory dist \
             --root .

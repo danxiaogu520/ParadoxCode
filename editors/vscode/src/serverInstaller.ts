@@ -37,25 +37,25 @@ export interface ServerInstallOptions {
 
 function platformArtifact(): ServerArtifact {
     if (process.platform === 'win32' && process.arch === 'x64') {
-        return { target: 'x86_64-pc-windows-msvc', binary: 'pdx-ls.exe', extension: 'zip' };
+        return { target: 'x86_64-pc-windows-msvc', binary: 'pdc.exe', extension: 'zip' };
     }
     if (process.platform === 'linux' && process.arch === 'x64') {
-        return { target: 'x86_64-unknown-linux-gnu', binary: 'pdx-ls', extension: 'tar.gz' };
+        return { target: 'x86_64-unknown-linux-gnu', binary: 'pdc', extension: 'tar.gz' };
     }
     if (process.platform === 'linux' && process.arch === 'arm64') {
-        return { target: 'aarch64-unknown-linux-gnu', binary: 'pdx-ls', extension: 'tar.gz' };
+        return { target: 'aarch64-unknown-linux-gnu', binary: 'pdc', extension: 'tar.gz' };
     }
     if (process.platform === 'darwin' && process.arch === 'x64') {
-        return { target: 'x86_64-apple-darwin', binary: 'pdx-ls', extension: 'tar.gz' };
+        return { target: 'x86_64-apple-darwin', binary: 'pdc', extension: 'tar.gz' };
     }
     if (process.platform === 'darwin' && process.arch === 'arm64') {
-        return { target: 'aarch64-apple-darwin', binary: 'pdx-ls', extension: 'tar.gz' };
+        return { target: 'aarch64-apple-darwin', binary: 'pdc', extension: 'tar.gz' };
     }
-    throw new Error(`ParadoxCode does not publish pdx-ls for ${process.platform}/${process.arch}.`);
+    throw new Error(`ParadoxCode does not publish pdc for ${process.platform}/${process.arch}.`);
 }
 
 export function archiveName(version: string, artifact: ServerArtifact): string {
-    return `pdx-ls-v${version}-${artifact.target}.${artifact.extension}`;
+    return `pdc-v${version}-${artifact.target}.${artifact.extension}`;
 }
 
 export function releaseAssetUrl(repository: string, version: string, archive: string): string {
@@ -198,7 +198,7 @@ async function extractArchive(archive: string, destination: string, artifact: Se
         );
         const entries = listing.stdout.split(/\r?\n/).map((entry) => entry.trim()).filter(Boolean);
         if (entries.length !== 1 || entries[0].replace(/\/$/, '') !== artifact.binary) {
-            throw new Error(`The pdx-ls archive must contain only ${artifact.binary}.`);
+            throw new Error(`The pdc archive must contain only ${artifact.binary}.`);
         }
         for (const entry of entries) {
             const normalized = entry.replace(/\\/g, '/');
@@ -208,7 +208,7 @@ async function extractArchive(archive: string, destination: string, artifact: Se
                 || normalized.split('/').some((part) => part === '..')
                 || normalized.length > 4_096
             ) {
-                throw new Error(`The pdx-ls archive contains an unsafe path: ${entry}`);
+                throw new Error(`The pdc archive contains an unsafe path: ${entry}`);
             }
         }
         const details = await execFileAsync(
@@ -217,7 +217,7 @@ async function extractArchive(archive: string, destination: string, artifact: Se
             { windowsHide: true, maxBuffer: 2 * 1024 * 1024 },
         );
         if (details.stdout.split(/\r?\n/).some((line) => /^[lh]/.test(line))) {
-            throw new Error('The pdx-ls archive must not contain symbolic or hard links.');
+            throw new Error('The pdc archive must not contain symbolic or hard links.');
         }
         if (artifact.extension === 'tar.gz') {
             await execFileAsync('tar', ['-xzf', archive, '-C', destination], { windowsHide: true });
@@ -229,7 +229,7 @@ async function extractArchive(archive: string, destination: string, artifact: Se
             && String((error as { code?: unknown }).code) === 'ENOENT';
         if (artifact.extension !== 'zip' || process.platform !== 'win32' || !commandMissing) {
             const message = error instanceof Error ? error.message : String(error);
-            throw new Error(`Could not extract the pdx-ls archive: ${message}`);
+            throw new Error(`Could not extract the pdc archive: ${message}`);
         }
         // Windows installations without bsdtar still have PowerShell's archive support. The
         // paths are encoded as single-quoted literals, so a downloaded filename cannot become
@@ -253,7 +253,7 @@ async function findBinary(root: string, binary: string): Promise<string> {
         for (const entry of entries) {
             visited += 1;
             if (visited > 512) {
-                throw new Error('The pdx-ls archive contains too many entries.');
+                throw new Error('The pdc archive contains too many entries.');
             }
             const candidate = path.join(current.directory, entry.name);
             if (entry.isFile() && entry.name === binary) {
@@ -264,7 +264,7 @@ async function findBinary(root: string, binary: string): Promise<string> {
             }
         }
     }
-    throw new Error(`The pdx-ls archive did not contain ${binary}.`);
+    throw new Error(`The pdc archive did not contain ${binary}.`);
 }
 
 async function replaceFile(source: string, target: string): Promise<void> {
@@ -284,7 +284,7 @@ async function replaceFile(source: string, target: string): Promise<void> {
 }
 
 export function defaultInstallDirectory(context: vscode.ExtensionContext): string {
-    return path.join(context.globalStorageUri.fsPath, 'pdx-ls');
+    return path.join(context.globalStorageUri.fsPath, 'pdc');
 }
 
 export function cachedServerPath(
@@ -315,7 +315,7 @@ export function cachedServerPath(
     }
 }
 
-export async function installPdxLs(
+export async function installServerRelease(
     context: vscode.ExtensionContext,
     options: ServerInstallOptions,
     progress?: vscode.Progress<{ message?: string; increment?: number }>,
@@ -350,18 +350,18 @@ export async function installPdxLs(
         progress?.report({ message: `Downloading ${archive}`, increment: 5 });
         const sidecar = await fetchBytes(checksumUrl, MAX_CHECKSUM_BYTES, 'checksum sidecar');
         const expectedArchiveDigest = parseExpectedChecksum(sidecar.toString('utf8'), archive);
-        progress?.report({ message: 'Downloading and verifying pdx-ls', increment: 30 });
+        progress?.report({ message: 'Downloading and verifying pdc', increment: 30 });
         const archiveBytes = await fetchBytes(archiveUrl, MAX_ARCHIVE_BYTES, 'server archive');
         if (sha256(archiveBytes) !== expectedArchiveDigest) {
-            throw new Error(`The downloaded pdx-ls archive failed SHA-256 verification: ${archive}.`);
+            throw new Error(`The downloaded pdc archive failed SHA-256 verification: ${archive}.`);
         }
         await fs.writeFile(archivePath, archiveBytes);
-        progress?.report({ message: 'Extracting pdx-ls', increment: 35 });
+        progress?.report({ message: 'Extracting pdc', increment: 35 });
         await extractArchive(archivePath, extractedPath, artifact);
         const extractedBinary = await findBinary(extractedPath, artifact.binary);
         const executable = await fs.readFile(extractedBinary);
         if (executable.length === 0 || executable.length > MAX_EXECUTABLE_BYTES) {
-            throw new Error('The extracted pdx-ls executable exceeds the safety limit.');
+            throw new Error('The extracted pdc executable exceeds the safety limit.');
         }
         const executableDigest = sha256(executable);
         const temporaryBinary = path.join(temporaryRoot, artifact.binary);
@@ -373,7 +373,7 @@ export async function installPdxLs(
         }
         await replaceFile(temporaryBinary, binaryPath);
         await replaceFile(temporaryChecksum, checksumPath);
-        progress?.report({ message: 'pdx-ls installed', increment: 30 });
+        progress?.report({ message: 'pdc installed', increment: 30 });
         return binaryPath;
     } finally {
         await fs.rm(temporaryRoot, { recursive: true, force: true });

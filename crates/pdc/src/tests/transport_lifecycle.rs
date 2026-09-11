@@ -1,0 +1,298 @@
+use std::fs;
+use std::io::Cursor;
+
+use rules::{RuleSet, RulesError, RulesModel};
+use serde_json::{Value, json};
+use text::TextRange;
+
+use super::*;
+
+#[test]
+fn transport_framing_rejects_oversized_and_ambiguous_headers() {
+    let oversized = format!(
+        "Content-Length: {}\r\n\r\n",
+        MAX_LSP_MESSAGE_BYTES.saturating_add(1)
+    );
+    assert!(matches!(
+        read_message(&mut Cursor::new(oversized)),
+        Err(LspError::Protocol(message)) if message.contains("safety limit")
+    ));
+
+    let duplicate = b"Content-Length: 2\r\nContent-Length: 2\r\n\r\n{}";
+    assert!(matches!(
+        read_message(&mut Cursor::new(duplicate)),
+        Err(LspError::Protocol(message)) if message.contains("duplicate")
+    ));
+
+    let oversized_header = format!("X-Test: {}\r\n\r\n", "x".repeat(MAX_LSP_HEADER_BYTES));
+    assert!(matches!(
+        read_message(&mut Cursor::new(oversized_header)),
+        Err(LspError::Protocol(message)) if message.contains("headers")
+    ));
+}
+
+#[test]
+fn document_changes_are_bounded_before_allocation() {
+    assert_eq!(
+        changed_document_len(0, None, MAX_DOCUMENT_BYTES).expect("boundary document"),
+        MAX_DOCUMENT_BYTES
+    );
+    assert!(changed_document_len(0, None, MAX_DOCUMENT_BYTES + 1).is_err());
+    assert!(
+        changed_document_len(
+            MAX_DOCUMENT_BYTES,
+            Some(TextRange::new(0, 1).expect("range")),
+            2,
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn ranked_result_limits_report_completion_truncation() {
+    let (values, incomplete) = bounded_results(vec![0, 1, 2, 3], 3);
+    assert_eq!(values, [0, 1, 2]);
+    assert!(incomplete);
+    let (values, incomplete) = bounded_results(vec![0, 1, 2], 3);
+    assert_eq!(values, [0, 1, 2]);
+    assert!(!incomplete);
+    assert_eq!(diagnostic_result_counts(3, 3), (3, 0));
+    assert_eq!(diagnostic_result_counts(4, 3), (2, 2));
+}
+#[test]
+fn uri_round_trip_preserves_unicode_and_spaces() {
+    let path = std::env::temp_dir().join("Paradox Code").join("汉.txt");
+    let uri = path_to_uri(&path);
+    assert!(uri.contains("%20"));
+    assert_eq!(uri_to_path(&uri).expect("URI should decode"), path);
+}
+
+/// `pdcloc://` is the extension's decoded view over a real file: the path
+/// must resolve to the same on-disk location the `file://` spelling does, so
+/// a virtually opened document attaches to (and hides) its backing file.
+#[test]
+fn pdcloc_uris_resolve_to_the_backing_file_path() {
+    assert_eq!(
+        uri_to_path("pdcloc:///C:/mods/edg/localisation/replace/edg_l_english.yml")
+            .expect("pdcloc URI should decode"),
+        std::path::PathBuf::from("C:/mods/edg/localisation/replace/edg_l_english.yml")
+    );
+    assert_eq!(
+        uri_to_path("pdcloc://localhost/C:/mods/edg/history/countries/CHI%20-%20Ming.txt")
+            .expect("pdcloc URI with localhost authority should decode"),
+        std::path::PathBuf::from("C:/mods/edg/history/countries/CHI - Ming.txt")
+    );
+    assert_eq!(
+        uri_to_path(&format!(
+            "pdcloc://{}",
+            path_to_uri(std::path::Path::new("/tmp/edg/localisation/x.yml"))
+                .trim_start_matches("file://")
+        ))
+        .expect("scheme-swapped file URI should decode"),
+        // The Windows branch of `uri_to_path` drops the leading `/` of a
+        // POSIX-style path just like it does for `file://` URIs.
+        std::path::PathBuf::from(if cfg!(windows) {
+            "tmp/edg/localisation/x.yml"
+        } else {
+            "/tmp/edg/localisation/x.yml"
+        })
+    );
+    assert!(uri_to_path("pdcloc://remote/share/file.yml").is_err());
+    assert!(uri_to_path("untitled:Untitled-1").is_err());
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_file_uri_normalizes_extended_canonical_paths() {
+    let path = std::path::Path::new(r"\\?\C:\Paradox Code\events\test.txt");
+    let uri = path_to_uri(path);
+    assert_eq!(uri, "file:///C:/Paradox%20Code/events/test.txt");
+    assert!(!uri.contains("%5C"));
+    assert!(!uri.contains("%3F"));
+}
+
+#[test]
+fn selected_game_rejects_a_mismatched_rules_artifact() {
+    let rules = RuleSet::from_model(RulesModel {
+        game_id: "another-game".to_owned(),
+        ..RulesModel::default()
+    });
+
+    let error = LspServer::try_new_with_rules(InitializeOptions, rules, game::eu4::profile())
+        .expect_err("mismatched game must be rejected");
+    assert!(matches!(
+        error,
+        LspError::Rules(RulesError::GameMismatch { expected, actual })
+            if expected == "eu4" && actual == "another-game"
+    ));
+}
+
+#[test]
+fn memory_transport_runs_real_json_rpc_lifecycle_and_sync() {
+    let path = std::env::temp_dir().join(format!("pdc-{}.txt", std::process::id()));
+    fs::write(&path, "disk").expect("write disk fixture");
+    let uri = path_to_uri(&path);
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"workspaceFolders":[{"uri":uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({
+            "jsonrpc":"2.0",
+            "method":"textDocument/didOpen",
+            "params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":"a\r\n汉😀e\u{301}\r\n"}}
+        }),
+        json!({
+            "jsonrpc":"2.0",
+            "method":"textDocument/didChange",
+            "params":{"textDocument":{"uri":uri,"version":2},"contentChanges":[{"range":{"start":{"line":1,"character":1},"end":{"line":1,"character":3}},"text":"猫"}]}
+        }),
+        json!({
+            "jsonrpc":"2.0",
+            "method":"textDocument/didChange",
+            "params":{"textDocument":{"uri":uri,"version":1},"contentChanges":[{"text":"stale"}]}
+        }),
+        json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":99}}),
+        json!({"jsonrpc":"2.0","id":99,"method":"textDocument/hover","params":{}}),
+        json!({
+            "jsonrpc":"2.0",
+            "method":"textDocument/didChange",
+            "params":{"textDocument":{"uri":uri,"version":3},"contentChanges":[{"text":"current"}]}
+        }),
+        json!({"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":uri}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("syntax-only server should initialize");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport should finish");
+
+    let responses = decode_frames(&output);
+    let before_initialize = responses
+        .iter()
+        .find(|value| value["id"] == 1)
+        .expect("pre-init response");
+    assert_eq!(before_initialize["error"]["code"], -32002);
+    let initialize = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("initialize response");
+    assert_eq!(
+        initialize["result"]["capabilities"]["textDocumentSync"]["change"],
+        2
+    );
+    assert_eq!(
+        initialize["result"]["capabilities"]["renameProvider"]["prepareProvider"],
+        true
+    );
+    assert_eq!(
+        initialize["result"]["capabilities"]["documentFormattingProvider"],
+        true
+    );
+    let cancelled = responses
+        .iter()
+        .find(|value| value["id"] == 99)
+        .expect("cancelled response");
+    assert_eq!(cancelled["error"]["code"], -32800);
+    let shutdown = responses
+        .iter()
+        .find(|value| value["id"] == 4)
+        .expect("shutdown response");
+    assert_eq!(shutdown["result"], Value::Null);
+    assert!(
+        responses
+            .iter()
+            .any(|value| value["method"] == "textDocument/publishDiagnostics")
+    );
+    let snapshot = server.snapshot();
+    let document = snapshot
+        .document(&engine::DocumentId::new(uri.clone()))
+        .expect("close restores disk candidate");
+    assert_eq!(document.text(), "disk");
+    assert_eq!(document.version(), None);
+    assert_eq!(server.state(), ServerState::Exited);
+    fs::remove_file(path).expect("remove disk fixture");
+}
+
+#[test]
+fn typed_protocol_rejects_malformed_params_without_corrupting_lifecycle() {
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":"file:///tmp","name":"test"}]}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"workspaceFolders":[{"uri":"file:///tmp","name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("server");
+
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+
+    let responses = decode_frames(&output);
+    let malformed_initialize = responses
+        .iter()
+        .find(|value| value["id"] == 1)
+        .expect("invalid initialize");
+    assert_eq!(malformed_initialize["error"]["code"], INVALID_PARAMS);
+    assert!(
+        malformed_initialize["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("invalid initialize params"))
+    );
+    assert!(
+        responses
+            .iter()
+            .find(|value| value["id"] == 2)
+            .is_some_and(|value| value["result"]["capabilities"].is_object())
+    );
+    let malformed_hover = responses
+        .iter()
+        .find(|value| value["id"] == 3)
+        .expect("invalid hover");
+    assert_eq!(malformed_hover["error"]["code"], INVALID_PARAMS);
+    assert_eq!(server.state(), ServerState::Exited);
+}
+
+#[test]
+fn initialize_rejects_root_uri_only_clients() {
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp","capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"workspaceFolders":[{"uri":"file:///tmp","name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("server");
+
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+
+    let responses = decode_frames(&output);
+    let initialize = responses
+        .iter()
+        .find(|value| value["id"] == 1)
+        .expect("initialize response");
+    assert_eq!(initialize["error"]["code"], INVALID_PARAMS);
+    assert_eq!(
+        initialize["error"]["message"],
+        "initialize requires at least one workspace folder; rootUri-only clients are not supported"
+    );
+    assert!(
+        responses
+            .iter()
+            .find(|value| value["id"] == 2)
+            .is_some_and(|value| value["result"]["capabilities"].is_object())
+    );
+    assert!(
+        responses
+            .iter()
+            .any(|value| value["id"] == 3 && value["result"].is_null())
+    );
+    assert_eq!(server.state(), ServerState::Exited);
+}

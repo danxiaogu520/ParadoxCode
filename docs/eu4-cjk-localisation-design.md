@@ -97,7 +97,7 @@ UTF-8 BOM、CRLF、键名、引号缩进、`§Y`/`$VAR$`/`@KTP`/`[…]` 命令�
 |---|---|---|
 | 码点 `0x1000–0xFFFF`（含全部常用 CJK） | 完全正确 | 正常读写 |
 | 码点 `0x100–0xFFF`（拉丁扩展/希腊/西里尔等） | 生态统一按 3 位 hex 切片，**往返会变字**（U+0160→U+1660） | encode 拒绝 + 诊断（EU4 中文 loc 不涉及） |
-| 上行的例外：27 个 CP1252 字符中的 8 个落在 `U+0100..U+0FFF`（Š œ ƒ Œ 等） | 形态 A：仍拒绝（三元组路径必被切片破坏）；形态 B：**单字节路径精确往返**（310 文件语料实证必需） | `pdx-codec` 已实现该例外并有单测锁定 |
+| 上行的例外：27 个 CP1252 字符中的 8 个落在 `U+0100..U+0FFF`（Š œ ƒ Œ 等） | 形态 A：仍拒绝（三元组路径必被切片破坏）；形态 B：**单字节路径精确往返**（310 文件语料实证必需） | `transcode` 已实现该例外并有单测锁定 |
 | 码点 ≥ `0x10000`（emoji、扩展 B 区生僻字） | 生态统一破坏（5 位 hex 切片错乱），游戏字体亦无字形 | encode 拒绝 + 诊断 |
 | 纯 ASCII | 恒等变换 | 无歧义 |
 | 形态 B 的 `0x80–0x9F` 三元组外原始字节（注释里的 CP1252 字符） | 历史工具按当时编码检测结果或直通或编为三元组（两种形态实测并存） | decode 统一按 CP1252 显示（0x91→`'`）；encode 统一单字节回写；两种历史形态均正确解码，重编码可能有字节级差异（仅注释，游戏等价） |
@@ -150,23 +150,23 @@ UTF-8 BOM、CRLF、键名、引号缩进、`§Y`/`$VAR$`/`@KTP`/`[…]` 命令�
 ```
 ┌─ VS Code ────────────────────────────────────────────────┐
 │  编辑器视图（中文）                                        │
-│      ↕ FileSystemProvider (scheme: pdxloc://)             │
+│      ↕ FileSystemProvider (scheme: pdcloc://)             │
 │  readFile:  磁盘字节 → decode → 可读 UTF-8                │
 │  writeFile: 可读 UTF-8 → [分类器 §5] → encode → 磁盘字节   │
 │      ↕ LSP client（虚拟文档 textSync：didOpen/didChange    │
 │                     只传解码后全文，服务端不读盘）           │
-├─ pdx-ls（现有）──────────────────────────────────────────┤
+├─ pdc（现有）──────────────────────────────────────────┤
 │  localisation 解析/诊断/补全 — 坐标即视图坐标，零映射        │
 └───────────────────────────────────────────────────────────┘
   codec：Rust crate（规范档 + 变体档 decode）→ TS 孪生实现供扩展进程内调用（差分锁定）；
-        同一 crate 供 pdx-ls 原生链接（单一实现，杜绝三处漂移）
+        同一 crate 供 pdc 原生链接（单一实现，杜绝三处漂移）
 ```
 
 要点：
 
-- **codec 单一来源**：Rust 纯函数 crate（建议 `pdx-codec`，或并入 `pdx-parser`），
-  TS 孪生（`editors/vscode/src/pdxCodec.ts`）给扩展进程内调用；等价性由黄金语料 + 差分向量（`pdx-codec-vectors`）锁定。
-- **虚拟 scheme**：`pdxloc://file/c/…/replace/xxx.yml` ↔ 真实路径一一级联映射；
+- **codec 单一来源**：Rust 纯函数 crate（建议 `transcode`，或并入 `parser`），
+  TS 孪生（`editors/vscode/src/transcode.ts`）给扩展进程内调用；等价性由黄金语料 + 差分向量（`transcode-vectors`）锁定。
+- **虚拟 scheme**：`pdcloc://file/c/…/replace/xxx.yml` ↔ 真实路径一一级联映射；
   打开方式：命令 `ParadoxCode: 以中文打开发行本`、文件资源管理器 context menu、或对
   `localisation` 目录下文件自动提示。
 - **脚本文件接入**（形态 B）：同一 provider，按文件类型选档（yml→A，`history/`、
@@ -246,12 +246,12 @@ UTF-8 BOM、CRLF、键名、引号缩进、`§Y`/`$VAR$`/`@KTP`/`[…]` 命令�
 
 | 事实 | 证据 |
 |---|---|
-| ✅ 层序已存在：Vanilla 0 < Dependency 1..n（声明序）< CurrentMod n+1 | `pdx-engine/src/scan.rs:629`、`model.rs:67` |
-| ✅ localisation 符号策略 `replace-by-symbol` + 大小写不敏感，层间遮蔽已生效 | `rules/eu4/catalog/symbol-descriptors.json:4369`、`pdx-engine/src/index.rs:1095` |
-| ❌ 同层并列：同层多文件同键**全部 active**（`== highest` 即胜），胜者由消费方 (优先级, 路径字典序, range) 排序碰巧选出；`l_english/` 字典序先于 `replace/`，与游戏"replace/ 后加载、后者胜"**相反** | `index.rs:1145`、`pdx-analysis/src/resolution.rs:952` |
+| ✅ 层序已存在：Vanilla 0 < Dependency 1..n（声明序）< CurrentMod n+1 | `engine/src/scan.rs:629`、`model.rs:67` |
+| ✅ localisation 符号策略 `replace-by-symbol` + 大小写不敏感，层间遮蔽已生效 | `rules/eu4/catalog/symbol-descriptors.json:4369`、`engine/src/index.rs:1095` |
+| ❌ 同层并列：同层多文件同键**全部 active**（`== highest` 即胜），胜者由消费方 (优先级, 路径字典序, range) 排序碰巧选出；`l_english/` 字典序先于 `replace/`，与游戏"replace/ 后加载、后者胜"**相反** | `index.rs:1145`、`ide/src/resolution.rs:952` |
 | ❌ 值未解码：形态 A 是合法 UTF-8，读取直接成功（不触发 1252 回退），preview 存转码形态乱码 | `scan.rs:430`、`model.rs:529` |
 | ❌ 版本号（`key:2`）在 HIR 收集时丢弃 | `hir/collector.rs:77` |
-| 纠错（调查初版结论有误） | `localisation/replace/` **确实被索引**：扫描根 `localisation` 无深度限制、递归遍历、yml 在白名单（`filesystem.json:128`、`pdx-rules/src/profile.rs:906`）——两棵树如今都在库里，这正是多值现场 |
+| 纠错（调查初版结论有误） | `localisation/replace/` **确实被索引**：扫描根 `localisation` 无深度限制、递归遍历、yml 在白名单（`filesystem.json:128`、`rules/src/profile.rs:906`）——两棵树如今都在库里，这正是多值现场 |
 
 ### 7.2 全序规则（2026-09-11 用户裁定）
 
@@ -273,7 +273,7 @@ UTF-8 BOM、CRLF、键名、引号缩进、`§Y`/`$VAR$`/`@KTP`/`[…]` 命令�
 ### 7.3 实现落点（2026-09-11 已落地，与初版设计有一处偏离）
 
 **关键偏离**：解码不进 scan.rs ingest（文档级换文本、坐标错位、需 offset 映射），而是
-**值级解码在 preview 派生处**（`pdx_codec::decode_value`）。理由：
+**值级解码在 preview 派生处**（`transcode::decode_value`）。理由：
 
 - 文档文本保持磁盘原样 → 跳转定义/hover/诊断的 range 永不错位，**offset 映射问题整体不存在**；
 - 缓存安装路径（`model.rs` preview 派生）与懒解析路径（`localisation.rs` CST 回退）共用同一
@@ -284,16 +284,16 @@ UTF-8 BOM、CRLF、键名、引号缩进、`§Y`/`$VAR$`/`@KTP`/`[…]` 命令�
 
 | 改动 | 位置 | 内容 | 状态 |
 |---|---|---|---|
-| 值级解码（缓存侧） | `pdx-engine/src/model.rs` | `localisation_previews_from_parsed` 去引号后接 `decode_value`，再截断进 preview | ✅ |
-| 值级解码（懒解析侧） | `pdx-analysis/src/localisation.rs` | `localisation_preview` CST 回退同样接 `decode_value` | ✅ |
-| ingest 三元组豁免 | `pdx-engine/src/scan.rs` | `sanitize_recovered_text` 的坏字符标记循环**整组消费合法三元组**（marker+2 payload，index+=3），转码 marker 不再被空格化；孤儿 marker 仍标记（payload 安全性由逃逸集保证：三元组内不含引号/换行/#） | ✅ |
-| 单值出口 | `pdx-analysis/src/resolution.rs`、`localisation.rs` | `effective_localisation_candidate`：候选按（层优先级降序, 读取序升序）排序后，取头部同层运行段的**最后**一个；`localisation_values_by_key`（mission preview）与 `localisation_previews_for_name`（hover，按语言分组、同层后来居上）均走该出口 | ✅ |
+| 值级解码（缓存侧） | `engine/src/model.rs` | `localisation_previews_from_parsed` 去引号后接 `decode_value`，再截断进 preview | ✅ |
+| 值级解码（懒解析侧） | `ide/src/localisation.rs` | `localisation_preview` CST 回退同样接 `decode_value` | ✅ |
+| ingest 三元组豁免 | `engine/src/scan.rs` | `sanitize_recovered_text` 的坏字符标记循环**整组消费合法三元组**（marker+2 payload，index+=3），转码 marker 不再被空格化；孤儿 marker 仍标记（payload 安全性由逃逸集保证：三元组内不含引号/换行/#） | ✅ |
+| 单值出口 | `ide/src/resolution.rs`、`localisation.rs` | `effective_localisation_candidate`：候选按（层优先级降序, 读取序升序）排序后，取头部同层运行段的**最后**一个；`localisation_values_by_key`（mission preview）与 `localisation_previews_for_name`（hover，按语言分组、同层后来居上）均走该出口 | ✅ |
 | 索引层不动 | `index.rs` | active 语义保持现状（`== highest` 同层并列）；跨语言同键依赖并列，按语言分组是消费方职责 | ✅（维持原判） |
-| 缓存失效 | `index_cache` | schema 13→14；`write.rs` 落 `codec_version` 元数据（=`pdx_codec::CODEC_VERSION`），`read.rs` 读取时不匹配即按 `UnsupportedSchema` 整体失效重扫 | ✅ |
-| 坐标一致性 | 跳转定义 | 由值级解码决策**消解**：文档坐标即磁盘坐标，无需映射；P2 的 `pdxloc://` 视图独立于本项，不互相依赖 | ✅（问题不存在） |
+| 缓存失效 | `index_cache` | schema 13→14；`write.rs` 落 `codec_version` 元数据（=`transcode::CODEC_VERSION`），`read.rs` 读取时不匹配即按 `UnsupportedSchema` 整体失效重扫 | ✅ |
+| 坐标一致性 | 跳转定义 | 由值级解码决策**消解**：文档坐标即磁盘坐标，无需映射；P2 的 `pdcloc://` 视图独立于本项，不互相依赖 | ✅（问题不存在） |
 
-测试锁定：`pdx-engine/src/tests/localisation.rs`（双树预览解码 + 单三元组值）、
-`pdx-analysis/src/tests/hover.rs::localisation_values_by_key_apply_the_layer_then_read_order_total_order`
+测试锁定：`engine/src/tests/localisation.rs`（双树预览解码 + 单三元组值）、
+`ide/src/tests/hover.rs::localisation_values_by_key_apply_the_layer_then_read_order_total_order`
 （层序压倒读序、`replace/` 后读胜、法语单语言键照常解析）。
 
 ### 7.4 双树过渡与终态
@@ -307,19 +307,19 @@ UTF-8 BOM、CRLF、键名、引号缩进、`§Y`/`$VAR$`/`@KTP`/`[…]` 命令�
 
 | 阶段 | 内容 | 产物 |
 |---|---|---|
-| P1 ✅（2026-09-11 完成） | `pdx-codec` crate：双档 encode/decode/classify + §3.2 黄金语料（native；语料含 EDG-KTP 文件对、310 文件脚本语料样本、全字节覆盖矩阵） | crate + 测试（37 项全绿，EDG-KTP 双向逐字节通过；语料位于 `crates/pdx-codec/tests/`） |
-| P2 ✅（2026-09-11 完成） | VS Code 扩展透明读写：`pdxloc://` FileSystemProvider（yml A 档 + 脚本 B 档，双档读门槛同为 `classify == Escaped`）+ 写入防二次编码闸门（Escaped/Mixed 缓冲拒绝保存并弹窗）+ 边界码点拒绝 + 状态栏 + 打开/揭示/转码（备份 `.pre-transcode.bak`）命令 + 打开原始路径自动提示；LSP 虚拟文档 textSync 经 `documentSelector` 的 `pdxloc` scheme 项 | `editors/vscode/src/transparentLoc.ts`、开关 `paradoxcode.localisation.transparentEncoding`（默认开）+ `transparentScriptGlobs`（默认 `history/**`）；**扩展侧绑定形态（2026-09-11 改版）：TS 孪生实现 `editors/vscode/src/pdxCodec.ts` 直接进程内调用，不再经 WASM**（首版曾用手写 `extern "C"` ABI 的 `pdx-codec-wasm` cdylib + 随包 `pdx_codec.wasm`，后按维护者决策移除：算法固定、双实现 + 强测试防护优先于单源编译）；等价性防护 = EDG-KTP 黄金语料逐字节（`scripts/codec-ts-test.mjs`）+ Rust↔TS 差分向量（`cargo run -p pdx-codec --bin pdx-codec-vectors` 出全码点扫描/随机序列，74,549 条全对拍，已接入 `npm run test:ci`/`test:contract`）；服务端 `uri.rs` 接受 `pdxloc://`（空 authority，路径即真实文件），虚拟文档挂接并遮蔽磁盘分片，坐标即视图坐标 |
-| P3 ✅（2026-09-11 完成） | 诊断六件套接入 LSP/`docs/diagnostics.md`：服务端 `pdx-analysis` 新增 `transcode` 诊断 pass（挂在 localisation 命令诊断之后，逐文档分类+按码上报）——`LocalisationNotTranscoded`（仅 `localisation/**replace**` 发行路径、锚首个裸 CJK）/ `LocalisationMixedEncoding`（Error，锚首个证据字符）/ `LocalisationBrokenEscapeSequence`（"转码为主+孤立 marker"细分支：E≥3 且裸 CJK=0 时逐孤立 marker Warning，不降级为 Mixed）/ `LocalisationUnencodableCodePoint`（profile 感知，Script 豁免 27 个 CP1252 映射字符，上限 32）/ `ScriptLegacyEscapeVariant`（decode→re-encode 字符级往返比对检出历史变体档，Hint）/ `LocalisationEscapeRefused`（仅客户端保存闸门，注册供过滤/覆盖，服务端不发）；`pdx-lsp` 走既有 codeDescription 管线（锚=小写码名）；扩展端 `handleDiagnostics` 中间件对 `pdxloc://` 视图抑制 `LocalisationNotTranscoded`（解码视图可读 CJK 是设计使然） | `crates/pdx-analysis/src/transcode.rs` + `types.rs` 六码 + 测试 `tests/transcode.rs`（6 项：release 路径根挂接、主树安静、混合首证据、孤立 marker、profile 边界 Š/😀、canonical vs DllFull 变体）；`docs/diagnostics.md` 六节 + 迁移注记；P2 客户端 3 码与保存闸门维持原状，全工作区 795+ 测试/clippy/fmt 绿、扩展五项契约绿 |
+| P1 ✅（2026-09-11 完成） | `transcode` crate：双档 encode/decode/classify + §3.2 黄金语料（native；语料含 EDG-KTP 文件对、310 文件脚本语料样本、全字节覆盖矩阵） | crate + 测试（37 项全绿，EDG-KTP 双向逐字节通过；语料位于 `crates/transcode/tests/`） |
+| P2 ✅（2026-09-11 完成） | VS Code 扩展透明读写：`pdcloc://` FileSystemProvider（yml A 档 + 脚本 B 档，双档读门槛同为 `classify == Escaped`）+ 写入防二次编码闸门（Escaped/Mixed 缓冲拒绝保存并弹窗）+ 边界码点拒绝 + 状态栏 + 打开/揭示/转码（备份 `.pre-transcode.bak`）命令 + 打开原始路径自动提示；LSP 虚拟文档 textSync 经 `documentSelector` 的 `pdcloc` scheme 项 | `editors/vscode/src/transparentLoc.ts`、开关 `paradoxcode.localisation.transparentEncoding`（默认开）+ `transparentScriptGlobs`（默认 `history/**`）；**扩展侧绑定形态（2026-09-11 改版）：TS 孪生实现 `editors/vscode/src/transcode.ts` 直接进程内调用，不再经 WASM**（首版曾用手写 `extern "C"` ABI 的 `transcode-wasm` cdylib + 随包 `pdx_codec.wasm`，后按维护者决策移除：算法固定、双实现 + 强测试防护优先于单源编译）；等价性防护 = EDG-KTP 黄金语料逐字节（`scripts/codec-ts-test.mjs`）+ Rust↔TS 差分向量（`cargo run -p transcode --bin transcode-vectors` 出全码点扫描/随机序列，74,549 条全对拍，已接入 `npm run test:ci`/`test:contract`）；服务端 `uri.rs` 接受 `pdcloc://`（空 authority，路径即真实文件），虚拟文档挂接并遮蔽磁盘分片，坐标即视图坐标 |
+| P3 ✅（2026-09-11 完成） | 诊断六件套接入 LSP/`docs/diagnostics.md`：服务端 `ide` 新增 `transcode` 诊断 pass（挂在 localisation 命令诊断之后，逐文档分类+按码上报）——`LocalisationNotTranscoded`（仅 `localisation/**replace**` 发行路径、锚首个裸 CJK）/ `LocalisationMixedEncoding`（Error，锚首个证据字符）/ `LocalisationBrokenEscapeSequence`（"转码为主+孤立 marker"细分支：E≥3 且裸 CJK=0 时逐孤立 marker Warning，不降级为 Mixed）/ `LocalisationUnencodableCodePoint`（profile 感知，Script 豁免 27 个 CP1252 映射字符，上限 32）/ `ScriptLegacyEscapeVariant`（decode→re-encode 字符级往返比对检出历史变体档，Hint）/ `LocalisationEscapeRefused`（仅客户端保存闸门，注册供过滤/覆盖，服务端不发）；`pdc` 走既有 codeDescription 管线（锚=小写码名）；扩展端 `handleDiagnostics` 中间件对 `pdcloc://` 视图抑制 `LocalisationNotTranscoded`（解码视图可读 CJK 是设计使然） | `crates/ide/src/transcode.rs` + `types.rs` 六码 + 测试 `tests/transcode.rs`（6 项：release 路径根挂接、主树安静、混合首证据、孤立 marker、profile 边界 Š/😀、canonical vs DllFull 变体）；`docs/diagnostics.md` 六节 + 迁移注记；P2 客户端 3 码与保存闸门维持原状，全工作区 795+ 测试/clippy/fmt 绿、扩展五项契约绿 |
 | P4（可选） | 服务器档黄金语料（待 paratranz API 恢复/用户提供 Token） | 语料更新 |
 | P5 ✅（2026-09-11 完成） | 数据库单源化（§7）：preview 派生处**值级解码**（偏离初版 ingest 方案，见 §7.3）+ 分析层 (键, 语言) effective resolver（层序压倒读序、同层后来居上）+ `sanitize_recovered_text` 三元组豁免 + 索引缓存 schema 14 + `codec_version` 元数据 | 单值本地化出口；引擎/分析双层测试锁定（验收 7/8/9） |
 
-涉及落点：crate `crates/pdx-codec`（含差分向量生成器 `pdx-codec-vectors` bin）与扩展 TS
-孪生 `editors/vscode/src/pdxCodec.ts`；`editors/vscode/src/transparentLoc.ts`（P2 已落地：provider + 分类调用 + URI 映射 +
-命令 + 状态栏 + 自动提示）；`pdx-lsp` 客户端 `documentSelector` 已注册 `pdxloc` scheme、
-服务端 `uri.rs` 已接受 `pdxloc://`；诊断 pass 落于 `crates/pdx-analysis/src/transcode.rs`
-（P3 已落地：六码服务端上报 + pdxloc 视图客户端抑制）；
-数据库单源化已落地在 `pdx-engine/src/model.rs` + `scan.rs`（值级解码与三元组豁免）、
-`pdx-analysis/src/localisation.rs` / `resolution.rs`（单值出口）与 `index_cache`
+涉及落点：crate `crates/transcode`（含差分向量生成器 `transcode-vectors` bin）与扩展 TS
+孪生 `editors/vscode/src/transcode.ts`；`editors/vscode/src/transparentLoc.ts`（P2 已落地：provider + 分类调用 + URI 映射 +
+命令 + 状态栏 + 自动提示）；`pdc` 客户端 `documentSelector` 已注册 `pdcloc` scheme、
+服务端 `uri.rs` 已接受 `pdcloc://`；诊断 pass 落于 `crates/ide/src/transcode.rs`
+（P3 已落地：六码服务端上报 + pdcloc 视图客户端抑制）；
+数据库单源化已落地在 `engine/src/model.rs` + `scan.rs`（值级解码与三元组豁免）、
+`ide/src/localisation.rs` / `resolution.rs`（单值出口）与 `index_cache`
 （schema 14 + codec 版本号）。
 
 ## 9. 验收标准
