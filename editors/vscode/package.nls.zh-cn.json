@@ -66,5 +66,10 @@
   "configuration.preview.persistViewport.description": "在数据更新和重新打开面板时记住预览平移和缩放。",
   "configuration.preview.showExternalPrerequisites.description": "显示位于当前任务文件之外的前置任务。",
   "configuration.preview.showDiagnostics.description": "在预览中显示诊断计数、标记、颜色和条目。",
-  "configuration.preview.defaultExportDirectory.description": "任务预览 PNG、SVG 和 JSON 导出的默认目录；相对路径以工作区根目录为准。"
+  "configuration.preview.defaultExportDirectory.description": "任务预览 PNG、SVG 和 JSON 导出的默认目录；相对路径以工作区根目录为准。",
+  "commands.localisation.openDecoded.title": "以中文（解码）视图打开",
+  "commands.localisation.revealOriginal.title": "打开原始转码文件",
+  "commands.localisation.transcodeFile.title": "转码本地化文件",
+  "configuration.localisation.transparentEncoding.description": "启用 `pdxloc://` 透明读写视图：本地化 yml（以及匹配下方 glob 的脚本文件）以可读中文打开，保存时自动重新编码为磁盘上的 EU4dll 转义形态。详见 `docs/eu4-cjk-localisation-design.md`。",
+  "configuration.localisation.transparentScriptGlobs.description": "有资格进入解码视图的脚本文件 glob（相对工作区，paratranz `latin1eu4` 档，例如 `history/countries/*.txt`）。默认：`history/**`。"
 }

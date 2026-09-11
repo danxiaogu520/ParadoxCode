@@ -634,6 +634,24 @@
         "title": "%commands.refreshLoadedFiles.title%",
         "category": "ParadoxCode",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "paradoxcode.localisation.openDecoded",
+        "title": "%commands.localisation.openDecoded.title%",
+        "category": "ParadoxCode",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "paradoxcode.localisation.revealOriginal",
+        "title": "%commands.localisation.revealOriginal.title%",
+        "category": "ParadoxCode",
+        "icon": "$(file)"
+      },
+      {
+        "command": "paradoxcode.localisation.transcodeFile",
+        "title": "%commands.localisation.transcodeFile.title%",
+        "category": "ParadoxCode",
+        "icon": "$(encode)"
       }
     ],
     "menus": {
@@ -647,6 +665,16 @@
           "command": "paradoxcode.refreshMissionPreview",
           "when": "paradoxcodeMissionFile",
           "group": "navigation@2"
+        },
+        {
+          "command": "paradoxcode.localisation.openDecoded",
+          "when": "resourceScheme == file && resourceFilename =~ /\\.yml$/ && resourcePath =~ /localisation\\//",
+          "group": "navigation@3"
+        },
+        {
+          "command": "paradoxcode.localisation.revealOriginal",
+          "when": "resourceScheme == pdxloc",
+          "group": "navigation@3"
         }
       ],
       "view/title": [
@@ -654,6 +682,25 @@
           "command": "paradoxcode.refreshLoadedFiles",
           "when": "view == paradoxcode.loadedFiles",
           "group": "navigation@1"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "paradoxcode.localisation.openDecoded",
+          "when": "resourceScheme == file && resourceFilename =~ /\\.yml$/ && resourcePath =~ /localisation\\//",
+          "group": "paradoxcode@1"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "paradoxcode.localisation.openDecoded",
+          "when": "resourceFilename =~ /\\.yml$/ && resourcePath =~ /localisation\\//",
+          "group": "paradoxcode@1"
+        },
+        {
+          "command": "paradoxcode.localisation.transcodeFile",
+          "when": "explorerResourceIsFolder == false",
+          "group": "paradoxcode@2"
         }
       ]
     },
@@ -897,6 +944,22 @@
           "type": "string",
           "default": "",
           "markdownDescription": "%configuration.preview.defaultExportDirectory.description%"
+        },
+        "paradoxcode.localisation.transparentEncoding": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%configuration.localisation.transparentEncoding.description%"
+        },
+        "paradoxcode.localisation.transparentScriptGlobs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^\\].*$"
+          },
+          "default": [
+            "history/**"
+          ],
+          "markdownDescription": "%configuration.localisation.transparentScriptGlobs.description%"
         }
       }
     }
@@ -905,9 +968,9 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "check": "npm run compile && node scripts/smoke.mjs",
-    "test:ci": "npm run compile && node scripts/smoke.mjs && node scripts/extension-contract.mjs && node scripts/package-contract.mjs && npm run test:package",
+    "test:ci": "npm run compile && node scripts/smoke.mjs && node scripts/codec-ts-test.mjs && node scripts/extension-contract.mjs && node scripts/package-contract.mjs && npm run test:package",
     "vscode:prepublish": "npm run compile",
-    "test:contract": "npm run compile && node scripts/extension-contract.mjs && node scripts/package-contract.mjs",
+    "test:contract": "npm run compile && node scripts/codec-ts-test.mjs && node scripts/extension-contract.mjs && node scripts/package-contract.mjs",
     "test:package": "vsce package --out ../../target/paradoxcode-vscode-contract.vsix",
     "test:host": "npm run compile && node scripts/host-test.mjs",
     "package": "npm run compile && vsce package"
