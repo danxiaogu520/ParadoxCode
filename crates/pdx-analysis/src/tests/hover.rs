@@ -504,6 +504,115 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
     std::fs::remove_dir_all(root).expect("cleanup");
 }
 
+/// The localisation total order (design doc §7.2): layer order
+/// (current mod > dependency > vanilla) dominates, and within a layer all
+/// files — `l_*` directories and `replace/` alike — are equal, with the
+/// later-read definition winning. Resolution is per (key, language), so a
+/// key that only exists outside the preferred language still resolves.
+#[test]
+fn localisation_values_by_key_apply_the_layer_then_read_order_total_order() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-localisation-order-{nonce}"));
+    let vanilla = root.join("vanilla");
+    let dependency = root.join("dependency");
+    let current = root.join("current");
+    std::fs::create_dir_all(vanilla.join("localisation/l_english")).expect("vanilla dir");
+    std::fs::create_dir_all(dependency.join("localisation")).expect("dependency dir");
+    std::fs::create_dir_all(current.join("localisation/l_english")).expect("current english dir");
+    std::fs::create_dir_all(current.join("localisation/replace")).expect("current replace dir");
+    std::fs::create_dir_all(current.join("localisation/l_french")).expect("current french dir");
+    std::fs::write(
+        vanilla.join("localisation/l_english/vanilla_l_english.yml"),
+        "l_english:\nlayered_title:0 \"Vanilla Layer\"\n",
+    )
+    .expect("vanilla english");
+    // The dependency path sorts after every current-mod path; a naive
+    // path-only ordering would let it win. Layer order must dominate.
+    std::fs::write(
+        dependency.join("localisation/zzz_dep_l_english.yml"),
+        "l_english:\nlayered_title:0 \"Dependency Layer\"\n",
+    )
+    .expect("dependency english");
+    std::fs::write(
+        current.join("localisation/l_english/aaa_cur_l_english.yml"),
+        "l_english:\nlayered_title:0 \"Current Layer\"\nwithin_title:0 \"Current First\"\n",
+    )
+    .expect("current first-read english");
+    // Same layer, read later (replace/ sorts after l_english/): must override
+    // the l_english value — replace/ carries no priority of its own.
+    std::fs::write(
+        current.join("localisation/replace/zzz_cur_l_english.yml"),
+        "l_english:\nwithin_title:0 \"Current Replace Override\"\n",
+    )
+    .expect("current replace english");
+    std::fs::write(
+        current.join("localisation/l_french/aaa_f_l_french.yml"),
+        "l_french:\nfrench_only_title:0 \"Premier Seul\"\n",
+    )
+    .expect("current first-read french");
+    std::fs::write(
+        current.join("localisation/l_french/zzz_f_l_french.yml"),
+        "l_french:\nfrench_only_title:0 \"Dernier Seul\"\n",
+    )
+    .expect("current last-read french");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot {
+            id: SourceRootId::new(1),
+            kind: SourceRootKind::Vanilla,
+            path: vanilla,
+            order: 0,
+            writable: false,
+        },
+        SourceRoot {
+            id: SourceRootId::new(2),
+            kind: SourceRootKind::Dependency,
+            path: dependency,
+            order: 1,
+            writable: false,
+        },
+        SourceRoot {
+            id: SourceRootId::new(3),
+            kind: SourceRootKind::CurrentMod,
+            path: current,
+            order: 2,
+            writable: true,
+        },
+    ]));
+    host.refresh_source_roots().expect("scan roots");
+
+    let snapshot = host.snapshot();
+    let resolved = crate::localisation_values_by_key(
+        &snapshot,
+        &["layered_title", "within_title", "french_only_title"],
+        &crate::CancellationToken::new(),
+    )
+    .expect("resolve total-order keys");
+
+    // The current-mod layer wins even though the dependency file sorts later
+    // in read order, and vanilla loses to both.
+    let (language, value) = resolved.get("layered_title").expect("layered title");
+    assert_eq!(value, "Current Layer");
+    assert_eq!(language.as_deref(), Some("l_english"));
+    // Within the current-mod layer, the later-read replace/ file overrides
+    // the earlier-read l_english file for the same key and language.
+    let (language, value) = resolved.get("within_title").expect("within-layer title");
+    assert_eq!(value, "Current Replace Override");
+    assert_eq!(language.as_deref(), Some("l_english"));
+    // Later-read-wins applies per language, and a key with no English variant
+    // at all still resolves through its sole language.
+    let (language, value) = resolved
+        .get("french_only_title")
+        .expect("french-only title");
+    assert_eq!(value, "Dernier Seul");
+    assert_eq!(language.as_deref(), Some("l_french"));
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
 #[test]
 fn custom_tooltip_hover_shows_localisation_preview_inside_mission_effects() {
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));

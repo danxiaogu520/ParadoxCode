@@ -14,6 +14,7 @@ publish = false
 [dependencies]
 rustc-hash = "2"
 encoding_rs = "0.8"
+pdx-codec = { path = "../pdx-codec" }
 pdx-rules = { path = "../pdx-rules" }
 pdx-parser = { path = "../pdx-parser" }
 postcard = { version = "1.1", default-features = false, features = ["alloc"] }

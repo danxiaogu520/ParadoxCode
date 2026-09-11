@@ -21,4 +21,5 @@ fn eu4_host() -> AnalysisHost {
 mod documents;
 mod index;
 mod index_cache;
+mod localisation;
 mod scan;

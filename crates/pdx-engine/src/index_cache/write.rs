@@ -216,6 +216,12 @@ fn write_cache(
         ),
         ("path_encoding", path_encoding.to_owned().into_bytes()),
         ("source_root", source_root),
+        // Persisted localisation previews are decoded by `pdx-codec`; a codec
+        // change alters their meaning, so the reader rejects mismatches.
+        (
+            "codec_version",
+            pdx_codec::CODEC_VERSION.to_string().into_bytes(),
+        ),
     ] {
         transaction.execute(
             "INSERT INTO metadata(key, value) VALUES (?1, ?2)",
