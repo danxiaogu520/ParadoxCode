@@ -29,7 +29,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   by `paradoxcode.serverPath` (the old key is still honoured).
 - CI is reorganized the rust-analyzer way: no path filtering or skip bookkeeping, every job
   runs on every pull request, and the fast lint gates (rustfmt, clippy, rustdoc) are separate
-  jobs that do not wait behind the test suite.
+  jobs that do not wait behind the test suite. Following rust-analyzer's actual workflow
+  further: a hardened global env (retries, no incremental artifacts, short backtraces), bash
+  as the default step shell, an Ubuntu/Windows test matrix with `fail-fast: false` plus a
+  run-cancelling companion job, a `conclusion` job aggregating everything into one branch
+  protection check, nextest as the test runner, cargo-machete for unused dependencies,
+  a pinned crate-ci/typos gate (game-data spellings allowlisted in `_typos.toml`), clippy
+  rejects `dbg!`/`todo!`, and rustc/clippy diagnostics surface as inline annotations through
+  the `.github/rust.json` problem matcher.
+- Dependencies left behind by the crate carve are removed: `engine` drops `encoding_rs`,
+  `postcard`, and `zstd`; `index` drops `postcard`, `rustc-hash`, `serde`, `serde_json`, and
+  `transcode`; `pdc` drops `hir`, `sha2`, and `toml`; the fuzz workspace drops `engine`
+  (all verified by cargo-machete and a full rebuild).
 
 ### Removed
 

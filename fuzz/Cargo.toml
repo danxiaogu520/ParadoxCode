@@ -12,7 +12,6 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 game = { path = "../crates/game" }
-engine = { path = "../crates/engine" }
 hir = { path = "../crates/hir" }
 rules = { path = "../crates/rules" }
 parser = { path = "../crates/parser" }

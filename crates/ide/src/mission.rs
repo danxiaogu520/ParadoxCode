@@ -65,7 +65,7 @@ fn is_mission_path(path: Option<&LogicalPath>) -> bool {
 ///
 /// Returns `None` for findings the rest of the pipeline owns: duplicate ids
 /// (the symbol layer's later-wins pass) and any code this mapping has not
-/// caught up with — better silent than mis-coded.
+/// caught up with — better silent than wrong.
 fn mission_diagnostic(finding: game::eu4::mission::Diagnostic) -> Option<Diagnostic> {
     let (code, severity) = match finding.code {
         "dangling-required" | "dependency-cycle" => {

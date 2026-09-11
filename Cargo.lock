@@ -162,13 +162,11 @@ dependencies = [
 name = "engine"
 version = "0.3.2"
 dependencies = [
- "encoding_rs",
  "game",
  "hir",
  "ide",
  "index",
  "parser",
- "postcard",
  "rules",
  "rusqlite",
  "rustc-hash",
@@ -178,7 +176,6 @@ dependencies = [
  "text",
  "transcode",
  "vfs",
- "zstd",
 ]
 
 [[package]]
@@ -348,13 +345,8 @@ version = "0.3.2"
 dependencies = [
  "hir",
  "parser",
- "postcard",
  "rules",
- "rustc-hash",
- "serde",
- "serde_json",
  "text",
- "transcode",
  "vfs",
 ]
 
@@ -473,17 +465,14 @@ version = "0.3.2"
 dependencies = [
  "engine",
  "game",
- "hir",
  "ide",
  "lsp-types",
  "parser",
  "rules",
  "serde",
  "serde_json",
- "sha2",
  "tempfile",
  "text",
- "toml",
 ]
 
 [[package]]
