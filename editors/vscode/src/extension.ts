@@ -12,6 +12,10 @@ import {
 import { LoadedFilesProvider } from './fileExplorer';
 import { MissionPreviewPanel } from './previewPanel';
 import {
+    PDXLOC_SCHEME,
+    activateTransparentLocalisation,
+} from './transparentLoc';
+import {
     attachFollowupCompletionTrigger,
     FOLLOWUP_COMPLETION_TRIGGER_COMMAND,
 } from './completionMiddleware';
@@ -576,6 +580,12 @@ function clientMiddleware(): NonNullable<LanguageClientOptions['middleware']> {
                     .get<string[]>('diagnosticIgnoreCodes', [])
                     .filter((value): value is string => typeof value === 'string'),
             );
+            // A decoded pdxloc view intentionally shows readable CJK; the backing
+            // shard is re-encoded on save, so the server's NotTranscoded warning
+            // for release paths would always be a false alarm in that view.
+            if (uri.scheme === PDXLOC_SCHEME) {
+                ignoredCodes.add('LocalisationNotTranscoded');
+            }
             const patterns = diagnosticIgnorePatterns().map(globToRegExp);
             const relative = relativeDiagnosticPath(uri);
             const filtered = diagnostics.filter((diagnostic) => {
@@ -629,6 +639,11 @@ function createClient({ command, source }: ServerResolution): LanguageClient {
         documentSelector: [
             { language: EU4_LANGUAGE_ID },
             { language: LOCALISATION_LANGUAGE_ID },
+            // Decoded views over transcoded files: the provider syncs decoded
+            // text under the pdxloc:// scheme; the server resolves these URIs
+            // to the backing path (see crates/pdx-lsp/src/uri.rs).
+            { scheme: PDXLOC_SCHEME, language: EU4_LANGUAGE_ID },
+            { scheme: PDXLOC_SCHEME, language: LOCALISATION_LANGUAGE_ID },
             { pattern: '**/common/achievements.txt' },
             { pattern: '**/common/alerts.txt' },
             { pattern: '**/common/graphicalculturetype.txt' },
@@ -1063,6 +1078,11 @@ export function activate(context: vscode.ExtensionContext): void {
         loadedFilesProvider,
         vscode.window.registerTreeDataProvider('paradoxcode.loadedFiles', loadedFilesProvider),
     );
+
+    // Transparent localisation (pdxloc:// decoded views) is independent of the
+    // language server lifecycle: register it up front so a pdxloc editor can
+    // be restored from a previous session even while pdx-ls is still starting.
+    void activateTransparentLocalisation(context, log);
 
     const refresh = debounce(() => {
         if (previewRefreshMode() === 'always') {

@@ -66,5 +66,10 @@
   "configuration.preview.persistViewport.description": "Remember the preview pan and zoom between payload updates and panel reopenings.",
   "configuration.preview.showExternalPrerequisites.description": "Show prerequisite missions that live outside the current mission file.",
   "configuration.preview.showDiagnostics.description": "Show diagnostic counts, badges, colors, and entries in the preview.",
-  "configuration.preview.defaultExportDirectory.description": "Default directory for mission preview PNG, SVG, and JSON exports. Relative paths use the workspace root."
+  "configuration.preview.defaultExportDirectory.description": "Default directory for mission preview PNG, SVG, and JSON exports. Relative paths use the workspace root.",
+  "commands.localisation.openDecoded.title": "Open in Decoded (Chinese) View",
+  "commands.localisation.revealOriginal.title": "Open the Raw Transcoded File",
+  "commands.localisation.transcodeFile.title": "Transcode Localisation File",
+  "configuration.localisation.transparentEncoding.description": "Enable the `pdxloc://` transparent read/write view over EU4dll-transcoded files: localisation yml (and script files matching the globs below) open as readable Chinese, and saving re-encodes to the on-disk escaped form. See `docs/eu4-cjk-localisation-design.md`.",
+  "configuration.localisation.transparentScriptGlobs.description": "Workspace-relative glob patterns of script files eligible for the decoded view (paratranz `latin1eu4` profile, e.g. `history/countries/*.txt`). Default: `history/**`."
 }
