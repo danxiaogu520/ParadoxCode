@@ -23,6 +23,7 @@ mod semantic;
 mod semantic_tokens;
 mod suggest;
 mod support;
+mod transcode;
 mod types;
 
 pub use completion::{complete, complete_with_cancellation, completion, completion_resolve};

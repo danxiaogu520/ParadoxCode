@@ -11,3 +11,4 @@ mod scope;
 mod semantic;
 mod semantic_tokens;
 mod support;
+mod transcode;
