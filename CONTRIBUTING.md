@@ -26,7 +26,7 @@ EU4 profile), never in the generic engine, LSP layer, or editor extensions.
 ## Prerequisites
 
 - Rust **1.98 or newer** (see `.github/workflows/ci.yml` for the enforced MSRV).
-- Node.js **24 LTS** for Tree-sitter corpus checks and the VS Code extension.
+- Node.js **24 LTS** for the VS Code extension.
 - Git. There are no commit hooks; run the quality gates before pushing and let CI verify
   the rest (`bash scripts/check-quality-gates.sh` with no arguments runs the full suite).
 
@@ -44,8 +44,8 @@ Run the complete quality gates explicitly:
 bash scripts/check-quality-gates.sh
 ```
 
-or a single group to diagnose a failure: `core`, `core-fast`, `perf`, `grammars`, `zed`, `vscode`,
-`release`, `fuzz`.
+or a single group to diagnose a failure: `core`, `core-fast`, `perf`, `vscode`, `release`,
+`fuzz`.
 
 Pull-request CI uses `core-fast` and leaves the optimized benchmark suite to the scheduled/manual
 `perf` workflow. Run the latter explicitly when changing performance-sensitive code:
@@ -54,7 +54,7 @@ Pull-request CI uses `core-fast` and leaves the optimized benchmark suite to the
 bash scripts/check-quality-gates.sh perf
 ```
 
-CI selects the editor, grammar, fuzz, and dependency jobs from changed paths. Fuzz is limited to
+CI runs the editor, fuzz, and dependency jobs on every pull request. Fuzz is limited to
 its direct runtime dependencies, and the Windows release build runs in parallel with Windows
 tests and clippy. Branch protection should require the stable `Required CI checks` aggregate rather
 than every conditional job.
@@ -77,9 +77,7 @@ ignored `diagnostic-reports/` directory and must not be committed.
 | Path | Purpose |
 | --- | --- |
 | `crates/` | Rust parser, rules, HIR, workspace, analysis, formatter, LSP, and CLI crates |
-| `editors/zed/` | Thin Zed extension and language metadata |
 | `editors/vscode/` | VS Code extension with server bootstrap and mission-tree preview |
-| `grammars/` | Editor-only Tree-sitter grammars and corpus tests |
 | `rules/` | Authoritative first-party EU4 rule source (`rules/eu4/*.json`) |
 | `fuzz/` | Parser, edit, formatter, and HIR fuzz targets |
 | `scripts/` | Reproducible quality checks and diagnostic workflows |

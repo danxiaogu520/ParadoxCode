@@ -30,18 +30,6 @@ check_perf() {
     run cargo bench --locked --workspace --all-features --benches
 }
 
-check_grammars() {
-    run bash scripts/check-grammars.sh
-}
-
-check_zed() {
-    run cargo fmt --manifest-path editors/zed/Cargo.toml -- --check
-    run cargo test --locked --manifest-path editors/zed/Cargo.toml
-    run cargo check --locked --manifest-path editors/zed/Cargo.toml --target wasm32-wasip1
-    run cargo build --locked --manifest-path editors/zed/Cargo.toml --target wasm32-wasip1 --release
-    run cargo clippy --locked --manifest-path editors/zed/Cargo.toml --all-targets -- -D warnings
-}
-
 check_vscode() {
     # Compile TypeScript once for the smoke and source contracts. `vsce package`
     # invokes the package's prepublish hook once more as part of packaging.
@@ -61,7 +49,7 @@ check_fuzz() {
 }
 
 usage() {
-    echo "usage: $0 [all|core|core-fast|perf|grammars|zed|vscode|release|fuzz] [group ...]" >&2
+    echo "usage: $0 [all|core|core-fast|perf|vscode|release|fuzz] [group ...]" >&2
     echo "       with no arguments, runs the full suite; multiple groups run in order" >&2
 }
 
@@ -73,8 +61,6 @@ for group in "${groups[@]}"; do
     case "$group" in
         all)
             check_core
-            check_grammars
-            check_zed
             check_vscode
             check_release
             check_fuzz
@@ -87,12 +73,6 @@ for group in "${groups[@]}"; do
             ;;
         perf)
             check_perf
-            ;;
-        grammars)
-            check_grammars
-            ;;
-        zed)
-            check_zed
             ;;
         vscode)
             check_vscode

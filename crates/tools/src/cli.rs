@@ -1,7 +1,6 @@
 //! User-facing command-line entry points.
 
 use std::fmt;
-use std::fs;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -21,10 +20,9 @@ const USAGE: &str = "usage (cargo run -p tools -- <command> ...):
   index [vanilla] --source <EU4 directory> --output <cache.pdcindex>
   index dependency --id <id> --source <directory> --output <cache.pdcindex>
   setup vanilla [--game eu4] [--root <directory>]... [--source <game directory>]
-  check policy|zed|release|grammar-fuzz|all [--root <repository root>]
+  check policy|release|all [--root <repository root>]
   release package --version <semver> --target <target> --binary <path> --output-dir <path> [--root <repository root>]
-  release verify --version <semver> --directory <path> [--root <repository root>]
-  dev prepare-manifest [--root <repository root>]";
+  release verify --version <semver> --directory <path> [--root <repository root>]";
 const SUPPORTED_GAME_INSTALLATIONS: &[GameInstallDescriptor] = &[game::eu4::INSTALL_DESCRIPTOR];
 
 /// Executes one repository tooling command and returns text intended for stdout.
@@ -48,11 +46,6 @@ pub fn execute(args: &[String]) -> Result<String, CliError> {
         }
         [check, sub, rest @ ..] if check == "check" => execute_check(sub, rest),
         [release, sub, rest @ ..] if release == "release" => execute_release(sub, rest),
-        [dev, prepare_manifest, rest @ ..]
-            if dev == "dev" && prepare_manifest == "prepare-manifest" =>
-        {
-            dev_prepare_manifest(rest)
-        }
         _ => Err(CliError::Usage(USAGE.to_owned())),
     }
 }
@@ -565,13 +558,10 @@ fn execute_check(sub: &str, args: &[String]) -> Result<String, CliError> {
     }
     let results = match sub {
         "policy" => crate::check::check_project_policy(&root),
-        "zed" => crate::check::check_zed_extension(&root),
         "release" => crate::check::check_release_artifact(&root),
-        "grammar-fuzz" => crate::check::check_grammar_fuzz(&root),
         "all" => {
             let mut all = Vec::new();
             all.extend(crate::check::check_project_policy(&root));
-            all.extend(crate::check::check_zed_extension(&root));
             all.extend(crate::check::check_editor_syntax_parity(&root));
             all.extend(crate::check::check_release_artifact(&root));
             all
@@ -695,90 +685,6 @@ fn execute_release(sub: &str, args: &[String]) -> Result<String, CliError> {
             "unknown release subcommand: {sub}\n\n{USAGE}"
         ))),
     }
-}
-
-fn dev_prepare_manifest(args: &[String]) -> Result<String, CliError> {
-    let root = parse_root_flag(args)?;
-    let manifest_path = root.join("editors/zed/extension.toml");
-    let mut text = fs::read_to_string(&manifest_path).map_err(|error| CliError::Path {
-        field: "manifest",
-        path: manifest_path.clone(),
-        error,
-    })?;
-
-    let repo = std::process::Command::new("git")
-        .args(["-C", &root.to_string_lossy(), "remote", "get-url", "origin"])
-        .output()
-        .map_err(|error| CliError::Usage(format!("cannot get git remote: {error}")))?;
-    if !repo.status.success() {
-        return Err(CliError::Usage(
-            "the Zed development manifest needs an origin remote so Zed can fetch grammar sources"
-                .to_owned(),
-        ));
-    }
-    let repository = String::from_utf8_lossy(&repo.stdout).trim().to_owned();
-
-    let rev = std::process::Command::new("git")
-        .args(["-C", &root.to_string_lossy(), "rev-parse", "HEAD"])
-        .output()
-        .map_err(|error| CliError::Usage(format!("cannot get git revision: {error}")))?;
-    if !rev.status.success() {
-        return Err(CliError::Usage(
-            "the Zed development manifest needs a Git checkout so its grammar revision can be pinned"
-                .to_owned(),
-        ));
-    }
-    let revision = String::from_utf8_lossy(&rev.stdout).trim().to_owned();
-
-    for (grammar_id, grammar_dir_name) in [("eu4", "eu4"), ("localisation", "localisation")] {
-        let table = format!("[grammars.{grammar_id}]");
-        if let Some(start) = text.find(&table) {
-            let next = text[start + table.len()..]
-                .find("\n[")
-                .map(|offset| start + table.len() + offset);
-            let end = next.unwrap_or(text.len());
-            let block = &text[start..end];
-            let mut new_block = block
-                .replacen(
-                    &extract_toml_value(block, "repository"),
-                    &format!(r#""{repository}""#),
-                    1,
-                )
-                .replacen(
-                    &extract_toml_value(block, "rev"),
-                    &format!(r#""{revision}""#),
-                    1,
-                )
-                .replacen(
-                    &extract_toml_value(block, "path"),
-                    &format!(r#""grammars/tree-sitter-{grammar_dir_name}""#),
-                    1,
-                );
-            if !new_block.ends_with('\n') {
-                new_block.push('\n');
-            }
-            text = format!("{}{new_block}{}", &text[..start], &text[end..]);
-        }
-    }
-    fs::write(&manifest_path, &text).map_err(|error| CliError::Path {
-        field: "manifest",
-        path: manifest_path.clone(),
-        error,
-    })?;
-    Ok(format!(
-        "Updated {} for this checkout.",
-        manifest_path.display()
-    ))
-}
-
-fn extract_toml_value(block: &str, key: &str) -> String {
-    for line in block.lines() {
-        let trimmed = line.trim();
-        if let Some(rest) = trimmed.strip_prefix(&format!("{key} = ")) {
-            return rest.to_owned();
-        }
-    }
-    String::new()
 }
 
 #[cfg(test)]

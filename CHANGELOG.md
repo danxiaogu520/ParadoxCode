@@ -18,16 +18,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Breaking:** the language server binary is now `pdc` (previously `pdx-ls`) and is the only
   shipped executable. The `pdx` CLI is removed: vanilla/dependency cache building and game
   discovery are performed by the server itself (missing dependency caches are rebuilt in place;
-  game selection moves to editor settings), and repository tooling (`check`, `release`,
-  `dev prepare-manifest`, `index`, `setup`) moved to the unpublished `tools` crate
+  game selection moves to editor settings), and repository tooling (`check`, `release`, `index`,
+  `setup`) moved to the unpublished `tools` crate
   (`cargo run -p tools -- check policy --root .`).
 - **Breaking:** user-visible contract names drop the `pdx` prefix: index caches are
   `.pdcindex` (old caches are regenerated), compiled rules are `.pdcrules`, the virtual
   localisation URI scheme is `pdcloc://`, workspace-local data lives under `.pdc/`, LSP methods
   and commands use the `pdc/` prefix, release archives are `pdc-v…`, and diagnostic codes are
   `pdc-parser-*`/`pdc-localisation-*`. The VS Code setting `paradoxcode.pdxLsPath` is replaced
-  by `paradoxcode.serverPath` (the old key is still honoured), and the Zed language-server id is
-  `pdc`.
+  by `paradoxcode.serverPath` (the old key is still honoured).
 - CI is reorganized the rust-analyzer way: no path filtering or skip bookkeeping, every job
   runs on every pull request, and the fast lint gates (rustfmt, clippy, rustdoc) are separate
   jobs that do not wait behind the test suite.
@@ -258,9 +257,8 @@ handling, and reworks EU4 vanilla installation discovery around launcher metadat
 
 ### Changed
 
-- Editor configuration is intentionally separate: VS Code uses its `paradoxcode.*` settings
-  while Zed uses `lsp.pdx-ls.initialization_options`; the two editors no longer read a shared
-  project file.
+- Editor configuration lives in the VS Code extension's `paradoxcode.*` settings; the shared
+  project file is gone.
 - VS Code's whole-workspace diagnostics default to off; opened documents are always validated
   either way, and the resolved setting is forwarded unconditionally so untouched
   configurations no longer fall back to the server-side default.
@@ -321,7 +319,7 @@ integration reliability.
 ### Changed
 
 - Completion candidates are ranked by contextual and macro-expansion relevance, with scripted macro
-  highlighting and completion aligned across the supported editors.
+  highlighting and completion kept aligned.
 - VS Code retriggers completion after assignments and block edits, while the CI matrix keeps
   Windows release builds parallel with Windows test and lint checks.
 
@@ -348,8 +346,7 @@ reliability.
   is not rewritten.
 - Completion now suggests the uppercase intrinsic spellings (`THIS`, `ROOT`, `FROM`, `PREV`) and no
   longer offers lowercase variants.
-- Control-flow keywords are highlighted as code keywords in both editors, with aligned semantic
-  token layers.
+- Control-flow keywords are highlighted as code keywords, with aligned semantic token layers.
 - Hover is faster and safer: known-key sets are memoized per snapshot revision and richer
   formatting is cached.
 
@@ -392,7 +389,6 @@ Maintenance release focused on the publish pipeline and release correctness.
 
 - VS Code extension now ships its runtime dependencies in the packaged VSIX.
 - CLI binaries derive their version from package metadata instead of duplicated constants.
-- Zed extension release manifest metadata (game version and artifact checksums).
 - Release workflow reruns are idempotent: re-running the workflow on an existing tag no longer
   corrupts or duplicates release assets.
 
@@ -419,7 +415,7 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
   cancellation and stale-result protection.
 - `pdx` CLI: `setup vanilla`, `index vanilla`, and `index dependency` commands.
 - VS Code extension with zero-configuration, checksum-verified server setup and a mission-tree
-  preview; thin Zed extension with Tree-sitter highlighting.
+  preview.
 - Release workflow for five native `pdx-ls` target archives with checksum sidecars, GitHub
   Releases, and Marketplace publishing.
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,

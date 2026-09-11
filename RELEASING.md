@@ -11,21 +11,17 @@ prerequisites before pushing it.
    identity is `paradoxcode.paradoxcode-vscode`.
 2. Marketplace publication is temporarily manual. After a release, download the attached VSIX and
    upload it from the `paradoxcode` publisher management page.
-3. Fork `zed-industries/extensions` in preparation for the Zed registry PR. Zed publication cannot
-   happen solely from this repository: the registry requires a reviewed submodule entry.
 
 ## Before tagging
 
-1. Confirm `Cargo.toml`, `editors/vscode/package.json`, `editors/vscode/package-lock.json`,
-   `editors/zed/Cargo.toml`, and `editors/zed/extension.toml` all carry the intended version.
+1. Confirm `Cargo.toml`, `editors/vscode/package.json`, and `editors/vscode/package-lock.json`
+   all carry the intended version.
 2. Run `bash scripts/check-quality-gates.sh`. Do not tag if any group fails.
 3. Package the VSIX with `npm --prefix editors/vscode run package`, install it into a clean VS Code
    profile, trust an EU4 Mod workspace, and open an EU4 file. Verify that `PDC ●` appears without
    configuring `pdc`, completion/diagnostics work, and the output reports a checksum-verified
    automatic installation.
-4. Install `editors/zed` as a Zed dev extension in a clean profile and verify that it downloads the
-   same release version and starts the server without editor settings.
-5. Review the generated VSIX contents and confirm no Vanilla files, local caches, credentials, or
+4. Review the generated VSIX contents and confirm no Vanilla files, local caches, credentials, or
    development artifacts are present.
 
 ## Publish
@@ -46,11 +42,6 @@ the server release because a fresh extension install immediately downloads that 
 For an already-pushed tag, use the workflow's manual dispatch input with the exact tag (for example
 `v0.3.2`). This runs the current release workflow while checking out the immutable tagged source.
 
-For Zed, open the required PR against `zed-industries/extensions` after the tagged commit is public.
-Use this repository as the HTTPS submodule, set `path = "editors/zed"`, and set the registry version
-to the exact `extension.toml` version. Zed publishes the extension after that PR is reviewed and
-merged.
-
 ## Verify the public release
 
 1. Confirm all five server archives and checksum sidecars plus the VSIX are attached to the GitHub
@@ -58,7 +49,5 @@ merged.
 2. Upload the VSIX manually to the Visual Studio Marketplace, then subscribe to the public
    Marketplace extension from a clean VS Code profile and repeat the
    installation smoke test. Do not rely on a previously populated global server cache.
-3. After the Zed registry PR merges, install ParadoxCode from Zed's Extension Gallery and repeat the
-   clean-profile server-start smoke test.
-4. Only then update the README's pre-release status and record the public links and any known
+3. Only then update the README's pre-release status and record the public links and any known
    limitations in the release notes.

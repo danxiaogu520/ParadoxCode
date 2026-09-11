@@ -32,7 +32,7 @@ The following areas are in scope:
 
 - `pdc`: parsing and indexing of untrusted files, cache handling, archive
   extraction, path handling, and resource limits.
-- Server bootstrap and checksum verification in the VS Code and Zed extensions.
+- Server bootstrap and checksum verification in the VS Code extension.
 - Rule/packaging artifacts: integrity metadata, manifest checks, and redistribution boundaries.
 - Dependencies with known, exploitable CVEs affecting the shipped binary or extensions.
 
