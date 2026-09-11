@@ -211,7 +211,7 @@ if (!localisationLanguage.filenamePatterns?.includes('**/localisation/**/*')) {
   fail('Localisation must claim all files recursively below localisation/');
 }
 if (manifest.activationEvents?.includes('onStartupFinished')) {
-  fail('the extension must not activate and download pdc in unrelated workspaces');
+  fail('the extension must not activate and download the server in unrelated workspaces');
 }
 if (!manifest.activationEvents?.includes('onLanguage:eu4')) {
   fail('opening an EU4 document must activate the zero-configuration startup path');

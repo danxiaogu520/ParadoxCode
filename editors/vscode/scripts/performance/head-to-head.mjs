@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Head-to-head performance harness for pdc against a real mod corpus.
+ * Head-to-head performance harness for the ParadoxCode server against a real mod corpus.
  *
  * Unlike `lsp-e2e.mjs` (a synthetic single-file smoke), this drives the full
  * lifecycle on a real workspace: initialize (which today performs the whole
@@ -42,7 +42,7 @@ const SCRIPT_DIRECTORIES = ['common', 'events', 'missions', 'decisions'];
 const USAGE = `Usage: node editors/vscode/scripts/performance/head-to-head.mjs [options]
 
 Options:
-  --server PATH              pdc executable (default target/release/pdc[.exe])
+  --server PATH              paradoxcode executable (default target/release/paradoxcode[.exe])
   --workspace DIR            mod/workspace root to measure (required unless --compare)
   --cache FILE               Vanilla .pdcindex cache (required unless --no-cache)
   --no-cache                 run without a Vanilla cache (explicit; numbers not comparable)
@@ -295,10 +295,10 @@ async function runMeasurement(options) {
   }
   const serverPath = inputPath(
     options.server ??
-      join('target', 'release', process.platform === 'win32' ? 'pdc.exe' : 'pdc'),
+      join('target', 'release', process.platform === 'win32' ? 'paradoxcode.exe' : 'paradoxcode'),
     REPOSITORY_ROOT,
   );
-  requireFile(serverPath, 'pdc executable');
+  requireFile(serverPath, 'paradoxcode executable');
 
   let cache;
   if (options.noCache) {

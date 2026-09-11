@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Run a whole-Current-Mod diagnostic pass through the real pdc JSON-RPC transport.
+ * Run a whole-Current-Mod diagnostic pass through the real ParadoxCode server JSON-RPC transport.
  *
  * The language server remains the source of truth for parsing, first-party EU4 rules, Vanilla
  * resolution, and diagnostics. This script only opens each relevant file, collects the normal
@@ -67,7 +67,7 @@ Required:
 
 Options:
   --vanilla-cache PATH       Vanilla .pdcindex (also PDC_DIAGNOSTIC_VANILLA_CACHE)
-  --server PATH              pdc executable (explicit path must exist; auto-detected from target/{debug,release} only when omitted)
+  --server PATH              paradoxcode executable (explicit path must exist; auto-detected from target/{debug,release} only when omitted)
   --workspace PATH           LSP workspace root (default: parent of --mod)
   --output DIR               report directory (default: ${DEFAULT_OUTPUT_DIR})
   --timeout-ms N             overall server timeout (default: ${DEFAULT_TIMEOUT_MS})
@@ -362,7 +362,7 @@ function resolveServer(explicit) {
     }
     return candidate;
   }
-  const executableName = process.platform === 'win32' ? 'pdc.exe' : 'pdc';
+  const executableName = process.platform === 'win32' ? 'paradoxcode.exe' : 'paradoxcode';
   const candidates = [
     join(REPOSITORY_ROOT, 'target', 'debug', executableName),
     join(REPOSITORY_ROOT, 'target', 'release', executableName),
@@ -370,7 +370,7 @@ function resolveServer(explicit) {
   for (const candidate of candidates) {
     if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
   }
-  return 'pdc';
+  return 'paradoxcode';
 }
 
 function decodeSource(bytes) {
@@ -532,7 +532,7 @@ function normalizeDiagnostic(diagnostic, text) {
     severity: Number(diagnostic.severity || 1),
     severity_name: severityName(diagnostic.severity),
     message: String(diagnostic.message || ''),
-    source: diagnostic.source || 'pdc',
+    source: diagnostic.source || 'paradoxcode',
     range: diagnostic.range || null,
     location,
     excerpt: lineExcerpt(text, location.line - 1),

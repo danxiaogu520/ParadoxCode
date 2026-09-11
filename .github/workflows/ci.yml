@@ -128,7 +128,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # Keep the optimized build on a separate runner so it overlaps with the
       # matrix test legs instead of extending their critical path.
-      - run: cargo build --locked --release -p pdc --bin pdc
+      - run: cargo build --locked --release -p pdc --bin paradoxcode
 
   vscode:
     name: VS Code extension package
@@ -190,7 +190,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # Inline like rust-analyzer: build the shipped binary, then re-run the
       # release checks maintainers use locally (`cargo tools check release`).
-      - run: cargo build --locked -p pdc --bin pdc
+      - run: cargo build --locked -p pdc --bin paradoxcode
       - run: cargo run --locked -p tools -- check release --root .
 
   dependencies:

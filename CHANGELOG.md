@@ -15,8 +15,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `pdx-engine` split into `vfs` (source roots, scans, document data), `hir` (semantic lowering),
   `index` (symbol shards and the analysis pipeline), and a slim `engine` orchestrator
   (analysis host, snapshots, `.pdcindex` persistence) that re-exports their API.
-- **Breaking:** the language server binary is now `pdc` (previously `pdx-ls`) and is the only
-  shipped executable. The `pdx` CLI is removed: vanilla/dependency cache building and game
+- **Breaking:** the language server binary is now `paradoxcode` (previously `pdx-ls`) and is the
+  only shipped executable; the `pdc` crate name stays internal, and every user-visible surface
+  (status bar, walkthrough, command titles, installer messages, release archives) shows
+  **ParadoxCode** rather than an acronym. The `pdx` CLI is removed: vanilla/dependency cache
+  building and game
   discovery are performed by the server itself (missing dependency caches are rebuilt in place;
   game selection moves to editor settings), and repository tooling (`check`, `release`, `index`,
   `setup`) moved to the unpublished `tools` crate
@@ -24,8 +27,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Breaking:** user-visible contract names drop the `pdx` prefix: index caches are
   `.pdcindex` (old caches are regenerated), compiled rules are `.pdcrules`, the virtual
   localisation URI scheme is `pdcloc://`, workspace-local data lives under `.pdc/`, LSP methods
-  and commands use the `pdc/` prefix, release archives are `pdc-v…`, and diagnostic codes are
-  `pdc-parser-*`/`pdc-localisation-*`. The VS Code setting `paradoxcode.pdxLsPath` is replaced
+  and commands use the `pdc/` prefix, release archives are `paradoxcode-v…`, and diagnostic codes
+  are `pdc-parser-*`/`pdc-localisation-*`. The VS Code setting `paradoxcode.pdxLsPath` is replaced
   by `paradoxcode.serverPath` (the old key is still honoured).
 - CI is reorganized the rust-analyzer way: no path filtering or skip bookkeeping, every job
   runs on every pull request, and the fast lint gates (rustfmt, clippy, rustdoc) are separate

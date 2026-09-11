@@ -49,16 +49,16 @@ export class LspClient {
     this.protocolError = undefined;
 
     child.stdout.on('data', (chunk) => this.consume(chunk));
-    child.stdout.on('end', () => this.failWaiters(new LspProtocolError('pdc closed stdout')));
+    child.stdout.on('end', () => this.failWaiters(new LspProtocolError('server closed stdout')));
     child.on('error', (error) => this.failWaiters(error));
     child.on('close', (code, signal) => {
       this.closed = true;
       if (code !== 0 || signal) {
         this.failWaiters(
-          new LspProtocolError(`pdc exited with code ${code ?? 'unknown'}${signal ? ` (${signal})` : ''}`),
+          new LspProtocolError(`server exited with code ${code ?? 'unknown'}${signal ? ` (${signal})` : ''}`),
         );
       } else {
-        this.failWaiters(new LspProtocolError('pdc exited before the expected response'));
+        this.failWaiters(new LspProtocolError('server exited before the expected response'));
       }
     });
     child.stderr.on('data', (chunk) => {
@@ -107,7 +107,7 @@ export class LspClient {
       try {
         message = JSON.parse(payload);
       } catch (error) {
-        this.protocolError = new LspProtocolError(`invalid JSON from pdc: ${error.message}`);
+        this.protocolError = new LspProtocolError(`invalid JSON from server: ${error.message}`);
         this.failWaiters(this.protocolError);
         return;
       }
@@ -188,12 +188,12 @@ export class LspClient {
 
   async next(timeoutMs) {
     if (this.messages.length) return this.messages.shift();
-    if (this.closed) throw new LspProtocolError('pdc is no longer running');
+    if (this.closed) throw new LspProtocolError('the server is no longer running');
     return new Promise((resolveMessage, reject) => {
       const timer = setTimeout(() => {
         const index = this.waiters.findIndex((candidate) => candidate.resolve === resolveMessage);
         if (index >= 0) this.waiters.splice(index, 1);
-        reject(new LspProtocolError(`timed out after ${timeoutMs} ms waiting for pdc`));
+        reject(new LspProtocolError(`timed out after ${timeoutMs} ms waiting for the server`));
       }, timeoutMs);
       this.waiters.push({ resolve: resolveMessage, reject, timer });
     });
@@ -201,7 +201,7 @@ export class LspClient {
 
   send(message) {
     if (this.closed || this.child.stdin.destroyed) {
-      throw new LspProtocolError('cannot write to stopped pdc');
+      throw new LspProtocolError('cannot write to stopped server');
     }
     const payload = Buffer.from(JSON.stringify(message), 'utf8');
     this.child.stdin.write(`Content-Length: ${payload.length}\r\n\r\n`);

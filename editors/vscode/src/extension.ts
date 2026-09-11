@@ -70,8 +70,8 @@ const statusBar = vscode.window.createStatusBarItem(
 );
 statusBar.name = 'ParadoxCode Language Server';
 statusBar.command = 'paradoxcode.openOutput';
-statusBar.text = 'PDC ○';
-statusBar.tooltip = 'ParadoxCode: pdc not running';
+statusBar.text = 'ParadoxCode ○';
+statusBar.tooltip = 'ParadoxCode: server not running';
 
 let client: LanguageClient | undefined;
 let missingServerWarningShown = false;
@@ -143,7 +143,7 @@ function updateVanillaContext(message: string): void {
     }
 }
 
-/** Maps VS Code's `paradoxcode.*` settings onto pdc initialization options. */
+/** Maps VS Code's `paradoxcode.*` settings onto server initialization options. */
 function readInitializationOptions(): Record<string, unknown> {
     const config = vscode.workspace.getConfiguration('paradoxcode');
     const options: Record<string, unknown> = {};
@@ -480,7 +480,7 @@ function installOptions(context: vscode.ExtensionContext) {
     };
 }
 
-/** Resolves the pdc server binary. Explicit user/workspace configuration always wins over the
+/** Resolves the ParadoxCode server binary. Explicit user/workspace configuration always wins over the
  * optional downloaded cache and PATH fallback. The legacy `serverPath` key is still honoured so
  * existing setups keep working after the rename. */
 function resolveServerCommand(context: vscode.ExtensionContext): ServerResolution {
@@ -505,9 +505,9 @@ function resolveServerCommand(context: vscode.ExtensionContext): ServerResolutio
         };
     }
     return {
-        command: 'pdc',
-        source: '$PATH (pdc)',
-        missingOnPath: findExecutableOnPath('pdc') === undefined,
+        command: 'paradoxcode',
+        source: '$PATH (paradoxcode)',
+        missingOnPath: findExecutableOnPath('paradoxcode') === undefined,
     };
 }
 
@@ -614,17 +614,17 @@ function showMissingServerActions(automaticInstallError?: string): void {
     }
     missingServerWarningShown = true;
     const message = automaticInstallError
-        ? `The automatic pdc installation failed: ${automaticInstallError}`
-        : 'pdc was not found. Install it from the ParadoxCode release cache, select a binary, ' +
-          'set paradoxcode.serverPath, or add pdc to PATH.';
+        ? `The automatic ParadoxCode server installation failed: ${automaticInstallError}`
+        : 'The ParadoxCode server was not found. Install it from the release cache, select a ' +
+          'binary, set paradoxcode.serverPath, or add paradoxcode to PATH.';
     log.appendLine(`WARNING: ${message}`);
     void vscode.window.showWarningMessage(
         `ParadoxCode: ${message}`,
-        'Install pdc',
+        'Install server',
         'Select binary',
         'Open Output',
     ).then((choice) => {
-        if (choice === 'Install pdc') {
+        if (choice === 'Install server') {
             void vscode.commands.executeCommand('paradoxcode.installServer');
         } else if (choice === 'Select binary') {
             void vscode.commands.executeCommand('paradoxcode.selectServer');
@@ -635,7 +635,7 @@ function showMissingServerActions(automaticInstallError?: string): void {
 }
 
 function createClient({ command, source }: ServerResolution): LanguageClient {
-    log.appendLine(`pdc binary: ${command} (from ${source})`);
+    log.appendLine(`ParadoxCode server binary: ${command} (from ${source})`);
     missingServerWarningShown = false;
     const serverOptions: ServerOptions = { command };
     const clientOptions: LanguageClientOptions = {
@@ -802,7 +802,7 @@ function createClient({ command, source }: ServerResolution): LanguageClient {
         middleware: clientMiddleware(),
     };
     return new LanguageClient(
-        'pdc',
+        'paradoxcode',
         'ParadoxCode Language Server',
         serverOptions,
         clientOptions,
@@ -812,19 +812,19 @@ function createClient({ command, source }: ServerResolution): LanguageClient {
 function updateStatus(state: State): void {
     switch (state) {
         case State.Running:
-            statusBar.text = serverReady ? 'PDC ●' : 'PDC ◐';
+            statusBar.text = serverReady ? 'ParadoxCode ●' : 'ParadoxCode ◐';
             statusBar.tooltip = serverReady
                 ? 'ParadoxCode: pdc ready (click to open output)'
                 : 'ParadoxCode: pdc running; indexes are loading…';
             void vscode.commands.executeCommand('setContext', 'paradoxcodeServerRunning', true);
             break;
         case State.Starting:
-            statusBar.text = 'PDC ◐';
+            statusBar.text = 'ParadoxCode ◐';
             statusBar.tooltip = 'ParadoxCode: pdc starting…';
             void vscode.commands.executeCommand('setContext', 'paradoxcodeServerRunning', false);
             break;
         default:
-            statusBar.text = 'PDC ○';
+            statusBar.text = 'ParadoxCode ○';
             statusBar.tooltip = 'ParadoxCode: pdc not running (click to open output)';
             void vscode.commands.executeCommand('setContext', 'paradoxcodeServerRunning', false);
     }
@@ -854,7 +854,7 @@ async function resolveOrInstallServer(context: vscode.ExtensionContext): Promise
 
     const options = installOptions(context);
     log.appendLine(`pdc was not found; installing the matching ${options.version} release automatically`);
-    statusBar.text = 'PDC ↓';
+    statusBar.text = 'ParadoxCode ↓';
     statusBar.tooltip = 'ParadoxCode: installing the language server…';
     try {
         const binary = await vscode.window.withProgress(

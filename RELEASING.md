@@ -18,9 +18,9 @@ prerequisites before pushing it.
    all carry the intended version.
 2. Run `cargo tools gates`. Do not tag if any group fails.
 3. Package the VSIX with `npm --prefix editors/vscode run package`, install it into a clean VS Code
-   profile, trust an EU4 Mod workspace, and open an EU4 file. Verify that `PDC ●` appears without
-   configuring `pdc`, completion/diagnostics work, and the output reports a checksum-verified
-   automatic installation.
+   profile, trust an EU4 Mod workspace, and open an EU4 file. Verify that `ParadoxCode ●` appears
+   without configuring the server, completion/diagnostics work, and the output reports a
+   checksum-verified automatic installation.
 4. Review the generated VSIX contents and confirm no Vanilla files, local caches, credentials, or
    development artifacts are present.
 
@@ -33,7 +33,7 @@ git tag -a v0.3.2 -m "ParadoxCode 0.3.2"
 git push origin v0.3.2
 ```
 
-The tag workflow builds and verifies all five native `pdc` archives, creates the immutable
+The tag workflow builds and verifies all five native `paradoxcode` archives, creates the immutable
 GitHub Release, packages the VSIX, and attaches it to that release. It deliberately does not publish
 to the Visual Studio Marketplace for now. Download `paradoxcode-vscode-<version>.vsix` from the
 release and upload it manually from the publisher management page. The VS Code job still waits for

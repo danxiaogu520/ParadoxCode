@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Measure the pdc stdio JSON-RPC path without depending on a particular
+ * Measure the ParadoxCode server stdio JSON-RPC path without depending on a particular
  * user's checkout or home directory.  The default workspace is a temporary
  * one-file EU4 fixture; pass --workspace/--document to measure another tree.
  * Vanilla cache resolution is explicit first, then PDC_PERF_CACHE, then the
@@ -31,12 +31,12 @@ const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '..', '..', '..', '..');
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_MEMORY_INTERVAL_MS = 250;
 const FIXTURE_TEXT = 'country_event = {\n    id = my_perf_event\n}\n';
-const NO_CACHE_NAME = `pdc-perf-no-cache-${process.pid}.pdcindex`;
+const NO_CACHE_NAME = `paradoxcode-perf-no-cache-${process.pid}.pdcindex`;
 
 const USAGE = `Usage: node editors/vscode/scripts/performance/lsp-e2e.mjs [options]
 
 Options:
-  --server PATH             pdc executable (default target/release/pdc[.exe])
+  --server PATH             paradoxcode executable (default target/release/paradoxcode[.exe])
   --workspace DIR           workspace root (default: temporary one-file fixture)
   --document FILE            document to open (relative to workspace or absolute)
   --cache FILE               Vanilla cache (overrides user config)
@@ -541,10 +541,10 @@ function initializeParameters(root, initializationOptions) {
 async function runMeasurement(options, workspace) {
   const cache = resolveVanillaCache(options);
   const serverPath = inputPath(
-    options.server ?? join('target', 'release', process.platform === 'win32' ? 'pdc.exe' : 'pdc'),
+    options.server ?? join('target', 'release', process.platform === 'win32' ? 'paradoxcode.exe' : 'paradoxcode'),
     REPOSITORY_ROOT,
   );
-  requireFile(serverPath, 'pdc executable');
+  requireFile(serverPath, 'paradoxcode executable');
   const initializationOptions = {};
   if (cache) initializationOptions.vanillaIndexCache = cache;
   else initializationOptions.vanillaIndexCache = join(tmpdir(), NO_CACHE_NAME);
