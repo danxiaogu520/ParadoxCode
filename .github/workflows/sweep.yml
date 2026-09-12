@@ -25,33 +25,38 @@ jobs:
   sweep:
     runs-on: [self-hosted, windows]
     timeout-minutes: 60
+    defaults:
+      run:
+        # The service account's PATH has no bash; pin Git Bash explicitly
+        # (forward slashes are accepted by the process spawn).
+        shell: C:/Program Files/Git/bin/bash.exe --noprofile --norc -eo pipefail {0}
     env:
       # Self-hosted runner facts: the service account (NETWORK SERVICE) has
       # neither the user's PATH nor the rustup user-home defaults, so the
       # toolchain locations are pinned explicitly. Adjust on the runner if
       # these locations move.
-      RUSTUP_HOME: C:\Users\Administrator\.rustup
-      CARGO_HOME: C:\Users\Administrator\.cargo
-      PDC_SWEEP_VANILLA_SOURCE: C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis IV
+      RUSTUP_HOME: C:/Users/Administrator/.rustup
+      CARGO_HOME: C:/Users/Administrator/.cargo
+      PDC_SWEEP_VANILLA_SOURCE: C:/Program Files (x86)/Steam/steamapps/common/Europa Universalis IV
     steps:
       - uses: actions/checkout@v7
 
       - name: Build release server
-        shell: C:\Program Files\Gitinash.exe --noprofile --norc -eo pipefail {0}
         run: |
           export PATH="/c/Users/Administrator/.cargo/bin:/c/Users/Administrator/AppData/Local/Programs/nodejs:/c/Program Files/Git/cmd:$PATH"
           cargo build --locked --release -p pdc
 
       - name: Cold caches
-        shell: C:\Program Files\Gitinash.exe --noprofile --norc -eo pipefail {0}
         run: |
-          cache="$LOCALAPPDATA/ParadoxCode/cache/eu4"
-          rm -f "$cache"/vanilla.pdcindex "$cache"/vanilla.pdxindex
+          # The sweep owns a dedicated cache path, separate from any IDE user
+          # cache (the service account cannot and should not touch those), so
+          # a cold run is a plain file deletion away.
+          mkdir -p /c/actions-runner/sweep-cache
+          rm -f /c/actions-runner/sweep-cache/vanilla.pdcindex
           echo "Vanilla cache removed for a cold sweep"
 
       - name: Fetch previous release sweep summary
         if: github.event_name == 'release'
-        shell: C:\Program Files\Gitinash.exe --noprofile --norc -eo pipefail {0}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -68,7 +73,6 @@ jobs:
           [ -f previous/sweep-summary.json ] || echo "no previous sweep summary found"
 
       - name: Run release sweep
-        shell: C:\Program Files\Gitinash.exe --noprofile --norc -eo pipefail {0}
         # Gate semantics: absolute severities cannot gate (the Vanilla
         # workspace carries a known error baseline under the current rules).
         # With a previous sweep summary the gate is the diagnostics
@@ -88,7 +92,6 @@ jobs:
 
       - name: Attach sweep summary to the release
         if: github.event_name == 'release'
-        shell: C:\Program Files\Gitinash.exe --noprofile --norc -eo pipefail {0}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
