@@ -111,6 +111,7 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
                 && sweep_workflow.contains("github.ref == 'refs/heads/main'")
                 && sweep_workflow.contains("refs/tags/{0}")
                 && sweep_workflow.contains("Test-FullyQualifiedPath")
+                && sweep_workflow.contains("-ExecutionPolicy Bypass")
                 && sweep_workflow
                     .contains("Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append")
                 && !sweep_workflow.contains(">> $env:GITHUB_ENV"),
