@@ -586,10 +586,10 @@ fn first_party_alternatives_select_value_shape_by_current_scope() {
         false,
         "country"
     ));
-    // Value-shape selection no longer gates on current scope for the flattened
-    // country+province groups: ROOT resolves to a country and now matches the
-    // former province-side alternative in both scopes.
-    assert!(accepts(
+    // The first-party declarations split the flattened mirror pair by scope:
+    // country scope takes province references, province scope takes country
+    // references, so a province-resolving ROOT no longer matches there.
+    assert!(!accepts(
         "trigger",
         "has_discovered",
         Some("ROOT"),
@@ -603,13 +603,43 @@ fn first_party_alternatives_select_value_shape_by_current_scope() {
         false,
         "province"
     ));
-    assert!(accepts(
-        "trigger",
-        "has_discovered",
-        Some("ROOT"),
-        false,
-        "province"
-    ));
+    // The vanilla province-event spelling: ROOT is the acting country while
+    // the trigger runs in province scope, so the root register differs from
+    // the current scope.
+    {
+        let property = crate::ScriptProperty {
+            key: std::sync::Arc::from("has_discovered"),
+            key_range: TextRange::empty(0),
+            range: TextRange::empty(0),
+            operator: Some(std::sync::Arc::from("=")),
+            scalar: Some((std::sync::Arc::from("ROOT"), TextRange::empty(20))),
+            quoted: false,
+            quoted_source: None,
+            block_range: None,
+            block: Vec::new(),
+            bare_values: Vec::new(),
+        };
+        let mut province_event_scope = crate::ScopeContext::new(snapshot.game_profile_handle());
+        province_event_scope.root = std::sync::Arc::from("country");
+        province_event_scope.current = std::sync::Arc::from("province");
+        let accepted = snapshot
+            .rules()
+            .semantic_rules_for_context_key("trigger", "has_discovered")
+            .filter(|rule| rule.parent_path.is_empty())
+            .any(|rule| {
+                crate::semantic::semantic_scope_allows(rule, &province_event_scope)
+                    && crate::semantic::semantic_property_matches(
+                        &snapshot,
+                        rule,
+                        &property,
+                        &province_event_scope,
+                    )
+            });
+        assert!(
+            accepted,
+            "ROOT-as-country must satisfy has_discovered in province scope"
+        );
+    }
 }
 
 #[test]

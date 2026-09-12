@@ -3,8 +3,8 @@
   "source_format_version": 10,
   "game_id": "eu4",
   "target_game_version": "1.37.5",
-  "rule_hash": "308f1ead18cc2ab9d78bd7a0c7436473f268bc71ec4508dbcf6cebcc4f517dde",
-  "artifact_sha256": "68634f628aeb0973cb8794b4ed4c18a06e1da9a9036819b56687e74e5268def1",
+  "rule_hash": "c62aad2d5d4df6e0c54c44dfef07793c6a2818f0438731e216aebf8e2ff3ec2d",
+  "artifact_sha256": "2e21aeb89714aeb077b85b797800d4b40b73ea1e29b27cd095670c47f134e5bd",
   "semantic_rule_count": 8357,
   "file_category_count": 124,
   "symbol_descriptor_count": 2663

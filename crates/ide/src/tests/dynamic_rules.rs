@@ -241,7 +241,9 @@ fn site_rows_record_value_site_position_transitions_and_scopes() {
     );
     assert_eq!(site.operator.as_deref(), Some("="));
     // Every alternative stays with its own allowed scopes; consumer policy
-    // prunes, the row never does.
+    // prunes, the row never does.  The first-party declarations split the
+    // mirror pair: `add_core` takes a province reference in country scope and
+    // a country reference in province scope.
     assert_eq!(
         site.matchers,
         vec![
@@ -254,10 +256,10 @@ fn site_rows_record_value_site_position_transitions_and_scopes() {
     assert_eq!(
         site.matcher_scopes,
         vec![
-            vec!["country".to_owned(), "province".to_owned()],
-            vec!["country".to_owned(), "province".to_owned()],
-            vec!["country".to_owned(), "province".to_owned()],
-            vec!["country".to_owned(), "province".to_owned()],
+            vec!["province".to_owned()],
+            vec!["province".to_owned()],
+            vec!["country".to_owned()],
+            vec!["country".to_owned()],
         ]
     );
     assert!(site.fallback_groups.is_empty());

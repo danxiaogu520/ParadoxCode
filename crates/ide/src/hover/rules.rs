@@ -184,6 +184,9 @@ pub(crate) fn semantic_context_category(context: &str) -> String {
 /// renamed from "Possible meanings" because the entries describe accepted value
 /// shapes) and scope links (block keys that re-target the scope — not value
 /// types), whose transitions render in the ambient `#### Scope` table instead.
+/// Value types group by valid scopes because a key may carry different value
+/// domains per scope (`add_claim` takes a province in country scope and a tag
+/// in province scope).
 pub(crate) fn semantic_rule_hover_for_candidates(
     snapshot: &AnalysisSnapshot,
     word: &str,
@@ -210,20 +213,11 @@ pub(crate) fn semantic_rule_hover_for_candidates(
     let mut sections = Vec::new();
     if value_typed.len() > 1 {
         let shared_documentation = shared_semantic_hover_documentation(&value_typed);
-        let summaries = value_typed
-            .iter()
-            .map(|candidate| {
-                semantic_hover_candidate_summary(
-                    snapshot,
-                    candidate,
-                    shared_documentation.is_none(),
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("\n\n");
-        sections.push(format!(
-            "#### Allowed value types ({})\n\n{summaries}",
-            value_typed.len()
+        sections.extend(grouped_allowed_value_types_sections(
+            snapshot,
+            &value_typed,
+            shared_documentation.is_none(),
+            value_typed.len(),
         ));
         if let Some(documentation) = shared_documentation {
             sections.push(format!(
@@ -275,20 +269,144 @@ fn is_scope_link_rule(rule: &rules::SemanticRule) -> bool {
         && (rule.push_scope.is_some() || !rule.replace_scope.is_empty())
 }
 
-fn semantic_hover_candidate_summary(
+/// One value entry of the grouped `Allowed value types` section: the accepted
+/// shape plus the scopes it is valid in. `extras` hold facts that only this
+/// entry carries (documentation, a scope transition, cardinality the other
+/// candidates do not share) and render as sub-bullets.
+struct AllowedValueEntry {
+    scopes: Vec<String>,
+    available_here: bool,
+    label: String,
+    extras: Vec<String>,
+}
+
+/// Renders the multi-candidate value section grouped by valid scopes, so a key
+/// whose value domain differs per scope reads as one line per scope
+/// (`- \`country\`: scope \`province\`, type \`province_id\``). Unrestricted
+/// rules form an implicit "any scope" group whose prefix is dropped when it is
+/// the only group. Cardinality shared by every candidate hoists into a
+/// `#### Constraints` section, mirroring the single-candidate path.
+fn grouped_allowed_value_types_sections(
     snapshot: &AnalysisSnapshot,
-    candidate: &SemanticCompletionRule<'_, '_>,
+    candidates: &[&SemanticCompletionRule<'_, '_>],
     include_documentation: bool,
-) -> String {
-    let mut details = semantic_hover_candidate_details(snapshot, candidate);
-    details.extend(semantic_hover_cardinality_details(candidate.rule));
-    if include_documentation && !candidate.rule.documentation.is_empty() {
-        details.push(format!(
-            "- documentation: {}",
-            truncate_documentation(&candidate.rule.documentation)
-        ));
+    entry_count: usize,
+) -> Vec<String> {
+    let cardinalities = candidates
+        .iter()
+        .map(|candidate| semantic_hover_cardinality_details(candidate.rule))
+        .collect::<Vec<_>>();
+    let shared_cardinality = (!cardinalities.is_empty()
+        && cardinalities.iter().all(|lines| !lines.is_empty())
+        && cardinalities.windows(2).all(|pair| pair[0] == pair[1]))
+    .then(|| cardinalities.first().cloned().unwrap_or_default());
+
+    let entries = candidates
+        .iter()
+        .zip(cardinalities)
+        .map(|(candidate, cardinality)| {
+            let mut extras = Vec::new();
+            if shared_cardinality.is_none() {
+                extras.extend(cardinality);
+            }
+            // Value-typed rules re-targeting the scope would have partitioned
+            // as scope links; a transparent wrapper that kept its value shape
+            // still reports its transition here.
+            if (candidate.rule.push_scope.is_some() || !candidate.rule.replace_scope.is_empty())
+                && {
+                    let child_scope =
+                        semantic_child_scope(snapshot, candidate.scope, candidate.rule);
+                    !candidate
+                        .scope
+                        .current
+                        .eq_ignore_ascii_case(&child_scope.current)
+                }
+            {
+                let child_scope = semantic_child_scope(snapshot, candidate.scope, candidate.rule);
+                extras.push(format!(
+                    "- scope transition: `{}` → `{}`",
+                    candidate.scope.current, child_scope.current
+                ));
+            }
+            if include_documentation && !candidate.rule.documentation.is_empty() {
+                extras.push(format!(
+                    "- documentation: {}",
+                    truncate_documentation(&candidate.rule.documentation)
+                ));
+            }
+            AllowedValueEntry {
+                scopes: candidate.rule.allowed_scopes.clone(),
+                available_here: semantic_scope_allows(candidate.rule, candidate.scope),
+                label: semantic_rule_hover_value_label(candidate.rule),
+                extras,
+            }
+        })
+        .collect::<Vec<_>>();
+
+    // Group by scope declaration and availability; the ambient scope is shared
+    // by every candidate of one hover, so the unavailable suffix names it once.
+    let mut groups: Vec<(Vec<String>, bool, Vec<&AllowedValueEntry>)> = Vec::new();
+    for entry in &entries {
+        let group = groups.iter_mut().find(|(scopes, available, _)| {
+            *available == entry.available_here && *scopes == entry.scopes
+        });
+        match group {
+            Some((_, _, members)) => members.push(entry),
+            None => groups.push((entry.scopes.clone(), entry.available_here, vec![entry])),
+        }
     }
-    details.join("\n")
+    groups.sort_by_key(|(_, available, _)| !*available);
+
+    let ambient = candidates
+        .first()
+        .map(|candidate| candidate.scope.current.clone())
+        .unwrap_or_default();
+    let mut lines = Vec::new();
+    for (scopes, available_here, members) in &groups {
+        let mut distinct = Vec::new();
+        for entry in members {
+            if !distinct.iter().any(|known: &&AllowedValueEntry| {
+                known.label == entry.label && known.extras == entry.extras
+            }) {
+                distinct.push(entry);
+            }
+        }
+        let mut line = String::from("- ");
+        if !scopes.is_empty() {
+            let allowed = scopes
+                .iter()
+                .map(|scope| format!("`{scope}`"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            line.push_str(&allowed);
+            line.push_str(": ");
+        }
+        line.push_str(
+            &distinct
+                .iter()
+                .map(|entry| entry.label.as_str())
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
+        if !available_here {
+            line.push_str(&format!(" (unavailable in current scope `{ambient}`)"));
+        }
+        for entry in &distinct {
+            for extra in &entry.extras {
+                line.push_str(&format!("\n  {extra}"));
+            }
+        }
+        lines.push(line);
+    }
+
+    let mut sections = vec![format!(
+        "#### Allowed value types ({entry_count})\n\n{}",
+        lines.join("\n")
+    )];
+    if let Some(cardinality) = shared_cardinality {
+        sections.push(format!("#### Constraints\n\n{}", cardinality.join("\n")));
+    }
+    sections
 }
 
 fn semantic_hover_candidate_details(
@@ -402,9 +520,11 @@ fn semantic_hover_cardinality_details(rule: &rules::SemanticRule) -> Vec<String>
     if rule.required {
         details.push("- required".to_owned());
     }
-    if let Some(min) = rule.min_occurs.filter(|min| *min > 0)
-        && (!rule.required || min > 1)
-    {
+    // `min_occurs = 1` is the generator's default for scalar keys and aliases;
+    // surfacing it contradicts the unenforced `required` flag and repeats the
+    // same noise `max_occurs = 1` already suppresses.  Real floors (>= 2,
+    // diagnostics-enforced) stay visible.
+    if let Some(min) = rule.min_occurs.filter(|min| *min > 1) {
         details.push(format!("- at least {min}"));
     }
     if let Some(max) = rule.max_occurs.filter(|max| *max != 1) {
@@ -610,9 +730,7 @@ pub(crate) fn semantic_rule_documentation_for_rule(rule: &rules::SemanticRule) -
     if rule.required {
         constraints.push("- required".to_owned());
     }
-    if let Some(min) = rule.min_occurs.filter(|min| *min > 0)
-        && (!rule.required || min > 1)
-    {
+    if let Some(min) = rule.min_occurs.filter(|min| *min > 1) {
         constraints.push(format!("- at least {min}"));
     }
     if let Some(max) = rule.max_occurs.filter(|max| *max != 1) {

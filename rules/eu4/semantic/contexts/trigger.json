@@ -31026,8 +31026,7 @@
       "Returns true if the country's or province's total development has grown by the specified amount"
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -33631,8 +33630,7 @@
       "In country scope, returns true if the country has discovered the province with the ID X. In province scope, returns true if the country X has discovered the province."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -33662,8 +33660,7 @@
       "In country scope, returns true if the country has discovered the province with the ID X. In province scope, returns true if the country X has discovered the province."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -33693,8 +33690,7 @@
       "In country scope, returns true if the country has discovered the province with the ID X. In province scope, returns true if the country X has discovered the province."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -33752,8 +33748,7 @@
       "In country scope, returns true if the country has discovered the province with the ID X. In province scope, returns true if the country X has discovered the province."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -33783,7 +33778,6 @@
       "In country scope, returns true if the country has discovered the province with the ID X. In province scope, returns true if the country X has discovered the province."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -33814,7 +33808,6 @@
       "In country scope, returns true if the country has discovered the province with the ID X. In province scope, returns true if the country X has discovered the province."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -33843,7 +33836,6 @@
       "In country scope, returns true if the country has discovered the province with the ID X. In province scope, returns true if the country X has discovered the province."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -34019,7 +34011,6 @@
       "Return true if the province has no estate (province scope) or the country has no estates (country scope)"
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -41153,8 +41144,7 @@
       "In country scope, returns true if the country has a claim on the province with the ID X. In province scope, returns true if the specified country has a claim on the province."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -41184,8 +41174,7 @@
       "In country scope, returns true if the country has a claim on the province with the ID X. In province scope, returns true if the specified country has a claim on the province."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -41215,7 +41204,6 @@
       "In country scope, returns true if the country has a claim on the province with the ID X. In province scope, returns true if the specified country has a claim on the province."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -41246,7 +41234,6 @@
       "In country scope, returns true if the country has a claim on the province with the ID X. In province scope, returns true if the specified country has a claim on the province."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -41540,8 +41527,7 @@
       "In country scope, returns true if the country has a core on the province with the ID X. In province scope, returns true if the country X has a core on the province."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -41571,8 +41557,7 @@
       "In country scope, returns true if the country has a core on the province with the ID X. In province scope, returns true if the country X has a core on the province."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -41602,7 +41587,6 @@
       "In country scope, returns true if the country has a core on the province with the ID X. In province scope, returns true if the country X has a core on the province."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -41666,7 +41650,6 @@
       "In country scope, returns true if the country has a core on the province with the ID X. In province scope, returns true if the country X has a core on the province."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -44129,7 +44112,6 @@
       "Returns true if the province is a permanent claim of X, or if country has a permanent claim on X."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -44160,7 +44142,6 @@
       "Returns true if the province is a permanent claim of X, or if country has a permanent claim on X."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -44191,8 +44172,7 @@
       "Returns true if the province is a permanent claim of X, or if country has a permanent claim on X."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -44255,8 +44235,7 @@
       "Returns true if the province is a permanent claim of X, or if country has a permanent claim on X."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -44963,8 +44942,7 @@
       "In country scope, returns true if the country has a state core on the province with the ID X. In province scope, returns true if the specified country has a claim on the province."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -44994,8 +44972,7 @@
       "In country scope, returns true if the country has a state core on the province with the ID X. In province scope, returns true if the specified country has a claim on the province."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -45025,7 +45002,6 @@
       "In country scope, returns true if the country has a state core on the province with the ID X. In province scope, returns true if the specified country has a claim on the province."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -45056,7 +45032,6 @@
       "In country scope, returns true if the country has a state core on the province with the ID X. In province scope, returns true if the specified country has a claim on the province."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -45326,8 +45301,7 @@
       "In country scope, returns true if the country has a territorial core on the province with the ID X. In province scope, returns true if the country X has a territorial core on the province."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -45357,8 +45331,7 @@
       "In country scope, returns true if the country has a territorial core on the province with the ID X. In province scope, returns true if the country X has a territorial core on the province."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -45388,7 +45361,6 @@
       "In country scope, returns true if the country has a territorial core on the province with the ID X. In province scope, returns true if the country X has a territorial core on the province."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -45419,7 +45391,6 @@
       "In country scope, returns true if the country has a territorial core on the province with the ID X. In province scope, returns true if the country X has a territorial core on the province."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
