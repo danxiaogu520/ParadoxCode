@@ -2,7 +2,7 @@
 //! (`editors/vscode/src/transcode.ts`).
 //!
 //! Emits one JSON object per line on stdout; `editors/vscode/scripts/
-//! codec-ts-test.mjs` feeds every vector through the TypeScript implementation
+//! transcode.mjs` feeds every vector through the TypeScript implementation
 //! and compares. The format is deliberately dumb — hex strings, integers, and
 //! short enum names only — so it stays hand-formatted without a JSON dependency
 //! in this std-only crate.

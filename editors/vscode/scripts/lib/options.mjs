@@ -21,7 +21,7 @@ export const DEFAULT_MAX_FILES = 100_000;
 export const DEFAULT_WORKSPACE_DIAGNOSTIC_BATCH_SIZE = 16;
 export const CHECKPOINT_FILE_INTERVAL = 128;
 
-export const USAGE = `Usage: node editors/vscode/scripts/diagnose-current-mod.mjs (--mod PATH | --vanilla-source PATH) [options]
+export const USAGE = `Usage: node editors/vscode/scripts/diagnose.mjs (--mod PATH | --vanilla-source PATH) [options]
 
 Diagnose every EU4 source file in a Current Mod using the embedded first-party rules and a local
 Vanilla index cache. The default output is diagnostic-reports/current-mod-<timestamp>.{json,md}.

@@ -79,7 +79,7 @@ cargo run -p rules --bin flag-audit -- --source rules/eu4 --game /path/to/eu4
 ```
 
 A whole-Current-Mod diagnostic pass against a local Vanilla index is available through
-`node editors/vscode/scripts/diagnose-current-mod.mjs` (or `npm --prefix editors/vscode run
+`node editors/vscode/scripts/diagnose.mjs` (or `npm --prefix editors/vscode run
   diagnose -- ...`; see the README for usage). Generated reports land in the
 ignored `diagnostic-reports/` directory and must not be committed.
 

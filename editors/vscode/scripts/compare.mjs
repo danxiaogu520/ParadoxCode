@@ -3,7 +3,7 @@
 /**
  * Head-to-head performance harness for the ParadoxCode server against a real mod corpus.
  *
- * Unlike `lsp-e2e.mjs` (a synthetic single-file smoke), this drives the full
+ * Unlike `probe.mjs` (a synthetic single-file smoke), this drives the full
  * lifecycle on a real workspace: initialize (which today performs the whole
  * scan), `pdc/ready`, an idle window, then a sampled set of files measured
  * for open->diagnostics, hover, completion, and edit->diagnostics latency.
@@ -12,11 +12,11 @@
  * wall-time + allocated-bytes report.
  *
  * Usage:
- *   node editors/vscode/scripts/performance/head-to-head.mjs --workspace <mod> --cache <vanilla.pdcindex> \
+ *   node editors/vscode/scripts/compare.mjs --workspace <mod> --cache <vanilla.pdcindex> \
  *       --label baseline --out performance-results/baseline.json
- *   node editors/vscode/scripts/performance/head-to-head.mjs --workspace <mod> --cache <vanilla.pdcindex> \
+ *   node editors/vscode/scripts/compare.mjs --workspace <mod> --cache <vanilla.pdcindex> \
  *       --dependency EDG=/path/to/reference-mod --label with-reference-mod
- *   node editors/vscode/scripts/performance/head-to-head.mjs --compare performance-results/baseline.json \
+ *   node editors/vscode/scripts/compare.mjs --compare performance-results/baseline.json \
  *       performance-results/candidate.json
  */
 
@@ -25,8 +25,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { LspClient } from '../lib/lsp-client.mjs';
-import { ProcessSampler, formatBytes } from '../lib/process-stats.mjs';
+import { LspClient } from './lib/client.mjs';
+import { ProcessSampler, formatBytes } from './lib/sampler.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '..', '..', '..', '..');
@@ -39,7 +39,7 @@ const DEFAULT_CLOSE_SETTLE_MS = 2_500;
 const DEFAULT_EDIT_GRACE_MS = 2_000;
 const SCRIPT_DIRECTORIES = ['common', 'events', 'missions', 'decisions'];
 
-const USAGE = `Usage: node editors/vscode/scripts/performance/head-to-head.mjs [options]
+const USAGE = `Usage: node editors/vscode/scripts/compare.mjs [options]
 
 Options:
   --server PATH              paradoxcode executable (default target/release/paradoxcode[.exe])

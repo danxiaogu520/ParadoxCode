@@ -10,7 +10,7 @@ import { relative, resolve, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 import { TextDecoder } from 'node:util';
 
-import { LspClient, LspProtocolError } from './lsp-client.mjs';
+import { LspClient, LspProtocolError } from './client.mjs';
 import { CHECKPOINT_FILE_INTERVAL, REPOSITORY_ROOT } from './options.mjs';
 import { addFileResult, addToolError, writeReports, MAX_REPORTED_TOOL_ERRORS } from './report.mjs';
 import { diagnosticItemPath, fileUri, overlayPathFor, pathKey } from './overlay.mjs';

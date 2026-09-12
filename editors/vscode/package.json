@@ -968,15 +968,15 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "check": "npm run compile && node scripts/smoke.mjs",
-    "test:ci": "npm run compile && node scripts/smoke.mjs && node scripts/codec-ts-test.mjs && node scripts/extension-contract.mjs && node scripts/package-contract.mjs && npm run test:package",
+    "test:ci": "npm run compile && node scripts/smoke.mjs && node scripts/transcode.mjs && node scripts/extension.mjs && node scripts/package.mjs && npm run test:package",
     "vscode:prepublish": "npm run compile",
-    "test:contract": "npm run compile && node scripts/codec-ts-test.mjs && node scripts/extension-contract.mjs && node scripts/package-contract.mjs",
+    "test:contract": "npm run compile && node scripts/transcode.mjs && node scripts/extension.mjs && node scripts/package.mjs",
     "test:package": "vsce package --out ../../target/paradoxcode-vscode-contract.vsix",
-    "test:host": "npm run compile && node scripts/host-test.mjs",
-    "diagnose": "node scripts/diagnose-current-mod.mjs",
-    "perf:lsp": "node scripts/performance/lsp-e2e.mjs",
-    "perf:compare": "node scripts/performance/head-to-head.mjs",
-    "package": "npm run compile && vsce package"
+    "test:host": "npm run compile && node scripts/host.mjs",
+    "diagnose": "node scripts/diagnose.mjs",
+    "perf:compare": "node scripts/compare.mjs",
+    "package": "npm run compile && vsce package",
+    "perf:probe": "node scripts/probe.mjs"
   },
   "dependencies": {
     "vscode-languageclient": "^10.1.1"

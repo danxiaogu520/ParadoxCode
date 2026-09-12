@@ -8,7 +8,7 @@
 import { mkdirSync, realpathSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { LspProtocolError } from './lsp-client.mjs';
+import { LspProtocolError } from './client.mjs';
 
 export function fileUri(path) {
   return pathToFileURL(path).href;

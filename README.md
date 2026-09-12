@@ -254,7 +254,7 @@ script below. It opens each relevant file through the real server transport and 
 JSON and Markdown reports under `diagnostic-reports/`:
 
 ```bash
-node editors/vscode/scripts/diagnose-current-mod.mjs \
+node editors/vscode/scripts/diagnose.mjs \
   --mod /path/to/current-mod \
   --vanilla-cache /path/to/vanilla.pdcindex
 ```
