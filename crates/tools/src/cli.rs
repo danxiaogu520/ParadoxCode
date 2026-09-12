@@ -11,7 +11,7 @@ use engine::{
 use game::{
     CandidateSource, DiscoveredInstallation, DiscoveryOptions, DiscoveryOutcome, DiscoveryToken,
     GameInstallDescriptor, UserConfigError, UserConfiguration, UserPaths, discover_installations,
-    portable_path, select_installation, validate_installation_for_source,
+    select_installation, validate_installation_for_source,
 };
 
 use pdc::stable_dependency_root_id;
@@ -180,12 +180,11 @@ fn setup_game(
         .unwrap_or_default();
     let explicit_search = source.is_some() || !roots.is_empty();
     let candidates = if let Some(source) = source {
-        let source = std::fs::canonicalize(&source).map_err(|error| CliError::Path {
+        let source = dunce::canonicalize(&source).map_err(|error| CliError::Path {
             field: "--source",
             path: source,
             error,
         })?;
-        let source = portable_path(source);
         if !validate_installation_for_source(&source, &descriptor) {
             return Err(CliError::Discovery(format!(
                 "{} is not a valid {} installation; expected an executable and common, events, missions, decisions, and localisation directories",
@@ -332,7 +331,7 @@ fn index_vanilla(args: &[String]) -> Result<String, CliError> {
     }
     let source = required_path(source, "--source")?;
     let output = required_path(output, "--output")?;
-    let source = std::fs::canonicalize(&source).map_err(|error| CliError::Path {
+    let source = dunce::canonicalize(&source).map_err(|error| CliError::Path {
         field: "--source",
         path: source,
         error,
@@ -386,7 +385,7 @@ fn index_dependency(args: &[String]) -> Result<String, CliError> {
     }
     let source = required_path(source, "--source")?;
     let output = required_path(output, "--output")?;
-    let source = std::fs::canonicalize(&source).map_err(|error| CliError::Path {
+    let source = dunce::canonicalize(&source).map_err(|error| CliError::Path {
         field: "--source",
         path: source,
         error,
@@ -870,7 +869,9 @@ mod tests {
         assert_eq!(
             game.vanilla_source.as_deref(),
             Some(
-                game::portable_path(fs::canonicalize(&source).expect("canonical source")).as_path()
+                dunce::canonicalize(&source)
+                    .expect("canonical source")
+                    .as_path()
             )
         );
         assert_eq!(game.resolved_via.as_deref(), Some("explicit"));
@@ -945,7 +946,9 @@ mod tests {
         assert_eq!(
             game.vanilla_source.as_deref(),
             Some(
-                game::portable_path(fs::canonicalize(source).expect("canonical source")).as_path()
+                dunce::canonicalize(source)
+                    .expect("canonical source")
+                    .as_path()
             )
         );
         assert!(game.vanilla_cache.is_none());

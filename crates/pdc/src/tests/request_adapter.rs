@@ -285,8 +285,8 @@ fn noncanonical_document_uri_preserves_rule_path_context() {
 
     let aliased_root = container.join("detour/../workspace");
     let aliased_file = aliased_root.join("common/decrees/test.txt");
-    let root_uri = path_to_uri(&aliased_root);
-    let uri = path_to_uri(&aliased_file);
+    let root_uri = file_uri_string(&aliased_root);
+    let uri = file_uri_string(&aliased_file);
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -1179,7 +1179,7 @@ fn memory_transport_rename_covers_current_mod_disk_references() {
     fs::write(&references_path, "event = cross.1\n").expect("reference");
     let target_uri = canonical_uri(&target_path);
     let references_uri = canonical_uri(&references_path);
-    let root_uri = canonical_uri(&fs::canonicalize(&root).expect("canonical root"));
+    let root_uri = canonical_uri(&dunce::canonicalize(&root).expect("canonical root"));
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),

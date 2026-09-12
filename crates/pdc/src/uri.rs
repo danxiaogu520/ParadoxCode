@@ -1,88 +1,96 @@
+//! Typed `file://`/`pdcloc://` URI boundary between the LSP wire format and filesystem paths.
+//!
+//! Parsing, percent-encoding, and serialization follow the WHATWG URL Standard via the `url`
+//! crate. This module adds only the two product rules the standard does not cover: the
+//! `pdcloc://` transparent-localisation scheme, which shares `file://` path semantics, and
+//! the mapping between URI authorities and Windows UNC paths.
+
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-/// Converts a `file://` or `pdcloc://` URI to a filesystem path.
+use percent_encoding::percent_decode_str;
+use url::Url;
+
+/// A validated `file://` or `pdcloc://` URI.
 ///
-/// `pdcloc://` is the extension's transparent localisation view: the URI is a
-/// `file://` URI with
-/// the scheme swapped, so the path is the real on-disk file and a virtual
-/// document opened under this scheme attaches to (and hides) the backing file
-/// while showing the decoded text the client syncs.
-pub fn uri_to_path(uri: &str) -> Result<PathBuf, UriError> {
-    let rest = uri
-        .strip_prefix("file://")
-        .or_else(|| uri.strip_prefix("FILE://"))
-        .or_else(|| uri.strip_prefix("pdcloc://"))
-        .or_else(|| uri.strip_prefix("PDCLOC://"))
-        .ok_or(UriError::UnsupportedScheme)?;
-    let rest = rest.split(['?', '#']).next().unwrap_or(rest);
-    let (authority, encoded_path) = if rest.starts_with('/') {
-        (None, rest.to_owned())
-    } else if let Some((authority, path)) = rest.split_once('/') {
-        (Some(authority), format!("/{path}"))
-    } else {
-        (Some(rest), "/".to_owned())
-    };
-    if authority.is_some_and(|value| !value.is_empty() && !value.eq_ignore_ascii_case("localhost"))
-    {
-        return Err(UriError::UnsupportedAuthority);
-    }
-    let decoded = percent_decode(&encoded_path)?;
-    #[cfg(windows)]
-    let decoded = decoded.strip_prefix('/').unwrap_or(&decoded).to_owned();
-    Ok(PathBuf::from(decoded))
+/// The serialized form is the canonical WHATWG spelling, so round-trips through
+/// [`FileUri::parse`] and [`FileUri::as_str`] are lossless for both schemes.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct FileUri {
+    url: Url,
 }
 
-/// Converts an absolute filesystem path to a percent-encoded `file://` URI.
-#[must_use]
-pub fn path_to_uri(path: &Path) -> String {
-    // `fs::canonicalize` returns an extended-length path on Windows (for example
-    // `\\\\?\\C:\\mods\\common\\events.txt`).  That spelling is valid for Win32
-    // file APIs, but it is not a portable file URI path: encoding the backslashes
-    // and the `\\\\?\\` prefix produces a URI that VS Code cannot open.  Normalize
-    // only the URI representation; the engine keeps its canonical path unchanged.
-    #[cfg(windows)]
-    let raw = {
-        let original = path.to_string_lossy();
-        let drive_path = original
-            .strip_prefix("\\\\?\\")
-            .filter(|value| value.as_bytes().get(1) == Some(&b':'))
-            .unwrap_or(&original);
-        if drive_path.as_bytes().get(1) == Some(&b':') {
-            drive_path.replace('\\', "/")
-        } else {
-            // Keep UNC paths on the existing local-authority path until URI
-            // authority support is added to uri_to_path.
-            drive_path.to_owned()
-        }
-    };
-    #[cfg(not(windows))]
-    let raw = path.to_string_lossy().into_owned();
-    let mut uri = String::from("file://");
-    if !raw.starts_with('/') {
-        uri.push('/');
-    }
-    for byte in raw.as_bytes() {
-        if *byte == b'/' || *byte == b':' || is_uri_unreserved(*byte) {
-            uri.push(char::from(*byte));
-        } else {
-            uri.push('%');
-            uri.push(hex_digit(byte >> 4));
-            uri.push(hex_digit(byte & 0x0f));
+impl FileUri {
+    /// Parses a client-supplied URI. Only the `file` and `pdcloc` schemes are accepted; the
+    /// scheme comparison itself is case-insensitive per RFC 3986.
+    pub fn parse(uri: &str) -> Result<Self, UriError> {
+        let url = Url::parse(uri).map_err(|_| UriError::UnsupportedScheme)?;
+        match url.scheme() {
+            "file" | "pdcloc" => Ok(Self { url }),
+            _ => Err(UriError::UnsupportedScheme),
         }
     }
-    uri
+
+    /// Builds the `file://` URI of a filesystem path.
+    ///
+    /// Extended-length Windows spellings are normalized first: `\\?\C:\...` loses its
+    /// verbatim prefix and `\\?\UNC\server\share` becomes `\\server\share`, which serializes
+    /// as `file://server/share/...`.
+    pub fn from_path(path: &Path) -> Result<Self, UriError> {
+        let url = Url::from_file_path(portable(path)).map_err(|_| UriError::NotAbsolute)?;
+        Ok(Self { url })
+    }
+
+    /// Returns the canonical serialized URI.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.url.as_str()
+    }
+
+    /// Resolves the URI to a filesystem path.
+    ///
+    /// A `localhost` authority counts as local. Any other authority names a remote host: on
+    /// Windows it maps to a UNC path, elsewhere no filesystem spelling exists and the URI is
+    /// rejected.
+    pub fn to_path(&self) -> Result<PathBuf, UriError> {
+        let host = self.url.host_str().unwrap_or_default();
+        if !host.is_empty() && !host.eq_ignore_ascii_case("localhost") {
+            #[cfg(windows)]
+            {
+                let host = decode(host)?;
+                let path = decode(self.url.path())?;
+                return Ok(PathBuf::from(format!(
+                    r"\\{host}{}",
+                    path.replace('/', "\\")
+                )));
+            }
+            #[cfg(not(windows))]
+            return Err(UriError::UnsupportedAuthority);
+        }
+        let path = decode(self.url.path())?;
+        #[cfg(windows)]
+        let path = path.strip_prefix('/').unwrap_or(&path).to_owned();
+        Ok(PathBuf::from(path))
+    }
+}
+
+impl fmt::Display for FileUri {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.url.as_str())
+    }
 }
 
 /// URI conversion failure.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum UriError {
-    /// The URI is not a supported `file://` URI.
+    /// The URI is not a supported `file://` or `pdcloc://` URI.
     UnsupportedScheme,
-    /// A non-local authority was supplied.
+    /// A remote-host authority has no filesystem spelling on this platform.
     UnsupportedAuthority,
     /// A percent escape or UTF-8 sequence is invalid.
     InvalidEncoding,
+    /// The path is not absolute and therefore has no `file://` representation.
+    NotAbsolute,
 }
 
 impl fmt::Display for UriError {
@@ -91,49 +99,41 @@ impl fmt::Display for UriError {
             Self::UnsupportedScheme => "unsupported URI scheme",
             Self::UnsupportedAuthority => "unsupported URI authority",
             Self::InvalidEncoding => "invalid URI percent encoding",
+            Self::NotAbsolute => "path is not absolute",
         })
     }
 }
 
 impl std::error::Error for UriError {}
 
-fn percent_decode(value: &str) -> Result<String, UriError> {
-    let bytes = value.as_bytes();
-    let mut decoded = Vec::with_capacity(bytes.len());
-    let mut index = 0;
-    while index < bytes.len() {
-        if bytes[index] == b'%' {
-            if index + 2 >= bytes.len() {
-                return Err(UriError::InvalidEncoding);
-            }
-            let high = hex_value(bytes[index + 1]).ok_or(UriError::InvalidEncoding)?;
-            let low = hex_value(bytes[index + 2]).ok_or(UriError::InvalidEncoding)?;
-            decoded.push((high << 4) | low);
-            index += 3;
+/// Percent-decodes one URI component into UTF-8.
+fn decode(value: &str) -> Result<String, UriError> {
+    percent_decode_str(value)
+        .decode_utf8()
+        .map(|value| value.into_owned())
+        .map_err(|_| UriError::InvalidEncoding)
+}
+
+/// Normalizes extended-length Windows spellings to the portable form the `url` crate expects:
+/// `\\?\UNC\server\share` becomes `\\server\share` and `\\?\C:\...` loses its verbatim prefix;
+/// every other path passes through unchanged.
+fn portable(path: &Path) -> PathBuf {
+    #[cfg(windows)]
+    {
+        let original = path.to_string_lossy();
+        let stripped = if let Some(rest) = original.strip_prefix(r"\\?\UNC\") {
+            Some(format!(r"\\{rest}"))
         } else {
-            decoded.push(bytes[index]);
-            index += 1;
+            original
+                .strip_prefix(r"\\?\")
+                .filter(|value| value.as_bytes().get(1) == Some(&b':'))
+                .map(str::to_owned)
+        };
+        if let Some(portable) = stripped {
+            return PathBuf::from(portable);
         }
+        path.to_path_buf()
     }
-    String::from_utf8(decoded).map_err(|_| UriError::InvalidEncoding)
-}
-
-fn is_uri_unreserved(byte: u8) -> bool {
-    byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~')
-}
-
-fn hex_value(byte: u8) -> Option<u8> {
-    match byte {
-        b'0'..=b'9' => Some(byte - b'0'),
-        b'a'..=b'f' => Some(byte - b'a' + 10),
-        b'A'..=b'F' => Some(byte - b'A' + 10),
-        _ => None,
-    }
-}
-
-fn hex_digit(value: u8) -> char {
-    match value {
-        0..=9 => char::from(b'0' + value),
-        _ => char::from(b'A' + value - 10),
-    }
+    #[cfg(not(windows))]
+    path.to_path_buf()
 }

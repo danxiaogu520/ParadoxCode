@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use engine::{AnalysisSnapshot, DocumentError, DocumentId};
 use ide::{
@@ -20,7 +20,7 @@ use serde_json::{Value, json};
 use text::{LineIndex, PositionRange, TextRange};
 
 use crate::server::{InFlightInitialize, InFlightRequest};
-use crate::uri::{path_to_uri, uri_to_path};
+use crate::uri::FileUri;
 use crate::{
     INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, JSON_RPC_VERSION, MAX_PUBLISHED_DIAGNOSTICS,
     REQUEST_CANCELLED,
@@ -681,9 +681,17 @@ pub(crate) fn location_to_lsp(
         .file
         .and_then(|file| snapshot.source_files().get(&file))
     {
-        path_to_uri(&file.physical_path).parse::<Uri>().ok()?
+        FileUri::from_path(&file.physical_path)
+            .ok()?
+            .as_str()
+            .parse::<Uri>()
+            .ok()?
     } else if let (Some(root), Some(path)) = (snapshot.workspace_root(), location.path.as_ref()) {
-        path_to_uri(&root.join(path.as_str())).parse::<Uri>().ok()?
+        FileUri::from_path(&root.join(path.as_str()))
+            .ok()?
+            .as_str()
+            .parse::<Uri>()
+            .ok()?
     } else {
         return None;
     };
@@ -746,12 +754,26 @@ pub(crate) fn request_id_from_lsp(id: NumberOrString) -> RequestId {
 }
 
 pub(crate) fn parse_file_uri_str(uri: &str) -> Result<PathBuf, RpcError> {
-    uri_to_path(uri).map_err(|_| {
-        RpcError::new(
-            INVALID_PARAMS,
-            "only file:// and pdcloc:// URIs are supported",
-        )
-    })
+    FileUri::parse(uri)
+        .and_then(|uri| uri.to_path())
+        .map_err(|_| {
+            RpcError::new(
+                INVALID_PARAMS,
+                "only file:// and pdcloc:// URIs are supported",
+            )
+        })
+}
+
+/// Builds the serialized `file://` URI of a scanned source file.
+pub(crate) fn disk_file_uri(path: &Path) -> Result<String, RpcError> {
+    FileUri::from_path(path)
+        .map(|uri| uri.as_str().to_owned())
+        .map_err(|error| {
+            RpcError::new(
+                INTERNAL_ERROR,
+                format!("source path has no file URI: {error}"),
+            )
+        })
 }
 
 impl RpcError {

@@ -78,6 +78,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- UNC paths work end to end: `file://server/share/...` URIs from the client decode to
+  `\\server\share\...` and `pdcloc://` keeps its twin semantics, while server-constructed
+  URIs of a verbatim UNC root (`\\?\UNC\server\share`) serialize as a proper authority URI
+  instead of a broken backslash spelling. Non-Windows hosts still reject remote authorities,
+  where no filesystem path exists.
 - Release sweep gate: `scripts/sweep.mjs` (npm `release:sweep`, workflow `sweep.yml` on release
   publication, self-hosted runner) cold-starts the server, lets it rebuild the Vanilla index
   cache, diagnoses the full Vanilla workspace through virtual overlays, and records per-phase
@@ -126,6 +131,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `common/estates_preload` (religion-scoped, exclusive, and piety variants such as
   `brahmins_hindu_loyalty_modifier` and `nobles_exclusive_influence_modifier`) gain first-party
   rows.
+
+- Path spellings are now uniform across the engine: document open/save/watched-file ingress
+  and source-root resolution canonicalize through `dunce`, which returns real-cased paths
+  without the Windows extended-length (`\\?\`) prefix, replacing the two hand-rolled
+  normalizers (`normalize_workspace_path`'s raw `fs::canonicalize` and `game::portable_path`).
+  URI conversion moves behind a typed `pdc::FileUri` built on the `url` crate, so the
+  hand-written percent codec is gone and round trips are the standard's guarantee. Index
+  caches recorded by older releases with verbatim root spellings keep loading; comparisons
+  accept both spellings.
+- `pdc index vanilla` and `pdc index dependency` record canonical source roots without the
+  extended-length prefix, matching what `pdc setup` has always persisted.
 
 ## [0.3.2] - 2026-09-11
 

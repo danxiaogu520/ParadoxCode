@@ -62,9 +62,9 @@ fn ranked_result_limits_report_completion_truncation() {
 #[test]
 fn uri_round_trip_preserves_unicode_and_spaces() {
     let path = std::env::temp_dir().join("Paradox Code").join("汉.txt");
-    let uri = path_to_uri(&path);
-    assert!(uri.contains("%20"));
-    assert_eq!(uri_to_path(&uri).expect("URI should decode"), path);
+    let uri = FileUri::from_path(&path).expect("absolute path has a file URI");
+    assert!(uri.as_str().contains("%20"));
+    assert_eq!(uri.to_path().expect("URI should decode"), path);
 }
 
 /// `pdcloc://` is the extension's decoded view over a real file: the path
@@ -78,24 +78,26 @@ fn pdcloc_uris_resolve_to_the_backing_file_path() {
     #[cfg(windows)]
     {
         assert_eq!(
-            uri_to_path("pdcloc:///C:/mods/edg/localisation/replace/edg_l_english.yml")
+            FileUri::parse("pdcloc:///C:/mods/edg/localisation/replace/edg_l_english.yml")
+                .expect("pdcloc URI should parse")
+                .to_path()
                 .expect("pdcloc URI should decode"),
             std::path::PathBuf::from("C:/mods/edg/localisation/replace/edg_l_english.yml")
         );
         assert_eq!(
-            uri_to_path("pdcloc://localhost/C:/mods/edg/history/countries/CHI%20-%20Ming.txt")
-                .expect("pdcloc URI with localhost authority should decode"),
+            FileUri::parse("pdcloc://localhost/C:/mods/edg/history/countries/CHI%20-%20Ming.txt")
+                .expect("pdcloc URI with localhost authority should parse")
+                .to_path()
+                .expect("localhost authority should decode"),
             std::path::PathBuf::from("C:/mods/edg/history/countries/CHI - Ming.txt")
         );
     }
     assert_eq!(
-        uri_to_path(&format!(
-            "pdcloc://{}",
-            path_to_uri(std::path::Path::new("/tmp/edg/localisation/x.yml"))
-                .trim_start_matches("file://")
-        ))
-        .expect("scheme-swapped file URI should decode"),
-        // The Windows branch of `uri_to_path` drops the leading `/` of a
+        FileUri::parse("pdcloc:///tmp/edg/localisation/x.yml")
+            .expect("scheme-swapped file URI should parse")
+            .to_path()
+            .expect("scheme-swapped file URI should decode"),
+        // The Windows branch of `to_path` drops the leading `/` of a
         // POSIX-style path just like it does for `file://` URIs.
         std::path::PathBuf::from(if cfg!(windows) {
             "tmp/edg/localisation/x.yml"
@@ -103,18 +105,106 @@ fn pdcloc_uris_resolve_to_the_backing_file_path() {
             "/tmp/edg/localisation/x.yml"
         })
     );
-    assert!(uri_to_path("pdcloc://remote/share/file.yml").is_err());
-    assert!(uri_to_path("untitled:Untitled-1").is_err());
+    // A non-local authority names a remote host: a UNC path on Windows, an
+    // error where no filesystem spelling exists.
+    #[cfg(windows)]
+    {
+        assert_eq!(
+            FileUri::parse("pdcloc://remote/share/file.yml")
+                .expect("remote authority should parse")
+                .to_path()
+                .expect("remote authority should decode"),
+            std::path::PathBuf::from(r"\\remote\share\file.yml")
+        );
+    }
+    #[cfg(not(windows))]
+    {
+        assert!(
+            FileUri::parse("pdcloc://remote/share/file.yml")
+                .and_then(|uri| uri.to_path())
+                .is_err()
+        );
+    }
+    assert!(FileUri::parse("untitled:Untitled-1").is_err());
+}
+
+#[test]
+fn file_uris_decode_client_spelling_variants_identically() {
+    // VS Code serializes drive letters percent-encoded and lowercased; both
+    // spellings of the same document must decode.
+    #[cfg(windows)]
+    {
+        for spelling in ["file:///c%3A/mods/x.txt", "file:///C:/mods/x.txt"] {
+            assert_eq!(
+                FileUri::parse(spelling)
+                    .expect("drive-letter URI should parse")
+                    .to_path()
+                    .expect("drive-letter URI should decode"),
+                std::path::PathBuf::from(
+                    spelling.trim_start_matches("file:///").replace("%3A", ":")
+                )
+            );
+        }
+        // Scheme case is insignificant per RFC 3986.
+        assert_eq!(
+            FileUri::parse("FILE:///C:/mods/x.txt")
+                .expect("uppercase scheme should parse")
+                .to_path()
+                .expect("uppercase scheme should decode"),
+            std::path::PathBuf::from("C:/mods/x.txt")
+        );
+        // Query and fragment components never enter the path.
+        assert_eq!(
+            FileUri::parse("file:///C:/mods/x.txt?server=1#frag")
+                .expect("URI with query should parse")
+                .to_path()
+                .expect("URI with query should decode"),
+            std::path::PathBuf::from("C:/mods/x.txt")
+        );
+    }
+}
+
+#[test]
+fn unc_paths_round_trip_through_authority_uris() {
+    let path = std::path::Path::new(r"\\server\share\mod x\localisation\a.yml");
+    let Ok(uri) = FileUri::from_path(path) else {
+        return; // Non-Windows: UNC input is not an absolute local path.
+    };
+    assert_eq!(
+        uri.as_str(),
+        "file://server/share/mod%20x/localisation/a.yml"
+    );
+    assert_eq!(uri.to_path().expect("UNC URI should decode"), path);
+}
+
+#[test]
+fn relative_paths_have_no_file_uri() {
+    assert!(matches!(
+        FileUri::from_path(std::path::Path::new("relative/x.txt")),
+        Err(crate::UriError::NotAbsolute)
+    ));
 }
 
 #[cfg(windows)]
 #[test]
 fn windows_file_uri_normalizes_extended_canonical_paths() {
     let path = std::path::Path::new(r"\\?\C:\Paradox Code\events\test.txt");
-    let uri = path_to_uri(path);
-    assert_eq!(uri, "file:///C:/Paradox%20Code/events/test.txt");
-    assert!(!uri.contains("%5C"));
-    assert!(!uri.contains("%3F"));
+    let uri = FileUri::from_path(path).expect("verbatim drive path has a file URI");
+    assert_eq!(uri.as_str(), "file:///C:/Paradox%20Code/events/test.txt");
+    assert!(!uri.as_str().contains("%5C"));
+    assert!(!uri.as_str().contains("%3F"));
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_file_uri_normalizes_verbatim_unc_paths() {
+    let path = std::path::Path::new(r"\\?\UNC\server\share\events\test.txt");
+    let uri = FileUri::from_path(path).expect("verbatim UNC path has a file URI");
+    assert_eq!(uri.as_str(), "file://server/share/events/test.txt");
+    assert_eq!(
+        uri.to_path().expect("UNC URI should decode"),
+        std::path::Path::new(r"\\server\share\events\test.txt")
+    );
 }
 
 #[test]
@@ -137,7 +227,7 @@ fn selected_game_rejects_a_mismatched_rules_artifact() {
 fn memory_transport_runs_real_json_rpc_lifecycle_and_sync() {
     let path = std::env::temp_dir().join(format!("pdc-{}.txt", std::process::id()));
     fs::write(&path, "disk").expect("write disk fixture");
-    let uri = path_to_uri(&path);
+    let uri = file_uri_string(&path);
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"workspaceFolders":[{"uri":uri,"name":"test"}],"capabilities":{}}}),

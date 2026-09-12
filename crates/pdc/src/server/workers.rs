@@ -1,6 +1,6 @@
 use super::*;
 use crate::MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS;
-use crate::uri::path_to_uri;
+use crate::uri::FileUri;
 
 /// Validates every parsed Current Mod source file in a refreshed candidate and aggregates the
 /// result for the explicit `validateWorkspace` command. The source-root refresh has already
@@ -164,7 +164,9 @@ fn workspace_validation_result(
                             filtered,
                             source: state.source_handle(),
                             line_index,
-                            closed_uri: Some(path_to_uri(&file.physical_path)),
+                            closed_uri: FileUri::from_path(&file.physical_path)
+                                .ok()
+                                .map(|uri| uri.as_str().to_owned()),
                         },
                     );
                 }
@@ -264,7 +266,10 @@ fn changed_files_validation_result(
         if scan_cancellation.is_cancelled() {
             return Err(WorkspaceError::Cancelled);
         }
-        let uri = path_to_uri(&change.path);
+        let uri = match FileUri::from_path(&change.path) {
+            Ok(uri) => uri.as_str().to_owned(),
+            Err(_) => continue,
+        };
         if change.kind == DiskFileChangeKind::Deleted {
             current_uris.push(uri.clone());
             publications.push(WorkspaceDiagnosticPublication {

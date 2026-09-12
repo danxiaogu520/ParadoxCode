@@ -917,25 +917,10 @@ fn join_portable(root: &Path, relative: &str) -> PathBuf {
         .fold(root.to_owned(), |path, part| path.join(part))
 }
 
-/// Canonicalizes a path and strips Windows verbatim prefixes from the result.
+/// Canonicalizes a path without the Windows verbatim (`\\?\`) prefix, so persisted and
+/// displayed paths stay portable.
 fn canonicalize_clean(path: &Path) -> Option<PathBuf> {
-    fs::canonicalize(path).ok().map(portable_path)
-}
-
-/// Strips Windows verbatim (`\\?\`) prefixes so persisted and displayed paths stay portable.
-#[must_use]
-pub fn portable_path(path: PathBuf) -> PathBuf {
-    #[cfg(target_os = "windows")]
-    {
-        let text = path.as_os_str().to_string_lossy();
-        if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
-            return PathBuf::from(format!(r"\\{rest}"));
-        }
-        if let Some(rest) = text.strip_prefix(r"\\?\") {
-            return PathBuf::from(rest.to_owned());
-        }
-    }
-    path
+    dunce::canonicalize(path).ok()
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -1249,10 +1234,8 @@ mod tests {
     #[test]
     fn discovery_finds_only_valid_roots() {
         let temporary = fixture();
-        let installation = super::portable_path(
-            fs::canonicalize(temporary.path().join("library/Test Game"))
-                .expect("canonical installation"),
-        );
+        let installation = dunce::canonicalize(temporary.path().join("library/Test Game"))
+            .expect("canonical installation");
         let report = discover_installations(
             &TEST_GAME,
             &DiscoveryOptions {
@@ -1498,31 +1481,5 @@ mod tests {
         assert_eq!(metadata_only.alternatives.len(), 2);
 
         assert!(select_installation(&[]).is_none());
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn verbatim_prefixes_are_stripped_from_canonical_paths() {
-        assert_eq!(
-            super::portable_path(std::path::PathBuf::from(r"\\?\C:\Games\Test Game")),
-            std::path::PathBuf::from(r"C:\Games\Test Game")
-        );
-        assert_eq!(
-            super::portable_path(std::path::PathBuf::from(r"\\?\UNC\server\share\Test Game")),
-            std::path::PathBuf::from(r"\\server\share\Test Game")
-        );
-        assert_eq!(
-            super::portable_path(std::path::PathBuf::from(r"C:\Games\Test Game")),
-            std::path::PathBuf::from(r"C:\Games\Test Game")
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    #[test]
-    fn canonical_paths_are_returned_unchanged_off_windows() {
-        assert_eq!(
-            super::portable_path(std::path::PathBuf::from("/games/test")),
-            std::path::PathBuf::from("/games/test")
-        );
     }
 }

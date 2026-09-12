@@ -263,11 +263,11 @@ fn editor_options_load_ordered_dependencies_and_keep_them_read_only() {
     for directory in [&current, &low, &high, &vanilla] {
         fs::create_dir_all(directory.join("events")).expect("fixture directory");
     }
-    let canonical_root = fs::canonicalize(&root).expect("canonical root");
-    let current = fs::canonicalize(&current).expect("canonical current");
-    let low = fs::canonicalize(&low).expect("canonical low");
-    let high = fs::canonicalize(&high).expect("canonical high");
-    let vanilla = fs::canonicalize(&vanilla).expect("canonical vanilla");
+    let canonical_root = dunce::canonicalize(&root).expect("canonical root");
+    let current = dunce::canonicalize(&current).expect("canonical current");
+    let low = dunce::canonicalize(&low).expect("canonical low");
+    let high = dunce::canonicalize(&high).expect("canonical high");
+    let vanilla = dunce::canonicalize(&vanilla).expect("canonical vanilla");
     let inline = super::resolve_source_roots(
         Some(&canonical_root),
         Some(json!({
@@ -304,7 +304,7 @@ fn editor_options_load_ordered_dependencies_and_keep_them_read_only() {
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+        dunce::canonicalize(&vanilla).expect("canonical Vanilla root"),
     )]));
     vanilla_host
         .refresh_source_roots()
@@ -446,7 +446,7 @@ fn missing_vanilla_cache_degrades_with_an_lsp_warning() {
     let root = std::env::temp_dir().join(format!("pdc-missing-vanilla-cache-{nonce}"));
     fs::create_dir_all(root.join("events")).expect("workspace fixture");
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":path_to_uri(&root),"name":"test"}],"capabilities":{},"initializationOptions":{"vanillaIndexCache":".pdc/missing.pdcindex"}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":file_uri_string(&root),"name":"test"}],"capabilities":{},"initializationOptions":{"vanillaIndexCache":".pdc/missing.pdcindex"}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
@@ -488,7 +488,7 @@ fn initialize_defers_an_existing_vanilla_cache() {
     let vanilla = container.join("vanilla");
     fs::create_dir_all(&workspace).expect("workspace directory");
     fs::create_dir_all(&vanilla).expect("Vanilla directory");
-    let vanilla = fs::canonicalize(&vanilla).expect("canonical Vanilla directory");
+    let vanilla = dunce::canonicalize(&vanilla).expect("canonical Vanilla directory");
     let cache_path = container.join("vanilla.pdcindex");
 
     let mut vanilla_host = AnalysisHost::with_profile(
@@ -504,7 +504,7 @@ fn initialize_defers_an_existing_vanilla_cache() {
     cache.save(&cache_path).expect("save Vanilla cache");
 
     let params = serde_json::from_value(json!({
-        "workspaceFolders":[{"uri":path_to_uri(&workspace),"name":"test"}],
+        "workspaceFolders":[{"uri":file_uri_string(&workspace),"name":"test"}],
         "capabilities": {},
         "initializationOptions": {"vanillaIndexCache": cache_path}
     }))
@@ -554,7 +554,7 @@ fn stale_vanilla_cache_is_regenerated_with_an_explicit_notification() {
     );
 
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":path_to_uri(&container.join("workspace")),"name":"test"}],"capabilities":{},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":file_uri_string(&container.join("workspace")),"name":"test"}],"capabilities":{},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
@@ -623,7 +623,7 @@ fn stale_cache_regeneration_reports_work_done_progress() {
     }
 
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":path_to_uri(&container.join("workspace")),"name":"test"}],"capabilities":{"window":{"workDoneProgress":true}},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":file_uri_string(&container.join("workspace")),"name":"test"}],"capabilities":{"window":{"workDoneProgress":true}},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
@@ -687,7 +687,7 @@ fn valid_cache_load_reports_work_done_progress() {
     let cache_path = valid_cache_fixture(&container);
 
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":path_to_uri(&container.join("workspace")),"name":"test"}],"capabilities":{"window":{"workDoneProgress":true}},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":file_uri_string(&container.join("workspace")),"name":"test"}],"capabilities":{"window":{"workDoneProgress":true}},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
@@ -801,7 +801,7 @@ fn stale_vanilla_cache_reports_regeneration_failure_explicitly() {
     fs::remove_dir_all(container.join("vanilla")).expect("remove Vanilla directory");
 
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":path_to_uri(&container.join("workspace")),"name":"test"}],"capabilities":{},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":file_uri_string(&container.join("workspace")),"name":"test"}],"capabilities":{},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
@@ -937,7 +937,7 @@ fn unavailable_configured_cache_is_rebuilt_from_configured_source() {
     };
 
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":path_to_uri(&root.join("workspace")),"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":file_uri_string(&root.join("workspace")),"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
@@ -1024,9 +1024,8 @@ fn unavailable_user_level_cache_rebuild_records_the_resolved_source() {
     let configuration =
         UserConfiguration::load(&automatic.user_paths.config_file).expect("configuration");
     let game = configuration.games.get("eu4").expect("EU4 configuration");
-    let expected = game::portable_path(
-        fs::canonicalize(root.join("library/Europa Universalis IV")).expect("canonical source"),
-    );
+    let expected =
+        dunce::canonicalize(root.join("library/Europa Universalis IV")).expect("canonical source");
     assert_eq!(game.vanilla_source.as_deref(), Some(expected.as_path()));
     assert_eq!(game.vanilla_cache.as_deref(), Some(cache_path.as_path()));
     // A caller-driven rebuild never marks the one-time automatic attempt as done.
@@ -1120,7 +1119,7 @@ fn automatic_discovery_resolves_multiple_candidates_deterministically() {
         &options,
     )
     .expect("multiple candidates must resolve instead of failing");
-    let expected = game::portable_path(fs::canonicalize(&newer).expect("canonical"));
+    let expected = dunce::canonicalize(&newer).expect("canonical");
     assert!(
         message.contains("Vanilla symbols are now enabled")
             && message.contains(expected.to_str().expect("utf-8 path"))
@@ -1276,7 +1275,7 @@ fn initialize_game_directory_guides_a_previous_failed_discovery() {
             "id":1,
             "method":"initialize",
             "params":{
-                "workspaceFolders":[{"uri":path_to_uri(&workspace),"name":"test"}],
+                "workspaceFolders":[{"uri":file_uri_string(&workspace),"name":"test"}],
                 "capabilities":{},
                 "initializationOptions":{"gameDirectory":source}
             }
@@ -1405,7 +1404,7 @@ fn legacy_project_file_is_rejected_without_being_read() {
     let (root, _) = temp_workspace_dir();
     fs::create_dir_all(root.join(".pdx")).expect("config directory");
     fs::write(root.join(".pdx/project.toml"), "this is not TOML").expect("write legacy file");
-    let canonical_root = fs::canonicalize(&root).expect("canonical root");
+    let canonical_root = dunce::canonicalize(&root).expect("canonical root");
     let error = super::resolve_source_roots(
         Some(&canonical_root),
         None,
@@ -1424,7 +1423,7 @@ fn legacy_project_file_is_rejected_without_being_read() {
 #[test]
 fn removed_project_config_option_is_rejected_explicitly() {
     let (root, _) = temp_workspace_dir();
-    let canonical_root = fs::canonicalize(&root).expect("canonical root");
+    let canonical_root = dunce::canonicalize(&root).expect("canonical root");
     let error = super::resolve_source_roots(
         Some(&canonical_root),
         Some(json!({"projectConfig": ".pdx/project.toml"})),
@@ -1446,7 +1445,7 @@ fn indexed_dependencies_are_excluded_from_live_scanning() {
     fs::create_dir_all(root.join("mod/events")).expect("current directory");
     fs::create_dir_all(root.join("deps/live/events")).expect("live dependency");
     fs::create_dir_all(root.join("deps/cached/events")).expect("cached dependency");
-    let canonical_root = fs::canonicalize(&root).expect("canonical root");
+    let canonical_root = dunce::canonicalize(&root).expect("canonical root");
     let resolved = super::resolve_source_roots(
         Some(&canonical_root),
         Some(json!({
@@ -1497,7 +1496,7 @@ fn existing_dependency_index_cache_is_installed_in_the_background() {
         "country_event = { id = dep.1 }\n",
     )
     .expect("dependency definition");
-    let dependency = fs::canonicalize(&dependency).expect("canonical dependency");
+    let dependency = dunce::canonicalize(&dependency).expect("canonical dependency");
     let dependency_root = SourceRoot::new(
         SourceRootId::new(42),
         SourceRootKind::Dependency,

@@ -208,7 +208,10 @@ impl LspServer {
         let text = params.text_document.text;
         changed_document_len(0, None, text.len())?;
         self.invalidate_semantic_tokens(&uri);
-        let path = uri_to_path(&uri).ok().map(normalize_workspace_path);
+        let path = FileUri::parse(&uri)
+            .ok()
+            .and_then(|uri| uri.to_path().ok())
+            .map(normalize_workspace_path);
         self.host
             .stage_open_document(DocumentId::new(uri.clone()), version, text, path)
             .map_err(document_error)?;
