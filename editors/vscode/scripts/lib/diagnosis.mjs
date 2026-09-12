@@ -28,17 +28,25 @@ function decodeSource(bytes) {
 }
 
 /**
- * Spawns the server, completes the LSP handshake, and waits for the Vanilla
- * cache progress token. Returns the live client, the child process (so the
- * caller can hard-kill it on signals), and the Vanilla readiness message.
+ * Spawns the server process and wraps it in an LSP client. Returns before
+ * the handshake so callers that need whole-lifetime resource sampling can
+ * start their sampler before any server work happens.
  */
-export async function connectClient(options) {
+export async function spawnServer(options) {
   const child = spawn(options.server, [], {
     cwd: REPOSITORY_ROOT,
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
   });
-  const client = new LspClient(child);
+  return { client: new LspClient(child), child };
+}
+
+/**
+ * Completes the LSP handshake on an already-spawned client: initialize,
+ * initialized, and the Vanilla cache progress token. Returns the Vanilla
+ * readiness message.
+ */
+export async function handshake(client, options) {
   const initializeParams = {
     processId: process.pid,
     clientInfo: { name: 'paradoxcode-current-mod-diagnostics', version: '1' },
@@ -61,6 +69,16 @@ export async function connectClient(options) {
   const vanillaStarted = Date.now();
   const vanillaMessage = await waitForVanillaReady(client, options.timeoutMs);
   console.error(`Vanilla cache ready in ${Date.now() - vanillaStarted} ms`);
+  return vanillaMessage;
+}
+
+/**
+ * Convenience composition for callers that do not sample resources:
+ * spawn plus handshake in one step.
+ */
+export async function connectClient(options) {
+  const { client, child } = await spawnServer(options);
+  const vanillaMessage = await handshake(client, options);
   return { client, child, vanillaMessage };
 }
 

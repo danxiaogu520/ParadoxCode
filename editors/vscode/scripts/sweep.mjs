@@ -20,19 +20,24 @@
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, appendFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { join, relative, resolve, sep } from 'node:path';
 import { execFile } from 'node:child_process';
+import { performance } from 'node:perf_hooks';
+import { TextDecoder } from 'node:util';
 import { promisify } from 'node:util';
 import os from 'node:os';
 
 import { ProcessSampler, formatBytes } from './lib/sampler.mjs';
 import { CliUsageError, REPOSITORY_ROOT, parseArgs, resolveOptions } from './lib/options.mjs';
 import { collectSourceFiles } from './lib/workspace.mjs';
+import { fileUri, overlayPathFor } from './lib/overlay.mjs';
+import { LspProtocolError } from './lib/client.mjs';
 import {
-  connectClient,
   diagnoseTextFiles,
+  handshake,
   selectDiagnosableFiles,
+  spawnServer,
   stopClient,
 } from './lib/diagnosis.mjs';
 import {
@@ -50,6 +55,10 @@ const DEFAULT_OUTPUT_DIR = join(REPOSITORY_ROOT, 'performance-results');
 const DEFAULT_TIMEOUT_MS = 1_800_000;
 const DEFAULT_FILE_TIMEOUT_MS = 120_000;
 const DEFAULT_MEMORY_INTERVAL_MS = 500;
+const DEFAULT_QUERY_SAMPLES = 40;
+const QUERY_DIAGNOSTIC_WAIT_MS = 3_000;
+const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true });
+const WINDOWS_1252_DECODER = new TextDecoder('windows-1252');
 const VANILLA_SOURCE_CANDIDATES = [
   process.env.PDC_SWEEP_VANILLA_SOURCE,
   'C:/Program Files (x86)/Steam/steamapps/common/Europa Universalis IV',
@@ -75,6 +84,7 @@ Options:
   --batch-size N          files per diagnostic request (default: 16)
   --concurrency N         concurrent workers (default: 8)
   --memory-interval-ms N  server resource sampling interval (default: ${DEFAULT_MEMORY_INTERVAL_MS})
+  --query-samples N       files sampled for per-query latencies (default: ${DEFAULT_QUERY_SAMPLES})
   --fail-on LEVEL         error, warning, or none (default: none — the release
                           gate is the diagnostics fingerprint against the previous
                           sweep, not the absolute severity counts)
@@ -109,6 +119,7 @@ function parseSweepArgs(argv) {
     batchSize: 16,
     concurrency: 8,
     memoryIntervalMs: DEFAULT_MEMORY_INTERVAL_MS,
+    querySamples: DEFAULT_QUERY_SAMPLES,
     failOn: 'none',
   };
   const numbers = new Map([
@@ -117,6 +128,7 @@ function parseSweepArgs(argv) {
     ['--batch-size', 'batchSize'],
     ['--concurrency', 'concurrency'],
     ['--memory-interval-ms', 'memoryIntervalMs'],
+    ['--query-samples', 'querySamples'],
   ]);
   const values = new Map([
     ['--vanilla-source', 'vanillaSource'],
@@ -211,6 +223,152 @@ function diagnosticsFingerprint(report) {
   return createHash('sha256').update(lines.join('\n'), 'utf8').digest('hex');
 }
 
+const QUERY_METHODS = [
+  'textDocument/completion',
+  'textDocument/hover',
+  'textDocument/definition',
+  'textDocument/references',
+  'textDocument/documentSymbol',
+];
+
+function percentile(values, fraction) {
+  if (!values.length) return undefined;
+  const sorted = [...values].sort((left, right) => left - right);
+  const index = Math.min(sorted.length - 1, Math.floor(sorted.length * fraction));
+  return sorted[index];
+}
+
+/**
+ * Interactive-query latency sampling over a spread of already-diagnosed
+ * files: opens each sample as a real overlay document, waits for its
+ * diagnostics (the signal that the file is analyzed), runs the common
+ * query battery at a mid-file position, measures an incremental
+ * `didChange -> publishDiagnostics` round trip, then closes it.
+ *
+ * Returns p50/p99/max per behavior. Sequential on purpose — concurrent
+ * load would contaminate the latencies being measured.
+ */
+async function sampleQueryLatencies(client, options, files, sampleCount) {
+  const samples = new Map();
+  for (const method of QUERY_METHODS) {
+    samples.set(method, []);
+  }
+  samples.set('incremental_diagnostics', []);
+
+  const step = Math.max(1, Math.floor(files.length / Math.max(1, sampleCount)));
+  const picked = [];
+  for (let index = 0; index < files.length && picked.length < sampleCount; index += step) {
+    picked.push(files[index]);
+  }
+  console.error(`Query latency sampling: ${picked.length} file(s)`);
+
+  const timings = (method, params) => {
+    const started = performance.now();
+    return client
+      .request(method, params, options.fileTimeoutMs)
+      .then((result) => ({ elapsed: performance.now() - started, result }))
+      .catch((error) => {
+        throw new LspProtocolError(`${method} failed: ${error.message}`);
+      });
+  };
+
+  for (const file of picked) {
+    const relativePath = relative(options.source, file).split(sep).join('/');
+    let text;
+    try {
+      text = decodeVanillaSource(readFileSync(file));
+    } catch (error) {
+      console.error(`[query sample skipped] ${relativePath}: ${error.message}`);
+      continue;
+    }
+    const lines = text.split(/\r?\n/);
+    let line = lines.length - 1;
+    while (line > 0 && lines[line].trim().length < 4) line -= 1;
+    const position = { line, character: Math.min(2, lines[line]?.length ?? 0) };
+    const uri = fileUri(
+      options.virtualOverlayRoot
+        ? overlayPathFor(options.virtualOverlayRoot, relativePath)
+        : file,
+    );
+
+    client.notify('textDocument/didOpen', {
+      textDocument: { uri, languageId: 'eu4', version: 1, text },
+    });
+    try {
+      // A clean file may legitimately never publish diagnostics; the wait
+      // only opportunistically confirms the file is analyzed before the
+      // query battery, so its timeout is short and non-fatal.
+      await client
+        .waitFor(
+          (message) =>
+            message.method === 'textDocument/publishDiagnostics' &&
+            message.params?.uri === uri,
+          QUERY_DIAGNOSTIC_WAIT_MS,
+          `first diagnostics for ${relativePath}`,
+        )
+        .catch(() => {});
+      const queryParams = { textDocument: { uri }, position };
+      for (const method of QUERY_METHODS) {
+        const params =
+          method === 'textDocument/documentSymbol'
+            ? { textDocument: { uri } }
+            : method === 'textDocument/references'
+              ? { textDocument: { uri }, position, context: { includeDeclaration: true } }
+              : queryParams;
+        const { elapsed } = await timings(method, params);
+        samples.get(method).push(elapsed);
+      }
+
+      // The probe key is guaranteed to be flagged as an unknown key, so the
+      // incremental round trip always produces a publish to wait for; the
+      // arrival stamp filters out the open-time publish.
+      const changeStarted = performance.now();
+      client.notify('textDocument/didChange', {
+        textDocument: { uri, version: 2 },
+        contentChanges: [{ text: `${text}\nedg_sweep_probe_unknown_key = yes` }],
+      });
+      const published = await client
+        .waitFor(
+          (message) =>
+            message.method === 'textDocument/publishDiagnostics' &&
+            message.params?.uri === uri &&
+            message._at >= changeStarted,
+          QUERY_DIAGNOSTIC_WAIT_MS,
+          `incremental diagnostics for ${relativePath}`,
+        )
+        .then(() => true)
+        .catch(() => false);
+      if (published) {
+        samples.get('incremental_diagnostics').push(performance.now() - changeStarted);
+      }
+    } catch (error) {
+      console.error(`[query sample failed] ${relativePath}: ${error.message}`);
+    } finally {
+      client.notify('textDocument/didClose', { textDocument: { uri } });
+    }
+  }
+
+  const summary = {};
+  for (const [name, values] of samples) {
+    if (!values.length) continue;
+    summary[name] = {
+      p50: Math.round(percentile(values, 0.5) * 10) / 10,
+      p99: Math.round(percentile(values, 0.99) * 10) / 10,
+      max: Math.round(Math.max(...values) * 10) / 10,
+      samples: values.length,
+    };
+  }
+  return summary;
+}
+
+function decodeVanillaSource(bytes) {
+  try {
+    return UTF8_DECODER.decode(bytes);
+  } catch {
+    return WINDOWS_1252_DECODER.decode(bytes);
+  }
+}
+
 function vanillaBuildId(vanillaSource) {
   const facts = {};
   for (const [key, file] of [
@@ -241,7 +399,7 @@ async function gitFacts() {
 }
 
 function summarize(previous, current) {
-  const phases = ['scan_ms', 'session_boot_ms', 'classify_ms', 'diagnose_ms', 'total_ms'];
+  const phases = ['scan_ms', 'session_boot_ms', 'classify_ms', 'diagnose_ms', 'query_samples_ms', 'total_ms'];
   const lines = [];
   for (const phase of phases) {
     const before = previous?.phases?.[phase];
@@ -250,6 +408,26 @@ function summarize(previous, current) {
     const delta = ((after - before) / before) * 100;
     const flagged = delta > 25 && phase !== 'total_ms' ? '  << REGRESSION?' : '';
     lines.push(`  ${phase}: ${before.toFixed(0)} ms -> ${after.toFixed(0)} ms (${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%)${flagged}`);
+  }
+  // Query latencies flag conservatively: sub-5 ms absolute movements are
+  // scheduler noise even at large relative deltas, so only p99/max past the
+  // floor are marked.
+  for (const name of Object.keys(current.query_latencies || {})) {
+    const before = previous?.query_latencies?.[name];
+    const after = current.query_latencies[name];
+    if (!before) continue;
+    const parts = [];
+    let flagged = false;
+    for (const stat of ['p50', 'p99', 'max']) {
+      const beforeMs = before[stat];
+      const afterMs = after[stat];
+      if (!Number.isFinite(beforeMs) || !Number.isFinite(afterMs)) continue;
+      const delta = ((afterMs - beforeMs) / beforeMs) * 100;
+      const mark = stat !== 'p50' && afterMs - beforeMs > 5 && delta > 25 ? ' <<' : '';
+      if (mark) flagged = true;
+      parts.push(`${stat} ${beforeMs} -> ${afterMs} ms (${delta >= 0 ? '+' : ''}${delta.toFixed(0)}%)${mark}`);
+    }
+    lines.push(`  query ${name}: ${parts.join(', ')}${flagged ? '  << REGRESSION?' : ''}`);
   }
   if (previous?.summary && current.summary) {
     lines.push(
@@ -283,22 +461,27 @@ async function run(raw) {
 
   let client;
   let sampler;
+  let queryLatencies = {};
   const phases = { scan_ms: scanMs };
   const sessionStarted = Date.now();
   try {
-    const boot = await connectClient(options);
+    // Sampling starts before the handshake so the resource numbers cover the
+    // whole server lifetime: rules load, Vanilla cache discovery/build, and
+    // every phase after.
+    const boot = await spawnServer(options);
     client = boot.client;
     activeServerChild = boot.child;
-    phases.session_boot_ms = Date.now() - sessionStarted;
-
     sampler = new ProcessSampler(boot.child.pid, raw.memoryIntervalMs);
     sampler.start();
 
-    const vanillaFailed = /could not|failed|without vanilla|error/i.test(boot.vanillaMessage);
+    const vanillaMessage = await handshake(client, options);
+    phases.session_boot_ms = Date.now() - sessionStarted;
+
+    const vanillaFailed = /could not|failed|without vanilla|error/i.test(vanillaMessage);
     report.inputs.vanilla_cache.loaded = !vanillaFailed;
-    report.inputs.vanilla_cache.status_message = boot.vanillaMessage;
+    report.inputs.vanilla_cache.status_message = vanillaMessage;
     if (vanillaFailed) {
-      addToolError(report, `Vanilla cache was not enabled: ${boot.vanillaMessage}`);
+      addToolError(report, `Vanilla cache was not enabled: ${vanillaMessage}`);
     }
 
     const classifyStarted = Date.now();
@@ -309,6 +492,10 @@ async function run(raw) {
     console.error(`Diagnosing ${selected.length} Vanilla files in bounded text batches`);
     await diagnoseTextFiles(client, report, options, selected);
     phases.diagnose_ms = Date.now() - diagnoseStarted;
+
+    const queriesStarted = Date.now();
+    queryLatencies = await sampleQueryLatencies(client, options, selected, raw.querySamples);
+    phases.query_samples_ms = Date.now() - queriesStarted;
   } catch (error) {
     addToolError(report, error instanceof Error ? error.message : String(error));
   } finally {
@@ -342,14 +529,18 @@ async function run(raw) {
     },
     rules_hash: report.inputs.rules.manifest_rule_hash,
     files_selected: report.scan.diagnosable_files_selected,
+    query_latencies: queryLatencies,
     summary: report.summary,
     diagnostics_fingerprint: diagnosticsFingerprint(report),
     phases,
     server_phases: serverPhases(report.server_messages),
     resources: {
+      // Whole server lifetime: the sampler starts at spawn, before the
+      // handshake, so rules load and cache build are included.
       cpu_seconds: sampler?.cpuSeconds,
       peak_working_set_bytes: sampler?.peakWorkingSetBytes,
       samples: sampler?.samples,
+      sample_interval_ms: raw.memoryIntervalMs,
     },
     full_report: outputs.jsonPath,
     status: report.status,
@@ -371,6 +562,11 @@ async function run(raw) {
   console.log(`Fingerprint: ${summary.diagnostics_fingerprint}`);
   console.log(`Peak server memory: ${formatBytes(summary.resources.peak_working_set_bytes)}`);
   for (const [phase, ms] of Object.entries(phases)) console.log(`  ${phase}: ${ms} ms`);
+  for (const [name, stats] of Object.entries(queryLatencies)) {
+    console.log(
+      `  query ${name}: p50 ${stats.p50} ms, p99 ${stats.p99} ms, max ${stats.max} ms (${stats.samples} samples)`,
+    );
+  }
 
   // Gate semantics: the Vanilla workspace carries a known nonzero error
   // baseline under the current rules, so absolute severities cannot gate a
