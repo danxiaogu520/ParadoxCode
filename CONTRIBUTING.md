@@ -1,8 +1,8 @@
 # Contributing to ParadoxCode
 
 Thanks for your interest in ParadoxCode! This guide explains how to build, test, and contribute to
-the repository. It is written for humans; AI agents working in this repository should also read
-[`AGENTS.md`](AGENTS.md), which defines the enforced engineering conventions.
+the repository. Repository rules and maintainer responsibilities are documented in
+[`GOVERNANCE.md`](GOVERNANCE.md).
 
 ## Project overview
 
@@ -13,23 +13,25 @@ these boundaries:
 
 ```text
 text
-  -> parser -> engine -> ide -> pdc
+  -> parser -> vfs -> hir -> index -> engine -> ide -> pdc
 game (EU4 profile) -> parser + text + rules
 rules -> bake
-rules + game -> engine / ide
+rules + game -> engine / ide / index
 ```
 
-Each layer has a strict responsibility list; details live in [`AGENTS.md`](AGENTS.md#4-architecture-boundaries).
-As a rule of thumb: EU4 name tables, scope lists, and special semantics belong in `game` (the
-EU4 profile), never in the generic engine, LSP layer, or editor extensions.
+Each layer has a strict responsibility list; details live in the
+[`README` architecture section](README.md#architecture). As a rule of thumb: EU4 name tables,
+scope lists, and special semantics belong in `game` (the EU4 profile), never in the generic engine,
+LSP layer, or editor extensions.
 
 ## Prerequisites
 
 - Rust **1.98 or newer** (see `.github/workflows/ci.yml` for the enforced MSRV).
 - Node.js **24 LTS** for the VS Code extension.
-- Git. There are no commit hooks; run the quality gates before pushing and let CI verify
-  the rest (`cargo tools gates` with no arguments runs the full suite; the alias lives in
-  `.cargo/config.toml`).
+- Git. There are no commit hooks; run the quality gates before pushing. CI adds the platform,
+  MSRV, dependency-policy, typo, and nightly fuzz coverage that is impractical to reproduce in
+  every local environment (`cargo tools gates` with no arguments runs the full local suite; the
+  alias lives in `.cargo/config.toml`).
 
 ## Building and testing
 
@@ -48,8 +50,9 @@ cargo tools gates
 or a single group to diagnose a failure: `core`, `core-fast`, `perf`, `vscode`, `release`,
 `fuzz` (the long spelling without the cargo alias is `cargo run -p tools -- gates <group>`).
 
-Pull-request CI uses `core-fast` and leaves the optimized benchmark suite to the scheduled/manual
-`perf` workflow. Run the latter explicitly when changing performance-sensitive code:
+Pull-request CI follows the `core-fast` intent and leaves the optimized benchmark suite to the
+scheduled/manual `perf` workflow. Run the latter explicitly when changing performance-sensitive
+code:
 
 ```bash
 cargo tools gates perf
@@ -57,8 +60,8 @@ cargo tools gates perf
 
 CI runs the editor, fuzz, and dependency jobs on every pull request. Fuzz is limited to
 its direct runtime dependencies, and the Windows release build runs in parallel with Windows
-tests and clippy. Branch protection should require the stable `Required CI checks` aggregate rather
-than every conditional job.
+tests and clippy. Branch protection requires the stable `Conclusion` aggregate rather than every
+individual job.
 
 Validate and compile the first-party EU4 rule source with `bake`:
 
@@ -91,7 +94,7 @@ ignored `diagnostic-reports/` directory and must not be committed.
 | `editors/vscode/` | VS Code extension with server bootstrap and mission-tree preview |
 | `rules/` | Authoritative first-party EU4 rule source (`rules/eu4/*.json`) |
 | `fuzz/` | Parser, edit, formatter, and HIR fuzz targets |
-| `scripts/` | Reproducible quality checks and diagnostic workflows |
+| `crates/tools/` | Cross-platform repository, release, and quality-gate tooling |
 
 ## How to contribute
 
@@ -99,7 +102,7 @@ ignored `diagnostic-reports/` directory and must not be committed.
    code is written. Use the issue templates for bug reports and feature requests.
 2. **Make focused, reviewable changes.** Keep behavior-preserving refactors separate from new
    features, and add tests or fixtures that prove the behavior in the same change.
-3. **Run the local quality gates** (they run automatically on commit) and make sure CI passes.
+3. **Run the local quality gates explicitly** and make sure the PR's `Conclusion` check passes.
 4. **Open a pull request** describing the change, the tests run, and any residual risks.
 
 ### Commit message convention
@@ -129,10 +132,15 @@ stale diagnostics never reach the client.
 
 ### Branching and publishing
 
-- The default publishing target is `main`; contributors work on their own forks/branches and open
-  pull requests into `main`.
-- Maintainers push release tags (`v0.1.x`) directly after CI passes. See
+- The default publishing target is `main`; all changes, including maintainer changes, use a pull
+  request. The protected branch rejects direct pushes, force pushes, and deletion.
+- Pull-request titles follow the commit convention above because squash merge uses the PR title as
+  the commit subject. Delete the source branch after merge.
+- Maintainers push annotated release tags (`v0.x.y`) only after the merged commit's `Conclusion`
+  check passes. Version tags are protected from updates and deletion. See
   [`RELEASING.md`](RELEASING.md) for the full release checklist.
+- Emergency rule bypasses are reserved for repository recovery and must be documented in an issue.
+  See [`GOVERNANCE.md`](GOVERNANCE.md).
 
 ## Engineering conventions
 

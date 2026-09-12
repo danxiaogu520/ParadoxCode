@@ -71,14 +71,39 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     results.push(requires_file("Cargo.toml"));
     results.push(requires_file("Cargo.lock"));
     results.push(requires_file("README.md"));
+    results.push(requires_file("GOVERNANCE.md"));
     results.push(requires_file("RELEASING.md"));
+    results.push(requires_file("SECURITY.md"));
     results.push(requires_file("LICENSE"));
+    results.push(requires_file(".github/actionlint.yaml"));
     results.push(requires_file(".github/workflows/ci.yml"));
     results.push(requires_file(".github/workflows/release.yml"));
+    results.push(requires_file(".github/workflows/sweep.yml"));
+    results.push(requires_file("docs/runner-recovery.md"));
     results.push(requires_file("deny.toml"));
     results.push(requires_file("editors/vscode/package.json"));
     results.push(requires_file("editors/vscode/package-lock.json"));
     results.push(requires_dir("fuzz"));
+
+    let unpinned_actions = unpinned_workflow_actions(root);
+    results.push(check(
+        unpinned_actions.is_empty(),
+        "workflow actions pinned",
+        format!(
+            "workflow actions must use full commit SHAs: {}",
+            unpinned_actions.join(", ")
+        ),
+    ));
+
+    if let Ok(release_workflow) = fs::read_to_string(root.join(".github/workflows/release.yml")) {
+        results.push(check(
+            release_workflow.contains("--draft")
+                && release_workflow.contains("uses: ./.github/workflows/sweep.yml")
+                && !release_workflow.contains("--clobber"),
+            "immutable release workflow",
+            "release workflow must gate through sweep, publish from a draft, and never clobber assets",
+        ));
+    }
 
     // README content checks.
     if let Ok(readme) = fs::read_to_string(root.join("README.md")) {
@@ -328,6 +353,45 @@ fn contains_extension_recursive(root: &Path, extension: &str) -> bool {
                 .is_some_and(|value| value.eq_ignore_ascii_case(extension))
         }
     })
+}
+
+fn unpinned_workflow_actions(root: &Path) -> Vec<String> {
+    let Ok(entries) = fs::read_dir(root.join(".github/workflows")) else {
+        return vec![".github/workflows is unreadable".to_owned()];
+    };
+    let mut findings = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let is_yaml = path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| matches!(extension, "yml" | "yaml"));
+        if !path.is_file() || !is_yaml {
+            continue;
+        }
+        let Ok(contents) = fs::read_to_string(&path) else {
+            findings.push(path.display().to_string());
+            continue;
+        };
+        for (line_index, line) in contents.lines().enumerate() {
+            let trimmed = line.trim_start();
+            let trimmed = trimmed.strip_prefix("- ").unwrap_or(trimmed);
+            let Some(value) = trimmed.strip_prefix("uses:") else {
+                continue;
+            };
+            let action = value.split_whitespace().next().unwrap_or_default();
+            if action.starts_with("./") {
+                continue;
+            }
+            let pinned = action.rsplit_once('@').is_some_and(|(_, reference)| {
+                reference.len() == 40 && reference.bytes().all(|byte| byte.is_ascii_hexdigit())
+            });
+            if !pinned {
+                findings.push(format!("{}:{} ({action})", path.display(), line_index + 1));
+            }
+        }
+    }
+    findings
 }
 
 /// Reads `{open, close}` object pairs from the canonical profile JSON.
