@@ -285,7 +285,16 @@ export function resolveOptions(raw) {
       'a Vanilla cache is required; pass --vanilla-cache PATH or launch `pdc` once against the game so it is discovered and built automatically',
     );
   }
-  vanillaCache = canonicalFile(vanillaCache, '--vanilla-cache');
+  // The cache file may legitimately not exist yet: the server rebuilds a
+  // missing or unloadable cache in place from the discovered installation,
+  // and the release sweep's cold protocol deletes the file before every run.
+  // Only an existing non-file is a usage error.
+  const cacheCandidate = resolve(vanillaCache);
+  if (existsSync(cacheCandidate)) {
+    vanillaCache = canonicalFile(cacheCandidate, '--vanilla-cache');
+  } else {
+    vanillaCache = cacheCandidate;
+  }
 
   const server = resolveServer(raw.server);
   const pathPrefix = raw.pathPrefix
