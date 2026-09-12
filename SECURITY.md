@@ -66,3 +66,6 @@ user's privileges. Defense-in-depth measures already in place include:
 - Workflow dependencies are pinned to reviewed commit SHAs. Release jobs use the short-lived,
   least-privilege repository `GITHUB_TOKEN`; no long-lived publishing credential is available to
   build or pull-request jobs.
+- The privileged Vanilla sweep job accepts only the protected release workflow or a manual run of
+  the workflow from `main`; pull-request refs and alternate callers are rejected before a
+  self-hosted runner is assigned.

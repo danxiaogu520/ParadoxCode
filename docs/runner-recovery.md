@@ -32,10 +32,12 @@ token automatically.
 
 ## Health check
 
-Before a release, open the Release sweep workflow and run it manually with an empty artifact name.
-The preflight verifies tools, variables, EU4 directory markers, permissions, and at least 10 GiB of
-free cache-drive space. A successful direct run builds the current revision and uploads diagnostics
-as workflow artifacts; it does not modify a GitHub Release.
+Before a release, open the Release sweep workflow, select `main`, and run it manually with an empty
+artifact name. The privileged job rejects every other ref and every caller except the release
+workflow. The preflight verifies tools, absolute path variables, EU4 directory markers,
+permissions, and at least 10 GiB of free cache-drive space. A successful direct run builds the
+current `main` revision and uploads diagnostics as workflow artifacts; it does not modify a GitHub
+Release.
 
 ## Rebuild procedure
 

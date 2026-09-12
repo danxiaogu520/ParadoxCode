@@ -105,6 +105,17 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
         ));
     }
 
+    if let Ok(sweep_workflow) = fs::read_to_string(root.join(".github/workflows/sweep.yml")) {
+        results.push(check(
+            sweep_workflow.contains("github.workflow_ref")
+                && sweep_workflow.contains("github.ref == 'refs/heads/main'")
+                && sweep_workflow.contains("refs/tags/{0}")
+                && sweep_workflow.contains("IsPathFullyQualified"),
+            "trusted sweep authorization",
+            "sweep must reject untrusted callers and refs and require absolute runner paths",
+        ));
+    }
+
     // README content checks.
     if let Ok(readme) = fs::read_to_string(root.join("README.md")) {
         results.push(check(
