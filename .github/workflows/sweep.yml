@@ -1,0 +1,64 @@
+name: Release sweep
+
+# The per-release performance and diagnostics gate: cold-start the server,
+# rebuild the Vanilla index cache, diagnose the full Vanilla workspace, and
+# record phase timings plus a diagnostics fingerprint. Runs only on the
+# repository's self-hosted runner — it needs the local EU4 installation for
+# the Vanilla tree and stable hardware for release-to-release comparisons —
+# and is deliberately never triggered by pull_request.
+#
+# First runs establish the baseline; tune `timeout-minutes` and the sweep's
+# batch/concurrency once real full-Vanilla durations are known.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sweep-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sweep:
+    runs-on: [self-hosted, windows]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build release server
+        run: cargo build --locked --release -p pdc
+
+      - name: Cold caches
+        shell: bash
+        run: |
+          cache="$LOCALAPPDATA/ParadoxCode/cache/eu4"
+          rm -f "$cache"/vanilla.pdcindex "$cache"/vanilla.pdxindex
+          echo "Vanilla cache removed for a cold sweep"
+
+      - name: Run release sweep
+        shell: bash
+        env:
+          # Self-hosted runner fact of life: the sweep needs the local EU4
+          # installation. Adjust on the runner if the Steam path differs.
+          PDC_SWEEP_VANILLA_SOURCE: C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis IV
+        # Gate semantics: absolute severities cannot gate (the Vanilla
+        # workspace carries a known error baseline under the current rules).
+        # Once each release attaches its sweep summary, pass
+        # --previous <summary.json> here and the gate flips to the
+        # diagnostics fingerprint.
+        run: |
+          node editors/vscode/scripts/sweep.mjs \
+            --label "${{ github.event.release.tag_name || github.sha }}" \
+            --server target/release/paradoxcode.exe \
+            --fail-on none
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-sweep
+          path: performance-results/
+          retention-days: 90

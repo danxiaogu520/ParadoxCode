@@ -976,7 +976,8 @@
     "diagnose": "node scripts/diagnose.mjs",
     "perf:compare": "node scripts/compare.mjs",
     "package": "npm run compile && vsce package",
-    "perf:probe": "node scripts/probe.mjs"
+    "perf:probe": "node scripts/probe.mjs",
+    "release:sweep": "node scripts/sweep.mjs"
   },
   "dependencies": {
     "vscode-languageclient": "^10.1.1"
