@@ -593,10 +593,13 @@ fn parse_root_flag(args: &[String]) -> Result<PathBuf, CliError> {
             }
             index += 2;
         } else {
-            index += 1;
+            return Err(CliError::Usage(format!(
+                "unknown option: {}\n\n{USAGE}",
+                args[index]
+            )));
         }
     }
-    root.ok_or_else(|| CliError::Usage(format!("missing required option: --root\n\n{USAGE}")))
+    crate::gates::resolve_root(root.as_deref())
 }
 
 fn execute_check(sub: &str, args: &[String]) -> Result<String, CliError> {
@@ -745,7 +748,7 @@ mod tests {
     use engine::{IndexCache, SourceRootId, SourceRootKind};
     use game::{DiscoveryOutcome, UserConfiguration, UserPaths};
 
-    use super::{CliError, execute, setup_vanilla};
+    use super::{CliError, execute, parse_root_flag, setup_vanilla};
 
     #[test]
     fn invalid_usage_has_stable_results() {
@@ -755,6 +758,21 @@ mod tests {
         let error = execute(&["--version".to_owned()]).expect_err("unknown command");
         assert!(matches!(error, CliError::Usage(_)));
         assert_eq!(error.exit_code(), 2);
+    }
+
+    #[test]
+    fn repository_checks_default_to_the_workspace_root() {
+        let root = parse_root_flag(&[]).expect("default repository root");
+        let expected = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(std::path::Path::parent)
+            .expect("workspace root");
+        assert_eq!(root, expected);
+        assert!(root.join("Cargo.toml").is_file());
+
+        let error = parse_root_flag(&["unexpected".to_owned()])
+            .expect_err("unknown check option must be rejected");
+        assert!(matches!(error, CliError::Usage(_)));
     }
 
     #[test]

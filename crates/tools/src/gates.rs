@@ -94,17 +94,31 @@ pub fn gate_actions(group: &str) -> Option<Vec<GateAction>> {
             ],
             Vec::new(),
         )]),
-        "vscode" => Some(vec![GateAction::Command {
-            name: "npm run test:ci (editors/vscode)".to_owned(),
-            program: "npm".to_owned(),
-            args: vec![
-                "--prefix".to_owned(),
-                "editors/vscode".to_owned(),
-                "run".to_owned(),
-                "test:ci".to_owned(),
-            ],
-            env: Vec::new(),
-        }]),
+        "vscode" => Some(vec![
+            GateAction::Command {
+                name: "npm run test:ci (editors/vscode)".to_owned(),
+                program: "npm".to_owned(),
+                args: vec![
+                    "--prefix".to_owned(),
+                    "editors/vscode".to_owned(),
+                    "run".to_owned(),
+                    "test:ci".to_owned(),
+                ],
+                env: Vec::new(),
+            },
+            GateAction::Command {
+                name: "npm audit production dependencies (editors/vscode)".to_owned(),
+                program: "npm".to_owned(),
+                args: vec![
+                    "--prefix".to_owned(),
+                    "editors/vscode".to_owned(),
+                    "audit".to_owned(),
+                    "--omit=dev".to_owned(),
+                    "--audit-level=high".to_owned(),
+                ],
+                env: Vec::new(),
+            },
+        ]),
         "release" => Some(vec![
             cargo_step(
                 &["build", "--locked", "-p", "pdc", "--bin", "paradoxcode"],
@@ -305,6 +319,15 @@ mod tests {
                 "{args:?}"
             );
         }
+    }
+
+    #[test]
+    fn vscode_tests_and_audits_production_dependencies() {
+        let commands = commands("vscode");
+        assert_eq!(commands.len(), 2, "{commands:?}");
+        assert!(commands[0].1.contains(&"test:ci".to_owned()));
+        assert!(commands[1].1.contains(&"audit".to_owned()));
+        assert!(commands[1].1.contains(&"--omit=dev".to_owned()));
     }
 
     #[test]

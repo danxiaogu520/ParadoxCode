@@ -1,0 +1,9 @@
+self-hosted-runner:
+  labels:
+    - paradoxcode-sweep
+
+config-variables:
+  - PDC_SWEEP_CACHE_DIR
+  - PDC_SWEEP_CARGO_HOME
+  - PDC_SWEEP_RUSTUP_HOME
+  - PDC_SWEEP_VANILLA_SOURCE

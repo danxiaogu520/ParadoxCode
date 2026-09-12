@@ -60,4 +60,12 @@ user's privileges. Defense-in-depth measures already in place include:
 - Scanning is bounded by file size, nesting depth, path escaping, and resource consumption limits.
 - Server downloads are checksum-verified (SHA-256) with restricted extraction and bounded streaming.
 - The runtime never imports external rule sources; first-party rules are validated before use.
-- CI runs advisory scans (`cargo-deny`) and the release workflow uses least-privilege OIDC tokens.
+- CI runs Rust advisory scans (`cargo-deny`) and production npm dependency audits. GitHub secret
+  scanning, push protection, Dependabot alerts, and Dependabot security updates are enabled for
+  the repository.
+- Workflow dependencies are pinned to reviewed commit SHAs. Release jobs use the short-lived,
+  least-privilege repository `GITHUB_TOKEN`; no long-lived publishing credential is available to
+  build or pull-request jobs.
+- The privileged Vanilla sweep job accepts only the protected release workflow or a manual run of
+  the workflow from `main`; pull-request refs and alternate callers are rejected before a
+  self-hosted runner is assigned.
