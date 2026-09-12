@@ -82,6 +82,7 @@ jobs:
           node editors/vscode/scripts/sweep.mjs \
             --label "${{ github.event.release.tag_name || github.sha }}" \
             --server target/release/paradoxcode.exe \
+            --vanilla-cache "C:/actions-runner/sweep-cache/vanilla.pdcindex" \
             --fail-on none \
             "${prev_args[@]}"
 
