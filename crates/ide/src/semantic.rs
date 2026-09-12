@@ -1108,13 +1108,14 @@ pub(crate) fn semantic_value_matcher_label(matcher: &ValueMatcher) -> String {
     }
 }
 
-pub(crate) fn semantic_parent_path_matches(
+pub(crate) fn semantic_parent_path_matches<S: AsRef<str>>(
     snapshot: &AnalysisSnapshot,
     expected: &[String],
-    actual: &[Arc<str>],
+    actual: &[S],
 ) -> bool {
     expected.len() == actual.len()
         && expected.iter().zip(actual).all(|(expected, actual)| {
+            let actual = actual.as_ref();
             if let Some(type_name) = expected
                 .strip_prefix('<')
                 .and_then(|name| name.strip_suffix('>'))
@@ -2871,6 +2872,71 @@ pub(crate) fn workspace_member(snapshot: &AnalysisSnapshot, type_name: &str, mem
         })
     });
     answer
+}
+
+/// Infers the one workspace type kind a scalar value belongs to when its key
+/// carries several typed alternatives.
+///
+/// `name` under `add_country_modifier` accepts both `event_modifier` and
+/// `static_modifier`, so the HIR typed-reference lowering — which refuses to
+/// guess between kinds — emits nothing and navigation plus localisation
+/// previews lose the value entirely (70 first-party keys: the modifier
+/// family, culture/religion switches, `trade_goods`, `area`, …). Membership
+/// breaks the tie: a value defined under `common/event_modifiers` is an
+/// `event_modifier`, one under `common/static_modifiers` a
+/// `static_modifier`. Returns `None` when fewer than two kinds apply (the
+/// single-kind case is the HIR lowering's job) or when membership is absent
+/// or ambiguous, mirroring the lowering's no-guess rule.
+pub(crate) fn semantic_inferred_typed_kind(
+    snapshot: &AnalysisSnapshot,
+    hir: &hir::HirFile,
+    key_range: text::TextRange,
+    key: &str,
+    value: &str,
+    operator: Option<&str>,
+) -> Option<String> {
+    let fact = hir.scope_fact_at(key_range)?;
+    let profile = snapshot.game_profile();
+    let scope = scope_context_from_hir(snapshot.game_profile_handle(), &fact.state);
+    let mut kinds = Vec::<String>::new();
+    for context in profile.expanded_rule_contexts(&fact.context) {
+        for rule in snapshot
+            .rules()
+            .semantic_rules_for_context_key(&context, key)
+        {
+            if !matches!(rule.shape, rules::RuleShape::Leaf)
+                || !semantic_parent_path_matches(snapshot, &rule.parent_path, &fact.parent_path)
+                || !rule
+                    .operator
+                    .as_deref()
+                    .is_none_or(|rule_operator| operator == Some(rule_operator))
+                || !semantic_scope_allows(rule, &scope)
+            {
+                continue;
+            }
+            let rules::ValueMatcher::Type(type_name) = &rule.value else {
+                continue;
+            };
+            let base = type_name
+                .split_once('.')
+                .map_or(type_name.as_str(), |(base, _)| base);
+            let kind = profile
+                .member_kind_alias(type_name)
+                .or_else(|| profile.member_kind_alias(base))
+                .unwrap_or(base);
+            if !kinds.iter().any(|known| known.eq_ignore_ascii_case(kind)) {
+                kinds.push(kind.to_owned());
+            }
+        }
+    }
+    if kinds.len() < 2 {
+        return None;
+    }
+    let mut winners = kinds
+        .iter()
+        .filter(|kind| workspace_member(snapshot, kind, value))
+        .collect::<Vec<_>>();
+    (winners.len() == 1).then(|| winners.remove(0).clone())
 }
 
 /// Returns whether an indexed definition's source layer is enabled for completion members.

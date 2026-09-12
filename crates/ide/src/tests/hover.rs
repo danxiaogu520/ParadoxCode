@@ -1396,3 +1396,112 @@ fn ambiguous_dynamic_set_candidates_carry_positions() {
         hover.contents
     );
 }
+
+#[test]
+fn semantic_hover_infers_modifier_kind_from_workspace_membership() {
+    use std::path::PathBuf;
+
+    let root = std::env::temp_dir().join(format!("pdc-infer-modifier-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("common/event_modifiers")).expect("modifier directory");
+    std::fs::create_dir_all(root.join("common/static_modifiers")).expect("static directory");
+    std::fs::create_dir_all(root.join("events")).expect("events directory");
+    std::fs::create_dir_all(root.join("localisation/english")).expect("localisation directory");
+    std::fs::write(
+        root.join("common/event_modifiers/00_edg.txt"),
+        "EDG_test_modifier = { awareness = 1 }\n",
+    )
+    .expect("write event modifier");
+    std::fs::write(
+        root.join("common/static_modifiers/00_edg.txt"),
+        "EDG_static_mod = { discipline = 0.05 }\n",
+    )
+    .expect("write static modifier");
+    std::fs::write(
+        root.join("localisation/english/edg_l_english.yml"),
+        "l_english:\n EDG_test_modifier:0 \"Tear of Iset\"\n EDG_static_mod:0 \"Static Tear\"\n",
+    )
+    .expect("write localisation");
+    let text = concat!(
+        "country_event = {\n",
+        "  id = edg.1\n",
+        "  immediate = {\n",
+        "    add_country_modifier = { name = EDG_test_modifier duration = 365 }\n",
+        "    remove_country_modifier = EDG_static_mod\n",
+        "    add_country_modifier = { name = EDG_unknown_modifier duration = 1 }\n",
+        "  }\n",
+        "}\n",
+    );
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan modifier root");
+    let id = DocumentId::new("file:///tmp/events/edg_events.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(PathBuf::from("events/edg_events.txt")),
+    )
+    .expect("open event document");
+    let snapshot = host.snapshot();
+
+    let position = u32::try_from(
+        text.find("EDG_test_modifier")
+            .expect("event modifier value")
+            + 3,
+    )
+    .expect("position");
+    let result = hover(&snapshot, &id, position).expect("event modifier hover");
+    assert!(
+        result
+            .contents
+            .contains("### event_modifier `EDG_test_modifier`"),
+        "{}",
+        result.contents
+    );
+    assert!(
+        result.contents.contains("Tear of Iset"),
+        "{}",
+        result.contents
+    );
+
+    let position = u32::try_from(text.find("EDG_static_mod").expect("static modifier value") + 3)
+        .expect("position");
+    let result = hover(&snapshot, &id, position).expect("static modifier hover");
+    assert!(
+        result
+            .contents
+            .contains("### static_modifier `EDG_static_mod`"),
+        "{}",
+        result.contents
+    );
+    assert!(
+        result.contents.contains("Static Tear"),
+        "{}",
+        result.contents
+    );
+
+    // Membership cannot resolve an unknown modifier, so the value keeps the
+    // multi-alternative rule hover and the mismatch validation instead of a
+    // guessed symbol interpretation.
+    let position = u32::try_from(text.find("EDG_unknown_modifier").expect("unknown value") + 3)
+        .expect("position");
+    let result = hover(&snapshot, &id, position).expect("unknown modifier hover");
+    assert!(
+        !result.contents.contains("### event_modifier")
+            && !result.contents.contains("### static_modifier"),
+        "{}",
+        result.contents
+    );
+    assert!(
+        result.contents.contains("Allowed value types")
+            && result.contents.contains("does not match"),
+        "{}",
+        result.contents
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
