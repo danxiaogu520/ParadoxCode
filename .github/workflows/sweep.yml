@@ -35,9 +35,9 @@ concurrency:
 
 jobs:
   sweep:
-    # github.workflow_ref describes the caller for reusable workflows. Keep this
-    # server-side condition on the privileged job so a pull request cannot add a
-    # new caller and execute untrusted code on the self-hosted runner.
+    # Defense in depth: github.workflow_ref describes the reusable workflow's
+    # caller. The host-local ACTIONS_RUNNER_HOOK_JOB_STARTED guard independently
+    # enforces the same allowlist before any job step can execute.
     if: >-
       github.repository == 'danxiaogu520/ParadoxCode' &&
       (
