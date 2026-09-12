@@ -161,7 +161,11 @@ jobs:
             const packageLock = require("./editors/vscode/package-lock.json");
             const expected = process.argv[1];
             if (packageJson.version !== expected || packageLock.version !== expected) {
-              throw new Error(`VS Code versions must equal tag ${expected}: package=${packageJson.version}, lock=${packageLock.version}`);
+              throw new Error(
+                "VS Code versions must equal tag " + expected +
+                ": package=" + packageJson.version +
+                ", lock=" + packageLock.version
+              );
             }
           ' "$version"
       - name: Check and package extension
