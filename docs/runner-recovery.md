@@ -15,7 +15,10 @@ Register the runner at repository scope as a Windows service and apply these lab
 
 The service account needs read and execute access to the EU4 installation, and read/write access to
 its Cargo, rustup, Actions work, temporary, and dedicated sweep-cache directories. Install current
-Git, GitHub CLI, Node.js 24, rustup, and the stable Rust toolchain on `PATH`.
+Git, GitHub CLI, Node.js 24, rustup, and the stable Rust toolchain on `PATH`. The workflow uses the
+Windows PowerShell 5.1 shell included with supported Windows versions; PowerShell 7 is not required.
+The trusted workflow uses a process-scoped execution-policy bypass for GitHub's generated step
+scripts, so the machine-wide execution policy does not need to be relaxed.
 
 Configure these repository Actions variables; paths must be absolute:
 
@@ -29,6 +32,30 @@ Configure these repository Actions variables; paths must be absolute:
 None of these values is a credential. Do not place GitHub, Steam, or Marketplace credentials in
 repository variables or the checked-out workspace. The workflow receives a short-lived GitHub
 token automatically.
+
+## Host-enforced job guard
+
+The workflow-level caller/ref condition is defense in depth, not the machine's authorization
+boundary: pull requests can change workflow files. Before bringing the runner online, copy
+`.github/runner-hooks/paradoxcode-sweep-guard.sh` from reviewed `main` to
+`C:/actions-runner-hooks/paradoxcode-sweep-guard.sh`, outside the runner application and work
+directories. Configure this line in `C:/actions-runner/.env`:
+
+```text
+ACTIONS_RUNNER_HOOK_JOB_STARTED=C:/actions-runner-hooks/paradoxcode-sweep-guard.sh
+```
+
+Restrict both locations so only administrators and SYSTEM can modify them; grant the runner
+service account read/execute access to the hook and read access to `.env`. Restart the runner
+service after any `.env` change. GitHub runs this pre-job hook before repository steps, and a
+nonzero exit rejects the job. The hook permits only:
+
+- `sweep.yml` or `release.yml` manually dispatched from `refs/heads/main`; and
+- `release.yml` triggered by a stable protected `vMAJOR.MINOR.PATCH` tag.
+
+Everything else, including pull-request refs and alternate workflow paths, is denied by the host
+before checkout or project code can run. Validate both an allowed health check and a deliberately
+denied non-main dispatch whenever the guard changes.
 
 ## Health check
 
@@ -45,9 +72,10 @@ Release.
 2. Provision a trusted Windows x64 host and install the required tools and licensed EU4 data.
 3. Register a repository runner using a fresh, short-lived registration token, install it as a
    service, and add the `paradoxcode-sweep` label.
-4. Create a dedicated empty sweep-cache directory outside the repository checkout.
-5. Update the four repository Actions variables for the new service-account paths.
-6. Run the manual health check and inspect `release-sweep-diagnostics` before tagging a release.
+4. Install and permission the host-enforced job guard, configure `.env`, and restart the service.
+5. Create a dedicated empty sweep-cache directory outside the repository checkout.
+6. Update the four repository Actions variables for the new service-account paths.
+7. Run the manual health check and inspect `release-sweep-diagnostics` before tagging a release.
 
 Do not copy Cargo targets, Actions work directories, GitHub tokens, or user editor caches from the
 old machine. The persistent performance baseline is the previous immutable Release's
