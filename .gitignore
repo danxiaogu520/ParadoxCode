@@ -53,4 +53,5 @@ Desktop.ini
 /reference/
 
 # Local performance benchmark results
-/performance-results/
+/performance-results/*
+!/performance-results/history.jsonl

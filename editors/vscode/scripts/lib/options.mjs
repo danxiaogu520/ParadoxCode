@@ -233,8 +233,10 @@ function tomlQuotedValue(line, key) {
 function userConfigCandidates() {
   const home = process.env.USERPROFILE || process.env.HOME;
   if (process.platform === 'win32') {
-    const localAppData = process.env.LOCALAPPDATA || (home ? join(home, 'AppData', 'Local') : undefined);
-    return localAppData ? [join(localAppData, 'ParadoxCode', 'config.toml')] : [];
+    // The server resolves its config from %APPDATA% (Roaming); LOCALAPPDATA
+    // holds only the cache root.
+    const roaming = process.env.APPDATA || (home ? join(home, 'AppData', 'Roaming') : undefined);
+    return roaming ? [join(roaming, 'ParadoxCode', 'config.toml')] : [];
   }
   if (process.platform === 'darwin') {
     return home ? [join(home, 'Library', 'Application Support', 'ParadoxCode', 'config.toml')] : [];
