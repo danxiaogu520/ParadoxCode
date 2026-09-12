@@ -81,10 +81,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Release sweep gate: `scripts/sweep.mjs` (npm `release:sweep`, workflow `sweep.yml` on release
   publication, self-hosted runner) cold-starts the server, lets it rebuild the Vanilla index
   cache, diagnoses the full Vanilla workspace through virtual overlays, and records per-phase
-  timings, server resource peaks, and a stable diagnostics fingerprint. Each run appends a
-  summary line to `performance-results/history.jsonl`; with a previous summary the gate fires on
-  fingerprint drift rather than the known nonzero Vanilla error baseline. First full-Vanilla
-  baseline on the reference machine: 8,670 files diagnosed in ~13 s.
+  timings, a stable diagnostics fingerprint, whole-lifetime server CPU and peak working set
+  (sampling starts at process spawn, before the handshake), and interactive-query latency
+  percentiles (p50/p99/max for completion, hover, definition, references, documentSymbol, and
+  the incremental didChange->publishDiagnostics round trip) over a spread of sampled files.
+  Each run appends a summary line to `performance-results/history.jsonl`; with a previous
+  summary the gate fires on fingerprint drift rather than the known nonzero Vanilla error
+  baseline. First full-Vanilla baseline on the reference machine: 8,670 files diagnosed in
+  ~13 s, full sweep including query sampling ~1 minute.
 - Template key matchers for parameterized rule families: `KeyMatcher::Template` splices a
   workspace type or static-enum member between literal affixes, with an optional member-prefix
   strip (estate members `estate_nobles` spell keys `nobles_…`). Completion expands the template
