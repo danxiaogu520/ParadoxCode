@@ -606,8 +606,13 @@ async function run(raw) {
     previous_fingerprint: previousSummary?.diagnostics_fingerprint ?? null,
   };
   writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+  // Stable-named copy: the release workflow attaches this asset so the next
+  // release's sweep can pass it as --previous without name bookkeeping.
+  const stableSummaryPath = join(outputDir, 'sweep-summary.json');
+  writeFileSync(stableSummaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
   console.log(`Full report: ${outputs.jsonPath}`);
   console.log(`Summary: ${summaryPath}`);
+  console.log(`Stable summary: ${stableSummaryPath}`);
   console.log(`History: ${historyPath}`);
   if (report.tool_errors.length) {
     for (const error of report.tool_errors) console.error(`sweep: ${error}`);
