@@ -97,7 +97,7 @@ jobs:
             performance-results/sweep-summary.json --clobber --repo "$GITHUB_REPOSITORY"
 
       - name: Upload reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-sweep
           path: performance-results/
