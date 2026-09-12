@@ -72,16 +72,22 @@ fn uri_round_trip_preserves_unicode_and_spaces() {
 /// a virtually opened document attaches to (and hides) its backing file.
 #[test]
 fn pdcloc_uris_resolve_to_the_backing_file_path() {
-    assert_eq!(
-        uri_to_path("pdcloc:///C:/mods/edg/localisation/replace/edg_l_english.yml")
-            .expect("pdcloc URI should decode"),
-        std::path::PathBuf::from("C:/mods/edg/localisation/replace/edg_l_english.yml")
-    );
-    assert_eq!(
-        uri_to_path("pdcloc://localhost/C:/mods/edg/history/countries/CHI%20-%20Ming.txt")
-            .expect("pdcloc URI with localhost authority should decode"),
-        std::path::PathBuf::from("C:/mods/edg/history/countries/CHI - Ming.txt")
-    );
+    // Drive-letter URIs only exist on Windows clients.  On POSIX the leading
+    // `/` is part of the path, so `pdcloc:///C:/...` keeps its slash exactly
+    // like `file:///C:/...` does.
+    #[cfg(windows)]
+    {
+        assert_eq!(
+            uri_to_path("pdcloc:///C:/mods/edg/localisation/replace/edg_l_english.yml")
+                .expect("pdcloc URI should decode"),
+            std::path::PathBuf::from("C:/mods/edg/localisation/replace/edg_l_english.yml")
+        );
+        assert_eq!(
+            uri_to_path("pdcloc://localhost/C:/mods/edg/history/countries/CHI%20-%20Ming.txt")
+                .expect("pdcloc URI with localhost authority should decode"),
+            std::path::PathBuf::from("C:/mods/edg/history/countries/CHI - Ming.txt")
+        );
+    }
     assert_eq!(
         uri_to_path(&format!(
             "pdcloc://{}",
