@@ -27,8 +27,11 @@ jobs:
     timeout-minutes: 60
     defaults:
       run:
-        # bash resolves through the runner's .path file (Git, cargo, and node
-        # are pinned there for the service account).
+        # bash, cargo, node, and gh all resolve through the machine PATH — the
+        # environment a Windows service account inherits. Git\bin (bash.exe),
+        # ~/.cargo/bin, and the nodejs dir are pinned there; the runner's
+        # .path file mechanism is Linux/macOS-only (runsvc.sh) and does not
+        # apply to RunnerService.exe.
         shell: bash
     env:
       # The rustup shim needs the user's toolchain home; the service account
