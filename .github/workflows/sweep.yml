@@ -6,9 +6,6 @@ name: Release sweep
 # repository's self-hosted runner — it needs the local EU4 installation for
 # the Vanilla tree and stable hardware for release-to-release comparisons —
 # and is deliberately never triggered by pull_request.
-#
-# First runs establish the baseline; tune `timeout-minutes` and the sweep's
-# batch/concurrency once real full-Vanilla durations are known.
 
 on:
   release:
@@ -16,7 +13,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  # contents: write is required to attach the sweep summary to the release
+  # so the next release's sweep can compare against it.
+  contents: write
 
 concurrency:
   group: sweep-${{ github.ref }}
@@ -25,12 +24,23 @@ concurrency:
 jobs:
   sweep:
     runs-on: [self-hosted, windows]
-    timeout-minutes: 120
+    timeout-minutes: 60
+    env:
+      # Self-hosted runner facts: the service account (NETWORK SERVICE) has
+      # neither the user's PATH nor the rustup user-home defaults, so the
+      # toolchain locations are pinned explicitly. Adjust on the runner if
+      # these locations move.
+      RUSTUP_HOME: C:\Users\Administrator\.rustup
+      CARGO_HOME: C:\Users\Administrator\.cargo
+      PDC_SWEEP_VANILLA_SOURCE: C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis IV
     steps:
       - uses: actions/checkout@v7
 
       - name: Build release server
-        run: cargo build --locked --release -p pdc
+        shell: bash
+        run: |
+          export PATH="/c/Users/Administrator/.cargo/bin:/c/Users/Administrator/AppData/Local/Programs/nodejs:/c/Program Files/Git/cmd:$PATH"
+          cargo build --locked --release -p pdc
 
       - name: Cold caches
         shell: bash
@@ -39,22 +49,51 @@ jobs:
           rm -f "$cache"/vanilla.pdcindex "$cache"/vanilla.pdxindex
           echo "Vanilla cache removed for a cold sweep"
 
-      - name: Run release sweep
+      - name: Fetch previous release sweep summary
+        if: github.event_name == 'release'
         shell: bash
         env:
-          # Self-hosted runner fact of life: the sweep needs the local EU4
-          # installation. Adjust on the runner if the Steam path differs.
-          PDC_SWEEP_VANILLA_SOURCE: C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis IV
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          export PATH="/c/Users/Administrator/AppData/Local/Programs/nodejs:/c/Program Files/Git/cmd:$PATH"
+          mkdir -p previous
+          # Walk releases newest-first and stop at the first one carrying a
+          # sweep summary; none yet (first gated release) simply skips --previous.
+          for tag in $(gh release list --repo "$GITHUB_REPOSITORY" --limit 10 --json tagName --jq '.[].tagName'); do
+            if gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "sweep-summary.json" --dir previous --clobber 2>/dev/null; then
+              echo "previous sweep summary from release $tag"
+              break
+            fi
+          done
+          [ -f previous/sweep-summary.json ] || echo "no previous sweep summary found"
+
+      - name: Run release sweep
+        shell: bash
         # Gate semantics: absolute severities cannot gate (the Vanilla
         # workspace carries a known error baseline under the current rules).
-        # Once each release attaches its sweep summary, pass
-        # --previous <summary.json> here and the gate flips to the
-        # diagnostics fingerprint.
+        # With a previous sweep summary the gate is the diagnostics
+        # fingerprint; without one it follows the fail-on status.
         run: |
+          export PATH="/c/Users/Administrator/.cargo/bin:/c/Users/Administrator/AppData/Local/Programs/nodejs:/c/Program Files/Git/cmd:$PATH"
+          prev_args=()
+          if [ -f previous/sweep-summary.json ]; then
+            prev_args+=(--previous previous/sweep-summary.json)
+          fi
           node editors/vscode/scripts/sweep.mjs \
             --label "${{ github.event.release.tag_name || github.sha }}" \
             --server target/release/paradoxcode.exe \
-            --fail-on none
+            --fail-on none \
+            "${prev_args[@]}"
+
+      - name: Attach sweep summary to the release
+        if: github.event_name == 'release'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          export PATH="/c/Users/Administrator/AppData/Local/Programs/nodejs:/c/Program Files/Git/cmd:$PATH"
+          gh release upload "${{ github.event.release.tag_name }}" \
+            performance-results/sweep-summary.json --clobber --repo "$GITHUB_REPOSITORY"
 
       - name: Upload reports
         uses: actions/upload-artifact@v4
