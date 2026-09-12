@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::PathBuf;
 
 use lsp_types::Range as LspRange;
@@ -8,7 +7,7 @@ use crate::protocol::RpcError;
 use crate::{INVALID_PARAMS, MAX_DOCUMENT_BYTES};
 
 pub(crate) fn normalize_workspace_path(path: PathBuf) -> PathBuf {
-    if let Ok(canonical) = fs::canonicalize(&path) {
+    if let Ok(canonical) = dunce::canonicalize(&path) {
         return canonical;
     }
 
@@ -20,7 +19,7 @@ pub(crate) fn normalize_workspace_path(path: PathBuf) -> PathBuf {
             break;
         };
         ancestor = parent;
-        if let Ok(mut canonical) = fs::canonicalize(ancestor) {
+        if let Ok(mut canonical) = dunce::canonicalize(ancestor) {
             for component in missing.iter().rev() {
                 canonical.push(component);
             }

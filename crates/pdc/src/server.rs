@@ -43,7 +43,7 @@ use crate::text::{
     apply_text_change, changed_document_len, lsp_range_to_text_range, normalize_workspace_path,
 };
 use crate::transport::{read_message, write_message};
-use crate::uri::uri_to_path;
+use crate::uri::FileUri;
 use crate::vanilla::{IndexCacheLoadRequest, run_index_cache_load};
 use crate::workspace::DependencyIndexCache;
 use crate::{

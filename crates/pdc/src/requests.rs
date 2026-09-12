@@ -34,13 +34,12 @@ use text::{LineIndex, LogicalPath, Position, TextRange};
 
 use crate::protocol::{
     RpcError, cancelled_error, completion_kind,
-    diagnostic_values_for_text_with_ignored_and_overrides, location_range_to_lsp, location_to_lsp,
-    range_to_lsp, range_to_lsp_for_location, rename_failure, symbol_kind, typed_params,
-    typed_value,
+    diagnostic_values_for_text_with_ignored_and_overrides, disk_file_uri, location_range_to_lsp,
+    location_to_lsp, range_to_lsp, range_to_lsp_for_location, rename_failure, symbol_kind,
+    typed_params, typed_value,
 };
 use crate::server::SemanticTokensCache;
 use crate::text::lsp_range_to_text_range;
-use crate::uri::path_to_uri;
 use crate::{
     INVALID_PARAMS, MAX_COMPLETION_RESULTS, MAX_WORKSPACE_DIAGNOSTIC_FILES,
     MAX_WORKSPACE_SYMBOL_RESULTS, METHOD_NOT_FOUND,
@@ -586,8 +585,9 @@ impl SnapshotRequestContext {
                 )
                 .map_err(cancelled_error)?;
                 let line_index = LineIndex::new(state.source());
+                let uri = disk_file_uri(&file.physical_path)?;
                 items.push(serde_json::json!({
-                    "uri": path_to_uri(&file.physical_path),
+                    "uri": uri,
                     "logicalPath": file.logical_path.as_str(),
                     "diagnostics": diagnostic_values_for_text_with_ignored_and_overrides(
                         diagnostics,
@@ -669,18 +669,19 @@ impl SnapshotRequestContext {
         }
         let items = files
             .into_iter()
-            .map(|file| {
+            .map(|file| -> Result<Value, RpcError> {
                 let active = active_files.contains(&file.id);
-                serde_json::json!({
+                let uri = disk_file_uri(&file.physical_path)?;
+                Ok(serde_json::json!({
                     "id": file.id.get(),
                     "rootId": file.root_id.get(),
                     "logicalPath": file.logical_path.as_str(),
-                    "uri": path_to_uri(&file.physical_path),
+                    "uri": uri,
                     "category": file.category_id,
                     "active": active,
-                })
+                }))
             })
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(serde_json::json!({
             "revision": self.snapshot.revision(),
             "roots": roots,

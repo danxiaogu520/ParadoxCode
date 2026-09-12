@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use engine::{
@@ -241,7 +240,7 @@ pub(crate) fn resolve_source_roots(
         Some(path) => Some(resolve_directory(path, base.as_deref(), "modDirectory")?),
         None => client_root
             .filter(|path| path.is_dir())
-            .map(fs::canonicalize)
+            .map(dunce::canonicalize)
             .transpose()
             .map_err(|error| {
                 RpcError::new(
@@ -285,7 +284,7 @@ pub(crate) fn resolve_source_roots(
                 let path =
                     resolve_configured_path(&dependency.path, base.as_deref(), "dependency path")?;
                 if path.is_dir() {
-                    fs::canonicalize(&path).map_err(|error| {
+                    dunce::canonicalize(&path).map_err(|error| {
                         RpcError::new(
                             INVALID_PARAMS,
                             format!("cannot resolve dependency path: {error}"),
@@ -625,7 +624,7 @@ fn resolve_path(
         })?;
         base.join(path)
     };
-    fs::canonicalize(&candidate).map_err(|error| {
+    dunce::canonicalize(&candidate).map_err(|error| {
         RpcError::new(
             INVALID_PARAMS,
             format!("cannot resolve {field} {}: {error}", candidate.display()),

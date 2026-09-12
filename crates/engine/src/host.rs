@@ -314,9 +314,9 @@ impl AnalysisHost {
                                 cached_root.kind
                             )));
                         }
-                        if cached_root.path.starts_with(&root.path)
-                            || root.path.starts_with(&cached_root.path)
-                        {
+                        let cached = dunce::simplified(&cached_root.path);
+                        let configured = dunce::simplified(&root.path);
+                        if cached.starts_with(configured) || configured.starts_with(cached) {
                             return Err(IndexCacheError::RootConflict {
                                 root: cached_root.path.clone(),
                                 configured: root.path.clone(),
@@ -1141,10 +1141,14 @@ fn source_file_paths(files: &BTreeMap<SourceFileId, SourceFile>) -> HashMap<Path
 /// plain absolute path, and its source directory may no longer exist. Equal canonical forms
 /// (when both resolve) or identical raw paths are accepted.
 fn paths_match(left: &Path, right: &Path) -> bool {
+    // Raw spellings may differ only in their Windows verbatim prefix (a cache
+    // built by an older release records an extended-length spelling); compare
+    // the simplified forms first, then canonicalize what still disagrees.
+    let (left, right) = (dunce::simplified(left), dunce::simplified(right));
     if left == right {
         return true;
     }
-    match (fs::canonicalize(left), fs::canonicalize(right)) {
+    match (dunce::canonicalize(left), dunce::canonicalize(right)) {
         (Ok(left), Ok(right)) => left == right,
         _ => false,
     }

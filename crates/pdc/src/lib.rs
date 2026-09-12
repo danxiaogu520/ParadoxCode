@@ -23,7 +23,7 @@ pub use game::eu4::{
 pub use initialize::{AutoVanillaConfiguration, InitializeOptions};
 pub use protocol::LspError;
 pub use server::{LspServer, ServerState};
-pub use uri::{UriError, path_to_uri, uri_to_path};
+pub use uri::{FileUri, UriError};
 pub use workspace::stable_dependency_root_id;
 
 pub(crate) const JSON_RPC_VERSION: &str = "2.0";

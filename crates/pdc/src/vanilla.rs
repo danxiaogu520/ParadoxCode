@@ -19,7 +19,7 @@ use serde_json::{Value, json};
 use crate::initialize::AutoVanillaConfiguration;
 use crate::protocol::RpcError;
 use crate::server::IndexSetupCancellation;
-use crate::uri::path_to_uri;
+use crate::uri::FileUri;
 use crate::workspace::ResolvedSourceRoots;
 use crate::{
     INTERNAL_ERROR, JSON_RPC_VERSION, WATCHED_FILES_REGISTRATION_ID, WATCHED_FILES_REQUEST_ID,
@@ -424,12 +424,24 @@ pub(crate) fn watched_files_registration(
         live_roots
             .into_iter()
             .map(|root| {
-                let uri = path_to_uri(&root.path).parse::<Uri>().map_err(|_| {
-                    RpcError::new(
-                        INTERNAL_ERROR,
-                        format!("source root has no valid file URI: {}", root.path.display()),
-                    )
-                })?;
+                let uri = FileUri::from_path(&root.path)
+                    .map_err(|error| {
+                        RpcError::new(
+                            INTERNAL_ERROR,
+                            format!(
+                                "source root has no valid file URI: {} ({error})",
+                                root.path.display()
+                            ),
+                        )
+                    })?
+                    .as_str()
+                    .parse::<Uri>()
+                    .map_err(|_| {
+                        RpcError::new(
+                            INTERNAL_ERROR,
+                            format!("source root has no valid file URI: {}", root.path.display()),
+                        )
+                    })?;
                 Ok(FileSystemWatcher {
                     glob_pattern: GlobPattern::Relative(RelativePattern {
                         base_uri: OneOf::Right(uri),

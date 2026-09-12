@@ -17,15 +17,23 @@ pub(crate) fn temp_workspace_dir() -> (std::path::PathBuf, String) {
         .as_nanos();
     let dir = std::env::temp_dir().join(format!("pdc-test-{nonce}"));
     fs::create_dir_all(&dir).expect("create temp workspace");
-    let canonical = fs::canonicalize(&dir).expect("canonicalize temp workspace");
-    (canonical.clone(), path_to_uri(&canonical))
+    let canonical = dunce::canonicalize(&dir).expect("canonicalize temp workspace");
+    (canonical.clone(), file_uri_string(&canonical))
 }
 
 /// Canonicalizes a path and returns its file:// URI, matching the format used by
 /// workspace scanning so that URI-keyed maps can be compared directly.
 pub(crate) fn canonical_uri(path: &std::path::Path) -> String {
-    let canonical = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-    path_to_uri(&canonical)
+    let canonical = dunce::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    file_uri_string(&canonical)
+}
+
+/// Builds the serialized `file://` URI of an absolute fixture path.
+pub(crate) fn file_uri_string(path: &std::path::Path) -> String {
+    FileUri::from_path(path)
+        .expect("absolute fixture path has a file URI")
+        .as_str()
+        .to_owned()
 }
 
 pub(crate) fn eu4_server(options: InitializeOptions) -> Result<LspServer, LspError> {
@@ -215,7 +223,7 @@ pub(crate) fn stale_cache_fixture(container: &std::path::Path) -> std::path::Pat
     let vanilla = container.join("vanilla");
     fs::create_dir_all(&workspace).expect("workspace directory");
     fs::create_dir_all(&vanilla).expect("Vanilla directory");
-    let vanilla = fs::canonicalize(&vanilla).expect("canonical Vanilla directory");
+    let vanilla = dunce::canonicalize(&vanilla).expect("canonical Vanilla directory");
     let cache_path = container.join("vanilla.pdcindex");
 
     let bootstrap_rules = game::eu4::bootstrap_rules();
@@ -237,7 +245,7 @@ pub(crate) fn valid_cache_fixture(container: &std::path::Path) -> std::path::Pat
     let vanilla = container.join("vanilla");
     fs::create_dir_all(&workspace).expect("workspace directory");
     fs::create_dir_all(&vanilla).expect("Vanilla directory");
-    let vanilla = fs::canonicalize(&vanilla).expect("canonical Vanilla directory");
+    let vanilla = dunce::canonicalize(&vanilla).expect("canonical Vanilla directory");
     let cache_path = container.join("vanilla.pdcindex");
 
     let rules = game::eu4::first_party_rules().expect("embedded rules");

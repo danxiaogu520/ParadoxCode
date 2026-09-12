@@ -12,6 +12,7 @@ readme.workspace = true
 publish = false
 
 [dependencies]
+dunce = "1.0"
 rustc-hash = "2"
 hir = { path = "../hir" }
 vfs = { path = "../vfs" }

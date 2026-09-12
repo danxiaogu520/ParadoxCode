@@ -12,6 +12,7 @@ readme.workspace = true
 publish = false
 
 [dependencies]
+dunce = "1.0"
 pdc = { path = "../pdc" }
 rules = { path = "../rules" }
 game = { path = "../game" }
