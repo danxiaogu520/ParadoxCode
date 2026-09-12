@@ -111,7 +111,7 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
                 && sweep_workflow.contains("github.ref == 'refs/heads/main'")
                 && sweep_workflow.contains("refs/tags/{0}")
                 && sweep_workflow.contains("Test-FullyQualifiedPath")
-                && sweep_workflow.contains("-ExecutionPolicy Bypass")
+                && all_run_steps_bypass_execution_policy(&sweep_workflow)
                 && sweep_workflow
                     .contains("Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append")
                 && !sweep_workflow.contains(">> $env:GITHUB_ENV"),
@@ -407,6 +407,24 @@ fn unpinned_workflow_actions(root: &Path) -> Vec<String> {
         }
     }
     findings
+}
+
+fn all_run_steps_bypass_execution_policy(workflow: &str) -> bool {
+    let run_step_count = workflow
+        .lines()
+        .filter(|line| line.trim_start().starts_with("run:"))
+        .count();
+    let shells: Vec<&str> = workflow
+        .lines()
+        .filter_map(|line| line.trim_start().strip_prefix("shell:"))
+        .map(str::trim)
+        .collect();
+
+    run_step_count > 0
+        && shells.len() == run_step_count
+        && shells.iter().all(|shell| {
+            shell.starts_with("powershell ") && shell.contains("-ExecutionPolicy Bypass")
+        })
 }
 
 /// Reads `{open, close}` object pairs from the canonical profile JSON.
@@ -815,5 +833,29 @@ mod tests {
             }
         }
         assert!(all_pass, "editor syntax parity checks must pass");
+    }
+
+    #[test]
+    fn every_sweep_run_step_requires_the_policy_bypass_shell() {
+        let safe = r#"
+          - name: First
+            shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
+            run: |
+              Write-Output first
+          - name: Second
+            shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
+            run: Write-Output second
+        "#;
+        assert!(all_run_steps_bypass_execution_policy(safe));
+
+        let missing_bypass = safe.replacen("-ExecutionPolicy Bypass", "", 1);
+        assert!(!all_run_steps_bypass_execution_policy(&missing_bypass));
+
+        let missing_shell = safe.replacen(
+            "            shell: powershell -NoProfile -ExecutionPolicy Bypass -Command \". '{0}'\"\n",
+            "",
+            1,
+        );
+        assert!(!all_run_steps_bypass_execution_policy(&missing_shell));
     }
 }
