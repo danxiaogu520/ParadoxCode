@@ -82,13 +82,14 @@ that send only the deprecated `rootUri` field are intentionally unsupported and 
 
 ## Project status
 
-**Latest release: v0.3.2** (11 Sep 2026). The EU4 analysis and indexing features are implemented,
+**Latest release: v0.3.3** (12 Sep 2026). The EU4 analysis and indexing features are implemented,
 tested, and released through the tag-driven release pipeline (see [Releases](#releases)). This
-release reworks hover into a first-class presentation surface (category titles, scope tables,
-parallel multi-language localisation previews), shares one per-site dynamic-parameter derivation
-across completion, hover, and diagnostics, rebuilds the EU4 variable model and modifier data from
-wiki and vanilla evidence, and cuts steady-state diagnostics latency on large workspaces to under
-a second. Early adopters should still expect rough edges while 0.x matures; please report problems
+release restructures the repository along rust-analyzer's layering (twelve crates, the server
+binary is now `paradoxcode`, user-visible contracts drop the `pdx` prefix), replaces the shell
+tooling layer with `cargo tools gates`, fixes whole-workspace validation pegging every worker
+core while a document is open, makes engine-parameterized modifier families actually validate
+through template key matchers, and supports UNC paths end to end. Early adopters should still
+expect rough edges while 0.x matures; please report problems
 through the issue templates so they can be fixed in the next
 release.
 

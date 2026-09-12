@@ -7,6 +7,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-09-12
+
+This release restructures the repository along rust-analyzer's layering: twelve crates with the
+`pdx-` prefixes gone, the language server binary renamed to `paradoxcode`, and every user-visible
+contract (`paradoxcode.serverPath`, `.pdcindex`, `.pdcrules`, `pdcloc://`, `pdc/`) carrying the
+new name. The shell tooling layer is replaced by `cargo tools gates`, CI is reorganized the
+rust-analyzer way, whole-workspace validation no longer pegs every worker core while a document
+is open, engine-parameterized modifier families validate through template key matchers, and UNC
+paths work end to end.
+
 ### Changed
 
 - **Breaking:** the editor scripts are renamed to single-word names and the diagnostic tool is
@@ -549,7 +559,8 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.2.0...v0.3.0

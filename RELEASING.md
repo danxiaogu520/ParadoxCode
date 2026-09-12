@@ -29,8 +29,8 @@ prerequisites before pushing it.
 Create and push an annotated version tag only after the commit on `main` has passed CI:
 
 ```bash
-git tag -a v0.3.2 -m "ParadoxCode 0.3.2"
-git push origin v0.3.2
+git tag -a v0.3.3 -m "ParadoxCode 0.3.3"
+git push origin v0.3.3
 ```
 
 The tag workflow builds and verifies all five native `paradoxcode` archives, creates the immutable
@@ -40,7 +40,7 @@ release and upload it manually from the publisher management page. The VS Code j
 the server release because a fresh extension install immediately downloads that matching asset.
 
 For an already-pushed tag, use the workflow's manual dispatch input with the exact tag (for example
-`v0.3.2`). This runs the current release workflow while checking out the immutable tagged source.
+`v0.3.3`). This runs the current release workflow while checking out the immutable tagged source.
 
 ## Verify the public release
 
