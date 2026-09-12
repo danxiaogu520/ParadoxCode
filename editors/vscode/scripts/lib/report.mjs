@@ -4,7 +4,7 @@
  * and the Markdown rendering used for both final and checkpoint reports.
  */
 
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { REPOSITORY_ROOT } from './options.mjs';
 
@@ -75,7 +75,9 @@ function normalizeDiagnostic(diagnostic, text) {
 }
 
 export function baseReport(options, files, skippedSymlinks, omittedSymlinks, depthLimitedDirectories) {
-  const cacheStat = statSync(options.vanillaCache);
+  // A cold sweep deletes the cache before invoking the tool and the server
+  // rebuilds it during the session, so the input stats may not exist yet.
+  const cacheStat = existsSync(options.vanillaCache) ? statSync(options.vanillaCache) : null;
   return {
     schema_version: 1,
     generated_at: new Date().toISOString(),
@@ -93,8 +95,8 @@ export function baseReport(options, files, skippedSymlinks, omittedSymlinks, dep
       workspace: options.workspace,
       vanilla_cache: {
         path: options.vanillaCache,
-        size_bytes: cacheStat.size,
-        modified_at: cacheStat.mtime.toISOString(),
+        size_bytes: cacheStat ? cacheStat.size : null,
+        modified_at: cacheStat ? cacheStat.mtime.toISOString() : null,
         loaded: false,
         status_message: null,
       },
