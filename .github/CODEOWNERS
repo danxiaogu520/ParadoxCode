@@ -27,7 +27,8 @@
 /editors/vscode/ @danxiaogu520
 
 # Tooling, quality gates, and releases
-/scripts/ @danxiaogu520
+/.cargo/ @danxiaogu520
+/.github/actionlint.yaml @danxiaogu520
 /.github/ @danxiaogu520
 
 # Fuzz targets
@@ -37,4 +38,6 @@
 /CONTRIBUTING.md @danxiaogu520
 /SECURITY.md @danxiaogu520
 /RELEASING.md @danxiaogu520
+/GOVERNANCE.md @danxiaogu520
 /CHANGELOG.md @danxiaogu520
+/docs/runner-recovery.md @danxiaogu520

@@ -94,7 +94,7 @@ cargo build --locked --workspace
 cargo test --locked --workspace --all-targets
 ```
 
-显式运行质量门禁套件，或只诊断某个分组（`core`、`vscode`、`release`、`fuzz`、`core-fast`、`perf`）。仓库不使用提交钩子；CI 会在每个 pull request 上运行同样的门禁：
+显式运行质量门禁套件，或只诊断某个分组（`core`、`vscode`、`release`、`fuzz`、`core-fast`、`perf`）。仓库不使用提交钩子；CI 遵循相同的本地门禁意图，并在每个 pull request 上增加平台矩阵、MSRV、依赖策略、拼写和 nightly fuzz 检查：
 
 ```bash
 cargo tools gates
@@ -102,10 +102,10 @@ cargo tools gates
 
 别名定义在 `.cargo/config.toml`；完整写法是 `cargo run -p tools -- gates`。
 
-Pull Request CI 使用 `core-fast` 分组：保留正确性检查，但不编译或运行 benchmark 目标。
+Pull Request CI 遵循 `core-fast` 分组：保留正确性检查，但不编译或运行 benchmark 目标。
 优化后的 benchmark 套件仍保留在 `perf` 分组中，由定时或手动触发的 Performance workflow 运行。
 CI 还会运行编辑器、fuzz 与依赖检查；fuzz 只绑定其直接运行时依赖，
-Windows release 构建则与 Windows 测试和 clippy 并行执行。分支保护应将 `Required CI checks`
+Windows release 构建则与 Windows 测试和 clippy 并行执行。分支保护将 `Conclusion`
 作为稳定的聚合必需检查。
 
 使用 `bake` 校验并编译开发者维护的第一方规则源；产物可放入被忽略的构建目录以供检视：
@@ -174,7 +174,7 @@ node editors/vscode/scripts/diagnose.mjs \
 
 ## 发布
 
-发布由标签驱动：推送 `v0.x.y` 标签后，流水线会构建并验证全部五个原生 `paradoxcode` 归档、创建不可变的 GitHub Release，并打包和附加 VSIX。Visual Studio Marketplace 发布暂时改为手动：从 Release 下载附加的 VSIX，再通过发布者管理页面上传。版本历史与各版本变更记录在 [CHANGELOG.md](CHANGELOG.md)；完整发布检查清单见 [RELEASING.md](RELEASING.md)。
+发布由标签驱动：推送受保护的 annotated `v0.x.y` 标签后，流水线会先确认目标提交位于 `main` 且 `Conclusion` 检查成功，再构建五个平台的原生 `paradoxcode` 归档和 VSIX，并用实际打包的 Windows 二进制执行 release sweep。所有门禁通过后，流水线才会组装并校验包含十二个资产的 Draft Release，随后公开并由 GitHub 锁定，禁止再修改资产或移动标签。Visual Studio Marketplace 发布暂时改为手动：从 Release 下载附加的 VSIX，再通过发布者管理页面上传。版本历史与各版本变更记录在 [CHANGELOG.md](CHANGELOG.md)；完整发布检查清单见 [RELEASING.md](RELEASING.md)。
 
 ## 贡献
 
