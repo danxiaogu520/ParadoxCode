@@ -110,7 +110,7 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
             sweep_workflow.contains("github.workflow_ref")
                 && sweep_workflow.contains("github.ref == 'refs/heads/main'")
                 && sweep_workflow.contains("refs/tags/{0}")
-                && sweep_workflow.contains("IsPathFullyQualified"),
+                && sweep_workflow.contains("Test-FullyQualifiedPath"),
             "trusted sweep authorization",
             "sweep must reject untrusted callers and refs and require absolute runner paths",
         ));

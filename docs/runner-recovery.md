@@ -15,7 +15,8 @@ Register the runner at repository scope as a Windows service and apply these lab
 
 The service account needs read and execute access to the EU4 installation, and read/write access to
 its Cargo, rustup, Actions work, temporary, and dedicated sweep-cache directories. Install current
-Git, GitHub CLI, Node.js 24, rustup, and the stable Rust toolchain on `PATH`.
+Git, GitHub CLI, Node.js 24, rustup, and the stable Rust toolchain on `PATH`. The workflow uses the
+Windows PowerShell 5.1 shell included with supported Windows versions; PowerShell 7 is not required.
 
 Configure these repository Actions variables; paths must be absolute:
 
