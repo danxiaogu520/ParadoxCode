@@ -35,9 +35,9 @@ concurrency:
 
 jobs:
   sweep:
-    # github.workflow_ref describes the caller for reusable workflows. Keep this
-    # server-side condition on the privileged job so a pull request cannot add a
-    # new caller and execute untrusted code on the self-hosted runner.
+    # Defense in depth: github.workflow_ref describes the reusable workflow's
+    # caller. The host-local ACTIONS_RUNNER_HOOK_JOB_STARTED guard independently
+    # enforces the same allowlist before any job step can execute.
     if: >-
       github.repository == 'danxiaogu520/ParadoxCode' &&
       (
@@ -68,7 +68,7 @@ jobs:
           ref: ${{ inputs.release_tag || github.sha }}
 
       - name: Validate runner environment
-        shell: powershell
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           $ErrorActionPreference = 'Stop'
           function Test-FullyQualifiedPath([string] $Path) {
@@ -122,7 +122,7 @@ jobs:
 
       - name: Verify and extract packaged Windows server
         if: inputs.windows_artifact_name != ''
-        shell: powershell
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           $ErrorActionPreference = 'Stop'
           $archives = @(Get-ChildItem -LiteralPath sweep-input -File -Filter '*.zip')
@@ -151,7 +151,7 @@ jobs:
 
       - name: Build server for a direct manual sweep
         if: inputs.windows_artifact_name == ''
-        shell: powershell
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           $ErrorActionPreference = 'Stop'
           cargo build --locked --release -p pdc --bin paradoxcode
@@ -161,7 +161,7 @@ jobs:
             Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Cold dedicated sweep cache
-        shell: powershell
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           $ErrorActionPreference = 'Stop'
           $cachePath = [System.IO.Path]::GetFullPath($env:PDC_SWEEP_CACHE_DIR)
@@ -174,7 +174,7 @@ jobs:
       - name: Fetch previous release sweep summary
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: powershell
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           $ErrorActionPreference = 'Stop'
           $previousDir = Join-Path $env:RUNNER_TEMP "previous-sweep-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
@@ -202,7 +202,7 @@ jobs:
           }
 
       - name: Run release sweep
-        shell: powershell
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           $ErrorActionPreference = 'Stop'
           $label = if ([string]::IsNullOrWhiteSpace($env:RELEASE_TAG)) {
@@ -226,7 +226,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify sweep gate output
-        shell: powershell
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           $ErrorActionPreference = 'Stop'
           $summaryPath = 'performance-results/sweep-summary.json'
