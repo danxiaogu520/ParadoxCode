@@ -24,7 +24,7 @@ List exactly what you ran and its result. Examples:
 
 <!--
 Call out anything reviewers should verify:
-- Does this respect the architecture boundaries in AGENTS.md (no EU4 logic leaking into generic layers)?
+- Does this respect the architecture boundaries in README.md (no EU4 logic leaking into generic layers)?
 - Any behavior changes, migration notes, or follow-up work?
 - Any residual risks or checks that could not be run locally?
 -->

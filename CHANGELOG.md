@@ -7,6 +7,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Protect the integration and release process: pull requests require the stable `Conclusion`
+  check, releases verify tag provenance, and the packaged Windows server must pass the Vanilla
+  sweep before a complete draft is published.
+- Make self-hosted sweep configuration portable through repository variables and add governance,
+  release recovery, and runner reconstruction runbooks.
+
+### Security
+
+- Publish future GitHub releases immutably, refuse asset replacement, audit production npm
+  dependencies, and pin GitHub Actions dependencies to reviewed commit SHAs.
+
 ## [0.3.3] - 2026-09-12
 
 This release restructures the repository along rust-analyzer's layering: twelve crates with the

@@ -1,103 +1,247 @@
 name: Release sweep
 
-# The per-release performance and diagnostics gate: cold-start the server,
-# rebuild the Vanilla index cache, diagnose the full Vanilla workspace, and
-# record phase timings plus a diagnostics fingerprint. Runs only on the
-# repository's self-hosted runner — it needs the local EU4 installation for
-# the Vanilla tree and stable hardware for release-to-release comparisons —
-# and is deliberately never triggered by pull_request.
-
+# This workflow is a reusable, pre-publication release gate. The release
+# workflow passes the exact packaged Windows artifact. A direct manual run is
+# accepted only from the default branch and builds that trusted checkout.
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      release_tag:
+        description: "Version tag being validated"
+        required: true
+        type: string
+      windows_artifact_name:
+        description: "Windows server artifact produced by the caller"
+        required: true
+        type: string
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Optional tag to inspect; empty uses the selected revision"
+        required: false
+        type: string
+      windows_artifact_name:
+        description: "Leave empty for a direct manual run"
+        required: false
+        type: string
 
 permissions:
-  # contents: write is required to attach the sweep summary to the release
-  # so the next release's sweep can compare against it.
-  contents: write
+  actions: read
+  contents: read
 
 concurrency:
-  group: sweep-${{ github.ref }}
+  group: sweep-${{ inputs.release_tag || github.ref }}
   cancel-in-progress: true
 
 jobs:
   sweep:
-    runs-on: [self-hosted, windows]
+    # github.workflow_ref describes the caller for reusable workflows. Keep this
+    # server-side condition on the privileged job so a pull request cannot add a
+    # new caller and execute untrusted code on the self-hosted runner.
+    if: >-
+      github.repository == 'danxiaogu520/ParadoxCode' &&
+      (
+        (
+          startsWith(github.workflow_ref, 'danxiaogu520/ParadoxCode/.github/workflows/release.yml@refs/tags/v') &&
+          github.ref == format('refs/tags/{0}', inputs.release_tag)
+        ) ||
+        (
+          github.event_name == 'workflow_dispatch' &&
+          github.ref == 'refs/heads/main' &&
+          (
+            github.workflow_ref == 'danxiaogu520/ParadoxCode/.github/workflows/release.yml@refs/heads/main' ||
+            github.workflow_ref == 'danxiaogu520/ParadoxCode/.github/workflows/sweep.yml@refs/heads/main'
+          )
+        )
+      )
+    runs-on: [self-hosted, Windows, X64, paradoxcode-sweep]
     timeout-minutes: 60
-    defaults:
-      run:
-        # bash, cargo, node, and gh all resolve through the machine PATH — the
-        # environment a Windows service account inherits. Git\bin (bash.exe),
-        # ~/.cargo/bin, and the nodejs dir are pinned there; the runner's
-        # .path file mechanism is Linux/macOS-only (runsvc.sh) and does not
-        # apply to RunnerService.exe.
-        shell: bash
     env:
-      # The rustup shim needs the user's toolchain home; the service account
-      # has no user profile of its own.
-      RUSTUP_HOME: C:/Users/Administrator/.rustup
-      CARGO_HOME: C:/Users/Administrator/.cargo
-      PDC_SWEEP_VANILLA_SOURCE: C:/Program Files (x86)/Steam/steamapps/common/Europa Universalis IV
+      CARGO_HOME: ${{ vars.PDC_SWEEP_CARGO_HOME }}
+      RUSTUP_HOME: ${{ vars.PDC_SWEEP_RUSTUP_HOME }}
+      PDC_SWEEP_CACHE_DIR: ${{ vars.PDC_SWEEP_CACHE_DIR }}
+      PDC_SWEEP_VANILLA_SOURCE: ${{ vars.PDC_SWEEP_VANILLA_SOURCE }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.release_tag || github.sha }}
 
-      - name: Build release server
-        run: cargo build --locked --release -p pdc
-
-      - name: Cold caches
+      - name: Validate runner environment
+        shell: pwsh
         run: |
-          # The sweep owns a dedicated cache path, separate from any IDE user
-          # cache (the service account cannot and should not touch those), so
-          # a cold run is a plain file deletion away.
-          mkdir -p /c/actions-runner/sweep-cache
-          rm -f /c/actions-runner/sweep-cache/vanilla.pdcindex
-          echo "Vanilla cache removed for a cold sweep"
+          $ErrorActionPreference = 'Stop'
+          foreach ($command in @('cargo', 'node', 'gh')) {
+            if (-not (Get-Command $command -ErrorAction SilentlyContinue)) {
+              throw "Required command is unavailable on the sweep runner: $command"
+            }
+          }
+          foreach ($variable in @(
+            'CARGO_HOME',
+            'RUSTUP_HOME',
+            'PDC_SWEEP_CACHE_DIR',
+            'PDC_SWEEP_VANILLA_SOURCE'
+          )) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($variable))) {
+              throw "Required Actions variable is not configured: $variable"
+            }
+            $value = [Environment]::GetEnvironmentVariable($variable)
+            if (-not [System.IO.Path]::IsPathFullyQualified($value)) {
+              throw "Required Actions variable must contain an absolute path: $variable"
+            }
+          }
+          if (-not (Test-Path -LiteralPath $env:PDC_SWEEP_VANILLA_SOURCE -PathType Container)) {
+            throw 'PDC_SWEEP_VANILLA_SOURCE is not an accessible directory.'
+          }
+          foreach ($relative in @('eu4.exe', 'common', 'events', 'missions', 'decisions', 'localisation')) {
+            $candidate = Join-Path $env:PDC_SWEEP_VANILLA_SOURCE $relative
+            if (-not (Test-Path -LiteralPath $candidate)) {
+              throw "Vanilla source is incomplete; missing: $relative"
+            }
+          }
+          $cachePath = [System.IO.Path]::GetFullPath($env:PDC_SWEEP_CACHE_DIR)
+          New-Item -ItemType Directory -Force -Path $cachePath | Out-Null
+          $driveName = [System.IO.Path]::GetPathRoot($cachePath).TrimEnd('\').TrimEnd(':')
+          $drive = Get-PSDrive -Name $driveName
+          if ($drive.Free -lt 10GB) {
+            throw "Sweep runner needs at least 10 GiB free on $driveName`:; available: $([math]::Round($drive.Free / 1GB, 2)) GiB"
+          }
+          cargo --version
+          node --version
+          gh --version | Select-Object -First 1
+
+      - name: Download packaged Windows server
+        if: inputs.windows_artifact_name != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ inputs.windows_artifact_name }}
+          path: sweep-input
+
+      - name: Verify and extract packaged Windows server
+        if: inputs.windows_artifact_name != ''
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archives = @(Get-ChildItem -LiteralPath sweep-input -File -Filter '*.zip')
+          if ($archives.Count -ne 1) {
+            throw "Expected exactly one Windows archive; found $($archives.Count)."
+          }
+          $archive = $archives[0]
+          $sidecarPath = "$($archive.FullName).sha256"
+          if (-not (Test-Path -LiteralPath $sidecarPath -PathType Leaf)) {
+            throw "Missing checksum sidecar: $sidecarPath"
+          }
+          $expected = ((Get-Content -LiteralPath $sidecarPath -Raw).Trim() -split '\s+')[0].ToLowerInvariant()
+          $actual = (Get-FileHash -LiteralPath $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "Windows release archive checksum mismatch: expected $expected, got $actual"
+          }
+          $destination = Join-Path $env:RUNNER_TEMP "paradoxcode-sweep-server-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          Expand-Archive -LiteralPath $archive.FullName -DestinationPath $destination
+          $servers = @(Get-ChildItem -LiteralPath $destination -Recurse -File -Filter 'paradoxcode.exe')
+          if ($servers.Count -ne 1) {
+            throw "Expected one paradoxcode.exe in the release archive; found $($servers.Count)."
+          }
+          "SWEEP_SERVER=$($servers[0].FullName)" >> $env:GITHUB_ENV
+
+      - name: Build server for a direct manual sweep
+        if: inputs.windows_artifact_name == ''
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo build --locked --release -p pdc --bin paradoxcode
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $server = (Resolve-Path -LiteralPath 'target/release/paradoxcode.exe').Path
+          "SWEEP_SERVER=$server" >> $env:GITHUB_ENV
+
+      - name: Cold dedicated sweep cache
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $cachePath = [System.IO.Path]::GetFullPath($env:PDC_SWEEP_CACHE_DIR)
+          $cacheFile = Join-Path $cachePath 'vanilla.pdcindex'
+          if (Test-Path -LiteralPath $cacheFile -PathType Leaf) {
+            Remove-Item -LiteralPath $cacheFile -Force
+          }
+          "Cold sweep cache prepared: $cacheFile"
 
       - name: Fetch previous release sweep summary
-        if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: pwsh
         run: |
-          mkdir -p previous
-          # Walk releases newest-first and stop at the first one carrying a
-          # sweep summary; none yet (first gated release) simply skips --previous.
-          for tag in $(gh release list --repo "$GITHUB_REPOSITORY" --limit 10 --json tagName --jq '.[].tagName'); do
-            if gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "sweep-summary.json" --dir previous --clobber 2>/dev/null; then
-              echo "previous sweep summary from release $tag"
-              break
-            fi
-          done
-          [ -f previous/sweep-summary.json ] || echo "no previous sweep summary found"
+          $ErrorActionPreference = 'Stop'
+          $previousDir = Join-Path $env:RUNNER_TEMP "previous-sweep-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          New-Item -ItemType Directory -Force -Path $previousDir | Out-Null
+          $releases = gh release list --repo $env:GITHUB_REPOSITORY --limit 20 --json tagName | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($release in $releases) {
+            if ($release.tagName -eq $env:RELEASE_TAG) { continue }
+            gh release download $release.tagName `
+              --repo $env:GITHUB_REPOSITORY `
+              --pattern 'sweep-summary.json' `
+              --dir $previousDir 2>$null
+            if ($LASTEXITCODE -eq 0) {
+              $summary = Join-Path $previousDir 'sweep-summary.json'
+              if (Test-Path -LiteralPath $summary -PathType Leaf) {
+                "PREVIOUS_SWEEP_SUMMARY=$summary" >> $env:GITHUB_ENV
+                "Previous sweep baseline: $($release.tagName)"
+                break
+              }
+            }
+          }
+          if (-not (Test-Path env:PREVIOUS_SWEEP_SUMMARY)) {
+            'No previous release sweep summary found; this run establishes the baseline.'
+          }
 
       - name: Run release sweep
-        # Gate semantics: absolute severities cannot gate (the Vanilla
-        # workspace carries a known error baseline under the current rules).
-        # With a previous sweep summary the gate is the diagnostics
-        # fingerprint; without one it follows the fail-on status.
+        shell: pwsh
         run: |
-          prev_args=()
-          if [ -f previous/sweep-summary.json ]; then
-            prev_args+=(--previous previous/sweep-summary.json)
-          fi
-          node editors/vscode/scripts/sweep.mjs \
-            --label "${{ github.event.release.tag_name || github.sha }}" \
-            --server target/release/paradoxcode.exe \
-            --vanilla-cache "C:/actions-runner/sweep-cache/vanilla.pdcindex" \
-            --fail-on none \
-            "${prev_args[@]}"
+          $ErrorActionPreference = 'Stop'
+          $label = if ([string]::IsNullOrWhiteSpace($env:RELEASE_TAG)) {
+            "manual-$env:GITHUB_SHA"
+          } else {
+            $env:RELEASE_TAG
+          }
+          $cacheFile = Join-Path ([System.IO.Path]::GetFullPath($env:PDC_SWEEP_CACHE_DIR)) 'vanilla.pdcindex'
+          $arguments = @(
+            'editors/vscode/scripts/sweep.mjs',
+            '--label', $label,
+            '--server', $env:SWEEP_SERVER,
+            '--vanilla-source', $env:PDC_SWEEP_VANILLA_SOURCE,
+            '--vanilla-cache', $cacheFile,
+            '--fail-on', 'none'
+          )
+          if (-not [string]::IsNullOrWhiteSpace($env:PREVIOUS_SWEEP_SUMMARY)) {
+            $arguments += @('--previous', $env:PREVIOUS_SWEEP_SUMMARY)
+          }
+          & node @arguments
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Attach sweep summary to the release
-        if: github.event_name == 'release'
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Verify sweep gate output
+        shell: pwsh
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" \
-            performance-results/sweep-summary.json --clobber --repo "$GITHUB_REPOSITORY"
+          $ErrorActionPreference = 'Stop'
+          $summaryPath = 'performance-results/sweep-summary.json'
+          if (-not (Test-Path -LiteralPath $summaryPath -PathType Leaf)) {
+            throw 'Sweep did not produce performance-results/sweep-summary.json.'
+          }
+          $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
+          if (-not $summary.gate.passed) {
+            throw 'Sweep summary reports a failed release gate.'
+          }
 
-      - name: Upload reports
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: release-sweep
+          name: release-sweep-summary
+          path: performance-results/sweep-summary.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-sweep-diagnostics
           path: performance-results/
+          if-no-files-found: error
           retention-days: 90

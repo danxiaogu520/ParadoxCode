@@ -136,20 +136,20 @@ cargo test --locked --workspace --all-targets
 ```
 
 Run the quality gates explicitly (or diagnose one group: `core`, `vscode`, `release`, `fuzz`,
-`core-fast`, `perf`). There are no commit hooks; CI runs the same gates on
-every pull request:
+`core-fast`, `perf`). There are no commit hooks. CI uses the same local gate intent and adds its
+platform matrix, MSRV, dependency-policy, typo, and nightly fuzz checks on every pull request:
 
 ```bash
 cargo tools gates
 ```
 
 The alias comes from `.cargo/config.toml`; the long spelling is `cargo run -p tools -- gates`.
-The pull-request CI uses the `core-fast` group, which keeps correctness checks but excludes
+The pull-request CI follows the `core-fast` group, which keeps correctness checks but excludes
 benchmark targets. The optimized benchmark suite is retained under the `perf` group and runs in
 the scheduled/manual Performance workflow. CI also runs the editor, fuzz, and dependency jobs on
 every pull request; fuzz is limited to its direct runtime dependencies, while the Windows
-release build runs in parallel with the Windows test/lint job. The `Required CI checks` job is the
-stable aggregate for branch protection.
+release build runs in parallel with the Windows test/lint job. The `Conclusion` job is the stable
+aggregate required by branch protection.
 
 Validate and compile the developer-maintained first-party rule source with `bake`; the output
 can be placed in the ignored build directory for inspection:
@@ -288,10 +288,13 @@ records the schema version, source format, canonical `rule_hash`, and artifact c
 
 ## Releases
 
-Releases are tag-driven: pushing a `v0.x.y` tag builds and verifies all five native
-`paradoxcode` archives, creates the immutable GitHub Release, and packages and attaches the VSIX. Visual Studio
-Marketplace publication is temporarily manual; download the attached VSIX and upload it from the
-publisher management page. Version history and per-release changes are tracked in
+Releases are tag-driven: pushing a protected, annotated `v0.x.y` tag verifies that its commit is on
+`main` with a successful `Conclusion` check, builds all five native `paradoxcode` archives and the
+VSIX, and runs the release sweep against the exact packaged Windows binary. Only after all gates
+pass does the workflow assemble and verify a draft with twelve assets, publish it, and let GitHub
+lock the release against later asset or tag changes. Visual Studio Marketplace publication is
+temporarily manual; download the attached VSIX and upload it from the publisher management page.
+Version history and per-release changes are tracked in
 [CHANGELOG.md](CHANGELOG.md); the full release checklist lives in [RELEASING.md](RELEASING.md).
 
 ## Contributing
