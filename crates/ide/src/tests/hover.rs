@@ -159,7 +159,10 @@ fn decision_hover_skips_type_instance_wrapper() {
         "{}",
         result.contents
     );
-    assert!(result.contents.contains("- at least 1"), "{result:?}");
+    assert!(
+        !result.contents.contains("- at least 1"),
+        "generator-default min_occurs = 1 must stay out of hovers: {result:?}"
+    );
 }
 
 #[test]
@@ -226,8 +229,106 @@ fn semantic_hover_keeps_multiple_matching_rule_meanings() {
     let hover = hover(&host.snapshot(), &id, position).expect("ambiguous rule hover");
     assert!(hover.contents.contains("#### Allowed value types (2)"));
     assert!(!hover.contents.contains("##### Candidate 1"));
-    assert!(hover.contents.contains("value: bool (`yes` / `no`)"));
-    assert!(hover.contents.contains("value: integer in [1, 3]"));
+    assert!(
+        hover
+            .contents
+            .contains("- bool (`yes` / `no`), integer in [1, 3]")
+    );
+}
+
+#[test]
+fn semantic_hover_groups_value_types_by_scope() {
+    let mut model = game::eu4::bootstrap_model();
+    for (id, value, scopes, min_occurs) in [
+        (
+            "fixture:trigger:choice-bool",
+            ValueMatcher::Bool,
+            vec!["country".to_owned()],
+            Some(2),
+        ),
+        (
+            "fixture:trigger:choice-tag",
+            ValueMatcher::Exact("fallback".to_owned()),
+            vec!["province".to_owned()],
+            None,
+        ),
+    ] {
+        model.semantic.rules.push(SemanticRule {
+            id: id.to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("choice".to_owned()),
+            operator: Some("=".to_owned()),
+            value,
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: scopes,
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs,
+            strict_min: true,
+            max_occurs: Some(1),
+            source_file: "fixture.semantic".to_owned(),
+            line: 1,
+        });
+    }
+    let mut host = eu4_host(RuleSet::from_model(model));
+    let id = DocumentId::new("file:///tmp/choice.txt");
+    let text = "trigger = { choice = yes }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open scope-split rule fixture");
+    let position = u32::try_from(text.find("choice").expect("choice") + 1).expect("position");
+    let hover = hover(&host.snapshot(), &id, position).expect("scope-split rule hover");
+    assert!(
+        hover
+            .contents
+            .contains("- `country`: bool (`yes` / `no`)\n  - at least 2"),
+        "{}",
+        hover.contents
+    );
+    assert!(
+        hover.contents.contains("- `province`: exact `fallback`"),
+        "{}",
+        hover.contents
+    );
+    // The bare `trigger` block carries no tracked scope, so nothing may be
+    // reported as unavailable here.
+    assert!(
+        !hover.contents.contains("unavailable in current scope"),
+        "{}",
+        hover.contents
+    );
+}
+
+#[test]
+fn semantic_hover_marks_scope_mismatched_value_groups_unavailable() {
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("load first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/add_claim_hover.txt");
+    let text = "country_event = { immediate = { add_claim = 123 } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open add_claim fixture");
+    let position =
+        u32::try_from(text.find("add_claim").expect("add_claim key") + 1).expect("position");
+    let hover = hover(&host.snapshot(), &id, position).expect("add_claim semantic hover");
+    assert!(
+        hover
+            .contents
+            .contains("- `country`: scope `province`, symbol type `province_id`"),
+        "{}",
+        hover.contents
+    );
+    assert!(
+        hover.contents.contains(
+            "- `province`: scope `country`, enum `country_tags` (unavailable in current scope `country`)",
+        ),
+        "{}",
+        hover.contents
+    );
 }
 
 #[test]

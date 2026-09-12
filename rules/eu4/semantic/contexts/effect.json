@@ -1223,8 +1223,7 @@
       "Saves a name to an unique key for usage in other effects. Usable with define_admiral, define_explorer, define_conquistador, define_general, define_ruler, define_consort, define_heir, define_advisor and spawn_rebels. Note: Does not work with country tags as scope, also type = simple does not work with spawn_rebels."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -16384,7 +16383,6 @@
       "Changes the religion of the current country/province scope. Religions are found in /Europa Universalis IV/common/religions/*.txt. Can utilise Event Scope Values."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -23583,8 +23581,7 @@
       "Spawns an artillery unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected artillery unit."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -23614,8 +23611,7 @@
       "Spawns an artillery unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected artillery unit."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -23645,7 +23641,6 @@
       "Spawns an artillery unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected artillery unit."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -23709,7 +23704,6 @@
       "Spawns an artillery unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected artillery unit."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -23740,8 +23734,7 @@
       "Spawns a cavalry unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected cavalry unit."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -23771,8 +23764,7 @@
       "Spawns a cavalry unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected cavalry unit."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -23802,7 +23794,6 @@
       "Spawns a cavalry unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected cavalry unit."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -23833,7 +23824,6 @@
       "Spawns a cavalry unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected cavalry unit."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -23864,8 +23854,7 @@
       "Spawns a infantry unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected infantry unit."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -23895,8 +23884,7 @@
       "Spawns a infantry unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected infantry unit."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -23926,7 +23914,6 @@
       "Spawns a infantry unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected infantry unit."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -23957,7 +23944,6 @@
       "Spawns a infantry unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected infantry unit."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -23988,8 +23974,7 @@
       "Spawns a mercenary infantry unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected mercenary infantry unit."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -24075,8 +24060,7 @@
       "Spawns a mercenary infantry unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected mercenary infantry unit."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -24106,7 +24090,6 @@
       "Spawns a mercenary infantry unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected mercenary infantry unit."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -24137,7 +24120,6 @@
       "Spawns a mercenary infantry unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected mercenary infantry unit."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -24168,8 +24150,7 @@
       "Spawns a mercenary cavalry unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected mercenary cavalry unit."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -24199,8 +24180,7 @@
       "Spawns a mercenary cavalry unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected mercenary cavalry unit."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -24230,7 +24210,6 @@
       "Spawns a mercenary cavalry unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected mercenary cavalry unit."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -24261,7 +24240,6 @@
       "Spawns a mercenary cavalry unit for the current country scope in the defined province scope, or vice versa. Uses the currently selected mercenary cavalry unit."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -24292,8 +24270,7 @@
       "Spawns a heavy ship unit for the current country scope in the defined province scope, or vice versa. Uses the current scope's current heavy ship unit. Requires the province scope to have a port."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -24323,8 +24300,7 @@
       "Spawns a heavy ship unit for the current country scope in the defined province scope, or vice versa. Uses the current scope's current heavy ship unit. Requires the province scope to have a port."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -24354,7 +24330,6 @@
       "Spawns a heavy ship unit for the current country scope in the defined province scope, or vice versa. Uses the current scope's current heavy ship unit. Requires the province scope to have a port."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -24418,7 +24393,6 @@
       "Spawns a heavy ship unit for the current country scope in the defined province scope, or vice versa. Uses the current scope's current heavy ship unit. Requires the province scope to have a port."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -24449,8 +24423,7 @@
       "Spawns a light ship unit for the current country scope in the defined province scope, or vice versa. Uses the current scope's current light ship unit. Requires the province scope to have a port."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -24480,8 +24453,7 @@
       "Spawns a light ship unit for the current country scope in the defined province scope, or vice versa. Uses the current scope's current light ship unit. Requires the province scope to have a port."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -24511,7 +24483,6 @@
       "Spawns a light ship unit for the current country scope in the defined province scope, or vice versa. Uses the current scope's current light ship unit. Requires the province scope to have a port."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -24542,7 +24513,6 @@
       "Spawns a light ship unit for the current country scope in the defined province scope, or vice versa. Uses the current scope's current light ship unit. Requires the province scope to have a port."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -24573,8 +24543,7 @@
       "Spawns a galley ship unit for the current country scope in the defined province scope, or vice versa. Uses the current scope's current galley ship unit. Requires the province scope to have a port."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -24604,8 +24573,7 @@
       "Spawns a galley ship unit for the current country scope in the defined province scope, or vice versa. Uses the current scope's current galley ship unit. Requires the province scope to have a port."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -24635,7 +24603,6 @@
       "Spawns a galley ship unit for the current country scope in the defined province scope, or vice versa. Uses the current scope's current galley ship unit. Requires the province scope to have a port."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -24666,7 +24633,6 @@
       "Spawns a galley ship unit for the current country scope in the defined province scope, or vice versa. Uses the current scope's current galley ship unit. Requires the province scope to have a port."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -24697,8 +24663,7 @@
       "Spawns a transport ship unit for the current country scope in the defined province scope, or vice versa. Uses the current scope's current transport ship unit. Requires the province scope to have a port."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -24756,8 +24721,7 @@
       "Spawns a transport ship unit for the current country scope in the defined province scope, or vice versa. Uses the current scope's current transport ship unit. Requires the province scope to have a port."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -24787,7 +24751,6 @@
       "Spawns a transport ship unit for the current country scope in the defined province scope, or vice versa. Uses the current scope's current transport ship unit. Requires the province scope to have a port."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -24818,7 +24781,6 @@
       "Spawns a transport ship unit for the current country scope in the defined province scope, or vice versa. Uses the current scope's current transport ship unit. Requires the province scope to have a port."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -43366,7 +43328,6 @@
       "In province scope, the defined scope gains a claim on the current province scope. In country scope, the current scope gains a claim on the defined province scope."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -43427,7 +43388,6 @@
       "In province scope, the defined scope gains a claim on the current province scope. In country scope, the current scope gains a claim on the defined province scope."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -43458,8 +43418,7 @@
       "In province scope, the defined scope gains a claim on the current province scope. In country scope, the current scope gains a claim on the defined province scope."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -43489,8 +43448,7 @@
       "In province scope, the defined scope gains a claim on the current province scope. In country scope, the current scope gains a claim on the defined province scope."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -43520,7 +43478,6 @@
       "In province scope, the defined scope gains a core on the current province scope. In country scope, the current scope gains a core on the defined province scope."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -43551,7 +43508,6 @@
       "In province scope, the defined scope gains a core on the current province scope. In country scope, the current scope gains a core on the defined province scope."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -43582,8 +43538,7 @@
       "In province scope, the defined scope gains a core on the current province scope. In country scope, the current scope gains a core on the defined province scope."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -43613,8 +43568,7 @@
       "In province scope, the defined scope gains a core on the current province scope. In country scope, the current scope gains a core on the defined province scope."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -43802,7 +43756,6 @@
       "In province scope, the defined scope gains a permanent claim on the current province scope. In country scope, the current scope gains a permanent claim on the defined province scope."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -43833,7 +43786,6 @@
       "In province scope, the defined scope gains a permanent claim on the current province scope. In country scope, the current scope gains a permanent claim on the defined province scope."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -43864,8 +43816,7 @@
       "In province scope, the defined scope gains a permanent claim on the current province scope. In country scope, the current scope gains a permanent claim on the defined province scope."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -43895,8 +43846,7 @@
       "In province scope, the defined scope gains a permanent claim on the current province scope. In country scope, the current scope gains a permanent claim on the defined province scope."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -43926,7 +43876,6 @@
       "In province scope, the defined scope gains a territorial core on the current province scope. In country scope, the current scope gains a territorial core on the defined province scope."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -43957,7 +43906,6 @@
       "In province scope, the defined scope gains a territorial core on the current province scope. In country scope, the current scope gains a territorial core on the defined province scope."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -43988,8 +43936,7 @@
       "In province scope, the defined scope gains a territorial core on the current province scope. In country scope, the current scope gains a territorial core on the defined province scope."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -44019,8 +43966,7 @@
       "In province scope, the defined scope gains a territorial core on the current province scope. In country scope, the current scope gains a territorial core on the defined province scope."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -44260,7 +44206,6 @@
       "In province scope, the defined scope loses their claim on the current province scope. In country scope, the current scope loses their claim on the defined province scope. Works for both types of claims."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -44291,7 +44236,6 @@
       "In province scope, the defined scope loses their claim on the current province scope. In country scope, the current scope loses their claim on the defined province scope. Works for both types of claims."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -44322,8 +44266,7 @@
       "In province scope, the defined scope loses their claim on the current province scope. In country scope, the current scope loses their claim on the defined province scope. Works for both types of claims."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -44353,8 +44296,7 @@
       "In province scope, the defined scope loses their claim on the current province scope. In country scope, the current scope loses their claim on the defined province scope. Works for both types of claims."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -44384,7 +44326,6 @@
       "In province scope, the defined scope loses their core on the current province scope. In country scope, the current scope loses their core on the defined province scope. Works for both types of claims."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -44447,7 +44388,6 @@
       "In province scope, the defined scope loses their core on the current province scope. In country scope, the current scope loses their core on the defined province scope. Works for both types of claims."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -44478,8 +44418,7 @@
       "In province scope, the defined scope loses their core on the current province scope. In country scope, the current scope loses their core on the defined province scope. Works for both types of claims."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -44509,8 +44448,7 @@
       "In province scope, the defined scope loses their core on the current province scope. In country scope, the current scope loses their core on the defined province scope. Works for both types of claims."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -44540,7 +44478,6 @@
       "In province scope, the defined scope loses their territorial core on the current province scope. In country scope, the current scope loses their territorial core on the defined province scope. Works for both types of claims."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -44571,7 +44508,6 @@
       "In province scope, the defined scope loses their territorial core on the current province scope. In country scope, the current scope loses their territorial core on the defined province scope. Works for both types of claims."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -44602,8 +44538,7 @@
       "In province scope, the defined scope loses their territorial core on the current province scope. In country scope, the current scope loses their territorial core on the defined province scope. Works for both types of claims."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -44633,8 +44568,7 @@
       "In province scope, the defined scope loses their territorial core on the current province scope. In country scope, the current scope loses their territorial core on the defined province scope. Works for both types of claims."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],

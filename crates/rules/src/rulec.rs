@@ -1603,9 +1603,10 @@ mod tests {
                 && matches!(rule.shape, RuleShape::Leaf)
                 && matches!(rule.value, ValueMatcher::AnyScalar)
         }));
-        // The unit-spawn family (army quintet + owner-ruled ship quartet
-        // E053-E056) is a country+province dual; both value alternatives
-        // stay available.
+        // 2026-09-12 split: the unit-spawn family is usable in country and
+        // province scope, but each value alternative carries the scope whose
+        // meaning it implements — province targets in country scope, country
+        // targets in province scope.
         for key in [
             "artillery",
             "cavalry",
@@ -1620,28 +1621,29 @@ mod tests {
             let rows = top_level_exact("effect", key);
             assert!(
                 rows.iter().any(|rule| {
-                    rule.allowed_scopes == ["country", "province"]
+                    rule.allowed_scopes == ["country"]
                         && matches!(
                             &rule.value,
                             ValueMatcher::Scope(Some(scope)) if scope == "province"
                         )
                 }),
-                "{key} must keep a province-target value alternative in country+province scope"
+                "{key} must keep a province-target value alternative in country scope"
             );
             assert!(
                 rows.iter().any(|rule| {
-                    rule.allowed_scopes == ["country", "province"]
+                    rule.allowed_scopes == ["province"]
                         && matches!(
                             &rule.value,
                             ValueMatcher::Scope(Some(scope)) if scope == "country"
                         )
                 }),
-                "{key} must keep a country-target value alternative in country+province scope"
+                "{key} must keep a country-target value alternative in province scope"
             );
         }
-        // 2026-09-04 arbitration: the claim/core mutation and comparison
-        // families are country+province duals (wiki + vanilla usage +
-        // cwtools agreement); both value alternatives stay available.
+        // 2026-09-12 split supersedes the 2026-09-04 flattening: the claim/core
+        // mutation and comparison families stay usable in both scopes, with
+        // each value alternative pinned to the scope whose meaning it
+        // implements (wiki + vanilla usage).
         for key in [
             "add_claim",
             "add_core",
@@ -1654,23 +1656,23 @@ mod tests {
             let rows = top_level_exact("effect", key);
             assert!(
                 rows.iter().any(|rule| {
-                    rule.allowed_scopes == ["country", "province"]
+                    rule.allowed_scopes == ["country"]
                         && matches!(
                             &rule.value,
                             ValueMatcher::Scope(Some(scope)) if scope == "province"
                         )
                 }),
-                "{key} must keep a province-target value alternative in country+province scope"
+                "{key} must keep a province-target value alternative in country scope"
             );
             assert!(
                 rows.iter().any(|rule| {
-                    rule.allowed_scopes == ["country", "province"]
+                    rule.allowed_scopes == ["province"]
                         && matches!(
                             &rule.value,
                             ValueMatcher::Scope(Some(scope)) if scope == "country"
                         )
                 }),
-                "{key} must keep a country-target value alternative in country+province scope"
+                "{key} must keep a country-target value alternative in province scope"
             );
         }
         for key in [
@@ -1684,23 +1686,23 @@ mod tests {
             let rows = top_level_exact("trigger", key);
             assert!(
                 rows.iter().any(|rule| {
-                    rule.allowed_scopes == ["country", "province"]
+                    rule.allowed_scopes == ["country"]
                         && matches!(
                             &rule.value,
                             ValueMatcher::Scope(Some(scope)) if scope == "province"
                         )
                 }),
-                "{key} must keep a province-target value alternative in country+province scope"
+                "{key} must keep a province-target value alternative in country scope"
             );
             assert!(
                 rows.iter().any(|rule| {
-                    rule.allowed_scopes == ["country", "province"]
+                    rule.allowed_scopes == ["province"]
                         && matches!(
                             &rule.value,
                             ValueMatcher::Scope(Some(scope)) if scope == "country"
                         )
                 }),
-                "{key} must keep a country-target value alternative in country+province scope"
+                "{key} must keep a country-target value alternative in province scope"
             );
         }
         let exists_bool = top_level_exact("trigger", "exists")
