@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use rules::FileResolutionPolicy;
-use text::{LogicalPath, TextRange};
+use text::TextRange;
 
 use super::IndexCacheError;
 use crate::SourceFileId;
@@ -45,13 +45,6 @@ pub(super) fn parse_resolution(value: &str) -> Result<FileResolutionPolicy, Inde
             "unknown file resolution policy: {value}"
         ))),
     }
-}
-
-pub(super) fn join_logical_path(root: &Path, logical: &LogicalPath) -> PathBuf {
-    logical
-        .as_str()
-        .split('/')
-        .fold(root.to_owned(), |path, component| path.join(component))
 }
 
 #[cfg(unix)]

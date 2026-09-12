@@ -6,7 +6,9 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { relative, resolve, sep } from 'node:path';
+
+import { logicalRelative } from './paths.mjs';
+import { resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { TextDecoder } from 'node:util';
 
@@ -158,7 +160,7 @@ export async function selectDiagnosableFiles(client, report, options, files) {
   for (let offset = 0; offset < files.length; offset += 4_096) {
     const batch = files.slice(offset, offset + 4_096);
     const logicalPaths = batch.map((file) =>
-      relative(options.source, file).split(sep).join('/'),
+      logicalRelative(options.source, file),
     );
     const result = await client.request(
       'pdc/classifyPaths',
@@ -171,7 +173,7 @@ export async function selectDiagnosableFiles(client, report, options, files) {
     for (const path of result) accepted.add(path);
   }
   const selected = files.filter((file) =>
-    accepted.has(relative(options.source, file).split(sep).join('/')),
+    accepted.has(logicalRelative(options.source, file)),
   );
   report.scan.diagnosable_files_selected = selected.length;
   console.error(
@@ -188,7 +190,7 @@ export async function diagnoseExplicitFiles(client, report, options, files, tota
     while (pending.size < options.concurrency && cursor < files.length) {
       const file = files[cursor];
       cursor += 1;
-      const relativePath = relative(options.source, file).split(sep).join('/');
+      const relativePath = logicalRelative(options.source, file);
       try {
         const bytes = readFileSync(file);
         if (bytes.length > MAX_SOURCE_BYTES) {
@@ -278,7 +280,7 @@ export async function diagnoseTextFiles(client, report, options, files) {
       const inputs = [];
       const sources = new Map();
       for (const file of batch) {
-        const relativePath = relative(options.source, file).split(sep).join('/');
+        const relativePath = logicalRelative(options.source, file);
         try {
           const bytes = readFileSync(file);
           if (bytes.length > MAX_SOURCE_BYTES) {

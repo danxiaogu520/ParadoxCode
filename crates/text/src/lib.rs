@@ -3,6 +3,10 @@
 //! This crate deliberately has no dependency on an editor protocol or EU4 semantic rules. It is
 //! the lowest layer in the `ParadoxCode` dependency graph.
 
+mod abs_path;
+
+pub use abs_path::AbsPath;
+
 use std::fmt;
 
 use serde::{Deserialize, Serialize};

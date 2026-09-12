@@ -1,3 +1,5 @@
+use text::AbsPath;
+
 use super::*;
 
 #[test]
@@ -21,7 +23,7 @@ fn persistent_parse_cache_skips_reparsing_matching_disk_source() {
             SourceRoot::new(
                 SourceRootId::new(1),
                 SourceRootKind::CurrentMod,
-                root.clone(),
+                AbsPath::normalize(&root),
             ),
         ]));
     };
@@ -68,7 +70,7 @@ fn physical_path_lookup_follows_scan_and_targeted_disk_changes() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     host.refresh_source_roots().expect("scan");
@@ -85,7 +87,7 @@ fn physical_path_lookup_follows_scan_and_targeted_disk_changes() {
 
     fs::remove_file(events.join("gone.txt")).expect("remove file");
     host.apply_disk_file_changes(&[DiskFileChange::new(
-        events.join("gone.txt"),
+        AbsPath::normalize(&events.join("gone.txt")),
         DiskFileChangeKind::Deleted,
     )])
     .expect("apply deletion");
@@ -102,7 +104,7 @@ fn physical_path_lookup_follows_scan_and_targeted_disk_changes() {
 
     fs::write(events.join("new.txt"), "country_event = { id = new.1 }\n").expect("new file");
     host.apply_disk_file_changes(&[DiskFileChange::new(
-        events.join("new.txt"),
+        AbsPath::normalize(&events.join("new.txt")),
         DiskFileChangeKind::Created,
     )])
     .expect("apply creation");
@@ -139,7 +141,7 @@ fn recoverable_file_failures_do_not_abort_the_workspace_scan() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     let report = host
@@ -195,7 +197,7 @@ fn eu4_legacy_windows1252_text_is_decoded_before_indexing() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     let report = host.refresh_source_roots().expect("legacy scan");
@@ -244,7 +246,7 @@ fn game_encoded_text_with_control_characters_keeps_surrounding_definitions() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     let report = host.refresh_source_roots().expect("game-encoded scan");
@@ -296,7 +298,7 @@ country_event = { id = after_close.1 }\n",
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     let report = host.refresh_source_roots().expect("encoded comment scan");
@@ -345,7 +347,7 @@ fn malformed_quoted_value_does_not_discard_the_parent_or_sibling() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     let report = host.refresh_source_roots().expect("encoded scan");
@@ -383,7 +385,7 @@ fn depth_limit_skips_nested_subtrees_with_a_reported_issue() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     let report = host
@@ -419,7 +421,7 @@ fn file_limit_failure_preserves_the_previous_snapshot() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     host.refresh_source_roots().expect("initial scan");
@@ -463,7 +465,7 @@ fn cancelled_scan_preserves_the_previous_snapshot_atomically() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     host.refresh_source_roots().expect("initial scan");
@@ -510,7 +512,7 @@ fn opaque_binary_assets_are_indexed_without_reading_them_as_utf8() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     let report = host.refresh_source_roots().expect("scan asset");
@@ -633,7 +635,7 @@ fn eu4_scan_uses_the_explicit_script_folder_whitelist() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     let report = host.refresh_source_roots().expect("whitelist scan");
@@ -737,7 +739,7 @@ fn eu4_scan_uses_the_explicit_script_folder_whitelist() {
     )
     .expect("ignored watched fixture");
     host.apply_disk_file_changes(&[DiskFileChange::new(
-        ignored_change,
+        AbsPath::normalize(&ignored_change),
         DiskFileChangeKind::Created,
     )])
     .expect("ignored watched change");
@@ -750,7 +752,7 @@ fn eu4_scan_uses_the_explicit_script_folder_whitelist() {
     let ignored_extension_change = root.join("events/created_after_scan.png");
     fs::write(&ignored_extension_change, [0_u8, 159, 146, 150]).expect("ignored extension fixture");
     host.apply_disk_file_changes(&[DiskFileChange::new(
-        ignored_extension_change,
+        AbsPath::normalize(&ignored_extension_change),
         DiskFileChangeKind::Created,
     )])
     .expect("ignored extension change");
@@ -788,7 +790,7 @@ fn directory_symlinks_are_reported_and_never_followed() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     let report = host.refresh_source_roots().expect("symlink-safe scan");
@@ -832,7 +834,7 @@ fn workspace_scan_skips_tool_generated_directories() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     let report = host.refresh_source_roots().expect("bounded workspace scan");
@@ -905,7 +907,7 @@ fn workspace_scan_filters_prune_files_before_budget_and_targeted_updates() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     let report = host
@@ -944,7 +946,7 @@ fn workspace_scan_filters_prune_files_before_budget_and_targeted_updates() {
     )
     .expect("ignored watched fixture");
     host.apply_disk_file_changes(&[DiskFileChange::new(
-        events.join("new.generated.txt"),
+        AbsPath::normalize(&events.join("new.generated.txt")),
         DiskFileChangeKind::Created,
     )])
     .expect("ignored targeted update");

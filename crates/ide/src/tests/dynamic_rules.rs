@@ -5,6 +5,7 @@ use crate::dynamic_rules::{
     DynamicSiteGate, DynamicSiteZone, dynamic_rule_row,
 };
 use rules::ValueMatcher;
+use text::AbsPath;
 
 fn province_push() -> DynamicScopeTransition {
     DynamicScopeTransition {
@@ -39,7 +40,7 @@ fn definitions_snapshot(body: &str) -> engine::AnalysisHost {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     host

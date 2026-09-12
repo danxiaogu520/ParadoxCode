@@ -1,4 +1,5 @@
 use super::support::*;
+use text::AbsPath;
 
 #[test]
 fn eu4_scope_links_switch_effect_context_and_scope() {
@@ -96,7 +97,7 @@ fn game_age_abilities_defined_in_the_current_file_validate_their_effects() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("index ability source");
 
@@ -111,7 +112,7 @@ fn game_age_abilities_defined_in_the_current_file_validate_their_effects() {
         id.clone(),
         1,
         source.to_owned(),
-        Some(ages.join("target.txt")),
+        Some(AbsPath::normalize(&ages.join("target.txt"))),
     )
     .expect("open target");
 
@@ -152,7 +153,7 @@ fn game_age_ability_in_an_initially_empty_index_is_a_definition() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     let id = DocumentId::new("file:///tmp/common/ages/empty-target.txt");
     let source = "age_of_discovery = { abilities = { MISSING = { effect = { custom_tooltip = missing_loc } } } }\n";
@@ -160,7 +161,7 @@ fn game_age_ability_in_an_initially_empty_index_is_a_definition() {
         id.clone(),
         1,
         source.to_owned(),
-        Some(ages.join("empty-target.txt")),
+        Some(AbsPath::normalize(&ages.join("empty-target.txt"))),
     )
     .expect("open target");
 
@@ -234,7 +235,7 @@ fn eu4_replace_scope_links_populate_from_intrinsics() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
 
     let valid_id = DocumentId::new("file:///tmp/from-building.txt");
@@ -242,7 +243,7 @@ fn eu4_replace_scope_links_populate_from_intrinsics() {
         valid_id.clone(),
         1,
         "test_building = { on_built = { cossack_infantry = FROM } }\n".to_owned(),
-        Some(directory.join("from.txt")),
+        Some(AbsPath::normalize(&directory.join("from.txt"))),
     )
     .expect("open FROM fixture");
     assert!(
@@ -256,7 +257,7 @@ fn eu4_replace_scope_links_populate_from_intrinsics() {
         invalid_id.clone(),
         1,
         "other_building = { on_built = { cossack_infantry = THIS } }\n".to_owned(),
-        Some(directory.join("this.txt")),
+        Some(AbsPath::normalize(&directory.join("this.txt"))),
     )
     .expect("open THIS fixture");
     assert!(
@@ -339,7 +340,7 @@ fn dynamic_scope_mismatch_surfaces_at_the_call_site() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definition");
     let id = DocumentId::new("file:///tmp/events/dynamic-scope.txt");

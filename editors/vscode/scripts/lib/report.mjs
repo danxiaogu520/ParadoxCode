@@ -5,7 +5,9 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve, sep } from 'node:path';
+import { join, relative, resolve } from 'node:path';
+
+import { logicalRelative } from './paths.mjs';
 import { REPOSITORY_ROOT } from './options.mjs';
 
 export const MAX_REPORTED_TOOL_ERRORS = 256;
@@ -142,7 +144,7 @@ export function addToolError(report, message) {
 
 export function addFileResult(report, file, text, encoding, diagnostics, root) {
   const normalized = diagnostics.map((diagnostic) => normalizeDiagnostic(diagnostic, text));
-  const relativePath = relative(root, file).split(sep).join('/');
+  const relativePath = logicalRelative(root, file);
   const result = {
     path: relativePath,
     physical_path: file,

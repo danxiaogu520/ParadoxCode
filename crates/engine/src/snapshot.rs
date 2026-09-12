@@ -2,11 +2,10 @@
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use rules::{FileResolutionPolicy, GameProfile, RuleSet};
-use text::{LogicalPath, TextRange};
+use text::{AbsPath, LogicalPath, TextRange};
 
 use crate::query_cache::SnapshotQueryCache;
 use index::prepare_document_snapshot;
@@ -25,10 +24,10 @@ pub struct AnalysisSnapshot {
     pub(crate) rules: Arc<RuleSet>,
     pub(crate) profile: Arc<GameProfile>,
     pub(crate) roots: Arc<[SourceRoot]>,
-    pub(crate) workspace_root: Option<PathBuf>,
+    pub(crate) workspace_root: Option<AbsPath>,
     pub(crate) documents: Arc<BTreeMap<DocumentId, DocumentSnapshot>>,
     pub(crate) source_files: Arc<BTreeMap<SourceFileId, SourceFile>>,
-    pub(crate) source_file_paths: Arc<HashMap<PathBuf, SourceFileId>>,
+    pub(crate) source_file_paths: Arc<HashMap<AbsPath, SourceFileId>>,
     pub(crate) file_states: Arc<BTreeMap<SourceFileId, Arc<FileState>>>,
     pub(crate) index: Arc<WorkspaceIndex>,
     pub(crate) scan_report: Arc<WorkspaceScanReport>,
@@ -72,8 +71,8 @@ impl AnalysisSnapshot {
 
     /// Returns the explicit workspace root, if configured.
     #[must_use]
-    pub fn workspace_root(&self) -> Option<&std::path::Path> {
-        self.workspace_root.as_deref()
+    pub fn workspace_root(&self) -> Option<&AbsPath> {
+        self.workspace_root.as_ref()
     }
 
     /// Returns all current document candidates keyed by stable document identity.
@@ -118,7 +117,9 @@ impl AnalysisSnapshot {
     /// cache-installed roots).
     #[must_use]
     pub fn source_file_id_for_path(&self, path: &std::path::Path) -> Option<SourceFileId> {
-        self.source_file_paths.get(path).copied()
+        self.source_file_paths
+            .get(&AbsPath::normalize(path))
+            .copied()
     }
 
     /// Returns the immutable parse/HIR/index state for one scanned disk file.

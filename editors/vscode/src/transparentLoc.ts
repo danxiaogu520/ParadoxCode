@@ -15,6 +15,7 @@
 import * as fs from 'node:fs/promises';
 import * as nodePath from 'node:path';
 import * as vscode from 'vscode';
+import { globToRegExp } from './paths';
 import {
     Transcoder,
     PROFILE_LOCALISATION,
@@ -36,17 +37,6 @@ export function realUriOf(uri: vscode.Uri): vscode.Uri | undefined {
         return undefined;
     }
     return uri.with({ scheme: 'file' });
-}
-
-function globToRegExp(pattern: string): RegExp {
-    const normalized = pattern.replace(/\\/g, '/');
-    const escaped = normalized
-        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-        .replace(/\*\*/g, '\u0000')
-        .replace(/\*/g, '[^/]*')
-        .replace(/\u0000/g, '.*')
-        .replace(/\?/g, '.');
-    return new RegExp(`^${escaped}$`, 'i');
 }
 
 /**
@@ -470,6 +460,10 @@ export async function activateTransparentLocalisation(
     if (configuration.get<boolean>('transparentEncoding', true)) {
         disposables.push(
             vscode.workspace.registerFileSystemProvider(PDCLOC_SCHEME, provider, {
+                // URIs under this scheme are byte-identical twins of their
+                // `file://` counterparts (only the scheme differs), so the
+                // provider must never fold case itself; case-insensitive
+                // game-rule matching happens in the profile selectors above.
                 isCaseSensitive: true,
             }),
             vscode.commands.registerCommand('paradoxcode.localisation.openDecoded', (uri) =>

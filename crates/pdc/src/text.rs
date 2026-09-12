@@ -1,33 +1,8 @@
-use std::path::PathBuf;
-
 use lsp_types::Range as LspRange;
 use text::{LineIndex, Position, TextRange};
 
 use crate::protocol::RpcError;
 use crate::{INVALID_PARAMS, MAX_DOCUMENT_BYTES};
-
-pub(crate) fn normalize_workspace_path(path: PathBuf) -> PathBuf {
-    if let Ok(canonical) = dunce::canonicalize(&path) {
-        return canonical;
-    }
-
-    let mut ancestor = path.as_path();
-    let mut missing = Vec::new();
-    while let Some(name) = ancestor.file_name() {
-        missing.push(name.to_owned());
-        let Some(parent) = ancestor.parent() else {
-            break;
-        };
-        ancestor = parent;
-        if let Ok(mut canonical) = dunce::canonicalize(ancestor) {
-            for component in missing.iter().rev() {
-                canonical.push(component);
-            }
-            return canonical;
-        }
-    }
-    path
-}
 
 pub(crate) fn lsp_range_to_text_range(
     range: &LspRange,

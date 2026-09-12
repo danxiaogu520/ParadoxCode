@@ -1563,7 +1563,7 @@ fn resolve_dynamic_definition_uncached(
         document.source() == DocumentSource::Overlay
             && document
                 .path()
-                .is_some_and(|path| path == source_file.physical_path)
+                .is_some_and(|path| path == source_file.physical_path.as_path())
     });
     if hidden_by_overlay {
         return None;

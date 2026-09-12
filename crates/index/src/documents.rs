@@ -1,11 +1,10 @@
 //! Parsed, lowered, and indexed per-document analysis state.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use hir::HirFile;
 use parser::{FileFormat, ParsedFile};
-use text::{LineIndex, TextRange};
+use text::{AbsPath, LineIndex, TextRange};
 
 use vfs::{DocumentId, DocumentSource, LocalisationPreview, localisation_previews_from_parsed};
 
@@ -170,7 +169,7 @@ pub struct DocumentSnapshot {
     pub text: Arc<str>,
     pub line_index: LineIndex,
     pub source: DocumentSource,
-    pub path: Option<PathBuf>,
+    pub path: Option<AbsPath>,
     pub parsed: Option<ParsedSource>,
     pub hir: Option<Arc<HirFile>>,
 }

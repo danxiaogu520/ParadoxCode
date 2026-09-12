@@ -23,7 +23,7 @@ use lsp_types::{
 };
 use rules::{GameProfile, RuleSet};
 use serde_json::{Value, json};
-use text::LineIndex;
+use text::{AbsPath, LineIndex};
 
 use crate::dependency::DependencySetupOutcome;
 use crate::initialize::{
@@ -39,9 +39,7 @@ use crate::protocol::{
     show_info_notification, show_warning_notification, typed_params,
 };
 use crate::requests::SnapshotRequestContext;
-use crate::text::{
-    apply_text_change, changed_document_len, lsp_range_to_text_range, normalize_workspace_path,
-};
+use crate::text::{apply_text_change, changed_document_len, lsp_range_to_text_range};
 use crate::transport::{read_message, write_message};
 use crate::uri::FileUri;
 use crate::vanilla::{IndexCacheLoadRequest, run_index_cache_load};
@@ -599,7 +597,7 @@ pub struct LspServer {
     diagnostics: BTreeMap<DocumentId, Value>,
     pending_parses: BTreeMap<DocumentId, PendingParse>,
     pending_diagnostics: BTreeMap<DocumentId, PendingDiagnostics>,
-    pending_disk_changes: BTreeMap<PathBuf, DiskFileChangeKind>,
+    pending_disk_changes: BTreeMap<AbsPath, DiskFileChangeKind>,
     pending_disk_changes_due: Option<Instant>,
     pending_disk_changes_rescan: bool,
     watcher_registration: Option<Value>,
@@ -957,7 +955,7 @@ impl LspServer {
     }
 
     /// Queues one watcher event and arms/resets the trailing coalescing window.
-    pub(crate) fn queue_watched_disk_change(&mut self, path: PathBuf, kind: DiskFileChangeKind) {
+    pub(crate) fn queue_watched_disk_change(&mut self, path: AbsPath, kind: DiskFileChangeKind) {
         if !self.pending_disk_changes_rescan {
             self.pending_disk_changes.insert(path, kind);
             if self.pending_disk_changes.len() > WATCHED_BULK_CAP {

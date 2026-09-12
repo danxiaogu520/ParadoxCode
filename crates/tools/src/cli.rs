@@ -13,6 +13,7 @@ use game::{
     GameInstallDescriptor, UserConfigError, UserConfiguration, UserPaths, discover_installations,
     select_installation, validate_installation_for_source,
 };
+use text::AbsPath;
 
 use pdc::stable_dependency_root_id;
 
@@ -243,7 +244,7 @@ fn setup_game(
         SourceRoot::new(
             SourceRootId::new(0),
             SourceRootKind::Vanilla,
-            selected.path.clone(),
+            AbsPath::normalize(selected.path.as_path()),
         ),
         &cache_path,
         "Vanilla",
@@ -344,7 +345,11 @@ fn index_vanilla(args: &[String]) -> Result<String, CliError> {
     }
 
     build_cache(
-        SourceRoot::new(SourceRootId::new(0), SourceRootKind::Vanilla, source),
+        SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Vanilla,
+            AbsPath::normalize(&source),
+        ),
         &output,
         "Vanilla",
     )
@@ -400,7 +405,7 @@ fn index_dependency(args: &[String]) -> Result<String, CliError> {
         SourceRoot::new(
             SourceRootId::new(stable_dependency_root_id(&id)),
             SourceRootKind::Dependency,
-            source,
+            AbsPath::normalize(&source),
         ),
         &output,
         &format!("Dependency {id}"),

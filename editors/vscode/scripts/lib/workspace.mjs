@@ -5,7 +5,9 @@
  */
 
 import { readdirSync } from 'node:fs';
-import { extname, join, relative, sep } from 'node:path';
+import { extname, join } from 'node:path';
+
+import { logicalRelative } from './paths.mjs';
 import { CliUsageError } from './options.mjs';
 
 const RELEVANT_EXTENSIONS = new Set(['.txt', '.gfx', '.yml', '.yaml']);
@@ -37,7 +39,7 @@ export function collectSourceFiles(root, maxFiles) {
       const path = join(directory, entry.name);
       if (entry.isSymbolicLink()) {
         if (skippedSymlinks.length < MAX_REPORTED_SYMLINKS) {
-          skippedSymlinks.push(relative(root, path).split(sep).join('/'));
+          skippedSymlinks.push(logicalRelative(root, path));
         } else {
           omittedSymlinks += 1;
         }
@@ -69,7 +71,7 @@ export function filterFiles(files, source, pathPrefix, shardCount, shardIndex) {
   let selected = files;
   if (pathPrefix) {
     selected = selected.filter((file) => {
-      const logicalPath = relative(source, file).split(sep).join('/');
+      const logicalPath = logicalRelative(source, file);
       return logicalPath === pathPrefix || logicalPath.startsWith(`${pathPrefix}/`);
     });
   }

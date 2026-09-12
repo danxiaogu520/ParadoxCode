@@ -15,6 +15,7 @@ use lsp_types::{
 };
 use rules::{GameProfile, RuleSet};
 use serde_json::{Value, json};
+use text::AbsPath;
 
 use crate::initialize::AutoVanillaConfiguration;
 use crate::protocol::RpcError;
@@ -315,7 +316,7 @@ fn build_cache_from_source(
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        source.to_owned(),
+        AbsPath::normalize(source),
     )]));
     if let Some(log) = context.log {
         log(&format!(
@@ -670,7 +671,7 @@ pub(crate) fn run_auto_vanilla_setup_with_options_and_limits(
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(0),
             SourceRootKind::Vanilla,
-            source.clone(),
+            AbsPath::normalize(&source),
         )]));
         let setup = (|| {
             if let Some(log) = log {

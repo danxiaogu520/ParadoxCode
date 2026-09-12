@@ -934,6 +934,7 @@ dependencies = [
 name = "text"
 version = "0.3.2"
 dependencies = [
+ "dunce",
  "serde",
 ]
 
@@ -1022,6 +1023,7 @@ dependencies = [
  "sha2",
  "tar",
  "tempfile",
+ "text",
  "toml",
  "zip",
 ]

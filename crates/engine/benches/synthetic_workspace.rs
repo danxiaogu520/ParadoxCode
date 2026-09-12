@@ -2,6 +2,7 @@ use std::fs;
 use std::hint::black_box;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use text::AbsPath;
 
 use engine::{AnalysisHost, DocumentId, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
 
@@ -81,7 +82,7 @@ fn main() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        fixture.root.clone(),
+        AbsPath::normalize(&fixture.root),
     )]));
 
     let (initial_scan, report) = measured(|| host.refresh_source_roots().expect("initial scan"));
@@ -111,7 +112,7 @@ fn main() {
         id.clone(),
         1,
         "country_event = { id = synthetic.changed }\n".to_owned(),
-        Some(path),
+        Some(AbsPath::normalize(&path)),
     )
     .expect("stage overlay");
     let initial_overlay = host

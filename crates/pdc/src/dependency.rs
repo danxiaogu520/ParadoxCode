@@ -376,6 +376,7 @@ mod tests {
     use engine::{SourceRoot, SourceRootId, SourceRootKind};
     use game::eu4::{first_party_rules, profile};
     use tempfile::tempdir;
+    use text::AbsPath;
 
     #[test]
     fn parallel_loader_preserves_configuration_order() {
@@ -393,7 +394,7 @@ mod tests {
                 root: SourceRoot::new(
                     SourceRootId::new(index),
                     SourceRootKind::Dependency,
-                    fs::canonicalize(root).expect("canonical dependency root"),
+                    AbsPath::normalize(&fs::canonicalize(root).expect("canonical dependency root")),
                 ),
                 index_path: container.path().join(format!("{name}.pdcindex")),
             });

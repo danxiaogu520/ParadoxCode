@@ -17,6 +17,7 @@
 use super::support::*;
 use crate::{Diagnostic, diagnostics};
 use std::path::PathBuf;
+use text::AbsPath;
 
 fn golden_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/tests/golden")
@@ -175,7 +176,7 @@ fn first_party_host(root: &std::path::Path) -> AnalysisHost {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.to_path_buf(),
+        AbsPath::normalize(root),
     )]));
     host.refresh_source_roots().expect("scan golden root");
     host
@@ -337,7 +338,9 @@ fn golden_lints_degenerate_shapes() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(root.join("events/golden_lint_probe.txt")),
+        Some(AbsPath::normalize(
+            &root.join("events/golden_lint_probe.txt"),
+        )),
     )
     .expect("open golden lint probe");
     assert_golden("lints_degenerate_shapes", text, &analyze_text(&host, &id));
@@ -360,7 +363,7 @@ fn golden_missing_limit_and_empty_block() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(root.join("events/golden_mle.txt")),
+        Some(AbsPath::normalize(&root.join("events/golden_mle.txt"))),
     )
     .expect("open golden mle probe");
     assert_golden(
@@ -382,7 +385,7 @@ fn golden_rule_wrong_scope() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(root.join("events/golden_rws.txt")),
+        Some(AbsPath::normalize(&root.join("events/golden_rws.txt"))),
     )
     .expect("open golden rws probe");
     assert_golden("rule_wrong_scope", text, &analyze_text(&host, &id));
@@ -407,7 +410,7 @@ fn golden_dynamic_cycles() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(effects.join("00_cycles.txt")),
+        Some(AbsPath::normalize(&effects.join("00_cycles.txt"))),
     )
     .expect("open golden cycles");
     assert_golden("dynamic_cycles", text, &analyze_text(&host, &id));
@@ -440,7 +443,7 @@ fn golden_dynamic_scope_contracts() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(effects.join("00_contracts.txt")),
+        Some(AbsPath::normalize(&effects.join("00_contracts.txt"))),
     )
     .expect("open golden contracts");
     assert_golden("dynamic_scope_contracts", text, &analyze_text(&host, &id));
@@ -490,7 +493,9 @@ fn golden_dynamic_call_scope_mismatch() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(events_dir.join("golden_call_sites.txt")),
+        Some(AbsPath::normalize(
+            &events_dir.join("golden_call_sites.txt"),
+        )),
     )
     .expect("open golden call sites");
     assert_golden(
@@ -544,7 +549,7 @@ fn golden_modifier_scope_mismatch() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(events_dir.join("golden_events.txt")),
+        Some(AbsPath::normalize(&events_dir.join("golden_events.txt"))),
     )
     .expect("open golden modifiers");
     assert_golden("modifier_scope_mismatch", text, &analyze_text(&host, &id));
@@ -562,7 +567,7 @@ fn golden_localisation_derived_keys() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(root.join("missions/golden.txt")),
+        Some(AbsPath::normalize(&root.join("missions/golden.txt"))),
     )
     .expect("open golden missions");
     assert_golden("localisation_derived_keys", text, &analyze_text(&host, &id));
@@ -688,7 +693,7 @@ fn golden_mission_trees() {
         focus.clone(),
         1,
         text.to_owned(),
-        Some(missions_dir.join("golden_main.txt")),
+        Some(AbsPath::normalize(&missions_dir.join("golden_main.txt"))),
     )
     .expect("open golden mission file");
     assert_golden("mission_trees", text, &analyze_text(&host, &focus));

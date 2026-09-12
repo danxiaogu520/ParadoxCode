@@ -7,6 +7,7 @@
 
 use std::hint::black_box;
 use std::time::{Duration, Instant};
+use text::AbsPath;
 
 use engine::{AnalysisHost, DocumentId, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
 use ide::{complete, diagnostics, scripted_localisation_names};
@@ -68,7 +69,7 @@ fn main() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     let scan = host.refresh_source_roots().expect("scan fixture");
     let names_cold = timed(|| {
@@ -85,7 +86,7 @@ fn main() {
         document.clone(),
         1,
         text.to_owned(),
-        Some(localisation.join("scripted.yml")),
+        Some(AbsPath::normalize(&localisation.join("scripted.yml"))),
     )
     .expect("open localisation overlay");
     let snapshot = host.snapshot();

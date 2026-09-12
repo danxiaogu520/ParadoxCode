@@ -3,6 +3,7 @@ use crate::{
     Diagnostic, DiagnosticCertainty, DiagnosticProvenance, Severity, quick_fixes_with_cancellation,
     scripted_localisation_names,
 };
+use text::AbsPath;
 
 #[test]
 fn diagnostic_ids_are_pascal_case_and_metadata_is_structured() {
@@ -51,7 +52,7 @@ fn scripted_localisation_names_feed_indexed_diagnostics_and_completion() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots()
         .expect("scan scripted localisation");
@@ -65,7 +66,7 @@ fn scripted_localisation_names_feed_indexed_diagnostics_and_completion() {
         definitions_id.clone(),
         1,
         "defined_text = { name = Overlay.Only text = yes }\n".to_owned(),
-        Some(definitions_path),
+        Some(AbsPath::normalize(&definitions_path)),
     )
     .expect("open scripted localisation overlay");
     assert_eq!(
@@ -87,7 +88,7 @@ fn scripted_localisation_names_feed_indexed_diagnostics_and_completion() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(localisation.join("use.yml")),
+        Some(AbsPath::normalize(&localisation.join("use.yml"))),
     )
     .expect("open localisation use site");
     let snapshot = host.snapshot();
@@ -109,7 +110,7 @@ fn scripted_localisation_names_feed_indexed_diagnostics_and_completion() {
         completion_id.clone(),
         1,
         completion_text.to_owned(),
-        Some(localisation.join("completion.yml")),
+        Some(AbsPath::normalize(&localisation.join("completion.yml"))),
     )
     .expect("open localisation completion");
     let position = u32::try_from(
@@ -262,7 +263,7 @@ fn dynamic_bare_parameter_validates_quoted_effect_payload_at_call_site() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/dynamic-quoted-diagnostic.txt");
@@ -307,7 +308,7 @@ fn quoted_payload_host(
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     (host, root)
@@ -436,7 +437,7 @@ fn affixed_value_host(
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     (host, root)
@@ -496,7 +497,7 @@ fn dynamic_definitions_preserve_literal_quoted_script_through_nested_calls() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/dynamic-nested-quoted.txt");
@@ -541,7 +542,7 @@ fn dynamic_definitions_omit_missing_optional_forwarded_arguments() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/dynamic-forwarded.txt");
@@ -586,7 +587,7 @@ fn runtime_branch_dynamic_accepts_the_amount_only_legitimacy_call() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definition");
     let id = DocumentId::new("file:///tmp/events/legitimacy-branch.txt");
@@ -635,7 +636,7 @@ fn cached_runtime_branch_dynamic_recomputes_optional_parameters_from_the_templat
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     vanilla_host
         .refresh_source_roots()
@@ -672,7 +673,7 @@ fn first_party_mission_trigger_and_effect_accept_quoted_script_forms() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        std::path::PathBuf::from("/tmp"),
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     let id = DocumentId::new("file:///tmp/missions/quoted_mission.txt");
     let text = concat!(
@@ -685,7 +686,9 @@ fn first_party_mission_trigger_and_effect_accept_quoted_script_forms() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(std::path::PathBuf::from("/tmp/missions/quoted_mission.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/missions/quoted_mission.txt",
+        ))),
     )
     .expect("open mission");
 
@@ -1126,7 +1129,7 @@ fn dynamic_calls_validate_required_and_duplicate_parameters() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/dynamic-arguments.txt");
@@ -1174,14 +1177,14 @@ fn dynamic_definition_parameters_do_not_trigger_value_or_key_diagnostics() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root,
+        AbsPath::normalize(&root),
     )]));
     let id = DocumentId::new("file:///tmp/common/scripted_effects/00_placeholders.txt");
     host.open_document(
         id.clone(),
         1,
         "probe = { add_prestige = $PRESTIGE$ $EFFECT$ = yes }\n".to_owned(),
-        Some(definition_path),
+        Some(AbsPath::normalize(&definition_path)),
     )
     .expect("open dynamic definition");
 
@@ -1220,7 +1223,7 @@ fn dynamic_invocation_diagnostics_report_precise_messages() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
@@ -1231,7 +1234,7 @@ fn dynamic_invocation_diagnostics_report_precise_messages() {
         definitions.clone(),
         1,
         definitions_body.to_owned(),
-        Some(effects.join("00_messages.txt")),
+        Some(AbsPath::normalize(&effects.join("00_messages.txt"))),
     )
     .expect("open definitions");
     let definition_results = diagnostics(&host.snapshot(), &definitions);
@@ -1392,7 +1395,7 @@ fn dynamic_rule_call_site_validates_argument_values_and_dispatch_keys() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/expanded.txt");
@@ -1465,7 +1468,7 @@ fn dynamic_rule_dispatch_accepts_known_keys_and_scope_registers() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/dispatch-ok.txt");
@@ -1525,7 +1528,7 @@ fn dynamic_definitions_defer_parameterized_nested_invocations() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let definition_id = DocumentId::new("file:///tmp/common/scripted_effects/00_forward.txt");
@@ -1533,7 +1536,7 @@ fn dynamic_definitions_defer_parameterized_nested_invocations() {
         definition_id.clone(),
         1,
         definitions_source.to_owned(),
-        Some(definition_path),
+        Some(AbsPath::normalize(&definition_path)),
     )
     .expect("open definitions");
 
@@ -1614,7 +1617,7 @@ fn dynamic_missing_required_parameter_is_reported_once() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definition");
     let id = DocumentId::new("file:///tmp/events/required.txt");
@@ -1661,7 +1664,7 @@ fn all_optional_dynamic_definition_accepts_scalar_invocation() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definition");
     let id = DocumentId::new("file:///tmp/events/optional.txt");
@@ -1708,7 +1711,7 @@ fn special_unit_type_keys_spawn_units_in_province_scope() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan mod");
     let id = DocumentId::new("file:///tmp/events/special-units.txt");
@@ -1749,7 +1752,7 @@ fn dynamic_rule_arguments_reject_block_bindings_and_use_last_duplicate_scalar() 
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definition");
     let id = DocumentId::new("file:///tmp/events/bindings.txt");
@@ -1814,7 +1817,7 @@ fn dynamic_definitions_activate_conditionals_and_report_cycles() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/cycle.txt");
@@ -1920,7 +1923,7 @@ fn deeply_nested_dynamic_rule_chains_validate_without_expansion_budgets() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/depth.txt");
@@ -1986,7 +1989,7 @@ fn empty_dynamic_calls_map_required_cardinality_to_the_call() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definition");
     let id = DocumentId::new("file:///tmp/events/empty-dynamic.txt");
@@ -2037,7 +2040,7 @@ fn vanilla_cache_only_dynamic_row_records_unknown_body_statement() {
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     vanilla_host
         .refresh_source_roots()
@@ -2098,7 +2101,7 @@ fn vanilla_cache_only_dynamic_validates_quoted_payload_at_exact_call_site_range(
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        vanilla.clone(),
+        AbsPath::normalize(&vanilla),
     )]));
     vanilla_host.refresh_source_roots().expect("scan Vanilla");
     let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
@@ -2142,14 +2145,16 @@ fn required_type_localisation_keys_report_missing_derived_keys() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        std::path::PathBuf::from("/tmp"),
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     let id = DocumentId::new("file:///tmp/missions/test.txt");
     host.open_document(
         id.clone(),
         1,
         "series = { mission_one = { potential = { always = yes } } }\n".to_owned(),
-        Some(std::path::PathBuf::from("/tmp/missions/test.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/missions/test.txt",
+        ))),
     )
     .expect("open mission");
 
@@ -2176,16 +2181,16 @@ fn ancestor_personality_localisation_uses_vanilla_key_templates() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        std::path::PathBuf::from("/tmp"),
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     host.open_document(
         DocumentId::new("file:///tmp/localisation/ancestor_l_english.yml"),
         1,
         "l_english:\n ancestor_test_personality:0 \"Test\"\n desc_ancestor_test_personality:0 \"Description\"\n"
             .to_owned(),
-        Some(std::path::PathBuf::from(
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/localisation/ancestor_l_english.yml",
-        )),
+        ))),
     )
     .expect("open localisation");
     let id = DocumentId::new("file:///tmp/common/ancestor_personalities/test.txt");
@@ -2193,9 +2198,9 @@ fn ancestor_personality_localisation_uses_vanilla_key_templates() {
         id.clone(),
         1,
         "ancestor_test_personality = { global_tax_modifier = 0.1 }\n".to_owned(),
-        Some(std::path::PathBuf::from(
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/common/ancestor_personalities/test.txt",
-        )),
+        ))),
     )
     .expect("open ancestor personality");
 
@@ -2214,7 +2219,7 @@ fn mission_metadata_fields_do_not_derive_localisation_keys() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        std::path::PathBuf::from("/tmp"),
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     let id = DocumentId::new("file:///tmp/missions/metadata.txt");
     host.open_document(
@@ -2222,7 +2227,7 @@ fn mission_metadata_fields_do_not_derive_localisation_keys() {
         1,
         "series = { slot = 1 generic = no ai = yes has_country_shield = yes mission_one = { potential = { always = yes } } }\n"
             .to_owned(),
-        Some(std::path::PathBuf::from("/tmp/missions/metadata.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from("/tmp/missions/metadata.txt"))),
     )
     .expect("open mission");
 
@@ -2269,18 +2274,18 @@ fn localisation_symbols_prefer_the_english_definition_across_languages() {
         DocumentId::new("file:///tmp/localisation/l_english/test_l_english.yml"),
         1,
         "l_english:\n shared_key: \"English\"\n".to_owned(),
-        Some(std::path::PathBuf::from(
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/localisation/l_english/test_l_english.yml",
-        )),
+        ))),
     )
     .expect("open english localisation");
     host.open_document(
         DocumentId::new("file:///tmp/localisation/l_french/test_l_french.yml"),
         1,
         "l_french:\n shared_key: \"Français\"\n".to_owned(),
-        Some(std::path::PathBuf::from(
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/localisation/l_french/test_l_french.yml",
-        )),
+        ))),
     )
     .expect("open french localisation");
     let script = DocumentId::new("file:///tmp/events/test.txt");
@@ -2289,7 +2294,9 @@ fn localisation_symbols_prefer_the_english_definition_across_languages() {
         1,
         "country_event = { id = a.1 option = { name = option_a custom_tooltip = shared_key } }\n"
             .to_owned(),
-        Some(std::path::PathBuf::from("/tmp/events/test.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/events/test.txt",
+        ))),
     )
     .expect("open script");
 
@@ -2317,9 +2324,9 @@ fn duplicate_localisation_keys_do_not_produce_ambiguous_diagnostics() {
             DocumentId::new(format!("file:///tmp/localisation/{name}")),
             1,
             text.to_owned(),
-            Some(std::path::PathBuf::from(format!(
+            Some(AbsPath::normalize(&std::path::PathBuf::from(format!(
                 "/tmp/localisation/{name}"
-            ))),
+            )))),
         )
         .expect("open localisation");
     }
@@ -2328,7 +2335,9 @@ fn duplicate_localisation_keys_do_not_produce_ambiguous_diagnostics() {
         script.clone(),
         1,
         "country_event = { id = a.1 option = { name = shared_key } }\n".to_owned(),
-        Some(std::path::PathBuf::from("/tmp/events/test.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/events/test.txt",
+        ))),
     )
     .expect("open script");
 
@@ -2348,14 +2357,14 @@ fn game_age_ability_definitions_are_collected_only_below_abilities() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        std::path::PathBuf::from("/tmp"),
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     let id = DocumentId::new("file:///tmp/common/ages/test.txt");
     host.open_document(
         id.clone(),
         1,
         "age_one = { can_start = { always = yes } abilities = { ab_one = { modifier = { global_tax_modifier = 0.1 } } } }\n".to_owned(),
-        Some(std::path::PathBuf::from("/tmp/common/ages/test.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from("/tmp/common/ages/test.txt"))),
     )
     .expect("open age source");
 
@@ -2380,7 +2389,7 @@ fn custom_government_attributes_remain_open_world() {
         1,
         "country_event = { id = a.1 trigger = { has_government_attribute = my_custom_attribute } }\n"
             .to_owned(),
-        Some(std::path::PathBuf::from("/tmp/events/test.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from("/tmp/events/test.txt"))),
     )
     .expect("open event");
 
@@ -2469,7 +2478,7 @@ fn parameterized_flag_writes_admit_their_expansions() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/flag-patterns.txt");
@@ -2510,7 +2519,7 @@ fn embedded_flag_templates_do_not_constrain_the_argument() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/embedded-flag.txt");
@@ -2551,7 +2560,7 @@ fn dispatch_keys_inside_limits_validate_in_the_trigger_context() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/limit-dispatch.txt");
@@ -2602,7 +2611,7 @@ fn tooltip_blocks_do_not_dispatch_validate() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/tooltip-dispatch.txt");
@@ -2645,7 +2654,7 @@ fn value_keyed_branch_containers_do_not_dispatch_validate() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/branch-dispatch.txt");
@@ -2685,7 +2694,7 @@ fn embedded_modifier_templates_do_not_constrain_the_argument() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/embedded-modifier.txt");
@@ -2803,7 +2812,7 @@ fn vanilla_dynamic_names_empty_event_lists_and_inherited_contexts_are_valid() {
             id.clone(),
             1,
             text.to_owned(),
-            Some(std::path::PathBuf::from(path)),
+            Some(AbsPath::normalize(&std::path::PathBuf::from(path))),
         )
         .expect("open Vanilla-shaped fixture");
         let results = diagnostics(&host.snapshot(), &id);
@@ -2852,7 +2861,7 @@ fn vanilla_dates_filtered_sprite_roots_and_runtime_tags_do_not_false_positive() 
             id.clone(),
             1,
             text.to_owned(),
-            Some(std::path::PathBuf::from(path)),
+            Some(AbsPath::normalize(&std::path::PathBuf::from(path))),
         )
         .expect("open Vanilla-shaped fixture");
         let results = diagnostics(&host.snapshot(), &id);
@@ -2892,7 +2901,7 @@ fn template_modifier_families_resolve_workspace_estates_and_powers() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots()
         .expect("scan estates and mechanic powers");
@@ -2965,7 +2974,7 @@ fn nested_government_mechanic_powers_feed_dynamic_value_validation() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan mechanic power");
     let id = DocumentId::new("file:///tmp/events/government-power.txt");
@@ -3012,7 +3021,7 @@ fn exported_modifier_keys_are_numeric_modifier_rules() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        std::path::PathBuf::from("/tmp"),
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     let id = DocumentId::new("file:///tmp/common/advisortypes/test.txt");
     host.open_document(
@@ -3020,9 +3029,9 @@ fn exported_modifier_keys_are_numeric_modifier_rules() {
         1,
         "philosopher = { monarch_power = ADM prestige = 1 modifier = { meritocracy = 1 monthly_russian_modernization = 0.02 } }\n"
             .to_owned(),
-        Some(std::path::PathBuf::from(
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/common/advisortypes/test.txt",
-        )),
+        ))),
     )
     .expect("open advisor type");
 
@@ -3066,7 +3075,7 @@ fn vanilla_powerprojection_file_and_static_modifier_blocks_validate() {
             id.clone(),
             1,
             text.to_owned(),
-            Some(std::path::PathBuf::from(path)),
+            Some(AbsPath::normalize(&std::path::PathBuf::from(path))),
         )
         .expect("open Vanilla-shaped fixture");
         let results = diagnostics(&host.snapshot(), &id);
@@ -3106,7 +3115,7 @@ fn severity_review_quoted_names_and_non_instance_scalars_are_not_localisation() 
             id.clone(),
             1,
             text.to_owned(),
-            Some(std::path::PathBuf::from(path)),
+            Some(AbsPath::normalize(&std::path::PathBuf::from(path))),
         )
         .expect("open Vanilla-shaped fixture");
         let results = diagnostics(&host.snapshot(), &id);
@@ -3132,7 +3141,7 @@ fn severity_review_unknown_keys_are_errors_and_known_keys_are_accepted() {
         1,
         "grasslands = { type = grasslands color = { 0 1 2 } }\ncompletely_wrong_key = { type = grasslands }\n"
             .to_owned(),
-        Some(std::path::PathBuf::from("/tmp/map/terrain.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from("/tmp/map/terrain.txt"))),
     )
     .expect("open terrain");
     let terrain_results = diagnostics(&host.snapshot(), &id);
@@ -3149,7 +3158,9 @@ fn severity_review_unknown_keys_are_errors_and_known_keys_are_accepted() {
         technology.clone(),
         1,
         "groups = { adm = { adm_tech = \"technologies/adm.txt\" totally_wrong = 1 } }\n".to_owned(),
-        Some(std::path::PathBuf::from("/tmp/common/technology.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/common/technology.txt",
+        ))),
     )
     .expect("open technology");
     let technology_results = diagnostics(&host.snapshot(), &technology);
@@ -3184,9 +3195,9 @@ fn severity_review_fallback_unknown_keys_and_unknown_bare_values_are_errors() {
         unknown_key.clone(),
         1,
         "natives_test = { definitely_wrong = yes }\n".to_owned(),
-        Some(std::path::PathBuf::from(
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/common/natives/unknown-key.txt",
-        )),
+        ))),
     )
     .expect("open fallback-context key fixture");
     let key_diagnostics = diagnostics(&host.snapshot(), &unknown_key);
@@ -3206,9 +3217,9 @@ fn severity_review_fallback_unknown_keys_and_unknown_bare_values_are_errors() {
         unknown_bare.clone(),
         1,
         "natives_test = { color = { not_a_color_component } }\n".to_owned(),
-        Some(std::path::PathBuf::from(
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/common/natives/unknown-bare.txt",
-        )),
+        ))),
     )
     .expect("open unknown bare value fixture");
     let bare_diagnostics = diagnostics(&host.snapshot(), &unknown_bare);
@@ -3231,9 +3242,9 @@ fn severity_review_incident_options_keep_trigger_wrappers() {
         1,
         "incident_test = {\n\tevent = test.1\n\tdefault_option = 0\n\toption = {\n\t\tOR = {\n\t\t\tNOT = { emperor = { is_rival = TEU } }\n\t\t}\n\t}\n}\n"
             .to_owned(),
-        Some(std::path::PathBuf::from(
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/common/imperial_incidents/00_test.txt",
-        )),
+        ))),
     )
     .expect("open incident");
     let results = diagnostics(&host.snapshot(), &id);
@@ -3254,7 +3265,9 @@ fn severity_review_color_overflow_is_a_warning_and_missing_ruler_an_error() {
         natives.clone(),
         1,
         "natives_test = { graphical_culture = inuitgfx color = { 0 255 400 } }\n".to_owned(),
-        Some(std::path::PathBuf::from("/tmp/common/natives/00_test.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/common/natives/00_test.txt",
+        ))),
     )
     .expect("open natives");
     let natives_results = diagnostics(&host.snapshot(), &natives);
@@ -3271,7 +3284,9 @@ fn severity_review_color_overflow_is_a_warning_and_missing_ruler_an_error() {
         event.clone(),
         1,
         "country_event = { immediate = { set_ruler = bloody_mary } }\n".to_owned(),
-        Some(std::path::PathBuf::from("/tmp/events/ruler-missing.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/events/ruler-missing.txt",
+        ))),
     )
     .expect("open event");
     let event_results = diagnostics(&host.snapshot(), &event);
@@ -3478,7 +3493,7 @@ fn common_alerts_and_units_display_use_path_specific_semantics() {
         1,
         "sound = { HIGH = new_alert MEDIUM = new_alert LOW = new_alert }\nicon = { HIGH = GFX_alerticon_banner }\nalerts = { alert_bankrupt = { category = HIGH } }\n"
             .to_owned(),
-        Some(std::path::PathBuf::from("/tmp/common/alerts.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from("/tmp/common/alerts.txt"))),
     )
     .expect("open alerts");
 
@@ -3487,9 +3502,9 @@ fn common_alerts_and_units_display_use_path_specific_semantics() {
         tags.clone(),
         1,
         "SPA = \"countries/Spain.txt\"\nCAS = \"countries/Castile.txt\"\n".to_owned(),
-        Some(std::path::PathBuf::from(
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/common/country_tags/test.txt",
-        )),
+        ))),
     )
     .expect("open country tags");
     let alert_diagnostics = diagnostics(&host.snapshot(), &alerts);
@@ -3508,9 +3523,9 @@ fn common_alerts_and_units_display_use_path_specific_semantics() {
         units.clone(),
         1,
         "cavalry = { factor = 1 modifier = { factor = 3 OR = { always = yes } } modifier = { factor = 2 has_country_flag = MUG_more_chance_for_elephants_flag } }\n".to_owned(),
-        Some(std::path::PathBuf::from(
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/common/units_display/test.txt",
-        )),
+        ))),
     )
     .expect("open units display");
     let unit_diagnostics = diagnostics(&host.snapshot(), &units);
@@ -3529,7 +3544,9 @@ fn common_alerts_and_units_display_use_path_specific_semantics() {
         lucky.clone(),
         1,
         "CAS = { NOT = { exists = SPA } is_year = 1700 }\n".to_owned(),
-        Some(std::path::PathBuf::from("/tmp/common/historial_lucky.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/common/historial_lucky.txt",
+        ))),
     )
     .expect("open historial lucky");
     let lucky_diagnostics = diagnostics(&host.snapshot(), &lucky);
@@ -3560,7 +3577,9 @@ fn lucky_country_blocks_accept_scalar_triggers() {
         lucky.clone(),
         1,
         "CAS = { always = yes }\nBUR = { is_year = 1700 always = no }\n".to_owned(),
-        Some(std::path::PathBuf::from("/tmp/common/historial_lucky.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/common/historial_lucky.txt",
+        ))),
     )
     .expect("open historial lucky");
     let lucky_diagnostics = diagnostics(&host.snapshot(), &lucky);
@@ -3576,7 +3595,7 @@ fn imperial_incident_entries_keep_their_structured_body_context() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        std::path::PathBuf::from("/tmp"),
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     let id = DocumentId::new("file:///tmp/common/imperial_incidents/00_test.txt");
     host.open_document(
@@ -3595,9 +3614,9 @@ fn imperial_incident_entries_keep_their_structured_body_context() {
             "}\n",
         )
         .to_owned(),
-        Some(std::path::PathBuf::from(
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/common/imperial_incidents/00_test.txt",
-        )),
+        ))),
     )
     .expect("open imperial incident");
     let results = diagnostics(&host.snapshot(), &id);
@@ -3617,7 +3636,7 @@ fn type_per_file_rules_validate_the_document_root_once() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        std::path::PathBuf::from("/tmp"),
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     let id = DocumentId::new("file:///tmp/common/countries/Test.txt");
     host.open_document(
@@ -3625,7 +3644,7 @@ fn type_per_file_rules_validate_the_document_root_once() {
         1,
         "graphical_culture = westerngfx\ncolor = { 20 50 210 }\nleader_names = { Blittersdorf \"von Gelnhausen\" }\n"
             .to_owned(),
-        Some(std::path::PathBuf::from("/tmp/common/countries/Test.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from("/tmp/common/countries/Test.txt"))),
     )
     .expect("open country file");
 
@@ -3684,7 +3703,7 @@ fn evicted_frontend_diagnostics_match_retained() {
         engine::SourceRoot::new(
             engine::SourceRootId::new(0),
             engine::SourceRootKind::CurrentMod,
-            root,
+            AbsPath::normalize(&root),
         ),
     ]));
     host.refresh_source_roots().unwrap();
@@ -3728,7 +3747,7 @@ fn logic_container_lints_fire_on_degenerate_shapes() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        std::path::PathBuf::from("/tmp"),
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     let id = DocumentId::new("file:///tmp/events/lint_probe.txt");
     host.open_document(
@@ -3756,7 +3775,7 @@ fn logic_container_lints_fire_on_degenerate_shapes() {
             "country_event = { id = lint.2 trigger = { add_prestige = 1 } option = { name = lint.2.a } }\n",
         )
         .to_owned(),
-        Some(std::path::PathBuf::from("/tmp/events/lint_probe.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from("/tmp/events/lint_probe.txt"))),
     )
     .expect("open lint probe");
     let all = diagnostics(&host.snapshot(), &id);
@@ -3851,7 +3870,7 @@ fn dynamic_cycles_are_reported_at_definition_sites() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
@@ -3870,7 +3889,7 @@ fn dynamic_cycles_are_reported_at_definition_sites() {
         definitions.clone(),
         1,
         definition_text.clone(),
-        Some(effects.join("00_cycles.txt")),
+        Some(AbsPath::normalize(&effects.join("00_cycles.txt"))),
     )
     .expect("open definitions");
     let all = diagnostics(&host.snapshot(), &definitions);
@@ -3932,7 +3951,9 @@ fn dynamic_cycles_are_reported_at_definition_sites() {
         event.clone(),
         1,
         "country_event = { id = cycle.1 immediate = { ping = yes } }\n".to_owned(),
-        Some(std::path::PathBuf::from("/tmp/events/cycle_call.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/events/cycle_call.txt",
+        ))),
     )
     .expect("open call site");
     let event_diagnostics = diagnostics(&host.snapshot(), &event);
@@ -3988,7 +4009,7 @@ fn dynamic_scope_contracts_infer_and_reject_empty_intersections() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
@@ -3997,7 +4018,7 @@ fn dynamic_scope_contracts_infer_and_reject_empty_intersections() {
         definitions.clone(),
         1,
         body.to_owned(),
-        Some(effects.join("00_contracts.txt")),
+        Some(AbsPath::normalize(&effects.join("00_contracts.txt"))),
     )
     .expect("open definitions");
     let snapshot = host.snapshot();
@@ -4144,7 +4165,7 @@ fn modifier_scope_mismatch_reports_cross_scope_modifier_applications() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
@@ -4155,7 +4176,7 @@ fn modifier_scope_mismatch_reports_cross_scope_modifier_applications() {
         document.clone(),
         1,
         events.to_owned(),
-        Some(events_dir.join("test_events.txt")),
+        Some(AbsPath::normalize(&events_dir.join("test_events.txt"))),
     )
     .expect("open events");
     let snapshot = host.snapshot();
@@ -4301,7 +4322,7 @@ fn dynamic_call_sites_are_validated_against_entry_contracts() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
@@ -4310,7 +4331,7 @@ fn dynamic_call_sites_are_validated_against_entry_contracts() {
         document.clone(),
         1,
         events.to_owned(),
-        Some(events_dir.join("call_sites.txt")),
+        Some(AbsPath::normalize(&events_dir.join("call_sites.txt"))),
     )
     .expect("open events");
     let snapshot = host.snapshot();
@@ -4378,7 +4399,7 @@ fn overlay_without_physical_path_routes_dynamic_definition_directories() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan");
 
@@ -4808,7 +4829,7 @@ fn luck_test_host(nonce: u128) -> AnalysisHost {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan country tags");
     host
@@ -4828,7 +4849,7 @@ fn luck_entries_validate_their_country_tag_keys() {
         id.clone(),
         1,
         text.clone(),
-        Some(std::path::PathBuf::from(path)),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(path))),
     )
     .expect("open luck");
     let diags = diagnostics(&host.snapshot(), &id);
@@ -4862,7 +4883,7 @@ fn continent_and_superregion_entries_accept_arbitrary_definition_names() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        std::path::PathBuf::from("/tmp"),
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
 
     // `map/continent.txt` and `map/superregion.txt` describe entry bodies through
@@ -4873,7 +4894,9 @@ fn continent_and_superregion_entries_accept_arbitrary_definition_names() {
         continent.clone(),
         1,
         "europe = {\n\t130 131\n}\ncustom_continent = {\n\t200\n}\n".to_owned(),
-        Some(std::path::PathBuf::from("/tmp/map/continent.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/map/continent.txt",
+        ))),
     )
     .expect("open continent");
     let superregion = DocumentId::new("file:///tmp/map/superregion.txt");
@@ -4881,7 +4904,9 @@ fn continent_and_superregion_entries_accept_arbitrary_definition_names() {
         superregion.clone(),
         1,
         "india_superregion = { india_region east_indies_region }\n".to_owned(),
-        Some(std::path::PathBuf::from("/tmp/map/superregion.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/map/superregion.txt",
+        ))),
     )
     .expect("open superregion");
     let snapshot = host.snapshot();
@@ -4910,7 +4935,7 @@ fn government_ranks_entries_require_integer_keys() {
         id.clone(),
         1,
         text.clone(),
-        Some(std::path::PathBuf::from(path)),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(path))),
     )
     .expect("open government ranks");
     let diags = diagnostics(&host.snapshot(), &id);

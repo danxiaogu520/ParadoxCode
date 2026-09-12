@@ -4,6 +4,7 @@ use crate::{
     semantic_tokens_in_range_with_cancellation,
 };
 use engine::DocumentId;
+use text::AbsPath;
 use text::TextRange;
 
 type Spelling = (String, SemanticTokenType, bool);
@@ -79,7 +80,7 @@ fn indexed_dynamic_definition_names_use_the_function_token_color() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots()
         .expect("index dynamic definitions");

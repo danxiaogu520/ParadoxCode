@@ -1,4 +1,5 @@
 use super::support::*;
+use text::AbsPath;
 
 #[test]
 fn symbol_hover_does_not_materialize_the_full_workspace() {
@@ -73,14 +74,14 @@ fn symbol_hover_explains_active_and_shadowed_source_roots() {
         SourceRoot {
             id: SourceRootId::new(1),
             kind: SourceRootKind::Vanilla,
-            path: vanilla,
+            path: AbsPath::normalize(&vanilla),
             order: 0,
             writable: false,
         },
         SourceRoot {
             id: SourceRootId::new(2),
             kind: SourceRootKind::CurrentMod,
-            path: current,
+            path: AbsPath::normalize(&current),
             order: 0,
             writable: true,
         },
@@ -147,7 +148,9 @@ fn decision_hover_skips_type_instance_wrapper() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(PathBuf::from("common/decisions/hover.txt")),
+        Some(AbsPath::normalize(&PathBuf::from(
+            "common/decisions/hover.txt",
+        ))),
     )
     .expect("open decision document");
     let position =
@@ -411,7 +414,7 @@ fn hover_prefers_nonempty_localisation_preview_over_empty_sibling() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        std::path::PathBuf::from("/tmp"),
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     let localisation = DocumentId::new("file:///tmp/localisation/test.yml");
     host.open_document(
@@ -419,7 +422,9 @@ fn hover_prefers_nonempty_localisation_preview_over_empty_sibling() {
         1,
         "l_english:\nmission_one_title:0 \"Mission One Title\"\nmission_one_desc:0 \"\"\n"
             .to_owned(),
-        Some(std::path::PathBuf::from("/tmp/localisation/test.yml")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/localisation/test.yml",
+        ))),
     )
     .expect("open localisation");
     let mission = DocumentId::new("file:///tmp/missions/test.txt");
@@ -428,7 +433,9 @@ fn hover_prefers_nonempty_localisation_preview_over_empty_sibling() {
         mission.clone(),
         1,
         source.to_owned(),
-        Some(std::path::PathBuf::from("/tmp/missions/test.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/missions/test.txt",
+        ))),
     )
     .expect("open mission");
 
@@ -453,18 +460,18 @@ fn localisation_values_by_key_resolve_english_preferred_titles() {
         1,
         "l_english:\nmission_one_title:0 \"Mission One Title\"\nmission_two_title:0 \"\"\n"
             .to_owned(),
-        Some(std::path::PathBuf::from(
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/localisation/l_english/test_l_english.yml",
-        )),
+        ))),
     )
     .expect("open english localisation");
     host.open_document(
         DocumentId::new("file:///tmp/localisation/l_french/test_l_french.yml"),
         1,
         "l_french:\nmission_one_title:0 \"Titre Mission Un\"\n".to_owned(),
-        Some(std::path::PathBuf::from(
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/localisation/l_french/test_l_french.yml",
-        )),
+        ))),
     )
     .expect("open french localisation");
 
@@ -518,7 +525,7 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        vanilla,
+        AbsPath::normalize(&vanilla),
     )]));
     vanilla_host.refresh_source_roots().expect("scan Vanilla");
     let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build Vanilla cache");
@@ -527,7 +534,7 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        current.clone(),
+        AbsPath::normalize(&current),
     )]));
     host.install_index_cache(cache)
         .expect("install Vanilla cache");
@@ -579,7 +586,7 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
     french_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        current,
+        AbsPath::normalize(&current),
     )]));
     french_host.set_preferred_localisation_languages(vec!["french".to_owned()]);
     french_host
@@ -664,21 +671,21 @@ fn localisation_values_by_key_apply_the_layer_then_read_order_total_order() {
         SourceRoot {
             id: SourceRootId::new(1),
             kind: SourceRootKind::Vanilla,
-            path: vanilla,
+            path: AbsPath::normalize(&vanilla),
             order: 0,
             writable: false,
         },
         SourceRoot {
             id: SourceRootId::new(2),
             kind: SourceRootKind::Dependency,
-            path: dependency,
+            path: AbsPath::normalize(&dependency),
             order: 1,
             writable: false,
         },
         SourceRoot {
             id: SourceRootId::new(3),
             kind: SourceRootKind::CurrentMod,
-            path: current,
+            path: AbsPath::normalize(&current),
             order: 2,
             writable: true,
         },
@@ -719,14 +726,16 @@ fn custom_tooltip_hover_shows_localisation_preview_inside_mission_effects() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        std::path::PathBuf::from("/tmp"),
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     let localisation = DocumentId::new("file:///tmp/localisation/test.yml");
     host.open_document(
         localisation.clone(),
         1,
         "l_english:\nEDG_TEST_TT:0 \"My tooltip text\"\n".to_owned(),
-        Some(std::path::PathBuf::from("/tmp/localisation/test.yml")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/localisation/test.yml",
+        ))),
     )
     .expect("open localisation");
     let mission = DocumentId::new("file:///tmp/missions/test.txt");
@@ -735,7 +744,9 @@ fn custom_tooltip_hover_shows_localisation_preview_inside_mission_effects() {
         mission.clone(),
         1,
         source.to_owned(),
-        Some(std::path::PathBuf::from("/tmp/missions/test.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/missions/test.txt",
+        ))),
     )
     .expect("open mission");
 
@@ -757,14 +768,16 @@ fn typed_symbol_hover_shows_definition_localisation_preview() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        std::path::PathBuf::from("/tmp"),
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     let localisation = DocumentId::new("file:///tmp/localisation/test.yml");
     host.open_document(
         localisation,
         1,
         "l_english:\nevent_title:0 \"Event Title\"\n".to_owned(),
-        Some(std::path::PathBuf::from("/tmp/localisation/test.yml")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/localisation/test.yml",
+        ))),
     )
     .expect("open localisation");
     let event = DocumentId::new("file:///tmp/events/test.txt");
@@ -773,7 +786,9 @@ fn typed_symbol_hover_shows_definition_localisation_preview() {
         event.clone(),
         1,
         text.to_owned(),
-        Some(std::path::PathBuf::from("/tmp/events/test.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/events/test.txt",
+        ))),
     )
     .expect("open event");
     let use_id = DocumentId::new("file:///tmp/events/use.txt");
@@ -782,7 +797,9 @@ fn typed_symbol_hover_shows_definition_localisation_preview() {
         use_id.clone(),
         1,
         use_text.to_owned(),
-        Some(std::path::PathBuf::from("/tmp/events/use.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/events/use.txt",
+        ))),
     )
     .expect("open event use");
     let position =
@@ -803,13 +820,15 @@ fn optional_type_localisation_hover_shows_existing_preview() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        std::path::PathBuf::from("/tmp"),
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     host.open_document(
         DocumentId::new("file:///tmp/localisation/test.yml"),
         1,
         "l_english:\nregion_one:0 \"Region One\"\n".to_owned(),
-        Some(std::path::PathBuf::from("/tmp/localisation/test.yml")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/localisation/test.yml",
+        ))),
     )
     .expect("open localisation");
     let definition = DocumentId::new("file:///tmp/common/colonial_regions/test.txt");
@@ -818,9 +837,9 @@ fn optional_type_localisation_hover_shows_existing_preview() {
         definition.clone(),
         1,
         source.to_owned(),
-        Some(std::path::PathBuf::from(
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/common/colonial_regions/test.txt",
-        )),
+        ))),
     )
     .expect("open colonial region");
     let position =
@@ -841,13 +860,15 @@ fn same_name_type_localisation_hover_shows_existing_preview() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        std::path::PathBuf::from("/tmp"),
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     host.open_document(
         DocumentId::new("file:///tmp/localisation/test.yml"),
         1,
         "l_english:\neurope:0 \"Europe\"\n".to_owned(),
-        Some(std::path::PathBuf::from("/tmp/localisation/test.yml")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/localisation/test.yml",
+        ))),
     )
     .expect("open localisation");
     let definition = DocumentId::new("file:///tmp/map/continent.txt");
@@ -856,7 +877,9 @@ fn same_name_type_localisation_hover_shows_existing_preview() {
         definition.clone(),
         1,
         source.to_owned(),
-        Some(std::path::PathBuf::from("/tmp/map/continent.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/map/continent.txt",
+        ))),
     )
     .expect("open continent");
     let position =
@@ -909,7 +932,7 @@ fn cache_only_optional_type_hover_shows_existing_preview() {
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        vanilla.clone(),
+        AbsPath::normalize(&vanilla),
     )]));
     vanilla_host
         .refresh_source_roots()
@@ -920,7 +943,7 @@ fn cache_only_optional_type_hover_shows_existing_preview() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        current.clone(),
+        AbsPath::normalize(&current),
     )]));
     host.install_index_cache(cache)
         .expect("install Vanilla cache");
@@ -930,7 +953,7 @@ fn cache_only_optional_type_hover_shows_existing_preview() {
         document.clone(),
         1,
         text.to_owned(),
-        Some(current.join("events/use.txt")),
+        Some(AbsPath::normalize(&current.join("events/use.txt"))),
     )
     .expect("open use");
     let position =
@@ -967,7 +990,7 @@ fn vanilla_cache_localisation_hover_shows_derived_text_without_source_state() {
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        vanilla.clone(),
+        AbsPath::normalize(&vanilla),
     )]));
     vanilla_host
         .refresh_source_roots()
@@ -983,7 +1006,7 @@ fn vanilla_cache_localisation_hover_shows_derived_text_without_source_state() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        current.clone(),
+        AbsPath::normalize(&current),
     )]));
     host.install_index_cache(cache)
         .expect("install Vanilla cache");
@@ -993,7 +1016,7 @@ fn vanilla_cache_localisation_hover_shows_derived_text_without_source_state() {
         document.clone(),
         1,
         text.to_owned(),
-        Some(current.join("events/hover.txt")),
+        Some(AbsPath::normalize(&current.join("events/hover.txt"))),
     )
     .expect("open current script");
     let position =
@@ -1029,7 +1052,7 @@ fn dynamic_parameter_hovers_and_payload_arguments_are_diagnosable() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
@@ -1039,7 +1062,7 @@ fn dynamic_parameter_hovers_and_payload_arguments_are_diagnosable() {
         definitions.clone(),
         1,
         definitions_body.to_owned(),
-        Some(effects.join("00_hover.txt")),
+        Some(AbsPath::normalize(&effects.join("00_hover.txt"))),
     )
     .expect("open definitions");
     let definition_hover_position =
@@ -1125,7 +1148,7 @@ fn affixed_value_parameter_hover_names_the_render_and_expected_domain() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
@@ -1134,7 +1157,7 @@ fn affixed_value_parameter_hover_names_the_render_and_expected_domain() {
         definitions.clone(),
         1,
         definitions_body.to_owned(),
-        Some(effects.join("00_affixed.txt")),
+        Some(AbsPath::normalize(&effects.join("00_affixed.txt"))),
     )
     .expect("open definitions");
     let position = u32::try_from(definitions_body.find("$RT$").expect("parameter reference") + 1)
@@ -1174,7 +1197,7 @@ fn dynamic_parameter_hover_replays_bindings_aware_sites() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
@@ -1183,7 +1206,7 @@ fn dynamic_parameter_hover_replays_bindings_aware_sites() {
         definitions.clone(),
         1,
         definitions_body.to_owned(),
-        Some(effects.join("00_replay.txt")),
+        Some(AbsPath::normalize(&effects.join("00_replay.txt"))),
     )
     .expect("open definitions");
 
@@ -1310,7 +1333,7 @@ fn event_hover_falls_back_to_the_generated_title_key() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
@@ -1319,7 +1342,7 @@ fn event_hover_falls_back_to_the_generated_title_key() {
         id.clone(),
         1,
         "country_event = { id = plain.1 immediate = { } }\n".to_owned(),
-        Some(events.join("hover_events.txt")),
+        Some(AbsPath::normalize(&events.join("hover_events.txt"))),
     )
     .expect("open event");
     let text = "country_event = { id = plain.1 immediate = { } }\n";
@@ -1436,7 +1459,7 @@ fn semantic_hover_infers_modifier_kind_from_workspace_membership() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan modifier root");
     let id = DocumentId::new("file:///tmp/events/edg_events.txt");
@@ -1444,7 +1467,7 @@ fn semantic_hover_infers_modifier_kind_from_workspace_membership() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(PathBuf::from("events/edg_events.txt")),
+        Some(AbsPath::normalize(&PathBuf::from("events/edg_events.txt"))),
     )
     .expect("open event document");
     let snapshot = host.snapshot();

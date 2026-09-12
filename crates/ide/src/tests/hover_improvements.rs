@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use text::AbsPath;
 
 use super::support::*;
 
@@ -104,7 +105,7 @@ fn template_modifier_keys_report_their_rule_family_hint() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan estates");
     let hint =

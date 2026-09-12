@@ -3,11 +3,12 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use rules::{GameProfile, RuleSet};
 use sha2::{Digest, Sha256};
+use text::AbsPath;
 
 use crate::{
     AnalysisSnapshot, SourceFile, SourceFileId, SourceRoot, SourceRootKind, WorkspaceScanToken,
@@ -363,7 +364,7 @@ pub enum IndexCacheError {
     /// Cache and selected game profile identities differ.
     GameMismatch { expected: String, actual: String },
     /// The cached root conflicts with a configured source root.
-    RootConflict { root: PathBuf, configured: PathBuf },
+    RootConflict { root: AbsPath, configured: AbsPath },
     /// The cache was built with a different rules hash; a full reindex is required.
     RuleHashMismatch { cached: String, active: String },
 }
@@ -397,8 +398,8 @@ impl fmt::Display for IndexCacheError {
             Self::RootConflict { root, configured } => write!(
                 formatter,
                 "index cache root {} overlaps configured source root {}",
-                root.display(),
-                configured.display()
+                root.as_path().display(),
+                configured.as_path().display()
             ),
             Self::RuleHashMismatch { cached, active } => write!(
                 formatter,

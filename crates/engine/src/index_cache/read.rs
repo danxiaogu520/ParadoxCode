@@ -6,7 +6,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
-use text::{LogicalPath, PositionRange, TextRange};
+use text::{AbsPath, LogicalPath, PositionRange, TextRange};
 
 use crate::{SourceFile, SourceFileId, SourceRoot, SourceRootId, WorkspaceScanToken};
 use hir::DefinitionAttributes;
@@ -17,9 +17,7 @@ use index::{
 use vfs::LocalisationPreview;
 use vfs::scan::stable_file_id;
 
-use super::codec::{
-    decode_file_id, decode_path, decode_range, join_logical_path, parse_resolution,
-};
+use super::codec::{decode_file_id, decode_path, decode_range, parse_resolution};
 use super::position_codec;
 use super::template_codec;
 use super::{
@@ -173,7 +171,7 @@ fn load_connection(
     let root = SourceRoot::new(
         SourceRootId::new(root_id),
         parse_root_kind(&metadata_text(connection, "root_kind")?)?,
-        source_root,
+        AbsPath::normalize(&source_root),
     );
     let game_id = metadata_text(connection, "game_id")?;
     let rule_hash = metadata_text(connection, "rule_hash")?;
@@ -418,7 +416,7 @@ fn load_index(
         let file = SourceFile {
             id,
             root_id: root.id,
-            physical_path: join_logical_path(&root.path, &logical_path),
+            physical_path: root.path.join_logical(&logical_path),
             logical_path,
             category_id,
             resolution: parse_resolution(&resolution)?,

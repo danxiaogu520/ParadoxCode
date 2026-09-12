@@ -256,8 +256,14 @@ function logicalPath(document: vscode.TextDocument): string | undefined {
     if (!workspace) {
         return undefined;
     }
-    const relative = path.posix.relative(workspace.uri.path, document.uri.path);
-    if (relative.startsWith('..')) {
+    // fsPath is the decoded, native-spelling form; the URI path component
+    // would deliver percent-encoded segments (`%20`, `%3A`) the server would
+    // then see as literal directory names.
+    const relative = path
+        .relative(workspace.uri.fsPath, document.uri.fsPath)
+        .split(path.sep)
+        .join('/');
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
         return undefined;
     }
     return relative;

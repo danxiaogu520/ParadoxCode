@@ -101,7 +101,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `<...>` placeholders in exact keys so a dead placeholder row cannot return (rules artifact
   schema 26; caches regenerate).
 
+### Changed
+
+- Source roots, scanned files, document paths, and disk-change events are typed as
+  `text::AbsPath`, a construction-only wrapper over `PathBuf` whose spelling is normalized by
+  its constructors; the physical-path lookup map keys on it, so "every ingress canonicalizes"
+  is now a type invariant instead of a convention. Editor paths that intentionally fall back
+  to URI-derived logical paths keep their graceful degradation.
+- The editor extension consolidates path handling into `src/paths.ts`: one glob converter,
+  and diagnostic-ignore prefix matching that folds Windows drive/directory casing (a settings
+  root spelled with a different case no longer silently disables the ignore list). Mission
+  preview logical paths derive from the decoded `fsPath` instead of percent-encoded URI
+  components, so spaces and non-ASCII directories reach the server as real names. The dead
+  legacy `serverPath` fallback read and the duplicated glob converter are gone, and the
+  sweep/diagnose scripts share one relative-path helper.
+
 ### Fixed
+
+- `pdc flag-audit` collects `.TXT` and `.GUI` files regardless of extension casing; previously
+  uppercase variants were silently skipped while directory names were already folded.
+- Mission `texturefile` values written with Windows separators (`gfx\interface\x.dds`)
+  normalize to forward slashes instead of being dropped entirely; drive-letter and escaping
+  paths are still rejected.
 
 - Whole-workspace validation no longer pegs every worker core indefinitely when a document is
   open (the "open a file, CPU jumps to 4 cores and all language features freeze" failure mode

@@ -11,6 +11,7 @@ use std::fs;
 use std::hint::black_box;
 use std::path::PathBuf;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use text::AbsPath;
 
 use engine::{AnalysisHost, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
 use game::eu4;
@@ -108,7 +109,7 @@ fn main() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        fixture.root.clone(),
+        AbsPath::normalize(&fixture.root),
     )]));
     let report = host
         .refresh_source_roots()

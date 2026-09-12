@@ -1,4 +1,5 @@
 use super::support::*;
+use text::AbsPath;
 
 #[test]
 fn unresolved_symbol_is_diagnosed_without_a_definition() {
@@ -30,7 +31,7 @@ fn navigation_and_rename_include_references_inside_quoted_script() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots()
         .expect("scan workspace definitions");
@@ -114,7 +115,7 @@ fn references_find_quoted_script_symbols_in_unopened_workspace_files() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan workspace");
     let id = DocumentId::new("file:///tmp/events/quoted-disk-definition.txt");
@@ -122,7 +123,7 @@ fn references_find_quoted_script_symbols_in_unopened_workspace_files() {
         id.clone(),
         1,
         definition_text.to_owned(),
-        Some(definition_path),
+        Some(AbsPath::normalize(&definition_path)),
     )
     .expect("open definition");
     let position = u32::try_from(definition_text.find("quoted_disk.1").expect("definition") + 1)
@@ -224,7 +225,7 @@ fn dynamic_calls_resolve_scalar_and_block_forms_with_overlay_priority() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
@@ -239,14 +240,19 @@ fn dynamic_calls_resolve_scalar_and_block_forms_with_overlay_priority() {
             "pair_effect = { add_prestige = $first$ add_stability = $second$ }\n",
         )
         .to_owned(),
-        Some(definitions_path.clone()),
+        Some(AbsPath::normalize(&definitions_path.clone())),
     )
     .expect("open definition overlay");
     let use_path = events_dir.join("use.txt");
     let use_id = DocumentId::new("file:///tmp/use.txt");
     let use_text = "country_event = { immediate = { overlay_effect = yes overlay_block_effect = { } scalar_effect = { amount = 25 } pair_effect = { first = 1 second = 2 } disk_effect = yes } }\n";
-    host.open_document(use_id.clone(), 1, use_text.to_owned(), Some(use_path))
-        .expect("open use document");
+    host.open_document(
+        use_id.clone(),
+        1,
+        use_text.to_owned(),
+        Some(AbsPath::normalize(&use_path)),
+    )
+    .expect("open use document");
 
     let snapshot = host.snapshot();
     let results = diagnostics(&snapshot, &use_id);
@@ -375,11 +381,16 @@ fn local_parameter_navigation_stays_within_its_scripted_definition() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     let id = DocumentId::new("file:///tmp/parameters.txt");
-    host.open_document(id.clone(), 1, text.to_owned(), Some(path.clone()))
-        .expect("open parameter document");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&path.clone())),
+    )
+    .expect("open parameter document");
     let snapshot = host.snapshot();
 
     let second_use =
@@ -459,11 +470,16 @@ fn local_parameter_navigation_stays_within_its_scripted_definition() {
     read_only.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(2),
         SourceRootKind::Dependency,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     let read_only_id = DocumentId::new("file:///tmp/read-only-parameters.txt");
     read_only
-        .open_document(read_only_id.clone(), 1, text.to_owned(), Some(path))
+        .open_document(
+            read_only_id.clone(),
+            1,
+            text.to_owned(),
+            Some(AbsPath::normalize(&path)),
+        )
         .expect("open dependency parameter document");
     let read_only_snapshot = read_only.snapshot();
     assert_eq!(
@@ -525,7 +541,7 @@ fn navigation_targets_the_name_in_an_indexed_definition() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan event definition");
 
@@ -593,7 +609,7 @@ fn navigation_targets_event_id_in_an_indexed_definition_from_a_call_block() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan event definition");
 

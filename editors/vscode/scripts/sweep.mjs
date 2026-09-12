@@ -21,7 +21,9 @@
 
 import { createHash } from 'node:crypto';
 import { existsSync, appendFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve, sep } from 'node:path';
+import { join, resolve } from 'node:path';
+
+import { logicalRelative } from './lib/paths.mjs';
 import { execFile } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 import { TextDecoder } from 'node:util';
@@ -273,7 +275,7 @@ async function sampleQueryLatencies(client, options, files, sampleCount) {
   };
 
   for (const file of picked) {
-    const relativePath = relative(options.source, file).split(sep).join('/');
+    const relativePath = logicalRelative(options.source, file);
     let text;
     try {
       text = decodeVanillaSource(readFileSync(file));

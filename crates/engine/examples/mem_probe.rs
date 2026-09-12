@@ -11,6 +11,7 @@ use std::mem::size_of;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
+use text::AbsPath;
 
 use engine::{
     AnalysisHost, ParsedSource, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
@@ -52,7 +53,7 @@ fn main() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(u32::MAX),
         SourceRootKind::CurrentMod,
-        root,
+        AbsPath::normalize(&root),
     )]));
     phase_rss("rules");
     let mut vanilla_installed = false;

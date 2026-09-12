@@ -261,7 +261,7 @@ fn definition_attribute_keys(
                 snapshot
                     .source_files()
                     .get(&definition.file_id)
-                    .is_some_and(|file| file.physical_path == path)
+                    .is_some_and(|file| file.physical_path.as_path() == path)
             })
     });
     if hidden_by_overlay {
