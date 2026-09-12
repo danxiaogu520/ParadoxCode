@@ -83,6 +83,13 @@
       "required": true
     }
   ],
+  "event_modifier": [
+    {
+      "field": "name",
+      "template": "$",
+      "optional": true
+    }
+  ],
   "static_modifier": [
     {
       "field": "name",

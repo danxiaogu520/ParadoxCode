@@ -192,7 +192,84 @@ fn semantic_data_with_cancellation_uncached(
         });
     }
     collect_quoted_semantics(snapshot, input, &mut data, cancellation)?;
+    collect_inferred_typed_references(
+        snapshot,
+        hir,
+        input,
+        &mut data,
+        &inactive_semantic_references,
+        has_semantic_references,
+    );
     Ok(data)
+}
+
+/// Recovers the typed references the HIR lowering refused to emit for
+/// multi-kind value positions (`add_country_modifier`'s `name` accepts both
+/// `event_modifier` and `static_modifier`). Membership disambiguates a
+/// concrete value to one kind, which is exactly what navigation and the
+/// localisation preview need; ambiguous or unknown values keep the HIR
+/// lowering's no-reference behavior. Skips ranges already referenced and
+/// ranges inside type-invalid containers, so the added references never
+/// contradict the diagnostics and never stack on an existing interpretation.
+fn collect_inferred_typed_references(
+    snapshot: &AnalysisSnapshot,
+    hir: &HirFile,
+    input: &ParsedInput,
+    data: &mut SemanticFile,
+    inactive_semantic_references: &BTreeSet<text::TextRange>,
+    has_semantic_references: bool,
+) {
+    for property in hir.properties() {
+        let Some(scalar) = property.scalar.as_ref() else {
+            continue;
+        };
+        if scalar.quoted
+            || scalar.value.is_empty()
+            || scalar.value.contains('$')
+            || scalar.value.eq_ignore_ascii_case("yes")
+            || scalar.value.eq_ignore_ascii_case("no")
+        {
+            continue;
+        }
+        // Typed membership only ever matches identifiers or province ids, so
+        // anything else (numbers, dates, arithmetic) cannot win a kind and is
+        // skipped before the rule scan.
+        let value = scalar.value.as_bytes();
+        let identifier = value
+            .iter()
+            .any(|byte| byte.is_ascii_alphabetic() || *byte == b'_');
+        if !identifier && !value.iter().all(|byte| byte.is_ascii_digit()) {
+            continue;
+        }
+        if data
+            .references
+            .iter()
+            .any(|reference| reference.range == scalar.range)
+        {
+            continue;
+        }
+        if has_semantic_references && inactive_semantic_references.contains(&scalar.range) {
+            continue;
+        }
+        let Some(kind) = crate::semantic::semantic_inferred_typed_kind(
+            snapshot,
+            hir,
+            property.key_range,
+            &property.key,
+            &scalar.value,
+            property.operator.as_deref(),
+        ) else {
+            continue;
+        };
+        data.references.push(ReferenceInternal {
+            kind,
+            name: scalar.value.clone(),
+            range: scalar.range,
+            document: input.document.clone(),
+            file: input.file,
+            path: input.path.clone(),
+        });
+    }
 }
 
 fn collect_quoted_semantics(

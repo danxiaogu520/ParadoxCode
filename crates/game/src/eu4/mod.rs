@@ -722,7 +722,7 @@ mod tests {
         assert!(!rules.model().semantic.rules.is_empty());
         assert_eq!(
             rules.model().semantic.localisation_bindings.len(),
-            188,
+            189,
             "embedded source must carry the complete first-party type localisation map"
         );
     }
