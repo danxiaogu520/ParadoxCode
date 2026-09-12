@@ -14,7 +14,7 @@
             "type": "node",
             "request": "launch",
             "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/node",
-            "runtimeArgs": ["scripts/host-test.mjs"],
+            "runtimeArgs": ["scripts/host.mjs"],
             "env": { "RUN_VSCODE_HOST_TESTS": "1" },
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "npm: compile",

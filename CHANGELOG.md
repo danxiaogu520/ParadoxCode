@@ -9,6 +9,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Breaking:** the editor scripts are renamed to single-word names and the diagnostic tool is
+  split into importable modules: `diagnose-current-mod.mjs`→`diagnose.mjs`,
+  `codec-ts-test.mjs`→`transcode.mjs`, `extension-contract.mjs`→`extension.mjs`,
+  `package-contract.mjs`→`package.mjs`, `host-test.mjs`→`host.mjs`,
+  `performance/lsp-e2e.mjs`→`probe.mjs`, `performance/head-to-head.mjs`→`compare.mjs`,
+  `lib/lsp-client.mjs`→`lib/client.mjs`, and `lib/process-stats.mjs`→`lib/sampler.mjs` (the
+  `performance/` directory is gone). The npm aliases follow (`perf:lsp` becomes `perf:probe`);
+  the diagnose logic now lives in `lib/{options,workspace,overlay,diagnosis,report}.mjs` so
+  tooling can import its phases directly.
+
 - **Breaking:** the workspace is restructured along rust-analyzer's layering and all `pdx-`
   crate prefixes are gone: `pdx-text`→`text`, `pdx-codec`→`transcode`, `pdx-parser`→`parser`,
   `pdx-rules`→`rules`, `pdx-game`→`game`, `pdx-analysis`→`ide`, and `pdx-lsp`→`pdc`. The old

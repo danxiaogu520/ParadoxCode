@@ -1,7 +1,7 @@
 /**
  * Child-process resource sampling shared by the performance scripts.
  *
- * `WorkingSetSampler` in `lsp-e2e.mjs` only reports memory; comparing against
+ * `WorkingSetSampler` in `probe.mjs` only reports memory; comparing against
  * CWTools also needs the child's cumulative CPU time, so this module samples
  * both in one probe per tick. On Windows each probe is a short PowerShell
  * invocation (`Get-Process`), on Unix a single `ps` call.

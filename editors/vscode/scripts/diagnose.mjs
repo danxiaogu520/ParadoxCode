@@ -157,7 +157,7 @@ async function main() {
   try {
     return await run(rawOptions);
   } catch (error) {
-    console.error(`diagnose-current-mod: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`diagnose: ${error instanceof Error ? error.message : String(error)}`);
     return error instanceof CliUsageError ? 2 : 1;
   }
 }
