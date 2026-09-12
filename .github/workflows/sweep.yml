@@ -146,7 +146,8 @@ jobs:
           if ($servers.Count -ne 1) {
             throw "Expected one paradoxcode.exe in the release archive; found $($servers.Count)."
           }
-          "SWEEP_SERVER=$($servers[0].FullName)" >> $env:GITHUB_ENV
+          "SWEEP_SERVER=$($servers[0].FullName)" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build server for a direct manual sweep
         if: inputs.windows_artifact_name == ''
@@ -156,7 +157,8 @@ jobs:
           cargo build --locked --release -p pdc --bin paradoxcode
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $server = (Resolve-Path -LiteralPath 'target/release/paradoxcode.exe').Path
-          "SWEEP_SERVER=$server" >> $env:GITHUB_ENV
+          "SWEEP_SERVER=$server" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Cold dedicated sweep cache
         shell: powershell
@@ -188,7 +190,8 @@ jobs:
             if ($LASTEXITCODE -eq 0) {
               $summary = Join-Path $previousDir 'sweep-summary.json'
               if (Test-Path -LiteralPath $summary -PathType Leaf) {
-                "PREVIOUS_SWEEP_SUMMARY=$summary" >> $env:GITHUB_ENV
+                "PREVIOUS_SWEEP_SUMMARY=$summary" |
+                  Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
                 "Previous sweep baseline: $($release.tagName)"
                 break
               }
