@@ -76,6 +76,9 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     results.push(requires_file("SECURITY.md"));
     results.push(requires_file("LICENSE"));
     results.push(requires_file(".github/actionlint.yaml"));
+    results.push(requires_file(
+        ".github/runner-hooks/paradoxcode-sweep-guard.sh",
+    ));
     results.push(requires_file(".github/workflows/ci.yml"));
     results.push(requires_file(".github/workflows/release.yml"));
     results.push(requires_file(".github/workflows/sweep.yml"));
@@ -117,6 +120,22 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
                 && !sweep_workflow.contains(">> $env:GITHUB_ENV"),
             "trusted sweep authorization",
             "sweep must reject untrusted callers and refs and require absolute runner paths",
+        ));
+    }
+
+    if let Ok(runner_guard) =
+        fs::read_to_string(root.join(".github/runner-hooks/paradoxcode-sweep-guard.sh"))
+    {
+        results.push(check(
+            runner_guard.contains("GITHUB_REPOSITORY")
+                && runner_guard.contains("GITHUB_WORKFLOW_REF")
+                && runner_guard.contains("GITHUB_REF")
+                && runner_guard.contains("GITHUB_EVENT_NAME")
+                && runner_guard.contains("refs/heads/main")
+                && runner_guard.contains("refs/tags/v")
+                && runner_guard.contains("exit 1"),
+            "host sweep guard",
+            "runner hook must allowlist the repository, workflow, event, and protected refs",
         ));
     }
 
