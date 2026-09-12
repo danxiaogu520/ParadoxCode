@@ -68,9 +68,12 @@ jobs:
           ref: ${{ inputs.release_tag || github.sha }}
 
       - name: Validate runner environment
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
+          function Test-FullyQualifiedPath([string] $Path) {
+            return $Path -match '^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+)'
+          }
           foreach ($command in @('cargo', 'node', 'gh')) {
             if (-not (Get-Command $command -ErrorAction SilentlyContinue)) {
               throw "Required command is unavailable on the sweep runner: $command"
@@ -86,7 +89,7 @@ jobs:
               throw "Required Actions variable is not configured: $variable"
             }
             $value = [Environment]::GetEnvironmentVariable($variable)
-            if (-not [System.IO.Path]::IsPathFullyQualified($value)) {
+            if (-not (Test-FullyQualifiedPath $value)) {
               throw "Required Actions variable must contain an absolute path: $variable"
             }
           }
@@ -119,7 +122,7 @@ jobs:
 
       - name: Verify and extract packaged Windows server
         if: inputs.windows_artifact_name != ''
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $archives = @(Get-ChildItem -LiteralPath sweep-input -File -Filter '*.zip')
@@ -147,7 +150,7 @@ jobs:
 
       - name: Build server for a direct manual sweep
         if: inputs.windows_artifact_name == ''
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           cargo build --locked --release -p pdc --bin paradoxcode
@@ -156,7 +159,7 @@ jobs:
           "SWEEP_SERVER=$server" >> $env:GITHUB_ENV
 
       - name: Cold dedicated sweep cache
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $cachePath = [System.IO.Path]::GetFullPath($env:PDC_SWEEP_CACHE_DIR)
@@ -169,7 +172,7 @@ jobs:
       - name: Fetch previous release sweep summary
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $previousDir = Join-Path $env:RUNNER_TEMP "previous-sweep-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
@@ -196,7 +199,7 @@ jobs:
           }
 
       - name: Run release sweep
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $label = if ([string]::IsNullOrWhiteSpace($env:RELEASE_TAG)) {
@@ -220,7 +223,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify sweep gate output
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $summaryPath = 'performance-results/sweep-summary.json'
