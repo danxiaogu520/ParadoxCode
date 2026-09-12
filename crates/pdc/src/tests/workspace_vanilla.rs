@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::Cursor;
+use text::AbsPath;
 
 use engine::{AnalysisHost, IndexCache, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
 use game::{DiscoveryOptions, DiscoveryOutcome, UserConfiguration, UserPaths};
@@ -304,7 +305,7 @@ fn editor_options_load_ordered_dependencies_and_keep_them_read_only() {
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        dunce::canonicalize(&vanilla).expect("canonical Vanilla root"),
+        AbsPath::normalize(&dunce::canonicalize(&vanilla).expect("canonical Vanilla root")),
     )]));
     vanilla_host
         .refresh_source_roots()
@@ -498,7 +499,7 @@ fn initialize_defers_an_existing_vanilla_cache() {
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        vanilla,
+        AbsPath::normalize(&vanilla),
     )]));
     let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("empty Vanilla cache");
     cache.save(&cache_path).expect("save Vanilla cache");
@@ -1471,7 +1472,10 @@ fn indexed_dependencies_are_excluded_from_live_scanning() {
     let cached = &resolved.dependency_caches[0];
     assert_eq!(cached.root.kind, SourceRootKind::Dependency);
     assert_eq!(cached.root.order, 2);
-    assert_eq!(cached.root.path, canonical_root.join("deps/cached"));
+    assert_eq!(
+        cached.root.path.as_path(),
+        canonical_root.join("deps/cached")
+    );
     assert_eq!(
         cached.index_path,
         canonical_root.join("cache/cached-dep.pdcindex")
@@ -1500,7 +1504,7 @@ fn existing_dependency_index_cache_is_installed_in_the_background() {
     let dependency_root = SourceRoot::new(
         SourceRootId::new(42),
         SourceRootKind::Dependency,
-        dependency.clone(),
+        AbsPath::normalize(&dependency),
     );
     let mut builder = AnalysisHost::with_profile(
         game::eu4::first_party_rules().expect("embedded rules"),

@@ -56,7 +56,7 @@ fn workspace_validation_result(
         .documents()
         .values()
         .filter(|document| document.source() == DocumentSource::Overlay)
-        .filter_map(|document| document.path().map(|path| (path.to_owned(), document)))
+        .filter_map(|document| document.path.clone().map(|path| (path, document)))
         .collect::<HashMap<_, _>>();
     let mut current_uris = Vec::new();
     let mut publications = Vec::new();
@@ -253,7 +253,7 @@ fn changed_files_validation_result(
         .documents()
         .values()
         .filter(|document| document.source() == DocumentSource::Overlay)
-        .filter_map(|document| document.path().map(|path| (path.to_owned(), document)))
+        .filter_map(|document| document.path.clone().map(|path| (path, document)))
         .collect::<HashMap<_, _>>();
     let mut summary = WorkspaceValidationSummary {
         total_files: changes.len(),
@@ -1608,7 +1608,7 @@ mod tests {
     fn watched_changes_reset_a_bounded_trailing_window() {
         let mut server = LspServer::try_new(InitializeOptions).expect("identity server");
         server.queue_watched_disk_change(
-            PathBuf::from("events/one.txt"),
+            AbsPath::normalize(&PathBuf::from("events/one.txt")),
             DiskFileChangeKind::Changed,
         );
         let first_due = server.pending_disk_changes_due.expect("debounce deadline");
@@ -1620,7 +1620,7 @@ mod tests {
         );
 
         server.queue_watched_disk_change(
-            PathBuf::from("events/two.txt"),
+            AbsPath::normalize(&PathBuf::from("events/two.txt")),
             DiskFileChangeKind::Changed,
         );
         let second_due = server.pending_disk_changes_due.expect("reset deadline");
@@ -1634,7 +1634,7 @@ mod tests {
         let mut server = LspServer::try_new(InitializeOptions).expect("identity server");
         for index in 0..=WATCHED_BULK_CAP {
             server.queue_watched_disk_change(
-                PathBuf::from(format!("events/{index}.txt")),
+                AbsPath::normalize(&PathBuf::from(format!("events/{index}.txt"))),
                 DiskFileChangeKind::Changed,
             );
         }

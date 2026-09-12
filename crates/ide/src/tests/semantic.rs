@@ -1,4 +1,5 @@
 use super::support::*;
+use text::AbsPath;
 
 #[test]
 fn query_input_reuses_the_document_hir_handle() {
@@ -194,7 +195,7 @@ fn area_scope_transition_keeps_province_trigger_valid() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("index area definitions");
     let id = DocumentId::new("file:///tmp/events/EDG_KTPEvents.txt");
@@ -207,8 +208,13 @@ fn area_scope_transition_keeps_province_trigger_valid() {
         "  }\n",
         "}\n",
     );
-    host.open_document(id.clone(), 1, text.to_owned(), Some(event_path))
-        .expect("open");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&event_path)),
+    )
+    .expect("open");
 
     let results = diagnostics(&host.snapshot(), &id);
     assert!(
@@ -247,15 +253,20 @@ fn eu4_normal_type_selector_applies_mission_rules_to_custom_root_names() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     let path = root.join("missions/EDG_Bavarian_Missions.txt");
     let source = "EDG_Bavarian_Missions = { slot = 1 generic = no ai = yes has_country_shield = yes potential = { } EDG_bav_claim = { required_missions = { potential } } }\n";
     fs::write(&path, source).expect("write mission document");
     host.refresh_source_roots().expect("index mission document");
     let id = DocumentId::new("file:///tmp/EDG_Bavarian_Missions.txt");
-    host.open_document(id.clone(), 1, source.to_owned(), Some(path))
-        .expect("open mission document");
+    host.open_document(
+        id.clone(),
+        1,
+        source.to_owned(),
+        Some(AbsPath::normalize(&path)),
+    )
+    .expect("open mission document");
     let results = diagnostics(&host.snapshot(), &id);
     assert!(
         !results.iter().any(|item| {
@@ -696,7 +707,7 @@ fn workspace_type_child_key_selects_only_one_transition() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
         kind: SourceRootKind::CurrentMod,
-        path: root.clone(),
+        path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
     }]));
@@ -776,7 +787,7 @@ fn eu4_dynamic_culture_definition_is_used_by_semantic_type_matcher() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
         kind: SourceRootKind::CurrentMod,
-        path: root.clone(),
+        path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
     }]));
@@ -816,7 +827,7 @@ fn eu4_country_tag_definition_feeds_dynamic_enum_matcher() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
         kind: SourceRootKind::CurrentMod,
-        path: root.clone(),
+        path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
     }]));
@@ -855,7 +866,7 @@ fn eu4_flag_definition_feeds_dynamic_value_matcher() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
         kind: SourceRootKind::CurrentMod,
-        path: root.clone(),
+        path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
     }]));
@@ -897,7 +908,7 @@ fn eu4_scripted_effect_params_are_owner_qualified() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
         kind: SourceRootKind::CurrentMod,
-        path: root.clone(),
+        path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
     }]));
@@ -967,7 +978,7 @@ fn eu4_scripted_effect_params_are_owner_qualified() {
         overlay_id,
         1,
         "apply = { add_prestige = $overlay_only$ }\n".to_owned(),
-        Some(definition_path),
+        Some(AbsPath::normalize(&definition_path)),
     )
     .expect("open scripted effect overlay");
     let overlay_call = DocumentId::new("file:///tmp/events/overlay-params.txt");
@@ -1015,7 +1026,7 @@ fn unresolved_dynamic_signature_keeps_parameter_blocks_open_world() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots()
         .expect("scan ambiguous definitions");
@@ -1078,7 +1089,7 @@ fn eu4_legacy_governments_use_eu4_reform_semantics() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
         kind: SourceRootKind::CurrentMod,
-        path: root.clone(),
+        path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
     }]));
@@ -1118,7 +1129,7 @@ fn membership_caches_do_not_leak_across_hosts_with_equal_revisions() {
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root,
+            AbsPath::normalize(&root),
         )]));
         host.refresh_source_roots().expect("scan definitions");
         host

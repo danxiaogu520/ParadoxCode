@@ -20,6 +20,7 @@ import {
     FOLLOWUP_COMPLETION_TRIGGER_COMMAND,
 } from './completionMiddleware';
 import { findExecutableOnPath } from './serverPath';
+import { globToRegExp, pathRelative } from './paths';
 import {
     DEFAULT_SERVER_REPOSITORY,
     cachedServerPath,
@@ -30,7 +31,6 @@ import {
 const EU4_LANGUAGE_ID = 'eu4';
 const LOCALISATION_LANGUAGE_ID = 'localisation';
 const SERVER_SETTING_KEYS = [
-    'serverPath',
     'serverPath',
     'modDirectory',
     'vanillaIndexCache',
@@ -481,13 +481,10 @@ function installOptions(context: vscode.ExtensionContext) {
 }
 
 /** Resolves the ParadoxCode server binary. Explicit user/workspace configuration always wins over the
- * optional downloaded cache and PATH fallback. The legacy `serverPath` key is still honoured so
- * existing setups keep working after the rename. */
+ * optional downloaded cache and PATH fallback. */
 function resolveServerCommand(context: vscode.ExtensionContext): ServerResolution {
     const configuration = vscode.workspace.getConfiguration('paradoxcode');
-    const configuredPath =
-        configuration.get<string>('serverPath', '') ||
-        configuration.get<string>('serverPath', '');
+    const configuredPath = configuration.get<string>('serverPath', '');
     if (configuredPath) {
         return {
             command: configuredPath,
@@ -511,17 +508,6 @@ function resolveServerCommand(context: vscode.ExtensionContext): ServerResolutio
     };
 }
 
-function globToRegExp(pattern: string): RegExp {
-    const normalized = pattern.replace(/\\/g, '/');
-    const escaped = normalized
-        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-        .replace(/\*\*/g, '\u0000')
-        .replace(/\*/g, '[^/]*')
-        .replace(/\u0000/g, '.*')
-        .replace(/\?/g, '.');
-    return new RegExp(`^${escaped}$`, 'i');
-}
-
 function diagnosticIgnorePatterns(): string[] {
     return vscode.workspace
         .getConfiguration('paradoxcode')
@@ -535,14 +521,6 @@ function relativeDiagnosticPath(uri: vscode.Uri): string {
         return uri.fsPath.replace(/\\/g, '/');
     }
     return pathRelative(folder.uri.fsPath, uri.fsPath);
-}
-
-function pathRelative(root: string, file: string): string {
-    const normalizedRoot = root.replace(/\\/g, '/').replace(/\/$/, '');
-    const normalizedFile = file.replace(/\\/g, '/');
-    return normalizedFile.startsWith(`${normalizedRoot}/`)
-        ? normalizedFile.slice(normalizedRoot.length + 1)
-        : normalizedFile;
 }
 
 function previewRefreshMode(): 'always' | 'onSave' | 'manual' {

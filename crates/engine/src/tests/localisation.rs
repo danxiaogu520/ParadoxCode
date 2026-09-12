@@ -1,4 +1,5 @@
 use super::*;
+use text::AbsPath;
 
 fn escaped_yml(readable: &str) -> String {
     transcode::encode_text(readable, transcode::EscapeSet::Paratranz)
@@ -38,7 +39,7 @@ fn transcoded_localisation_previews_decode_to_readable_values() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root,
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan roots");
     let snapshot = host.snapshot();
@@ -94,7 +95,7 @@ fn single_triple_values_still_decode() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root,
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan roots");
     let snapshot = host.snapshot();

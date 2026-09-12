@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use encoding_rs::WINDOWS_1252;
 use rules::{GameProfile, SourceEncoding};
-use text::LogicalPath;
+use text::{AbsPath, LogicalPath};
 
 use crate::model::{
     SourceFile, SourceFileId, SourceRoot, SourceRootId, WorkspaceError, WorkspaceScanFilters,
@@ -38,7 +38,7 @@ pub fn collect_whitelisted_files(
     filters: &WorkspaceScanFilters,
     limits: WorkspaceScanLimits,
     report: &mut WorkspaceScanReport,
-    output: &mut Vec<(LogicalPath, PathBuf)>,
+    output: &mut Vec<(LogicalPath, AbsPath)>,
     cancellation: &WorkspaceScanToken,
 ) -> Result<(), WorkspaceError> {
     let root_metadata = fs::metadata(root).map_err(WorkspaceError::Io)?;
@@ -176,7 +176,7 @@ struct DiskScanContext<'a> {
     profile: &'a GameProfile,
     filters: &'a WorkspaceScanFilters,
     report: &'a mut WorkspaceScanReport,
-    output: &'a mut Vec<(LogicalPath, PathBuf)>,
+    output: &'a mut Vec<(LogicalPath, AbsPath)>,
     seen: &'a mut BTreeSet<LogicalPath>,
     cancellation: &'a WorkspaceScanToken,
 }
@@ -310,7 +310,7 @@ fn collect_disk_files(
         if !scan.seen.insert(logical.clone()) {
             continue;
         }
-        scan.output.push((logical, path));
+        scan.output.push((logical, AbsPath::normalize(&path)));
     }
     Ok(())
 }

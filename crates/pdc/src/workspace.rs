@@ -8,6 +8,7 @@ use engine::{
 use ide::{DiagnosticCode, Severity};
 use serde::Deserialize;
 use serde_json::Value;
+use text::AbsPath;
 
 use crate::protocol::RpcError;
 use crate::{INVALID_PARAMS, REQUEST_CANCELLED};
@@ -98,7 +99,7 @@ struct DependencyConfiguration {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ResolvedSourceRoots {
-    pub(crate) workspace_root: Option<PathBuf>,
+    pub(crate) workspace_root: Option<AbsPath>,
     pub(crate) roots: Vec<SourceRoot>,
     pub(crate) index_cache: Option<PathBuf>,
     pub(crate) vanilla_explicit: bool,
@@ -357,7 +358,7 @@ pub(crate) fn resolve_source_roots(
         let mut root = SourceRoot::new(
             SourceRootId::new(stable_dependency_root_id(&id)),
             SourceRootKind::Dependency,
-            path,
+            AbsPath::normalize(&path),
         );
         root.order = order;
         match index {
@@ -369,7 +370,7 @@ pub(crate) fn resolve_source_roots(
         let mut current_root = SourceRoot::new(
             SourceRootId::new(u32::MAX),
             SourceRootKind::CurrentMod,
-            path,
+            AbsPath::normalize(&path),
         );
         current_root.order = u32::try_from(dependency_count)
             .map_err(|_| {
@@ -382,7 +383,9 @@ pub(crate) fn resolve_source_roots(
         roots.push(current_root);
     }
     Ok(ResolvedSourceRoots {
-        workspace_root: current_mod.or(base),
+        workspace_root: current_mod
+            .or(base)
+            .map(|path| AbsPath::canonicalize(&path).unwrap_or_else(|_| AbsPath::normalize(&path))),
         roots,
         index_cache: vanilla_index_cache,
         vanilla_explicit,

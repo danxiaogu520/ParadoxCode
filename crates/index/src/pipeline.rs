@@ -1,13 +1,13 @@
 //! Parse, lower, and materialize immutable per-file pipeline state.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 use parser::{CstKind, CstNode, FileFormat, ParsedFile, parse};
 use rules::{GameProfile, ParserKind, RuleSet};
-use text::{LineIndex, LogicalPath, PositionRange, TextRange};
+use text::{AbsPath, LineIndex, LogicalPath, PositionRange, TextRange};
 
 use crate::documents::{DocumentSnapshot, FileState, ParsedSource};
 use crate::index::{
@@ -166,7 +166,7 @@ pub fn unparsed_document(
     version: Option<i64>,
     text: String,
     source: DocumentSource,
-    path: Option<PathBuf>,
+    path: Option<AbsPath>,
 ) -> DocumentSnapshot {
     let line_index = LineIndex::new(&text);
     DocumentSnapshot {
@@ -185,7 +185,7 @@ pub fn staged_overlay_document(
     id: DocumentId,
     version: i64,
     text: String,
-    path: Option<PathBuf>,
+    path: Option<AbsPath>,
 ) -> DocumentSnapshot {
     unparsed_document(id, Some(version), text, DocumentSource::Overlay, path)
 }
@@ -195,7 +195,7 @@ const PARALLEL_SOURCE_THRESHOLD: usize = 32;
 
 pub struct SourceReadJob {
     pub file: SourceFile,
-    pub physical_path: PathBuf,
+    pub physical_path: AbsPath,
     pub retain_frontend: bool,
 }
 
@@ -891,6 +891,7 @@ fn find_property(node: CstNode<'_>, wanted: &str, parsed: &ParsedFile) -> Option
 mod tests {
     use super::*;
     use rules::{FileCategory, FileMatcher, FileResolutionPolicy, RulesModel};
+    use std::path::PathBuf;
     use vfs::{SourceRootId, SourceRootKind};
 
     fn strict_common_profile() -> GameProfile {
@@ -928,7 +929,7 @@ mod tests {
         let root = SourceRoot::new(
             SourceRootId::new(0),
             SourceRootKind::CurrentMod,
-            PathBuf::from("C:/fixture"),
+            AbsPath::normalize(&PathBuf::from("C:/fixture")),
         );
         let profile = strict_common_profile();
         let rules = generic_script_rules();
@@ -937,7 +938,7 @@ mod tests {
             None,
             "unknown = yes".to_owned(),
             DocumentSource::Disk,
-            Some(root.path.join("common/unknown.txt")),
+            Some(AbsPath::normalize(&root.path.join("common/unknown.txt"))),
         );
         let prepared = prepare_document_snapshot(&rules, &profile, &[root], unknown);
         assert!(prepared.parsed.is_none());
@@ -949,7 +950,7 @@ mod tests {
         let root = SourceRoot::new(
             SourceRootId::new(0),
             SourceRootKind::CurrentMod,
-            PathBuf::from("C:/fixture"),
+            AbsPath::normalize(&PathBuf::from("C:/fixture")),
         );
         let profile = strict_common_profile();
         let rules = generic_script_rules();
@@ -958,7 +959,7 @@ mod tests {
             None,
             "technology_group = { adm_tech = 1 }".to_owned(),
             DocumentSource::Disk,
-            Some(root.path.join("common/technology.txt")),
+            Some(AbsPath::normalize(&root.path.join("common/technology.txt"))),
         );
         let prepared = prepare_document_snapshot(&rules, &profile, &[root], known);
         assert!(prepared.parsed.is_some());

@@ -2,6 +2,7 @@
 
 use super::support::*;
 use crate::{DiagnosticCode, Severity};
+use text::AbsPath;
 
 fn escaped_yml(value: &str) -> String {
     transcode::encode_text(
@@ -25,7 +26,7 @@ fn rooted_host(tag: &str) -> (AnalysisHost, std::path::PathBuf) {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan source root");
     (host, root)
@@ -40,7 +41,9 @@ fn readable_release_file_is_flagged_not_transcoded() {
         id.clone(),
         1,
         "l_english:\n edg_key:0 \"\u{6F22}\u{5B57}\"\n".to_owned(),
-        Some(root.join("localisation/replace/edg.yml")),
+        Some(AbsPath::normalize(
+            &root.join("localisation/replace/edg.yml"),
+        )),
     )
     .expect("open release file");
     let diagnostics = crate::diagnostics(&host.snapshot(), &id);
@@ -60,7 +63,9 @@ fn readable_master_tree_stays_quiet() {
         id.clone(),
         1,
         "l_english:\n edg_key:0 \"\u{6F22}\u{5B57}\"\n".to_owned(),
-        Some(root.join("localisation/l_english/edg.yml")),
+        Some(AbsPath::normalize(
+            &root.join("localisation/l_english/edg.yml"),
+        )),
     )
     .expect("open master file");
     let diagnostics = crate::diagnostics(&host.snapshot(), &id);
@@ -81,7 +86,9 @@ fn mixed_encoding_is_an_error_at_first_evidence() {
         id.clone(),
         1,
         text.clone(),
-        Some(std::env::temp_dir().join("transcode/localisation/replace/mixed.yml")),
+        Some(AbsPath::normalize(
+            &std::env::temp_dir().join("transcode/localisation/replace/mixed.yml"),
+        )),
     )
     .expect("open mixed file");
     let diagnostics = crate::diagnostics(&host.snapshot(), &id);
@@ -107,7 +114,9 @@ fn escaped_files_report_orphan_markers_and_stay_otherwise_quiet() {
         id.clone(),
         1,
         text.clone(),
-        Some(std::env::temp_dir().join("transcode/localisation/replace/edg.yml")),
+        Some(AbsPath::normalize(
+            &std::env::temp_dir().join("transcode/localisation/replace/edg.yml"),
+        )),
     )
     .expect("open escaped file");
     let diagnostics = crate::diagnostics(&host.snapshot(), &id);
@@ -137,7 +146,9 @@ fn unencodable_code_points_follow_the_profile_rules() {
         yml.clone(),
         1,
         "l_english:\n edg_key:0 \"\u{0160}trasse\"\n".to_owned(),
-        Some(std::env::temp_dir().join("transcode/localisation/l_english/edg.yml")),
+        Some(AbsPath::normalize(
+            &std::env::temp_dir().join("transcode/localisation/l_english/edg.yml"),
+        )),
     )
     .expect("open yml");
     let diagnostics = crate::diagnostics(&host.snapshot(), &yml);
@@ -153,7 +164,9 @@ fn unencodable_code_points_follow_the_profile_rules() {
         script.clone(),
         1,
         "dynasty = \"\u{0160}trasse\"\n".to_owned(),
-        Some(std::env::temp_dir().join("transcode/history/countries/CHI.txt")),
+        Some(AbsPath::normalize(
+            &std::env::temp_dir().join("transcode/history/countries/CHI.txt"),
+        )),
     )
     .expect("open script");
     let diagnostics = crate::diagnostics(&host.snapshot(), &script);
@@ -213,7 +226,9 @@ fn legacy_escape_variant_script_files_get_a_hint() {
         canonical_id.clone(),
         1,
         canonical,
-        Some(std::env::temp_dir().join("transcode/history/countries/AAA.txt")),
+        Some(AbsPath::normalize(
+            &std::env::temp_dir().join("transcode/history/countries/AAA.txt"),
+        )),
     )
     .expect("open canonical script");
     let diagnostics = crate::diagnostics(&host.snapshot(), &canonical_id);
@@ -233,7 +248,9 @@ fn legacy_escape_variant_script_files_get_a_hint() {
         legacy_id.clone(),
         1,
         legacy,
-        Some(std::env::temp_dir().join("transcode/history/countries/BBB.txt")),
+        Some(AbsPath::normalize(
+            &std::env::temp_dir().join("transcode/history/countries/BBB.txt"),
+        )),
     )
     .expect("open legacy script");
     let diagnostics = crate::diagnostics(&host.snapshot(), &legacy_id);

@@ -118,9 +118,11 @@ impl LspServer {
                 let params = typed_params::<DidSaveTextDocumentParams>(params, "didSave")?;
                 let uri = params.text_document.uri.as_str();
                 self.invalidate_semantic_tokens(uri);
-                if let Ok(path) = parse_file_uri_str(uri) {
+                if let Ok(path) = parse_file_uri_str(uri)
+                    && let Ok(path) = AbsPath::canonicalize(&path)
+                {
                     self.pending_disk_changes
-                        .insert(normalize_workspace_path(path), DiskFileChangeKind::Changed);
+                        .insert(path, DiskFileChangeKind::Changed);
                 }
                 self.schedule_parse(uri);
                 self.schedule_diagnostics(uri, Duration::ZERO);
@@ -211,7 +213,7 @@ impl LspServer {
         let path = FileUri::parse(&uri)
             .ok()
             .and_then(|uri| uri.to_path().ok())
-            .map(normalize_workspace_path);
+            .and_then(|path| AbsPath::canonicalize(&path).ok());
         self.host
             .stage_open_document(DocumentId::new(uri.clone()), version, text, path)
             .map_err(document_error)?;
@@ -270,7 +272,8 @@ impl LspServer {
     fn handle_did_change_watched_files(&mut self, params: Option<&Value>) -> Result<(), RpcError> {
         let params = typed_params::<DidChangeWatchedFilesParams>(params, "didChangeWatchedFiles")?;
         for event in params.changes {
-            let path = normalize_workspace_path(parse_file_uri_str(event.uri.as_str())?);
+            let raw = parse_file_uri_str(event.uri.as_str())?;
+            let path = AbsPath::canonicalize(&raw).unwrap_or_else(|_| AbsPath::normalize(&raw));
             let kind = if event.typ == FileChangeType::CREATED {
                 DiskFileChangeKind::Created
             } else if event.typ == FileChangeType::CHANGED {

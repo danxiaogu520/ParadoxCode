@@ -1,3 +1,5 @@
+use text::AbsPath;
+
 use super::support::*;
 
 #[test]
@@ -73,15 +75,24 @@ fn rename_rejects_dependency_and_vanilla_definitions() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
         kind: SourceRootKind::Dependency,
-        path: root.join("dependency"),
+        path: AbsPath::normalize(&root.join("dependency")),
         order: 0,
         writable: false,
     }]));
     host.refresh_source_roots().expect("scan dependency");
     let id = DocumentId::new("file:///dependency/events.txt");
     let text = "country_event = { id = read_only.1 }\n";
-    host.open_document(id.clone(), 1, text.to_owned(), Some(path.clone()))
-        .expect("open dependency overlay");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&AbsPath::normalize(
+            &AbsPath::normalize(&AbsPath::normalize(&AbsPath::normalize(
+                &AbsPath::normalize(&path.clone()),
+            ))),
+        ))),
+    )
+    .expect("open dependency overlay");
     let position = u32::try_from(text.find("read_only.1").expect("definition")).expect("offset");
     assert_eq!(
         prepare_rename(&host.snapshot(), &id, position).expect_err("read-only definition"),

@@ -3,6 +3,7 @@ use std::fs;
 use std::io::{Cursor, Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
+use text::AbsPath;
 
 use super::*;
 use engine::{AnalysisHost, IndexCache, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
@@ -231,7 +232,7 @@ pub(crate) fn stale_cache_fixture(container: &std::path::Path) -> std::path::Pat
     stale_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        vanilla,
+        AbsPath::normalize(&vanilla),
     )]));
     stale_host.refresh_source_roots().expect("scan Vanilla");
     let stale_cache = IndexCache::from_snapshot(&stale_host.snapshot()).expect("stale cache");
@@ -253,7 +254,7 @@ pub(crate) fn valid_cache_fixture(container: &std::path::Path) -> std::path::Pat
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        vanilla,
+        AbsPath::normalize(&vanilla),
     )]));
     host.refresh_source_roots().expect("scan Vanilla");
     let cache = IndexCache::from_snapshot(&host.snapshot()).expect("cache");

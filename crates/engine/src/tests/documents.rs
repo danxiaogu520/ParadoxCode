@@ -1,3 +1,5 @@
+use text::AbsPath;
+
 use super::*;
 
 #[test]
@@ -20,7 +22,7 @@ fn targeted_disk_changes_replace_one_shard_without_overwriting_an_overlay() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     host.refresh_source_roots().expect("initial scan");
@@ -28,13 +30,13 @@ fn targeted_disk_changes_replace_one_shard_without_overwriting_an_overlay() {
     let changed_id = before
         .source_files()
         .values()
-        .find(|file| file.physical_path == changed_path)
+        .find(|file| file.physical_path.as_path() == changed_path)
         .expect("changed source")
         .id;
     let untouched_id = before
         .source_files()
         .values()
-        .find(|file| file.physical_path == untouched_path)
+        .find(|file| file.physical_path.as_path() == untouched_path)
         .expect("untouched source")
         .id;
     let untouched_state = Arc::clone(before.file_states.get(&untouched_id).expect("state"));
@@ -43,14 +45,14 @@ fn targeted_disk_changes_replace_one_shard_without_overwriting_an_overlay() {
         document.clone(),
         1,
         "country_event = { id = overlay.1 }\n".to_owned(),
-        Some(changed_path.clone()),
+        Some(AbsPath::normalize(&changed_path)),
     )
     .expect("open overlay");
 
     fs::write(&changed_path, "country_event = { id = new.1 }\n").expect("disk edit");
     ::index::reset_pipeline_counts();
     host.apply_disk_file_changes(&[DiskFileChange::new(
-        changed_path.clone(),
+        AbsPath::normalize(&changed_path.clone()),
         DiskFileChangeKind::Changed,
     )])
     .expect("targeted change");
@@ -93,7 +95,7 @@ fn targeted_disk_changes_replace_one_shard_without_overwriting_an_overlay() {
     let created_path = events.join("created.txt");
     fs::write(&created_path, "country_event = { id = created.1 }\n").expect("created fixture");
     host.apply_disk_file_changes(&[DiskFileChange::new(
-        created_path,
+        AbsPath::normalize(&created_path),
         DiskFileChangeKind::Created,
     )])
     .expect("targeted create");
@@ -106,7 +108,7 @@ fn targeted_disk_changes_replace_one_shard_without_overwriting_an_overlay() {
 
     fs::remove_file(&changed_path).expect("delete changed fixture");
     host.apply_disk_file_changes(&[DiskFileChange::new(
-        changed_path,
+        AbsPath::normalize(&changed_path),
         DiskFileChangeKind::Deleted,
     )])
     .expect("targeted delete");
@@ -145,7 +147,7 @@ fn targeted_disk_changes_reindex_a_localisation_shard() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     host.refresh_source_roots()
@@ -160,7 +162,7 @@ fn targeted_disk_changes_reindex_a_localisation_shard() {
     fs::write(&changed_path, "l_english:\nnew_name:0 \"New\"\n").expect("localisation edit");
     ::index::reset_pipeline_counts();
     host.apply_disk_file_changes(&[DiskFileChange::new(
-        changed_path,
+        AbsPath::normalize(&changed_path),
         DiskFileChangeKind::Changed,
     )])
     .expect("targeted localisation change");
@@ -198,7 +200,7 @@ fn source_file_ids_do_not_shift_when_an_earlier_path_is_added() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     host.refresh_source_roots().expect("initial scan");
@@ -254,7 +256,7 @@ fn unchanged_file_states_are_reused_and_only_changed_files_advance() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     host.refresh_source_roots().expect("initial scan");
@@ -358,7 +360,7 @@ fn one_overlay_edit_parses_and_lowers_exactly_once_in_a_populated_workspace() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     host.refresh_source_roots().expect("initial scan");
@@ -369,7 +371,7 @@ fn one_overlay_edit_parses_and_lowers_exactly_once_in_a_populated_workspace() {
         id.clone(),
         1,
         "country_event = { id = synthetic.0 }\n".to_owned(),
-        Some(path),
+        Some(AbsPath::normalize(&path)),
     )
     .expect("stage initial overlay");
     let initial = host
@@ -565,12 +567,17 @@ fn close_restores_the_backing_disk_candidate() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            path.parent().expect("temp parent").to_owned(),
+            AbsPath::normalize(path.parent().expect("temp parent")),
         ),
     ]));
     let id = DocumentId::new("file:///tmp/engine.txt");
-    host.open_document(id.clone(), 1, "overlay".to_owned(), Some(path.clone()))
-        .expect("open should succeed");
+    host.open_document(
+        id.clone(),
+        1,
+        "overlay".to_owned(),
+        Some(AbsPath::normalize(&path)),
+    )
+    .expect("open should succeed");
     host.close_document(&id).expect("close should succeed");
     let snapshot = host.snapshot();
     let document = snapshot.document(&id).expect("disk candidate exists");
@@ -638,21 +645,21 @@ fn roots_overlay_and_shards_preserve_shadowed_semantic_definitions() {
         SourceRoot {
             id: SourceRootId::new(1),
             kind: SourceRootKind::Vanilla,
-            path: vanilla,
+            path: AbsPath::normalize(&vanilla),
             order: 0,
             writable: false,
         },
         SourceRoot {
             id: SourceRootId::new(2),
             kind: SourceRootKind::Dependency,
-            path: dependency,
+            path: AbsPath::normalize(&dependency),
             order: 1,
             writable: false,
         },
         SourceRoot {
             id: SourceRootId::new(3),
             kind: SourceRootKind::CurrentMod,
-            path: current.clone(),
+            path: AbsPath::normalize(&current),
             order: 2,
             writable: true,
         },
@@ -710,7 +717,7 @@ fn roots_overlay_and_shards_preserve_shadowed_semantic_definitions() {
         DocumentId::new("file:///current/foo.txt"),
         1,
         "country_event = { id = foo.1 }\n".to_owned(),
-        Some(current_event.clone()),
+        Some(AbsPath::normalize(&current_event)),
     )
     .expect("overlay");
     let overlay_snapshot = host.snapshot();

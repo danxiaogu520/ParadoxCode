@@ -1,4 +1,5 @@
 use super::support::*;
+use text::AbsPath;
 
 #[test]
 fn workspace_member_index_tracks_overlay_open_and_close() {
@@ -16,7 +17,7 @@ fn workspace_member_index_tracks_overlay_open_and_close() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan scripted effects");
     assert_eq!(
@@ -29,7 +30,7 @@ fn workspace_member_index_tracks_overlay_open_and_close() {
         id.clone(),
         1,
         "overlay_effect = { }\n".to_owned(),
-        Some(source),
+        Some(AbsPath::normalize(&source)),
     )
     .expect("open scripted-effect overlay");
     assert_eq!(
@@ -60,7 +61,9 @@ fn event_file_root_offers_all_entries_with_correct_shapes() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(PathBuf::from("events/root-entries.txt")),
+        Some(AbsPath::normalize(&PathBuf::from(
+            "events/root-entries.txt",
+        ))),
     )
     .expect("open event document");
     let snapshot = host.snapshot();
@@ -111,7 +114,9 @@ fn event_file_root_leaf_entry_completes_its_value_domain() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(PathBuf::from("events/root-leaf-value.txt")),
+        Some(AbsPath::normalize(&PathBuf::from(
+            "events/root-leaf-value.txt",
+        ))),
     )
     .expect("open event document");
     let snapshot = host.snapshot();
@@ -132,7 +137,9 @@ fn event_file_root_leaf_entry_completes_its_value_domain() {
             id2.clone(),
             1,
             "namespace = \n".to_owned(),
-            Some(PathBuf::from("events/root-leaf-value-2.txt")),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "events/root-leaf-value-2.txt",
+            ))),
         )
         .expect("open event document");
     let snapshot2 = host2.snapshot();
@@ -158,7 +165,7 @@ fn event_file_root_repeats_blocks_but_not_single_declarations() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(PathBuf::from("events/root-gap.txt")),
+        Some(AbsPath::normalize(&PathBuf::from("events/root-gap.txt"))),
     )
     .expect("open event document");
     let snapshot = host.snapshot();
@@ -191,7 +198,7 @@ fn event_file_root_repeats_blocks_but_not_single_declarations() {
             id2.clone(),
             1,
             text2.to_owned(),
-            Some(PathBuf::from("decisions/root-gap.txt")),
+            Some(AbsPath::normalize(&PathBuf::from("decisions/root-gap.txt"))),
         )
         .expect("open decision document");
     let snapshot2 = host2.snapshot();
@@ -232,7 +239,7 @@ fn on_action_event_block_completion_excludes_namespace_headers() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("index event document");
     let id = DocumentId::new("file:///tmp/common/on_actions/completion.txt");
@@ -241,7 +248,9 @@ fn on_action_event_block_completion_excludes_namespace_headers() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(std::path::PathBuf::from("common/on_actions/completion.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "common/on_actions/completion.txt",
+        ))),
     )
     .expect("open on_action document");
     let snapshot = host.snapshot();
@@ -274,7 +283,9 @@ fn on_action_file_root_offers_declared_actions() {
         id.clone(),
         1,
         "\n".to_owned(),
-        Some(PathBuf::from("common/on_actions/root-entries.txt")),
+        Some(AbsPath::normalize(&PathBuf::from(
+            "common/on_actions/root-entries.txt",
+        ))),
     )
     .expect("open on_action document");
     let result = complete(&host.snapshot(), &id, 0);
@@ -334,7 +345,9 @@ fn on_action_file_root_offers_declared_actions() {
             prefixed_id.clone(),
             1,
             prefix.to_owned(),
-            Some(PathBuf::from("common/on_actions/root-prefix.txt")),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "common/on_actions/root-prefix.txt",
+            ))),
         )
         .expect("open prefixed on_action document");
     let prefixed = complete(
@@ -359,7 +372,9 @@ fn on_action_file_root_offers_declared_actions() {
             gap_id.clone(),
             1,
             gap_text.to_owned(),
-            Some(PathBuf::from("common/on_actions/root-gap.txt")),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "common/on_actions/root-gap.txt",
+            ))),
         )
         .expect("open on_action root gap");
     let gap = complete(
@@ -398,8 +413,13 @@ fn on_action_entries_seed_documented_initial_scopes() {
         let path = format!("common/on_actions/{action}.txt");
         let id = DocumentId::new(format!("file:///tmp/{path}"));
         let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
-        host.open_document(id.clone(), 1, text.clone(), Some(PathBuf::from(&path)))
-            .expect("open on_action document");
+        host.open_document(
+            id.clone(),
+            1,
+            text.clone(),
+            Some(AbsPath::normalize(&PathBuf::from(&path))),
+        )
+        .expect("open on_action document");
 
         let snapshot = host.snapshot();
         let input = input_for_document(&snapshot, &id).expect("analysis input");
@@ -440,7 +460,9 @@ fn event_modifier_completion_inherits_generic_modifier_keys() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(std::path::PathBuf::from("common/event_modifiers/test.txt")),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "common/event_modifiers/test.txt",
+        ))),
     )
     .expect("open event modifier");
     let position = u32::try_from(text.find("dis").expect("completion prefix") + 3)
@@ -483,12 +505,17 @@ fn leaf_value_container_completion_offers_typed_workspace_members() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("index mission document");
     let id = DocumentId::new("file:///tmp/missions/test.txt");
-    host.open_document(id.clone(), 1, text.to_owned(), Some(path.clone()))
-        .expect("open");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&path.clone())),
+    )
+    .expect("open");
     let snapshot = host.snapshot();
     let position = u32::try_from(
         text.find("required_missions = { }")
@@ -809,12 +836,17 @@ fn leaf_value_clause_bare_value_completion_offers_typed_workspace_members() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("index mission document");
     let id = DocumentId::new("file:///tmp/missions/test.txt");
-    host.open_document(id.clone(), 1, text.to_owned(), Some(path.clone()))
-        .expect("open");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&path.clone())),
+    )
+    .expect("open");
     let snapshot = host.snapshot();
     let position = u32::try_from(
         text.find("required_missions = ")
@@ -902,7 +934,7 @@ fn template_modifier_rules_complete_workspace_member_spellings() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots()
         .expect("scan estates and mechanic powers");
@@ -1121,7 +1153,9 @@ fn decision_completion_skips_type_instance_wrapper() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(PathBuf::from("common/decisions/completion.txt")),
+        Some(AbsPath::normalize(&PathBuf::from(
+            "common/decisions/completion.txt",
+        ))),
     )
     .expect("open decision document");
     let snapshot = host.snapshot();
@@ -1171,7 +1205,9 @@ fn decision_file_root_offers_only_the_country_decisions_entry() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(PathBuf::from("decisions/root-entry.txt")),
+        Some(AbsPath::normalize(&PathBuf::from(
+            "decisions/root-entry.txt",
+        ))),
     )
     .expect("open decision document");
     let snapshot = host.snapshot();
@@ -1197,7 +1233,9 @@ fn decision_file_root_offers_only_the_country_decisions_entry() {
             id2.clone(),
             1,
             "cou".to_owned(),
-            Some(PathBuf::from("decisions/root-entry-2.txt")),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "decisions/root-entry-2.txt",
+            ))),
         )
         .expect("open prefixed document");
     let snapshot2 = host2.snapshot();
@@ -1222,7 +1260,7 @@ fn decision_file_root_offers_only_the_country_decisions_entry() {
             id3.clone(),
             1,
             "\n".to_owned(),
-            Some(PathBuf::from("events/root-entry.txt")),
+            Some(AbsPath::normalize(&PathBuf::from("events/root-entry.txt"))),
         )
         .expect("open event document");
     let snapshot3 = host3.snapshot();
@@ -1244,7 +1282,9 @@ fn decision_file_root_offers_only_the_country_decisions_entry() {
             id4.clone(),
             1,
             text4.to_owned(),
-            Some(PathBuf::from("decisions/root-entry-4.txt")),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "decisions/root-entry-4.txt",
+            ))),
         )
         .expect("open populated document");
     let snapshot4 = host4.snapshot();
@@ -1275,7 +1315,9 @@ fn decision_wrapper_body_without_instance_offers_no_key_candidates() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(PathBuf::from("decisions/wrapper-body.txt")),
+        Some(AbsPath::normalize(&PathBuf::from(
+            "decisions/wrapper-body.txt",
+        ))),
     )
     .expect("open decision document");
     let snapshot = host.snapshot();
@@ -1302,7 +1344,9 @@ fn decision_wrapper_body_without_instance_offers_no_key_candidates() {
             id2.clone(),
             1,
             text2.to_owned(),
-            Some(PathBuf::from("decisions/wrapper-body-2.txt")),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "decisions/wrapper-body-2.txt",
+            ))),
         )
         .expect("open decision document");
     let snapshot2 = host2.snapshot();
@@ -1328,7 +1372,9 @@ fn decision_wrapper_body_without_instance_offers_no_key_candidates() {
             id3.clone(),
             1,
             text3.to_owned(),
-            Some(PathBuf::from("decisions/wrapper-body-3.txt")),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "decisions/wrapper-body-3.txt",
+            ))),
         )
         .expect("open decision document");
     let snapshot3 = host3.snapshot();
@@ -1495,7 +1541,7 @@ fn scripted_definition_completion_snippet_includes_parameters() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
         kind: SourceRootKind::CurrentMod,
-        path: root.clone(),
+        path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
     }]));
@@ -1572,7 +1618,7 @@ fn dynamic_call_blocks_complete_only_the_owners_parameter_keys() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/dynamic-call-keys.txt");
@@ -1622,7 +1668,7 @@ fn dynamic_argument_values_follow_direct_and_nested_body_constraints() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
@@ -1697,7 +1743,7 @@ fn dynamic_affixed_value_arguments_complete_stripped_members() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
@@ -1743,7 +1789,7 @@ fn dynamic_bare_parameter_infers_quoted_effect_completion_context() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/dynamic-quoted.txt");
@@ -1791,7 +1837,7 @@ fn dynamic_argument_value_inference_handles_conditionals_scope_and_conflicts() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let localisation_id = DocumentId::new("file:///tmp/localisation/dynamic_l_english.yml");
@@ -1897,7 +1943,7 @@ fn vanilla_cache_only_dynamic_value_completion_uses_persisted_body_constraints()
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     vanilla_host.refresh_source_roots().expect("scan Vanilla");
     let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
@@ -1939,7 +1985,7 @@ fn non_enumerable_dynamic_value_constraints_suppress_generic_fallback() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
@@ -1993,7 +2039,7 @@ fn vanilla_cache_only_dynamic_completes_inside_quoted_effect_payload() {
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     vanilla_host.refresh_source_roots().expect("scan Vanilla");
     let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
@@ -2046,7 +2092,7 @@ fn vanilla_cache_dynamic_templates_preserve_nested_conditional_and_scope_semanti
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     vanilla_host.refresh_source_roots().expect("scan Vanilla");
     let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
@@ -2146,7 +2192,7 @@ fn current_mod_dynamic_template_overrides_cached_vanilla_template() {
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        vanilla.clone(),
+        AbsPath::normalize(&vanilla),
     )]));
     vanilla_host.refresh_source_roots().expect("scan Vanilla");
     let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
@@ -2156,7 +2202,7 @@ fn current_mod_dynamic_template_overrides_cached_vanilla_template() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        current,
+        AbsPath::normalize(&current),
     )]));
     host.refresh_source_roots().expect("scan current Mod");
     host.install_index_cache(cache).expect("install cache");
@@ -2192,13 +2238,18 @@ fn dynamic_bodies_complete_owner_local_dollar_parameters() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root,
+        AbsPath::normalize(&root),
     )]));
     let id = DocumentId::new("file:///tmp/common/scripted_effects/00_complete.txt");
     let text =
         "probe = { add_prestige = $PRESTIGE$ custom_tooltip = $TOOLTIP$ add_stability = $ }\n";
-    host.open_document(id.clone(), 1, text.to_owned(), Some(path))
-        .expect("open dynamic definition");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&path)),
+    )
+    .expect("open dynamic definition");
     let position =
         u32::try_from(text.find("$ }").expect("incomplete parameter") + 1).expect("position");
 
@@ -2227,15 +2278,20 @@ fn dollar_completion_does_not_leak_parameters_between_dynamic_owners() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root,
+        AbsPath::normalize(&root),
     )]));
     let id = DocumentId::new("file:///tmp/common/scripted_effects/00_complete.txt");
     let text = concat!(
         "first = { add_prestige = $FIRST$ }\n",
         "second = { add_prestige = $SECOND$ add_stability = $ }\n",
     );
-    host.open_document(id.clone(), 1, text.to_owned(), Some(path))
-        .expect("open dynamic definitions");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&path)),
+    )
+    .expect("open dynamic definitions");
     let position =
         u32::try_from(text.rfind("$ }").expect("incomplete parameter") + 1).expect("position");
 
@@ -2260,12 +2316,17 @@ fn dynamic_dollar_completion_marks_key_usage() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root,
+        AbsPath::normalize(&root),
     )]));
     let id = DocumentId::new("file:///tmp/common/scripted_effects/00_complete.txt");
     let text = "probe = { $EFFECT$ = yes $ = yes }\n";
-    host.open_document(id.clone(), 1, text.to_owned(), Some(path))
-        .expect("open dynamic definition");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&path)),
+    )
+    .expect("open dynamic definition");
     let position = u32::try_from(text.rfind("$ =").expect("incomplete key") + 1).expect("position");
 
     let item = complete(&host.snapshot(), &id, position)
@@ -3174,7 +3235,9 @@ fn file_root_scaffolds_use_rule_backed_entry_containers() {
             decision_id.clone(),
             1,
             "\n".to_owned(),
-            Some(PathBuf::from("decisions/entry-context.txt")),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "decisions/entry-context.txt",
+            ))),
         )
         .expect("open decision document");
     let snapshot = decision_host.snapshot();
@@ -3193,7 +3256,9 @@ fn file_root_scaffolds_use_rule_backed_entry_containers() {
             event_id.clone(),
             1,
             "\n".to_owned(),
-            Some(PathBuf::from("events/entry-context.txt")),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "events/entry-context.txt",
+            ))),
         )
         .expect("open event document");
     let snapshot = event_host.snapshot();
@@ -3227,8 +3292,13 @@ fn mission_probe(
 
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     let id = DocumentId::new(format!("file:///tmp/{path}"));
-    host.open_document(id.clone(), 1, text.to_owned(), Some(PathBuf::from(path)))
-        .expect("open mission document");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&PathBuf::from(path))),
+    )
+    .expect("open mission document");
     let snapshot = host.snapshot();
     let position =
         u32::try_from(text.find(needle).expect("needle") + needle.len()).expect("position");
@@ -3484,7 +3554,9 @@ fn custom_gui_file_root_offers_all_declared_entry_types() {
         id.clone(),
         1,
         "\n".to_owned(),
-        Some(PathBuf::from("common/custom_gui/root-entries.txt")),
+        Some(AbsPath::normalize(&PathBuf::from(
+            "common/custom_gui/root-entries.txt",
+        ))),
     )
     .expect("open custom gui document");
     let result = complete(&host.snapshot(), &id, 0);
@@ -3517,7 +3589,9 @@ fn custom_gui_file_root_offers_all_declared_entry_types() {
             repeat_id.clone(),
             1,
             repeat_text.to_owned(),
-            Some(PathBuf::from("common/custom_gui/repeat-root-entries.txt")),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "common/custom_gui/repeat-root-entries.txt",
+            ))),
         )
         .expect("open repeated custom gui document");
     let repeat = complete(
@@ -3544,7 +3618,9 @@ fn graphical_culture_file_root_offers_bare_enum_values() {
         id.clone(),
         1,
         "\n".to_owned(),
-        Some(PathBuf::from("common/graphicalculturetype.txt")),
+        Some(AbsPath::normalize(&PathBuf::from(
+            "common/graphicalculturetype.txt",
+        ))),
     )
     .expect("open graphical culture document");
     let result = complete(&host.snapshot(), &id, 0);
@@ -3571,7 +3647,9 @@ fn country_tag_file_root_offers_workspace_and_profile_members() {
         source_id,
         1,
         "ABC = \"countries/Abc.txt\"\n".to_owned(),
-        Some(PathBuf::from("common/country_tags/definitions.txt")),
+        Some(AbsPath::normalize(&PathBuf::from(
+            "common/country_tags/definitions.txt",
+        ))),
     )
     .expect("open country tag definitions");
     let id = DocumentId::new("file:///tmp/common/country_tags/root-entries.txt");
@@ -3579,7 +3657,9 @@ fn country_tag_file_root_offers_workspace_and_profile_members() {
         id.clone(),
         1,
         "F0".to_owned(),
-        Some(PathBuf::from("common/country_tags/root-entries.txt")),
+        Some(AbsPath::normalize(&PathBuf::from(
+            "common/country_tags/root-entries.txt",
+        ))),
     )
     .expect("open country tag document");
     let result = complete(&host.snapshot(), &id, 2);
@@ -3603,7 +3683,9 @@ fn country_tag_file_root_offers_workspace_and_profile_members() {
             source_id2,
             1,
             "ABC = \"countries/Abc.txt\"\n".to_owned(),
-            Some(PathBuf::from("common/country_tags/definitions-2.txt")),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "common/country_tags/definitions-2.txt",
+            ))),
         )
         .expect("open country tag definitions");
     let id2 = DocumentId::new("file:///tmp/common/country_tags/root-entries-2.txt");
@@ -3612,7 +3694,9 @@ fn country_tag_file_root_offers_workspace_and_profile_members() {
             id2.clone(),
             1,
             "AB".to_owned(),
-            Some(PathBuf::from("common/country_tags/root-entries-2.txt")),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "common/country_tags/root-entries-2.txt",
+            ))),
         )
         .expect("open country tag document");
     let result2 = complete(&host2.snapshot(), &id2, 2);
@@ -3632,7 +3716,7 @@ fn alerts_file_root_offers_file_wrappers() {
         id.clone(),
         1,
         "\n".to_owned(),
-        Some(PathBuf::from("common/alerts.txt")),
+        Some(AbsPath::normalize(&PathBuf::from("common/alerts.txt"))),
     )
     .expect("open alerts document");
     let result = complete(&host.snapshot(), &id, 0);
@@ -3663,7 +3747,7 @@ fn technology_file_root_offers_groups_and_tables() {
         id.clone(),
         1,
         "\n".to_owned(),
-        Some(PathBuf::from("common/technology.txt")),
+        Some(AbsPath::normalize(&PathBuf::from("common/technology.txt"))),
     )
     .expect("open technology document");
     let result = complete(&host.snapshot(), &id, 0);
@@ -3699,7 +3783,7 @@ fn closed_flag_kinds_complete_indexed_overlay_and_engine_seeded_names() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
@@ -3770,7 +3854,7 @@ fn dynamic_definition_completion_filters_by_entry_contract_at_call_sites() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
@@ -3864,7 +3948,7 @@ fn dynamic_trigger_completion_filters_by_entry_contract() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan triggers");
 
@@ -3933,15 +4017,20 @@ fn dynamic_definition_completion_keeps_all_contracts_under_unknown_scope() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     // A scripted-effect body has an unknown entry scope, so both contracts
     // stay offered while editing inside it.
     let id = DocumentId::new("file:///tmp/common/scripted_effects/00_open.txt");
     let text = "wrapper = {  }\n";
-    host.open_document(id.clone(), 1, text.to_owned(), Some(path))
-        .expect("open body");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&path)),
+    )
+    .expect("open body");
     let completion = complete(
         &host.snapshot(),
         &id,
@@ -3977,7 +4066,7 @@ fn dynamic_key_position_parameter_completes_command_names() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/dynamic-key-cmd.txt");
@@ -4036,7 +4125,7 @@ fn dynamic_affixed_key_parameter_completes_stripped_key_members() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
@@ -4110,7 +4199,7 @@ fn dynamic_key_position_parameter_respects_site_scope() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/dynamic-key-scope.txt");
@@ -4162,14 +4251,19 @@ fn dynamic_body_completion_seeds_scope_from_own_contract() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
 
     let id = DocumentId::new("file:///tmp/common/scripted_effects/00_open.txt");
     let text = "country_tool = {\n    join_trade_league = yes\n    \n}\n";
-    host.open_document(id.clone(), 1, text.to_owned(), Some(path))
-        .expect("open body");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&path)),
+    )
+    .expect("open body");
     let completion = complete(
         &host.snapshot(),
         &id,
@@ -4226,13 +4320,18 @@ fn dynamic_trigger_body_completion_seeds_scope_from_own_contract() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan triggers");
     let id = DocumentId::new("file:///tmp/common/scripted_triggers/00_complete.txt");
     let text = "country_gate = {\n    num_of_cities = 1\n    \n}\n";
-    host.open_document(id.clone(), 1, text.to_owned(), Some(path))
-        .expect("open body");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&path)),
+    )
+    .expect("open body");
     let completion = complete(
         &host.snapshot(),
         &id,
@@ -4353,7 +4452,7 @@ fn country_history_nested_effect_block_completes_inherited_effect_keys() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(std::path::PathBuf::from(path)),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(path))),
     )
     .expect("open country history");
     let snapshot = host.snapshot();
@@ -4381,7 +4480,7 @@ fn incident_option_wrapper_completion_offers_trigger_keys() {
         id.clone(),
         1,
         text.to_owned(),
-        Some(std::path::PathBuf::from(path)),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(path))),
     )
     .expect("open incident");
     let snapshot = host.snapshot();
@@ -4419,15 +4518,20 @@ fn luck_root_completion_offers_workspace_country_tags() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan country tags");
 
     let path = "common/historial_lucky.txt";
     let text = "CAS = {\n\talways = yes\n}\n\n";
     let id = DocumentId::new("file:///tmp/common/historial_lucky-completion.txt");
-    host.open_document(id.clone(), 1, text.to_owned(), Some(PathBuf::from(path)))
-        .expect("open luck document");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&PathBuf::from(path))),
+    )
+    .expect("open luck document");
     let position = u32::try_from(text.len() - 1).expect("position");
     let result = complete(&host.snapshot(), &id, position);
     let labels = result

@@ -1,4 +1,5 @@
 use super::*;
+use text::AbsPath;
 
 #[test]
 fn previous_cache_schema_is_rejected_before_table_loading() {
@@ -22,7 +23,7 @@ fn previous_cache_schema_is_rejected_before_table_loading() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+        AbsPath::normalize(&fs::canonicalize(&vanilla).expect("canonical Vanilla root")),
     )]));
     host.refresh_source_roots().expect("scan Vanilla");
     let cache = IndexCache::from_snapshot(&host.snapshot()).expect("build cache");
@@ -72,7 +73,7 @@ fn vanilla_cache_preserves_dynamic_definition_references_without_hir() {
         SourceRoot::new(
             SourceRootId::new(0),
             SourceRootKind::Vanilla,
-            fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+            AbsPath::normalize(&fs::canonicalize(&vanilla).expect("canonical Vanilla root")),
         ),
     ]));
     host.refresh_source_roots().expect("scan Vanilla");
@@ -157,7 +158,7 @@ fn definition_attribute_summaries_survive_live_and_cached_indexing() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+        AbsPath::normalize(&fs::canonicalize(&vanilla).expect("canonical Vanilla root")),
     )]));
     host.refresh_source_roots().expect("scan Vanilla");
     let snapshot = host.snapshot();
@@ -205,7 +206,7 @@ fn corrupted_navigation_position_is_rejected_without_symbol_table_scans() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+        AbsPath::normalize(&fs::canonicalize(&vanilla).expect("canonical Vanilla root")),
     )]));
     host.refresh_source_roots().expect("scan Vanilla");
     let cache = IndexCache::from_snapshot(&host.snapshot()).expect("build cache");
@@ -257,7 +258,7 @@ fn refreshed_cache_reindexes_changed_files_and_drops_deleted_ones() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+        AbsPath::normalize(&fs::canonicalize(&vanilla).expect("canonical Vanilla root")),
     )]));
     host.refresh_source_roots().expect("scan Vanilla");
     let cache = IndexCache::from_snapshot(&host.snapshot()).expect("build cache");
@@ -383,7 +384,7 @@ fn refresh_rejects_stale_rules_and_mismatched_games() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+        AbsPath::normalize(&fs::canonicalize(&vanilla).expect("canonical Vanilla root")),
     )]));
     host.refresh_source_roots().expect("scan Vanilla");
     let cache = IndexCache::from_snapshot(&host.snapshot()).expect("build cache");
@@ -432,7 +433,7 @@ fn save_reclaims_free_pages_when_rebuilding_a_smaller_cache() {
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(0),
             SourceRootKind::Vanilla,
-            fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+            AbsPath::normalize(&fs::canonicalize(&vanilla).expect("canonical Vanilla root")),
         )]));
         host.refresh_source_roots().expect("scan Vanilla");
         IndexCache::from_snapshot(&host.snapshot()).expect("build cache")
@@ -506,7 +507,7 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
         SourceRoot::new(
             SourceRootId::new(0),
             SourceRootKind::Vanilla,
-            fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+            AbsPath::normalize(&fs::canonicalize(&vanilla).expect("canonical Vanilla root")),
         ),
     ]));
     vanilla_host
@@ -563,7 +564,7 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
         SourceRoot::new(
             SourceRootId::new(u32::MAX),
             SourceRootKind::CurrentMod,
-            fs::canonicalize(&current).expect("canonical current root"),
+            AbsPath::normalize(&fs::canonicalize(&current).expect("canonical current root")),
         ),
     ]));
     host.refresh_source_roots().expect("scan current root");
@@ -635,7 +636,7 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
     let dependency_root = SourceRoot::new(
         SourceRootId::new(7),
         SourceRootKind::Dependency,
-        fs::canonicalize(&dependency).expect("canonical dependency root"),
+        AbsPath::normalize(&fs::canonicalize(&dependency).expect("canonical dependency root")),
     );
     let mut dependency_builder = eu4_host();
     dependency_builder.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
@@ -703,7 +704,7 @@ fn vanilla_cache_previews_retain_only_preferred_languages() {
         SourceRoot::new(
             SourceRootId::new(0),
             SourceRootKind::Vanilla,
-            fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+            AbsPath::normalize(&fs::canonicalize(&vanilla).expect("canonical Vanilla root")),
         ),
     ]));
     builder.refresh_source_roots().expect("scan Vanilla");
@@ -786,7 +787,7 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
     let dependency_root = SourceRoot::new(
         SourceRootId::new(42),
         SourceRootKind::Dependency,
-        dependency_path.clone(),
+        AbsPath::normalize(&dependency_path),
     );
 
     // Build the cache from a dedicated dependency-only workspace.
@@ -882,7 +883,7 @@ fn batch_dependency_cache_install_rebuilds_the_workspace_index_once() {
         let dependency_root = SourceRoot::new(
             SourceRootId::new(id),
             SourceRootKind::Dependency,
-            dependency_path,
+            AbsPath::normalize(&dependency_path),
         );
         let mut builder = AnalysisHost::with_profile(rules.clone(), game::eu4::profile());
         builder.apply_change(WorkspaceChange::SetSourceRoots(vec![dependency_root]));
@@ -900,7 +901,7 @@ fn batch_dependency_cache_install_rebuilds_the_workspace_index_once() {
     let current_root = SourceRoot::new(
         SourceRootId::new(u32::MAX),
         SourceRootKind::CurrentMod,
-        fs::canonicalize(&current).expect("canonical current mod root"),
+        AbsPath::normalize(&fs::canonicalize(&current).expect("canonical current mod root")),
     );
     let mut host = AnalysisHost::with_profile(rules, game::eu4::profile());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![current_root]));
@@ -955,7 +956,7 @@ fn dependency_index_cache_rejects_an_unrelated_configured_root() {
     builder.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(7),
         SourceRootKind::Dependency,
-        dependency_path.clone(),
+        AbsPath::normalize(&dependency_path),
     )]));
     builder.refresh_source_roots().expect("scan dependency");
     let cache = IndexCache::from_snapshot(&builder.snapshot()).expect("build cache");
@@ -973,7 +974,7 @@ fn dependency_index_cache_rejects_an_unrelated_configured_root() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(7),
         SourceRootKind::Dependency,
-        fs::canonicalize(&other).expect("canonical other root"),
+        AbsPath::normalize(&fs::canonicalize(&other).expect("canonical other root")),
     )]));
     assert!(matches!(
         host.install_index_cache(loaded),

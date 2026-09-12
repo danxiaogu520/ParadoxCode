@@ -1,3 +1,5 @@
+use text::AbsPath;
+
 use super::support::*;
 
 #[test]
@@ -30,7 +32,7 @@ fn country_history_nested_blocks_get_scope_hints_from_inherited_context() {
         id.clone(),
         1,
         "if = {\n\tlimit = { always = yes }\n\trandom_owned_province = {\n\t\tadd_core = ZZZ\n\t}\n}\n".to_owned(),
-        Some(std::path::PathBuf::from(path)),
+        Some(AbsPath::normalize(&AbsPath::normalize(&AbsPath::normalize(&AbsPath::normalize(&AbsPath::normalize(&AbsPath::normalize(&std::path::PathBuf::from(path)))))))),
     )
     .expect("open country history");
     let hints =
@@ -52,7 +54,11 @@ fn province_history_nested_blocks_get_scope_hints_from_inherited_context() {
         1,
         "if = {\n\tlimit = { always = yes }\n\towner = {\n\t\tadd_treasury = 10\n\t}\n}\n"
             .to_owned(),
-        Some(std::path::PathBuf::from(path)),
+        Some(AbsPath::normalize(&AbsPath::normalize(
+            &AbsPath::normalize(&AbsPath::normalize(&AbsPath::normalize(
+                &AbsPath::normalize(&std::path::PathBuf::from(path)),
+            ))),
+        ))),
     )
     .expect("open province history");
     let hints =
@@ -74,7 +80,11 @@ fn on_action_effect_bodies_get_scope_hints_from_inherited_context() {
         1,
         "consort_on_shipwreck = {\n\trandom_owned_province = {\n\t\tadd_core = ZZZ\n\t}\n}\n"
             .to_owned(),
-        Some(std::path::PathBuf::from(path)),
+        Some(AbsPath::normalize(&AbsPath::normalize(
+            &AbsPath::normalize(&AbsPath::normalize(&AbsPath::normalize(
+                &AbsPath::normalize(&std::path::PathBuf::from(path)),
+            ))),
+        ))),
     )
     .expect("open on_action");
     let hints =

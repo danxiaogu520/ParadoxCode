@@ -58,13 +58,19 @@ pub fn build_sprite_index(files: &[&str]) -> HashMap<String, String> {
 }
 
 /// Normalizes an EU4 texture path (`gfx//interface//missions//x.dds`,
-/// `gfx/interface/...`) into a clean root-relative path with `/` separators.
+/// `gfx/interface/...`, or Windows-separator `gfx\interface\x.dds`) into a
+/// clean root-relative path with `/` separators.
 fn normalize_texture_path(path: &str) -> String {
     let trimmed = path.trim().trim_matches('"').trim();
-    let cleaned = trimmed.replace("//", "/");
+    // Mod sources occasionally use Windows separators; fold them like the
+    // workspace `LogicalPath` policy instead of dropping the whole entry.
+    let cleaned = trimmed.replace('\\', "/").replace("//", "/");
     let cleaned = cleaned.trim_start_matches('/');
     // Reject escaping or absolute paths defensively.
-    if cleaned.starts_with("..") || cleaned.contains('\\') || cleaned.contains('\0') {
+    if cleaned.starts_with("..")
+        || cleaned.contains('\0')
+        || cleaned.as_bytes().get(1) == Some(&b':')
+    {
         return String::new();
     }
     cleaned.to_owned()
@@ -189,6 +195,16 @@ spriteType = {
     fn rejects_escaping_paths() {
         assert_eq!(normalize_texture_path("../evil.dds"), "");
         assert_eq!(normalize_texture_path("C:\\evil.dds"), "");
+        assert_eq!(normalize_texture_path("C:/evil.dds"), "");
+        // A leading slash is trimmed, matching the long-standing contract.
+        assert_eq!(
+            normalize_texture_path("/absolute/evil.dds"),
+            "absolute/evil.dds"
+        );
+        assert_eq!(
+            normalize_texture_path("gfx\\interface\\missions\\a.dds"),
+            "gfx/interface/missions/a.dds"
+        );
         assert_eq!(
             normalize_texture_path("gfx//interface//missions//a.dds"),
             "gfx/interface/missions/a.dds"

@@ -2,6 +2,7 @@ use std::fs;
 use std::hint::black_box;
 use std::path::PathBuf;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use text::AbsPath;
 
 use engine::{
     AnalysisHost, IndexCache, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
@@ -164,7 +165,7 @@ fn main() {
     builder.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        fixture.root.clone(),
+        AbsPath::normalize(&fixture.root),
     )]));
     let (scan, report) = measured(|| builder.refresh_source_roots().expect("scan fixture"));
     assert_eq!(report.indexed_files, count);
@@ -223,7 +224,7 @@ fn main() {
     dense_builder.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
-        dense_fixture.root.clone(),
+        AbsPath::normalize(&dense_fixture.root),
     )]));
     let (dense_scan, dense_report) = measured(|| {
         dense_builder
@@ -291,7 +292,7 @@ fn main() {
     mixed_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(u32::MAX),
         SourceRootKind::CurrentMod,
-        mixed_current_fixture.root.clone(),
+        AbsPath::normalize(&mixed_current_fixture.root),
     )]));
     let (mixed_scan, mixed_report) = measured(|| {
         mixed_host

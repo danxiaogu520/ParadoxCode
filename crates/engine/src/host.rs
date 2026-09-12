@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use rules::{GameProfile, ParserKind, RuleSet};
-use text::LogicalPath;
+use text::{AbsPath, LogicalPath};
 
 use crate::index_cache::{IndexCache, IndexCacheError};
 use crate::query_cache::SnapshotQueryCache;
@@ -37,10 +37,10 @@ pub struct AnalysisHost {
     rules: Arc<RuleSet>,
     profile: Arc<GameProfile>,
     roots: Arc<[SourceRoot]>,
-    workspace_root: Option<PathBuf>,
+    workspace_root: Option<AbsPath>,
     documents: Arc<BTreeMap<DocumentId, DocumentSnapshot>>,
     source_files: Arc<BTreeMap<SourceFileId, SourceFile>>,
-    source_file_paths: Arc<HashMap<PathBuf, SourceFileId>>,
+    source_file_paths: Arc<HashMap<AbsPath, SourceFileId>>,
     file_states: Arc<BTreeMap<SourceFileId, Arc<FileState>>>,
     index: Arc<WorkspaceIndex>,
     scan_report: Arc<WorkspaceScanReport>,
@@ -186,7 +186,7 @@ impl AnalysisHost {
         version: Option<i64>,
         text: String,
         source: DocumentSource,
-        path: Option<PathBuf>,
+        path: Option<AbsPath>,
     ) -> DocumentSnapshot {
         prepare_document_snapshot(
             self.rules.as_ref(),
@@ -725,11 +725,14 @@ impl AnalysisHost {
             let relative = change
                 .path
                 .strip_prefix(&root.path)
-                .map_err(|_| WorkspaceError::InvalidLogicalPath(change.path.clone()))?
+                .map_err(|_| {
+                    WorkspaceError::InvalidLogicalPath(change.path.as_path().to_path_buf())
+                })?
                 .to_string_lossy()
                 .replace('\\', "/");
-            let logical = LogicalPath::parse(&relative)
-                .map_err(|_| WorkspaceError::InvalidLogicalPath(change.path.clone()))?;
+            let logical = LogicalPath::parse(&relative).map_err(|_| {
+                WorkspaceError::InvalidLogicalPath(change.path.as_path().to_path_buf())
+            })?;
             if !self.profile.allows_scan_file(logical.as_str()) {
                 continue;
             }
@@ -746,7 +749,7 @@ impl AnalysisHost {
                         &mut report,
                         limits,
                         WorkspaceScanIssueKind::SymlinkSkipped,
-                        change.path.clone(),
+                        change.path.as_path().to_path_buf(),
                         "symbolic links are not followed during targeted disk updates".to_owned(),
                     );
                     continue;
@@ -758,7 +761,7 @@ impl AnalysisHost {
                         &mut report,
                         limits,
                         WorkspaceScanIssueKind::MetadataUnreadable,
-                        change.path.clone(),
+                        change.path.as_path().to_path_buf(),
                         error.to_string(),
                     );
                     continue;
@@ -885,7 +888,7 @@ impl AnalysisHost {
         id: DocumentId,
         version: i64,
         text: String,
-        path: Option<PathBuf>,
+        path: Option<AbsPath>,
     ) -> Result<(), DocumentError> {
         if self
             .documents
@@ -915,7 +918,7 @@ impl AnalysisHost {
         id: DocumentId,
         version: i64,
         text: String,
-        path: Option<PathBuf>,
+        path: Option<AbsPath>,
     ) -> Result<(), DocumentError> {
         if self
             .documents
@@ -1127,7 +1130,7 @@ impl AnalysisHost {
 
 /// Builds the physical-path lookup used to resolve one scanned file without scanning the full
 /// file table. First match wins, mirroring the iteration order of the previous linear scans.
-fn source_file_paths(files: &BTreeMap<SourceFileId, SourceFile>) -> HashMap<PathBuf, SourceFileId> {
+fn source_file_paths(files: &BTreeMap<SourceFileId, SourceFile>) -> HashMap<AbsPath, SourceFileId> {
     let mut paths = HashMap::with_capacity(files.len());
     for (id, file) in files {
         paths.entry(file.physical_path.clone()).or_insert(*id);

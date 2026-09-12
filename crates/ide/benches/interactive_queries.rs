@@ -7,6 +7,7 @@
 //! because the snapshot query cache makes repeated interactions at one revision cheap.
 
 use std::time::{Duration, Instant};
+use text::AbsPath;
 
 use engine::{AnalysisHost, DocumentId, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
 use game::eu4;
@@ -61,7 +62,7 @@ fn main() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::CurrentMod,
-        root.clone(),
+        AbsPath::normalize(&root),
     )]));
     let scan = host.refresh_source_roots().expect("scan fixture");
     println!("indexed {} files in the fixture", scan.indexed_files);
@@ -72,8 +73,13 @@ fn main() {
             let document = DocumentId::new(format!(
                 "file:///bench/common/scripted_effects/overlay_{index}.txt"
             ));
-            host.open_document(document.clone(), 1, overlay_text.clone(), Some(path))
-                .expect("open overlay document");
+            host.open_document(
+                document.clone(),
+                1,
+                overlay_text.clone(),
+                Some(AbsPath::normalize(&path)),
+            )
+            .expect("open overlay document");
             document
         })
         .collect::<Vec<_>>();

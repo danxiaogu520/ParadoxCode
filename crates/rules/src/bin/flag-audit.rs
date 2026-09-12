@@ -168,10 +168,9 @@ fn collect_script_files(root: &Path, out: &mut Vec<PathBuf>) -> std::io::Result<
                 continue;
             }
             collect_script_files(&path, out)?;
-        } else if path
-            .extension()
-            .is_some_and(|extension| extension == "txt" || extension == "gui")
-        {
+        } else if path.extension().is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("txt") || extension.eq_ignore_ascii_case("gui")
+        }) {
             out.push(path);
         }
     }

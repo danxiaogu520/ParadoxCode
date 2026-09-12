@@ -234,13 +234,13 @@ mod tests {
     use super::*;
     use crate::{SourceFileId, SourceRootId};
     use rules::FileResolutionPolicy;
-    use text::LogicalPath;
+    use text::{AbsPath, LogicalPath};
 
     fn file(root: &Path) -> SourceFile {
         SourceFile {
             id: SourceFileId::new(7),
             root_id: SourceRootId::new(3),
-            physical_path: root.join("events/test.txt"),
+            physical_path: AbsPath::normalize(&root.join("events/test.txt")),
             logical_path: LogicalPath::parse("events/test.txt").expect("logical path"),
             category_id: Some("script".to_owned()),
             resolution: FileResolutionPolicy::ReplaceByRelativePath,

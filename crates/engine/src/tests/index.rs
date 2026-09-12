@@ -1,4 +1,5 @@
 use super::*;
+use text::AbsPath;
 
 #[test]
 fn grouped_position_map_keeps_sorted_lookup_and_replacement_semantics() {
@@ -132,7 +133,7 @@ fn parallel_file_state_materialization_is_deterministic() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     let report = host.refresh_source_roots().expect("parallel scan");
@@ -164,7 +165,11 @@ fn type_per_file_definition_is_emitted_once_without_generic_pseudo_members() {
     let rules = game::eu4::first_party_rules().expect("first-party rules");
     let mut host = AnalysisHost::with_profile(rules, game::eu4::profile());
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
-        SourceRoot::new(SourceRootId::new(1), SourceRootKind::CurrentMod, root),
+        SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            AbsPath::normalize(&root),
+        ),
     ]));
     host.refresh_source_roots().expect("scan country file");
 
@@ -283,7 +288,7 @@ fn identity_only_host_does_not_leak_eu4_dynamic_symbols() {
         SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
-            root.clone(),
+            AbsPath::normalize(&root),
         ),
     ]));
     host.refresh_source_roots().expect("scan roots");

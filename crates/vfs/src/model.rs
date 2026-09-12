@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use parser::{CstKind, FileFormat, ParsedFile};
 use rules::FileResolutionPolicy;
-use text::{LogicalPath, TextRange};
+use text::{AbsPath, LogicalPath, TextRange};
 
 /// Stable identity for a source root during one host lifetime.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -35,8 +35,8 @@ pub struct SourceRoot {
     pub id: SourceRootId,
     /// Root kind; resolution order is implemented in a later phase.
     pub kind: SourceRootKind,
-    /// Explicit filesystem path.
-    pub path: PathBuf,
+    /// Canonical filesystem path.
+    pub path: AbsPath,
     /// Explicit low-to-high order among roots of the same kind.
     pub order: u32,
     /// Whether this root is allowed to own generated or edited files.
@@ -46,7 +46,7 @@ pub struct SourceRoot {
 impl SourceRoot {
     /// Creates a root with an order derived from its stable ID.
     #[must_use]
-    pub fn new(id: SourceRootId, kind: SourceRootKind, path: PathBuf) -> Self {
+    pub fn new(id: SourceRootId, kind: SourceRootKind, path: AbsPath) -> Self {
         let writable = matches!(kind, SourceRootKind::CurrentMod);
         Self {
             id,
@@ -99,8 +99,8 @@ pub struct SourceFile {
     pub id: SourceFileId,
     /// Owning source root.
     pub root_id: SourceRootId,
-    /// Physical disk path.
-    pub physical_path: PathBuf,
+    /// Canonical disk path.
+    pub physical_path: AbsPath,
     /// PDX logical path relative to the root.
     pub logical_path: LogicalPath,
     /// Rules catalog category, when one matched.
@@ -658,7 +658,7 @@ pub enum WorkspaceChange {
     /// Replace the configured source roots.
     SetSourceRoots(Vec<SourceRoot>),
     /// Replace the explicit workspace root.
-    SetWorkspaceRoot(Option<PathBuf>),
+    SetWorkspaceRoot(Option<AbsPath>),
 }
 
 /// Filesystem event kind supplied by an editor watcher or save fallback.
@@ -675,8 +675,8 @@ pub enum DiskFileChangeKind {
 /// One editor-neutral disk candidate event.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DiskFileChange {
-    /// Absolute path reported by the client.
-    pub path: PathBuf,
+    /// Canonical absolute path reported by the client.
+    pub path: AbsPath,
     /// Reported change kind.
     pub kind: DiskFileChangeKind,
 }
@@ -684,7 +684,7 @@ pub struct DiskFileChange {
 impl DiskFileChange {
     /// Creates one disk event.
     #[must_use]
-    pub fn new(path: PathBuf, kind: DiskFileChangeKind) -> Self {
+    pub fn new(path: AbsPath, kind: DiskFileChangeKind) -> Self {
         Self { path, kind }
     }
 }
@@ -752,7 +752,7 @@ pub enum WorkspaceError {
     /// A root-relative path escaped its logical root.
     InvalidLogicalPath(PathBuf),
     /// Two distinct physical files produced the same stable source identity.
-    FileIdCollision { first: PathBuf, second: PathBuf },
+    FileIdCollision { first: AbsPath, second: AbsPath },
     /// Source discovery exceeded its total regular-file budget.
     FileLimitExceeded { limit: usize },
 }
@@ -772,8 +772,8 @@ impl fmt::Display for WorkspaceError {
             Self::FileIdCollision { first, second } => write!(
                 formatter,
                 "source file identity collision between {} and {}",
-                first.display(),
-                second.display()
+                first.as_path().display(),
+                second.as_path().display()
             ),
             Self::FileLimitExceeded { limit } => {
                 write!(
