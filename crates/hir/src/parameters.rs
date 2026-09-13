@@ -52,6 +52,15 @@ pub(super) fn lower_parameters(
                 continue;
             };
             for (name, range, name_range) in delimited_parameters(raw, token.range(), delimiter) {
+                // A substitution written inside a `[[condition] … ]` head is already represented
+                // by that conditional's reference; keeping both would nest ranges, and the
+                // non-overlapping source order is what `parameter_reference_at` binary-searches.
+                if conditionals
+                    .iter()
+                    .any(|conditional| ranges_overlap(range, conditional.condition_range))
+                {
+                    continue;
+                }
                 let Some(owner_range) = owning_top_level_range(properties, range) else {
                     continue;
                 };
@@ -104,6 +113,10 @@ fn owning_top_level_range(properties: &[HirProperty], occurrence: TextRange) -> 
         .filter(|property| property.top_level && range_within(occurrence, property.range))
         .map(|property| property.range)
         .next()
+}
+
+fn ranges_overlap(left: TextRange, right: TextRange) -> bool {
+    left.start() < right.end() && right.start() < left.end()
 }
 
 fn parameter_reference_kind(

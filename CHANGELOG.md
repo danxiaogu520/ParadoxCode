@@ -36,6 +36,10 @@ host-local allowlist on the dedicated self-hosted runner.
 
 ### Fixed
 
+- Lowering no longer emits a substitution reference nested inside a `[[condition] … ]` head: the
+  conditional's own reference already represents that occurrence, and the overlapping pair broke
+  the non-overlapping source order that `parameter_reference_at` binary-searches over (surfaced
+  by the fuzz invariant smoke).
 - Cancel dynamic contract inference when its triggering completion request is cancelled: the
   workspace-wide contract report previously ran under a fresh, never-cancelled token on the
   completion path, and documents without dynamic definitions now skip the report entirely.
