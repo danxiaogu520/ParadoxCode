@@ -668,7 +668,7 @@
         },
         {
           "command": "paradoxcode.localisation.openDecoded",
-          "when": "resourceScheme == file && resourceFilename =~ /\\.yml$/ && resourcePath =~ /localisation\\//",
+          "when": "resourceScheme == file && resourceFilename =~ /\\.(yml|txt)$/ && paradoxcode.transcodeEscaped",
           "group": "navigation@3"
         },
         {
@@ -687,14 +687,14 @@
       "editor/context": [
         {
           "command": "paradoxcode.localisation.openDecoded",
-          "when": "resourceScheme == file && resourceFilename =~ /\\.yml$/ && resourcePath =~ /localisation\\//",
+          "when": "resourceScheme == file && resourceFilename =~ /\\.(yml|txt)$/ && paradoxcode.transcodeEscaped",
           "group": "paradoxcode@1"
         }
       ],
       "explorer/context": [
         {
           "command": "paradoxcode.localisation.openDecoded",
-          "when": "resourceFilename =~ /\\.yml$/ && resourcePath =~ /localisation\\//",
+          "when": "resourceFilename =~ /\\.(yml|txt)$/",
           "group": "paradoxcode@1"
         },
         {
@@ -962,7 +962,7 @@
             "pattern": "^[^\\].*$"
           },
           "default": [
-            "history/**"
+            "**/*.txt"
           ],
           "markdownDescription": "%configuration.localisation.transparentScriptGlobs.description%"
         }

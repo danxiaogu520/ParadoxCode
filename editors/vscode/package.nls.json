@@ -72,5 +72,5 @@
   "commands.localisation.transcodeFile.title": "Transcode Localisation File",
   "configuration.localisation.transparentEncoding.description": "Enable the `pdcloc://` transparent read/write view over EU4dll-transcoded files. Eligible localisation yml and script files can open as readable Chinese, and saving the decoded view re-encodes the on-disk escaped form.",
   "configuration.localisation.autoOpenDecoded.description": "Automatically open eligible EU4dll-transcoded files in the decoded Chinese view. Readable, mixed, and ASCII files remain on their original file URI.",
-  "configuration.localisation.transparentScriptGlobs.description": "Workspace-relative glob patterns of script files eligible for the decoded view (paratranz `latin1eu4` profile, e.g. `history/countries/*.txt`). Default: `history/**`."
+  "configuration.localisation.transparentScriptGlobs.description": "Workspace-relative glob patterns of script files eligible for the decoded view (paratranz `latin1eu4` profile). Files that are normal readable UTF-8 (BOM included) never enter the decoded view regardless of this setting. Default: `**/*.txt`."
 }
