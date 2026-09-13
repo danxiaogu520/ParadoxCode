@@ -82,14 +82,15 @@ that send only the deprecated `rootUri` field are intentionally unsupported and 
 
 ## Project status
 
-**Latest release: v0.3.3** (12 Sep 2026). The EU4 analysis and indexing features are implemented,
+**Latest release: v0.3.4** (13 Sep 2026). The EU4 analysis and indexing features are implemented,
 tested, and released through the tag-driven release pipeline (see [Releases](#releases)). This
-release restructures the repository along rust-analyzer's layering (twelve crates, the server
-binary is now `paradoxcode`, user-visible contracts drop the `pdx` prefix), replaces the shell
-tooling layer with `cargo tools gates`, fixes whole-workspace validation pegging every worker
-core while a document is open, makes engine-parameterized modifier families actually validate
-through template key matchers, and supports UNC paths end to end. Early adopters should still
-expect rough edges while 0.x matures; please report problems
+release retires the typed-language editor surface for EU4 localisation prose (no diagnostics or
+identifier completion in `.yml` localisation documents; the decoded `pdcloc://` view opens
+automatically and remains the only reporter of the not-transcoded warning), makes completion's
+dynamic-contract inference cancellable so obsolete requests stop pinning a core, and hardens the
+release process into protected atomic releases (immutable assets, a packaged-artifact sweep,
+pinned GitHub Actions, and a host allowlist on the self-hosted runner). Early adopters should
+still expect rough edges while 0.x matures; please report problems
 through the issue templates so they can be fixed in the next
 release.
 
