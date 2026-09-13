@@ -380,48 +380,61 @@ async function transcodeFile(
     );
 }
 
+/** Whether opening an eligible raw file should automatically use its decoded twin. */
+function autoOpenDecoded(): boolean {
+    return vscode.workspace
+        .getConfiguration('paradoxcode.localisation')
+        .get<boolean>('autoOpenDecoded', true);
+}
+
 /**
- * Offers the decoded view when a transcoded file is opened through its raw
- * path — the most common entry point for `localisation/replace/*.yml`.
- * Each file is only asked once per session.
+ * Opens the decoded view when an eligible, transcoded file is opened through
+ * its raw path. Readable, mixed, and ASCII files stay on the normal `file://`
+ * URI so the classifier remains the single guard against double decoding.
+ *
+ * The set is only an in-flight guard. A raw document can be intentionally
+ * revealed later, and closing/reopening it should apply the setting again.
  */
-async function maybePromptDecodedView(
+async function maybeAutoOpenDecodedView(
     codec: Transcoder,
     document: vscode.TextDocument,
-    prompted: Set<string>,
+    opening: Set<string>,
 ): Promise<void> {
-    const key = document.uri.toString();
-    if (prompted.has(key) || document.uri.scheme !== 'file') {
+    if (!autoOpenDecoded() || document.uri.scheme !== 'file') {
         return;
     }
     const profile = profileForRealPath(document.uri.fsPath, transparentScriptGlobs());
     if (profile === undefined) {
         return;
     }
-    let bytes: Uint8Array;
+    const key = document.uri.toString();
+    if (opening.has(key)) {
+        return;
+    }
+    opening.add(key);
     try {
-        bytes = new Uint8Array(await fs.readFile(document.uri.fsPath));
-    } catch {
-        return;
-    }
-    if (codec.classify(bytes, profile) !== 'escaped') {
-        return;
-    }
-    prompted.add(key);
-    const choice = await vscode.window.showInformationMessage(
-        'ParadoxCode: this file contains EU4dll escape sequences. Open it as readable Chinese?',
-        'Open decoded view',
-    );
-    if (choice === 'Open decoded view') {
+        let bytes: Uint8Array;
+        try {
+            bytes = new Uint8Array(await fs.readFile(document.uri.fsPath));
+        } catch {
+            return;
+        }
+        if (codec.classify(bytes, profile) !== 'escaped') {
+            return;
+        }
         await openDecodedView(document.uri);
+    } finally {
+        opening.delete(key);
     }
 }
 
 /**
  * Registers the whole transparent-localisation feature: the FileSystemProvider,
  * commands, status-bar indicator, and client-side classification diagnostics.
- * Controlled by `paradoxcode.localisation.transparentEncoding`; when the
- * artifact is missing the feature degrades to a log line, never an error.
+ * Controlled by `paradoxcode.localisation.transparentEncoding`; automatic
+ * raw-to-decoded redirection is controlled separately by
+ * `paradoxcode.localisation.autoOpenDecoded`. When the artifact is missing
+ * the feature degrades to a log line, never an error.
  */
 export async function activateTransparentLocalisation(
     context: vscode.ExtensionContext,
@@ -454,10 +467,19 @@ export async function activateTransparentLocalisation(
         }
     };
 
-    const promptedDecodedViews = new Set<string>();
+    const openingDecodedViews = new Set<string>();
     const disposables: vscode.Disposable[] = [provider, statusItem, diagnostics];
     const configuration = vscode.workspace.getConfiguration('paradoxcode.localisation');
     if (configuration.get<boolean>('transparentEncoding', true)) {
+        const autoOpenDocument = (document: vscode.TextDocument | undefined): void => {
+            if (!document) {
+                return;
+            }
+            void maybeAutoOpenDecodedView(codec, document, openingDecodedViews).catch((error) => {
+                const message = error instanceof Error ? error.message : String(error);
+                log.appendLine(`transparentLoc: automatic decoded view failed: ${message}`);
+            });
+        };
         disposables.push(
             vscode.workspace.registerFileSystemProvider(PDCLOC_SCHEME, provider, {
                 // URIs under this scheme are byte-identical twins of their
@@ -476,11 +498,13 @@ export async function activateTransparentLocalisation(
                 void transcodeFile(codec, uri, log),
             ),
             vscode.window.onDidChangeActiveTextEditor(updateStatus),
-            vscode.workspace.onDidOpenTextDocument((document) =>
-                void maybePromptDecodedView(codec, document, promptedDecodedViews),
-            ),
+            vscode.workspace.onDidOpenTextDocument(autoOpenDocument),
         );
         updateStatus();
+        // `onLanguage` activation can happen after VS Code has already opened
+        // the triggering document, so inspect the active editor as well as
+        // relying on the document-open event.
+        autoOpenDocument(vscode.window.activeTextEditor?.document);
         log.appendLine('transparent localisation enabled (pdcloc:// provider active)');
     } else {
         log.appendLine('transparent localisation disabled by configuration');

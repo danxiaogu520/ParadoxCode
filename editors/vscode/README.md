@@ -52,9 +52,10 @@ navigation, zoom controls, a mission list, and PNG/JSON export.
 Mods running the EU4dll double-byte patch store localisation as escape-tripled bytes. ParadoxCode
 ships the transcoder and opens those files as readable Chinese through the `pdcloc://` view:
 
-- Choose **ParadoxCode: Open in Decoded (Chinese) View** on any `localisation/**/*.yml` (or a
-  script file matching `paradoxcode.localisation.transparentScriptGlobs`) — you can also accept
-  the prompt shown when a transcoded file is opened through its raw path.
+- Eligible transcoded files automatically open in the decoded view. You can still choose
+  **ParadoxCode: Open in Decoded (Chinese) View** on any `localisation/**/*.yml` (or a script file
+  matching `paradoxcode.localisation.transparentScriptGlobs`) when needed. Automatic redirection is
+  controlled by `paradoxcode.localisation.autoOpenDecoded` and is enabled by default.
 - Edits are re-encoded on save; the raw bytes on disk always stay game-ready. Saving is refused
   (never double-encoded) if the buffer itself already contains escape sequences or code points
   the ecosystem cannot round-trip.
@@ -101,6 +102,7 @@ on the next server restart; preview settings take effect immediately.
 | `paradoxcode.diagnostics.severityOverrides` | `{}` | Remap diagnostic codes to `error`, `warning`, `info`, `hint`, or `off`. |
 | `paradoxcode.localisation.preferredLanguages` | `[]` | Localisation language preference order. |
 | `paradoxcode.localisation.transparentEncoding` | `true` | Enable the `pdcloc://` decoded read/write view over EU4dll-transcoded files. |
+| `paradoxcode.localisation.autoOpenDecoded` | `true` | Automatically open eligible transcoded files in the decoded view. |
 | `paradoxcode.localisation.transparentScriptGlobs` | `["history/**"]` | Workspace-relative globs of script files eligible for the decoded view (`latin1eu4`). |
 | `paradoxcode.completion.sourceLayers` | `[currentMod, dependencies, vanilla]` | Completion layers to include; resolution priority is unchanged. |
 | `paradoxcode.performance.profile` | `"balanced"` | Bounded scan concurrency: `conservative`, `balanced`, or `fast`. |

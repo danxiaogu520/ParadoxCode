@@ -108,6 +108,7 @@ suite('ParadoxCode VS Code extension host', () => {
       assert.equal(config.get('preview.defaultExportDirectory'), '');
       assert.deepEqual(config.get('diagnostics.severityOverrides'), {});
       assert.deepEqual(config.get('localisation.preferredLanguages'), []);
+      assert.equal(config.get('localisation.autoOpenDecoded'), true);
       assert.deepEqual(config.get('completion.sourceLayers'), [
         'currentMod',
         'dependencies',

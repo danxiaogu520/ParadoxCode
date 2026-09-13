@@ -360,6 +360,7 @@ const requiredSettings = [
   'paradoxcode.preview.defaultExportDirectory',
   'paradoxcode.diagnostics.severityOverrides',
   'paradoxcode.localisation.preferredLanguages',
+  'paradoxcode.localisation.autoOpenDecoded',
   'paradoxcode.completion.sourceLayers',
   'paradoxcode.performance.profile',
 ];
@@ -371,7 +372,10 @@ for (const setting of requiredSettings) {
   const nlsKey = property.markdownDescription.match(/^%(.+)%$/)?.[1];
   if (!nlsKey || typeof nls[nlsKey] !== 'string' || typeof zh[nlsKey] !== 'string') {
     fail(`English and Chinese NLS entries are required for ${setting}`);
-  }
+    }
+}
+if (manifest.contributes.configuration?.properties?.['paradoxcode.localisation.autoOpenDecoded']?.default !== true) {
+  fail('paradoxcode.localisation.autoOpenDecoded must default to true');
 }
 // Whole-workspace diagnostics is opt-in from the editor: the manifest default
 // must be false and the resolved value must be forwarded unconditionally, or
