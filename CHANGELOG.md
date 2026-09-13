@@ -33,6 +33,11 @@ host-local allowlist on the dedicated self-hosted runner.
 - Open eligible EU4dll-transcoded localisation files directly in their decoded `pdcloc://` view
   by default, while preserving automatic re-encoding on save; the redirection can be disabled
   with `paradoxcode.localisation.autoOpenDecoded`.
+- Extend the decoded view to workspace script files: `paradoxcode.localisation.transparentScriptGlobs`
+  defaults to `**/*.txt`, files that are not classifier-escaped (readable UTF-8, BOM included, and
+  ASCII) never enter the view, and the editor and explorer entries follow a cached
+  `paradoxcode.transcodeEscaped` context key that refreshes right after Transcode Localisation
+  File.
 - Protect the integration and release process: pull requests require the stable `Conclusion`
   check, releases verify tag provenance, and the packaged Windows server must pass the Vanilla
   sweep before a complete draft is published.
