@@ -109,6 +109,13 @@ pub(crate) fn dynamic_contract_diagnostics(
     let Some(hir) = input.hir.as_deref() else {
         return Ok(Vec::new());
     };
+    if !hir
+        .definitions()
+        .iter()
+        .any(|definition| dynamic_definition_type(snapshot, &definition.kind))
+    {
+        return Ok(Vec::new());
+    }
     let report = dynamic_contract_report(snapshot, cancellation)?;
     if report.contracts.is_empty() {
         return Ok(Vec::new());
@@ -155,11 +162,8 @@ pub(crate) fn dynamic_call_site_diagnostics(
     let Some(hir) = input.hir.as_deref() else {
         return Ok(Vec::new());
     };
-    let report = dynamic_contract_report(snapshot, cancellation)?;
-    if report.contracts.is_empty() {
-        return Ok(Vec::new());
-    }
     let profile = snapshot.game_profile();
+    let mut report = None;
     let mut diagnostics = Vec::new();
     for property in hir.properties() {
         cancellation.checkpoint()?;
@@ -214,6 +218,16 @@ pub(crate) fn dynamic_call_site_diagnostics(
         let Some(dynamic_kind) = dynamic_kind else {
             continue;
         };
+        let report = match report.as_ref() {
+            Some(report) => report,
+            None => {
+                let computed = dynamic_contract_report(snapshot, cancellation)?;
+                if computed.contracts.is_empty() {
+                    return Ok(Vec::new());
+                }
+                report.insert(computed)
+            }
+        };
         let Some(contract) = report.contract(&dynamic_kind, &property.key) else {
             continue;
         };
@@ -252,14 +266,15 @@ pub(crate) fn dynamic_contract(
     report.contract(kind, name).cloned()
 }
 
-/// Loads the workspace-wide contract report for read-only consumers such as
-/// completion filtering. The report is cached per revision; the fresh
-/// cancellation token matches the hover path (`dynamic_contract`).
+/// Loads the workspace-wide contract report for cancellable consumers such as
+/// completion filtering. The report is cached per revision, and the caller's
+/// token must reach the workspace traversal so obsolete editor requests stop
+/// before consuming a full core.
 pub(crate) fn dynamic_contract_report_view(
     snapshot: &AnalysisSnapshot,
-) -> std::sync::Arc<DynamicContractReport> {
-    let cancellation = CancellationToken::new();
-    uncancelled(dynamic_contract_report(snapshot, &cancellation))
+    cancellation: &CancellationToken,
+) -> Result<std::sync::Arc<DynamicContractReport>, Cancelled> {
+    dynamic_contract_report(snapshot, cancellation)
 }
 
 /// One-line hover summary of a definition's inferred contract.

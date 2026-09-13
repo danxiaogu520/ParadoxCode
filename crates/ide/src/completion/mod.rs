@@ -128,7 +128,8 @@ pub fn complete_with_cancellation(
                         &mut items,
                         replacement_range,
                         &prefix,
-                    );
+                        cancellation,
+                    )?;
                 }
             }
         } else {
@@ -147,7 +148,8 @@ pub fn complete_with_cancellation(
                     replacement_range,
                     &prefix,
                     insert_assignment,
-                );
+                    cancellation,
+                )?;
             }
         }
     } else if !value_context {
