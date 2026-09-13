@@ -7,15 +7,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Changed
-
-- Let the release sweep accept exactly one reviewed diagnostics fingerprint through a checked-in
-  baseline file (`editors/vscode/scripts/sweep-baseline.json`): releases that intentionally change
-  diagnostic output record the accepted fingerprint there through a pull request, and the gate
-  still fails on any drift the file does not name. The published sweep summary records the
-  expected fingerprint openly.
-
-## [0.3.4] - 2026-09-13
+## [0.3.5] - 2026-09-13
 
 This release retires the typed-language editor surface for EU4 localisation prose: `.yml`
 localisation documents stay indexed for hover and navigation but no longer receive diagnostics or
@@ -28,6 +20,11 @@ host-local allowlist on the dedicated self-hosted runner.
 
 ### Changed
 
+- Let the release sweep accept exactly one reviewed diagnostics fingerprint through a checked-in
+  baseline file (`editors/vscode/scripts/sweep-baseline.json`): releases that intentionally change
+  diagnostic output record the accepted fingerprint there through a pull request, and the gate
+  still fails on any drift the file does not name. The published sweep summary records the
+  expected fingerprint openly.
 - Keep EU4 localisation documents in the workspace index for hover and navigation while returning
   no LSP diagnostics or completion items from those documents, preventing prose edits from
   triggering unrelated key lists and warnings. The server-side `LocalisationNotTranscoded`
@@ -612,8 +609,8 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.4...HEAD
-[0.3.4]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.3...v0.3.4
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.5...HEAD
+[0.3.5]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.3...v0.3.5
 [0.3.3]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.0...v0.3.1

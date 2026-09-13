@@ -82,7 +82,7 @@ that send only the deprecated `rootUri` field are intentionally unsupported and 
 
 ## Project status
 
-**Latest release: v0.3.4** (13 Sep 2026). The EU4 analysis and indexing features are implemented,
+**Latest release: v0.3.5** (13 Sep 2026). The EU4 analysis and indexing features are implemented,
 tested, and released through the tag-driven release pipeline (see [Releases](#releases)). This
 release retires the typed-language editor surface for EU4 localisation prose (no diagnostics or
 identifier completion in `.yml` localisation documents; the decoded `pdcloc://` view opens
