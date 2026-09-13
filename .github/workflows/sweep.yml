@@ -219,6 +219,16 @@ jobs:
             '--vanilla-cache', $cacheFile,
             '--fail-on', 'none'
           )
+          # A reviewed baseline file may accept exactly one intentional
+          # diagnostics drift; the gate still fails on any other fingerprint.
+          $baselinePath = 'editors/vscode/scripts/sweep-baseline.json'
+          if (Test-Path -LiteralPath $baselinePath -PathType Leaf) {
+            $baseline = Get-Content -LiteralPath $baselinePath -Raw | ConvertFrom-Json
+            if (-not [string]::IsNullOrWhiteSpace($baseline.fingerprint)) {
+              $arguments += @('--expect-fingerprint', $baseline.fingerprint)
+              "Sweep baseline armed: $($baseline.fingerprint)"
+            }
+          }
           if (-not [string]::IsNullOrWhiteSpace($env:PREVIOUS_SWEEP_SUMMARY)) {
             $arguments += @('--previous', $env:PREVIOUS_SWEEP_SUMMARY)
           }

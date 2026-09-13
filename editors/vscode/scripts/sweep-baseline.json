@@ -1,0 +1,6 @@
+{
+  "fingerprint": "269c1d11d1f75752edb3978a60824217297af747e4aeaaa7a0005f08177e3858",
+  "previous_fingerprint": "d9a4d9dfbf1ef093caeb29de1ade1e45db7b99022b87f48061ff8f2d8b9a4fae",
+  "reason": "Localisation documents no longer publish server diagnostics: LocalisationUnencodableCodePoint drops 1241 -> 14 warnings on the Vanilla sweep; every other diagnostic code keeps its count and the error total stays at the known 102 baseline.",
+  "established": "2026-09-13"
+}
