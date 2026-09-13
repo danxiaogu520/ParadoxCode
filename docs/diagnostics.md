@@ -3,6 +3,10 @@
 Every diagnostic ParadoxCode publishes carries one of the codes below. The
 `codeDescription` link in your editor points at the matching section here.
 
+Localisation documents participate in parsing and workspace indexing but do not
+publish LSP diagnostics. The transparent-encoding file provider can still report
+read/save safety failures described in the localisation sections below.
+
 All messages are written for the script in front of you: they name the
 offending token, state the violated constraint on an `expected:` line, and
 attach a `related:` location when another spot in the workspace explains the
@@ -10,8 +14,8 @@ finding. Internal rule provenance never appears in messages.
 
 ## SyntaxError
 
-The file could not be parsed: an unclosed block or string, a stray
-delimiter, an operator without a value, or a malformed localisation entry.
+The script file could not be parsed: an unclosed block or string, a stray
+delimiter, or an operator without a value.
 The range covers the incomplete construct (for a missing value, the `key =`
 that never received one).
 
@@ -118,13 +122,14 @@ on a country, for example). The `expected:` line lists the valid scopes.
 
 ## LocalisationNotTranscoded
 
-The file sits on the game read path (`localisation/…/replace/…`) but contains
-readable CJK text: without the escape triples the EU4dll patch expects, the
-game renders mojibake. Transcode the file (`ParadoxCode: Transcode localisation
-file`) or keep readable sources in the master tree outside `replace/`. Files
-under other `localisation/` directories are master copies by convention and
-are never flagged. A decoded `pdcloc://` view suppresses this code: readable
-text is the point of that view, and saving re-encodes the shard behind it.
+The server no longer publishes this code: raw localisation documents carry
+no LSP diagnostics at all (see the note at the top), which retired the old
+release-path check for readable CJK under `localisation/…/replace/…`.
+Transcode release-tree files deliberately (`ParadoxCode: Transcode Localisation
+File`) or keep readable sources in the master tree outside `replace/`. The
+VS Code decoded-view provider still attaches this code when a `pdcloc://`
+view is opened over a file whose bytes are readable CJK — through that route
+readable text means the file was never transcoded.
 
 ## LocalisationMixedEncoding
 
@@ -144,13 +149,11 @@ orphan is flagged individually; fix the triple or delete the stray marker.
 
 ## LocalisationUnencodableCodePoint
 
-A character in the file cannot survive the EU4 transcoder: code points in
+A character in a configured script file cannot survive the EU4 transcoder: code points in
 U+0100–U+0FFF are silently mangled into triples (and back incorrectly), and
 code points beyond the BMP are destroyed. Re-transcoding the file would
-corrupt these characters, so they are flagged per character. The check is
-profile-aware: in script (`.txt`) files the 27 CP1252-mapped Latin letters
-(ä, é, ß, …) stay single bytes and are allowed; in localisation (`.yml`) files
-they are refused.
+corrupt these characters, so they are flagged per character. The 27
+CP1252-mapped Latin letters (ä, é, ß, …) stay single bytes and are allowed.
 
 ## LocalisationEscapeRefused
 
@@ -193,4 +196,7 @@ New codes: `UnknownLocalisationKey`, `AmbiguousDefinition`,
 The EU4dll transcode pipeline later added `LocalisationNotTranscoded`,
 `LocalisationMixedEncoding`, `LocalisationBrokenEscapeSequence`,
 `LocalisationUnencodableCodePoint`, `LocalisationEscapeRefused` (extension
-save gate only), and `ScriptLegacyEscapeVariant`.
+save gate only), and `ScriptLegacyEscapeVariant`. The removal of LSP
+diagnostics from localisation documents then retired the server-side
+`LocalisationNotTranscoded` release-path check; that code now surfaces only
+through the decoded-view provider described above.

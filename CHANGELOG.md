@@ -9,6 +9,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Keep EU4 localisation documents in the workspace index for hover and navigation while returning
+  no LSP diagnostics or completion items from those documents, preventing prose edits from
+  triggering unrelated key lists and warnings. The server-side `LocalisationNotTranscoded`
+  release-path warning is retired with it: readable CJK under `localisation/…/replace/…` must be
+  transcoded deliberately, and only the decoded-view provider still attaches that code.
 - Open eligible EU4dll-transcoded localisation files directly in their decoded `pdcloc://` view
   by default, while preserving automatic re-encoding on save; the redirection can be disabled
   with `paradoxcode.localisation.autoOpenDecoded`.
