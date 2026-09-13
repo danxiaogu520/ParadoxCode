@@ -9,6 +9,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Open eligible EU4dll-transcoded localisation files directly in their decoded `pdcloc://` view
+  by default, while preserving automatic re-encoding on save; the redirection can be disabled
+  with `paradoxcode.localisation.autoOpenDecoded`.
 - Protect the integration and release process: pull requests require the stable `Conclusion`
   check, releases verify tag provenance, and the packaged Windows server must pass the Vanilla
   sweep before a complete draft is published.

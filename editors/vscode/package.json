@@ -950,6 +950,11 @@
           "default": true,
           "markdownDescription": "%configuration.localisation.transparentEncoding.description%"
         },
+        "paradoxcode.localisation.autoOpenDecoded": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%configuration.localisation.autoOpenDecoded.description%"
+        },
         "paradoxcode.localisation.transparentScriptGlobs": {
           "type": "array",
           "items": {
