@@ -4,7 +4,6 @@ use crate::lints::{
     is_boolean_container_key, is_conditional_key, lint_boolean_container, lint_conditional_block,
     lint_conditional_siblings,
 };
-use crate::localisation::localisation_command_diagnostics;
 use crate::messages::{
     backticked_list, did_you_mean, expected_from_rules, key_description, occurrence_word,
     value_description, value_plural,
@@ -74,6 +73,39 @@ impl DiagnosticCollector {
             }
         });
         self.values
+    }
+}
+
+fn file_analysis(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    semantic: SemanticFile,
+    diagnostics: Vec<Diagnostic>,
+) -> FileAnalysis {
+    FileAnalysis {
+        revision: snapshot.revision(),
+        document: input.document.clone(),
+        file: input.file,
+        format: Some(input.format),
+        scope: Scope::Unknown,
+        diagnostics,
+        symbols: semantic
+            .definitions
+            .into_iter()
+            .map(|definition| definition.symbol)
+            .collect(),
+        references: semantic
+            .references
+            .into_iter()
+            .map(|reference| {
+                let location = reference.location();
+                ReferenceInfo {
+                    kind: reference.kind,
+                    name: reference.name,
+                    location,
+                }
+            })
+            .collect(),
     }
 }
 
@@ -195,6 +227,12 @@ pub(crate) fn analyze_input_with_cancellation(
     cancellation.checkpoint()?;
     let semantic = semantic_data(snapshot, input);
     cancellation.checkpoint()?;
+    // Localisation documents remain parsed and indexed so script-side references, hover, and
+    // navigation keep working, but the editor surface deliberately publishes no diagnostics for
+    // prose files.  Diagnostics below are reserved for Paradox script documents.
+    if input.format == FileFormat::Localisation {
+        return Ok(file_analysis(snapshot, input, semantic, Vec::new()));
+    }
     let resolution = DirectResolutionContext::new(snapshot);
     let mut diagnostics = DiagnosticCollector::new(syntax_diagnostics(input));
     // Definition-site dynamic analyses run first: they warm the per-revision
@@ -230,11 +268,6 @@ pub(crate) fn analyze_input_with_cancellation(
     diagnostics
         .values
         .extend(semantic_rule_diagnostics(snapshot, input, cancellation)?);
-    diagnostics.values.extend(localisation_command_diagnostics(
-        snapshot,
-        input,
-        cancellation,
-    )?);
     diagnostics
         .values
         .extend(crate::transcode::transcode_diagnostics(
@@ -416,31 +449,7 @@ pub(crate) fn analyze_input_with_cancellation(
     }
     let diagnostics = diagnostics.finish();
     cancellation.checkpoint()?;
-    Ok(FileAnalysis {
-        revision: snapshot.revision(),
-        document: input.document.clone(),
-        file: input.file,
-        format: Some(input.format),
-        scope: Scope::Unknown,
-        diagnostics,
-        symbols: semantic
-            .definitions
-            .into_iter()
-            .map(|definition| definition.symbol)
-            .collect(),
-        references: semantic
-            .references
-            .into_iter()
-            .map(|reference| {
-                let location = reference.location();
-                ReferenceInfo {
-                    kind: reference.kind,
-                    name: reference.name,
-                    location,
-                }
-            })
-            .collect(),
-    })
+    Ok(file_analysis(snapshot, input, semantic, diagnostics))
 }
 
 /// Returns whether a fixed first-party rule in `context` accepts `key` exactly.

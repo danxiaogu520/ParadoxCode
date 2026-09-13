@@ -3,15 +3,12 @@
 //! The server sees documents as text (disk bytes were already read through the
 //! UTF-8/CP1252 layer), so these checks classify the document text and report:
 //!
-//! * readable CJK on a `replace/` release path (`LocalisationNotTranscoded`) —
-//!   the master-tree convention keeps readable sources under other
-//!   `localisation/` directories on purpose, so only release paths are flagged;
 //! * files mixing readable CJK with escape triples or carrying stray markers
 //!   (`LocalisationMixedEncoding`);
 //! * orphan escape markers that decoding passed through
 //!   (`LocalisationBrokenEscapeSequence`);
 //! * code points the transcoder refuses (`LocalisationUnencodableCodePoint`),
-//!   profile-aware: the script profile accepts the 27 CP1252 letters;
+//!   while the script profile accepts the 27 CP1252 letters;
 //! * script files that decode correctly but re-encode differently
 //!   (`ScriptLegacyEscapeVariant`, Hint).
 //!
@@ -32,6 +29,9 @@ pub(crate) fn transcode_diagnostics(
     cancellation: &CancellationToken,
 ) -> Result<Vec<Diagnostic>, Cancelled> {
     cancellation.checkpoint()?;
+    if input.format != FileFormat::Script {
+        return Ok(Vec::new());
+    }
     let source: &str = input.source.as_ref();
     let counts = transcode::classify_text_counts(source);
     let mut diagnostics = Vec::new();
@@ -107,48 +107,27 @@ pub(crate) fn transcode_diagnostics(
                 ));
             }
         }
-        transcode::Classification::Readable => {
-            let release_localisation = input.format == FileFormat::Localisation
-                && input
-                    .path
-                    .as_ref()
-                    .is_some_and(|path| is_release_localisation_path(path.as_str()));
-            if release_localisation && let Some(range) = first_raw_cjk(source) {
-                diagnostics.push(Diagnostic::new(
-                    DiagnosticCode::LocalisationNotTranscoded,
-                    Severity::Warning,
-                    range,
-                    "this file sits on the game read path (replace/) but contains readable \
-                     CJK text: the game will render mojibake. Transcode it or keep it out \
-                     of the release tree"
-                        .to_owned(),
-                ));
-            }
-        }
+        transcode::Classification::Readable => {}
         transcode::Classification::Ascii => {}
     }
     if diagnostics.len() < MAX_TRANSCODE_DIAGNOSTICS {
-        diagnostics.extend(unencodable_diagnostics(input, source, cancellation)?);
+        diagnostics.extend(unencodable_diagnostics(source, cancellation)?);
     }
     Ok(diagnostics)
 }
 
-/// Per-character warnings for code points the transcoder refuses. Applies to
-/// readable and plain documents of both profiles; the script profile keeps the
-/// 27 CP1252-mapped letters.
+/// Per-character warnings for code points the script transcoder refuses. The 27
+/// CP1252-mapped letters remain valid single bytes.
 fn unencodable_diagnostics(
-    input: &ParsedInput,
     source: &str,
     cancellation: &CancellationToken,
 ) -> Result<Vec<Diagnostic>, Cancelled> {
-    let profile = match input.format {
-        FileFormat::Localisation => transcode::Profile::Localisation,
-        FileFormat::Script => transcode::Profile::Script,
-    };
     let mut diagnostics = Vec::new();
     for (offset, character) in source.char_indices() {
         cancellation.checkpoint()?;
-        if let Some(kind) = transcode::file_unencodable_kind(u32::from(character), profile) {
+        if let Some(kind) =
+            transcode::file_unencodable_kind(u32::from(character), transcode::Profile::Script)
+        {
             if diagnostics.len() >= MAX_TRANSCODE_DIAGNOSTICS {
                 break;
             }
@@ -174,29 +153,11 @@ fn unencodable_diagnostics(
     Ok(diagnostics)
 }
 
-/// A `localisation/…` path containing a `replace` segment: the dual-tree
-/// release layout where readable CJK means the game renders mojibake. Other
-/// localisation directories are master copies by convention and stay quiet.
-fn is_release_localisation_path(path: &str) -> bool {
-    let mut segments = path.split('/');
-    let under_localisation = segments
-        .next()
-        .is_some_and(|first| first.eq_ignore_ascii_case("localisation"));
-    under_localisation && segments.any(|segment| segment.eq_ignore_ascii_case("replace"))
-}
-
 fn char_range(source: &str, offset: usize) -> Option<TextRange> {
     let start = u32::try_from(offset).ok()?;
     let character = source[offset..].chars().next()?;
     let end = start + (character.len_utf8() as u32);
     TextRange::new(start, end)
-}
-
-fn first_raw_cjk(source: &str) -> Option<TextRange> {
-    source
-        .char_indices()
-        .find(|(_, character)| transcode::is_raw_cjk(u32::from(*character)))
-        .and_then(|(offset, _)| char_range(source, offset))
 }
 
 /// Anchors the mixed-encoding error at the first marker or CJK character,

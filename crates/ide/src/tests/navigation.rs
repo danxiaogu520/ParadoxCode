@@ -184,27 +184,6 @@ fn duplicate_definitions_resolve_last_and_warn_at_the_later_definition() {
 }
 
 #[test]
-fn localisation_values_offer_indexed_localisation_symbols() {
-    let mut host = eu4_host(game::eu4::bootstrap_rules());
-    let id = DocumentId::new("file:///tmp/localisation/test.yml");
-    host.open_document(
-        id.clone(),
-        1,
-        "l_english:\nfoo_name:0 \"Foo\"\nbar:0 \"\"\n".to_owned(),
-        None,
-    )
-    .expect("open");
-    let snapshot = host.snapshot();
-    let result = complete(&snapshot, &id, 36);
-    assert!(
-        result
-            .items
-            .iter()
-            .any(|item| item.label == "foo_name" && item.kind == CompletionKind::Localisation)
-    );
-}
-
-#[test]
 fn dynamic_calls_resolve_scalar_and_block_forms_with_overlay_priority() {
     use engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
     use std::fs;

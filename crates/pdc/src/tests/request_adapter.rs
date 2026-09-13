@@ -76,6 +76,55 @@ fn text_diagnostics_analyzes_caller_supplied_files_without_opening_overlays() {
 }
 
 #[test]
+fn localisation_documents_publish_no_diagnostics_or_completion() {
+    let (root, root_uri) = temp_workspace_dir();
+    let localisation = root.join("localisation");
+    fs::create_dir_all(&localisation).expect("create localisation directory");
+    let file = localisation.join("quiet_l_english.yml");
+    fs::write(&file, "").expect("create localisation file");
+    let uri = canonical_uri(&file);
+    let text = "l_english:\nplain text without localisation syntax\n";
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"localisation","version":1,"text":text}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":5}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    let completion = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("completion response");
+    assert!(
+        completion["result"]["items"]
+            .as_array()
+            .is_some_and(Vec::is_empty),
+        "localisation completion must be empty: {completion}"
+    );
+    let diagnostics = responses
+        .iter()
+        .find(|value| {
+            value["method"] == "textDocument/publishDiagnostics"
+                && value["params"]["uri"].as_str() == Some(uri.as_str())
+        })
+        .expect("diagnostic notification");
+    assert!(
+        diagnostics["params"]["diagnostics"]
+            .as_array()
+            .is_some_and(Vec::is_empty),
+        "localisation diagnostics must be empty: {diagnostics}"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn mission_preview_returns_renderer_ready_tree_data() {
     let (root, root_uri) = temp_workspace_dir();
     let input = frames([

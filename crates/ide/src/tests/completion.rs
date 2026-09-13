@@ -1469,48 +1469,30 @@ fn semantic_rules_drive_value_completion_and_hover() {
 }
 
 #[test]
-fn localisation_key_position_completes_existing_and_workspace_keys() {
+fn localisation_documents_produce_no_completion_items() {
     let mut host = eu4_host(game::eu4::bootstrap_rules());
     let id = DocumentId::new("file:///tmp/localisation/test.yml");
-    let text = "l_english:\nfoo_name:0 \"Foo\"\nbar:0 \"\"\nfo";
+    let text = "l_english:\nfoo_name:0 \"中文正文 [ROOT.Get]\"\nbar:0 \"\"\nfo";
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open");
-    let header_result = complete(
-        &host.snapshot(),
-        &id,
-        u32::try_from("l_english:".len()).expect("header position"),
-    );
-    assert!(
-        header_result.items.is_empty(),
-        "language headers must not offer localisation entry keys: {:?}",
-        header_result.items
-    );
-    let result = complete(
-        &host.snapshot(),
-        &id,
-        u32::try_from(text.len()).expect("position"),
-    );
-    let labels = result
-        .items
-        .iter()
-        .map(|item| item.label.as_str())
-        .collect::<Vec<_>>();
-    assert!(
-        labels.contains(&"foo_name"),
-        "a partially typed localisation key must complete: {labels:?}"
-    );
-    assert!(
-        !labels.contains(&"bar"),
-        "non-matching localisation keys must be filtered: {labels:?}"
-    );
-    assert!(
-        result
-            .items
-            .iter()
-            .all(|item| item.kind == CompletionKind::Localisation),
-        "localisation key completion must not offer PDX properties: {:?}",
-        result.items
-    );
+    let positions = [
+        "l_english:".len(),
+        text.find("正文").expect("prose") + "正文".len(),
+        text.find("Get").expect("command") + "Get".len(),
+        text.len(),
+    ];
+    for position in positions {
+        let result = complete(
+            &host.snapshot(),
+            &id,
+            u32::try_from(position).expect("position"),
+        );
+        assert!(
+            result.items.is_empty(),
+            "localisation completion must stay empty at byte offset {position}: {:?}",
+            result.items
+        );
+    }
 }
 
 #[test]
@@ -2457,24 +2439,36 @@ fn scope_value_completion_offers_intrinsics_links_and_chains() {
 
 #[test]
 fn fuzzy_completion_prefers_prefix_over_substring_matches() {
-    let mut host = eu4_host(game::eu4::bootstrap_rules());
-    let def_id = DocumentId::new("file:///tmp/localisation/fuzzy-defs.yml");
-    host.open_document(
-        def_id.clone(),
-        1,
-        "l_english:\nfuzz_name:0 \"A\"\nrefuse_name:0 \"B\"\n".to_owned(),
-        None,
+    use engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+    use std::fs;
+
+    let root = std::env::temp_dir().join(format!("ide-fuzzy-{}", std::process::id()));
+    fs::create_dir_all(root.join("common/scripted_effects")).expect("effect directory");
+    fs::write(
+        root.join("common/scripted_effects/00_fuzzy.txt"),
+        concat!(
+            "fuzz_name = { add_prestige = 1 }\n",
+            "refuse_name = { add_prestige = 2 }\n",
+        ),
     )
-    .expect("open definitions");
-    let id = DocumentId::new("file:///tmp/localisation/fuzzy-use.yml");
-    let text = "l_english:\nfu";
+    .expect("scripted effect definitions");
+    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let mut host = eu4_host(rules);
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
+        id: SourceRootId::new(1),
+        kind: SourceRootKind::CurrentMod,
+        path: AbsPath::normalize(&root),
+        order: 0,
+        writable: true,
+    }]));
+    host.refresh_source_roots()
+        .expect("scan effect definitions");
+    let id = DocumentId::new("file:///tmp/events/fuzzy.txt");
+    let text = "country_event = { immediate = { fu";
     host.open_document(id.clone(), 1, text.to_owned(), None)
-        .expect("open use site");
-    let result = complete(
-        &host.snapshot(),
-        &id,
-        u32::try_from(text.len()).expect("position"),
-    );
+        .expect("open");
+    let position = u32::try_from(text.find("fu").expect("prefix") + 1).expect("position");
+    let result = complete(&host.snapshot(), &id, position);
     let prefix = result
         .items
         .iter()
@@ -2488,8 +2482,13 @@ fn fuzzy_completion_prefers_prefix_over_substring_matches() {
     assert!(
         prefix < substring,
         "prefix matches must sort before substring matches: {:?}",
-        result.items
+        result
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
     );
+    fs::remove_dir_all(root).expect("cleanup");
 }
 
 #[test]

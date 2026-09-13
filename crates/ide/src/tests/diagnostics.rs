@@ -32,7 +32,7 @@ fn diagnostic_ids_are_pascal_case_and_metadata_is_structured() {
 }
 
 #[test]
-fn scripted_localisation_names_feed_indexed_diagnostics_and_completion() {
+fn scripted_localisation_names_follow_indexed_and_overlay_sources() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -82,55 +82,23 @@ fn scripted_localisation_names_feed_indexed_diagnostics_and_completion() {
         "closing an overlay must invalidate its derived name cache"
     );
 
-    let id = DocumentId::new("file:///tmp/scripted-localisation-use.yml");
-    let text = "l_english:\nentry: \"[ROOT.Scripted.One] [ROOT.MissingScripted]\"\n";
-    host.open_document(
-        id.clone(),
-        1,
-        text.to_owned(),
-        Some(AbsPath::normalize(&localisation.join("use.yml"))),
-    )
-    .expect("open localisation use site");
-    let snapshot = host.snapshot();
-    let diagnostics = crate::diagnostics(&snapshot, &id);
-    let unknown = diagnostics
-        .iter()
-        .find(|diagnostic| diagnostic.message.contains("MissingScripted"))
-        .expect("unknown scripted localisation command");
-    assert_eq!(unknown.code, DiagnosticCode::InvalidValue);
-    assert_eq!(unknown.severity, Severity::Warning);
-    assert_eq!(
-        unknown.range.start(),
-        u32::try_from(text.find("MissingScripted").expect("missing command")).expect("offset")
-    );
-
-    let completion_text = "l_english:\nentry: \"[ROOT.Scripted.O]\"\n";
-    let completion_id = DocumentId::new("file:///tmp/scripted-localisation-completion.yml");
-    host.open_document(
-        completion_id.clone(),
-        1,
-        completion_text.to_owned(),
-        Some(AbsPath::normalize(&localisation.join("completion.yml"))),
-    )
-    .expect("open localisation completion");
-    let position = u32::try_from(
-        completion_text
-            .find("Scripted.O")
-            .expect("completion prefix")
-            + "Scripted.O".len(),
-    )
-    .expect("position");
-    let completion = crate::complete(&host.snapshot(), &completion_id, position);
-    assert!(
-        completion
-            .items
-            .iter()
-            .any(|item| item.label == "Scripted.One"),
-        "scripted localisation completion missing: {:?}",
-        completion.items
-    );
-
     std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn localisation_documents_produce_no_diagnostics() {
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/localisation/quiet.yml");
+    // This deliberately combines malformed syntax, an unknown command, mixed escape markers,
+    // and an unencodable supplementary-plane character. Localisation remains indexable, but its
+    // editor document must stay free of LSP diagnostics.
+    let text = "l_english:\n没有键 [ROOT.MissingScripted] \u{10}\u{1f600}\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open localisation");
+    assert!(
+        diagnostics(&host.snapshot(), &id).is_empty(),
+        "localisation documents must not publish diagnostics"
+    );
 }
 
 #[test]

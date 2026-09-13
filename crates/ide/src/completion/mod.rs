@@ -1,4 +1,3 @@
-use crate::localisation::{localisation_command_completion, localisation_command_fragment};
 use crate::support::*;
 use crate::types::*;
 use engine::{AnalysisSnapshot, DocumentId};
@@ -48,6 +47,15 @@ pub fn complete_with_cancellation(
             items: Vec::new(),
         });
     };
+    // Localisation values are prose, so automatic identifier completion is mostly noise.  The
+    // file still participates in the workspace index for script-side hover and navigation;
+    // only requests originating in the localisation document stay quiet.
+    if input.format == FileFormat::Localisation {
+        return Ok(CompletionResult {
+            revision: snapshot.revision(),
+            items: Vec::new(),
+        });
+    }
     if let Some(items) = dynamic_parameter_completion(snapshot, &input, position, cancellation)? {
         return Ok(CompletionResult {
             revision: snapshot.revision(),
@@ -60,29 +68,6 @@ pub fn complete_with_cancellation(
         .unwrap_or_default()
         .to_owned();
     let default_value_context = completion_value_context(&input, position);
-    if input.format == FileFormat::Localisation {
-        if localisation_language_header(&input, position) {
-            return Ok(CompletionResult {
-                revision: snapshot.revision(),
-                items: Vec::new(),
-            });
-        }
-        if let Some((command_range, command_prefix)) =
-            localisation_command_fragment(&input, position)
-        {
-            return localisation_command_completion(
-                snapshot,
-                command_range,
-                &command_prefix,
-                cancellation,
-            );
-        }
-        return if default_value_context {
-            localisation_value_completion(snapshot, replacement_range, &prefix, cancellation)
-        } else {
-            localisation_key_completion(snapshot, replacement_range, &prefix, cancellation)
-        };
-    }
     let mut items = Vec::<RankedCompletionItem>::new();
     let mut member_cache = CompletionMemberCache::default();
     let semantic_context =
@@ -251,95 +236,6 @@ fn dollar_parameter_fragment(source: &str, position: TextSize) -> Option<(TextRa
     ))
 }
 
-/// Completes localisation entry keys in a localisation document: workspace keys plus keys
-/// already defined in the open file. The value side of an entry is free text; see
-/// `localisation_value_completion`.
-pub(crate) fn localisation_key_completion(
-    snapshot: &AnalysisSnapshot,
-    replacement_range: TextRange,
-    prefix: &str,
-    cancellation: &CancellationToken,
-) -> Result<CompletionResult, Cancelled> {
-    let mut items = Vec::new();
-    for (kind_name, definition_name) in
-        completion_definitions_for_kinds(snapshot, prefix, &["localisation"], cancellation)?
-    {
-        cancellation.checkpoint()?;
-        debug_assert_eq!(kind_name, "localisation");
-        push_completion(
-            &mut items,
-            CompletionItem {
-                label: definition_name.clone(),
-                kind: CompletionKind::Localisation,
-                detail: "localisation".to_owned(),
-                documentation: None,
-                replacement_range,
-                insert_text: definition_name,
-                sort_score: 0,
-                deprecated: false,
-                resolve_data: None,
-            },
-            prefix,
-            CompletionRankContext::new(
-                CompletionSchemaTier::CurrentContext,
-                CompletionSpecificity::Localisation,
-                false,
-                false,
-            ),
-        );
-    }
-    let items = finalize_completion_items(items);
-    cancellation.checkpoint()?;
-    Ok(CompletionResult {
-        revision: snapshot.revision(),
-        items,
-    })
-}
-
-/// Completes localisation keys referenced from the value side of a localisation entry. Only
-/// `localisation` kind members are offered; unrelated workspace definitions and generic scalars
-/// are not candidates here.
-pub(crate) fn localisation_value_completion(
-    snapshot: &AnalysisSnapshot,
-    replacement_range: TextRange,
-    prefix: &str,
-    cancellation: &CancellationToken,
-) -> Result<CompletionResult, Cancelled> {
-    let mut items = Vec::<RankedCompletionItem>::new();
-    for (kind_name, definition_name) in
-        completion_definitions_for_kinds(snapshot, prefix, &["localisation"], cancellation)?
-    {
-        cancellation.checkpoint()?;
-        debug_assert_eq!(kind_name, "localisation");
-        push_completion(
-            &mut items,
-            CompletionItem {
-                label: definition_name.clone(),
-                kind: CompletionKind::Localisation,
-                detail: "localisation".to_owned(),
-                documentation: None,
-                replacement_range,
-                insert_text: definition_name,
-                sort_score: 0,
-                deprecated: false,
-                resolve_data: None,
-            },
-            prefix,
-            CompletionRankContext::new(
-                CompletionSchemaTier::CurrentContext,
-                CompletionSpecificity::Localisation,
-                false,
-                false,
-            ),
-        );
-    }
-    let items = finalize_completion_items(items);
-    cancellation.checkpoint()?;
-    Ok(CompletionResult {
-        revision: snapshot.revision(),
-        items,
-    })
-}
 /// Alias with the noun used by several editor adapters.
 #[must_use]
 pub fn completion(
