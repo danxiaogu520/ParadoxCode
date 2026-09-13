@@ -3996,6 +3996,40 @@ fn dynamic_trigger_completion_filters_by_entry_contract() {
 }
 
 #[test]
+fn dynamic_contract_report_honors_completion_cancellation() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ide-dynamic-contract-cancel-{nonce}"));
+    let triggers = root.join("common/scripted_triggers");
+    std::fs::create_dir_all(&triggers).expect("trigger directory");
+    std::fs::write(
+        triggers.join("00_complete.txt"),
+        "every_fixture_trigger = { num_of_cities = 1 }\n",
+    )
+    .expect("dynamic trigger definition");
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().expect("scan triggers");
+
+    // Completion used to replace the request token with a fresh one here. A
+    // cancelled completion therefore continued inferring every workspace
+    // contract before the outer query could observe cancellation.
+    let cancellation = CancellationToken::cancel_after(1);
+    assert!(matches!(
+        crate::dynamic_contracts::dynamic_contract_report_view(&host.snapshot(), &cancellation),
+        Err(Cancelled)
+    ));
+    assert!(cancellation.is_cancelled());
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn dynamic_definition_completion_keeps_all_contracts_under_unknown_scope() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

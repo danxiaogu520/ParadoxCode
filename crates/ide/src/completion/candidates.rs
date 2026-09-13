@@ -266,14 +266,19 @@ fn contract_filtered_dynamic_members(
     kind: &str,
     members: &[String],
     scope: &ScopeContext,
-) -> Vec<String> {
+    cancellation: &CancellationToken,
+) -> Result<Vec<String>, Cancelled> {
+    cancellation.checkpoint()?;
+    if members.is_empty() {
+        return Ok(Vec::new());
+    }
     let current = scope.current.as_ref();
     if current.eq_ignore_ascii_case("any") || current.eq_ignore_ascii_case("invalid") {
-        return members.to_vec();
+        return Ok(members.to_vec());
     }
-    let report = crate::dynamic_contracts::dynamic_contract_report_view(snapshot);
+    let report = crate::dynamic_contracts::dynamic_contract_report_view(snapshot, cancellation)?;
     let profile = snapshot.game_profile();
-    members
+    let filtered = members
         .iter()
         .filter(|name| {
             let Some(contract) = report.contract(kind, name) else {
@@ -283,7 +288,9 @@ fn contract_filtered_dynamic_members(
                 || contract.accepts(profile, current)
         })
         .cloned()
-        .collect()
+        .collect();
+    cancellation.checkpoint()?;
+    Ok(filtered)
 }
 
 /// Lists workspace members of a dynamic-definition kind filtered by entry
@@ -294,12 +301,13 @@ fn dynamic_members_for_scope(
     type_name: &str,
     prefix: &str,
     scope: &ScopeContext,
-) -> Vec<String> {
+    cancellation: &CancellationToken,
+) -> Result<Vec<String>, Cancelled> {
     let members = member_cache.workspace_member_names(snapshot, type_name, prefix);
     if dynamic_definition_type(snapshot, type_name) {
-        contract_filtered_dynamic_members(snapshot, type_name, members, scope)
+        contract_filtered_dynamic_members(snapshot, type_name, members, scope, cancellation)
     } else {
-        members.to_vec()
+        Ok(members.to_vec())
     }
 }
 
@@ -425,7 +433,7 @@ pub(crate) fn add_semantic_key_items(
     insert_assignment: bool,
 ) {
     let mut ranked = Vec::new();
-    add_semantic_key_items_ranked(
+    uncancelled(add_semantic_key_items_ranked(
         snapshot,
         context,
         member_cache,
@@ -433,10 +441,12 @@ pub(crate) fn add_semantic_key_items(
         replacement_range,
         prefix,
         insert_assignment,
-    );
+        &CancellationToken::new(),
+    ));
     items.extend(finalize_completion_items(ranked));
 }
 
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn add_semantic_key_items_ranked(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
@@ -445,7 +455,9 @@ pub(crate) fn add_semantic_key_items_ranked(
     replacement_range: TextRange,
     prefix: &str,
     insert_assignment: bool,
-) {
+    cancellation: &CancellationToken,
+) -> Result<(), Cancelled> {
+    cancellation.checkpoint()?;
     add_type_root_key_items(
         snapshot,
         context,
@@ -456,6 +468,7 @@ pub(crate) fn add_semantic_key_items_ranked(
         insert_assignment,
     );
     for candidate in semantic_rules_for_completion(snapshot, context) {
+        cancellation.checkpoint()?;
         let rule = candidate.rule;
         if !semantic_scope_allows(rule, candidate.scope) {
             continue;
@@ -513,7 +526,8 @@ pub(crate) fn add_semantic_key_items_ranked(
                     type_name,
                     prefix,
                     candidate.scope,
-                ) {
+                    cancellation,
+                )? {
                     let insert_text = if !insert_assignment {
                         label.clone()
                     } else if dynamic_definition_type(snapshot, type_name) {
@@ -600,9 +614,14 @@ pub(crate) fn add_semantic_key_items_ranked(
                 }
             }
             KeyMatcher::Dynamic(kind) => {
-                for label in
-                    dynamic_members_for_scope(snapshot, member_cache, kind, prefix, candidate.scope)
-                {
+                for label in dynamic_members_for_scope(
+                    snapshot,
+                    member_cache,
+                    kind,
+                    prefix,
+                    candidate.scope,
+                    cancellation,
+                )? {
                     push_completion(
                         items,
                         CompletionItem {
@@ -682,6 +701,7 @@ pub(crate) fn add_semantic_key_items_ranked(
             KeyMatcher::AnyScalar | KeyMatcher::Date | KeyMatcher::Int { .. } => {}
         }
     }
+    Ok(())
 }
 
 /// Adds the concrete keys that instantiate a type at a file root.
@@ -1007,6 +1027,7 @@ fn add_leaf_value_member_items(
     }
 }
 
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn add_semantic_value_items(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
@@ -1015,7 +1036,9 @@ pub(crate) fn add_semantic_value_items(
     items: &mut Vec<RankedCompletionItem>,
     replacement_range: TextRange,
     prefix: &str,
-) {
+    cancellation: &CancellationToken,
+) -> Result<(), Cancelled> {
+    cancellation.checkpoint()?;
     let matching = semantic_rules_for_completion(snapshot, context)
         .into_iter()
         .filter(|candidate| {
@@ -1029,6 +1052,7 @@ pub(crate) fn add_semantic_value_items(
         .filter(|candidate| semantic_scope_allows(candidate.rule, candidate.scope))
         .collect::<Vec<_>>();
     for candidate in matching {
+        cancellation.checkpoint()?;
         let rule = candidate.rule;
         let documentation = (!rule.documentation.is_empty()).then(|| rule.documentation.join("\n"));
         if matches!(rule.shape, RuleShape::LeafValue) {
@@ -1118,7 +1142,8 @@ pub(crate) fn add_semantic_value_items(
                     type_name,
                     prefix,
                     candidate.scope,
-                ) {
+                    cancellation,
+                )? {
                     add_value_completion_ranked(
                         items,
                         &label,
@@ -1227,9 +1252,14 @@ pub(crate) fn add_semantic_value_items(
                     }
                     continue;
                 }
-                for label in
-                    dynamic_members_for_scope(snapshot, member_cache, kind, prefix, candidate.scope)
-                {
+                for label in dynamic_members_for_scope(
+                    snapshot,
+                    member_cache,
+                    kind,
+                    prefix,
+                    candidate.scope,
+                    cancellation,
+                )? {
                     add_value_completion_ranked(
                         items,
                         &label,
@@ -1287,6 +1317,7 @@ pub(crate) fn add_semantic_value_items(
             | ValueMatcher::Opaque(_) => {}
         }
     }
+    Ok(())
 }
 
 pub(crate) struct InferredDynamicCompletionInput<'a> {
@@ -1349,7 +1380,8 @@ pub(crate) fn add_inferred_dynamic_value_items(
                 &mut site_items,
                 replacement_range,
                 prefix,
-            );
+                cancellation,
+            )?;
         }
         let site_items = site_items.into_iter().fold(
             BTreeMap::<(String, CompletionKind), RankedCompletionItem>::new(),
@@ -1382,7 +1414,8 @@ pub(crate) fn add_inferred_dynamic_value_items(
         member_cache,
         replacement_range,
         prefix,
-    });
+        cancellation,
+    })?;
     match (intersection, key_rendered) {
         (Some(values), Some(keys)) => {
             // The argument must satisfy both stories: keep value-site items
@@ -1409,6 +1442,7 @@ pub(crate) struct KeyRenderSiteInput<'a> {
     pub(crate) member_cache: &'a mut CompletionMemberCache,
     pub(crate) replacement_range: TextRange,
     pub(crate) prefix: &'a str,
+    pub(crate) cancellation: &'a CancellationToken,
 }
 
 /// Builds the candidate list implied by key-render sites: sites whose
@@ -1418,7 +1452,7 @@ pub(crate) struct KeyRenderSiteInput<'a> {
 /// sites intersect case-insensitively; wildcard sites never narrow them.
 fn key_render_site_items(
     input: KeyRenderSiteInput<'_>,
-) -> Option<BTreeMap<String, RankedCompletionItem>> {
+) -> Result<Option<BTreeMap<String, RankedCompletionItem>>, Cancelled> {
     let KeyRenderSiteInput {
         snapshot,
         context,
@@ -1426,7 +1460,9 @@ fn key_render_site_items(
         member_cache,
         replacement_range,
         prefix,
+        cancellation,
     } = input;
+    cancellation.checkpoint()?;
     let affixed = sites
         .iter()
         .filter(|site| !site.prefix.is_empty() || !site.suffix.is_empty())
@@ -1434,7 +1470,9 @@ fn key_render_site_items(
     if affixed.is_empty() {
         // Wildcard dispatch: the argument is a whole key, so reuse the key
         // completion of the first site's context and scope verbatim.
-        let site = sites.first()?;
+        let Some(site) = sites.first() else {
+            return Ok(None);
+        };
         let site_context = SemanticCompletionContext {
             context: site.context.clone(),
             parent_path: site.parent_path.clone(),
@@ -1459,8 +1497,9 @@ fn key_render_site_items(
             replacement_range,
             prefix,
             false,
-        );
-        return Some(site_items.into_iter().fold(
+            cancellation,
+        )?;
+        return Ok(Some(site_items.into_iter().fold(
             BTreeMap::<String, RankedCompletionItem>::new(),
             |mut known, item| {
                 let key = item.item.label.to_ascii_lowercase();
@@ -1477,10 +1516,11 @@ fn key_render_site_items(
                 }
                 known
             },
-        ));
+        )));
     }
     let mut intersection: Option<BTreeMap<String, RankedCompletionItem>> = None;
     for site in affixed {
+        cancellation.checkpoint()?;
         let site_context = SemanticCompletionContext {
             context: site.context.clone(),
             parent_path: site.parent_path.clone(),
@@ -1548,7 +1588,7 @@ fn key_render_site_items(
             intersection = Some(site_items);
         }
     }
-    intersection
+    Ok(intersection)
 }
 
 /// Extracts the middle segment of a rule key matching the site's literal
@@ -1575,6 +1615,7 @@ fn strip_key_affixes<'label>(
     }
 }
 
+#[expect(clippy::too_many_arguments)]
 fn add_inferred_matcher_items(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
@@ -1583,7 +1624,9 @@ fn add_inferred_matcher_items(
     items: &mut Vec<RankedCompletionItem>,
     replacement_range: TextRange,
     prefix: &str,
-) {
+    cancellation: &CancellationToken,
+) -> Result<(), Cancelled> {
+    cancellation.checkpoint()?;
     match matcher {
         ValueMatcher::Exact(label) => add_value_completion_ranked(
             items,
@@ -1615,9 +1658,14 @@ fn add_inferred_matcher_items(
         // completion values.
         ValueMatcher::Int { .. } | ValueMatcher::Float { .. } | ValueMatcher::Date => {}
         ValueMatcher::Type(type_name) => {
-            for label in
-                dynamic_members_for_scope(snapshot, member_cache, type_name, prefix, &context.scope)
-            {
+            for label in dynamic_members_for_scope(
+                snapshot,
+                member_cache,
+                type_name,
+                prefix,
+                &context.scope,
+                cancellation,
+            )? {
                 add_value_completion_ranked(
                     items,
                     &label,
@@ -1679,9 +1727,14 @@ fn add_inferred_matcher_items(
             }
         }
         ValueMatcher::Dynamic(kind) => {
-            for label in
-                dynamic_members_for_scope(snapshot, member_cache, kind, prefix, &context.scope)
-            {
+            for label in dynamic_members_for_scope(
+                snapshot,
+                member_cache,
+                kind,
+                prefix,
+                &context.scope,
+                cancellation,
+            )? {
                 add_value_completion_ranked(
                     items,
                     &label,
@@ -1700,6 +1753,7 @@ fn add_inferred_matcher_items(
         | ValueMatcher::Filepath
         | ValueMatcher::Opaque(_) => {}
     }
+    Ok(())
 }
 
 /// Maximum number of multi-segment scope chains offered as completion candidates.
