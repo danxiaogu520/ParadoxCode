@@ -6,7 +6,7 @@ use super::{
 use game::eu4::{bootstrap_rules, first_party_rules, profile};
 use parser::{FileFormat, parse};
 use rules::{GameProfile, KeyMatcher, RuleSet, RuleShape, ValueMatcher};
-use text::LogicalPath;
+use text::{LogicalPath, TextRange};
 
 #[test]
 fn lowering_retains_property_paths_scalars_and_top_level_identity() {
@@ -1143,4 +1143,36 @@ fn mission_trigger_boolean_containers_still_extract_scripted_references() {
         2,
         "AND and NOT containers must keep extracting scripted trigger references"
     );
+}
+
+#[test]
+fn profile_lowering_skips_substitutions_inside_condition_ranges() {
+    let source = "block = { [[!$guard$] inner = $guard$ ] }\n";
+    let path = LogicalPath::parse("common/scripted_effects/parameters.txt").expect("logical path");
+    let hir = lower_with_profile(
+        parse(FileFormat::Script, source),
+        &path,
+        &bootstrap_rules(),
+        &profile(),
+    );
+
+    // The `!$guard$` head keeps only its conditional reference; the nested substitution is
+    // represented by it, so references stay ordered and non-overlapping.
+    let references = hir.parameter_references();
+    assert_eq!(references.len(), 2);
+    assert_eq!(references[0].kind, HirParameterReferenceKind::Conditional);
+    assert_eq!(references[1].name, "guard");
+    assert_eq!(references[1].range, TextRange::new(30, 37).unwrap());
+    assert!(
+        references
+            .windows(2)
+            .all(|items| items[0].range.end() <= items[1].range.start())
+    );
+
+    // Inside the `!$guard$` head: the conditional reference must resolve instead of the
+    // nested-substitution gap that overlapping ranges previously produced.
+    assert!(matches!(
+        hir.parameter_reference_at(13),
+        Some(reference) if reference.kind == HirParameterReferenceKind::Conditional
+    ));
 }
