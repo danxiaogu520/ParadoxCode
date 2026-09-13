@@ -73,7 +73,7 @@ export function profileForRealPath(
 function transparentScriptGlobs(): string[] {
     return vscode.workspace
         .getConfiguration('paradoxcode.localisation')
-        .get<string[]>('transparentScriptGlobs', ['history/**'])
+        .get<string[]>('transparentScriptGlobs', ['**/*.txt'])
         .filter((value): value is string => typeof value === 'string' && value.length > 0);
 }
 
@@ -294,7 +294,7 @@ function commandResource(uri: vscode.Uri | undefined): vscode.Uri | undefined {
     return realUriOf(active) ?? active;
 }
 
-async function openDecodedView(uri: vscode.Uri | undefined): Promise<void> {
+async function openDecodedView(codec: Transcoder, uri: vscode.Uri | undefined): Promise<void> {
     const real = commandResource(uri);
     if (!real || real.scheme !== 'file') {
         void vscode.window.showErrorMessage(
@@ -302,10 +302,27 @@ async function openDecodedView(uri: vscode.Uri | undefined): Promise<void> {
         );
         return;
     }
-    if (profileForRealPath(real.fsPath, transparentScriptGlobs()) === undefined) {
+    const profile = profileForRealPath(real.fsPath, transparentScriptGlobs());
+    if (profile === undefined) {
         void vscode.window.showErrorMessage(
             'ParadoxCode: this file is not eligible for the decoded view ' +
                 '(localisation/**/*.yml or paradoxcode.localisation.transparentScriptGlobs).',
+        );
+        return;
+    }
+    const bytes = new Uint8Array(await fs.readFile(real.fsPath));
+    const classification = codec.classify(bytes, profile);
+    if (classification === 'mixed') {
+        void vscode.window.showErrorMessage(
+            'ParadoxCode: this file mixes readable CJK with escape sequences; fix it manually first.',
+        );
+        return;
+    }
+    if (classification !== 'escaped') {
+        // A normal readable UTF-8 (BOM included) or ASCII file has nothing to
+        // decode — its decoded view would be a byte-identical copy.
+        void vscode.window.showInformationMessage(
+            'ParadoxCode: this file is readable UTF-8 already; the decoded view only applies to transcoded (escape-encoded) files.',
         );
         return;
     }
@@ -374,6 +391,9 @@ async function transcodeFile(
     const backup = `${real.fsPath}.pre-transcode.bak`;
     await fs.copyFile(real.fsPath, backup);
     await fs.writeFile(real.fsPath, encoded.bytes);
+    classificationStamps.delete(real.fsPath);
+    // The file flipped readable → escaped, so the eye icon must appear now.
+    void updateDecodedEntryContext(codec, vscode.window.activeTextEditor?.document);
     log.appendLine(`transparentLoc: transcoded ${real.fsPath} (backup: ${backup})`);
     void vscode.window.showInformationMessage(
         `ParadoxCode: transcoded ${nodePath.basename(real.fsPath)} (backup: ${nodePath.basename(backup)}).`,
@@ -385,6 +405,66 @@ function autoOpenDecoded(): boolean {
     return vscode.workspace
         .getConfiguration('paradoxcode.localisation')
         .get<boolean>('autoOpenDecoded', true);
+}
+
+const TRANSCODE_ESCAPED_CONTEXT = 'paradoxcode.transcodeEscaped';
+
+/** Cached escaped-classification behind the eye-icon context key. */
+interface ClassificationStamp {
+    mtime: number;
+    size: number;
+    profile: LocalisationProfile;
+    escaped: boolean;
+}
+
+const classificationStamps = new Map<string, ClassificationStamp>();
+let contextUpdateSequence = 0;
+
+/**
+ * Publishes `paradoxcode.transcodeEscaped` for a document: true only when the
+ * file is both eligible and classifier-escaped. Normal readable UTF-8 (BOM
+ * included) and ASCII files never offer the decoded view, yml and txt alike —
+ * the same gate `openDecodedView` enforces, precomputed so menu `when`
+ * clauses hide the eye icon instead of failing on click.
+ */
+async function updateDecodedEntryContext(
+    codec: Transcoder,
+    document: vscode.TextDocument | undefined,
+): Promise<void> {
+    const sequence = ++contextUpdateSequence;
+    let escaped = false;
+    if (document && document.uri.scheme === 'file') {
+        const profile = profileForRealPath(document.uri.fsPath, transparentScriptGlobs());
+        if (profile !== undefined) {
+            try {
+                const stats = await fs.stat(document.uri.fsPath);
+                const stamp = classificationStamps.get(document.uri.fsPath);
+                if (
+                    stamp &&
+                    stamp.mtime === stats.mtimeMs &&
+                    stamp.size === stats.size &&
+                    stamp.profile === profile
+                ) {
+                    escaped = stamp.escaped;
+                } else {
+                    const bytes = new Uint8Array(await fs.readFile(document.uri.fsPath));
+                    escaped = codec.classify(bytes, profile) === 'escaped';
+                    classificationStamps.set(document.uri.fsPath, {
+                        mtime: stats.mtimeMs,
+                        size: stats.size,
+                        profile,
+                        escaped,
+                    });
+                }
+            } catch {
+                escaped = false;
+            }
+        }
+    }
+    if (sequence !== contextUpdateSequence) {
+        return;
+    }
+    await vscode.commands.executeCommand('setContext', TRANSCODE_ESCAPED_CONTEXT, escaped);
 }
 
 /**
@@ -422,7 +502,7 @@ async function maybeAutoOpenDecodedView(
         if (codec.classify(bytes, profile) !== 'escaped') {
             return;
         }
-        await openDecodedView(document.uri);
+        await openDecodedView(codec, document.uri);
     } finally {
         opening.delete(key);
     }
@@ -480,6 +560,15 @@ export async function activateTransparentLocalisation(
                 log.appendLine(`transparentLoc: automatic decoded view failed: ${message}`);
             });
         };
+        const updateEntryContext = (document: vscode.TextDocument | undefined): void => {
+            if (!document) {
+                return;
+            }
+            void updateDecodedEntryContext(codec, document).catch((error) => {
+                const message = error instanceof Error ? error.message : String(error);
+                log.appendLine(`transparentLoc: decoded-view context update failed: ${message}`);
+            });
+        };
         disposables.push(
             vscode.workspace.registerFileSystemProvider(PDCLOC_SCHEME, provider, {
                 // URIs under this scheme are byte-identical twins of their
@@ -489,7 +578,7 @@ export async function activateTransparentLocalisation(
                 isCaseSensitive: true,
             }),
             vscode.commands.registerCommand('paradoxcode.localisation.openDecoded', (uri) =>
-                void openDecodedView(uri),
+                void openDecodedView(codec, uri),
             ),
             vscode.commands.registerCommand('paradoxcode.localisation.revealOriginal', () =>
                 void revealOriginal(),
@@ -497,14 +586,20 @@ export async function activateTransparentLocalisation(
             vscode.commands.registerCommand('paradoxcode.localisation.transcodeFile', (uri) =>
                 void transcodeFile(codec, uri, log),
             ),
-            vscode.window.onDidChangeActiveTextEditor(updateStatus),
+            vscode.window.onDidChangeActiveTextEditor((editor) => {
+                updateStatus();
+                updateEntryContext(editor?.document);
+            }),
             vscode.workspace.onDidOpenTextDocument(autoOpenDocument),
+            vscode.workspace.onDidOpenTextDocument(updateEntryContext),
+            vscode.workspace.onDidSaveTextDocument(updateEntryContext),
         );
         updateStatus();
         // `onLanguage` activation can happen after VS Code has already opened
         // the triggering document, so inspect the active editor as well as
         // relying on the document-open event.
         autoOpenDocument(vscode.window.activeTextEditor?.document);
+        updateEntryContext(vscode.window.activeTextEditor?.document);
         log.appendLine('transparent localisation enabled (pdcloc:// provider active)');
     } else {
         log.appendLine('transparent localisation disabled by configuration');
