@@ -23,11 +23,15 @@ Visual Studio Marketplace publication remains a separate manual step.
 2. Confirm `Cargo.toml`, `editors/vscode/package.json`, and `editors/vscode/package-lock.json`
    carry the intended version and that `CHANGELOG.md` has a dated entry for it.
 3. Run `cargo tools gates`. Do not tag if any local group fails.
-4. Package the VSIX with `npm --prefix editors/vscode run package`, install it into a clean VS Code
+4. If the release intentionally changes diagnostic output, update
+   `editors/vscode/scripts/sweep-baseline.json` with the accepted fingerprint (taken from the
+   sweep report that produced it) through a reviewed pull request. The release sweep accepts
+   exactly that fingerprint and still fails on any other drift.
+5. Package the VSIX with `npm --prefix editors/vscode run package`, install it into a clean VS Code
    profile, trust an EU4 Mod workspace, and open an EU4 file. Verify that the ParadoxCode status
    item shows its check mark without configuring the server, completion and diagnostics work, and
    the output reports a checksum-verified automatic installation.
-5. Review the generated VSIX contents and confirm no Vanilla files, caches, credentials, or
+6. Review the generated VSIX contents and confirm no Vanilla files, caches, credentials, or
    development artifacts are present.
 
 ## Publish

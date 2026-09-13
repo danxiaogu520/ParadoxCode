@@ -81,6 +81,8 @@ Options:
   --output DIR            report directory (default: ${DEFAULT_OUTPUT_DIR})
   --label NAME            release label recorded in the summary (default: git describe)
   --previous PATH         previous sweep summary to diff against
+  --expect-fingerprint SHA  reviewed fingerprint that accepts an intentional
+                          diagnostics drift (takes precedence over --previous)
   --timeout-ms N          session timeout (default: ${DEFAULT_TIMEOUT_MS})
   --file-timeout-ms N     per-request timeout (default: ${DEFAULT_FILE_TIMEOUT_MS})
   --batch-size N          files per diagnostic request (default: 16)
@@ -139,6 +141,7 @@ function parseSweepArgs(argv) {
     ['--output', 'output'],
     ['--label', 'label'],
     ['--previous', 'previous'],
+    ['--expect-fingerprint', 'expectFingerprint'],
     ['--fail-on', 'failOn'],
   ]);
   for (let index = 0; index < argv.length; index += 1) {
@@ -159,6 +162,12 @@ function parseSweepArgs(argv) {
   }
   if (!['error', 'warning', 'none'].includes(options.failOn)) {
     throw new CliUsageError('--fail-on must be error, warning, or none');
+  }
+  if (
+    options.expectFingerprint !== undefined &&
+    !/^[0-9a-f]{64}$/.test(options.expectFingerprint)
+  ) {
+    throw new CliUsageError('--expect-fingerprint must be 64 lowercase hex characters');
   }
   return options;
 }
@@ -575,8 +584,11 @@ async function run(raw) {
   // release. With a baseline the gate is the diagnostics fingerprint — an
   // identical fingerprint means behavior did not drift, whatever the error
   // count; a drift means the release changed diagnostic output and must be
-  // looked at. Without a baseline (first run) the gate falls back to the
-  // plain fail-on status.
+  // looked at. A release that intentionally changes diagnostics records the
+  // accepted fingerprint in the reviewed sweep-baseline.json and passes it
+  // as --expect-fingerprint, which takes precedence over --previous.
+  // Without a baseline (first run) the gate falls back to the plain
+  // fail-on status.
   let previousSummary;
   if (raw.previous) {
     if (!existsSync(raw.previous)) {
@@ -588,7 +600,19 @@ async function run(raw) {
     }
   }
   let gate;
-  if (previousSummary) {
+  if (raw.expectFingerprint) {
+    // A reviewed baseline file declares the one fingerprint a release may
+    // legitimately produce when it intentionally changes diagnostic output.
+    // The expectation takes precedence over --previous and is recorded in
+    // the summary so the published asset shows the accepted drift openly.
+    const accepted = raw.expectFingerprint === summary.diagnostics_fingerprint;
+    gate = accepted && report.tool_errors.length === 0;
+    console.log(
+      accepted
+        ? 'Gate: PASSED — diagnostics fingerprint matches the reviewed baseline'
+        : `Gate: FAILED — diagnostics fingerprint does not match the reviewed baseline: ${raw.expectFingerprint}`,
+    );
+  } else if (previousSummary) {
     const drifted = previousSummary.diagnostics_fingerprint !== summary.diagnostics_fingerprint;
     gate = !drifted && report.tool_errors.length === 0;
     console.log(
@@ -603,8 +627,13 @@ async function run(raw) {
     );
   }
   summary.gate = {
-    mode: previousSummary ? 'fingerprint' : 'status',
+    mode: raw.expectFingerprint
+      ? 'expected-fingerprint'
+      : previousSummary
+        ? 'fingerprint'
+        : 'status',
     passed: gate,
+    expected_fingerprint: raw.expectFingerprint ?? null,
     previous_fingerprint: previousSummary?.diagnostics_fingerprint ?? null,
   };
   writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
