@@ -7,6 +7,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Let the release sweep accept exactly one reviewed diagnostics fingerprint through a checked-in
+  baseline file (`editors/vscode/scripts/sweep-baseline.json`): releases that intentionally change
+  diagnostic output record the accepted fingerprint there through a pull request, and the gate
+  still fails on any drift the file does not name. The published sweep summary records the
+  expected fingerprint openly.
+
 ## [0.3.4] - 2026-09-13
 
 This release retires the typed-language editor surface for EU4 localisation prose: `.yml`
