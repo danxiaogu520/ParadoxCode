@@ -7,6 +7,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-09-13
+
+This release retires the typed-language editor surface for EU4 localisation prose: `.yml`
+localisation documents stay indexed for hover and navigation but no longer receive diagnostics or
+identifier completion, the decoded `pdcloc://` view opens automatically for EU4dll-transcoded
+files, and only that view still reports the not-transcoded warning. Completion's dynamic-contract
+inference becomes cancellable so obsolete requests stop pinning a core, and the release process is
+hardened into protected atomic releases: a PR-only mainline with the stable `Conclusion` check,
+immutable verified assets, a sweep of the packaged Windows server, pinned GitHub Actions, and a
+host-local allowlist on the dedicated self-hosted runner.
+
 ### Changed
 
 - Keep EU4 localisation documents in the workspace index for hover and navigation while returning
@@ -23,10 +34,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Make self-hosted sweep configuration portable through repository variables and add governance,
   release recovery, and runner reconstruction runbooks.
 
+### Fixed
+
+- Cancel dynamic contract inference when its triggering completion request is cancelled: the
+  workspace-wide contract report previously ran under a fresh, never-cancelled token on the
+  completion path, and documents without dynamic definitions now skip the report entirely.
+
 ### Security
 
 - Publish future GitHub releases immutably, refuse asset replacement, audit production npm
   dependencies, and pin GitHub Actions dependencies to reviewed commit SHAs.
+- Enforce a host-local pre-job guard on the dedicated self-hosted sweep runner: the repository,
+  workflow path, event, and protected ref are independently allowlisted before any repository
+  step executes on the host.
 
 ## [0.3.3] - 2026-09-12
 
@@ -580,7 +600,8 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.0...v0.3.1

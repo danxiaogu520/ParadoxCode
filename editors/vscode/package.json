@@ -2,7 +2,7 @@
   "name": "paradoxcode-vscode",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "publisher": "paradoxcode",
   "license": "MIT",
   "repository": {
