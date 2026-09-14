@@ -7,6 +7,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Editing a document that calls scripted triggers/effects no longer sends the server into an
+  unending single-core spin (the "type in a file that uses a `scripted_trigger`, CPU pins one core
+  forever and no diagnostics ever publish" failure mode). The diagnostics path resolved the
+  workspace-wide dynamic-rule, contract, and cycle reports through uncancellable fresh tokens and
+  cached them in the documents domain, so every keystroke dropped them; a worker whose revision the
+  domain had advanced past then had every insert discarded, rebuilding all 3,306 vanilla-and-mod
+  definitions per property without end. Three changes land together: the dynamic reports and
+  per-definition resolutions move to a new definitions cache domain that only advances when a
+  document declaring dynamic definitions commits or closes (caller-file edits keep the entries),
+  probes on a superseded revision degrade to an empty report instead of rebuilding work whose
+  insert would be dropped, and the per-property diagnostics and completion entry points forward
+  the request's cancellation token so interrupted workers stop at the next checkpoint. The
+  rule-row build also resolves the contract report once per build instead of re-probing it per
+  nested call. On the reproducing workspace a 50-second edit session with the old failure now
+  costs 3.7 seconds of CPU total and publishes diagnostics; editing the declaring file itself
+  stays busy per keystroke (each edit legitimately rebuilds the reports) and settles the moment
+  typing stops.
+
 ## [0.3.5] - 2026-09-13
 
 This release retires the typed-language editor surface for EU4 localisation prose: `.yml`

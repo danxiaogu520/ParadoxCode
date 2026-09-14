@@ -99,11 +99,20 @@ pub(crate) fn dynamic_cycle_report(
     {
         return Ok(cached);
     }
+    // Definition-set domain, same policy as the contract report: call-site
+    // edits keep the graph, declaring commits invalidate it, and superseded
+    // readers skip the rebuild instead of looping on dropped inserts.
+    if snapshot
+        .query_cache()
+        .is_superseded(engine::CacheDomain::Definitions, revision)
+    {
+        return Ok(Arc::new(DynamicCycleReport::default()));
+    }
     let report = build_cycle_report(snapshot, cancellation)?;
     let report = Arc::new(report);
     snapshot.query_cache().insert(
         revision,
-        engine::CacheDomain::Documents,
+        engine::CacheDomain::Definitions,
         CYCLE_CACHE_KEY.to_owned(),
         report.clone(),
     );

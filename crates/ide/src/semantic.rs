@@ -1500,10 +1500,20 @@ pub(crate) fn resolve_dynamic_definition(
     ) {
         return cached.as_ref().clone();
     }
+    // A worker still observing a superseded definition set must not rebuild:
+    // its insert would be dropped, so the next probe would rerun the scan and
+    // the resolution loop would burn a core. The worker's own results are
+    // destined to be discarded with its revision.
+    if snapshot
+        .query_cache()
+        .is_superseded(engine::CacheDomain::Definitions, revision)
+    {
+        return None;
+    }
     let resolved = resolve_dynamic_definition_uncached(snapshot, owner_kind, owner_name);
     snapshot.query_cache().insert(
         revision,
-        engine::CacheDomain::Documents,
+        engine::CacheDomain::Definitions,
         format!("dynamic-definition:{owner_kind}:{owner_name}"),
         Arc::new(resolved.clone()),
     );
