@@ -784,3 +784,92 @@ fn cloned_hosts_observe_live_revisions() {
     assert_eq!(worker.snapshot().revision(), base);
     assert!(worker.live_revision() > base);
 }
+
+#[test]
+fn declaring_document_edits_move_the_definitions_cache_domain() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("engine-definitions-domain-{nonce}"));
+    let triggers = root.join("common/scripted_triggers");
+    fs::create_dir_all(&triggers).expect("fixture directory");
+    fs::write(triggers.join("base.txt"), "is_ready = { always = yes }\n").expect("trigger fixture");
+
+    // The bootstrap rules carry no semantic model, so the declaring-kind
+    // recognition needs a dynamic-definition descriptor injected here.
+    let mut model = rules::RulesModel::default();
+    model.semantic.type_descriptors.insert(
+        "scripted_trigger".to_owned(),
+        rules::TypeDescriptor {
+            dynamic_definition: Some(rules::DynamicDefinitionDescriptor {
+                body_context: "trigger".to_owned(),
+                enabled: true,
+                ..rules::DynamicDefinitionDescriptor::default()
+            }),
+            ..rules::TypeDescriptor::default()
+        },
+    );
+    let mut host =
+        AnalysisHost::with_profile(rules::RuleSet::from_model(model), game::eu4::profile());
+    host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            AbsPath::normalize(&root),
+        ),
+    ]));
+    host.refresh_source_roots().expect("scan roots");
+
+    let report_revision = host.snapshot().revision();
+    host.snapshot().query_cache().insert(
+        report_revision,
+        crate::CacheDomain::Definitions,
+        "dynamic-rule-rows".to_owned(),
+        Arc::new(vec![1_u32]),
+    );
+    // Opening a document that only calls scripted definitions keeps the
+    // definition-derived entry valid at the new revision.
+    let caller = DocumentId::new("file:///tmp/calls-scripted.txt");
+    host.open_document(
+        caller,
+        1,
+        "country_event = { trigger = { is_ready = yes } }".to_owned(),
+        None,
+    )
+    .expect("open caller");
+    let caller_revision = host.snapshot().revision();
+    assert!(
+        host.snapshot()
+            .query_cache()
+            .get::<Vec<u32>>(caller_revision, "dynamic-rule-rows")
+            .is_some(),
+        "a non-declaring edit must not invalidate definition-derived entries"
+    );
+    // Opening an overlay that declares a scripted trigger moves the domain:
+    // the entry is gone and the pre-edit reader is superseded.
+    let declaring_path = triggers.join("overlay.txt");
+    let declaring = DocumentId::new("file:///tmp/scripted_triggers/overlay.txt");
+    host.open_document(
+        declaring,
+        1,
+        "my_trigger = { always = yes }".to_owned(),
+        Some(AbsPath::normalize(&declaring_path)),
+    )
+    .expect("open declaring overlay");
+    let declaring_revision = host.snapshot().revision();
+    assert!(
+        host.snapshot()
+            .query_cache()
+            .get::<Vec<u32>>(declaring_revision, "dynamic-rule-rows")
+            .is_none(),
+        "a declaring commit must invalidate definition-derived entries"
+    );
+    assert!(
+        host.snapshot()
+            .query_cache()
+            .is_superseded(crate::CacheDomain::Definitions, caller_revision),
+        "the pre-commit reader must observe a superseded definition set"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}

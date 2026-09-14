@@ -305,6 +305,17 @@ fn dynamic_contract_report(
     {
         return Ok(cached);
     }
+    // The report derives from the dynamic-definition set, so it lives in the
+    // definitions domain: editing a document that only calls scripted
+    // definitions keeps it valid. A worker whose revision the domain has
+    // advanced past must not rebuild — the insert would be dropped and every
+    // following probe would rerun the workspace-wide inference.
+    if snapshot
+        .query_cache()
+        .is_superseded(engine::CacheDomain::Definitions, revision)
+    {
+        return Ok(Arc::new(DynamicContractReport::default()));
+    }
     cancellation.checkpoint()?;
     let report = build_contract_report(snapshot, cancellation)?;
     if std::env::var("PDC_DEBUG_DYNAMIC_CONTRACTS").is_ok_and(|value| !value.is_empty()) {
@@ -327,7 +338,7 @@ fn dynamic_contract_report(
     let report = Arc::new(report);
     snapshot.query_cache().insert(
         revision,
-        engine::CacheDomain::Documents,
+        engine::CacheDomain::Definitions,
         CONTRACT_CACHE_KEY.to_owned(),
         report.clone(),
     );

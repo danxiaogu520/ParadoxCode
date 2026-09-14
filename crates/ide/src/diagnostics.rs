@@ -913,7 +913,8 @@ fn validate_semantic_container(
                     parent_path,
                     hir,
                     property,
-                )
+                    cancellation,
+                )?
                 .map(|message| {
                     Diagnostic::new(
                         DiagnosticCode::UnknownKey,
@@ -1176,8 +1177,21 @@ fn validate_semantic_container(
                     }))
             });
             if !parameterized_invocation {
-                validate_dynamic_arguments(snapshot, applicable, property, scope, diagnostics);
-                validate_dynamic_dispatch_keys(snapshot, applicable, property, diagnostics);
+                validate_dynamic_arguments(
+                    snapshot,
+                    applicable,
+                    property,
+                    scope,
+                    diagnostics,
+                    cancellation,
+                )?;
+                validate_dynamic_dispatch_keys(
+                    snapshot,
+                    applicable,
+                    property,
+                    diagnostics,
+                    cancellation,
+                )?;
                 validate_dynamic_quoted_payloads(
                     ValidationState {
                         snapshot,
@@ -1885,25 +1899,37 @@ fn dynamic_invocation_parameter_message(
     parent_path: &[std::sync::Arc<str>],
     hir: Option<&HirFile>,
     property: &ScriptProperty,
-) -> Option<String> {
-    let owner_name = parent_path.last()?;
-    let kind = crate::dynamic_rules::dynamic_kind_for_context(snapshot, context)?;
-    let summary = dynamic_definition_summary(snapshot, &kind, owner_name)?;
+    cancellation: &CancellationToken,
+) -> Result<Option<String>, Cancelled> {
+    let Some(owner_name) = parent_path.last() else {
+        return Ok(None);
+    };
+    let Some(kind) = crate::dynamic_rules::dynamic_kind_for_context(snapshot, context) else {
+        return Ok(None);
+    };
+    let Some(summary) = dynamic_definition_summary(snapshot, &kind, owner_name) else {
+        return Ok(None);
+    };
     if inside_dynamic_definition_body(snapshot, hir, property.key_range) {
-        return None;
+        return Ok(None);
     }
-    if crate::dynamic_rules::dynamic_rule_row(snapshot, &kind, owner_name)
-        .is_some_and(|row| row.dispatches_dynamically)
+    if crate::dynamic_rules::dynamic_rule_row_with_cancellation(
+        snapshot,
+        &kind,
+        owner_name,
+        cancellation,
+    )?
+    .is_some_and(|row| row.dispatches_dynamically)
     {
         // A dispatching invocation binds arbitrary caller-chosen keys; only
         // the dispatch-key validator can judge them.
-        return None;
+        return Ok(None);
     }
     if summary.parameters.is_empty() {
-        return Some(format!(
+        return Ok(Some(format!(
             "unexpected key `{}`: scripted `{}` takes no parameters",
             property.key, summary.name
-        ));
+        )));
     }
     let names = summary
         .parameters
@@ -1911,10 +1937,10 @@ fn dynamic_invocation_parameter_message(
         .map(|parameter| parameter.name.as_str())
         .collect::<Vec<_>>()
         .join(", ");
-    Some(format!(
+    Ok(Some(format!(
         "unexpected parameter `{}` of scripted `{}` (known: {names})",
         property.key, summary.name
-    ))
+    )))
 }
 
 fn validate_dynamic_arguments(
@@ -1923,13 +1949,14 @@ fn validate_dynamic_arguments(
     property: &ScriptProperty,
     scope: &ScopeContext,
     diagnostics: &mut Vec<Diagnostic>,
-) {
+    cancellation: &CancellationToken,
+) -> Result<(), Cancelled> {
     // Scalar invocations (`stable = yes`) cannot bind anything, but fall
     // through: a definition with required parameters must still get the
     // dedicated missing-parameter message instead of only the generic
     // value mismatch.
     let Some(summary) = dynamic_invocation_summary(snapshot, rules, &property.key) else {
-        return;
+        return Ok(());
     };
 
     let mut counts = std::collections::BTreeMap::<String, usize>::new();
@@ -1976,12 +2003,17 @@ fn validate_dynamic_arguments(
                 missing.join(", ")
             ),
         ));
-        return;
+        return Ok(());
     }
     // A conditional whose guard is supplied (or, for `[!X]`, absent)
     // activates its body; parameters the body then uses without a runtime
     // guard become required for this invocation.
-    let row = crate::dynamic_rules::dynamic_rule_row(snapshot, &summary.kind, &summary.name);
+    let row = crate::dynamic_rules::dynamic_rule_row_with_cancellation(
+        snapshot,
+        &summary.kind,
+        &summary.name,
+        cancellation,
+    )?;
     if let (Some(template), Some(row)) = (summary.template.as_ref(), row.as_ref()) {
         let supplied: std::collections::BTreeSet<String> = counts.keys().cloned().collect();
         let branch_missing =
@@ -2001,7 +2033,7 @@ fn validate_dynamic_arguments(
                     summary.name
                 ),
             ));
-            return;
+            return Ok(());
         }
     }
     // The derived dynamic row carries the usage-site value constraints that
@@ -2009,8 +2041,16 @@ fn validate_dynamic_arguments(
     // arguments against them here, at the call site, without instantiating
     // the definition body.
     if let Some(row) = row {
-        validate_dynamic_argument_values(snapshot, &row, property, scope, diagnostics);
+        validate_dynamic_argument_values(
+            snapshot,
+            &row,
+            property,
+            scope,
+            diagnostics,
+            cancellation,
+        )?;
     }
+    Ok(())
 }
 
 /// Parameters that activated conditional branches use without a runtime
@@ -2169,7 +2209,8 @@ fn validate_dynamic_argument_values(
     invocation: &ScriptProperty,
     scope: &ScopeContext,
     diagnostics: &mut Vec<Diagnostic>,
-) {
+    cancellation: &CancellationToken,
+) -> Result<(), Cancelled> {
     for (index, argument) in invocation.block.iter().enumerate() {
         // Forwarded parameters (`K = $K$` inside another definition) render
         // at that definition's own call sites; they cannot be checked here.
@@ -2195,7 +2236,8 @@ fn validate_dynamic_argument_values(
         if superseded {
             continue;
         }
-        let sites = effective_parameter_sites(snapshot, row, parameter, &mut Vec::new());
+        let sites =
+            effective_parameter_sites(snapshot, row, parameter, &mut Vec::new(), cancellation)?;
         let Some((value, value_range)) = argument.scalar.as_ref() else {
             if sites.is_empty() {
                 continue;
@@ -2286,13 +2328,16 @@ fn validate_dynamic_argument_values(
             *value_range,
             scope,
             diagnostics,
-        );
+            cancellation,
+        )?;
     }
+    Ok(())
 }
 
 /// Forwards whose callee parameter name is itself rendered from a `$param$`
 /// key (`helper = { $WHICH$ = $X$ }`) can land on any of the callee's
 /// parameters: the binding must be acceptable to at least one of them.
+#[expect(clippy::too_many_arguments)]
 fn validate_forwarded_to_any_parameter(
     snapshot: &AnalysisSnapshot,
     row: &crate::dynamic_rules::DynamicRuleRow,
@@ -2301,13 +2346,19 @@ fn validate_forwarded_to_any_parameter(
     value_range: TextRange,
     scope: &ScopeContext,
     diagnostics: &mut Vec<Diagnostic>,
-) {
+    cancellation: &CancellationToken,
+) -> Result<(), Cancelled> {
     for edge in parameter
         .forwarded_to
         .iter()
         .filter(|edge| edge.parameter.is_none())
     {
-        let Some(callee) = crate::dynamic_rules::dynamic_rule_row(snapshot, &edge.kind, &edge.name)
+        let Some(callee) = crate::dynamic_rules::dynamic_rule_row_with_cancellation(
+            snapshot,
+            &edge.kind,
+            &edge.name,
+            cancellation,
+        )?
         else {
             continue;
         };
@@ -2334,6 +2385,7 @@ fn validate_forwarded_to_any_parameter(
             );
         }
     }
+    Ok(())
 }
 
 /// Validates quoted script payloads bound to payload parameters (bare
@@ -2356,7 +2408,7 @@ fn validate_dynamic_quoted_payloads(
         cancellation,
         quoted_scripts,
     } = state;
-    let Some(row) = dynamic_row_for_invocation(snapshot, rules, invocation) else {
+    let Some(row) = dynamic_row_for_invocation(snapshot, rules, invocation, cancellation)? else {
         return Ok(());
     };
     for (index, argument) in invocation.block.iter().enumerate() {
@@ -2477,16 +2529,24 @@ fn dynamic_row_for_invocation(
     snapshot: &AnalysisSnapshot,
     rules: &[&rules::SemanticRule],
     invocation: &ScriptProperty,
-) -> Option<crate::dynamic_rules::DynamicRuleRow> {
-    let type_name = rules.iter().find_map(|rule| match &rule.key {
+    cancellation: &CancellationToken,
+) -> Result<Option<crate::dynamic_rules::DynamicRuleRow>, Cancelled> {
+    let Some(type_name) = rules.iter().find_map(|rule| match &rule.key {
         KeyMatcher::Type(type_name) | KeyMatcher::Dynamic(type_name)
             if dynamic_definition_type(snapshot, type_name) =>
         {
             Some(type_name.as_str())
         }
         _ => None,
-    })?;
-    crate::dynamic_rules::dynamic_rule_row(snapshot, type_name, &invocation.key)
+    }) else {
+        return Ok(None);
+    };
+    crate::dynamic_rules::dynamic_rule_row_with_cancellation(
+        snapshot,
+        type_name,
+        &invocation.key,
+        cancellation,
+    )
 }
 
 /// The sites constraining one parameter, following forwarding edges into
@@ -2497,13 +2557,14 @@ pub(crate) fn effective_parameter_sites(
     row: &crate::dynamic_rules::DynamicRuleRow,
     parameter: &crate::dynamic_rules::DynamicParameterRow,
     visited: &mut Vec<(String, String)>,
-) -> Vec<Vec<rules::ValueMatcher>> {
+    cancellation: &CancellationToken,
+) -> Result<Vec<Vec<rules::ValueMatcher>>, Cancelled> {
     if !parameter.sites.is_empty() || parameter.forwarded_to.is_empty() {
-        return parameter.sites.clone();
+        return Ok(parameter.sites.clone());
     }
     let identity = (row.kind.to_ascii_lowercase(), row.name.to_ascii_lowercase());
     if visited.contains(&identity) {
-        return parameter.sites.clone();
+        return Ok(parameter.sites.clone());
     }
     visited.push(identity);
     let mut sites = parameter.sites.clone();
@@ -2513,7 +2574,12 @@ pub(crate) fn effective_parameter_sites(
             // `validate_forwarded_to_any_parameter` instead.
             continue;
         };
-        let Some(callee) = crate::dynamic_rules::dynamic_rule_row(snapshot, &edge.kind, &edge.name)
+        let Some(callee) = crate::dynamic_rules::dynamic_rule_row_with_cancellation(
+            snapshot,
+            &edge.kind,
+            &edge.name,
+            cancellation,
+        )?
         else {
             continue;
         };
@@ -2529,9 +2595,10 @@ pub(crate) fn effective_parameter_sites(
             &callee,
             callee_parameter,
             visited,
-        ));
+            cancellation,
+        )?);
     }
-    sites
+    Ok(sites)
 }
 
 /// Renders the `$param$` keys of a dynamically dispatching scripted
@@ -2544,32 +2611,38 @@ fn validate_dynamic_dispatch_keys(
     rules: &[&rules::SemanticRule],
     property: &ScriptProperty,
     diagnostics: &mut Vec<Diagnostic>,
-) {
+    cancellation: &CancellationToken,
+) -> Result<(), Cancelled> {
     if property.block_range.is_none() {
-        return;
+        return Ok(());
     }
     let Some(type_name) = rules.iter().find_map(|rule| match &rule.key {
-        rules::KeyMatcher::Type(type_name) | rules::KeyMatcher::Dynamic(type_name)
+        rules::KeyMatcher::Type(type_name) | KeyMatcher::Dynamic(type_name)
             if dynamic_definition_type(snapshot, type_name) =>
         {
             Some(type_name.as_str())
         }
         _ => None,
     }) else {
-        return;
+        return Ok(());
     };
-    let Some(row) = crate::dynamic_rules::dynamic_rule_row(snapshot, type_name, &property.key)
+    let Some(row) = crate::dynamic_rules::dynamic_rule_row_with_cancellation(
+        snapshot,
+        type_name,
+        &property.key,
+        cancellation,
+    )?
     else {
-        return;
+        return Ok(());
     };
     if !row.dispatches_dynamically {
-        return;
+        return Ok(());
     }
     let Some(resolved) = resolve_dynamic_definition(snapshot, type_name, &property.key) else {
-        return;
+        return Ok(());
     };
     let Some(template) = resolved.summary.template.as_ref() else {
-        return;
+        return Ok(());
     };
     let bindings = dynamic_cycles::scalar_argument_bindings(property);
     let mut walker = DispatchKeyWalker {
@@ -2580,6 +2653,7 @@ fn validate_dynamic_dispatch_keys(
         diagnostics,
     };
     walker.walk_items(&template.items, &resolved.body_context, true);
+    Ok(())
 }
 
 struct DispatchKeyWalker<'a> {

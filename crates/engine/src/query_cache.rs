@@ -11,7 +11,7 @@
 //! revisions are discarded as soon as a newer revision is observed; an old worker that finishes
 //! later cannot repopulate the cache with stale data.
 //!
-//! Entries live in one of two invalidation domains, each tracking its own revision.
+//! Entries live in one of three invalidation domains, each tracking its own revision.
 //! Document edits used to clear the whole cache, so every keystroke discarded
 //! workspace-scale indexes (member-name lists, the localisation key index) and rebuilt them
 //! from scratch. Index-domain entries now survive document revisions: an entry built from
@@ -21,6 +21,12 @@
 //! Documents-domain entries are valid for exactly one document revision. Each domain
 //! overflows independently, so cheap boolean probes no longer evict the large shared
 //! indexes they share a map with.
+//!
+//! The definitions domain covers entries derived from the set of dynamic
+//! definitions (index files plus overlay documents that declare one): editing a
+//! document that only *calls* scripted definitions leaves those entries valid,
+//! while a commit that changes a declaring document advances the domain. Its
+//! watermark advances on index changes too, matching the index domain's rules.
 
 use std::any::Any;
 use std::fmt;
@@ -35,6 +41,9 @@ pub enum CacheDomain {
     Index,
     /// Derived from open overlay documents; invalidated by every document edit.
     Documents,
+    /// Derived from the dynamic-definition set (index plus declaring overlays);
+    /// invalidated when a declaring document commits or the index advances.
+    Definitions,
 }
 
 /// Bounded snapshot-scoped cache keyed by `(revision, domain, key)`.
@@ -67,8 +76,12 @@ struct CacheState {
     index_revision: Option<u64>,
     /// Revision of the `documents` entries; document revisions change per keystroke.
     documents_revision: Option<u64>,
+    /// Revision of the dynamic-definition set the `definitions` entries were built
+    /// from; only declaring-document commits and index advances move it.
+    definitions_revision: Option<u64>,
     index: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
     documents: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
+    definitions: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
 }
 
 impl CacheState {
@@ -76,6 +89,7 @@ impl CacheState {
         match domain {
             CacheDomain::Index => &mut self.index,
             CacheDomain::Documents => &mut self.documents,
+            CacheDomain::Definitions => &mut self.definitions,
         }
     }
 }
@@ -94,8 +108,10 @@ impl SnapshotQueryCache {
             state: RwLock::new(CacheState {
                 index_revision: None,
                 documents_revision: None,
+                definitions_revision: None,
                 index: FxHashMap::default(),
                 documents: FxHashMap::default(),
+                definitions: FxHashMap::default(),
             }),
             capacity,
             id: NEXT_CACHE_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
@@ -122,10 +138,11 @@ impl SnapshotQueryCache {
 
     /// Returns the cached value for `(revision, key)` when it was inserted as `T`.
     ///
-    /// Documents-domain entries answer only at their exact revision. Index-domain
-    /// entries answer at their revision and every later one: only an index advance
-    /// can clear them, so a reader still observing an older revision (a slow
-    /// workspace-wide pass) hits views built for the same index state.
+    /// Documents-domain entries answer only at their exact revision. Index- and
+    /// definitions-domain entries answer at their revision and every later one:
+    /// only an advance of their own domain can clear them, so a reader still
+    /// observing an older revision (a slow workspace-wide pass) hits views built
+    /// for the same underlying state.
     pub fn get<T: Send + Sync + 'static>(&self, revision: u64, key: &str) -> Option<Arc<T>> {
         let state = self
             .state
@@ -133,6 +150,13 @@ impl SnapshotQueryCache {
             .expect("snapshot query cache lock poisoned");
         if state.documents_revision == Some(revision)
             && let Some(value) = state.documents.get(key)
+        {
+            return Arc::clone(value).downcast::<T>().ok();
+        }
+        if state
+            .definitions_revision
+            .is_some_and(|current| revision >= current)
+            && let Some(value) = state.definitions.get(key)
         {
             return Arc::clone(value).downcast::<T>().ok();
         }
@@ -152,7 +176,8 @@ impl SnapshotQueryCache {
     /// stale worker finishing late must not repopulate the cache with results derived
     /// from superseded state. An Index insert at a newer revision does not clear the
     /// domain — reaching a newer revision without an index advance proves the index
-    /// state did not change, so the older entries remain valid.
+    /// state did not change, so the older entries remain valid. Definitions-domain
+    /// inserts follow the same lineage rule as the index domain.
     pub fn insert<T: Send + Sync + 'static>(
         &self,
         revision: u64,
@@ -180,6 +205,14 @@ impl SnapshotQueryCache {
                 Some(_) => {}
                 None => state.index_revision = Some(revision),
             },
+            CacheDomain::Definitions => match state.definitions_revision {
+                Some(current) if revision < current => return,
+                // Same lineage argument as the index domain: reaching a newer
+                // revision without a definitions advance proves the declaring
+                // documents did not change, so the entry joins the lineage.
+                Some(_) => {}
+                None => state.definitions_revision = Some(revision),
+            },
         }
         let entries = state.map(domain);
         if entries.len() >= self.capacity && !entries.contains_key(key.as_str()) {
@@ -199,6 +232,13 @@ impl SnapshotQueryCache {
         {
             state.index.clear();
             state.index_revision = Some(revision);
+        }
+        if state
+            .definitions_revision
+            .is_none_or(|current| revision > current)
+        {
+            state.definitions.clear();
+            state.definitions_revision = Some(revision);
         }
         if state
             .documents_revision
@@ -225,6 +265,42 @@ impl SnapshotQueryCache {
         }
     }
 
+    /// Advances to a revision that changed the dynamic-definition set.
+    ///
+    /// A committed document that declares dynamic definitions (or the close of one)
+    /// invalidates definition-derived entries while leaving both the index domain
+    /// and plain document entries alone: callers advance the documents domain
+    /// themselves for the same revision.
+    pub fn advance_definitions(&self, revision: u64) {
+        let mut state = self.write();
+        if state
+            .definitions_revision
+            .is_none_or(|current| revision > current)
+        {
+            state.definitions.clear();
+            state.definitions_revision = Some(revision);
+        }
+    }
+
+    /// True when `revision` observes state the domain has already advanced past.
+    ///
+    /// Long-running workers on superseded snapshots use this to skip rebuilding
+    /// domain-derived results whose insert would be dropped anyway: rebuilding
+    /// would only burn a core repeating work the advancing reader will redo.
+    #[must_use]
+    pub fn is_superseded(&self, domain: CacheDomain, revision: u64) -> bool {
+        let state = self
+            .state
+            .read()
+            .expect("snapshot query cache lock poisoned");
+        let watermark = match domain {
+            CacheDomain::Index => state.index_revision,
+            CacheDomain::Documents => state.documents_revision,
+            CacheDomain::Definitions => state.definitions_revision,
+        };
+        watermark.is_some_and(|current| revision < current)
+    }
+
     /// Returns the number of cached entries (for diagnostics and tests).
     #[must_use]
     pub fn len(&self) -> usize {
@@ -232,7 +308,7 @@ impl SnapshotQueryCache {
             .state
             .read()
             .expect("snapshot query cache lock poisoned");
-        state.index.len() + state.documents.len()
+        state.index.len() + state.documents.len() + state.definitions.len()
     }
 
     /// Returns whether the cache holds no entries.
@@ -397,5 +473,62 @@ mod tests {
                 .get::<Vec<String>>(3, "workspace-member-names:event")
                 .is_none()
         );
+    }
+
+    /// Definition-derived entries must survive edits of documents that only
+    /// call scripted definitions (plain document advances), move when a
+    /// declaring document commits, and answer superseded readers so a stale
+    /// worker degrades instead of looping on dropped inserts.
+    #[test]
+    fn definitions_entries_track_declaring_documents_only() {
+        let cache = SnapshotQueryCache::with_capacity(8);
+        cache.insert(
+            1,
+            CacheDomain::Definitions,
+            "dynamic-rule-rows".to_owned(),
+            Arc::new(vec![1_u32]),
+        );
+        // A keystroke in a non-declaring document keeps the report valid for
+        // readers at both revisions.
+        cache.advance_documents(2);
+        assert!(cache.get::<Vec<u32>>(1, "dynamic-rule-rows").is_some());
+        assert!(cache.get::<Vec<u32>>(2, "dynamic-rule-rows").is_some());
+        assert!(!cache.is_superseded(CacheDomain::Definitions, 1));
+        // A declaring-document commit moves the domain: the older reader is
+        // superseded and its insert would be dropped.
+        cache.advance_definitions(4);
+        assert!(cache.get::<Vec<u32>>(1, "dynamic-rule-rows").is_none());
+        assert!(cache.get::<Vec<u32>>(4, "dynamic-rule-rows").is_none());
+        assert!(cache.is_superseded(CacheDomain::Definitions, 1));
+        assert!(!cache.is_superseded(CacheDomain::Definitions, 4));
+        cache.insert(
+            1,
+            CacheDomain::Definitions,
+            "stale".to_owned(),
+            Arc::new(vec![2_u32]),
+        );
+        assert!(cache.get::<Vec<u32>>(4, "stale").is_none());
+        // A current worker populates and later readers at the same lineage hit it.
+        cache.insert(
+            4,
+            CacheDomain::Definitions,
+            "dynamic-rule-rows".to_owned(),
+            Arc::new(vec![3_u32]),
+        );
+        assert_eq!(
+            cache
+                .get::<Vec<u32>>(4, "dynamic-rule-rows")
+                .expect("rebuilt")[0],
+            3
+        );
+        assert_eq!(
+            cache
+                .get::<Vec<u32>>(6, "dynamic-rule-rows")
+                .expect("later reader")[0],
+            3
+        );
+        // An index advance clears the domain too: index files declare.
+        cache.advance_to(7);
+        assert!(cache.get::<Vec<u32>>(6, "dynamic-rule-rows").is_none());
     }
 }

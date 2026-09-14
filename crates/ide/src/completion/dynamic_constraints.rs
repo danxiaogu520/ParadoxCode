@@ -22,6 +22,7 @@ use crate::dynamic_rules::{
     DynamicAffixSegment, DynamicAffixedSiteRow, DynamicForwardSiteRow, DynamicForwardValue,
     DynamicKeyRenderSiteRow, DynamicParameterRow, DynamicQuotedSiteRow, DynamicRuleRow,
     DynamicScopeStep, DynamicSiteGuard, DynamicSiteZone, DynamicValueSiteRow, dynamic_rule_row,
+    dynamic_rule_row_with_cancellation,
 };
 use crate::semantic::{
     enum_members, semantic_rule_key_matches, semantic_scope_allows, workspace_member_index,
@@ -152,9 +153,9 @@ pub(crate) fn infer_dynamic_value_constraints(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
     target: &ScriptProperty,
-    _cancellation: &CancellationToken,
+    cancellation: &CancellationToken,
 ) -> Result<DynamicValueConstraints, Cancelled> {
-    let constraints = infer_dynamic_argument_constraints(snapshot, context, target);
+    let constraints = infer_dynamic_argument_constraints(snapshot, context, target, cancellation)?;
     Ok(DynamicValueConstraints {
         sites: constraints.values,
         key_renders: constraints.key_renders,
@@ -166,26 +167,34 @@ pub(crate) fn infer_dynamic_quoted_script_constraints(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
     target: &ScriptProperty,
-    _cancellation: &CancellationToken,
+    cancellation: &CancellationToken,
 ) -> Result<Vec<DynamicQuotedScriptConstraintSite>, Cancelled> {
-    Ok(infer_dynamic_argument_constraints(snapshot, context, target).quoted_scripts)
+    Ok(infer_dynamic_argument_constraints(snapshot, context, target, cancellation)?.quoted_scripts)
 }
 
 fn infer_dynamic_argument_constraints(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
     target: &ScriptProperty,
-) -> DynamicArgumentConstraints {
+    cancellation: &CancellationToken,
+) -> Result<DynamicArgumentConstraints, Cancelled> {
     let Some(invocation) = context.container_property.as_ref() else {
-        return DynamicArgumentConstraints::default();
+        return Ok(DynamicArgumentConstraints::default());
     };
     let Some((owner_kind, owner_name, caller_scope)) =
         dynamic_parameter_owner(snapshot, context, target, invocation)
     else {
-        return DynamicArgumentConstraints::default();
+        return Ok(DynamicArgumentConstraints::default());
     };
     let bindings = invocation_bindings(invocation, Some(target));
-    infer_argument_constraints(snapshot, &owner_kind, &owner_name, &bindings, &caller_scope)
+    infer_argument_constraints(
+        snapshot,
+        &owner_kind,
+        &owner_name,
+        &bindings,
+        &caller_scope,
+        cancellation,
+    )
 }
 
 /// Per-render-site (context, parent_path, scope) for one quoted payload
@@ -199,13 +208,18 @@ pub(crate) fn infer_dynamic_quoted_payload_sites(
     invocation: &ScriptProperty,
     target: &ScriptProperty,
     caller_scope: &ScopeContext,
-    _cancellation: &CancellationToken,
+    cancellation: &CancellationToken,
 ) -> Result<Vec<DynamicQuotedScriptConstraintSite>, Cancelled> {
     let bindings = invocation_bindings(invocation, Some(target));
-    Ok(
-        infer_argument_constraints(snapshot, owner_kind, owner_name, &bindings, caller_scope)
-            .quoted_scripts,
-    )
+    Ok(infer_argument_constraints(
+        snapshot,
+        owner_kind,
+        owner_name,
+        &bindings,
+        caller_scope,
+        cancellation,
+    )?
+    .quoted_scripts)
 }
 
 fn infer_argument_constraints(
@@ -214,16 +228,19 @@ fn infer_argument_constraints(
     owner_name: &str,
     bindings: &BTreeMap<String, BoundArgument>,
     caller_scope: &ScopeContext,
-) -> DynamicArgumentConstraints {
-    let Some(row) = dynamic_rule_row(snapshot, owner_kind, owner_name) else {
-        return DynamicArgumentConstraints::default();
+    cancellation: &CancellationToken,
+) -> Result<DynamicArgumentConstraints, Cancelled> {
+    let Some(row) =
+        dynamic_rule_row_with_cancellation(snapshot, owner_kind, owner_name, cancellation)?
+    else {
+        return Ok(DynamicArgumentConstraints::default());
     };
     let Some(target_parameter) = bindings
         .iter()
         .find(|(_, value)| matches!(value, BoundArgument::Target))
         .map(|(name, _)| name.clone())
     else {
-        return DynamicArgumentConstraints::default();
+        return Ok(DynamicArgumentConstraints::default());
     };
     let replayed = replay_sites(
         snapshot,
@@ -233,7 +250,7 @@ fn infer_argument_constraints(
         caller_scope,
         ReplayOptions::COMPLETION,
     );
-    project_completion_constraints(snapshot, replayed)
+    Ok(project_completion_constraints(snapshot, replayed))
 }
 
 /// Runs the two-pass row replay for one parameter under a consumer policy.

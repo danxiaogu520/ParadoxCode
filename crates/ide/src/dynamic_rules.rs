@@ -39,7 +39,7 @@ use hir::{TemplateFragment, TemplateItem, TemplateProperty, TemplateToken, Templ
 use rules::{GameProfile, RuleShape, ValueMatcher};
 use text::TextRange;
 
-use crate::dynamic_contracts::{ScopeContract, dynamic_contract};
+use crate::dynamic_contracts::ScopeContract;
 use crate::dynamic_cycles::dynamic_cycle_report;
 use crate::semantic::{
     dynamic_definition_type, probe_query_cache, resolve_dynamic_definition,
@@ -427,8 +427,25 @@ pub(crate) fn dynamic_rule_row(
     name: &str,
 ) -> Option<DynamicRuleRow> {
     let cancellation = CancellationToken::new();
-    let report = uncancelled(dynamic_rule_report(snapshot, &cancellation));
-    report.row(kind, name).cloned()
+    uncancelled(dynamic_rule_row_with_cancellation(
+        snapshot,
+        kind,
+        name,
+        &cancellation,
+    ))
+}
+
+/// Cancellable variant for diagnostics and completion workers: a superseded
+/// worker stops at the report boundary instead of rebuilding workspace-wide
+/// state whose insert would be dropped.
+pub(crate) fn dynamic_rule_row_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+    name: &str,
+    cancellation: &CancellationToken,
+) -> Result<Option<DynamicRuleRow>, Cancelled> {
+    let report = dynamic_rule_report(snapshot, cancellation)?;
+    Ok(report.row(kind, name).cloned())
 }
 
 /// Snapshot-level lookup by definition name alone, for callers that only
@@ -451,6 +468,16 @@ fn dynamic_rule_report(
         probe_query_cache::<DynamicRuleReport>(snapshot, revision, &[DYNAMIC_RULES_CACHE_KEY])
     {
         return Ok(cached);
+    }
+    // Definition-set domain, same policy as the contract and cycle reports:
+    // call-site edits keep the rows, declaring commits invalidate them, and a
+    // superseded reader degrades to an empty report rather than rebuilding
+    // workspace-wide state whose insert would be dropped.
+    if snapshot
+        .query_cache()
+        .is_superseded(engine::CacheDomain::Definitions, revision)
+    {
+        return Ok(Arc::new(DynamicRuleReport::default()));
     }
     cancellation.checkpoint()?;
     let report = build_dynamic_rule_report(snapshot, cancellation)?;
@@ -475,7 +502,7 @@ fn dynamic_rule_report(
     let report = Arc::new(report);
     snapshot.query_cache().insert(
         revision,
-        CacheDomain::Documents,
+        CacheDomain::Definitions,
         DYNAMIC_RULES_CACHE_KEY.to_owned(),
         report.clone(),
     );
@@ -524,6 +551,11 @@ fn build_dynamic_rule_report(
     // The definition-site cycle analysis is computed here so shadow rows carry
     // the flag even before any diagnostics pass warms the cache.
     let cycles = dynamic_cycle_report(snapshot, cancellation)?;
+    // Resolve the contract report once for the whole build: it is
+    // workspace-wide itself, and per-definition lookups go through this Arc
+    // instead of re-probing (and on a superseded revision, re-rebuilding) the
+    // cache for every nested call.
+    let contracts = crate::dynamic_contracts::dynamic_contract_report_view(snapshot, cancellation)?;
     for (kind, name) in &candidates {
         cancellation.checkpoint()?;
         let Some(resolved) = resolve_dynamic_definition(snapshot, kind, name) else {
@@ -537,7 +569,9 @@ fn build_dynamic_rule_report(
         // nested callees; reuse it instead of re-inferring here. Empty
         // contracts are a definition error on their own and would turn every
         // body statement into a finding, so their bodies walk as unknown.
-        let contract = dynamic_contract(snapshot, &resolved.summary.kind, &resolved.summary.name)
+        let contract = contracts
+            .contract(&resolved.summary.kind, &resolved.summary.name)
+            .cloned()
             .unwrap_or(ScopeContract::Unknown);
         let entry_flow = match &contract {
             ScopeContract::Scopes(scopes) => {
@@ -547,7 +581,7 @@ fn build_dynamic_rule_report(
                 ScopeFlow::Unknown
             }
         };
-        let mut derivation = Derivation::new(snapshot, profile);
+        let mut derivation = Derivation::new(snapshot, profile, Arc::clone(&contracts));
         let mut sites = SiteDerivation::new(snapshot, profile);
         if let Some(template) = resolved.summary.template.as_ref() {
             derivation.walk_items(&template.items, &resolved.body_context, &[], entry_flow);
@@ -671,16 +705,24 @@ struct ParameterUsage {
 struct Derivation<'a> {
     snapshot: &'a AnalysisSnapshot,
     profile: &'a GameProfile,
+    /// Workspace-wide contracts resolved once per report build; nested calls
+    /// look their callees up here instead of re-probing per property.
+    contracts: Arc<crate::dynamic_contracts::DynamicContractReport>,
     parameters: BTreeMap<String, ParameterUsage>,
     dynamic_dispatch: bool,
     findings: Vec<DynamicBodyFinding>,
 }
 
 impl<'a> Derivation<'a> {
-    fn new(snapshot: &'a AnalysisSnapshot, profile: &'a GameProfile) -> Self {
+    fn new(
+        snapshot: &'a AnalysisSnapshot,
+        profile: &'a GameProfile,
+        contracts: Arc<crate::dynamic_contracts::DynamicContractReport>,
+    ) -> Self {
         Self {
             snapshot,
             profile,
+            contracts,
             parameters: BTreeMap::new(),
             dynamic_dispatch: false,
             findings: Vec::new(),
@@ -821,8 +863,10 @@ impl<'a> Derivation<'a> {
         if let Some(callee) = dynamic_kind_for_context(self.snapshot, context)
             .and_then(|kind| resolve_dynamic_definition(self.snapshot, &kind, key))
         {
-            let callee_contract =
-                dynamic_contract(self.snapshot, &callee.summary.kind, &callee.summary.name);
+            let callee_contract = self
+                .contracts
+                .contract(&callee.summary.kind, &callee.summary.name)
+                .cloned();
             if let (Some(current), Some(ScopeContract::Scopes(required))) =
                 (flow.scopes(), callee_contract.as_ref())
             {

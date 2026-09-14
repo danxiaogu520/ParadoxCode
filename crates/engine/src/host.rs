@@ -904,8 +904,12 @@ impl AnalysisHost {
             DocumentSource::Overlay,
             path,
         );
+        let declares_dynamic_definitions = self.document_declares_dynamic_definitions(&document);
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
         self.advance_document_revision();
+        if declares_dynamic_definitions {
+            self.query_cache.advance_definitions(self.revision);
+        }
         Ok(())
     }
 
@@ -958,9 +962,16 @@ impl AnalysisHost {
                 received: version,
             });
         }
+        // The staged replacement carries no HIR yet, so overlay resolution
+        // falls back to the index text for this document; definition-derived
+        // entries must move with it when the outgoing text declared anything.
+        let declares_dynamic_definitions = self.document_declares_dynamic_definitions(current);
         let document = staged_overlay_document(id.clone(), version, text, current.path.clone());
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
         self.advance_document_revision();
+        if declares_dynamic_definitions {
+            self.query_cache.advance_definitions(self.revision);
+        }
         Ok(())
     }
 
@@ -977,11 +988,19 @@ impl AnalysisHost {
         if !matches_current {
             return false;
         }
+        // Definition-derived query results depend on the dynamic-definition set,
+        // so a commit that declares one must invalidate them even though plain
+        // document entries advance with the revision below.
+        let declares_dynamic_definitions =
+            self.document_declares_dynamic_definitions(&prepared.document);
         Arc::make_mut(&mut self.documents).insert(id, prepared.document);
         // Only the overlay document map changes here, so index-derived cache
         // entries stay valid; a full advance would wipe them on every
         // keystroke's parse commit and defeat the index cache domain.
         self.advance_document_revision();
+        if declares_dynamic_definitions {
+            self.query_cache.advance_definitions(self.revision);
+        }
         true
     }
 
@@ -1030,6 +1049,7 @@ impl AnalysisHost {
         }
 
         let path = current.path.clone();
+        let previous_declared = self.document_declares_dynamic_definitions(current);
         let document = self.document_snapshot(
             id.clone(),
             Some(version),
@@ -1037,8 +1057,13 @@ impl AnalysisHost {
             DocumentSource::Overlay,
             path,
         );
+        let declares_dynamic_definitions =
+            previous_declared || self.document_declares_dynamic_definitions(&document);
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
         self.advance_document_revision();
+        if declares_dynamic_definitions {
+            self.query_cache.advance_definitions(self.revision);
+        }
         Ok(())
     }
 
@@ -1051,6 +1076,10 @@ impl AnalysisHost {
             return Err(DocumentError::NotOpen(id.clone()));
         }
         let path = current.path.clone();
+        // Closing a declaring overlay changes the dynamic-definition set just
+        // like editing one; the restored index candidate counts too (an edit
+        // that removed every definition must still invalidate).
+        let mut declares_dynamic_definitions = self.document_declares_dynamic_definitions(current);
         Arc::make_mut(&mut self.documents).remove(id);
         if let Some(path) = path {
             let mut report = WorkspaceScanReport::default();
@@ -1067,11 +1096,34 @@ impl AnalysisHost {
                     DocumentSource::Disk,
                     Some(path),
                 );
+                declares_dynamic_definitions |=
+                    self.document_declares_dynamic_definitions(&document);
                 Arc::make_mut(&mut self.documents).insert(id.clone(), document);
             }
         }
         self.advance_document_revision();
+        if declares_dynamic_definitions {
+            self.query_cache.advance_definitions(self.revision);
+        }
         Ok(())
+    }
+
+    /// True when the document's HIR declares a definition of a
+    /// dynamic-definition kind (scripted triggers, effects, ...).
+    ///
+    /// Commits and closes of such documents move the definitions cache domain;
+    /// documents that only call scripted definitions leave it untouched, so
+    /// workspace-scale dynamic reports survive ordinary edits. An unparsed
+    /// staged document reports false — the caller decides how to treat the
+    /// document it is replacing.
+    fn document_declares_dynamic_definitions(&self, document: &DocumentSnapshot) -> bool {
+        document.hir().is_some_and(|hir| {
+            hir.definitions().iter().any(|definition| {
+                self.rules
+                    .dynamic_definition_context(&definition.kind)
+                    .is_some()
+            })
+        })
     }
 
     /// Captures an immutable query view.
