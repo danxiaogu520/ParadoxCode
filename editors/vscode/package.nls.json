@@ -26,6 +26,7 @@
   "commands.openDependencySettings.title": "Open ParadoxCode Dependency Settings",
   "commands.reloadServer.title": "Reload ParadoxCode Language Server",
   "commands.exportDiagnostics.title": "Export Workspace Diagnostics",
+  "commands.formatWorkspace.title": "Format Workspace Scripts",
   "commands.openOutput.title": "Open ParadoxCode Output",
   "commands.refreshLoadedFiles.title": "Refresh Loaded Files",
   "configuration.serverPath.description": "Path to the pdc server binary. When empty, ParadoxCode checks the downloaded cache and PATH.",

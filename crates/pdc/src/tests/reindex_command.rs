@@ -67,7 +67,11 @@ fn execute_reindex_workspace_refreshes_sources_and_reports_capability() {
         .expect("initialize response");
     assert_eq!(
         initialize["result"]["capabilities"]["executeCommandProvider"]["commands"],
-        json!(["pdc/reindexWorkspace", "validateWorkspace"])
+        json!([
+            "pdc/reindexWorkspace",
+            "validateWorkspace",
+            "pdc/formatWorkspace"
+        ])
     );
 
     let reindex = responses

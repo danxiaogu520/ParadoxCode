@@ -321,6 +321,7 @@ pub(crate) fn prepare_initialize_candidate(
                 commands: vec![
                     "pdc/reindexWorkspace".to_owned(),
                     "validateWorkspace".to_owned(),
+                    "pdc/formatWorkspace".to_owned(),
                 ],
                 ..ExecuteCommandOptions::default()
             }),

@@ -1016,6 +1016,49 @@ async function exportDiagnostics(): Promise<void> {
     }
 }
 
+interface WorkspaceFormatSummary {
+    totalFiles: number;
+    formattedFiles: number;
+    unchangedFiles: number;
+    skippedUnsafeFiles: number;
+    skippedLegacyEncodingFiles: number;
+    failedFiles: number;
+}
+
+async function formatWorkspace(): Promise<void> {
+    if (!client) {
+        void vscode.window.showWarningMessage('ParadoxCode: the language server is not running.');
+        return;
+    }
+    // Saving first closes the gap between dirty editor buffers and disk: the
+    // server rewrites the files on disk, and VSCode reloads clean open
+    // documents from disk once those files change.
+    await vscode.commands.executeCommand('workbench.action.files.saveAll', false);
+    try {
+        const summary = await client.sendRequest<WorkspaceFormatSummary>('workspace/executeCommand', {
+            command: 'pdc/formatWorkspace',
+            arguments: [],
+        });
+        const skipped = summary.skippedUnsafeFiles + summary.skippedLegacyEncodingFiles;
+        const parts = [
+            `${summary.formattedFiles} formatted`,
+            `${summary.unchangedFiles} already canonical`,
+        ];
+        if (skipped > 0) {
+            parts.push(`${skipped} skipped`);
+        }
+        if (summary.failedFiles > 0) {
+            parts.push(`${summary.failedFiles} failed`);
+        }
+        void vscode.window.showInformationMessage(
+            `ParadoxCode: workspace formatting finished (${summary.totalFiles} script files): ${parts.join(', ')}.`,
+        );
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        void vscode.window.showErrorMessage(`ParadoxCode: workspace formatting failed: ${message}`);
+    }
+}
+
 async function installServer(context: vscode.ExtensionContext): Promise<boolean> {
     const options = installOptions(context);
     try {
@@ -1107,6 +1150,7 @@ export function activate(context: vscode.ExtensionContext): void {
         ),
         vscode.commands.registerCommand('paradoxcode.reloadServer', restart),
         vscode.commands.registerCommand('paradoxcode.exportDiagnostics', () => exportDiagnostics()),
+        vscode.commands.registerCommand('paradoxcode.formatWorkspace', () => formatWorkspace()),
         vscode.commands.registerCommand('paradoxcode.refreshLoadedFiles', () => loadedFilesProvider.refresh(client)),
         vscode.commands.registerCommand('paradoxcode.refreshMissionPreview', () => MissionPreviewPanel.refresh(client)),
         { dispose: () => MissionPreviewPanel.dispose() },

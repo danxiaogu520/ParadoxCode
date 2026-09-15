@@ -26,6 +26,7 @@
   "commands.openDependencySettings.title": "打开 ParadoxCode 依赖设置",
   "commands.reloadServer.title": "重载 ParadoxCode 语言服务器",
   "commands.exportDiagnostics.title": "导出工作区诊断",
+  "commands.formatWorkspace.title": "格式化工作区脚本",
   "commands.openOutput.title": "打开 ParadoxCode 输出",
   "commands.refreshLoadedFiles.title": "刷新已加载文件",
   "configuration.serverPath.description": "pdc 服务器路径。留空时依次检查下载缓存和 PATH。",

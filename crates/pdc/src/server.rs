@@ -489,6 +489,27 @@ pub(crate) struct InFlightReindexCommand {
     pub(crate) cancellation: WorkspaceScanToken,
 }
 
+/// An in-flight `pdc/formatWorkspace` command. Unlike the reindex commands this
+/// worker writes files straight to disk, so completion never swaps the host and
+/// a revision mismatch cannot invalidate the summary; the token only exists so
+/// `$/cancelRequest` and `exit` can stop the walk between files.
+pub(crate) struct InFlightFormatCommand {
+    pub(crate) request_id: RequestId,
+    pub(crate) cancellation: WorkspaceScanToken,
+    pub(crate) progress_token: Option<String>,
+}
+
+/// Aggregate outcome of one `pdc/formatWorkspace` pass over the Current Mod.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct WorkspaceFormatSummary {
+    pub(crate) total_files: usize,
+    pub(crate) formatted_files: usize,
+    pub(crate) unchanged_files: usize,
+    pub(crate) skipped_unsafe_files: usize,
+    pub(crate) skipped_legacy_encoding_files: usize,
+    pub(crate) failed_files: usize,
+}
+
 /// Explicit workspace command executed by the single serialized scan worker.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum WorkspaceCommand {
@@ -538,6 +559,13 @@ pub(crate) struct ReindexCommandResult {
 }
 
 #[derive(Debug)]
+pub(crate) struct FormatCommandResult {
+    pub(crate) request_id: RequestId,
+    pub(crate) id: Value,
+    pub(crate) result: Result<WorkspaceFormatSummary, WorkspaceError>,
+}
+
+#[derive(Debug)]
 pub(crate) struct DiskChangesResult {
     base_revision: u64,
     changes: Vec<DiskFileChange>,
@@ -575,6 +603,7 @@ enum TransportEvent {
     ScanSetup(ScanSetupResult),
     BackgroundReindex(BackgroundReindexResult),
     ReindexCommand(ReindexCommandResult),
+    FormatCommand(FormatCommandResult),
     /// A server-side `window/logMessage` notification produced by a worker.
     Log(Value),
     Progress(Progress),

@@ -45,6 +45,7 @@ impl LspServer {
             let mut in_flight_background_reindex = None::<InFlightBackgroundReindex>;
             let mut in_flight_workspace_diagnostics = None::<InFlightWorkspaceDiagnostics>;
             let mut in_flight_reindex_command = None::<InFlightReindexCommand>;
+            let mut in_flight_format_command = None::<InFlightFormatCommand>;
             let mut deferred_messages = VecDeque::<Value>::new();
 
             loop {
@@ -80,7 +81,8 @@ impl LspServer {
                     || in_flight_disk_changes.is_some()
                     || in_flight_background_reindex.is_some()
                     || in_flight_workspace_diagnostics.is_some()
-                    || in_flight_reindex_command.is_some();
+                    || in_flight_reindex_command.is_some()
+                    || in_flight_format_command.is_some();
                 self.spawn_due_background_reindex(
                     scope,
                     &event_sender,
@@ -92,7 +94,8 @@ impl LspServer {
                 // guard before accepting an explicit command so the two full scans never overlap.
                 background_busy = background_busy
                     || in_flight_background_reindex.is_some()
-                    || in_flight_reindex_command.is_some();
+                    || in_flight_reindex_command.is_some()
+                    || in_flight_format_command.is_some();
                 self.spawn_pending_workspace_diagnostics(
                     scope,
                     &event_sender,
@@ -101,6 +104,11 @@ impl LspServer {
                 );
                 background_busy = background_busy || in_flight_workspace_diagnostics.is_some();
                 if let Some(task) = in_flight_reindex_command.as_ref()
+                    && self.cancelled.contains(&task.request_id)
+                {
+                    task.cancellation.cancel();
+                }
+                if let Some(task) = in_flight_format_command.as_ref()
                     && self.cancelled.contains(&task.request_id)
                 {
                     task.cancellation.cancel();
@@ -146,7 +154,8 @@ impl LspServer {
                     || in_flight_disk_changes.is_some()
                     || in_flight_background_reindex.is_some()
                     || in_flight_workspace_diagnostics.is_some()
-                    || in_flight_reindex_command.is_some();
+                    || in_flight_reindex_command.is_some()
+                    || in_flight_format_command.is_some();
                 let deferred_ready = !parse_busy
                     && !initialize_busy
                     && !disk_changes_busy
@@ -272,7 +281,14 @@ impl LspServer {
                                 &mut in_flight_reindex_command,
                                 background_busy,
                                 &message,
-                            ) || self.spawn_snapshot_request(
+                            ) || self.spawn_format_command(
+                                scope,
+                                &event_sender,
+                                &mut in_flight_format_command,
+                                background_busy,
+                                &message,
+                                &mut output,
+                            )? || self.spawn_snapshot_request(
                                 scope,
                                 &event_sender,
                                 &mut in_flight_requests,
@@ -324,6 +340,9 @@ impl LspServer {
                                 task.cancellation.cancel();
                             }
                             if let Some(task) = in_flight_reindex_command.as_ref() {
+                                task.cancellation.cancel();
+                            }
+                            if let Some(task) = in_flight_format_command.as_ref() {
                                 task.cancellation.cancel();
                             }
                             return if self.clean_exit {
@@ -1137,6 +1156,59 @@ impl LspServer {
                         self.arm_background_reindex();
                         write_message(&mut output, &response)?;
                     }
+                    TransportEvent::FormatCommand(result) => {
+                        let current = in_flight_format_command
+                            .as_ref()
+                            .is_some_and(|task| task.request_id == result.request_id);
+                        if !current {
+                            continue;
+                        }
+                        let task = in_flight_format_command
+                            .take()
+                            .expect("checked explicit format command task");
+                        self.cancelled.remove(&result.request_id);
+                        if let Some(token) = &task.progress_token {
+                            let message = match &result.result {
+                                Ok(summary) => {
+                                    format!("Formatted {} file(s)", summary.formatted_files)
+                                }
+                                Err(WorkspaceError::Cancelled) => "Formatting cancelled".to_owned(),
+                                Err(error) => format!("Workspace formatting failed: {error}"),
+                            };
+                            write_message(&mut output, &work_done_progress_end(token, &message))?;
+                        }
+                        let response = if task.cancellation.is_cancelled() {
+                            RpcError::new(REQUEST_CANCELLED, "request was cancelled")
+                                .response(result.id)
+                        } else {
+                            match result.result {
+                                Ok(summary) => json!({
+                                    "jsonrpc": JSON_RPC_VERSION,
+                                    "id": result.id,
+                                    "result": {
+                                        "totalFiles": summary.total_files,
+                                        "formattedFiles": summary.formatted_files,
+                                        "unchangedFiles": summary.unchanged_files,
+                                        "skippedUnsafeFiles": summary.skipped_unsafe_files,
+                                        "skippedLegacyEncodingFiles":
+                                            summary.skipped_legacy_encoding_files,
+                                        "failedFiles": summary.failed_files,
+                                    },
+                                }),
+                                Err(WorkspaceError::Cancelled) => {
+                                    RpcError::new(REQUEST_CANCELLED, "request was cancelled")
+                                        .response(result.id)
+                                }
+                                Err(error) => RpcError::new(
+                                    INTERNAL_ERROR,
+                                    format!("workspace formatting failed: {error}"),
+                                )
+                                .response(result.id),
+                            }
+                        };
+                        self.arm_background_reindex();
+                        write_message(&mut output, &response)?;
+                    }
                     TransportEvent::DiskChanges(result) => {
                         let current = in_flight_disk_changes
                             .as_ref()
@@ -1258,7 +1330,8 @@ impl LspServer {
                         || in_flight_disk_changes.is_some()
                         || in_flight_background_reindex.is_some()
                         || in_flight_workspace_diagnostics.is_some()
-                        || in_flight_reindex_command.is_some());
+                        || in_flight_reindex_command.is_some()
+                        || in_flight_format_command.is_some());
                 if !reader_active && !draining_shutdown && deferred_messages.is_empty() {
                     read_sender.send(()).map_err(|_| {
                         LspError::Protocol("LSP transport reader stopped unexpectedly".to_owned())
