@@ -98,6 +98,17 @@ impl LspServer {
 
         match method {
             "initialized" => Ok(self.watcher_registration.take().unwrap_or(Value::Null)),
+            "$/setTrace" => {
+                // The spec allows servers to ignore this; the recorded value
+                // gates the `pdc/trace` decision trail in the event loop.
+                if let Some(value) = params
+                    .and_then(|params| params.get("value"))
+                    .and_then(Value::as_str)
+                {
+                    self.client_trace = value.to_owned();
+                }
+                Ok(Value::Null)
+            }
             "shutdown" => {
                 self.state = ServerState::ShuttingDown;
                 Ok(Value::Null)
@@ -177,6 +188,9 @@ impl LspServer {
             .and_then(|completion| completion.completion_item.as_ref())
             .and_then(|item| item.snippet_support)
             .unwrap_or(false);
+        if let Some(trace) = params.trace.as_ref() {
+            self.client_trace = trace_value_string(trace);
+        }
         let prepared = prepare_initialize_candidate(
             self.host.clone(),
             params,

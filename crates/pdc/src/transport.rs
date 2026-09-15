@@ -63,17 +63,20 @@ pub(crate) fn read_message<R: BufRead>(reader: &mut R) -> Result<Option<Value>, 
     }
     let mut body = vec![0; content_length];
     reader.read_exact(&mut body)?;
-    serde_json::from_slice(&body).map_err(|error| {
+    let message: Value = serde_json::from_slice(&body).map_err(|error| {
         if error.is_data() || error.is_syntax() {
             LspError::Json(error)
         } else {
             LspError::Protocol(format!("invalid JSON-RPC body: {error}"))
         }
-    })
+    })?;
+    crate::trace::frame(false, &message, body.len());
+    Ok(Some(message))
 }
 
 pub(crate) fn write_message<W: Write>(writer: &mut W, message: &Value) -> Result<(), LspError> {
     let body = serde_json::to_vec(message)?;
+    crate::trace::frame(true, message, body.len());
     write!(writer, "Content-Length: {}\r\n\r\n", body.len())?;
     writer.write_all(&body)?;
     writer.flush()?;

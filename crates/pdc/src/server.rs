@@ -71,6 +71,16 @@ fn progress_nonce() -> u128 {
         .map_or(0, |elapsed| elapsed.as_nanos())
 }
 
+/// Wire spelling of the LSP `TraceValue` carried by initialize and `$/setTrace`.
+fn trace_value_string(value: &lsp_types::TraceValue) -> String {
+    match value {
+        lsp_types::TraceValue::Off => "off",
+        lsp_types::TraceValue::Messages => "messages",
+        lsp_types::TraceValue::Verbose => "verbose",
+    }
+    .to_owned()
+}
+
 /// Server-initiated work-done-progress create request; the client's response is ignored.
 fn work_done_progress_create(token: &str) -> Value {
     json!({
@@ -661,6 +671,10 @@ pub struct LspServer {
     pub(crate) workspace_wide_diagnostics: bool,
     /// Whether an automatic closed-file validation pass is waiting for a quiet worker slot.
     pub(crate) workspace_diagnostics_pending: bool,
+    /// Client-requested LSP trace level, captured from the initialize `trace`
+    /// parameter and live `$/setTrace` notifications. Only `"verbose"` turns on
+    /// the `pdc/trace` scheduling-decision trail.
+    pub(crate) client_trace: String,
     /// Whether the initial background workspace scan still needs to start. Set
     /// during the initialize handshake when live roots exist; the scan worker
     /// commits while the live revision is unchanged and retries otherwise.
@@ -729,6 +743,7 @@ impl LspServer {
             diagnostic_severity_overrides: Arc::new(BTreeMap::new()),
             workspace_wide_diagnostics: crate::workspace::DEFAULT_WORKSPACE_WIDE_DIAGNOSTICS,
             workspace_diagnostics_pending: false,
+            client_trace: "off".to_owned(),
             scan_pending: false,
             pending_cache_setup: PendingCacheSetup::default(),
             scan_retries: 0,

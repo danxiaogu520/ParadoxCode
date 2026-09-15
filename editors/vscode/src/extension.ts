@@ -7,8 +7,10 @@ import {
     RevealOutputChannelOn,
     ServerOptions,
     State,
+    Trace,
 } from 'vscode-languageclient/node';
 
+import { FileTeeDebugChannel } from './debugChannel';
 import { LoadedFilesProvider } from './fileExplorer';
 import { MissionPreviewPanel } from './previewPanel';
 import {
@@ -60,7 +62,77 @@ interface DependencySetting {
 const DEPENDENCY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
 
 /** Visible diagnostic trail: activation, binary resolution, server start. */
-const log = vscode.window.createOutputChannel('ParadoxCode');
+const log = vscode.window.createOutputChannel('ParadoxCode', { log: true });
+
+/**
+ * Debug trail: the server's INFO chatter, `pdc/trace` scheduling decisions, and
+ * the verbose LSP protocol trace. Stays empty unless debug mode is on; the file
+ * mirror behind `paradoxcode.debug.logFile` is part of the same wrapper.
+ */
+const debugLog = new FileTeeDebugChannel(
+    vscode.window.createOutputChannel('ParadoxCode Debug', { log: true }),
+    (message) => log.appendLine(message),
+);
+
+/** LSP MessageType: 1 = Error, 2 = Warning. Everything below is debug detail. */
+const MESSAGE_TYPE_WARNING = 2;
+
+/** Reads the live debug-mode switch; applies without a server restart. */
+function debugModeEnabled(): boolean {
+    return vscode.workspace.getConfiguration('paradoxcode')
+        .get<boolean>('debug.enable', false);
+}
+
+/**
+ * Resolves `paradoxcode.debug.logFile` to an absolute path. Relative paths are
+ * anchored at the first workspace folder; a relative path without a workspace
+ * is invalid and disables the mirror (with a one-line notice).
+ */
+function debugLogFilePath(): string | undefined {
+    const configured = vscode.workspace.getConfiguration('paradoxcode')
+        .get<string>('debug.logFile', '')
+        .trim();
+    if (!configured) {
+        return undefined;
+    }
+    if (path.isAbsolute(configured)) {
+        return configured;
+    }
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) {
+        log.appendLine(
+            `WARNING: paradoxcode.debug.logFile "${configured}" is relative but no workspace folder is open; the debug log file mirror stays off.`,
+        );
+        return undefined;
+    }
+    return path.join(root, configured);
+}
+
+/** Last announced debug state; suppresses a startup log line when debug is off. */
+let debugModeAnnounced: boolean | undefined;
+
+/**
+ * Applies the current debug settings live: the file-mirror target and the
+ * protocol trace level of the running client. Never restarts the server —
+ * debug mode exists to observe a live repro.
+ */
+function applyDebugConfiguration(): void {
+    const enabled = debugModeEnabled();
+    if (enabled !== debugModeAnnounced) {
+        debugModeAnnounced = enabled;
+        log.appendLine(`debug mode ${enabled ? 'enabled' : 'disabled'}`);
+    }
+    debugLog.updateTarget(enabled ? debugLogFilePath() : undefined);
+    if (client) {
+        client.setTrace(enabled ? Trace.Verbose : Trace.Off).catch(() => undefined);
+        // vscode-languageclient never forwards $/setTrace itself, and the
+        // server only sees the initialize-time `trace` parameter — so the
+        // extension notifies it explicitly to gate the pdc/trace trail live.
+        client
+            .sendNotification('$/setTrace', { value: enabled ? 'verbose' : 'off' })
+            .catch(() => undefined);
+    }
+}
 
 /** Server state is deliberately compact so it works in narrow status bars. */
 const statusBar = vscode.window.createStatusBarItem(
@@ -121,6 +193,11 @@ function handleServerReady(
     const wasReady = serverReady;
     setServerReady(true);
     updateStatus(readyClient.state);
+    if (!wasReady) {
+        // The main channel deliberately shows only basic output; readiness is
+        // the one milestone users wait for during the first index load.
+        log.appendLine('pdc ready');
+    }
     if (!wasReady && readyClient.state === State.Running) {
         void loadedFiles?.refresh(readyClient);
     }
@@ -776,15 +853,26 @@ function createClient({ command, source }: ServerResolution): LanguageClient {
             configurationSection: 'paradoxcode',
         },
         initializationOptions: readInitializationOptions(),
+        // The client writes server stderr and its own diagnostics into the main
+        // channel so users have exactly one basic-output channel to watch.
+        outputChannel: log,
+        traceOutputChannel: debugLog,
         revealOutputChannelOn: RevealOutputChannelOn.Error,
         middleware: clientMiddleware(),
     };
-    return new LanguageClient(
+    const languageClient = new LanguageClient(
         'paradoxcode',
         'ParadoxCode Language Server',
         serverOptions,
         clientOptions,
     );
+    if (debugModeEnabled()) {
+        // Setting the trace before start makes the initialize request itself
+        // carry `trace: "verbose"` and attaches the protocol tracer from the
+        // first frame; a later enable goes through `applyDebugConfiguration`.
+        languageClient.setTrace(Trace.Verbose).catch(() => undefined);
+    }
+    return languageClient;
 }
 
 function updateStatus(state: State): void {
@@ -908,9 +996,29 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
             if (client !== currentClient) {
                 return;
             }
-            log.appendLine(`[pdc] ${params.message}`);
+            // Errors and warnings are basic output; the INFO/LOG trail (index
+            // phases, quiet scans, worker reports) belongs to the debug
+            // channel. Parsing and the status-bar mirror must keep running
+            // for every message: the Vanilla walkthrough state machine reacts
+            // to INFO message text.
+            if (params.type <= MESSAGE_TYPE_WARNING) {
+                log.appendLine(`[pdc] ${params.message}`);
+            } else if (debugModeEnabled()) {
+                // Leveled (not appendLine) so every debug line carries a
+                // timestamp, aligning with the timestamped protocol trace.
+                debugLog.info(`[pdc] ${params.message}`);
+            }
             statusBar.tooltip = `ParadoxCode: ${params.message}`;
             updateVanillaContext(params.message);
+        });
+        currentClient.onNotification('pdc/trace', (params: unknown) => {
+            if (client !== currentClient) {
+                return;
+            }
+            const message = (params as { message?: unknown } | undefined)?.message;
+            if (debugModeEnabled() && typeof message === 'string') {
+                debugLog.info(`[trace] ${message}`);
+            }
         });
         currentClient.onNotification('pdc/ready', () => {
             if (client !== currentClient) {
@@ -921,6 +1029,7 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
         updateStatus(currentClient.state);
         currentClient.start();
         log.appendLine('language server client started');
+        debugLog.markSession(`binary ${resolution.command}`);
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         log.appendLine(`ERROR: ${message}`);
@@ -944,6 +1053,29 @@ async function stopClient(loadedFiles?: LoadedFilesProvider): Promise<void> {
         }
     }
     loadedFiles?.clear();
+}
+
+/**
+ * Flips `paradoxcode.debug.enable` in user- or workspace scope. The resulting
+ * configuration change drives `applyDebugConfiguration`; no restart happens.
+ */
+async function toggleDebugMode(): Promise<void> {
+    const config = vscode.workspace.getConfiguration('paradoxcode');
+    const enabled = config.get<boolean>('debug.enable', false);
+    const target = vscode.workspace.workspaceFolders
+        ? vscode.ConfigurationTarget.Workspace
+        : vscode.ConfigurationTarget.Global;
+    await config.update('debug.enable', !enabled, target);
+    if (!enabled) {
+        void vscode.window.showInformationMessage(
+            'ParadoxCode: debug mode enabled. Reproduce the issue, then share the "ParadoxCode Debug" output.',
+            'Open Debug Output',
+        ).then((choice) => {
+            if (choice === 'Open Debug Output') {
+                debugLog.show(true);
+            }
+        });
+    }
 }
 
 async function chooseServerPath(): Promise<void> {
@@ -1096,8 +1228,10 @@ export function activate(context: vscode.ExtensionContext): void {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? 'none';
     log.appendLine(`ParadoxCode extension activated (workspace root: ${root})`);
     setVanillaContext(false);
-    context.subscriptions.push(log, statusBar);
+    // `debugLog.dispose` also disposes the wrapped raw channel.
+    context.subscriptions.push(log, statusBar, debugLog);
     statusBar.show();
+    applyDebugConfiguration();
 
     loadedFilesProvider = new LoadedFilesProvider();
     context.subscriptions.push(
@@ -1135,6 +1269,8 @@ export function activate(context: vscode.ExtensionContext): void {
         }),
         vscode.commands.registerCommand(FOLLOWUP_COMPLETION_TRIGGER_COMMAND, triggerFollowupCompletion),
         vscode.commands.registerCommand('paradoxcode.openOutput', () => log.show(true)),
+        vscode.commands.registerCommand('paradoxcode.toggleDebug', () => toggleDebugMode()),
+        vscode.commands.registerCommand('paradoxcode.openDebugOutput', () => debugLog.show(true)),
         vscode.commands.registerCommand('paradoxcode.selectServer', () => chooseServerPath()),
         vscode.commands.registerCommand('paradoxcode.installServer', async () => {
             if (await installServer(context)) {
@@ -1179,6 +1315,10 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (SERVER_SETTING_KEYS.some((key) => event.affectsConfiguration(`paradoxcode.${key}`))) {
                 restart();
+            } else if (event.affectsConfiguration('paradoxcode.debug')) {
+                // Debug mode and its file mirror are applied live; restarting
+                // the server would destroy the repro state being observed.
+                applyDebugConfiguration();
             } else if (event.affectsConfiguration('paradoxcode.preview')) {
                 void MissionPreviewPanel.refresh(client);
             }
