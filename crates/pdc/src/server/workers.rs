@@ -1032,6 +1032,11 @@ impl LspServer {
             .as_ref()
             .and_then(|window| window.work_done_progress)
             .unwrap_or(false);
+        // Captured on the event-loop thread before the worker spawns so the
+        // very first traced decisions of this initialize already observe it.
+        if let Some(trace) = params.trace.as_ref() {
+            self.client_trace = trace_value_string(trace);
+        }
 
         let cancellation = WorkspaceScanToken::new();
         if self.cancelled.contains(&request_id) {

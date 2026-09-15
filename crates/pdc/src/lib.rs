@@ -10,6 +10,7 @@ mod protocol;
 mod requests;
 mod server;
 mod text;
+mod trace;
 mod transport;
 mod uri;
 mod vanilla;

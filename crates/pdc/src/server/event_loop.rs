@@ -1,6 +1,40 @@
 use super::*;
 
+/// Short label for a traced message: its method, or `response` for frames
+/// that only carry an id.
+fn message_label(message: &Value) -> &str {
+    message
+        .get("method")
+        .and_then(Value::as_str)
+        .unwrap_or("response")
+}
+
+/// ` id=<id>` suffix for traced messages that carry a request id, so decision
+/// lines correlate with the ids visible in the protocol frame trace.
+fn message_id_label(message: &Value) -> String {
+    match message.get("id") {
+        Some(id) if !id.is_null() => format!(" id={id}"),
+        _ => String::new(),
+    }
+}
+
 impl LspServer {
+    /// Emits one `pdc/trace` scheduling-decision notification while the client
+    /// asked for verbose tracing; a single string compare otherwise.
+    fn trace_decision<W: Write>(&self, output: &mut W, message: String) -> Result<(), LspError> {
+        if self.client_trace == "verbose" {
+            write_message(
+                output,
+                &json!({
+                    "jsonrpc": JSON_RPC_VERSION,
+                    "method": "pdc/trace",
+                    "params": {"message": message},
+                }),
+            )?;
+        }
+        Ok(())
+    }
+
     /// Runs the same framed transport over arbitrary streams.
     ///
     /// This is public so integration tests can drive the actual JSON-RPC framing without a
@@ -47,6 +81,7 @@ impl LspServer {
             let mut in_flight_reindex_command = None::<InFlightReindexCommand>;
             let mut in_flight_format_command = None::<InFlightFormatCommand>;
             let mut deferred_messages = VecDeque::<Value>::new();
+            let mut drain_traced = false;
 
             loop {
                 let pending_workspace_clears =
@@ -170,6 +205,15 @@ impl LspServer {
                     && (!front_deferred_exit || !shutdown_owes_work);
                 let (event, from_reader) = if deferred_ready {
                     let message = deferred_messages.pop_front().expect("checked non-empty");
+                    self.trace_decision(
+                        &mut output,
+                        format!(
+                            "replayed {}{} (deferred remaining {})",
+                            message_label(&message),
+                            message_id_label(&message),
+                            deferred_messages.len()
+                        ),
+                    )?;
                     (TransportEvent::Input(Ok(Some(message))), false)
                 } else {
                     let timeout = self
@@ -266,6 +310,23 @@ impl LspServer {
                                 || execute_command_busy
                                 || (initialize_busy && !is_initialize_control_message(&message)))
                         {
+                            self.trace_decision(
+                                &mut output,
+                                format!(
+                                    "deferred {}{} (parses={} diagnostics={} disk={} scan={} vanilla-load={} dependency-load={} initialize={} command-busy={} queue={})",
+                                    message_label(&message),
+                                    message_id_label(&message),
+                                    self.pending_parses.len() + in_flight_parses.len(),
+                                    self.pending_diagnostics.len() + in_flight.len(),
+                                    usize::from(disk_changes_busy),
+                                    usize::from(scan_busy),
+                                    usize::from(vanilla_load_busy),
+                                    usize::from(dependency_load_busy),
+                                    usize::from(initialize_busy),
+                                    usize::from(execute_command_busy),
+                                    deferred_messages.len() + 1,
+                                ),
+                            )?;
                             deferred_messages.push_back(message);
                         } else {
                             let spawned = self.spawn_initialize_request(
@@ -295,6 +356,20 @@ impl LspServer {
                                 &message,
                             );
                             if !spawned {
+                                if message.get("method").and_then(Value::as_str)
+                                    == Some("$/cancelRequest")
+                                {
+                                    self.trace_decision(
+                                        &mut output,
+                                        format!(
+                                            "cancel requested ({})",
+                                            message
+                                                .get("params")
+                                                .map(|params| params["id"].to_string())
+                                                .unwrap_or_else(|| "null".to_owned())
+                                        ),
+                                    )?;
+                                }
                                 let responses = self.handle_message(message.clone())?;
                                 for response in responses {
                                     write_message(&mut output, &response)?;
@@ -304,6 +379,16 @@ impl LspServer {
                                     &message,
                                     in_flight_initialize.as_ref(),
                                 );
+                            }
+                            if spawned {
+                                self.trace_decision(
+                                    &mut output,
+                                    format!(
+                                        "accepted {}{} (worker)",
+                                        message_label(&message),
+                                        message_id_label(&message)
+                                    ),
+                                )?;
                             }
                         }
                         self.cancel_stale_parses(&in_flight_parses);
@@ -360,6 +445,10 @@ impl LspServer {
                             .as_ref()
                             .is_some_and(|task| task.request_id == result.request_id);
                         if !current {
+                            self.trace_decision(
+                                &mut output,
+                                "dropped stale initialize result".to_owned(),
+                            )?;
                             continue;
                         }
                         let task = in_flight_initialize
@@ -426,6 +515,7 @@ impl LspServer {
                                 }
                             };
                         write_message(&mut output, &response)?;
+                        self.trace_decision(&mut output, "initialize finished".to_owned())?;
                         if let Some(token) = initialize_progress_token.take() {
                             let message = if response.get("result").is_some() {
                                 format!(
@@ -570,6 +660,10 @@ impl LspServer {
                             .as_ref()
                             .is_some_and(|task| task.base_revision == result.base_revision);
                         if !current {
+                            self.trace_decision(
+                                &mut output,
+                                "dropped stale scan result".to_owned(),
+                            )?;
                             continue;
                         }
                         let task = in_flight_scan.take().expect("checked scan task");
@@ -584,11 +678,22 @@ impl LspServer {
                             write_message(&mut output, &work_done_progress_end(token, &message))?;
                         }
                         if task.cancellation.is_cancelled() {
+                            self.trace_decision(
+                                &mut output,
+                                "scan completed but was cancelled".to_owned(),
+                            )?;
                             continue;
                         }
                         let scan_is_current =
                             self.host.snapshot().revision() == result.base_revision;
                         if !scan_is_current {
+                            self.trace_decision(
+                                &mut output,
+                                format!(
+                                    "scan lost the revision race (base revision {})",
+                                    result.base_revision
+                                ),
+                            )?;
                             // Document edits raced the scan; restart from a
                             // fresh clone so the commit never drops overlay
                             // state. The attempt counter is bumped by each
@@ -617,6 +722,13 @@ impl LspServer {
                                 Ok((host, report)) => {
                                     self.host = host;
                                     self.invalidate_all_semantic_tokens();
+                                    self.trace_decision(
+                                        &mut output,
+                                        format!(
+                                            "scan committed: {} file(s) indexed",
+                                            report.indexed_files
+                                        ),
+                                    )?;
                                     write_message(
                                         &mut output,
                                         &log_message_notification(
@@ -710,6 +822,13 @@ impl LspServer {
                     }
                     TransportEvent::DependencySetup(result) => {
                         in_flight_dependency = None;
+                        self.trace_decision(
+                            &mut output,
+                            format!(
+                                "dependency setup finished ({} result(s))",
+                                result.results.len()
+                            ),
+                        )?;
                         let outcome_message = result
                             .results
                             .iter()
@@ -863,6 +982,17 @@ impl LspServer {
                     }
                     TransportEvent::VanillaSetup(result) => {
                         in_flight_index = None;
+                        self.trace_decision(
+                            &mut output,
+                            format!(
+                                "vanilla setup finished ({})",
+                                if result.result.is_ok() {
+                                    "installed"
+                                } else {
+                                    "failed"
+                                }
+                            ),
+                        )?;
                         let outcome_message = match &result.result {
                             Ok((_, message)) => message.clone(),
                             Err(message) => message.clone(),
@@ -987,18 +1117,30 @@ impl LspServer {
                             .as_ref()
                             .is_some_and(|task| task.base_revision == result.base_revision);
                         if !current {
+                            self.trace_decision(
+                                &mut output,
+                                "dropped stale background reindex".to_owned(),
+                            )?;
                             continue;
                         }
                         let task = in_flight_background_reindex
                             .take()
                             .expect("checked background reindex task");
                         if task.cancellation.is_cancelled() {
+                            self.trace_decision(
+                                &mut output,
+                                "background reindex cancelled".to_owned(),
+                            )?;
                             self.arm_background_reindex();
                             continue;
                         }
                         if self.host.snapshot().revision() != result.base_revision {
                             // A foreground edit or disk refresh won while the quiet pass was
                             // running. Its candidate is stale and must never replace newer state.
+                            self.trace_decision(
+                                &mut output,
+                                "background reindex lost the revision race".to_owned(),
+                            )?;
                             self.arm_background_reindex();
                             continue;
                         }
@@ -1006,6 +1148,13 @@ impl LspServer {
                             Ok((host, workspace)) => {
                                 self.host = host;
                                 self.invalidate_all_semantic_tokens();
+                                self.trace_decision(
+                                    &mut output,
+                                    format!(
+                                        "background reindex committed (revision {})",
+                                        self.host.snapshot().revision()
+                                    ),
+                                )?;
                                 let snapshot = self.host.snapshot();
                                 write_message(
                                     &mut output,
@@ -1055,6 +1204,10 @@ impl LspServer {
                                 && task.command == result.command
                         });
                         if !current {
+                            self.trace_decision(
+                                &mut output,
+                                "dropped stale reindex command result".to_owned(),
+                            )?;
                             continue;
                         }
                         let task = in_flight_reindex_command
@@ -1155,12 +1308,27 @@ impl LspServer {
                         };
                         self.arm_background_reindex();
                         write_message(&mut output, &response)?;
+                        self.trace_decision(
+                            &mut output,
+                            format!(
+                                "reindex command finished ({})",
+                                if response.get("result").is_some() {
+                                    "committed"
+                                } else {
+                                    "failed"
+                                }
+                            ),
+                        )?;
                     }
                     TransportEvent::FormatCommand(result) => {
                         let current = in_flight_format_command
                             .as_ref()
                             .is_some_and(|task| task.request_id == result.request_id);
                         if !current {
+                            self.trace_decision(
+                                &mut output,
+                                "dropped stale format command result".to_owned(),
+                            )?;
                             continue;
                         }
                         let task = in_flight_format_command
@@ -1208,21 +1376,41 @@ impl LspServer {
                         };
                         self.arm_background_reindex();
                         write_message(&mut output, &response)?;
+                        self.trace_decision(
+                            &mut output,
+                            format!(
+                                "format command finished ({})",
+                                if response.get("result").is_some() {
+                                    "committed"
+                                } else {
+                                    "failed"
+                                }
+                            ),
+                        )?;
                     }
                     TransportEvent::DiskChanges(result) => {
                         let current = in_flight_disk_changes
                             .as_ref()
                             .is_some_and(|task| task.base_revision == result.base_revision);
                         if !current {
+                            self.trace_decision(
+                                &mut output,
+                                "dropped stale disk change result".to_owned(),
+                            )?;
                             continue;
                         }
                         let task = in_flight_disk_changes
                             .take()
                             .expect("checked disk change task");
                         if task.cancellation.is_cancelled() {
+                            self.trace_decision(&mut output, "disk changes cancelled".to_owned())?;
                             continue;
                         }
                         if self.host.snapshot().revision() != result.base_revision {
+                            self.trace_decision(
+                                &mut output,
+                                "disk changes lost the revision race; requeued".to_owned(),
+                            )?;
                             self.requeue_disk_changes(result.changes);
                             continue;
                         }
@@ -1230,6 +1418,10 @@ impl LspServer {
                             Ok((host, workspace)) => {
                                 self.host = host;
                                 self.invalidate_all_semantic_tokens();
+                                self.trace_decision(
+                                    &mut output,
+                                    "disk changes committed".to_owned(),
+                                )?;
                                 let open = self
                                     .host
                                     .snapshot()
@@ -1267,6 +1459,13 @@ impl LspServer {
                         let current = in_flight_workspace_diagnostics
                             .as_ref()
                             .is_some_and(|task| task.base_revision == result.base_revision);
+                        if !current {
+                            self.trace_decision(
+                                &mut output,
+                                "dropped stale workspace diagnostics result".to_owned(),
+                            )?;
+                            continue;
+                        }
                         if current {
                             let _task = in_flight_workspace_diagnostics
                                 .take()
@@ -1276,10 +1475,19 @@ impl LspServer {
                                     // Any edit or source refresh while the worker was running
                                     // invalidates its snapshot. Re-run once newer foreground work
                                     // is complete.
+                                    self.trace_decision(
+                                        &mut output,
+                                        "workspace diagnostics lost the revision race; requeued"
+                                            .to_owned(),
+                                    )?;
                                     self.workspace_diagnostics_pending = true;
                                 } else {
                                     match result.result {
                                         Ok(workspace) => {
+                                            self.trace_decision(
+                                                &mut output,
+                                                "workspace diagnostics published".to_owned(),
+                                            )?;
                                             self.publish_workspace_diagnostics(
                                                 &mut output,
                                                 &workspace,
@@ -1332,6 +1540,23 @@ impl LspServer {
                         || in_flight_workspace_diagnostics.is_some()
                         || in_flight_reindex_command.is_some()
                         || in_flight_format_command.is_some());
+                if draining_shutdown != drain_traced {
+                    drain_traced = draining_shutdown;
+                    self.trace_decision(
+                        &mut output,
+                        if draining_shutdown {
+                            format!(
+                                "shutdown drain started (parses={} diagnostics={} requests={} deferred={})",
+                                self.pending_parses.len() + in_flight_parses.len(),
+                                self.pending_diagnostics.len() + in_flight.len(),
+                                in_flight_requests.len(),
+                                deferred_messages.len()
+                            )
+                        } else {
+                            "shutdown drain cleared".to_owned()
+                        },
+                    )?;
+                }
                 if !reader_active && !draining_shutdown && deferred_messages.is_empty() {
                     read_sender.send(()).map_err(|_| {
                         LspError::Protocol("LSP transport reader stopped unexpectedly".to_owned())

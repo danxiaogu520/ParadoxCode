@@ -7,6 +7,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Debug mode: the new `paradoxcode.debug.enable` setting (default off, live without a server
+  restart) quiets the default experience and unlocks full observability when needed. Off, the
+  ParadoxCode channel shows only lifecycle lines plus server errors/warnings (server INFO
+  messages stop printing but keep flowing, because the Vanilla walkthrough state machine parses
+  them). On, a new "ParadoxCode Debug" channel receives the INFO trail, the complete LSP
+  conversation (via the client's verbose protocol trace), and a new `pdc/trace` server
+  notification stream exposing event-loop scheduling decisions — deferrals with their busy
+  reasons, deferred replays, `$/cancelRequest` arrivals, stale worker-result drops, scan/reindex
+  commits and revision races, and shutdown-drain transitions, every line timestamped and tagged
+  with the request id it concerns — the exact blind spots of the
+  0.3.5 CPU-burn investigation. The server learns the trace level from the initialize `trace`
+  parameter and a `$/setTrace` notification (which it now handles instead of silently
+  discarding); everything gates on a single string compare, so the off path is unchanged.
+  `paradoxcode.toggleDebug` and `paradoxcode.openDebugOutput` commands round out the workflow,
+  `paradoxcode.debug.logFile` mirrors the debug channel to an append-only file, and a headless
+  `PDC_TRACE=<path>` environment variable (optional `PDC_TRACE_FULL=1` for truncated params)
+  writes per-frame lines with request round-trip times from the transport's two framing
+  choke points for repro-driver sessions.
 - New `pdc/formatWorkspace` command (VSCode: "ParadoxCode: Format Workspace Scripts") formats
   every Current Mod script file in one pass on a bounded worker pool, writing canonical text
   straight to disk. Each file is re-read from disk and must pass the formatter's full safety

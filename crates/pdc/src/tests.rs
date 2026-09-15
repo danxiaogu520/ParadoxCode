@@ -14,6 +14,7 @@ pub(crate) use crate::{
 mod support;
 pub(crate) use support::*;
 
+mod debug_trace;
 mod format_command;
 mod freshness;
 mod reindex_command;

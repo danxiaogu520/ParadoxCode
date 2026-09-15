@@ -635,6 +635,16 @@
         "category": "ParadoxCode"
       },
       {
+        "command": "paradoxcode.toggleDebug",
+        "title": "%commands.toggleDebug.title%",
+        "category": "ParadoxCode"
+      },
+      {
+        "command": "paradoxcode.openDebugOutput",
+        "title": "%commands.openDebugOutput.title%",
+        "category": "ParadoxCode"
+      },
+      {
         "command": "paradoxcode.refreshLoadedFiles",
         "title": "%commands.refreshLoadedFiles.title%",
         "category": "ParadoxCode",
@@ -816,6 +826,16 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "%configuration.diagnosticLogging.description%"
+        },
+        "paradoxcode.debug.enable": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "%configuration.debug.enable.description%"
+        },
+        "paradoxcode.debug.logFile": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "%configuration.debug.logFile.description%"
         },
         "paradoxcode.server.installPolicy": {
           "type": "string",
