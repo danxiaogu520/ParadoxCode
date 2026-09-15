@@ -9,28 +9,30 @@
 //     -> segments [{text:'red', color:R}, {text:'blue', color:B},
 //                  {text:'red', color:R}, {text:'plain', color:null}]
 //
-// Colour values: G/R/Y are vanilla ground truth (interface/core.gfx
-// `textcolors`). The other 11 are engine-internal with no data file to
-// read — approximations pending screenshot calibration. TODO(calibrate).
+// Colour values are game ground truth from vanilla `interface/core.gfx`:
+// the global `textcolors` block for eleven of the codes, plus the `vic_18`
+// bitmapfont's own G/R/Y overrides — mission titles render in `vic_18`
+// (the Chinese mods remap that same font to zh-hans-16 and ship identical
+// values, so one flat table serves both languages).
 
 (function (global) {
     'use strict';
 
     const COLORS = {
-        W: '#ffffff', // white
-        B: '#3c6eb4', // blue — TODO(calibrate)
-        G: '#2cab32', // green (core.gfx)
-        R: '#b53d3d', // red (core.gfx)
-        b: '#111111', // black — TODO(calibrate)
-        g: '#9e9e9e', // grey — TODO(calibrate)
-        Y: '#dbcb47', // yellow (core.gfx)
-        M: '#275bb7', // marine — TODO(calibrate)
-        T: '#2e8b8b', // teal — TODO(calibrate)
-        O: '#e58a2e', // orange — TODO(calibrate)
-        l: '#a0c040', // lime — TODO(calibrate)
-        J: '#53a886', // jade — TODO(calibrate)
-        P: '#7b3fa0', // purple — TODO(calibrate)
-        V: '#c351cc', // violet — TODO(calibrate)
+        W: '#ffffff', // white — default text colour
+        B: '#0000ff', // blue
+        G: '#2cab32', // green — vic_18 override (44 171 50)
+        R: '#b53d3d', // red — vic_18 override (181 61 61)
+        b: '#000000', // black
+        g: '#b0b0b0', // grey — "not possible" text
+        Y: '#dbcb47', // yellow — vic_18 override (219 203 71)
+        M: '#23ceff', // marine — Shogunate / tutorials
+        T: '#00ffef', // turquoise
+        O: '#ffa000', // orange — branching missions
+        l: '#9ac14b', // lime — multiplayer
+        J: '#00a86b', // jade — mercs without professionalism cost
+        P: '#702963', // purple — Byzantium
+        V: '#fab6ff', // violet — debug text
     };
 
     // Parses a localised value into colour runs. `color` is null while no

@@ -22,9 +22,29 @@ function segmentsOf(text) {
 if (Object.keys(colors).length !== 14) {
   fail('the § colour table must cover exactly the 14 game codes');
 }
-// Vanilla ground truth (interface/core.gfx textcolors).
-if (colors.G !== '#2cab32' || colors.R !== '#b53d3d' || colors.Y !== '#dbcb47') {
-  fail('G/R/Y must stay at the core.gfx ground-truth values');
+// Game ground truth from vanilla interface/core.gfx: the global textcolors
+// block plus the vic_18 bitmapfont's own G/R/Y overrides (mission titles
+// render in that font; the Chinese font mods ship identical values).
+const groundTruthColors = {
+  W: '#ffffff',
+  B: '#0000ff',
+  G: '#2cab32',
+  R: '#b53d3d',
+  b: '#000000',
+  g: '#b0b0b0',
+  Y: '#dbcb47',
+  M: '#23ceff',
+  T: '#00ffef',
+  O: '#ffa000',
+  l: '#9ac14b',
+  J: '#00a86b',
+  P: '#702963',
+  V: '#fab6ff',
+};
+for (const [code, color] of Object.entries(groundTruthColors)) {
+  if (colors[code] !== color) {
+    fail(`§${code} must be the core.gfx ground truth ${color}, got ${colors[code]}`);
+  }
 }
 for (const [code, color] of Object.entries(colors)) {
   if (!/^#[0-9a-f]{6}$/.test(color)) {
