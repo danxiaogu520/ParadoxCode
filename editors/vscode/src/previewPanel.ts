@@ -30,6 +30,10 @@ export interface MissionArrow {
     glyph: string;
     /** Game sprite name for this glyph, or null when unavailable. */
     texture: string | null;
+    /** Tree (series) of the dependent mission the run points into. */
+    tree: number;
+    /** Tree (series) of the prerequisite mission the run starts from. */
+    from: number;
     x: number;
     y: number;
 }

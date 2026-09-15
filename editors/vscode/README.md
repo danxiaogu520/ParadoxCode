@@ -45,8 +45,13 @@ Clients that send only the deprecated `rootUri` field are not supported.
 
 Open a mission file under `common/missions` or `missions`, then choose **Open Mission Tree Preview
 to the Side**. The preview supports live refresh, source navigation, texture-backed nodes, keyboard
-navigation, zoom controls, and a mission list. The view keeps its pan and zoom across refreshes,
-fitting only when a different mission file is opened.
+navigation, and zoom controls. The view keeps its pan and zoom across refreshes, fitting only when
+a different mission file is opened. The search box finds missions by localised title or id;
+opening a result jumps to its source definition and centers the canvas on the node. A **Series**
+panel mirrors the canvas layout column by column (`Slot N` blocks wrapping left to right) with a
+checkbox per mission series: hidden series keep their canvas position but drop out of the canvas,
+dependency arrows, search result highlighting, and the diagnostic summary, and each document
+remembers its hidden set for the session.
 
 ## Transparent Localisation (Chinese)
 

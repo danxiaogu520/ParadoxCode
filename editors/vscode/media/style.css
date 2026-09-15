@@ -61,51 +61,91 @@ summary:focus-visible {
     outline-offset: 1px;
 }
 
-.legend,
-.mission-list {
+.series-list,
+.search {
     position: relative;
 }
 
-.legend-content {
-    position: absolute;
-    top: 28px;
-    left: 0;
-    min-width: 140px;
-    padding: 8px;
-    display: grid;
-    gap: 5px;
-    background: var(--vscode-editorWidget-background);
-    color: var(--vscode-editorWidget-foreground);
-    border: 1px solid var(--vscode-widget-border, transparent);
-    box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, .35));
-}
-
-.legend-content span {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-}
-
-.swatch {
-    width: 11px;
-    height: 11px;
-    border-radius: 50%;
-    border: 1px solid var(--vscode-editor-foreground);
-}
-
-.swatch.warning { background: var(--vscode-editorWarning-foreground, #d9a13b); }
-.swatch.error { background: var(--vscode-editorError-foreground, #d55c5c); }
-.swatch.selected { background: var(--vscode-focusBorder, #4d7cfe); }
-
-.mission-list {
+.search {
     margin-left: auto;
 }
 
-#node-list {
+#search {
+    border: 1px solid var(--vscode-input-border, var(--vscode-widget-border, transparent));
+    border-radius: 3px;
+    padding: 3px 8px;
+    width: 200px;
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    font: inherit;
+}
+
+#search:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder, #4d7cfe);
+    outline-offset: 0;
+}
+
+#search::placeholder {
+    color: var(--vscode-input-placeholderForeground);
+}
+
+#search-results {
     position: absolute;
     top: 28px;
     right: 0;
     width: min(360px, 70vw);
+    max-height: min(50vh, 400px);
+    overflow: auto;
+    padding: 4px;
+    display: none;
+    background: var(--vscode-editorWidget-background);
+    border: 1px solid var(--vscode-widget-border, transparent);
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, .35));
+}
+
+#search-results.visible {
+    display: block;
+}
+
+.search-result {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    width: 100%;
+    margin: 2px 0;
+    text-align: left;
+}
+
+.search-result.selected {
+    outline: 1px solid var(--vscode-focusBorder, #4d7cfe);
+}
+
+.search-result.hidden-series {
+    opacity: 0.55;
+}
+
+.search-result-title {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.search-result-series {
+    font-size: 10px;
+    color: var(--vscode-descriptionForeground);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.series-content {
+    position: absolute;
+    top: 28px;
+    right: 0;
+    width: min(560px, 90vw);
     max-height: min(60vh, 480px);
     overflow: auto;
     padding: 6px;
@@ -114,18 +154,53 @@ summary:focus-visible {
     box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, .35));
 }
 
-.node-entry {
-    display: block;
-    width: 100%;
-    margin: 2px 0;
-    text-align: left;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+/* Columns mirror the canvas: slot-major left to right, stacked series top to
+   bottom inside each column block, wrapping when the file is wide. */
+#series-entries {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
 }
 
-.node-entry.error { border-left: 3px solid var(--vscode-editorError-foreground, #d55c5c); }
-.node-entry.warning { border-left: 3px solid var(--vscode-editorWarning-foreground, #d9a13b); }
+.series-column {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 96px;
+}
+
+.series-column-slot {
+    font-size: 10px;
+    color: var(--vscode-descriptionForeground);
+    padding: 0 4px;
+}
+
+.series-entry {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 4px;
+    cursor: pointer;
+}
+
+.series-entry input {
+    flex: none;
+    accent-color: var(--vscode-focusBorder, #4d7cfe);
+}
+
+.series-entry span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.series-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+    padding-top: 6px;
+    border-top: 1px solid var(--vscode-widget-border, transparent);
+}
 
 .tooltip {
     position: fixed;

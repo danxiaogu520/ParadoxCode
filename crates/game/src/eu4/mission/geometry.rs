@@ -106,9 +106,17 @@ pub enum ArrowGlyph {
 }
 
 /// One arrow texture placement, in world coordinates (EMT's `AddIcon` calls).
+///
+/// Every segment of a run carries the tree of both endpoints so a renderer
+/// can hide whole relationships when either series is filtered out, without
+/// re-deriving attribution from coordinates.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ArrowSegment {
     pub glyph: ArrowGlyph,
+    /// Tree of the dependent mission (where the run ends).
+    pub tree: usize,
+    /// Tree of the prerequisite mission (where the run starts).
+    pub from: usize,
     pub x: f32,
     pub y: f32,
 }
@@ -135,6 +143,13 @@ pub fn arrow_geometry(file: &MissionFile, layout: &[NodePosition]) -> Vec<ArrowS
                 continue;
             };
             let (src_x, src_y) = world_position(req_pos);
+            let place = |glyph: ArrowGlyph, x: f32, y: f32| ArrowSegment {
+                glyph,
+                tree: pos.tree_index,
+                from: req_pos.tree_index,
+                x,
+                y,
+            };
             let h_diff = pos.column as i32 - req_pos.column as i32;
             // Literal rows can put a dependent above its prerequisite (the
             // file says so, e.g. positions written out of order); the arrow
@@ -145,80 +160,72 @@ pub fn arrow_geometry(file: &MissionFile, layout: &[NodePosition]) -> Vec<ArrowS
 
             if h_diff == 0 {
                 // Same column: vertical run from the prerequisite's bottom edge.
-                segments.push(ArrowSegment {
-                    glyph: ArrowGlyph::VerticalTile,
-                    x: src_x + 46.0,
-                    y: src_y + h - 1.0,
-                });
+                segments.push(place(
+                    ArrowGlyph::VerticalTile,
+                    src_x + 46.0,
+                    src_y + h - 1.0,
+                ));
                 for i in 0..v_diff.saturating_sub(1) {
-                    segments.push(ArrowSegment {
-                        glyph: ArrowGlyph::VerticalSkipTier,
-                        x: src_x + 46.0,
-                        y: src_y + h - 1.0 + i as f32 * row_step,
-                    });
+                    segments.push(place(
+                        ArrowGlyph::VerticalSkipTier,
+                        src_x + 46.0,
+                        src_y + h - 1.0 + i as f32 * row_step,
+                    ));
                 }
                 if v_diff > 1 {
-                    segments.push(ArrowSegment {
-                        glyph: ArrowGlyph::VerticalTile,
-                        x: src_x + 46.0,
-                        y: src_y + h - 1.0 + (v_diff - 1) as f32 * row_step,
-                    });
+                    segments.push(place(
+                        ArrowGlyph::VerticalTile,
+                        src_x + 46.0,
+                        src_y + h - 1.0 + (v_diff - 1) as f32 * row_step,
+                    ));
                 }
-                segments.push(ArrowSegment {
-                    glyph: ArrowGlyph::End,
-                    x: src_x + 38.0,
-                    y: src_y + h + 19.0 + (v_diff - 1) as f32 * row_step,
-                });
+                segments.push(place(
+                    ArrowGlyph::End,
+                    src_x + 38.0,
+                    src_y + h + 19.0 + (v_diff - 1) as f32 * row_step,
+                ));
             } else if h_diff > 0 {
                 // Prerequisite left of the dependent: arrow exits right.
-                segments.push(ArrowSegment {
-                    glyph: ArrowGlyph::RightOut,
-                    x: src_x + 60.0,
-                    y: src_y + h,
-                });
+                segments.push(place(ArrowGlyph::RightOut, src_x + 60.0, src_y + h));
                 for i in 0..h_diff.saturating_sub(1) {
-                    segments.push(ArrowSegment {
-                        glyph: ArrowGlyph::HorizontalSkipSlot,
-                        x: src_x + (i + 1) as f32 * w - 6.0,
-                        y: src_y + h + 5.0,
-                    });
+                    segments.push(place(
+                        ArrowGlyph::HorizontalSkipSlot,
+                        src_x + (i + 1) as f32 * w - 6.0,
+                        src_y + h + 5.0,
+                    ));
                 }
-                segments.push(ArrowSegment {
-                    glyph: ArrowGlyph::RightIn,
-                    x: src_x + w * h_diff as f32 - 5.0,
-                    y: src_y + h + 5.0 + (v_diff - 1) as f32 * row_step,
-                });
-                segments.push(ArrowSegment {
-                    glyph: ArrowGlyph::End,
-                    x: src_x + 15.0 + w * h_diff as f32,
-                    y: src_y + h + 19.0 + (v_diff - 1) as f32 * row_step,
-                });
+                segments.push(place(
+                    ArrowGlyph::RightIn,
+                    src_x + w * h_diff as f32 - 5.0,
+                    src_y + h + 5.0 + (v_diff - 1) as f32 * row_step,
+                ));
+                segments.push(place(
+                    ArrowGlyph::End,
+                    src_x + 15.0 + w * h_diff as f32,
+                    src_y + h + 19.0 + (v_diff - 1) as f32 * row_step,
+                ));
             } else {
                 // Prerequisite right of the dependent: arrow exits left.
-                segments.push(ArrowSegment {
-                    glyph: ArrowGlyph::LeftOut,
-                    x: src_x + 4.0,
-                    y: src_y + h,
-                });
+                segments.push(place(ArrowGlyph::LeftOut, src_x + 4.0, src_y + h));
                 let mut i = 0i32;
                 while i > h_diff + 1 {
-                    segments.push(ArrowSegment {
-                        glyph: ArrowGlyph::HorizontalSkipSlot,
-                        x: src_x + (i - 1) as f32 * w - 6.0,
-                        y: src_y + h + 5.0,
-                    });
+                    segments.push(place(
+                        ArrowGlyph::HorizontalSkipSlot,
+                        src_x + (i - 1) as f32 * w - 6.0,
+                        src_y + h + 5.0,
+                    ));
                     i -= 1;
                 }
-                segments.push(ArrowSegment {
-                    glyph: ArrowGlyph::LeftIn,
-                    x: src_x + w * h_diff as f32 + 69.0,
-                    y: src_y + h + 3.0 + (v_diff - 1) as f32 * row_step,
-                });
-                segments.push(ArrowSegment {
-                    glyph: ArrowGlyph::End,
-                    x: src_x + 61.0 + w * h_diff as f32,
-                    y: src_y + h + 19.0 + (v_diff - 1) as f32 * row_step,
-                });
+                segments.push(place(
+                    ArrowGlyph::LeftIn,
+                    src_x + w * h_diff as f32 + 69.0,
+                    src_y + h + 3.0 + (v_diff - 1) as f32 * row_step,
+                ));
+                segments.push(place(
+                    ArrowGlyph::End,
+                    src_x + 61.0 + w * h_diff as f32,
+                    src_y + h + 19.0 + (v_diff - 1) as f32 * row_step,
+                ));
             }
         }
     }
@@ -527,6 +534,25 @@ arrow_c_tree = {
         assert_eq!(find(ArrowGlyph::LeftOut), vec![(228.0, 178.0)]);
         assert_eq!(find(ArrowGlyph::HorizontalSkipSlot), vec![(114.0, 183.0)]);
         assert_eq!(find(ArrowGlyph::LeftIn), vec![(85.0, 485.0)]);
+
+        // Every segment names both endpoint trees: the a1 -> b1 run (tree 0
+        // prerequisite, tree 1 dependent) and the b1 -> c1 run (tree 1
+        // prerequisite, tree 2 dependent) each carry their own attribution.
+        let a1_to_b1 = segments
+            .iter()
+            .find(|s| s.glyph == ArrowGlyph::RightOut && s.x == 76.0)
+            .unwrap();
+        assert_eq!((a1_to_b1.from, a1_to_b1.tree), (0, 1));
+        let b1_to_c1 = segments
+            .iter()
+            .find(|s| s.glyph == ArrowGlyph::RightOut && s.x == 180.0)
+            .unwrap();
+        assert_eq!((b1_to_c1.from, b1_to_c1.tree), (1, 2));
+        let same_tree = segments
+            .iter()
+            .find(|s| s.glyph == ArrowGlyph::End && s.x == 54.0)
+            .unwrap();
+        assert_eq!((same_tree.from, same_tree.tree), (0, 0));
     }
 
     /// Literal rows can put a dependent above its prerequisite (the file

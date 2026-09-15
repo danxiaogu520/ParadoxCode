@@ -55,7 +55,10 @@
     const canvas = document.getElementById('tree');
     const status = document.getElementById('status');
     const tooltip = document.getElementById('tooltip');
-    const nodeList = document.getElementById('node-list');
+    const seriesEntries = document.getElementById('series-entries');
+    const seriesSummary = document.getElementById('series-summary');
+    const searchInput = document.getElementById('search');
+    const searchResults = document.getElementById('search-results');
     const ctx = canvas.getContext('2d');
 
     let preview = null;
@@ -142,16 +145,27 @@
         let maxX = -Infinity;
         let maxY = -Infinity;
         for (const group of preview.groups) {
+            if (!isTreeVisible(group.tree)) {
+                continue;
+            }
             minX = Math.min(minX, group.x);
             minY = Math.min(minY, group.y);
             maxX = Math.max(maxX, group.x + 200);
             maxY = Math.max(maxY, group.y + 18);
         }
         for (const node of preview.nodes) {
+            if (!isTreeVisible(node.tree)) {
+                continue;
+            }
             minX = Math.min(minX, node.x);
             minY = Math.min(minY, node.y);
             maxX = Math.max(maxX, node.x + NODE_WIDTH);
             maxY = Math.max(maxY, node.y + NODE_HEIGHT);
+        }
+        if (!Number.isFinite(minX)) {
+            pan = { x: 24, y: 24 };
+            zoom = 1;
+            return;
         }
         const margin = 48;
         const width = maxX - minX;
@@ -172,6 +186,30 @@
     let lastDocumentUri = null;
     const viewportsByDocument = new Map();
 
+    // Series visibility memory, same lifecycle as the viewport map: per
+    // document, keyed by tree id (the series block name) so edits that add or
+    // remove series keep the hidden set pointing at the right ones. Hidden
+    // series keep their canvas position — the gap stays.
+    const hiddenByDocument = new Map();
+    let hiddenTreeIds = new Set();
+    let treeIds = []; // tree index -> series id, rebuilt per payload
+
+    function isTreeVisible(treeIndex) {
+        return !hiddenTreeIds.has(treeIds[treeIndex]);
+    }
+
+    // Rebuild the index -> series id table from the payload and drop hidden
+    // ids that no longer exist (their series were deleted or renamed).
+    function syncSeriesState() {
+        treeIds = [];
+        for (const group of preview.groups) {
+            treeIds[group.tree] = group.label;
+        }
+        const existing = new Set(treeIds.filter(Boolean));
+        hiddenTreeIds = new Set([...hiddenTreeIds].filter((id) => existing.has(id)));
+        hiddenByDocument.set(lastDocumentUri, hiddenTreeIds);
+    }
+
     // Snapshot the outgoing document's viewport and adopt the incoming one
     // (remembered view, or a fit for a first look). Call after `setPreview`
     // so `fitView` can measure the new payload.
@@ -181,8 +219,10 @@
         }
         if (lastDocumentUri !== null) {
             viewportsByDocument.set(lastDocumentUri, { x: pan.x, y: pan.y, zoom });
+            hiddenByDocument.set(lastDocumentUri, hiddenTreeIds);
         }
         lastDocumentUri = documentUri;
+        hiddenTreeIds = new Set(hiddenByDocument.get(documentUri) || []);
         const saved = viewportsByDocument.get(documentUri);
         if (saved) {
             pan = { x: saved.x, y: saved.y };
@@ -453,6 +493,13 @@
         }
         let chain = null; // { x, y } of the previous vertical glyph in this run
         for (const segment of preview.arrows) {
+            // A run disappears when either endpoint's series is hidden — the
+            // dependent (`tree`) or the prerequisite (`from`) — so no arrow
+            // ever dangles into or out of empty space.
+            if (!isTreeVisible(segment.tree) || !isTreeVisible(segment.from)) {
+                chain = null;
+                continue;
+            }
             const image = textureImage(segment.texture);
             if (image) {
                 chain = null;
@@ -481,6 +528,9 @@
         }
         ctx.font = `11px ${FONT_FAMILY}`;
         for (const group of preview.groups) {
+            if (!isTreeVisible(group.tree)) {
+                continue;
+            }
             const width = groupWidth(group);
             if (!worldRectVisible(group.x, group.y, width, 18)) {
                 continue;
@@ -613,7 +663,11 @@
         drawArrows();
         drawGroups();
         const frame = textureImage('GFX_mission_icons_frame');
-        preview.nodes.forEach((node, index) => drawNode(node, index, frame));
+        preview.nodes.forEach((node, index) => {
+            if (isTreeVisible(node.tree)) {
+                drawNode(node, index, frame);
+            }
+        });
     }
 
     function showStatus(message) {
@@ -631,11 +685,12 @@
             hideStatus();
             return;
         }
-        const errors = preview.diagnostics.filter((d) => d.severity === 1).length;
-        const warnings = preview.diagnostics.filter((d) => d.severity === 2).length;
+        const visible = preview.nodes.filter((node) => isTreeVisible(node.tree));
+        const errors = visible.filter((node) => node.hasError).length;
+        const warnings = visible.filter((node) => node.hasWarning).length;
         if (errors + warnings > 0) {
             showStatus(
-                `${preview.nodes.length} missions · ${errors} error${errors === 1 ? '' : 's'} · ${warnings} warning${warnings === 1 ? '' : 's'}`,
+                `${visible.length} missions · ${errors} error${errors === 1 ? '' : 's'} · ${warnings} warning${warnings === 1 ? '' : 's'}`,
             );
         } else {
             hideStatus();
@@ -662,52 +717,241 @@
         });
     }
 
-    function renderNodeList() {
-        if (!nodeList) {
+    // --- mission search ------------------------------------------------------
+
+    const SEARCH_RESULT_LIMIT = 50;
+    let searchMatches = []; // node indices, in payload order
+    let searchSelected = -1;
+
+    function runSearch() {
+        const query = (searchInput?.value ?? '').trim().toLowerCase();
+        searchMatches = [];
+        if (query && preview) {
+            for (let i = 0; i < preview.nodes.length && searchMatches.length < SEARCH_RESULT_LIMIT; i += 1) {
+                const node = preview.nodes[i];
+                const title = node.title?.value ?? '';
+                if (node.id.toLowerCase().includes(query) || title.toLowerCase().includes(query)) {
+                    searchMatches.push(i);
+                }
+            }
+        }
+        searchSelected = -1;
+        renderSearchResults();
+    }
+
+    // Matches list regardless of series visibility; rows inside hidden
+    // series stay reachable (jump to source) but are dimmed, since their
+    // canvas node is not drawn.
+    function renderSearchResults() {
+        if (!searchResults) {
             return;
         }
-        if (!preview) {
-            nodeList.replaceChildren();
+        if (searchMatches.length === 0) {
+            searchResults.replaceChildren();
+            searchResults.classList.remove('visible');
             return;
         }
         const fragment = document.createDocumentFragment();
-        preview.nodes.forEach((node, index) => {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'node-entry';
-            if (options.showDiagnostics && node.hasError) button.classList.add('error');
-            else if (options.showDiagnostics && node.hasWarning) button.classList.add('warning');
-            button.textContent = nodeLabel(node);
-            button.title = node.titleKey || node.id;
-            button.setAttribute('role', 'listitem');
-            button.dataset.nodeIndex = String(index);
-            fragment.appendChild(button);
+        searchMatches.forEach((nodeIndex, rank) => {
+            const node = preview.nodes[nodeIndex];
+            const row = document.createElement('button');
+            row.type = 'button';
+            row.className = 'search-result';
+            if (!isTreeVisible(node.tree)) {
+                row.classList.add('hidden-series');
+            }
+            row.title = node.titleKey || node.id;
+            row.setAttribute('role', 'listitem');
+            row.dataset.rank = String(rank);
+            const primary = document.createElement('span');
+            primary.className = 'search-result-title';
+            primary.textContent = node.title?.value || node.id;
+            const secondary = document.createElement('span');
+            secondary.className = 'search-result-series';
+            secondary.textContent = `${treeIds[node.tree]}${isTreeVisible(node.tree) ? '' : ' · series hidden'}`;
+            row.append(primary, secondary);
+            fragment.appendChild(row);
         });
-        nodeList.replaceChildren(fragment);
+        searchResults.replaceChildren(fragment);
+        searchResults.classList.add('visible');
     }
 
-    // Delegate list events once instead of allocating two closures per node
-    // on every preview refresh. This matters for large mission files and also
-    // lets the browser replace the list in one DOM operation.
-    nodeList?.addEventListener('focusin', (event) => {
-        const button = event.target.closest?.('button[data-node-index]');
-        const index = button ? Number(button.dataset.nodeIndex) : -1;
-        if (!preview || !Number.isInteger(index) || index < 0 || index >= preview.nodes.length) {
+    function highlightSearchSelection() {
+        if (!searchResults) {
             return;
         }
-        keyboardIndex = index;
-        hovered = { kind: 'node', index, node: preview.nodes[index], rect: null };
-        scheduleDraw();
+        let selectedRow = null;
+        searchResults.querySelectorAll('button[data-rank]').forEach((row) => {
+            const isSelected = Number(row.dataset.rank) === searchSelected;
+            row.classList.toggle('selected', isSelected);
+            if (isSelected) {
+                selectedRow = row;
+            }
+        });
+        selectedRow?.scrollIntoView({ block: 'nearest' });
+    }
+
+    // Jump to the result's source definition; when its series is on the
+    // canvas, also center the view on the node and show the hover ring.
+    function openSearchResult(rank) {
+        if (rank < 0 || rank >= searchMatches.length || !preview) {
+            return;
+        }
+        const nodeIndex = searchMatches[rank];
+        const node = preview.nodes[nodeIndex];
+        postJump({ kind: 'node', node, index: nodeIndex });
+        if (isTreeVisible(node.tree)) {
+            pan.x = canvas.clientWidth / 2 - (node.x + NODE_WIDTH / 2) * zoom;
+            pan.y = canvas.clientHeight / 2 - (node.y + NODE_HEIGHT / 2) * zoom;
+            hovered = { kind: 'node', index: nodeIndex, node, rect: null };
+            keyboardIndex = nodeIndex;
+            scheduleDraw();
+        }
+    }
+
+    searchInput?.addEventListener('input', runSearch);
+
+    // mousedown rather than click so the input never loses focus mid-pick.
+    searchResults?.addEventListener('mousedown', (event) => {
+        const row = event.target.closest?.('button[data-rank]');
+        if (row) {
+            event.preventDefault();
+            openSearchResult(Number(row.dataset.rank));
+        }
     });
 
-    nodeList?.addEventListener('click', (event) => {
-        const button = event.target.closest?.('button[data-node-index]');
-        const index = button ? Number(button.dataset.nodeIndex) : -1;
-        if (!preview || !Number.isInteger(index) || index < 0 || index >= preview.nodes.length) {
+    searchInput?.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            if (searchMatches.length === 0) {
+                return;
+            }
+            event.preventDefault();
+            const step = event.key === 'ArrowDown' ? 1 : -1;
+            searchSelected = (searchSelected + step + searchMatches.length) % searchMatches.length;
+            highlightSearchSelection();
+        } else if (event.key === 'Enter') {
+            if (searchMatches.length > 0) {
+                event.preventDefault();
+                openSearchResult(searchSelected >= 0 ? searchSelected : 0);
+            }
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            if (searchInput) {
+                searchInput.value = '';
+            }
+            runSearch();
+        }
+    });
+
+    // --- series visibility panel -------------------------------------------
+
+    function updateSeriesSummary() {
+        if (!seriesSummary) {
             return;
         }
-        postJump({ kind: 'node', node: preview.nodes[index], index });
+        const total = treeIds.filter(Boolean).length;
+        seriesSummary.textContent = total > 0
+            ? `Series (${total - hiddenTreeIds.size}/${total})`
+            : 'Series';
+    }
+
+    // World-space x of the grid origin (geometry::ORIGIN.0), used to derive a
+    // column's slot number from a series label's x position.
+    const ORIGIN_X = 16;
+
+    // Groups series by column — identical label x means the same slot column,
+    // sorted left to right; within a column the stacking order (y) is kept.
+    // The panel is a horizontal mirror of the canvas layout.
+    function seriesColumns() {
+        const byX = new Map();
+        for (const group of preview.groups) {
+            let column = byX.get(group.x);
+            if (!column) {
+                column = {
+                    x: group.x,
+                    slot: Math.round((group.x - ORIGIN_X) / NODE_WIDTH) + 1,
+                    groups: [],
+                };
+                byX.set(group.x, column);
+            }
+            column.groups.push(group);
+        }
+        const columns = [...byX.values()].sort((a, b) => a.x - b.x);
+        for (const column of columns) {
+            column.groups.sort((a, b) => a.y - b.y);
+        }
+        return columns;
+    }
+
+    function renderSeriesList() {
+        if (!seriesEntries) {
+            return;
+        }
+        if (!preview) {
+            seriesEntries.replaceChildren();
+            updateSeriesSummary();
+            return;
+        }
+        const fragment = document.createDocumentFragment();
+        for (const column of seriesColumns()) {
+            const block = document.createElement('div');
+            block.className = 'series-column';
+            block.setAttribute('role', 'group');
+            block.setAttribute('aria-label', `Slot ${column.slot}`);
+            const header = document.createElement('div');
+            header.className = 'series-column-slot';
+            header.textContent = `Slot ${column.slot}`;
+            block.append(header);
+            for (const group of column.groups) {
+                const row = document.createElement('label');
+                row.className = 'series-entry';
+                row.setAttribute('role', 'listitem');
+                const box = document.createElement('input');
+                box.type = 'checkbox';
+                box.checked = isTreeVisible(group.tree);
+                box.dataset.treeId = group.label;
+                const text = document.createElement('span');
+                text.textContent = group.label;
+                row.append(box, text);
+                block.appendChild(row);
+            }
+            fragment.appendChild(block);
+        }
+        seriesEntries.replaceChildren(fragment);
+        updateSeriesSummary();
+    }
+
+    function applySeriesVisibility() {
+        if (lastDocumentUri !== null) {
+            hiddenByDocument.set(lastDocumentUri, hiddenTreeIds);
+        }
+        updateSeriesSummary();
+        scheduleDraw();
+        renderSearchResults();
+        renderSummary();
+    }
+
+    seriesEntries?.addEventListener('change', (event) => {
+        const box = event.target;
+        if (!(box instanceof HTMLInputElement) || box.type !== 'checkbox' || !box.dataset.treeId) {
+            return;
+        }
+        if (box.checked) {
+            hiddenTreeIds.delete(box.dataset.treeId);
+        } else {
+            hiddenTreeIds.add(box.dataset.treeId);
+        }
+        applySeriesVisibility();
     });
+
+    function setAllSeriesVisible(visible) {
+        hiddenTreeIds = visible ? new Set() : new Set(treeIds.filter(Boolean));
+        applySeriesVisibility();
+        renderSeriesList();
+    }
+
+    document.getElementById('series-all')?.addEventListener('click', () => setAllSeriesVisible(true));
+    document.getElementById('series-none')?.addEventListener('click', () => setAllSeriesVisible(false));
 
     function showTooltip(hit, clientX, clientY) {
         if (!tooltip || !hit) {
@@ -731,11 +975,15 @@
         tooltip.setAttribute('aria-hidden', 'true');
     }
 
-    function focusNode(index) {
+    function focusNode(index, step = 1) {
         if (!preview || preview.nodes.length === 0) {
             return;
         }
         keyboardIndex = (index + preview.nodes.length) % preview.nodes.length;
+        // Keyboard focus steps over hidden-series nodes in the move direction.
+        for (let i = 0; i < preview.nodes.length && !isTreeVisible(preview.nodes[keyboardIndex].tree); i += 1) {
+            keyboardIndex = (keyboardIndex + step + preview.nodes.length) % preview.nodes.length;
+        }
         const node = preview.nodes[keyboardIndex];
         hovered = { kind: 'node', index: keyboardIndex, node, rect: null };
         canvas.setAttribute('aria-label', `Mission ${nodeLabel(node)}`);
@@ -747,14 +995,17 @@
         if (message.type === 'preview') {
             setPreview(message.payload);
             switchDocument(message.payload.documentUri);
+            syncSeriesState();
             keyboardIndex = -1;
             hideStatus();
             scheduleDraw();
-            renderNodeList();
+            runSearch();
+            renderSeriesList();
             renderSummary();
         } else if (message.type === 'empty' || message.type === 'error') {
             preview = null;
-            renderNodeList();
+            runSearch();
+            renderSeriesList();
             hideTooltip();
             showStatus(message.message || 'No preview available.');
         } else if (message.type === 'options') {
@@ -764,7 +1015,6 @@
                 showExternalPrerequisites: message.showExternalPrerequisites !== false,
                 showDiagnostics: message.showDiagnostics !== false,
             };
-            renderNodeList();
             renderSummary();
             scheduleDraw();
         }
@@ -847,10 +1097,10 @@
         }
         if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
             event.preventDefault();
-            focusNode(keyboardIndex + 1);
+            focusNode(keyboardIndex + 1, 1);
         } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
             event.preventDefault();
-            focusNode(keyboardIndex - 1);
+            focusNode(keyboardIndex - 1, -1);
         } else if (event.key === 'Enter' && keyboardIndex >= 0) {
             event.preventDefault();
             postJump({ kind: 'node', node: preview.nodes[keyboardIndex], index: keyboardIndex });

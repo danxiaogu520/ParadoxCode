@@ -165,6 +165,12 @@ fn mission_preview_returns_renderer_ready_tree_data() {
         arrows.iter().all(|arrow| arrow["texture"].is_string()),
         "every arrow must expose its sprite name"
     );
+    assert!(
+        arrows
+            .iter()
+            .all(|arrow| arrow["tree"] == 0 && arrow["from"] == 0),
+        "the a1 -> a2 run must name both endpoint trees"
+    );
     let a1 = nodes
         .iter()
         .find(|node| node["id"] == "a1")

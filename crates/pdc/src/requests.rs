@@ -374,6 +374,8 @@ impl SnapshotRequestContext {
                 serde_json::json!({
                     "glyph": glyph_name(segment.glyph),
                     "texture": game::eu4::mission::arrow_sprite_name(glyph_name(segment.glyph)),
+                    "tree": segment.tree,
+                    "from": segment.from,
                     "x": segment.x,
                     "y": segment.y,
                 })

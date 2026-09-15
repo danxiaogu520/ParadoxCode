@@ -37,8 +37,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the pass completes. This is the first server feature that writes user source files: the
   watched-file pipeline and clean open-document reloads pick the rewrites up, so no host commit
   is involved and `$/cancelRequest` plus shutdown drain both stop the walk.
+- Mission Tree Preview series visibility: a new **Series** panel in the preview toolbar lists every
+  mission series in the file with a checkbox (plus All/None shortcuts and a visible/total count in
+  its summary). Unchecking a series hides its nodes, column label, and every dependency arrow that
+  starts or ends in it — the `pdc/missionPreview` arrow payload now carries the endpoint series of
+  each segment (`tree` for the dependent, `from` for the prerequisite), so cross-series arrows never
+  dangle into hidden space. Hidden series keep their canvas position (the gap stays, the view does
+  not move), and they drop out of the mission list and the diagnostic summary. Each document
+  remembers its hidden set for the lifetime of the panel, keyed by series id so edits that add,
+  remove, or rename series keep the set pointing at the right ones; explicit Fit and the
+  switch-document fit measure only visible content.
+- Mission Tree Preview search: a search box in the preview toolbar matches missions by localised
+  title or id (case-insensitive substring, capped at 50 results, each row naming its series).
+  Opening a result jumps to the mission's source definition and centers the canvas view on its
+  node with the hover ring; matches inside hidden series are listed dimmed and jump to source
+  only. Arrow keys plus Enter navigate results, Escape clears.
 
 ### Changed
+
+- The Mission Preview **Series** panel now mirrors the canvas layout: series are grouped into
+  `Slot N` column blocks arranged left to right (stacked series keep their vertical order inside
+  a column), wrapping across a wider panel — a miniature of the file's column structure instead
+  of a flat list.
 
 - The Mission Tree Preview keeps its pan and zoom across payload refreshes: editing the mission
   file (or a manual refresh) no longer snaps the view back to the fitted default, which was the
@@ -60,6 +80,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   viewport, the SVG export was a texture-less schematic, and the JSON export was a raw wire dump.
 - The root-mission green highlight (border, fallback fill, legend entry, and mission-list marker)
   and the `isRoot` field on the `pdc/missionPreview` node payload.
+- The Mission Preview legend and mission-list panels. The new search box replaces the list's
+  jump-to-source with match-by-title-or-id plus canvas centering, and node border colors are
+  error red / warning amber / hover blue only.
 
 ### Fixed
 
