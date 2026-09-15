@@ -13,17 +13,20 @@
         <button id="fit" type="button" title="Fit mission tree (F)">Fit</button>
         <button id="zoom-out" type="button" title="Zoom out (-)">−</button>
         <button id="zoom-in" type="button" title="Zoom in (+)">+</button>
-        <details class="legend">
-            <summary>Legend</summary>
-            <div class="legend-content">
-                <span><i class="swatch warning"></i>Warning</span>
-                <span><i class="swatch error"></i>Error</span>
-                <span><i class="swatch selected"></i>Selected</span>
+        <div class="search">
+            <input id="search" type="text" placeholder="Search missions…"
+                   aria-label="Search missions by title or id" autocomplete="off" spellcheck="false">
+            <div id="search-results" role="list" aria-label="Matching missions"></div>
+        </div>
+        <details id="series-list" class="series-list">
+            <summary id="series-summary">Series</summary>
+            <div class="series-content">
+                <div id="series-entries" role="list" aria-label="Mission series visibility"></div>
+                <div class="series-actions">
+                    <button id="series-all" type="button">All</button>
+                    <button id="series-none" type="button">None</button>
+                </div>
             </div>
-        </details>
-        <details id="mission-list" class="mission-list">
-            <summary>Mission list</summary>
-            <div id="node-list" role="list" aria-label="Mission nodes"></div>
         </details>
     </header>
     <canvas id="tree" tabindex="0" role="img" aria-label="Mission tree preview"></canvas>

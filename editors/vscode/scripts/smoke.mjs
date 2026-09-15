@@ -259,6 +259,9 @@ if (!preview) {
     if (typeof arrow?.texture !== 'string') {
       fail(`arrow ${arrow?.glyph} must expose a sprite texture name`);
     }
+    if (!Number.isInteger(arrow?.tree) || !Number.isInteger(arrow?.from)) {
+      fail(`arrow ${arrow?.glyph} must name its endpoint series (tree/from)`);
+    }
   }
   // Without a configured game directory the texture table is empty but present.
   if (!result.textures || typeof result.textures !== 'object') {
