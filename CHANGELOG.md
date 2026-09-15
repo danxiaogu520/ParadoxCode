@@ -9,6 +9,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Mission Preview renders titles with the game's own bitmap fonts and honours `§` colour codes.
+  Titles blit glyph-by-glyph from the BMFont atlases the game uses — vanilla `vic_18` for English
+  and the `zh-hans-16` DXT5 atlas for Chinese — with kerning, per-character CJK wrapping, and
+  per-glyph colour tinting; font choice follows content, not the `l_english` headers Chinese
+  replace files carry. The 14 `§` codes nest and pop like in game (`§!` restores the enclosing
+  colour); G/R/Y use the vanilla `core.gfx` ground truth while the other eleven ship as
+  approximations pending screenshot calibration. Search, tooltips, and aria labels all match
+  against the same `§`-stripped plain text. Two settings control it:
+  `paradoxcode.preview.gameFonts` (default on) and `paradoxcode.preview.chineseFontMod` (explicit
+  mod folder override; empty auto-discovers the newest matching Steam Workshop mod of the located
+  game installation, so players need no extra setup).
+
 - Debug mode: the new `paradoxcode.debug.enable` setting (default off, live without a server
   restart) quiets the default experience and unlocks full observability when needed. Off, the
   ParadoxCode channel shows only lifecycle lines plus server errors/warnings (server INFO
@@ -62,6 +74,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The pdc server no longer decodes pixel data: the entire texture pipeline
+  (`game::eu4::mission::texture` — DDS/TGA decode, PNG encode, gfx sprite resolution) is deleted
+  from Rust and every `pdc/missionPreview` response is pure text (arrow sprites are still named
+  on the payload, via `arrow_sprite_name` in `geometry`). The extension decodes the referenced
+  sprites and fonts itself — new `GameAssetStore` with mtime caching — and ships them once per
+  asset generation in a separate `assets` webview message, instead of re-sending every sprite as
+  base64 on each keystroke.
 - The Mission Preview **Series** panel now mirrors the canvas layout: series are grouped into
   `Slot N` column blocks arranged left to right (stacked series keep their vertical order inside
   a column), wrapping across a wider panel — a miniature of the file's column structure instead

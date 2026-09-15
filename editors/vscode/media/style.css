@@ -219,6 +219,10 @@ summary:focus-visible {
 
 .tooltip.visible { display: block; }
 
+.tooltip-dim {
+    color: var(--vscode-descriptionForeground, #8a919c);
+}
+
 .status {
     position: fixed;
     top: 48px;

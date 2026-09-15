@@ -104,6 +104,8 @@ suite('ParadoxCode VS Code extension host', () => {
       assert.equal(config.get('preview.refreshMode'), 'always');
       assert.equal(config.get('preview.showExternalPrerequisites'), true);
       assert.equal(config.get('preview.showDiagnostics'), true);
+      assert.equal(config.get('preview.gameFonts'), true);
+      assert.equal(config.get('preview.chineseFontMod'), '');
       assert.deepEqual(config.get('diagnostics.severityOverrides'), {});
       assert.deepEqual(config.get('localisation.preferredLanguages'), []);
       assert.equal(config.get('localisation.autoOpenDecoded'), true);

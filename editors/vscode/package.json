@@ -960,6 +960,16 @@
           "default": true,
           "markdownDescription": "%configuration.preview.showDiagnostics.description%"
         },
+        "paradoxcode.preview.gameFonts": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%configuration.preview.gameFonts.description%"
+        },
+        "paradoxcode.preview.chineseFontMod": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "%configuration.preview.chineseFontMod.description%"
+        },
         "paradoxcode.localisation.transparentEncoding": {
           "type": "boolean",
           "default": true,
