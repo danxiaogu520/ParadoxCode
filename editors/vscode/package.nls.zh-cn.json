@@ -70,6 +70,8 @@
   "configuration.preview.refreshMode.manual.description": "仅在使用预览刷新命令或按钮时刷新。",
   "configuration.preview.showExternalPrerequisites.description": "显示位于当前任务文件之外的前置任务。",
   "configuration.preview.showDiagnostics.description": "在预览中显示诊断计数、标记、颜色和条目。",
+  "configuration.preview.gameFonts.description": "使用游戏位图字体渲染任务标题（原版 `vic_18`；中文字体取自定位到的汉化 mod），而非系统字体。",
+  "configuration.preview.chineseFontMod.description": "提供中文位图字体（`gfx/fonts/zh-hans-16.fnt`）的 mod 文件夹路径。留空时自动在定位到的游戏安装的 Steam 创意工坊中发现最新的匹配 mod。",
   "commands.localisation.openDecoded.title": "以中文（解码）视图打开",
   "commands.localisation.revealOriginal.title": "打开原始转码文件",
   "commands.localisation.transcodeFile.title": "转码本地化文件",

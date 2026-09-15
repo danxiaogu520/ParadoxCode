@@ -356,6 +356,8 @@ const requiredSettings = [
   'paradoxcode.preview.refreshMode',
   'paradoxcode.preview.showExternalPrerequisites',
   'paradoxcode.preview.showDiagnostics',
+  'paradoxcode.preview.gameFonts',
+  'paradoxcode.preview.chineseFontMod',
   'paradoxcode.diagnostics.severityOverrides',
   'paradoxcode.localisation.preferredLanguages',
   'paradoxcode.localisation.autoOpenDecoded',
@@ -374,6 +376,14 @@ for (const setting of requiredSettings) {
 }
 if (manifest.contributes.configuration?.properties?.['paradoxcode.localisation.autoOpenDecoded']?.default !== true) {
   fail('paradoxcode.localisation.autoOpenDecoded must default to true');
+}
+// Game-font rendering is on unless opted out, and font-mod auto-discovery is
+// the default path (empty override).
+if (manifest.contributes.configuration?.properties?.['paradoxcode.preview.gameFonts']?.default !== true) {
+  fail('paradoxcode.preview.gameFonts must default to true');
+}
+if (manifest.contributes.configuration?.properties?.['paradoxcode.preview.chineseFontMod']?.default !== '') {
+  fail('paradoxcode.preview.chineseFontMod must default to the empty auto-discovery path');
 }
 // Whole-workspace diagnostics is opt-in from the editor: the manifest default
 // must be false and the resolved value must be forwarded unconditionally, or
@@ -431,6 +441,12 @@ for (const marker of [
   'worldRectVisible',
   'setAssets',
   'textureUrls',
+  'parseLocFormat',
+  'fontBook',
+  'titleFont',
+  'drawStyledLine',
+  'wrapStyledLine',
+  'glyphTintCache',
 ]) {
   if (!rendererSource.includes(marker)) {
     fail(`Preview UX marker missing: ${marker}`);

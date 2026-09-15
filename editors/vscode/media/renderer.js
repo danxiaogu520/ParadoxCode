@@ -72,6 +72,7 @@
         showTextures: true,
         showExternalPrerequisites: true,
         showDiagnostics: true,
+        gameFonts: true,
     };
     let drawPending = false;
     let groupWidths = new WeakMap();
@@ -254,28 +255,6 @@
         ctx.closePath();
     }
 
-    function wrapText(text, maxWidth) {
-        if (!text) {
-            return [''];
-        }
-        const words = text.split(/(\s+)/).filter((w) => w.trim().length > 0);
-        const lines = [];
-        let line = '';
-        for (const word of words) {
-            const candidate = line ? `${line} ${word}` : word;
-            if (ctx.measureText(candidate).width <= maxWidth || !line) {
-                line = candidate;
-            } else {
-                lines.push(line);
-                line = word;
-            }
-        }
-        if (line) {
-            lines.push(line);
-        }
-        return lines.slice(0, 3);
-    }
-
     function nodeColor(node) {
         if (options.showDiagnostics && node.hasError) {
             return COLORS.error;
@@ -357,12 +336,13 @@
     const failedTextures = new Set(); // sprite names that failed to decode
     const textureUrls = {}; // sprite name -> data URL, delivered via 'assets'
 
-    // Merges a batch of decoded sprite data URLs. They arrive separately from
-    // the per-keystroke preview payload (which is pure text); a name whose URL
+    // Merges a batch of decoded sprite data URLs (and, once per font
+    // generation, the game bitmap fonts). Sprites arrive separately from the
+    // per-keystroke preview payload (which is pure text); a name whose URL
     // changed on disk drops its cached image so the new pixels reload.
-    function setAssets(textures) {
+    function setAssets(message) {
         let changed = false;
-        for (const [name, url] of Object.entries(textures || {})) {
+        for (const [name, url] of Object.entries(message.textures || {})) {
             if (textureUrls[name] === url) {
                 continue;
             }
@@ -370,6 +350,10 @@
             textureUrls[name] = url;
             textureImages.delete(name);
             failedTextures.delete(name);
+        }
+        if (message.fonts) {
+            setFonts(message.fonts);
+            changed = true;
         }
         if (changed) {
             scheduleDraw();
@@ -415,6 +399,294 @@
             image.width * zoom,
             image.height * zoom,
         );
+    }
+
+    // --- game fonts -----------------------------------------------------------
+
+    // § localisation colour parser, provided by media/loc-format.js which is
+    // loaded before this script.
+    const parseLocFormat = window.LocFormat.parseLocFormat;
+
+    // Game bitmap fonts delivered via the 'assets' message, keyed by id.
+    // Rows are the compact wire format: chars[i] =
+    // [id, x, y, w, h, xOffset, yOffset, xAdvance]; kernings[i] =
+    // [first, second, amount].
+    const fontBook = { english: null, chinese: null };
+
+    function setFonts(fonts) {
+        for (const id of ['english', 'chinese']) {
+            const payload = fonts && fonts[id];
+            if (!payload) {
+                fontBook[id] = null;
+                continue;
+            }
+            const chars = new Map();
+            for (const row of payload.chars) {
+                chars.set(row[0], {
+                    x: row[1],
+                    y: row[2],
+                    w: row[3],
+                    h: row[4],
+                    xo: row[5],
+                    yo: row[6],
+                    adv: row[7],
+                });
+            }
+            const kernings = new Map();
+            for (const row of payload.kernings || []) {
+                kernings.set(`${row[0]},${row[1]}`, row[2]);
+            }
+            const atlas = new Image();
+            atlas.onload = () => scheduleDraw();
+            atlas.onerror = () => {
+                fontBook[id] = null;
+                scheduleDraw();
+            };
+            atlas.src = payload.atlasUrl;
+            fontBook[id] = { id, lineHeight: payload.lineHeight, base: payload.base, atlas, chars, kernings };
+        }
+        glyphTintCache.clear();
+        scheduleDraw();
+    }
+
+    function fontReady(font) {
+        return !!font && font.atlas.complete && font.atlas.naturalWidth > 0;
+    }
+
+    function fontKerning(font, first, second) {
+        return first ? font.kernings.get(`${first},${second}`) || 0 : 0;
+    }
+
+    // CJK detection drives both font choice and per-character wrapping:
+    // Chinese replace-file localisation carries l_english headers, so the
+    // language tag alone cannot be trusted — the content decides.
+    const CJK_RE = /[\u2e80-\u9fff\uf900-\ufaff\ufe30-\ufe4f\uff00-\uffef\u3000-\u303f]/;
+
+    function titleFont(title) {
+        const chinese = !!title && (title.language === 'simp_chinese' || CJK_RE.test(title.value));
+        const primary = fontBook[chinese ? 'chinese' : 'english'];
+        if (fontReady(primary)) {
+            return primary;
+        }
+        const secondary = fontBook[chinese ? 'english' : 'chinese'];
+        return fontReady(secondary) ? secondary : null;
+    }
+
+    // Glyph resolution order for one codepoint: the primary font, then the
+    // other font (mixed-script titles), else null for the system fallback.
+    function resolveGlyph(layout, codePoint) {
+        if (layout.font) {
+            const glyph = layout.font.chars.get(codePoint);
+            if (glyph && fontReady(layout.font)) {
+                return { font: layout.font, glyph };
+            }
+            const other = layout.font.id === 'english' ? fontBook.chinese : fontBook.english;
+            const alt = other && other.chars.get(codePoint);
+            if (alt && fontReady(other)) {
+                return { font: other, glyph: alt };
+            }
+        }
+        return null;
+    }
+
+    // Per-glyph tint cache: the font atlases are white-on-transparent, so a
+    // coloured § run blits through a tiny canvas tinted with 'source-in'.
+    // White draws straight from the atlas and skips the cache.
+    const glyphTintCache = new Map();
+
+    function glyphSource(font, glyph, codePoint, color) {
+        if (color === '#ffffff') {
+            return { source: font.atlas, sx: glyph.x, sy: glyph.y };
+        }
+        const key = `${font.id}|${codePoint}|${color}`;
+        let canvas = glyphTintCache.get(key);
+        if (!canvas) {
+            canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, glyph.w);
+            canvas.height = Math.max(1, glyph.h);
+            const g = canvas.getContext('2d');
+            g.drawImage(font.atlas, glyph.x, glyph.y, glyph.w, glyph.h, 0, 0, glyph.w, glyph.h);
+            g.globalCompositeOperation = 'source-in';
+            g.fillStyle = color;
+            g.fillRect(0, 0, canvas.width, canvas.height);
+            if (glyphTintCache.size > 8192) {
+                glyphTintCache.clear(); // hard cap; titles revisit few glyphs
+            }
+            glyphTintCache.set(key, canvas);
+        }
+        return { source: canvas, sx: 0, sy: 0 };
+    }
+
+    // Advance of one character in screen pixels, kerned against `prev` when
+    // the primary font owns both; the system font estimates the rest.
+    function charAdvance(layout, codePoint, prev) {
+        const hit = resolveGlyph(layout, codePoint);
+        if (hit) {
+            const kerning = hit.font === layout.font ? fontKerning(hit.font, prev, codePoint) : 0;
+            return (hit.glyph.adv + kerning) * layout.zoom;
+        }
+        ctx.font = layout.sysFont;
+        return ctx.measureText(String.fromCodePoint(codePoint)).width;
+    }
+
+    function measureStyled(layout, text) {
+        let width = 0;
+        let prev = 0;
+        for (const ch of text) {
+            const codePoint = ch.codePointAt(0);
+            width += charAdvance(layout, codePoint, prev);
+            prev = codePoint;
+        }
+        return width;
+    }
+
+    // Splits styled runs into wrap tokens: CJK characters break individually,
+    // Latin words (with their inner spaces) stay whole.
+    function tokenizeStyled(line) {
+        const tokens = [];
+        let word = null;
+        for (const run of line) {
+            for (const ch of run.text) {
+                if (CJK_RE.test(ch)) {
+                    if (word) {
+                        tokens.push(word);
+                        word = null;
+                    }
+                    tokens.push({ text: ch, color: run.color });
+                } else if (word && word.color === run.color) {
+                    word.text += ch;
+                } else {
+                    if (word) {
+                        tokens.push(word);
+                    }
+                    word = { text: ch, color: run.color };
+                }
+            }
+        }
+        if (word) {
+            tokens.push(word);
+        }
+        return tokens;
+    }
+
+    // Greedy wrap of one styled line at maxWidth; a token moved to a new line
+    // never carries leading spaces with it.
+    function wrapStyledLine(line, maxWidth, layout) {
+        const lines = [];
+        let current = [];
+        let width = 0;
+        for (let token of tokenizeStyled(line)) {
+            if (current.length > 0 && width + measureStyled(layout, token.text) > maxWidth) {
+                lines.push(current);
+                current = [];
+                width = 0;
+                const trimmed = token.text.replace(/^\s+/, '');
+                token = { text: trimmed, color: token.color };
+            } else if (current.length === 0) {
+                const trimmed = token.text.replace(/^\s+/, '');
+                token = { text: trimmed, color: token.color };
+            }
+            if (!token.text) {
+                continue;
+            }
+            current.push(token);
+            width += measureStyled(layout, token.text);
+        }
+        if (current.length > 0 || lines.length === 0) {
+            lines.push(current);
+        }
+        return lines;
+    }
+
+    // Splits parsed segments into explicit lines at newline boundaries.
+    function segmentLines(segments) {
+        const lines = [[]];
+        for (const segment of segments) {
+            const parts = segment.text.split('\n');
+            parts.forEach((part, index) => {
+                if (index > 0) {
+                    lines.push([]);
+                }
+                if (part) {
+                    lines[lines.length - 1].push({ text: part, color: segment.color });
+                }
+            });
+        }
+        return lines;
+    }
+
+    // Full title pipeline: parse § colour codes, honor newlines, wrap.
+    function styledLines(text, maxWidth, layout) {
+        const result = [];
+        for (const line of segmentLines(parseLocFormat(text).segments)) {
+            result.push(...wrapStyledLine(line, maxWidth, layout));
+        }
+        return result;
+    }
+
+    function lineWidth(tokens, layout) {
+        let width = 0;
+        for (const token of tokens) {
+            width += measureStyled(layout, token.text);
+        }
+        return width;
+    }
+
+    // Draws one wrapped line left-to-right from x. Glyphs blit from the game
+    // font (tinted per § colour, baseline-aligned when the other font owns
+    // the glyph); characters missing from both fonts fall back to a
+    // system-font run. `layout.baseline` is the baseline offset from line top.
+    function drawStyledLine(tokens, x, lineTop, layout) {
+        let pen = x;
+        let prev = 0;
+        let run = null; // pending system-font run { text, color }
+        const flushRun = () => {
+            if (!run || !run.text) {
+                return;
+            }
+            ctx.font = layout.sysFont;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'alphabetic';
+            ctx.fillStyle = run.color ?? layout.defaultColor;
+            ctx.fillText(run.text, pen, lineTop + layout.baseline);
+            pen += ctx.measureText(run.text).width;
+            run = null;
+        };
+        for (const token of tokens) {
+            const color = token.color ?? null;
+            for (const ch of token.text) {
+                const codePoint = ch.codePointAt(0);
+                const hit = resolveGlyph(layout, codePoint);
+                if (hit) {
+                    flushRun();
+                    const kerning = hit.font === layout.font
+                        ? fontKerning(hit.font, prev, codePoint) * layout.zoom
+                        : 0;
+                    const baseline = lineTop + layout.baseline;
+                    const top = baseline - hit.font.base * layout.zoom;
+                    const { source, sx, sy } = glyphSource(hit.font, hit.glyph, codePoint, token.color ?? layout.defaultColor);
+                    ctx.drawImage(
+                        source,
+                        sx,
+                        sy,
+                        hit.glyph.w,
+                        hit.glyph.h,
+                        pen + hit.glyph.xo * layout.zoom + kerning,
+                        top + hit.glyph.yo * layout.zoom,
+                        hit.glyph.w * layout.zoom,
+                        hit.glyph.h * layout.zoom,
+                    );
+                    pen += hit.glyph.adv * layout.zoom + kerning;
+                } else if (run && run.color === color) {
+                    run.text += ch;
+                } else {
+                    flushRun();
+                    run = { text: ch, color };
+                }
+                prev = codePoint;
+            }
+        }
+        flushRun();
     }
 
     function drawArrowHead(pos, direction) {
@@ -592,42 +864,71 @@
         }
     }
 
-    // Draws the node title centered inside the cell. In textured mode it sits
-    // in the frame's lower slot like the game UI; the raw id stays visible
+    // Draws the node title centered inside the cell. With a game font it
+    // renders §-coloured text glyph-by-glyph from the bitmap atlas (the
+    // frame's lower slot in textured mode); otherwise the same styled
+    // pipeline falls back to the system font. The raw id stays visible
     // (dimmed) when a localised title is shown.
     function drawNodeTitle(node, pos, w, textured) {
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
         const title = node.title ? node.title.value : '';
         const label = title || node.id;
+        const font = options.gameFonts ? titleFont(node.title) : null;
         if (textured) {
             const slotX = pos.x + EMT_TITLE_X * zoom;
             const slotY = pos.y + EMT_TITLE_Y * zoom;
             const slotW = EMT_TITLE_WIDTH * zoom;
-            ctx.fillStyle = COLORS.texturedText;
-            ctx.font = `bold ${Math.max(8, 10 * zoom)}px ${FONT_FAMILY}`;
-            // Top-aligned like the game's title label: first line sits at the
-            // slot's top edge, subsequent lines follow.
-            const lines = wrapText(label, slotW).slice(0, 2);
-            const lineHeight = 11 * zoom;
-            lines.forEach((line, lineIndex) => {
-                ctx.fillText(line, slotX + slotW / 2, slotY + lineHeight / 2 + lineIndex * lineHeight);
+            // Top-aligned like the game's title label: two font line-heights
+            // fit the frame's slot exactly (2 × 18px in 38px for vic_18).
+            const layout = font
+                ? {
+                    font,
+                    zoom,
+                    defaultColor: COLORS.texturedText,
+                    baseline: font.base * zoom,
+                    sysFont: `${Math.max(8, font.base * zoom)}px ${FONT_FAMILY}`,
+                }
+                : {
+                    font: null,
+                    zoom,
+                    defaultColor: COLORS.texturedText,
+                    baseline: 8 * zoom,
+                    sysFont: `bold ${Math.max(8, 10 * zoom)}px ${FONT_FAMILY}`,
+                };
+            const lineHeight = (font ? font.lineHeight : 11) * zoom;
+            const lines = styledLines(label, slotW, layout).slice(0, 2);
+            lines.forEach((tokens, index) => {
+                drawStyledLine(tokens, slotX + (slotW - lineWidth(tokens, layout)) / 2, slotY + index * lineHeight, layout);
             });
             return;
         }
         const h = NODE_HEIGHT * zoom;
-        ctx.fillStyle = COLORS.text;
-        ctx.font = `${Math.max(9, 11 * zoom)}px ${FONT_FAMILY}`;
-        const lines = wrapText(label, w - 12).slice(0, 2);
-        const lineHeight = 13 * zoom;
+        const layout = font
+            ? {
+                font,
+                zoom,
+                defaultColor: COLORS.text,
+                baseline: font.base * zoom,
+                sysFont: `${Math.max(9, font.base * zoom)}px ${FONT_FAMILY}`,
+            }
+            : {
+                font: null,
+                zoom,
+                defaultColor: COLORS.text,
+                baseline: 9 * zoom,
+                sysFont: `${Math.max(9, 11 * zoom)}px ${FONT_FAMILY}`,
+            };
+        const lineHeight = (font ? font.lineHeight : 13) * zoom;
+        const lines = styledLines(label, w - 12, layout).slice(0, 2);
         const blockHeight = lines.length * lineHeight;
         const startY = pos.y + h / 2 - blockHeight / 2;
-        lines.forEach((line, lineIndex) => {
-            ctx.fillText(line, pos.x + w / 2, startY + lineIndex * lineHeight);
+        lines.forEach((tokens, index) => {
+            drawStyledLine(tokens, pos.x + (w - lineWidth(tokens, layout)) / 2, startY + index * lineHeight, layout);
         });
         if (title) {
             ctx.fillStyle = COLORS.dim;
             ctx.font = `${Math.max(8, 9 * zoom)}px ${FONT_FAMILY}`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
             ctx.fillText(node.id, pos.x + w / 2, startY + blockHeight + lineHeight);
         }
     }
@@ -717,8 +1018,21 @@
         }
     }
 
+    // §-stripped localised titles, cached per payload node. Search and the
+    // plain-text labels must not match against colour codes.
+    const plainTitles = new WeakMap();
+
+    function plainTitle(node) {
+        let plain = plainTitles.get(node);
+        if (plain === undefined) {
+            plain = node.title && node.title.value ? parseLocFormat(node.title.value).plain : '';
+            plainTitles.set(node, plain);
+        }
+        return plain;
+    }
+
     function nodeLabel(node) {
-        const title = node.title && node.title.value ? node.title.value : node.id;
+        const title = plainTitle(node) || node.id;
         const flags = [];
         if (options.showDiagnostics && node.hasError) flags.push('error');
         if (options.showDiagnostics && node.hasWarning) flags.push('warning');
@@ -749,7 +1063,7 @@
         if (query && preview) {
             for (let i = 0; i < preview.nodes.length && searchMatches.length < SEARCH_RESULT_LIMIT; i += 1) {
                 const node = preview.nodes[i];
-                const title = node.title?.value ?? '';
+                const title = plainTitle(node);
                 if (node.id.toLowerCase().includes(query) || title.toLowerCase().includes(query)) {
                     searchMatches.push(i);
                 }
@@ -785,7 +1099,7 @@
             row.dataset.rank = String(rank);
             const primary = document.createElement('span');
             primary.className = 'search-result-title';
-            primary.textContent = node.title?.value || node.id;
+            primary.textContent = plainTitle(node) || node.id;
             const secondary = document.createElement('span');
             secondary.className = 'search-result-series';
             secondary.textContent = `${treeIds[node.tree]}${isTreeVisible(node.tree) ? '' : ' · series hidden'}`;
@@ -978,9 +1292,32 @@
             return;
         }
         const node = hit.node;
-        tooltip.textContent = hit.kind === 'node'
-            ? `${nodeLabel(node)}\n${node.titleKey || node.id}`
-            : node.label;
+        if (hit.kind === 'group') {
+            tooltip.textContent = node.label;
+        } else {
+            // §-coloured spans: the tooltip mirrors the canvas colour model
+            // (system font — the bitmap font only exists as an atlas).
+            tooltip.replaceChildren();
+            const titleLine = document.createElement('div');
+            const label = (node.title && node.title.value) || node.id;
+            for (const segment of parseLocFormat(label).segments) {
+                const span = document.createElement('span');
+                span.textContent = segment.text;
+                if (segment.color) {
+                    span.style.color = segment.color;
+                }
+                titleLine.appendChild(span);
+            }
+            const flags = [];
+            if (options.showDiagnostics && node.hasError) flags.push('error');
+            if (options.showDiagnostics && node.hasWarning) flags.push('warning');
+            const keyLine = document.createElement('div');
+            keyLine.className = 'tooltip-dim';
+            keyLine.textContent = flags.length
+                ? `${node.titleKey || node.id} · ${flags.join(', ')}`
+                : node.titleKey || node.id;
+            tooltip.append(titleLine, keyLine);
+        }
         tooltip.style.left = `${Math.min(clientX + 12, window.innerWidth - 380)}px`;
         tooltip.style.top = `${Math.min(clientY + 12, window.innerHeight - 100)}px`;
         tooltip.classList.add('visible');
@@ -1029,13 +1366,14 @@
             hideTooltip();
             showStatus(message.message || 'No preview available.');
         } else if (message.type === 'assets') {
-            setAssets(message.textures);
+            setAssets(message);
         } else if (message.type === 'options') {
             options = {
                 zoomSensitivity: Math.min(2, Math.max(0.5, Number(message.zoomSensitivity) || 1)),
                 showTextures: message.showTextures !== false,
                 showExternalPrerequisites: message.showExternalPrerequisites !== false,
                 showDiagnostics: message.showDiagnostics !== false,
+                gameFonts: message.gameFonts !== false,
             };
             renderSummary();
             scheduleDraw();

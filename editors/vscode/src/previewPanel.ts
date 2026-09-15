@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
-import { FRAME_SPRITE, GameAssetStore, findGameDirectory } from './gameAssets';
+import { FRAME_SPRITE, FontAssets, GameAssetStore, findChineseFontMod, findGameDirectory } from './gameAssets';
 
 const PREVIEW_VIEW_TYPE = 'paradoxcode.missionPreview';
 
@@ -79,14 +79,15 @@ type OutboundMessage =
     | { type: 'preview'; payload: MissionPreview }
     | { type: 'empty'; message: string }
     | { type: 'error'; message: string }
-    /** Sprite pixels the renderer asked for by name, decoded client-side. */
-    | { type: 'assets'; textures: Record<string, string> }
+    /** Sprite pixels and game fonts the renderer asked for, decoded client-side. */
+    | { type: 'assets'; textures: Record<string, string>; fonts?: FontAssets }
     | {
         type: 'options';
         zoomSensitivity: number;
         showTextures: boolean;
         showExternalPrerequisites: boolean;
         showDiagnostics: boolean;
+        gameFonts: boolean;
     };
 
 /** Webview messages received from the renderer. */
@@ -405,16 +406,25 @@ export class MissionPreviewPanel {
         void panel.webview.postMessage(message);
     }
 
-    /** Client-side asset store, rebuilt when the game directory changes. */
+    /** Client-side asset store, rebuilt when its source directories change. */
     private static assetStore: GameAssetStore | undefined;
     private static assetStoreKey: string | undefined;
+    /** Fonts are large payloads: post them once per store generation and panel. */
+    private static postedFonts: { panel: vscode.WebviewPanel; key: string } | undefined;
 
     private static store(): GameAssetStore {
         const config = vscode.workspace.getConfiguration('paradoxcode');
         const gameDirectory = findGameDirectory(config.get<string>('gameDirectory', '')) ?? '';
-        if (!MissionPreviewPanel.assetStore || MissionPreviewPanel.assetStoreKey !== gameDirectory) {
-            MissionPreviewPanel.assetStore = new GameAssetStore(gameDirectory || undefined, undefined);
-            MissionPreviewPanel.assetStoreKey = gameDirectory;
+        const gameFonts = config.get<boolean>('preview.gameFonts', true);
+        // The Chinese bitmap font is not shipped with the game: resolve the
+        // mod that remaps vic_18 (setting override > newest workshop match).
+        const chineseFontDirectory = gameFonts
+            ? findChineseFontMod(gameDirectory || undefined, config.get<string>('preview.chineseFontMod', ''))
+            : undefined;
+        const key = `${gameDirectory}\0${chineseFontDirectory ?? ''}`;
+        if (!MissionPreviewPanel.assetStore || MissionPreviewPanel.assetStoreKey !== key) {
+            MissionPreviewPanel.assetStore = new GameAssetStore(gameDirectory || undefined, chineseFontDirectory);
+            MissionPreviewPanel.assetStoreKey = key;
         }
         return MissionPreviewPanel.assetStore;
     }
@@ -437,11 +447,27 @@ export class MissionPreviewPanel {
                 wanted.add(arrow.texture);
             }
         }
-        const textures = await MissionPreviewPanel.store().spriteUrls([...wanted]);
-        if (Object.keys(textures).length === 0 || MissionPreviewPanel.panel !== panel) {
+        const store = MissionPreviewPanel.store();
+        const textures = await store.spriteUrls([...wanted]);
+        const config = vscode.workspace.getConfiguration('paradoxcode');
+        const fontsKey = MissionPreviewPanel.assetStoreKey ?? '';
+        let fonts: FontAssets | undefined;
+        if (
+            config.get<boolean>('preview.gameFonts', true) &&
+            (!MissionPreviewPanel.postedFonts ||
+                MissionPreviewPanel.postedFonts.panel !== panel ||
+                MissionPreviewPanel.postedFonts.key !== fontsKey)
+        ) {
+            const loaded = await store.loadFonts();
+            MissionPreviewPanel.postedFonts = { panel, key: fontsKey };
+            if (loaded.english || loaded.chinese) {
+                fonts = loaded;
+            }
+        }
+        if ((Object.keys(textures).length === 0 && !fonts) || MissionPreviewPanel.panel !== panel) {
             return;
         }
-        MissionPreviewPanel.post(panel, { type: 'assets', textures });
+        MissionPreviewPanel.post(panel, { type: 'assets', textures, fonts });
     }
 
     private static postOptions(panel: vscode.WebviewPanel): void {
@@ -452,6 +478,7 @@ export class MissionPreviewPanel {
             showTextures: config.get<boolean>('showTextures', true),
             showExternalPrerequisites: config.get<boolean>('showExternalPrerequisites', true),
             showDiagnostics: config.get<boolean>('showDiagnostics', true),
+            gameFonts: config.get<boolean>('gameFonts', true),
         });
     }
 
@@ -503,12 +530,16 @@ export class MissionPreviewPanel {
         const styleUri = webview.asWebviewUri(
             vscode.Uri.joinPath(extensionUri, 'media', 'style.css'),
         );
+        const locFormatUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(extensionUri, 'media', 'loc-format.js'),
+        );
         const scriptUri = webview.asWebviewUri(
             vscode.Uri.joinPath(extensionUri, 'media', 'renderer.js'),
         );
         return template
             .replaceAll('{{cspSource}}', webview.cspSource)
             .replaceAll('{{styleUri}}', styleUri.toString())
+            .replaceAll('{{locFormatUri}}', locFormatUri.toString())
             .replaceAll('{{scriptUri}}', scriptUri.toString());
     }
 }
