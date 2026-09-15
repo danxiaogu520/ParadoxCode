@@ -362,4 +362,3 @@ pub(crate) fn prepare_initialize_candidate(
         workspace_wide_diagnostics: resolved.workspace_wide_diagnostics,
     })
 }
-
