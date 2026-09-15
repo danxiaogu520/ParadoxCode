@@ -169,7 +169,6 @@ fn mission_preview_returns_renderer_ready_tree_data() {
         .iter()
         .find(|node| node["id"] == "a1")
         .expect("a1 node");
-    assert!(a1["isRoot"] == true);
     assert!(a1["hasError"] == false);
     assert_eq!(a1["icon"], "mission_alpha");
     assert_eq!(a1["x"], 16.0);

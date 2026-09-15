@@ -354,10 +354,8 @@ const requiredSettings = [
   'paradoxcode.server.installPolicy',
   'paradoxcode.vanilla.mode',
   'paradoxcode.preview.refreshMode',
-  'paradoxcode.preview.persistViewport',
   'paradoxcode.preview.showExternalPrerequisites',
   'paradoxcode.preview.showDiagnostics',
-  'paradoxcode.preview.defaultExportDirectory',
   'paradoxcode.diagnostics.severityOverrides',
   'paradoxcode.localisation.preferredLanguages',
   'paradoxcode.localisation.autoOpenDecoded',
@@ -418,9 +416,9 @@ for (const marker of ['fetchBytesOnce', 'ECONNRESET', 'Timed out downloading '])
 }
 const rendererSource = readFileSync(join(root, 'media', 'renderer.js'), 'utf8');
 for (const marker of [
-  'exportPng',
-  'exportSvg',
-  'exportJson',
+  'switchDocument',
+  'viewportsByDocument',
+  'DRAG_THRESHOLD_PX',
   'addEventListener(\'keydown\'',
   'renderNodeList',
   'readColors',

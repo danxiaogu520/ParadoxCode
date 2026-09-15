@@ -950,11 +950,6 @@
           "default": "always",
           "markdownDescription": "%configuration.preview.refreshMode.description%"
         },
-        "paradoxcode.preview.persistViewport": {
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "%configuration.preview.persistViewport.description%"
-        },
         "paradoxcode.preview.showExternalPrerequisites": {
           "type": "boolean",
           "default": true,
@@ -964,11 +959,6 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "%configuration.preview.showDiagnostics.description%"
-        },
-        "paradoxcode.preview.defaultExportDirectory": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "%configuration.preview.defaultExportDirectory.description%"
         },
         "paradoxcode.localisation.transparentEncoding": {
           "type": "boolean",

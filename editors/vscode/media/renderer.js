@@ -37,14 +37,12 @@
             borderSelected: themeColor('--vscode-focusBorder', '#4d7cfe'),
             error: themeColor('--vscode-editorError-foreground', '#d55c5c'),
             warning: themeColor('--vscode-editorWarning-foreground', '#d9a13b'),
-            root: themeColor('--vscode-testing-iconPassed', '#5fd58a'),
             text: styles.color || '#d4d8dd',
             dim: themeColor('--vscode-descriptionForeground', '#8a919c'),
             groupBg: themeColor('--vscode-editorWidget-background', 'rgba(42, 50, 64, 0.85)'),
             arrow: themeColor('--vscode-charts-blue', '#4d7cfe'),
             card: themeColor('--vscode-editorWidget-background', '#23282f'),
             errorBg: themeColor('--vscode-inputValidation-errorBackground', 'rgba(58, 31, 31, 0.9)'),
-            rootBg: themeColor('--vscode-inputValidation-infoBackground', 'rgba(29, 58, 42, 0.9)'),
             externalBg: themeColor('--vscode-editorHoverWidget-background', 'rgba(27, 30, 35, 0.8)'),
             texturedText: themeColor('--vscode-editor-foreground', '#ffffff'),
             canvas: 'transparent',
@@ -64,12 +62,11 @@
     let hovered = null; // { kind: 'node'|'group', index, rect }
     let pan = { x: 0, y: 0 };
     let zoom = 1;
-    let dragging = null; // { startX, startY, panX, panY }
+    let press = null; // { clientX, clientY, hit, panning, panX, panY }
     let keyboardIndex = -1;
     let options = {
         zoomSensitivity: 1,
         showTextures: true,
-        persistViewport: false,
         showExternalPrerequisites: true,
         showDiagnostics: true,
     };
@@ -168,36 +165,43 @@
         };
     }
 
-    function viewportStateKey() {
-        return preview && preview.documentUri ? preview.documentUri : null;
-    }
+    // Session viewport memory: refreshing the same document must never move
+    // the view, and switching between mission files remembers each document's
+    // pan/zoom for the lifetime of the webview. No persistence beyond that —
+    // a rebuilt page (window reload, webview discard) fits, which is expected.
+    let lastDocumentUri = null;
+    const viewportsByDocument = new Map();
 
-    function saveViewport() {
-        const key = viewportStateKey();
-        if (!options.persistViewport || !key) {
+    // Snapshot the outgoing document's viewport and adopt the incoming one
+    // (remembered view, or a fit for a first look). Call after `setPreview`
+    // so `fitView` can measure the new payload.
+    function switchDocument(documentUri) {
+        if (documentUri === lastDocumentUri) {
             return;
         }
-        const state = vscode.getState() || {};
-        const viewports = { ...(state.viewports || {}) };
-        viewports[key] = { x: pan.x, y: pan.y, zoom };
-        vscode.setState({ ...state, viewports });
-    }
-
-    function restoreViewport() {
-        const key = viewportStateKey();
-        if (!options.persistViewport || !key) {
-            fitView();
-            return;
+        if (lastDocumentUri !== null) {
+            viewportsByDocument.set(lastDocumentUri, { x: pan.x, y: pan.y, zoom });
         }
-        const state = vscode.getState() || {};
-        const saved = state.viewports && state.viewports[key];
-        if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)
-            && Number.isFinite(saved.zoom) && saved.zoom >= 0.35 && saved.zoom <= 2.5) {
+        lastDocumentUri = documentUri;
+        const saved = viewportsByDocument.get(documentUri);
+        if (saved) {
             pan = { x: saved.x, y: saved.y };
             zoom = saved.zoom;
         } else {
             fitView();
         }
+    }
+
+    // Zooms around the current view center (keyboard and toolbar zoom have no
+    // cursor anchor; the wheel handler keeps its own cursor-anchored math).
+    function zoomBy(factor) {
+        const sx = canvas.clientWidth / 2;
+        const sy = canvas.clientHeight / 2;
+        const world = toWorld(sx, sy);
+        zoom = Math.min(2.5, Math.max(0.35, zoom * factor));
+        pan.x = sx - world.x * zoom;
+        pan.y = sy - world.y * zoom;
+        scheduleDraw();
     }
 
     function roundRect(x, y, w, h, r) {
@@ -238,9 +242,6 @@
         }
         if (options.showDiagnostics && node.hasWarning) {
             return COLORS.warning;
-        }
-        if (node.isRoot) {
-            return COLORS.root;
         }
         return COLORS.border;
     }
@@ -569,7 +570,7 @@
         const isHovered = hovered && hovered.kind === 'node' && hovered.index === i;
         drawImageWorld(textureImage(node.icon), node.x + EMT_ICON_X, node.y + EMT_ICON_Y);
         drawImageWorld(frame, node.x, node.y);
-        if (isHovered || (options.showDiagnostics && (node.hasError || node.hasWarning)) || node.isRoot) {
+        if (isHovered || (options.showDiagnostics && (node.hasError || node.hasWarning))) {
             ctx.strokeStyle = isHovered ? COLORS.borderSelected : nodeColor(node);
             ctx.lineWidth = isHovered ? 3 : 2;
             roundRect(pos.x, pos.y, w, h, 4 * zoom);
@@ -594,7 +595,7 @@
         const isHovered = hovered && hovered.kind === 'node' && hovered.index === i;
         ctx.fillStyle = options.showDiagnostics && node.hasError
             ? COLORS.errorBg
-            : node.isRoot ? COLORS.rootBg : COLORS.card;
+            : COLORS.card;
         roundRect(pos.x, pos.y, w, h, 6 * zoom);
         ctx.fill();
         ctx.strokeStyle = isHovered ? COLORS.borderSelected : nodeColor(node);
@@ -646,7 +647,6 @@
         const flags = [];
         if (options.showDiagnostics && node.hasError) flags.push('error');
         if (options.showDiagnostics && node.hasWarning) flags.push('warning');
-        if (node.isRoot) flags.push('root');
         return `${title}${flags.length ? ` · ${flags.join(', ')}` : ''}`;
     }
 
@@ -677,7 +677,6 @@
             button.className = 'node-entry';
             if (options.showDiagnostics && node.hasError) button.classList.add('error');
             else if (options.showDiagnostics && node.hasWarning) button.classList.add('warning');
-            else if (node.isRoot) button.classList.add('root');
             button.textContent = nodeLabel(node);
             button.title = node.titleKey || node.id;
             button.setAttribute('role', 'listitem');
@@ -743,81 +742,12 @@
         scheduleDraw();
     }
 
-    function exportJson() {
-        if (preview) {
-            vscode.postMessage({ type: 'exportJson', json: JSON.stringify(preview, null, 2) });
-        }
-    }
-
-    function exportPng() {
-        vscode.postMessage({ type: 'exportPng', dataUri: canvas.toDataURL('image/png') });
-    }
-
-    function escapeXml(value) {
-        return String(value)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/\"/g, '&quot;')
-            .replace(/'/g, '&apos;');
-    }
-
-    function exportSvg() {
-        if (!preview) {
-            return;
-        }
-        let maxX = 640;
-        let maxY = 480;
-        for (const node of preview.nodes) {
-            maxX = Math.max(maxX, node.x + NODE_WIDTH + 32);
-            maxY = Math.max(maxY, node.y + NODE_HEIGHT + 32);
-        }
-        const parts = [
-            `<svg xmlns="http://www.w3.org/2000/svg" width="${maxX}" height="${maxY}" viewBox="0 0 ${maxX} ${maxY}">`,
-            `<rect width="100%" height="100%" fill="${escapeXml(getComputedStyle(document.body).getPropertyValue('--vscode-editor-background').trim() || '#20252d')}"/>`,
-        ];
-        for (const segment of preview.arrows) {
-            const x = Number(segment.x) || 0;
-            const y = Number(segment.y) || 0;
-            const stroke = `stroke="${escapeXml(COLORS.arrow)}" stroke-width="2.5" fill="${escapeXml(COLORS.arrow)}"`;
-            if (segment.glyph === 'verticalTile' || segment.glyph === 'verticalSkipTier') {
-                parts.push(`<line x1="${x}" y1="${y}" x2="${x}" y2="${y + ARROW_TILE_HEIGHT}" ${stroke}/>`);
-            } else if (segment.glyph === 'horizontalSkipSlot') {
-                parts.push(`<line x1="${x}" y1="${y}" x2="${x + ARROW_TILE_WIDTH}" y2="${y}" ${stroke}/>`);
-            } else if (segment.glyph === 'end') {
-                parts.push(`<path d="M ${x - 7} ${y - 4} L ${x + 7} ${y - 4} L ${x} ${y + 7} Z" ${stroke}/>`);
-            } else if (segment.glyph === 'rightOut' || segment.glyph === 'rightIn') {
-                parts.push(`<path d="M ${x - 4} ${y - 7} L ${x - 4} ${y + 7} L ${x + 7} ${y} Z" ${stroke}/>`);
-            } else if (segment.glyph === 'leftOut' || segment.glyph === 'leftIn') {
-                parts.push(`<path d="M ${x + 4} ${y - 7} L ${x + 4} ${y + 7} L ${x - 7} ${y} Z" ${stroke}/>`);
-            }
-        }
-        for (const group of preview.groups) {
-            parts.push(`<rect x="${group.x}" y="${group.y}" width="200" height="20" rx="4" fill="${escapeXml(COLORS.groupBg)}" stroke="${escapeXml(COLORS.border)}"/>`);
-            parts.push(`<text x="${group.x + 8}" y="${group.y + 14}" fill="${escapeXml(COLORS.dim)}" font-family="sans-serif" font-size="11">${escapeXml(group.label)}</text>`);
-        }
-        for (const node of preview.nodes) {
-            const stroke = options.showDiagnostics && node.hasError
-                ? COLORS.error
-                : options.showDiagnostics && node.hasWarning
-                    ? COLORS.warning
-                    : node.isRoot ? COLORS.root : COLORS.border;
-            const fill = options.showDiagnostics && node.hasError
-                ? COLORS.errorBg
-                : node.isRoot ? COLORS.rootBg : COLORS.card;
-            parts.push(`<rect x="${node.x}" y="${node.y}" width="${NODE_WIDTH}" height="${NODE_HEIGHT}" rx="6" fill="${escapeXml(fill)}" stroke="${escapeXml(stroke)}"/>`);
-            parts.push(`<text x="${node.x + NODE_WIDTH / 2}" y="${node.y + NODE_HEIGHT / 2}" text-anchor="middle" fill="${escapeXml(COLORS.text)}" font-family="sans-serif" font-size="11">${escapeXml(node.title?.value || node.id)}</text>`);
-        }
-        parts.push('</svg>');
-        vscode.postMessage({ type: 'exportSvg', svg: parts.join('') });
-    }
-
     window.addEventListener('message', (event) => {
         const message = event.data;
         if (message.type === 'preview') {
             setPreview(message.payload);
+            switchDocument(message.payload.documentUri);
             keyboardIndex = -1;
-            restoreViewport();
             hideStatus();
             scheduleDraw();
             renderNodeList();
@@ -831,7 +761,6 @@
             options = {
                 zoomSensitivity: Math.min(2, Math.max(0.5, Number(message.zoomSensitivity) || 1)),
                 showTextures: message.showTextures !== false,
-                persistViewport: message.persistViewport === true,
                 showExternalPrerequisites: message.showExternalPrerequisites !== false,
                 showDiagnostics: message.showDiagnostics !== false,
             };
@@ -841,24 +770,36 @@
         }
     });
 
+    // Press then decide: a move beyond the threshold pans (even when the
+    // press started on a node), a release without movement jumps to source.
+    const DRAG_THRESHOLD_PX = 3;
+
     canvas.addEventListener('mousedown', (event) => {
         const rect = canvas.getBoundingClientRect();
-        const sx = event.clientX - rect.left;
-        const sy = event.clientY - rect.top;
-        const hit = nodeAt(sx, sy);
-        if (hit) {
-            postJump(hit);
-        } else {
-            dragging = { startX: event.clientX, startY: event.clientY, panX: pan.x, panY: pan.y };
-        }
+        const hit = nodeAt(event.clientX - rect.left, event.clientY - rect.top);
+        press = {
+            clientX: event.clientX,
+            clientY: event.clientY,
+            hit,
+            panning: false,
+            panX: pan.x,
+            panY: pan.y,
+        };
     });
 
     window.addEventListener('mousemove', (event) => {
-        if (dragging) {
-            pan.x = dragging.panX + (event.clientX - dragging.startX);
-            pan.y = dragging.panY + (event.clientY - dragging.startY);
-            scheduleDraw();
-            return;
+        if (press) {
+            const dx = event.clientX - press.clientX;
+            const dy = event.clientY - press.clientY;
+            if (!press.panning && Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) {
+                press.panning = true;
+            }
+            if (press.panning) {
+                pan.x = press.panX + dx;
+                pan.y = press.panY + dy;
+                scheduleDraw();
+                return;
+            }
         }
         const rect = canvas.getBoundingClientRect();
         const next = nodeAt(event.clientX - rect.left, event.clientY - rect.top);
@@ -873,8 +814,10 @@
     });
 
     window.addEventListener('mouseup', () => {
-        saveViewport();
-        dragging = null;
+        if (press && !press.panning && press.hit) {
+            postJump(press.hit);
+        }
+        press = null;
     });
 
     canvas.addEventListener('mouseleave', hideTooltip);
@@ -890,13 +833,11 @@
         zoom = nextZoom;
         pan.x = sx - world.x * zoom;
         pan.y = sy - world.y * zoom;
-        saveViewport();
         scheduleDraw();
     }, { passive: false });
 
     canvas.addEventListener('dblclick', () => {
         fitView();
-        saveViewport();
         scheduleDraw();
     });
 
@@ -915,28 +856,20 @@
             postJump({ kind: 'node', node: preview.nodes[keyboardIndex], index: keyboardIndex });
         } else if (event.key === '+' || event.key === '=') {
             event.preventDefault();
-            zoom = Math.min(2.5, zoom * 1.15);
-            saveViewport();
-            scheduleDraw();
+            zoomBy(1.15);
         } else if (event.key === '-') {
             event.preventDefault();
-            zoom = Math.max(0.35, zoom / 1.15);
-            saveViewport();
-            scheduleDraw();
+            zoomBy(1 / 1.15);
         } else if (event.key.toLowerCase() === 'f') {
             event.preventDefault();
             fitView();
-            saveViewport();
             scheduleDraw();
         }
     });
 
-    document.getElementById('fit')?.addEventListener('click', () => { fitView(); saveViewport(); scheduleDraw(); });
-    document.getElementById('zoom-in')?.addEventListener('click', () => { zoom = Math.min(2.5, zoom * 1.15); saveViewport(); scheduleDraw(); });
-    document.getElementById('zoom-out')?.addEventListener('click', () => { zoom = Math.max(0.35, zoom / 1.15); saveViewport(); scheduleDraw(); });
-    document.getElementById('export-png')?.addEventListener('click', exportPng);
-    document.getElementById('export-svg')?.addEventListener('click', exportSvg);
-    document.getElementById('export-json')?.addEventListener('click', exportJson);
+    document.getElementById('fit')?.addEventListener('click', () => { fitView(); scheduleDraw(); });
+    document.getElementById('zoom-in')?.addEventListener('click', () => zoomBy(1.15));
+    document.getElementById('zoom-out')?.addEventListener('click', () => zoomBy(1 / 1.15));
 
     window.addEventListener('resize', resize);
     resize();
