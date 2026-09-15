@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
+import { FRAME_SPRITE, GameAssetStore, findGameDirectory } from './gameAssets';
 
 const PREVIEW_VIEW_TYPE = 'paradoxcode.missionPreview';
 
@@ -61,8 +62,6 @@ export interface MissionPreview {
     groups: MissionGroup[];
     external: MissionExternal[];
     diagnostics: { severity: number; code: string; message: string }[];
-    /** Game sprite data URLs (`data:image/png;base64,`), keyed by sprite name. */
-    textures: Record<string, string>;
 }
 
 export interface SourcePosition {
@@ -80,6 +79,8 @@ type OutboundMessage =
     | { type: 'preview'; payload: MissionPreview }
     | { type: 'empty'; message: string }
     | { type: 'error'; message: string }
+    /** Sprite pixels the renderer asked for by name, decoded client-side. */
+    | { type: 'assets'; textures: Record<string, string> }
     | {
         type: 'options';
         zoomSensitivity: number;
@@ -391,6 +392,7 @@ export class MissionPreviewPanel {
             MissionPreviewPanel.previewUri = documentUri;
             MissionPreviewPanel.previewVersion = documentVersion;
             MissionPreviewPanel.post(panel, { type: 'preview', payload });
+            void MissionPreviewPanel.postAssets(panel, payload);
         } catch (error) {
             MissionPreviewPanel.post(panel, {
                 type: 'error',
@@ -401,6 +403,45 @@ export class MissionPreviewPanel {
 
     private static post(panel: vscode.WebviewPanel, message: OutboundMessage): void {
         void panel.webview.postMessage(message);
+    }
+
+    /** Client-side asset store, rebuilt when the game directory changes. */
+    private static assetStore: GameAssetStore | undefined;
+    private static assetStoreKey: string | undefined;
+
+    private static store(): GameAssetStore {
+        const config = vscode.workspace.getConfiguration('paradoxcode');
+        const gameDirectory = findGameDirectory(config.get<string>('gameDirectory', '')) ?? '';
+        if (!MissionPreviewPanel.assetStore || MissionPreviewPanel.assetStoreKey !== gameDirectory) {
+            MissionPreviewPanel.assetStore = new GameAssetStore(gameDirectory || undefined, undefined);
+            MissionPreviewPanel.assetStoreKey = gameDirectory;
+        }
+        return MissionPreviewPanel.assetStore;
+    }
+
+    /** Decodes the sprites a payload references (frame, node icons, arrow
+     * tiles) and pushes any newly loaded ones to the webview. Client-side
+     * decoding keeps every per-keystroke `missionPreview` response pure text. */
+    private static async postAssets(
+        panel: vscode.WebviewPanel,
+        payload: MissionPreview,
+    ): Promise<void> {
+        const wanted = new Set<string>([FRAME_SPRITE]);
+        for (const node of payload.nodes) {
+            if (node.icon) {
+                wanted.add(node.icon);
+            }
+        }
+        for (const arrow of payload.arrows) {
+            if (arrow.texture) {
+                wanted.add(arrow.texture);
+            }
+        }
+        const textures = await MissionPreviewPanel.store().spriteUrls([...wanted]);
+        if (Object.keys(textures).length === 0 || MissionPreviewPanel.panel !== panel) {
+            return;
+        }
+        MissionPreviewPanel.post(panel, { type: 'assets', textures });
     }
 
     private static postOptions(panel: vscode.WebviewPanel): void {

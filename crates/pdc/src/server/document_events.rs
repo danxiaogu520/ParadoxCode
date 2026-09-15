@@ -156,7 +156,6 @@ impl LspServer {
                 self.host.snapshot(),
                 CancellationToken::new(),
                 self.client_snippet_support,
-                self.textures.clone(),
                 Arc::clone(&self.ignored_diagnostic_codes),
                 Arc::clone(&self.diagnostic_severity_overrides),
                 Arc::clone(&self.semantic_tokens_cache),
@@ -204,7 +203,6 @@ impl LspServer {
         )?;
         self.host = prepared.host;
         self.invalidate_all_semantic_tokens();
-        self.textures = prepared.textures;
         self.watcher_registration = prepared.watcher_registration;
         self.background_reindex_interval_minutes = prepared.background_reindex_interval_minutes;
         self.background_reindex_idle_seconds = prepared.background_reindex_idle_seconds;

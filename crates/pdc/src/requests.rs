@@ -127,9 +127,6 @@ pub(crate) struct SnapshotRequestContext {
     cancellation: CancellationToken,
     /// Whether the client advertises snippet support for completion items.
     client_snippets: bool,
-    /// Mission-preview textures, resolved lazily from the captured discovery
-    /// inputs when a preview is first requested.
-    textures: Arc<crate::initialize::TextureStore>,
     /// Diagnostic categories hidden by workspace configuration.
     ignored_diagnostic_codes: Arc<HashSet<String>>,
     /// Per-category severity remapping applied before diagnostic publication.
@@ -143,7 +140,6 @@ impl SnapshotRequestContext {
         snapshot: AnalysisSnapshot,
         cancellation: CancellationToken,
         client_snippets: bool,
-        textures: Arc<crate::initialize::TextureStore>,
         ignored_diagnostic_codes: Arc<HashSet<String>>,
         diagnostic_severity_overrides: Arc<BTreeMap<String, Option<ide::Severity>>>,
         semantic_tokens_cache: Arc<SemanticTokensCache>,
@@ -152,7 +148,6 @@ impl SnapshotRequestContext {
             snapshot,
             cancellation,
             client_snippets,
-            textures,
             ignored_diagnostic_codes,
             diagnostic_severity_overrides,
             semantic_tokens_cache,
@@ -382,28 +377,6 @@ impl SnapshotRequestContext {
             })
             .collect::<Vec<_>>();
 
-        // Game sprites the renderer needs: the mission frame, every node icon,
-        // and every arrow glyph, deduplicated and resolved to data URLs.
-        let mut wanted = vec![game::eu4::mission::FRAME_SPRITE];
-        wanted.extend(layout.iter().filter_map(|pos| {
-            file.trees[pos.tree_index].missions[pos.mission_index]
-                .icon
-                .as_deref()
-        }));
-        wanted.extend(segments.iter().filter_map(|segment| {
-            game::eu4::mission::arrow_sprite_name(glyph_name(segment.glyph))
-        }));
-        wanted.sort_unstable();
-        wanted.dedup();
-        let mut textures = serde_json::Map::new();
-        if let Some(assets) = self.textures.get() {
-            for name in wanted {
-                if let Some(url) = assets.data_url(name) {
-                    textures.insert(name.to_owned(), Value::String(url));
-                }
-            }
-        }
-
         // Group labels above each column, stacked for same-column groups —
         // identical placement to the editor canvas.
         let mut per_column: HashMap<u32, Vec<usize>> = HashMap::new();
@@ -479,7 +452,6 @@ impl SnapshotRequestContext {
             "groups": groups,
             "external": external,
             "diagnostics": diagnostics,
-            "textures": textures,
         }))
     }
 

@@ -7,11 +7,9 @@ use lsp_types::{
     TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions,
 };
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock};
 
 use engine::{AnalysisHost, WorkspaceChange, WorkspaceScanToken};
-use game::eu4::mission::TextureAssets;
-use game::{DiscoveryOptions, DiscoveryToken, GameInstallDescriptor, UserPaths};
+use game::{GameInstallDescriptor, UserPaths};
 use ide::SemanticTokenType;
 
 use crate::protocol::{RpcError, parse_file_uri_str};
@@ -166,11 +164,6 @@ pub(crate) fn prepare_initialize_candidate(
         }
     }
     let mut warnings = Vec::new();
-    // The texture loader needs the profile descriptor for discovery. Capture it
-    // BEFORE the vanilla configuration pass: that pass legitimately returns
-    // `None` when the user configured an explicit `vanilla_index_cache`, but
-    // mission-preview textures must not depend on it.
-    let texture_descriptor = auto_vanilla.map(|config| config.descriptor);
     if let Some(log) = callbacks.log {
         match resolved.index_cache.as_ref() {
             Some(path) => log(&format!(
@@ -266,17 +259,6 @@ pub(crate) fn prepare_initialize_candidate(
         // to automatic discovery and rebuilds the cache in place.
         Some(path) => Some(path),
     };
-    // Mission-preview textures are resolved lazily on the first preview
-    // request: discovery scans the game installation's interface definitions
-    // and most sessions never open a preview, so startup only captures the
-    // (cheap, `Copy`) inputs. An explicitly configured game directory wins;
-    // otherwise a one-time quick discovery via the profile descriptor is
-    // deferred to the same lazy path. Texture failures stay silent — the
-    // preview simply renders without textures.
-    let textures = Arc::new(TextureStore::new(
-        resolved.game_directory.take(),
-        texture_descriptor,
-    ));
     if cancellation.is_cancelled() {
         return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
     }
@@ -368,7 +350,6 @@ pub(crate) fn prepare_initialize_candidate(
         warnings,
         auto_vanilla,
         index_cache,
-        textures,
         dependency_caches: resolved.dependency_caches,
         scan_pending,
         watcher_registration,
@@ -382,70 +363,3 @@ pub(crate) fn prepare_initialize_candidate(
     })
 }
 
-/// Lazily resolved mission-preview texture assets.
-///
-/// Texture discovery scans the game installation's interface definitions,
-/// which costs real time at startup and is only needed when a mission preview
-/// is actually opened. The initialize path captures the inputs (both cheap to
-/// hold: an optional path and a `Copy` descriptor) and the first preview
-/// request materializes the store exactly once.
-#[derive(Debug)]
-pub(crate) struct TextureStore {
-    game_directory: Option<PathBuf>,
-    descriptor: Option<GameInstallDescriptor>,
-    resolved: OnceLock<Option<Arc<TextureAssets>>>,
-}
-
-impl TextureStore {
-    /// Captures discovery inputs without touching the game installation.
-    pub(crate) fn new(
-        game_directory: Option<PathBuf>,
-        descriptor: Option<GameInstallDescriptor>,
-    ) -> Self {
-        Self {
-            game_directory,
-            descriptor,
-            resolved: OnceLock::new(),
-        }
-    }
-
-    /// Returns the texture assets, discovering them on first use.
-    ///
-    /// Always `None` for stores created without any input. Repeated calls
-    /// return clones of the first resolution.
-    pub(crate) fn get(&self) -> Option<Arc<TextureAssets>> {
-        self.resolved
-            .get_or_init(|| {
-                resolve_texture_assets(self.game_directory.clone(), self.descriptor.as_ref())
-            })
-            .clone()
-    }
-}
-
-/// Builds the mission-preview texture store for the active game installation.
-/// `configured` (explicit `gameDirectory`) wins; otherwise a one-time quick
-/// discovery using the profile descriptor is attempted.
-fn resolve_texture_assets(
-    configured: Option<PathBuf>,
-    descriptor: Option<&GameInstallDescriptor>,
-) -> Option<Arc<TextureAssets>> {
-    let root = if let Some(root) = configured {
-        Some(root)
-    } else if let Some(descriptor) = descriptor {
-        let report = game::discover_installations(
-            descriptor,
-            &DiscoveryOptions::default(),
-            &DiscoveryToken::new(),
-        );
-        game::select_installation(&report.installations)
-            .map(|selection| resolution_path(selection.selected))
-    } else {
-        None
-    };
-    root.as_deref().and_then(TextureAssets::load).map(Arc::new)
-}
-
-/// The installation root to load textures from.
-fn resolution_path(installation: &game::DiscoveredInstallation) -> PathBuf {
-    installation.path.clone()
-}

@@ -363,9 +363,6 @@ pub(crate) struct PreparedInitialize {
     pub(crate) warnings: Vec<String>,
     pub(crate) auto_vanilla: Option<AutoVanillaConfiguration>,
     pub(crate) index_cache: Option<PathBuf>,
-    /// Mission-preview textures, resolved lazily from the captured discovery
-    /// inputs on the first preview request.
-    pub(crate) textures: Arc<crate::initialize::TextureStore>,
     /// Dependencies configured with persistent index caches, loaded in the background after
     /// the initialize response is sent.
     pub(crate) dependency_caches: Vec<DependencyIndexCache>,
@@ -662,8 +659,6 @@ pub struct LspServer {
     pending_disk_changes_rescan: bool,
     watcher_registration: Option<Value>,
     auto_vanilla: Option<AutoVanillaConfiguration>,
-    /// Mission-preview textures, resolved lazily on first preview use.
-    textures: Arc<crate::initialize::TextureStore>,
     /// Whether the client advertises `window.workDoneProgress`, so server-initiated background
     /// work can be surfaced as a progress bar instead of only start/end messages.
     client_work_done_progress: bool,
@@ -752,7 +747,6 @@ impl LspServer {
             pending_disk_changes_rescan: false,
             watcher_registration: None,
             auto_vanilla: None,
-            textures: Arc::new(crate::initialize::TextureStore::new(None, None)),
             client_work_done_progress: false,
             client_snippet_support: false,
             semantic_tokens_cache: Arc::new(SemanticTokensCache::new()),

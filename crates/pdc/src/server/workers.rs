@@ -953,7 +953,6 @@ impl LspServer {
             self.host.snapshot(),
             cancellation.clone(),
             self.client_snippet_support,
-            self.textures.clone(),
             Arc::clone(&self.ignored_diagnostic_codes),
             Arc::clone(&self.diagnostic_severity_overrides),
             Arc::clone(&self.semantic_tokens_cache),

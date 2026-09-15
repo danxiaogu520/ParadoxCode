@@ -355,16 +355,36 @@
 
     const textureImages = new Map(); // sprite name -> HTMLImageElement
     const failedTextures = new Set(); // sprite names that failed to decode
+    const textureUrls = {}; // sprite name -> data URL, delivered via 'assets'
 
-    // Returns the loaded image for a sprite, or null when the server did not
-    // supply one. Images decode asynchronously; drawing happens on `load`.
+    // Merges a batch of decoded sprite data URLs. They arrive separately from
+    // the per-keystroke preview payload (which is pure text); a name whose URL
+    // changed on disk drops its cached image so the new pixels reload.
+    function setAssets(textures) {
+        let changed = false;
+        for (const [name, url] of Object.entries(textures || {})) {
+            if (textureUrls[name] === url) {
+                continue;
+            }
+            changed = true;
+            textureUrls[name] = url;
+            textureImages.delete(name);
+            failedTextures.delete(name);
+        }
+        if (changed) {
+            scheduleDraw();
+        }
+    }
+
+    // Returns the loaded image for a sprite, or null when no asset has been
+    // delivered for it. Images decode asynchronously; drawing happens on `load`.
     // A failed decode is cached as a miss so the schematic fallback stays
     // reachable (a failed `Image` still reports `complete === true`).
     function textureImage(name) {
-        if (!options.showTextures || !preview || !preview.textures || !name || failedTextures.has(name)) {
+        if (!options.showTextures || !name || failedTextures.has(name)) {
             return null;
         }
-        const url = preview.textures[name];
+        const url = textureUrls[name];
         if (!url) {
             return null;
         }
@@ -437,8 +457,8 @@
         ctx.stroke();
     }
 
-    // Draws one server-placed arrow segment: its game texture when the server
-    // supplied one (EMT-style tile assembly), or a schematic stroke otherwise.
+    // Draws one server-placed arrow segment: its game texture when the asset
+    // pipeline delivered one (EMT-style tile assembly), or a schematic stroke.
     function drawArrowSegment(segment, image = textureImage(segment.texture)) {
         const width = segment.glyph === 'horizontalSkipSlot' ? ARROW_TILE_WIDTH : 14;
         const height = segment.glyph === 'verticalTile' || segment.glyph === 'verticalSkipTier'
@@ -484,8 +504,8 @@
         }
     }
 
-    // Draws all arrow segments. When the server supplies textures every glyph
-    // is drawn as its tile (vertical runs become continuous automatically);
+    // Draws all arrow segments. When textures are available every glyph is
+    // drawn as its tile (vertical runs become continuous automatically);
     // without textures, vertical runs chain into one continuous stroke.
     function drawArrows() {
         if (!preview) {
@@ -1008,6 +1028,8 @@
             renderSeriesList();
             hideTooltip();
             showStatus(message.message || 'No preview available.');
+        } else if (message.type === 'assets') {
+            setAssets(message.textures);
         } else if (message.type === 'options') {
             options = {
                 zoomSensitivity: Math.min(2, Math.max(0.5, Number(message.zoomSensitivity) || 1)),
