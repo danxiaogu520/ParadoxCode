@@ -1077,6 +1077,7 @@ pub(crate) fn semantic_matcher_accepts(
             context,
             operand,
         } => typed_prefix_value_matches(snapshot, prefix, context, *operand, value),
+        ValueMatcher::TexturePath => snapshot.resolve_texture_path(value).is_some(),
         matcher => matcher.matches(
             value,
             |type_name, member| workspace_member(snapshot, type_name, member),
@@ -1101,6 +1102,7 @@ pub(crate) fn semantic_value_matcher_label(matcher: &ValueMatcher) -> String {
             .map_or_else(|| "scope".to_owned(), |value| format!("scope[{value}]")),
         ValueMatcher::Localisation => "localisation".to_owned(),
         ValueMatcher::Filepath => "filepath".to_owned(),
+        ValueMatcher::TexturePath => "texture path".to_owned(),
         ValueMatcher::Dynamic(value) => format!("value[{value}]"),
         ValueMatcher::DynamicSet(value) => format!("value_set[{value}]"),
         ValueMatcher::TypedPrefix { prefix, .. } => format!("prefix[{prefix}]"),
@@ -1733,6 +1735,11 @@ pub(crate) fn semantic_property_matches(
     } = &rule.value
     {
         return typed_prefix_value_matches(snapshot, prefix, context, *operand, value);
+    }
+    // Texture existence is workspace state, not syntax: the generic matcher only
+    // checks the scalar shape, so resolution goes through the snapshot catalog.
+    if let ValueMatcher::TexturePath = &rule.value {
+        return snapshot.resolve_texture_path(value).is_some();
     }
     rule.value.matches(
         value,

@@ -358,6 +358,7 @@ const requiredSettings = [
   'paradoxcode.preview.showDiagnostics',
   'paradoxcode.preview.gameFonts',
   'paradoxcode.preview.chineseFontMod',
+  'paradoxcode.hover.texturePreview',
   'paradoxcode.diagnostics.severityOverrides',
   'paradoxcode.localisation.preferredLanguages',
   'paradoxcode.localisation.autoOpenDecoded',
@@ -384,6 +385,10 @@ if (manifest.contributes.configuration?.properties?.['paradoxcode.preview.gameFo
 }
 if (manifest.contributes.configuration?.properties?.['paradoxcode.preview.chineseFontMod']?.default !== '') {
   fail('paradoxcode.preview.chineseFontMod must default to the empty auto-discovery path');
+}
+// Hover texture previews are on unless opted out.
+if (manifest.contributes.configuration?.properties?.['paradoxcode.hover.texturePreview']?.default !== true) {
+  fail('paradoxcode.hover.texturePreview must default to true');
 }
 // Whole-workspace diagnostics is opt-in from the editor: the manifest default
 // must be false and the resolved value must be forwarded unconditionally, or

@@ -617,3 +617,127 @@ fn navigation_targets_event_id_in_an_indexed_definition_from_a_call_block() {
     );
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn gfx_sprite_families_and_mesh_font_kinds_are_symbolized() {
+    use std::fs;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ide-gfx-symbols-{nonce}"));
+    let interface_dir = root.join("interface");
+    fs::create_dir_all(&interface_dir).expect("interface directory");
+    fs::write(
+        interface_dir.join("golden.gfx"),
+        concat!(
+            "spriteTypes = {\n",
+            "\tspriteType = { name = \"GFX_plain\" texturefile = \"gfx/a.dds\" }\n",
+            "\ttextSpriteType = { name = \"GFX_text\" texturefile = \"gfx/a.dds\" }\n",
+            "\tprogressbartype = { name = \"GFX_bar\" texturefile = \"gfx/a.dds\" }\n",
+            "\tcorneredTileSpriteType = { name = \"GFX_tile\" texturefile = \"gfx/a.dds\" }\n",
+            "\tmaskedShieldType = { name = \"GFX_shield\" texturefile = \"gfx/a.dds\" }\n",
+            "\tframeAnimatedSpriteType = { name = \"GFX_flame\" texturefile = \"gfx/a.dds\" }\n",
+            "}\n",
+            "objectTypes = {\n",
+            "\tpdxmesh = { name = \"golden_mesh\" file = \"gfx/m.mesh\" }\n",
+            "}\n",
+        ),
+    )
+    .expect("write golden gfx");
+    // The vanilla chat fonts file numbers its root key `2-bitmapfonts`.
+    fs::write(
+        interface_dir.join("chatfonts.gfx"),
+        "2-bitmapfonts = {\n\tbitmapfont = { name = \"chat_font\" path = \"gfx/fonts/standard\" }\n}\n",
+    )
+    .expect("write chat fonts");
+
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().expect("scan gfx roots");
+    let golden_gfx = DocumentId::new("file:///interface/golden.gfx");
+    host.open_document(
+        golden_gfx.clone(),
+        1,
+        fs::read_to_string(interface_dir.join("golden.gfx")).expect("golden gfx text"),
+        Some(AbsPath::normalize(&interface_dir.join("golden.gfx"))),
+    )
+    .expect("open golden gfx");
+    let chatfonts = DocumentId::new("file:///interface/chatfonts.gfx");
+    host.open_document(
+        chatfonts.clone(),
+        1,
+        fs::read_to_string(interface_dir.join("chatfonts.gfx")).expect("chat fonts text"),
+        Some(AbsPath::normalize(&interface_dir.join("chatfonts.gfx"))),
+    )
+    .expect("open chat fonts");
+    let snapshot = host.snapshot();
+
+    let mut kinds: Vec<(String, String)> = Vec::new();
+    for document in [&golden_gfx, &chatfonts] {
+        for symbol in document_symbols(&snapshot, document) {
+            kinds.push((symbol.name.clone(), symbol.kind.clone()));
+        }
+    }
+    let sprite_names = kinds
+        .iter()
+        .filter(|(_, kind)| kind == "sprite")
+        .map(|(name, _)| name.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        sprite_names,
+        [
+            "GFX_plain",
+            "GFX_text",
+            "GFX_bar",
+            "GFX_tile",
+            "GFX_shield",
+            "GFX_flame"
+        ],
+        "all six GUI sprite kinds share the sprite symbol kind"
+    );
+    assert_eq!(
+        kinds
+            .iter()
+            .filter(|(_, kind)| kind == "object")
+            .map(|(name, _)| name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["golden_mesh"]
+    );
+    assert_eq!(
+        kinds
+            .iter()
+            .filter(|(_, kind)| kind == "bitmap_font")
+            .map(|(name, _)| name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["chat_font"],
+        "the numbered `2-bitmapfonts` root key still symbolizes its fonts"
+    );
+
+    // The shared engine namespace means a mission icon resolves across kinds.
+    let missions_dir = root.join("missions");
+    fs::create_dir_all(&missions_dir).expect("missions directory");
+    let mission_text = "golden_tree = {\n\tslot = 0\n\tgm_step = {\n\t\ticon = GFX_flame\n\t\tposition = 1\n\t}\n}\n";
+    let mission_id = DocumentId::new("file:///missions/golden_mission.txt");
+    host.open_document(
+        mission_id.clone(),
+        1,
+        mission_text.to_owned(),
+        Some(AbsPath::normalize(&missions_dir.join("golden_mission.txt"))),
+    )
+    .expect("open mission reference");
+    let snapshot = host.snapshot();
+    let position =
+        u32::try_from(mission_text.find("GFX_flame").expect("icon reference")).expect("offset");
+    let targets = definition(&snapshot, &mission_id, position);
+    assert_eq!(targets.len(), 1, "mission icon resolves to the sprite");
+    let references = references(&snapshot, &mission_id, position, true);
+    assert_eq!(references.len(), 2, "definition plus mission use");
+
+    fs::remove_dir_all(root).expect("cleanup");
+}

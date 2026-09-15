@@ -4577,3 +4577,65 @@ fn luck_root_completion_offers_workspace_country_tags() {
         "luck entry keys complete from workspace country tags: {labels:?}"
     );
 }
+
+#[test]
+fn texturefile_value_completes_from_the_workspace_catalog() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ide-texture-completion-{nonce}"));
+    let gfx_dir = root.join("gfx/interface");
+    std::fs::create_dir_all(root.join("interface")).expect("interface directory");
+    std::fs::create_dir_all(&gfx_dir).expect("gfx directory");
+    std::fs::write(gfx_dir.join("health.dds"), b"").expect("texture");
+    std::fs::write(gfx_dir.join("shield.dds"), b"").expect("texture");
+    std::fs::create_dir_all(root.join("gfx/map")).expect("map directory");
+    std::fs::write(root.join("gfx/map/terrain.dds"), b"").expect("texture");
+
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().expect("scan texture roots");
+
+    let text = "spriteTypes = {\n\tspriteType = {\n\t\tname = \"GFX_test\"\n\t\ttexturefile = \"gfx/interface/h\"\n\t}\n}\n";
+    let id = DocumentId::new("file:///interface/test.gfx");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&root.join("interface/test.gfx"))),
+    )
+    .expect("open gfx document");
+    let position = u32::try_from(text.find("h\"").expect("prefix")).expect("offset");
+    let items = complete(&host.snapshot(), &id, position).items;
+    let labels = items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"gfx/interface/health.dds"),
+        "catalog hit under the typed prefix: {items:?}"
+    );
+    assert!(
+        labels
+            .iter()
+            .any(|label| label.starts_with("gfx/interface/shield")),
+        "sibling catalog entries share the prefix: {items:?}"
+    );
+    assert!(
+        labels.iter().all(|label| !label.starts_with("gfx/map/")),
+        "entries outside the typed prefix are filtered: {items:?}"
+    );
+    let health = items
+        .iter()
+        .find(|item| item.label == "gfx/interface/health.dds")
+        .expect("health completion");
+    assert_eq!(health.kind, CompletionKind::Value);
+    assert_eq!(health.detail, "texture path");
+
+    std::fs::remove_dir_all(root).expect("cleanup");
+}

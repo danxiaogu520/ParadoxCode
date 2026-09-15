@@ -970,6 +970,11 @@
           "default": "",
           "markdownDescription": "%configuration.preview.chineseFontMod.description%"
         },
+        "paradoxcode.hover.texturePreview": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%configuration.hover.texturePreview.description%"
+        },
         "paradoxcode.localisation.transparentEncoding": {
           "type": "boolean",
           "default": true,

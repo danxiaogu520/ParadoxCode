@@ -72,6 +72,7 @@
   "configuration.preview.showDiagnostics.description": "在预览中显示诊断计数、标记、颜色和条目。",
   "configuration.preview.gameFonts.description": "使用游戏位图字体渲染任务标题（原版 `vic_18`；中文字体取自定位到的汉化 mod），而非系统字体。",
   "configuration.preview.chineseFontMod.description": "提供中文位图字体（`gfx/fonts/zh-hans-16.fnt`）的 mod 文件夹路径。留空时自动在定位到的游戏安装的 Steam 创意工坊中发现最新的匹配 mod。",
+  "configuration.hover.texturePreview.description": "在 sprite 悬停（`icon = …`、事件 `picture`、`.gfx` 内 sprite 定义以及 `texturefile` 路径值）后追加解码后的贴图图片。贴图优先从工作区 mod 解析，其次为定位到的游戏安装目录。",
   "commands.localisation.openDecoded.title": "以中文（解码）视图打开",
   "commands.localisation.revealOriginal.title": "打开原始转码文件",
   "commands.localisation.transcodeFile.title": "转码本地化文件",

@@ -701,6 +701,119 @@ fn golden_mission_trees() {
 }
 
 #[test]
+fn golden_gfx_sprite_semantics() {
+    let root = temp_root("gfx");
+    let interface_dir = root.join("interface");
+    let gfx_dir = root.join("gfx/interface");
+    std::fs::create_dir_all(&interface_dir).expect("interface directory");
+    std::fs::create_dir_all(&gfx_dir).expect("gfx directory");
+    for texture in [
+        "health.dds",
+        "shield.dds",
+        "bar1.dds",
+        "bar2.dds",
+        "tile.dds",
+        "frames.png",
+        "scroll.dds",
+        "mesh.mesh",
+    ] {
+        std::fs::write(gfx_dir.join(texture), b"").expect("texture fixture");
+    }
+    let text = concat!(
+        "spriteTypes = {\n",
+        "\tspriteType = {\n",
+        "\t\tname = \"GFX_health\"\n",
+        "\t\ttexturefile = \"gfx/interface/health.dds\"\n",
+        "\t\tloadtype = \"INGAME\"\n",
+        "\t\tnoOfFrames = 4\n",
+        "\t\ttransparencecheck = yes\n",
+        "\t}\n",
+        "\tspriteType = {\n",
+        "\t\tname = \"GFX_drift\"\n",
+        "\t\ttexturefile = \"gfx/interface/shield.tga\"\n",
+        "\t}\n",
+        "\tprogressbartype = {\n",
+        "\t\tname = \"GFX_bar\"\n",
+        "\t\ttexturefile1 = \"gfx/interface/bar1.dds\"\n",
+        "\t\ttexturefile2 = \"gfx/interface/bar2.dds\"\n",
+        "\t\tcolor = { 0.0 0.5 0.0 }\n",
+        "\t\tcolortwo = { 0.2 0.2 0.2 }\n",
+        "\t\thorizontal = yes\n",
+        "\t}\n",
+        "\tcorneredTileSpriteType = {\n",
+        "\t\tname = \"GFX_tile\"\n",
+        "\t\ttexturefile = \"gfx/interface/tile.dds\"\n",
+        "\t\tsize = { x = 10 y = 10 }\n",
+        "\t\tborderSize = { x = 2 y = 2 }\n",
+        "\t}\n",
+        "\tframeAnimatedSpriteType = {\n",
+        "\t\tname = \"GFX_flame\"\n",
+        "\t\ttexturefile = \"gfx/interface/frames.png\"\n",
+        "\t\tnoOfFrames = 8\n",
+        "\t\tanimation_rate_fps = 12\n",
+        "\t\tlooping = yes\n",
+        "\t\tplay_on_show = yes\n",
+        "\t\tpause_on_loop = 0.5\n",
+        "\t}\n",
+        "\tmaskedShieldType = {\n",
+        "\t\tname = \"GFX_shield\"\n",
+        "\t\ttexturefile1 = \"gfx/interface/bar1.tga\"\n",
+        "\t\ttexturefile2 = \"gfx/interface/bar2.tga\"\n",
+        "\t}\n",
+        "\tspriteType = {\n",
+        "\t\tname = \"GFX_broken\"\n",
+        "\t\ttexturefile = \"gfx/interface/nowhere.dds\"\n",
+        "\t\tloadtype = NOPE\n",
+        "\t\tnoofframes = 0\n",
+        "\t\tbogus_key = yes\n",
+        "\t\tanimation = {\n",
+        "\t\t\tanimationtexturefile = \"gfx/interface/scroll.dds\"\n",
+        "\t\t\tanimationrotation = 0.25\n",
+        "\t\t}\n",
+        "\t}\n",
+        "\tspriteType = {\n",
+        "\t\ttexturefile = \"gfx/interface/missing.dds\"\n",
+        "\t}\n",
+        "}\n",
+        "objectTypes = {\n",
+        "\tpdxmesh = {\n",
+        "\t\tname = \"test_mesh\"\n",
+        "\t\tfile = \"gfx/interface/mesh.mesh\"\n",
+        "\t\tscale = 1.0\n",
+        "\t\tcull_distance = 2000\n",
+        "\t}\n",
+        "\tpdxmesh = {\n",
+        "\t\tname = \"broken_mesh\"\n",
+        "\t\tfile = \"gfx/interface/nope.mesh\"\n",
+        "\t\twrong_key = yes\n",
+        "\t}\n",
+        "}\n",
+        "bitmapfonts = {\n",
+        "\tbitmapfont = {\n",
+        "\t\tname = \"vic_18\"\n",
+        "\t\tpath = \"gfx/fonts/vic_18.fnt\"\n",
+        "\t\tcolor = 0xffffffff\n",
+        "\t\ttextcolors = { G = { 44 171 50 } }\n",
+        "\t}\n",
+        "\tbitmapfont = {\n",
+        "\t\tpath = \"gfx/fonts/nameless.fnt\"\n",
+        "\t}\n",
+        "}\n",
+    );
+    let mut host = first_party_host(&root);
+    let focus = DocumentId::new("file:///interface/golden.gfx");
+    host.open_document(
+        focus.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&interface_dir.join("golden.gfx"))),
+    )
+    .expect("open golden gfx file");
+    assert_golden("gfx_sprite_semantics", text, &analyze_text(&host, &focus));
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn golden_quoted_script_syntax() {
     let text = "trigger = { embedded = \"\n foo = maybe\n broken = {\n\" }\n";
     let (host, id) = quoted_script_snapshot(text);

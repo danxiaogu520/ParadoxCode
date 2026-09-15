@@ -36,6 +36,7 @@ pub struct AnalysisSnapshot {
     pub(crate) scan_limits: WorkspaceScanLimits,
     pub(crate) preferred_localisation_languages: Arc<[String]>,
     pub(crate) completion_source_layers: Arc<[SourceRootKind]>,
+    pub(crate) texture_catalog: Arc<crate::texture::TextureCatalog>,
 }
 
 impl AnalysisSnapshot {
@@ -67,6 +68,18 @@ impl AnalysisSnapshot {
     #[must_use]
     pub fn source_roots(&self) -> &[SourceRoot] {
         &self.roots
+    }
+
+    /// Returns the workspace asset catalog backing `texture_path` matchers.
+    #[must_use]
+    pub fn texture_catalog(&self) -> &crate::texture::TextureCatalog {
+        &self.texture_catalog
+    }
+
+    /// Resolves one raw `.gfx` asset-path value against the workspace catalog.
+    #[must_use]
+    pub fn resolve_texture_path(&self, raw: &str) -> Option<crate::texture::TextureResolution> {
+        self.texture_catalog.resolve(&self.roots, raw)
     }
 
     /// Returns the explicit workspace root, if configured.

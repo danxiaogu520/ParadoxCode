@@ -412,7 +412,9 @@ export class MissionPreviewPanel {
     /** Fonts are large payloads: post them once per store generation and panel. */
     private static postedFonts: { panel: vscode.WebviewPanel; key: string } | undefined;
 
-    private static store(): GameAssetStore {
+    /** Builds the shared client-side asset store, rebuilt when its source
+     * directories change. Shared with the hover texture preview middleware. */
+    public static store(): GameAssetStore {
         const config = vscode.workspace.getConfiguration('paradoxcode');
         const gameDirectory = findGameDirectory(config.get<string>('gameDirectory', '')) ?? '';
         const gameFonts = config.get<boolean>('preview.gameFonts', true);
@@ -421,9 +423,25 @@ export class MissionPreviewPanel {
         const chineseFontDirectory = gameFonts
             ? findChineseFontMod(gameDirectory || undefined, config.get<string>('preview.chineseFontMod', ''))
             : undefined;
-        const key = `${gameDirectory}\0${chineseFontDirectory ?? ''}`;
+        // The mod side of the texture lookup: an explicit mod directory,
+        // else the workspace folders — the same roots the server treats as
+        // the Current Mod source root.
+        const modRoots: string[] = [];
+        const modDirectory = config.get<string>('modDirectory', '');
+        if (modDirectory.trim() !== '') {
+            modRoots.push(modDirectory);
+        }
+        for (const folder of vscode.workspace.workspaceFolders ?? []) {
+            modRoots.push(folder.uri.fsPath);
+        }
+        const uniqueModRoots = [...new Set(modRoots)];
+        const key = `${gameDirectory}\0${chineseFontDirectory ?? ''}\0${uniqueModRoots.join('\0')}`;
         if (!MissionPreviewPanel.assetStore || MissionPreviewPanel.assetStoreKey !== key) {
-            MissionPreviewPanel.assetStore = new GameAssetStore(gameDirectory || undefined, chineseFontDirectory);
+            MissionPreviewPanel.assetStore = new GameAssetStore(
+                gameDirectory || undefined,
+                chineseFontDirectory,
+                uniqueModRoots,
+            );
             MissionPreviewPanel.assetStoreKey = key;
         }
         return MissionPreviewPanel.assetStore;

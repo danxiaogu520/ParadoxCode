@@ -1528,3 +1528,58 @@ fn semantic_hover_infers_modifier_kind_from_workspace_membership() {
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn texturefile_value_hover_reports_resolution_provenance() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ide-texture-hover-{nonce}"));
+    std::fs::create_dir_all(root.join("interface")).expect("interface directory");
+    std::fs::create_dir_all(root.join("gfx/interface")).expect("gfx directory");
+    std::fs::write(root.join("gfx/interface/health.dds"), b"").expect("texture");
+    let text = "spriteTypes = {\n\tspriteType = {\n\t\tname = \"GFX_test\"\n\t\ttexturefile = \"gfx/interface/health.tga\"\n\t}\n\tspriteType = {\n\t\tname = \"GFX_gone\"\n\t\ttexturefile = \"gfx/interface/gone.dds\"\n\t}\n}\n";
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().expect("scan texture root");
+    let id = DocumentId::new("file:///interface/test.gfx");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&root.join("interface/test.gfx"))),
+    )
+    .expect("open gfx document");
+    let snapshot = host.snapshot();
+
+    let drift = u32::try_from(text.find("health.tga").expect("drift value")).expect("offset");
+    let drift_hover = hover(&snapshot, &id, drift).expect("texture hover");
+    assert!(
+        drift_hover.contents.contains("- resolved: "),
+        "{drift_hover:?}"
+    );
+    assert!(
+        drift_hover.contents.contains("extension fallback"),
+        "drift resolution notes the engine fallback: {drift_hover:?}"
+    );
+    assert!(
+        drift_hover.contents.contains("the current mod"),
+        "resolution names the providing root: {drift_hover:?}"
+    );
+
+    let missing = u32::try_from(text.find("gone.dds").expect("missing value")).expect("offset");
+    let missing_hover = hover(&snapshot, &id, missing).expect("texture hover");
+    assert!(
+        missing_hover
+            .contents
+            .contains("not found in any mod, game, or DLC pack root"),
+        "{missing_hover:?}"
+    );
+
+    std::fs::remove_dir_all(root).expect("cleanup");
+}

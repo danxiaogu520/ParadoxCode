@@ -826,6 +826,7 @@ fn is_completion_constraint(matcher: &ValueMatcher) -> bool {
             | ValueMatcher::Date
             | ValueMatcher::DynamicSet(_)
             | ValueMatcher::Filepath
+            | ValueMatcher::TexturePath
             | ValueMatcher::Opaque(_)
     )
 }

@@ -324,6 +324,10 @@ pub enum ValueMatcher {
     Localisation,
     /// Accepts a path-like scalar.
     Filepath,
+    /// Accepts a game-relative asset path (`.gfx` texture and effect references).
+    /// The generic matcher only checks the scalar shape; existence is resolved
+    /// against the workspace texture catalog by the analysis layer.
+    TexturePath,
     /// Accepts a workspace- or scope-derived value set.
     Dynamic(String),
     /// Accepts any non-empty value while defining a dynamic value set.
@@ -386,7 +390,9 @@ impl ValueMatcher {
             }
             // The game falls back to rendering the raw spelling, so an empty string is valid.
             Self::Localisation => true,
-            Self::Filepath | Self::Dynamic(_) | Self::DynamicSet(_) => !value.is_empty(),
+            Self::Filepath | Self::TexturePath | Self::Dynamic(_) | Self::DynamicSet(_) => {
+                !value.is_empty()
+            }
         }
     }
 }

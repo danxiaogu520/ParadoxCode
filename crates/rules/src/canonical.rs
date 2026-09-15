@@ -444,6 +444,7 @@ fn put_semantic_value(bytes: &mut Vec<u8>, matcher: &ValueMatcher) {
         }
         ValueMatcher::Localisation => put_str(bytes, "localisation"),
         ValueMatcher::Filepath => put_str(bytes, "filepath"),
+        ValueMatcher::TexturePath => put_str(bytes, "texture-path"),
         ValueMatcher::Dynamic(value) => {
             put_str(bytes, "dynamic");
             put_str(bytes, value);

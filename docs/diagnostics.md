@@ -52,6 +52,20 @@ states the constraint (for example `a whole number between 0 and 255` or
 exactly one accepted value is close. Usage of a declaration the game data
 marks deprecated renders with strikethrough.
 
+## UnknownTexturePath
+
+A `texturefile`/`texturefile1`–`3`, `alphamaskfile`, `effectfile`, or mesh
+`file` value in a `.gfx` file does not resolve to any existing texture.
+Resolution mirrors the engine: the spelling is normalized (case, forward and
+back slashes, doubled separators), looked up across the workspace mod, the
+game installation, and DLC pack directories pack-relative, then falls back
+between the `.tga` and `.dds` spellings, and finally probes the game root
+directly — so stale-but-working references stay silent and only truly
+dangling paths are flagged. A did-you-mean correction suggests a sibling
+file from the same directory when one is close. The sprite renders as
+nothing in game, so the finding is an error; it can be muted per code with
+`paradoxcode.diagnosticIgnoreCodes`.
+
 ## Cardinality
 
 A required key or list entry is missing, or a key/list appears more often
