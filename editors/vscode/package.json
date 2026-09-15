@@ -987,10 +987,10 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "check": "npm run compile && node scripts/smoke.mjs",
-    "test:ci": "npm run compile && node scripts/smoke.mjs && node scripts/transcode.mjs && node scripts/extension.mjs && node scripts/package.mjs && npm run test:package",
+    "check": "npm run compile && node scripts/smoke.mjs && node scripts/assets-test.mjs",
+    "test:ci": "npm run compile && node scripts/smoke.mjs && node scripts/assets-test.mjs && node scripts/transcode.mjs && node scripts/extension.mjs && node scripts/package.mjs && npm run test:package",
     "vscode:prepublish": "npm run compile",
-    "test:contract": "npm run compile && node scripts/transcode.mjs && node scripts/extension.mjs && node scripts/package.mjs",
+    "test:contract": "npm run compile && node scripts/assets-test.mjs && node scripts/transcode.mjs && node scripts/extension.mjs && node scripts/package.mjs",
     "test:package": "vsce package --out ../../target/paradoxcode-vscode-contract.vsix",
     "test:host": "npm run compile && node scripts/host.mjs",
     "diagnose": "node scripts/diagnose.mjs",
