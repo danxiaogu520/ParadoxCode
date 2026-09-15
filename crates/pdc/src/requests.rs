@@ -328,10 +328,6 @@ impl SnapshotRequestContext {
                 let tree = &file.trees[pos.tree_index];
                 let mission = &tree.missions[pos.mission_index];
                 let (x, y) = geometry::world_position(pos);
-                let is_root = mission
-                    .required
-                    .iter()
-                    .all(|required| !in_file.contains(required.as_str()));
                 // The game renders `{mission_id}_title`; resolve it through the
                 // active workspace localisation definition so mod overrides and
                 // Vanilla keys both work. The raw id remains as the fallback.
@@ -365,7 +361,6 @@ impl SnapshotRequestContext {
                     "x": x,
                     "y": y,
                     "sourceRange": source_range,
-                    "isRoot": is_root,
                     "hasError": error_missions.contains(mission.id.as_str()),
                     "hasWarning": warning_missions.contains(mission.id.as_str()),
                 })

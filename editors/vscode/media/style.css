@@ -93,7 +93,6 @@ summary:focus-visible {
     border: 1px solid var(--vscode-editor-foreground);
 }
 
-.swatch.root { background: var(--vscode-testing-iconPassed, #5fd58a); }
 .swatch.warning { background: var(--vscode-editorWarning-foreground, #d9a13b); }
 .swatch.error { background: var(--vscode-editorError-foreground, #d55c5c); }
 .swatch.selected { background: var(--vscode-focusBorder, #4d7cfe); }
@@ -127,7 +126,6 @@ summary:focus-visible {
 
 .node-entry.error { border-left: 3px solid var(--vscode-editorError-foreground, #d55c5c); }
 .node-entry.warning { border-left: 3px solid var(--vscode-editorWarning-foreground, #d9a13b); }
-.node-entry.root { border-left: 3px solid var(--vscode-testing-iconPassed, #5fd58a); }
 
 .tooltip {
     position: fixed;

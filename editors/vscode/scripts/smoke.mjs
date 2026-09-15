@@ -201,7 +201,7 @@ if (!preview) {
   if (!a1) {
     fail('node a1 missing');
   } else {
-    for (const field of ['x', 'y', 'sourceRange', 'isRoot', 'hasError', 'hasWarning', 'icon', 'titleKey']) {
+    for (const field of ['x', 'y', 'sourceRange', 'hasError', 'hasWarning', 'icon', 'titleKey']) {
       if (!(field in a1)) {
         fail(`node a1 missing field ${field}`);
       }

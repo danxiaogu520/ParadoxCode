@@ -22,7 +22,6 @@ export interface MissionNode {
     y: number;
     /** UTF-16 LSP range supplied by pdc. */
     sourceRange: SourceRange | null;
-    isRoot: boolean;
     hasError: boolean;
     hasWarning: boolean;
 }
@@ -81,7 +80,6 @@ type OutboundMessage =
         type: 'options';
         zoomSensitivity: number;
         showTextures: boolean;
-        persistViewport: boolean;
         showExternalPrerequisites: boolean;
         showDiagnostics: boolean;
     };
@@ -89,10 +87,7 @@ type OutboundMessage =
 /** Webview messages received from the renderer. */
 type InboundMessage =
     | { type: 'jump'; uri: string; range: SourceRange | null }
-    | { type: 'openGroup'; uri: string; range: SourceRange | null }
-    | { type: 'exportPng'; dataUri: string }
-    | { type: 'exportJson'; json: string }
-    | { type: 'exportSvg'; svg: string };
+    | { type: 'openGroup'; uri: string; range: SourceRange | null };
 
 function isEu4Document(document: vscode.TextDocument): boolean {
     return document.languageId === EU4_LANGUAGE_ID;
@@ -319,15 +314,6 @@ export class MissionPreviewPanel {
                 case 'openGroup':
                     void MissionPreviewPanel.jump(message.uri, message.range);
                     return;
-                case 'exportPng':
-                    void MissionPreviewPanel.exportPng(message.dataUri);
-                    return;
-                case 'exportJson':
-                    void MissionPreviewPanel.exportJson(message.json);
-                    return;
-                case 'exportSvg':
-                    void MissionPreviewPanel.exportSvg(message.svg);
-                    return;
             }
         });
 
@@ -419,22 +405,9 @@ export class MissionPreviewPanel {
             type: 'options',
             zoomSensitivity: config.get<number>('zoomSensitivity', 1),
             showTextures: config.get<boolean>('showTextures', true),
-            persistViewport: config.get<boolean>('persistViewport', false),
             showExternalPrerequisites: config.get<boolean>('showExternalPrerequisites', true),
             showDiagnostics: config.get<boolean>('showDiagnostics', true),
         });
-    }
-
-    private static defaultExportUri(filename: string): vscode.Uri {
-        const config = vscode.workspace.getConfiguration('paradoxcode.preview');
-        const configured = config.get<string>('defaultExportDirectory', '').trim();
-        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
-        const directory = configured
-            ? path.isAbsolute(configured)
-                ? configured
-                : path.join(workspaceRoot, configured)
-            : workspaceRoot;
-        return vscode.Uri.file(path.join(directory, filename));
     }
 
     private static async jump(
@@ -475,47 +448,6 @@ export class MissionPreviewPanel {
         );
         editor.selection = new vscode.Selection(range.start, range.end);
         editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
-    }
-
-    private static async exportPng(dataUri: string): Promise<void> {
-        const match = /^data:image\/png;base64,(.+)$/s.exec(dataUri);
-        if (!match) {
-            void vscode.window.showErrorMessage('ParadoxCode: the preview did not return a PNG image.');
-            return;
-        }
-        const target = await vscode.window.showSaveDialog({
-            saveLabel: 'Export Mission Tree PNG',
-            filters: { 'PNG image': ['png'] },
-            defaultUri: MissionPreviewPanel.defaultExportUri('mission-tree.png'),
-        });
-        if (!target) {
-            return;
-        }
-        await vscode.workspace.fs.writeFile(target, Buffer.from(match[1], 'base64'));
-    }
-
-    private static async exportJson(json: string): Promise<void> {
-        const target = await vscode.window.showSaveDialog({
-            saveLabel: 'Export Mission Tree JSON',
-            filters: { JSON: ['json'] },
-            defaultUri: MissionPreviewPanel.defaultExportUri('mission-tree.json'),
-        });
-        if (!target) {
-            return;
-        }
-        await vscode.workspace.fs.writeFile(target, Buffer.from(json, 'utf8'));
-    }
-
-    private static async exportSvg(svg: string): Promise<void> {
-        const target = await vscode.window.showSaveDialog({
-            saveLabel: 'Export Mission Tree SVG',
-            filters: { 'SVG image': ['svg'] },
-            defaultUri: MissionPreviewPanel.defaultExportUri('mission-tree.svg'),
-        });
-        if (!target) {
-            return;
-        }
-        await vscode.workspace.fs.writeFile(target, Buffer.from(svg, 'utf8'));
     }
 
     private static html(webview: vscode.Webview, extensionUri: vscode.Uri): string {

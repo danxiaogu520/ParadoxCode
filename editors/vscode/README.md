@@ -45,7 +45,8 @@ Clients that send only the deprecated `rootUri` field are not supported.
 
 Open a mission file under `common/missions` or `missions`, then choose **Open Mission Tree Preview
 to the Side**. The preview supports live refresh, source navigation, texture-backed nodes, keyboard
-navigation, zoom controls, a mission list, and PNG/JSON export.
+navigation, zoom controls, and a mission list. The view keeps its pan and zoom across refreshes,
+fitting only when a different mission file is opened.
 
 ## Transparent Localisation (Chinese)
 
@@ -110,7 +111,5 @@ on the next server restart; preview settings take effect immediately.
 | `paradoxcode.preview.refreshMode` | `"always"` | Preview refresh timing: `always`, `onSave`, or `manual`. |
 | `paradoxcode.preview.zoomSensitivity` | `1` | Wheel zoom multiplier. |
 | `paradoxcode.preview.showTextures` | `true` | Use EU4 textures when available. |
-| `paradoxcode.preview.persistViewport` | `false` | Remember pan and zoom per mission document. |
 | `paradoxcode.preview.showExternalPrerequisites` | `true` | Show prerequisite missions outside the current file. |
 | `paradoxcode.preview.showDiagnostics` | `true` | Show preview diagnostic counts, badges, and list entries. |
-| `paradoxcode.preview.defaultExportDirectory` | `""` | Default export directory; relative paths use the workspace root. |

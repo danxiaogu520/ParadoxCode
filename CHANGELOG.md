@@ -38,6 +38,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   watched-file pipeline and clean open-document reloads pick the rewrites up, so no host commit
   is involved and `$/cancelRequest` plus shutdown drain both stop the walk.
 
+### Changed
+
+- The Mission Tree Preview keeps its pan and zoom across payload refreshes: editing the mission
+  file (or a manual refresh) no longer snaps the view back to the fitted default, which was the
+  default `persistViewport: false` behavior refitting on every debounced update. The view now fits
+  only on first load, when a different mission file becomes active (each document remembers its
+  own viewport for the lifetime of the panel), and on explicit Fit (button, `F`, or double-click).
+  The `paradoxcode.preview.persistViewport` setting is retired — session viewport retention is now
+  unconditional and needs no configuration.
+- Mission Preview interaction: pressing on a mission node and dragging now pans the view (any
+  press point pans once the pointer moves more than 3 px), and a press released without movement
+  is the jump-to-source gesture, removing the accidental jumps from pressing a node to start a
+  drag. Keyboard `+`/`-` and the toolbar zoom buttons now zoom around the current view center
+  instead of the canvas top-left corner.
+
+### Removed
+
+- Mission Tree Preview PNG/SVG/JSON export (toolbar buttons, handlers, and the
+  `paradoxcode.preview.defaultExportDirectory` setting). The PNG export captured only the current
+  viewport, the SVG export was a texture-less schematic, and the JSON export was a raw wire dump.
+- The root-mission green highlight (border, fallback fill, legend entry, and mission-list marker)
+  and the `isRoot` field on the `pdc/missionPreview` node payload.
+
 ### Fixed
 
 - Editing a document that calls scripted triggers/effects no longer sends the server into an

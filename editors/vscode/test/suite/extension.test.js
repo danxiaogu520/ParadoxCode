@@ -102,10 +102,8 @@ suite('ParadoxCode VS Code extension host', () => {
       assert.equal(config.get('server.installPolicy'), 'auto');
       assert.equal(config.get('vanilla.mode'), 'auto');
       assert.equal(config.get('preview.refreshMode'), 'always');
-      assert.equal(config.get('preview.persistViewport'), false);
       assert.equal(config.get('preview.showExternalPrerequisites'), true);
       assert.equal(config.get('preview.showDiagnostics'), true);
-      assert.equal(config.get('preview.defaultExportDirectory'), '');
       assert.deepEqual(config.get('diagnostics.severityOverrides'), {});
       assert.deepEqual(config.get('localisation.preferredLanguages'), []);
       assert.equal(config.get('localisation.autoOpenDecoded'), true);
