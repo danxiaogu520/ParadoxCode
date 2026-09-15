@@ -26,7 +26,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `paradoxcode.debug.logFile` mirrors the debug channel to an append-only file, and a headless
   `PDC_TRACE=<path>` environment variable (optional `PDC_TRACE_FULL=1` for truncated params)
   writes per-frame lines with request round-trip times from the transport's two framing
-  choke points for repro-driver sessions.
+  choke points for repro-driver sessions. The decision stream now also covers the per-document
+  edit-diagnostics lifecycle — the exact path the 0.3.5 single-core burn lived in and the one
+  class of worker it previously could not see: every round is traced from `started` through its
+  outcome (`published <file> v<n> (<k> diagnostic(s))`, `suppressed … (batch identical to last
+  publish)` for the deduped-identical case, `discarded … (stale version)`, `aborted … (cancelled
+  or panicked)`), and superseding a still-running round emits `superseded …; cancelled in flight`
+  once (not per loop iteration). Without verbose trace none of these lines are evaluated past the
+  gating string compare.
 - New `pdc/formatWorkspace` command (VSCode: "ParadoxCode: Format Workspace Scripts") formats
   every Current Mod script file in one pass on a bounded worker pool, writing canonical text
   straight to disk. Each file is re-read from disk and must pass the formatter's full safety

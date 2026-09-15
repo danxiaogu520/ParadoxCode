@@ -17,7 +17,10 @@ fn stale_diagnostics_do_not_replace_newer_results() {
         .host
         .open_document(id.clone(), 1, "key = value".to_owned(), None)
         .expect("open should succeed");
-    assert!(server.commit_diagnostics(uri, 1, json!([{"message":"old"}])));
+    assert_eq!(
+        server.commit_diagnostics(uri, 1, json!([{"message":"old"}])),
+        DiagnosticsCommit::Published
+    );
     server
         .host
         .apply_document_changes(
@@ -29,15 +32,28 @@ fn stale_diagnostics_do_not_replace_newer_results() {
             )],
         )
         .expect("change should succeed");
-    assert!(!server.commit_diagnostics(uri, 1, json!([{"message":"stale"}])));
+    assert_eq!(
+        server.commit_diagnostics(uri, 1, json!([{"message":"stale"}])),
+        DiagnosticsCommit::StaleVersion
+    );
     assert_eq!(
         server.diagnostics(uri).expect("old result remains")[0]["message"],
         "old"
     );
-    assert!(server.commit_diagnostics(uri, 2, json!([{"message":"new"}])));
+    assert_eq!(
+        server.commit_diagnostics(uri, 2, json!([{"message":"new"}])),
+        DiagnosticsCommit::Published
+    );
     assert_eq!(
         server.diagnostics(uri).expect("new result accepted")[0]["message"],
         "new"
+    );
+    // Re-committing a fresh version with a byte-identical batch is suppressed, not
+    // stale: the round completed legitimately and must be distinguishable in the
+    // decision trace from a result the freshness gate dropped.
+    assert_eq!(
+        server.commit_diagnostics(uri, 2, json!([{"message":"new"}])),
+        DiagnosticsCommit::SuppressedIdentical
     );
 }
 
