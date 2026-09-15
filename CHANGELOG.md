@@ -14,8 +14,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and the `zh-hans-16` DXT5 atlas for Chinese — with kerning, per-character CJK wrapping, and
   per-glyph colour tinting; font choice follows content, not the `l_english` headers Chinese
   replace files carry. The 14 `§` codes nest and pop like in game (`§!` restores the enclosing
-  colour); G/R/Y use the vanilla `core.gfx` ground truth while the other eleven ship as
-  approximations pending screenshot calibration. Search, tooltips, and aria labels all match
+  colour); every value is game ground truth from vanilla `interface/core.gfx` — the global
+  `textcolors` block plus the `vic_18` bitmapfont's own G/R/Y overrides, identical in the Chinese
+  font mods. Search, tooltips, and aria labels all match
   against the same `§`-stripped plain text. Two settings control it:
   `paradoxcode.preview.gameFonts` (default on) and `paradoxcode.preview.chineseFontMod` (explicit
   mod folder override; empty auto-discovers the newest matching Steam Workshop mod of the located
