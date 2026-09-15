@@ -152,13 +152,12 @@ fn mission_preview_returns_renderer_ready_tree_data() {
         format!("{root_uri}/missions/test.txt")
     );
     assert_eq!(response["result"]["documentVersion"], 7);
-    // Without a game installation the texture table is empty but present, and
-    // every node/arrow still carries its sprite identity for textured runs.
+    // Pixel payloads are owned by the editor now: the preview response must
+    // stay text-only while every node/arrow still carries its sprite identity
+    // for the client-side textured run.
     assert!(
-        response["result"]["textures"]
-            .as_object()
-            .is_some_and(|map| map.is_empty()),
-        "textures must be an empty object without a game directory"
+        response["result"].get("textures").is_none(),
+        "the preview payload must not carry pixel data"
     );
     let arrows = response["result"]["arrows"].as_array().expect("arrows");
     assert!(

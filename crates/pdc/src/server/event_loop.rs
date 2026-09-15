@@ -472,8 +472,7 @@ impl LspServer {
                                     self.host = prepared.host;
                                     self.invalidate_all_semantic_tokens();
                                     self.state = ServerState::Initialized;
-                                    self.textures = prepared.textures;
-                                    self.watcher_registration = prepared.watcher_registration;
+                                                self.watcher_registration = prepared.watcher_registration;
                                     self.client_work_done_progress =
                                         prepared.client_work_done_progress;
                                     self.client_snippet_support = prepared.client_snippet_support;

@@ -21,15 +21,14 @@ pub mod geometry;
 pub mod graph;
 pub mod load;
 pub mod model;
-pub mod texture;
 pub mod validate;
 pub mod write;
 
 pub use edit::{BlockField, EditError, TreeBlockField};
 pub use encoding::{EncodingError, FileEncoding, decode_bytes, encode_text};
 pub use geometry::{
-    ArrowGlyph, ArrowSegment, NodePosition, arrow_geometry, layout_file, world_position,
-    world_position_at,
+    ArrowGlyph, ArrowSegment, NodePosition, arrow_geometry, arrow_sprite_name, layout_file,
+    world_position, world_position_at,
 };
 pub use graph::{
     CreateError, CreateTarget, GroupTarget, MissionLoc, SpatialViolation, creation_target,
@@ -37,9 +36,6 @@ pub use graph::{
 };
 pub use load::{LoadedFile, parse_file};
 pub use model::{Block, Mission, MissionFile, MissionTree, RawField};
-pub use texture::{
-    FRAME_SPRITE, TextureAssets, arrow_sprite_name, decode_dds, parse_gfx_sprites, png_data_url,
-};
 pub use validate::{Diagnostic, Severity, validate, validate_in, validate_with_universe_ids};
 pub use write::{
     BlockSpacing, Indent, WriteStyle, apply_tree_edit, detect_style, render_mission_block,

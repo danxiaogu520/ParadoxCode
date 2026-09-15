@@ -263,9 +263,10 @@ if (!preview) {
       fail(`arrow ${arrow?.glyph} must name its endpoint series (tree/from)`);
     }
   }
-  // Without a configured game directory the texture table is empty but present.
-  if (!result.textures || typeof result.textures !== 'object') {
-    fail('result.textures must be an object');
+  // The preview payload is pure text — pixel data ships through the
+  // client-side asset pipeline, so the wire must not carry a textures table.
+  if (result.textures !== undefined) {
+    fail('result.textures must be absent from the missionPreview payload');
   }
   if (result.groups.length !== 2) {
     fail(`expected 2 groups, got ${result.groups.length}`);

@@ -25,6 +25,23 @@ pub const GAP_Y: f32 = 30.0;
 /// EMT origin).
 pub const ORIGIN: (f32, f32) = (16.0, 56.0);
 
+/// The interface sprite each arrow glyph is drawn with (`arrow_*.gfx`
+/// entries). The renderer resolves the names to pixels on its own — the
+/// server only speaks sprite names.
+pub fn arrow_sprite_name(glyph: &str) -> Option<&'static str> {
+    Some(match glyph {
+        "verticalTile" => "gfx_arrow_verticall_tile",
+        "verticalSkipTier" => "gfx_arrow_verticall_skip_tier",
+        "horizontalSkipSlot" => "gfx_arrow_horizontal_skip_slot",
+        "leftOut" => "gfx_arrow_left_out",
+        "leftIn" => "gfx_arrow_left_in",
+        "rightOut" => "gfx_arrow_right_out",
+        "rightIn" => "gfx_arrow_right_in",
+        "end" => "gfx_arrow_end",
+        _ => return None,
+    })
+}
+
 /// Grid position of one mission.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NodePosition {
@@ -234,6 +251,26 @@ pub fn arrow_geometry(file: &MissionFile, layout: &[NodePosition]) -> Vec<ArrowS
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn arrow_sprite_names_cover_every_glyph() {
+        for glyph in [
+            "verticalTile",
+            "verticalSkipTier",
+            "horizontalSkipSlot",
+            "leftOut",
+            "leftIn",
+            "rightOut",
+            "rightIn",
+            "end",
+        ] {
+            assert!(
+                super::arrow_sprite_name(glyph).is_some(),
+                "glyph {glyph} must map to a texture"
+            );
+        }
+        assert_eq!(super::arrow_sprite_name("bogus"), None);
+    }
+
     use super::*;
     use crate::eu4::mission::model::{Mission, MissionTree};
     use crate::eu4::mission::parse_file;

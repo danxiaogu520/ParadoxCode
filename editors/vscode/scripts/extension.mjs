@@ -429,6 +429,8 @@ for (const marker of [
   'requestAnimationFrame',
   'replaceChildren',
   'worldRectVisible',
+  'setAssets',
+  'textureUrls',
 ]) {
   if (!rendererSource.includes(marker)) {
     fail(`Preview UX marker missing: ${marker}`);
