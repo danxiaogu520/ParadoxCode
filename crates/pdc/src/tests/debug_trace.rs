@@ -145,3 +145,60 @@ fn settrace_without_value_keeps_previous_level() {
         "malformed setTrace must not enable tracing: {responses:?}"
     );
 }
+
+#[test]
+fn document_diagnostics_lifecycle_is_traced() {
+    let (dir, root_uri) = temp_workspace_dir();
+    let _ = dir;
+    let uri = format!("{root_uri}/events/lifecycle.txt");
+    let script: Vec<Value> = vec![
+        json!({"jsonrpc": "2.0", "method": "initialized", "params": {}}),
+        json!({"jsonrpc": "2.0", "method": "$/setTrace", "params": {"value": "verbose"}}),
+        json!({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {
+            "textDocument": {
+                "uri": uri,
+                "languageId": "eu4",
+                "version": 1,
+                "text": "scope = nowhere\n",
+            }
+        }}),
+    ];
+    let input = frames(
+        std::iter::once(json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "workspaceFolders": [{"uri": root_uri, "name": "test"}],
+                "capabilities": {},
+            }
+        }))
+        .chain(script)
+        .chain([
+            json!({"jsonrpc": "2.0", "id": 2, "method": "shutdown", "params": {}}),
+            json!({"jsonrpc": "2.0", "method": "exit"}),
+        ]),
+    );
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("server");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+
+    // The per-document round must be visible from spawn to publication: the
+    // 0.3.5 burn was invisible precisely because this lifecycle had no lines.
+    let traces = trace_messages(&responses);
+    assert!(
+        traces
+            .iter()
+            .any(|message| message.contains("document diagnostics started lifecycle.txt v1")),
+        "expected a started decision trace, got {traces:?}"
+    );
+    assert!(
+        traces
+            .iter()
+            .any(|message| message.contains("document diagnostics published lifecycle.txt v1")),
+        "expected a published decision trace, got {traces:?}"
+    );
+}

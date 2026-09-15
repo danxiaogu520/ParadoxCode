@@ -188,6 +188,27 @@ struct PendingDiagnostics {
     due: Instant,
 }
 
+/// Outcome of committing one per-document diagnostics batch.
+///
+/// Callers need the distinction for the decision trace: a suppressed batch means the round
+/// completed fine, while a stale version means the document moved on mid-flight — the two look
+/// identical from the outside (no `publishDiagnostics` either way).
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum DiagnosticsCommit {
+    /// Fresh version with changed content; the caller must publish the batch.
+    Published,
+    /// Fresh version but byte-identical to the last published batch; suppressed.
+    SuppressedIdentical,
+    /// The open document has moved to a newer version; the batch is stale.
+    StaleVersion,
+}
+
+/// Last non-empty path segment of a document URI, for per-document decision-trace
+/// lines where a full URI would drown everything else in the verbose stream.
+fn uri_tail(uri: &str) -> &str {
+    uri.rsplit('/').find(|part| !part.is_empty()).unwrap_or(uri)
+}
+
 #[derive(Debug)]
 struct PendingParse {
     version: i64,
@@ -812,7 +833,12 @@ impl LspServer {
     ///
     /// Phase 2 has no syntax analyzer yet, but this freshness gate is the boundary used by later
     /// background diagnostics workers. A stale result is discarded without changing the store.
-    pub fn commit_diagnostics(&mut self, uri: &str, version: i64, diagnostics: Value) -> bool {
+    pub(crate) fn commit_diagnostics(
+        &mut self,
+        uri: &str,
+        version: i64,
+        diagnostics: Value,
+    ) -> DiagnosticsCommit {
         let id = DocumentId::new(uri);
         let snapshot = self.host.snapshot();
         let current = snapshot.document(&id);
@@ -827,12 +853,12 @@ impl LspServer {
                 .get(&id)
                 .is_some_and(|published| *published == diagnostics)
             {
-                return false;
+                return DiagnosticsCommit::SuppressedIdentical;
             }
             self.diagnostics.insert(id, diagnostics);
-            true
+            DiagnosticsCommit::Published
         } else {
-            false
+            DiagnosticsCommit::StaleVersion
         }
     }
 

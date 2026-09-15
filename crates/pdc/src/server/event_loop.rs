@@ -21,7 +21,11 @@ fn message_id_label(message: &Value) -> String {
 impl LspServer {
     /// Emits one `pdc/trace` scheduling-decision notification while the client
     /// asked for verbose tracing; a single string compare otherwise.
-    fn trace_decision<W: Write>(&self, output: &mut W, message: String) -> Result<(), LspError> {
+    pub(super) fn trace_decision<W: Write>(
+        &self,
+        output: &mut W,
+        message: String,
+    ) -> Result<(), LspError> {
         if self.client_trace == "verbose" {
             write_message(
                 output,
@@ -96,13 +100,14 @@ impl LspServer {
                 self.spawn_pending_scan(scope, &event_sender, &mut in_flight_scan, &mut output)?;
                 self.cancel_stale_parses(&in_flight_parses);
                 self.spawn_pending_parses(scope, &event_sender, &mut in_flight_parses);
-                self.cancel_stale_diagnostics(&in_flight);
+                self.cancel_stale_diagnostics(&in_flight, &mut output)?;
                 self.spawn_due_diagnostics(
                     scope,
                     &event_sender,
                     &mut in_flight,
                     self.state == ServerState::ShuttingDown,
-                );
+                    &mut output,
+                )?;
                 let mut background_busy = !self.pending_parses.is_empty()
                     || !in_flight_parses.is_empty()
                     || !self.pending_diagnostics.is_empty()
@@ -392,7 +397,7 @@ impl LspServer {
                             }
                         }
                         self.cancel_stale_parses(&in_flight_parses);
-                        self.cancel_stale_diagnostics(&in_flight);
+                        self.cancel_stale_diagnostics(&in_flight, &mut output)?;
                         if self.state == ServerState::Exited {
                             for task in in_flight_parses.values() {
                                 task.cancelled.store(true, Ordering::Release);
@@ -437,7 +442,13 @@ impl LspServer {
                             };
                         }
                         if self.state == ServerState::ShuttingDown {
-                            self.spawn_due_diagnostics(scope, &event_sender, &mut in_flight, true);
+                            self.spawn_due_diagnostics(
+                                scope,
+                                &event_sender,
+                                &mut in_flight,
+                                true,
+                                &mut output,
+                            )?;
                         }
                     }
                     TransportEvent::Initialize(result) => {
@@ -615,9 +626,51 @@ impl LspServer {
                         {
                             in_flight.remove(&result.id);
                         }
-                        if let Some(values) = result.values
-                            && self.commit_diagnostics(&result.uri, result.version, values.clone())
-                        {
+                        let tail = uri_tail(&result.uri);
+                        let (decision, publish) = match result.values {
+                            Some(values) => {
+                                let findings = values.as_array().map_or(0, Vec::len);
+                                match self.commit_diagnostics(
+                                    &result.uri,
+                                    result.version,
+                                    values.clone(),
+                                ) {
+                                    DiagnosticsCommit::Published => (
+                                        format!(
+                                            "published {tail} v{} ({findings} diagnostic(s))",
+                                            result.version
+                                        ),
+                                        Some(values),
+                                    ),
+                                    DiagnosticsCommit::SuppressedIdentical => (
+                                        format!(
+                                            "suppressed {tail} v{} (batch identical to last publish)",
+                                            result.version
+                                        ),
+                                        None,
+                                    ),
+                                    DiagnosticsCommit::StaleVersion => (
+                                        format!(
+                                            "discarded {tail} v{} (stale version)",
+                                            result.version
+                                        ),
+                                        None,
+                                    ),
+                                }
+                            }
+                            None => (
+                                format!(
+                                    "aborted {tail} v{} (cancelled or panicked)",
+                                    result.version
+                                ),
+                                None,
+                            ),
+                        };
+                        self.trace_decision(
+                            &mut output,
+                            format!("document diagnostics {decision}"),
+                        )?;
+                        if let Some(values) = publish {
                             write_message(
                                 &mut output,
                                 &diagnostics_notification(

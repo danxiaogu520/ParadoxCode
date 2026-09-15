@@ -85,7 +85,9 @@ pub(crate) use protocol::{
 #[cfg(test)]
 pub(crate) use requests::{bounded_results, strip_snippet_placeholders};
 #[cfg(test)]
-pub(crate) use server::{InFlightInitialize, InFlightRequest, IndexSetupCancellation};
+pub(crate) use server::{
+    DiagnosticsCommit, InFlightInitialize, InFlightRequest, IndexSetupCancellation,
+};
 #[cfg(test)]
 pub(crate) use text::changed_document_len;
 #[cfg(test)]

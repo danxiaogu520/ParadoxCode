@@ -1355,10 +1355,11 @@ impl LspServer {
         );
     }
 
-    pub(super) fn cancel_stale_diagnostics(
+    pub(super) fn cancel_stale_diagnostics<W: Write>(
         &self,
         in_flight: &BTreeMap<DocumentId, InFlightDiagnostics>,
-    ) {
+        output: &mut W,
+    ) -> Result<(), LspError> {
         let snapshot = self.host.snapshot();
         for (id, task) in in_flight {
             let current_version = snapshot
@@ -1369,9 +1370,23 @@ impl LspServer {
                 .get(id)
                 .is_some_and(|pending| pending.version != task.version);
             if current_version != Some(task.version) || superseded {
-                task.cancellation.cancel();
+                // The stale check runs every loop iteration; trace the transition
+                // only once per task or a cancelled round would spam one line per
+                // iteration until its worker thread reports back.
+                if !task.cancellation.is_cancelled() {
+                    task.cancellation.cancel();
+                    self.trace_decision(
+                        output,
+                        format!(
+                            "document diagnostics superseded {} v{}; cancelled in flight",
+                            uri_tail(id.as_str()),
+                            task.version
+                        ),
+                    )?;
+                }
             }
         }
+        Ok(())
     }
 
     pub(super) fn next_diagnostic_wait(
@@ -1386,13 +1401,14 @@ impl LspServer {
             .min()
     }
 
-    pub(super) fn spawn_due_diagnostics<'scope, 'environment>(
+    pub(super) fn spawn_due_diagnostics<'scope, 'environment, W: Write>(
         &mut self,
         scope: &'scope std::thread::Scope<'scope, 'environment>,
         event_sender: &mpsc::Sender<TransportEvent>,
         in_flight: &mut BTreeMap<DocumentId, InFlightDiagnostics>,
         force: bool,
-    ) {
+        output: &mut W,
+    ) -> Result<(), LspError> {
         let now = Instant::now();
         let ready = self
             .pending_diagnostics
@@ -1404,6 +1420,14 @@ impl LspServer {
             let Some(pending) = self.pending_diagnostics.remove(&id) else {
                 continue;
             };
+            self.trace_decision(
+                output,
+                format!(
+                    "document diagnostics started {} v{}",
+                    uri_tail(&pending.uri),
+                    pending.version
+                ),
+            )?;
             let snapshot = self.host.snapshot();
             let sender = event_sender.clone();
             let cancellation = CancellationToken::new();
@@ -1441,6 +1465,7 @@ impl LspServer {
                 }));
             });
         }
+        Ok(())
     }
 
     /// Drops CST/HIR frontends of source files once background validation
