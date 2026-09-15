@@ -7,6 +7,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- New `pdc/formatWorkspace` command (VSCode: "ParadoxCode: Format Workspace Scripts") formats
+  every Current Mod script file in one pass on a bounded worker pool, writing canonical text
+  straight to disk. Each file is re-read from disk and must pass the formatter's full safety
+  pipeline (no parse errors, token equivalence, idempotence) before it is rewritten; files that
+  are not valid UTF-8 are skipped rather than silently re-encoded, and localisation files,
+  vanilla, and dependency roots stay out of scope. The client saves all dirty editors first so
+  disk is authoritative, and a summary (formatted / unchanged / skipped / failed) is reported when
+  the pass completes. This is the first server feature that writes user source files: the
+  watched-file pipeline and clean open-document reloads pick the rewrites up, so no host commit
+  is involved and `$/cancelRequest` plus shutdown drain both stop the walk.
+
 ### Fixed
 
 - Editing a document that calls scripted triggers/effects no longer sends the server into an

@@ -625,6 +625,11 @@
         "category": "ParadoxCode"
       },
       {
+        "command": "paradoxcode.formatWorkspace",
+        "title": "%commands.formatWorkspace.title%",
+        "category": "ParadoxCode"
+      },
+      {
         "command": "paradoxcode.openOutput",
         "title": "%commands.openOutput.title%",
         "category": "ParadoxCode"

@@ -1,6 +1,7 @@
 use super::*;
 use crate::MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS;
 use crate::uri::FileUri;
+use std::fs;
 
 /// Validates every parsed Current Mod source file in a refreshed candidate and aggregates the
 /// result for the explicit `validateWorkspace` command. The source-root refresh has already
@@ -352,6 +353,176 @@ fn changed_files_validation_result(
     })
 }
 
+/// Outcome of formatting one Current Mod file during a `pdc/formatWorkspace` pass.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum WorkspaceFileFormatOutcome {
+    Formatted,
+    Unchanged,
+    /// The parser reported errors or the rewrite failed safety validation; the
+    /// file is left untouched.
+    SkippedUnsafe,
+    /// The on-disk bytes are not valid UTF-8 (legacy encoding). Rewriting the
+    /// decoded text would silently re-encode the file, so it is left untouched.
+    SkippedLegacyEncoding,
+    Failed,
+}
+
+/// Applies the formatter's non-overlapping, source-ordered edits back-to-front.
+fn apply_format_edits(source: &str, edits: &[parser::format::TextEdit]) -> String {
+    let mut text = source.to_owned();
+    for edit in edits.iter().rev() {
+        if let (Some(start), Some(end)) = (
+            usize::try_from(edit.range.start()).ok(),
+            usize::try_from(edit.range.end()).ok(),
+        ) && text.get(start..end).is_some()
+        {
+            text.replace_range(start..end, &edit.replacement);
+        }
+    }
+    text
+}
+
+/// Formats one on-disk script file in place.
+///
+/// The file is re-read from disk rather than taken from the snapshot so the
+/// rewrite always reflects the bytes the game sees. Files that are not valid
+/// UTF-8 are skipped instead of re-encoded, and the formatter's own safety
+/// pipeline (no parse errors, token equivalence, idempotence) gates every
+/// write.
+fn format_workspace_file(path: &AbsPath) -> WorkspaceFileFormatOutcome {
+    let bytes = match fs::read(path.as_path()) {
+        Ok(bytes) => bytes,
+        Err(_) => return WorkspaceFileFormatOutcome::Failed,
+    };
+    let Ok(text) = String::from_utf8(bytes) else {
+        return WorkspaceFileFormatOutcome::SkippedLegacyEncoding;
+    };
+    let parsed = parser::parse(parser::FileFormat::Script, &text);
+    let result = parser::format::format(&parsed);
+    if result.skipped.is_some() {
+        return WorkspaceFileFormatOutcome::SkippedUnsafe;
+    }
+    if result.edits.is_empty() {
+        return WorkspaceFileFormatOutcome::Unchanged;
+    }
+    let formatted = apply_format_edits(&text, &result.edits);
+    match fs::write(path.as_path(), formatted.as_bytes()) {
+        Ok(()) => WorkspaceFileFormatOutcome::Formatted,
+        Err(_) => WorkspaceFileFormatOutcome::Failed,
+    }
+}
+
+/// Formats every Current Mod script file in place and aggregates the outcome
+/// for the explicit `pdc/formatWorkspace` command. Localisation files are out
+/// of scope by design; vanilla and dependency roots are read-only reference
+/// material and never written.
+fn format_workspace_files(
+    host: &AnalysisHost,
+    scan_cancellation: &WorkspaceScanToken,
+    progress: &(dyn Fn(usize, usize) + Sync),
+) -> Result<WorkspaceFormatSummary, WorkspaceError> {
+    let snapshot = host.snapshot();
+    let mut files = snapshot
+        .source_files()
+        .values()
+        .filter(|file| {
+            snapshot
+                .source_roots()
+                .iter()
+                .any(|root| root.id == file.root_id && root.kind == SourceRootKind::CurrentMod)
+        })
+        .filter(|file| {
+            snapshot
+                .rules()
+                .classify(&file.logical_path)
+                .is_some_and(|category| category.parser == rules::ParserKind::Script)
+        })
+        .collect::<Vec<_>>();
+    files.sort_by(|left, right| {
+        left.logical_path
+            .as_str()
+            .cmp(right.logical_path.as_str())
+            .then_with(|| left.physical_path.cmp(&right.physical_path))
+    });
+
+    let mut summary = WorkspaceFormatSummary {
+        total_files: files.len(),
+        ..WorkspaceFormatSummary::default()
+    };
+    // Per-file formatting is independent disk-bound work; the bounded
+    // worker-stealing pool mirrors `workspace_validation_result` so a full-mod
+    // pass stays polite instead of saturating every core.
+    let outcomes = std::sync::Mutex::new((0..files.len()).map(|_| None).collect::<Vec<_>>());
+    let next_file = std::sync::atomic::AtomicUsize::new(0);
+    let cancelled = std::sync::atomic::AtomicBool::new(false);
+    let completed = std::sync::atomic::AtomicUsize::new(0);
+    let reported = std::sync::atomic::AtomicUsize::new(0);
+    let report_step = (files.len() / 50).max(1);
+    let worker_count = std::env::var("PDC_FORMAT_WORKERS")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(crate::DEFAULT_WORKSPACE_FORMAT_WORKERS)
+        .clamp(1, crate::MAX_WORKSPACE_FORMAT_WORKERS);
+    std::thread::scope(|scope| {
+        for _ in 0..worker_count {
+            scope.spawn(|| {
+                loop {
+                    if cancelled.load(std::sync::atomic::Ordering::Relaxed)
+                        || scan_cancellation.is_cancelled()
+                    {
+                        return;
+                    }
+                    let index = next_file.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let Some(file) = files.get(index) else {
+                        return;
+                    };
+                    let outcome = format_workspace_file(&file.physical_path);
+                    outcomes.lock().expect("format outcome lock poisoned")[index] = Some(outcome);
+                    let done = completed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                    let last = reported.load(std::sync::atomic::Ordering::Relaxed);
+                    if (done == files.len() || done.saturating_sub(last) >= report_step)
+                        && reported
+                            .compare_exchange(
+                                last,
+                                done,
+                                std::sync::atomic::Ordering::Relaxed,
+                                std::sync::atomic::Ordering::Relaxed,
+                            )
+                            .is_ok()
+                    {
+                        progress(done, files.len());
+                    }
+                }
+            });
+        }
+    });
+    if cancelled.load(std::sync::atomic::Ordering::Relaxed) || scan_cancellation.is_cancelled() {
+        return Err(WorkspaceError::Cancelled);
+    }
+    let outcomes = outcomes.into_inner().expect("format outcome lock poisoned");
+    for outcome in outcomes.into_iter().flatten() {
+        match outcome {
+            WorkspaceFileFormatOutcome::Formatted => {
+                summary.formatted_files = summary.formatted_files.saturating_add(1);
+            }
+            WorkspaceFileFormatOutcome::Unchanged => {
+                summary.unchanged_files = summary.unchanged_files.saturating_add(1);
+            }
+            WorkspaceFileFormatOutcome::SkippedUnsafe => {
+                summary.skipped_unsafe_files = summary.skipped_unsafe_files.saturating_add(1);
+            }
+            WorkspaceFileFormatOutcome::SkippedLegacyEncoding => {
+                summary.skipped_legacy_encoding_files =
+                    summary.skipped_legacy_encoding_files.saturating_add(1);
+            }
+            WorkspaceFileFormatOutcome::Failed => {
+                summary.failed_files = summary.failed_files.saturating_add(1);
+            }
+        }
+    }
+    Ok(summary)
+}
+
 impl LspServer {
     /// Starts an explicit `workspace/executeCommand` refresh or validation request. Both commands
     /// share the same cloned-host and revision-checked commit path as the quiet pass, but are not
@@ -449,6 +620,117 @@ impl LspServer {
             }));
         });
         true
+    }
+
+    /// Starts an explicit `pdc/formatWorkspace` request. The worker formats
+    /// Current Mod script files straight to disk; completion never swaps the
+    /// host — the watched-file pipeline and clean open-document reloads pick
+    /// the rewrites up — so unlike the reindex commands there is no
+    /// revision-checked commit to lose.
+    pub(super) fn spawn_format_command<'scope, 'environment, W: Write>(
+        &mut self,
+        scope: &'scope std::thread::Scope<'scope, 'environment>,
+        event_sender: &mpsc::Sender<TransportEvent>,
+        in_flight: &mut Option<InFlightFormatCommand>,
+        busy: bool,
+        message: &Value,
+        output: &mut W,
+    ) -> Result<bool, LspError> {
+        if self.state != ServerState::Initialized || in_flight.is_some() || busy {
+            return Ok(false);
+        }
+        let Some(object) = message.as_object() else {
+            return Ok(false);
+        };
+        if object.get("jsonrpc").and_then(Value::as_str) != Some(JSON_RPC_VERSION)
+            || object.get("method").and_then(Value::as_str) != Some("workspace/executeCommand")
+        {
+            return Ok(false);
+        }
+        let Some(id) = object.get("id").filter(|id| !id.is_null()) else {
+            return Ok(false);
+        };
+        let Ok(request_id) = RequestId::parse(id) else {
+            return Ok(false);
+        };
+        if self.cancelled.contains(&request_id) {
+            // Let the ordinary dispatcher produce the standard cancellation response before a
+            // worker is created for a request the client already abandoned.
+            return Ok(false);
+        }
+        let Ok(params) =
+            typed_params::<ExecuteCommandParams>(object.get("params"), "executeCommand")
+        else {
+            return Ok(false);
+        };
+        if !matches!(
+            params.command.as_str(),
+            "pdc/formatWorkspace" | "formatWorkspace"
+        ) {
+            return Ok(false);
+        }
+        self.mark_activity();
+
+        let cancellation = WorkspaceScanToken::new();
+        let worker_cancellation = cancellation.clone();
+        let candidate = self.host.clone();
+        let sender = event_sender.clone();
+        self.background_reindex_due = None;
+        // One progress token for the whole pass: the event loop sends the
+        // terminal `end` report when the worker completes.
+        let progress_token = format!("pdc-format-{}", progress_nonce());
+        let client_progress = self.client_work_done_progress;
+        if client_progress {
+            write_message(output, &work_done_progress_create(&progress_token))?;
+            write_message(
+                output,
+                &work_done_progress_begin(&progress_token, "Formatting workspace…"),
+            )?;
+        }
+        *in_flight = Some(InFlightFormatCommand {
+            request_id: request_id.clone(),
+            cancellation,
+            progress_token: client_progress.then_some(progress_token.clone()),
+        });
+        let progress = {
+            let sender = sender.clone();
+            let token = progress_token;
+            move |done: usize, total: usize| {
+                if !client_progress {
+                    return;
+                }
+                let mut value = json!({
+                    "kind": "report",
+                    "message": format!("Formatting workspace ({done}/{total})…"),
+                });
+                if let Some(percent) = done
+                    .checked_mul(100)
+                    .and_then(|percent| percent.checked_div(total))
+                {
+                    value["percentage"] = json!(u32::try_from(percent).unwrap_or(100));
+                }
+                let _ = sender.send(TransportEvent::Progress(Progress {
+                    params: json!({"token": token, "value": value}),
+                }));
+            }
+        };
+        let id = id.clone();
+        scope.spawn(move || {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                format_workspace_files(&candidate, &worker_cancellation, &progress)
+            }))
+            .unwrap_or_else(|_| {
+                Err(WorkspaceError::Io(io::Error::other(
+                    "workspace format worker failed unexpectedly",
+                )))
+            });
+            let _ = sender.send(TransportEvent::FormatCommand(FormatCommandResult {
+                request_id,
+                id,
+                result,
+            }));
+        });
+        Ok(true)
     }
 
     /// Starts an automatic closed-file diagnostic pass once all foreground work has drained.
