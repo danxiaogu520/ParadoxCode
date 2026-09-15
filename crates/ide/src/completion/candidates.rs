@@ -7,11 +7,10 @@ use engine::AnalysisSnapshot;
 use rules::{
     KeyMatcher, ProfileRootEntryInsertion, ProfileRootEntrySource, RuleShape, ValueMatcher,
 };
-use text::TextRange;
+use text::{TextRange, TextSize};
 
 use super::context::SemanticCompletionContext;
 use super::dynamic_constraints::infer_dynamic_value_constraints;
-#[cfg(test)]
 use super::support::finalize_completion_items;
 use super::support::{
     CompletionRankContext, CompletionSchemaTier, CompletionSpecificity, RankedCompletionItem,
@@ -929,6 +928,31 @@ fn add_leaf_value_member_items(
                 );
             }
         }
+        ValueMatcher::TexturePath => {
+            for label in snapshot.texture_catalog().paths_with_prefix(prefix) {
+                push_completion(
+                    items,
+                    CompletionItem {
+                        label: label.to_owned(),
+                        kind: CompletionKind::Value,
+                        detail: "texture path".to_owned(),
+                        documentation: documentation.clone(),
+                        replacement_range,
+                        insert_text: label.to_owned(),
+                        sort_score: 0,
+                        deprecated: rule.deprecated,
+                        resolve_data: Some(format!("rule:{}", rule.id)),
+                    },
+                    prefix,
+                    CompletionRankContext::new(
+                        schema_tier,
+                        CompletionSpecificity::Value,
+                        false,
+                        rule.deprecated,
+                    ),
+                );
+            }
+        }
         ValueMatcher::Dynamic(kind) => {
             for label in member_cache.workspace_member_names(snapshot, kind, prefix) {
                 push_completion(
@@ -1171,6 +1195,15 @@ pub(crate) fn add_semantic_value_items(
                     );
                 }
             }
+            ValueMatcher::TexturePath => add_texture_path_items(
+                snapshot,
+                items,
+                documentation.clone(),
+                replacement_range,
+                prefix,
+                rule.deprecated,
+                candidate.schema_tier,
+            ),
             ValueMatcher::TypedPrefix {
                 prefix: matcher_prefix,
                 context,
@@ -1751,6 +1784,7 @@ fn add_inferred_matcher_items(
         ValueMatcher::DynamicSet(_)
         | ValueMatcher::AnyScalar
         | ValueMatcher::Filepath
+        | ValueMatcher::TexturePath
         | ValueMatcher::Opaque(_) => {}
     }
     Ok(())
@@ -1758,6 +1792,126 @@ fn add_inferred_matcher_items(
 
 /// Maximum number of multi-segment scope chains offered as completion candidates.
 pub(crate) const SCOPE_CHAIN_LIMIT: usize = 16;
+
+/// Offers workspace texture-catalog paths as value completion for one `texture_path` rule.
+fn add_texture_path_items(
+    snapshot: &AnalysisSnapshot,
+    items: &mut Vec<RankedCompletionItem>,
+    documentation: Option<String>,
+    replacement_range: TextRange,
+    prefix: &str,
+    deprecated: bool,
+    schema_tier: CompletionSchemaTier,
+) {
+    for label in snapshot.texture_catalog().paths_with_prefix(prefix) {
+        add_value_completion_ranked(
+            items,
+            label,
+            "texture path",
+            documentation.clone(),
+            replacement_range,
+            prefix,
+            deprecated,
+            schema_tier,
+            CompletionSpecificity::Value,
+        );
+    }
+}
+
+/// Texture-path value completion with slash-aware prefix extraction.
+///
+/// Path values contain `/` and `\`, which the generic word-range machinery treats
+/// as delimiters, so a half-typed `texturefile = "gfx/interface/h` would
+/// complete from a one-letter prefix and replace only that fragment. This
+/// dedicated entry point derives the prefix and replacement range from the
+/// scalar token up to the cursor instead, the way the game expects the whole
+/// path to be replaced.
+pub(crate) fn texture_path_completion(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: TextSize,
+    context: &SemanticCompletionContext,
+    cancellation: &CancellationToken,
+) -> Result<Option<Vec<CompletionItem>>, Cancelled> {
+    cancellation.checkpoint()?;
+    // The context builder folds a scalar-valued property the cursor sits inside into
+    // `container_property` (with `property` empty), so both fields are candidates.
+    // Only value positions qualify: a cursor on the key must keep key completion.
+    let Some(property) = [
+        context.property.as_ref(),
+        context.container_property.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    .find(|property| match property.scalar.as_ref() {
+        Some((_, range)) => position >= range.start() && position <= range.end(),
+        None => position > property.key_range.end() && position <= property.range.end(),
+    }) else {
+        return Ok(None);
+    };
+    // The context builder descends INTO the property the cursor sits inside,
+    // appending its key to the parent path; the rule governing the property's
+    // own value lives one level up.
+    let mut rule_context = context.clone();
+    if rule_context
+        .parent_path
+        .last()
+        .is_some_and(|segment| segment.eq_ignore_ascii_case(&property.key))
+    {
+        rule_context.parent_path.pop();
+    }
+    let candidates = semantic_rules_for_completion(snapshot, &rule_context)
+        .into_iter()
+        .filter(|candidate| {
+            matches!(candidate.rule.shape, RuleShape::Leaf)
+                && matches!(candidate.rule.value, ValueMatcher::TexturePath)
+                && semantic_rule_key_matches(
+                    snapshot,
+                    candidate.rule,
+                    candidate.parent_path,
+                    &property.key,
+                )
+                && candidate
+                    .rule
+                    .operator
+                    .as_deref()
+                    .is_none_or(|operator| property.operator.as_deref() == Some(operator))
+        })
+        .collect::<Vec<_>>();
+    let Some(candidate) = candidates.first() else {
+        return Ok(None);
+    };
+    let (replacement_range, prefix) = match property.scalar.as_ref() {
+        Some((_, range)) if position >= range.start() && position <= range.end() => {
+            let mut start = range.start();
+            let mut text = input
+                .source_text(TextRange::new(start, position).unwrap_or(TextRange::empty(start)))
+                .unwrap_or_default()
+                .to_owned();
+            if text.starts_with('"') {
+                text.remove(0);
+                start += 1;
+            }
+            (
+                TextRange::new(start, position).unwrap_or(TextRange::empty(start)),
+                text,
+            )
+        }
+        // An absent or already-closed scalar keeps completion at the cursor.
+        _ => (TextRange::empty(position), String::new()),
+    };
+    let mut items = Vec::new();
+    add_texture_path_items(
+        snapshot,
+        &mut items,
+        candidate.rule.documentation.first().cloned(),
+        replacement_range,
+        &prefix,
+        candidate.rule.deprecated,
+        candidate.schema_tier,
+    );
+    Ok(Some(finalize_completion_items(items)))
+}
 
 /// Scope expression candidates for a value position: base scope names and intrinsics whose
 /// resolved scope is compatible with the expectation, plus scope links reachable from the

@@ -21,6 +21,13 @@ import {
     attachFollowupCompletionTrigger,
     FOLLOWUP_COMPLETION_TRIGGER_COMMAND,
 } from './completionMiddleware';
+import { normalizeTexturePath } from './gameAssets';
+import {
+    appendTextureSection,
+    extractSpriteHoverName,
+    texturefileHoverMarkdown,
+    texturefileValueAt,
+} from './hoverTextures';
 import { findExecutableOnPath } from './serverPath';
 import { globToRegExp, pathRelative } from './paths';
 import {
@@ -631,6 +638,11 @@ function clientMiddleware(): NonNullable<LanguageClientOptions['middleware']> {
                 return resolved;
             });
         },
+        provideHover(document, position, token, next) {
+            return Promise.resolve(next(document, position, token)).then((hover) =>
+                augmentHoverTexturePreview(document, position, hover),
+            );
+        },
         handleDiagnostics(uri, diagnostics, next) {
             const config = vscode.workspace.getConfiguration('paradoxcode');
             const ignoredCodes = new Set(
@@ -661,6 +673,100 @@ function clientMiddleware(): NonNullable<LanguageClientOptions['middleware']> {
             next(uri, filtered);
         },
     };
+}
+
+/** Returns the markdown string of a hover whose contents the language
+ * server produced as MarkupContent markdown (pdc's only hover shape). */
+function hoverMarkdownString(hover: vscode.Hover): vscode.MarkdownString | undefined {
+    const contents = hover.contents as unknown;
+    if (typeof contents !== 'object' || contents === null || Array.isArray(contents)) {
+        return undefined;
+    }
+    const candidate = contents as { value?: unknown; language?: unknown };
+    if (typeof candidate.value !== 'string' || candidate.language !== undefined) {
+        return undefined;
+    }
+    return contents as vscode.MarkdownString;
+}
+
+/**
+ * Appends decoded texture previews to hovers. Sprite symbol hovers get a
+ * `#### Texture` section; a hovered `texturefile` value in a `.gfx` file gets
+ * the preview appended to the server's semantic value hover (the server now
+ * resolves the path and reports provenance) or, when the server produced no
+ * hover, a standalone preview. Every failure degrades to the untouched server
+ * hover — the preview must never fail.
+ */
+async function augmentHoverTexturePreview(
+    document: vscode.TextDocument,
+    position: vscode.Position,
+    hover: vscode.Hover | null | undefined,
+): Promise<vscode.Hover | null | undefined> {
+    if (!vscode.workspace.getConfiguration('paradoxcode.hover').get<boolean>('texturePreview', true)) {
+        return hover;
+    }
+    if (document.uri.fsPath.toLowerCase().endsWith('.gfx')) {
+        const value = texturefileValueAt(document.lineAt(position.line).text, position.character);
+        if (value !== undefined) {
+            const rel = normalizeTexturePath(value);
+            const store = MissionPreviewPanel.store();
+            const file = rel === '' ? undefined : store.resolveTexture(rel);
+            const image = file ? await store.textureFile(file) : undefined;
+            if (file && image) {
+                const section = texturefileHoverMarkdown({
+                    name: path.basename(rel),
+                    rel,
+                    url: image.url,
+                    width: image.width,
+                });
+                const markdown = hover ? hoverMarkdownString(hover) : undefined;
+                if (hover && markdown) {
+                    const augmented = new vscode.MarkdownString(`${markdown.value}\n\n${section}`);
+                    augmented.isTrusted = true;
+                    return new vscode.Hover(augmented, hover.range);
+                }
+                if (hover) {
+                    // A non-markdown server hover keeps its own shape untouched.
+                    return hover;
+                }
+                const standalone = new vscode.MarkdownString(section);
+                standalone.isTrusted = true;
+                return new vscode.Hover(standalone);
+            }
+            // No decodable preview (missing or unhandled format): the server
+            // hover already reports resolution, so pass it through.
+            return hover ?? null;
+        }
+    }
+    if (hover) {
+        const markdown = hoverMarkdownString(hover);
+        const name = markdown ? extractSpriteHoverName(markdown.value) : undefined;
+        if (!markdown || !name) {
+            return hover;
+        }
+        // Only sprite hovers pay for the asset store (its generation key
+        // probes the workshop font-mod directory); everything else returns
+        // the server hover untouched.
+        const store = MissionPreviewPanel.store();
+        const entry = store.spriteTexture(name);
+        const file = entry ? store.resolveTexture(entry.textureFile) : undefined;
+        const image = file ? await store.textureFile(file) : undefined;
+        if (!entry || !image) {
+            return hover;
+        }
+        const augmented = new vscode.MarkdownString(
+            appendTextureSection(markdown.value, {
+                name,
+                rel: entry.textureFile,
+                frames: entry.frames,
+                url: image.url,
+                width: image.width,
+            }),
+        );
+        augmented.isTrusted = true;
+        return new vscode.Hover(augmented, hover.range);
+    }
+    return hover ?? null;
 }
 
 function showMissingServerActions(automaticInstallError?: string): void {

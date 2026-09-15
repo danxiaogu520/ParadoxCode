@@ -72,6 +72,7 @@
   "configuration.preview.showDiagnostics.description": "Show diagnostic counts, badges, colors, and entries in the preview.",
   "configuration.preview.gameFonts.description": "Render mission titles with the game's bitmap fonts (vanilla `vic_18`; the Chinese font from a located Chinese localisation mod) instead of the system font.",
   "configuration.preview.chineseFontMod.description": "Path to the mod folder that provides the Chinese bitmap font (`gfx/fonts/zh-hans-16.fnt`). Leave empty to auto-discover the newest matching Steam Workshop mod of the located game installation.",
+  "configuration.hover.texturePreview.description": "Append a decoded texture image to sprite hovers (`icon = …`, event `picture`, `.gfx` sprite definitions, and `texturefile` values). Textures are resolved from the workspace mod first, then the located game installation.",
   "commands.localisation.openDecoded.title": "Open in Decoded (Chinese) View",
   "commands.localisation.revealOriginal.title": "Open the Raw Transcoded File",
   "commands.localisation.transcodeFile.title": "Transcode Localisation File",

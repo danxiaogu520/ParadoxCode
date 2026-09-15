@@ -478,6 +478,7 @@ fn semantic_value_columns(
         ValueMatcher::Scope(value) => ("scope", value.as_deref(), None, None),
         ValueMatcher::Localisation => ("localisation", None, None, None),
         ValueMatcher::Filepath => ("filepath", None, None, None),
+        ValueMatcher::TexturePath => ("texture-path", None, None, None),
         ValueMatcher::Dynamic(value) => ("dynamic", Some(value), None, None),
         ValueMatcher::DynamicSet(value) => ("dynamic-set", Some(value), None, None),
         // Typed-prefix matchers pack their three fields into the generic text columns:
@@ -988,6 +989,7 @@ fn decode_semantic_value(
         "scope" => ValueMatcher::Scope(arg.map(str::to_owned)),
         "localisation" => ValueMatcher::Localisation,
         "filepath" => ValueMatcher::Filepath,
+        "texture-path" => ValueMatcher::TexturePath,
         "dynamic" => ValueMatcher::Dynamic(arg.unwrap_or_default().to_owned()),
         "dynamic-set" => ValueMatcher::DynamicSet(arg.unwrap_or_default().to_owned()),
         "typed-prefix" => ValueMatcher::TypedPrefix {

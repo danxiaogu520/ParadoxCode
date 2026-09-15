@@ -11,6 +11,7 @@ use text::{AbsPath, LogicalPath};
 use crate::index_cache::{IndexCache, IndexCacheError};
 use crate::query_cache::SnapshotQueryCache;
 use crate::snapshot::AnalysisSnapshot;
+use crate::texture::TextureCatalog;
 use index::{DocumentSnapshot, FileState, PreparedDocument};
 use index::{FileIndexShard, LocalisationPreviewMap, PositionMap, WorkspaceIndex};
 use index::{
@@ -52,6 +53,9 @@ pub struct AnalysisHost {
     scan_limits: WorkspaceScanLimits,
     preferred_localisation_languages: Arc<[String]>,
     completion_source_layers: Arc<[SourceRootKind]>,
+    /// Lazily built asset catalog keyed by the live `roots` pointer; see
+    /// [`AnalysisHost::texture_catalog`].
+    texture_catalog: Arc<crate::texture::TextureCatalogCache>,
     /// Live revision shared across host clones. `revision` itself is cloned by
     /// value, so a worker holding a cloned host would otherwise observe a frozen
     /// counter and never notice that the originating host advanced past it.
@@ -99,6 +103,7 @@ impl AnalysisHost {
                 SourceRootKind::Dependency,
                 SourceRootKind::Vanilla,
             ]),
+            texture_catalog: Arc::new(std::sync::Mutex::new(None)),
             revision_watch: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
     }
@@ -698,6 +703,13 @@ impl AnalysisHost {
         cancellation: &WorkspaceScanToken,
     ) -> Result<WorkspaceScanReport, WorkspaceError> {
         cancellation.checkpoint()?;
+        if changes.iter().any(|change| {
+            change.path.extension().is_some_and(|extension| {
+                TextureCatalog::is_catalog_extension(&extension.to_string_lossy())
+            })
+        }) {
+            self.invalidate_texture_catalog();
+        }
         let limits = self.scan_limits;
         let mut files = self.source_files.as_ref().clone();
         let mut paths = self.source_file_paths.as_ref().clone();
@@ -1176,7 +1188,38 @@ impl AnalysisHost {
             scan_limits: self.scan_limits,
             preferred_localisation_languages: Arc::clone(&self.preferred_localisation_languages),
             completion_source_layers: Arc::clone(&self.completion_source_layers),
+            texture_catalog: self.texture_catalog(),
         }
+    }
+
+    /// Returns the workspace asset catalog, building it on first use.
+    ///
+    /// The cache is keyed by the live `roots` pointer, so replacing the roots
+    /// (a workspace reload or cache install) rebuilds the walk automatically.
+    /// Document overlays never touch it; disk events that touch harvested
+    /// extensions invalidate it explicitly.
+    #[must_use]
+    pub fn texture_catalog(&self) -> Arc<TextureCatalog> {
+        // Thin pointer identity: the cached Arc pins the allocation, so the address
+        // cannot be reused by a different roots slice while the cache holds it.
+        let key = Arc::as_ptr(&self.roots).cast::<SourceRoot>() as usize;
+        let mut cache = self.texture_catalog.lock().expect("texture catalog lock");
+        if let Some((cached_key, catalog)) = cache.as_ref()
+            && *cached_key == key
+        {
+            return Arc::clone(catalog);
+        }
+        let catalog = Arc::new(TextureCatalog::build(&self.roots));
+        *cache = Some((key, Arc::clone(&catalog)));
+        catalog
+    }
+
+    /// Drops the cached asset catalog so the next query rebuilds it from disk.
+    pub fn invalidate_texture_catalog(&self) {
+        self.texture_catalog
+            .lock()
+            .expect("texture catalog lock")
+            .take();
     }
 }
 

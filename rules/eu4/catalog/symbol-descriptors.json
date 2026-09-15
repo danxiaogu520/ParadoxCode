@@ -231,6 +231,11 @@
       "case_sensitive": false
     },
     {
+      "kind_id": "bitmap_font",
+      "resolution": "replace-by-symbol",
+      "case_sensitive": false
+    },
+    {
       "kind_id": "blessing",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
@@ -6467,6 +6472,11 @@
     },
     {
       "kind_id": "normal",
+      "resolution": "replace-by-symbol",
+      "case_sensitive": false
+    },
+    {
+      "kind_id": "object",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },

@@ -16,7 +16,59 @@
     "starts_with": null,
     "type_key_filter": [
       [
-        "spriteType"
+        "spriteType",
+        "textSpriteType",
+        "progressbartype",
+        "corneredTileSpriteType",
+        "maskedShieldType",
+        "frameAnimatedSpriteType"
+      ],
+      false
+    ]
+  },
+  "bitmap_font": {
+    "name": "bitmap_font",
+    "path": "game/interface",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "bitmapfonts"
+      ],
+      [
+        "2-bitmapfonts"
+      ]
+    ],
+    "name_field": "name",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "bitmapfont"
+      ],
+      false
+    ]
+  },
+  "object": {
+    "name": "object",
+    "path": "game/interface",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "objectTypes"
+      ]
+    ],
+    "name_field": "name",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "pdxmesh"
       ],
       false
     ]

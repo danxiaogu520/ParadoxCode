@@ -1,0 +1,103 @@
+// case: gfx_sprite_semantics
+// input:
+//   spriteTypes = {
+//   	spriteType = {
+//   		name = "GFX_health"
+//   		texturefile = "gfx/interface/health.dds"
+//   		loadtype = "INGAME"
+//   		noOfFrames = 4
+//   		transparencecheck = yes
+//   	}
+//   	spriteType = {
+//   		name = "GFX_drift"
+//   		texturefile = "gfx/interface/shield.tga"
+//   	}
+//   	progressbartype = {
+//   		name = "GFX_bar"
+//   		texturefile1 = "gfx/interface/bar1.dds"
+//   		texturefile2 = "gfx/interface/bar2.dds"
+//   		color = { 0.0 0.5 0.0 }
+//   		colortwo = { 0.2 0.2 0.2 }
+//   		horizontal = yes
+//   	}
+//   	corneredTileSpriteType = {
+//   		name = "GFX_tile"
+//   		texturefile = "gfx/interface/tile.dds"
+//   		size = { x = 10 y = 10 }
+//   		borderSize = { x = 2 y = 2 }
+//   	}
+//   	frameAnimatedSpriteType = {
+//   		name = "GFX_flame"
+//   		texturefile = "gfx/interface/frames.png"
+//   		noOfFrames = 8
+//   		animation_rate_fps = 12
+//   		looping = yes
+//   		play_on_show = yes
+//   		pause_on_loop = 0.5
+//   	}
+//   	maskedShieldType = {
+//   		name = "GFX_shield"
+//   		texturefile1 = "gfx/interface/bar1.tga"
+//   		texturefile2 = "gfx/interface/bar2.tga"
+//   	}
+//   	spriteType = {
+//   		name = "GFX_broken"
+//   		texturefile = "gfx/interface/nowhere.dds"
+//   		loadtype = NOPE
+//   		noofframes = 0
+//   		bogus_key = yes
+//   		animation = {
+//   			animationtexturefile = "gfx/interface/scroll.dds"
+//   			animationrotation = 0.25
+//   		}
+//   	}
+//   	spriteType = {
+//   		texturefile = "gfx/interface/missing.dds"
+//   	}
+//   }
+//   objectTypes = {
+//   	pdxmesh = {
+//   		name = "test_mesh"
+//   		file = "gfx/interface/mesh.mesh"
+//   		scale = 1.0
+//   		cull_distance = 2000
+//   	}
+//   	pdxmesh = {
+//   		name = "broken_mesh"
+//   		file = "gfx/interface/nope.mesh"
+//   		wrong_key = yes
+//   	}
+//   }
+//   bitmapfonts = {
+//   	bitmapfont = {
+//   		name = "vic_18"
+//   		path = "gfx/fonts/vic_18.fnt"
+//   		color = 0xffffffff
+//   		textcolors = { G = { 44 171 50 } }
+//   	}
+//   	bitmapfont = {
+//   		path = "gfx/fonts/nameless.fnt"
+//   	}
+//   }
+//   
+diagnostics:
+- code=UnknownTexturePath severity=Error certainty=certain range=982..1009
+  message: texture file `gfx/interface/nowhere.dds` not found in any mod, game, or DLC pack root
+- code=InvalidValue severity=Error certainty=certain range=1023..1027
+  message: invalid value `NOPE` for `loadtype`
+  expected: one of `FRONTEND`, `INGAME`
+- code=InvalidValue severity=Error certainty=certain range=1043..1044
+  message: invalid value `0` for `noofframes`
+  expected: a whole number of at least 1
+- code=UnknownKey severity=Error certainty=certain range=1047..1056
+  message: unknown key `bogus_key` in a `sprite` definition
+- code=Cardinality severity=Error certainty=certain range=1181..1182
+  message: this block is missing required key `name`
+- code=UnknownTexturePath severity=Error certainty=certain range=1199..1226
+  message: texture file `gfx/interface/missing.dds` not found in any mod, game, or DLC pack root
+- code=UnknownTexturePath severity=Error certainty=certain range=1402..1427
+  message: texture file `gfx/interface/nope.mesh` not found in any mod, game, or DLC pack root
+- code=UnknownKey severity=Error certainty=certain range=1430..1439
+  message: unknown key `wrong_key` in an `object` definition
+- code=Cardinality severity=Error certainty=certain range=1608..1609
+  message: this block is missing required key `name`

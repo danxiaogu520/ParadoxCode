@@ -7,8 +7,8 @@ pub(crate) use super::{
     DocumentId, DocumentSource, DynamicParameterSignature, FileIndexShard, FlagWrite,
     FlagWriteMembership, IndexCache, IndexCacheError, LocalisationPreview, LocalisationPreviewMap,
     ParsedSource, PositionMap, Reference, SourceFileId, SourceRoot, SourceRootId, SourceRootKind,
-    TextChange, WorkspaceChange, WorkspaceError, WorkspaceIndex, WorkspaceScanFilters,
-    WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanToken,
+    TextChange, TextureCatalog, WorkspaceChange, WorkspaceError, WorkspaceIndex,
+    WorkspaceScanFilters, WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanToken,
 };
 use rules::{RuleSet, RulesModel, SymbolDescriptor, SymbolResolutionPolicy};
 use text::{LogicalPath, Position, PositionRange, TextRange};
@@ -22,3 +22,4 @@ mod index;
 mod index_cache;
 mod localisation;
 mod scan;
+mod texture;

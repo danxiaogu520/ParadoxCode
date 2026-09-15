@@ -44,6 +44,7 @@
     ],
     "values": [
       "values/enums/diplomacy.json",
+      "values/enums/interface.json",
       "values/enums/map.json",
       "values/enums/military.json",
       "values/enums/other.json",

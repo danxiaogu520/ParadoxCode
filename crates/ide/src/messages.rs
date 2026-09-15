@@ -137,6 +137,7 @@ pub(crate) fn value_description(snapshot: &AnalysisSnapshot, matcher: &ValueMatc
         ValueMatcher::Scope(None) => "a scope name".to_owned(),
         ValueMatcher::Localisation => "a localisation key".to_owned(),
         ValueMatcher::Filepath => "a file path".to_owned(),
+        ValueMatcher::TexturePath => "a texture path".to_owned(),
         ValueMatcher::Dynamic(kind) => format!("{} `{kind}` name", article_for(kind)),
         ValueMatcher::TypedPrefix {
             prefix, context, ..
@@ -177,6 +178,7 @@ pub(crate) fn value_plural(snapshot: &AnalysisSnapshot, matcher: &ValueMatcher) 
         ValueMatcher::Scope(None) => "scope names".to_owned(),
         ValueMatcher::Localisation => "localisation keys".to_owned(),
         ValueMatcher::Filepath => "file paths".to_owned(),
+        ValueMatcher::TexturePath => "texture paths".to_owned(),
         ValueMatcher::Dynamic(kind) => format!("`{kind}` names"),
         ValueMatcher::TypedPrefix {
             prefix, context, ..

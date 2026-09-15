@@ -1457,10 +1457,10 @@ mod tests {
             read_json(&root.join("rules/manifest.json")).expect("committed manifest");
         let (_, source_model) = load_source(&root.join("rules/eu4")).expect("source model");
         assert_eq!(source_model.file_categories.len(), 124);
-        assert_eq!(source_model.symbol_descriptors.len(), 2663);
+        assert_eq!(source_model.symbol_descriptors.len(), 2665);
         assert_eq!(source_model.records.len(), 12_971);
-        assert_eq!(source_model.semantic.rules.len(), 8_357);
-        assert_eq!(source_model.semantic.enum_values.len(), 70);
+        assert_eq!(source_model.semantic.rules.len(), 8_436);
+        assert_eq!(source_model.semantic.enum_values.len(), 72);
         assert_eq!(source_model.semantic.type_root_keys.len(), 7);
         assert_eq!(source_model.semantic.type_root_scopes.len(), 4);
         assert_eq!(
@@ -1504,7 +1504,7 @@ mod tests {
         assert_eq!(startup.this, "country");
         assert_eq!(startup.from, "any");
         assert!(!startup.documentation.is_empty());
-        assert_eq!(source_model.semantic.type_descriptors.len(), 153);
+        assert_eq!(source_model.semantic.type_descriptors.len(), 155);
         assert_eq!(source_model.semantic.localisation_bindings.len(), 189);
         assert_eq!(source_model.profile.scan_roots.len(), 126);
         for (key, expected_scopes) in [

@@ -1,4 +1,5 @@
-// Contract test for the extension-host game asset pipeline (src/gameAssets.ts).
+// Contract test for the extension-host game asset pipeline (src/gameAssets.ts)
+// and the hover texture preview assembly (src/hoverTextures.ts).
 //
 // The DDS decoder cases are ports of the former Rust suite
 // (crates/game/src/eu4/mission/texture/dds.rs); TGA, BMFont, and the sprite
@@ -242,6 +243,15 @@ function tgaHeader(width, height, bpp, descriptor) {
     const flat = 'spriteType = { name = mission_x texturefile = gfx/interface/missions/mission_x.dds }';
     assert.equal(assets.parseGfxSprites(flat)[0].name, 'mission_x');
 
+    // noOfFrames is captured (quoted or bare value, case-insensitive key);
+    // absent, zero, or non-positive values stay undefined.
+    const framed = 'spriteType = { name = strip texturefile = "s.dds" noOfFrames = "8" }';
+    assert.equal(assets.parseGfxSprites(framed)[0].frames, 8);
+    const upper = 'spriteType = { name = strip texturefile = "s.dds" NOOFFRAMES = 4 }';
+    assert.equal(assets.parseGfxSprites(upper)[0].frames, 4);
+    assert.equal(assets.parseGfxSprites('spriteType = { name = s texturefile = "s.dds" }')[0].frames, undefined);
+    assert.equal(assets.parseGfxSprites('spriteType = { name = s texturefile = "s.dds" noOfFrames = 0 }')[0].frames, undefined);
+
     assert.equal(assets.normalizeTexturePath('../evil.dds'), '');
     assert.equal(assets.normalizeTexturePath('C:\\evil.dds'), '');
     assert.equal(assets.normalizeTexturePath('C:/evil.dds'), '');
@@ -250,10 +260,11 @@ function tgaHeader(width, height, bpp, descriptor) {
     assert.equal(assets.normalizeTexturePath('gfx//interface//missions//a.dds'), 'gfx/interface/missions/a.dds');
 
     const index = assets.buildSpriteIndex([
-        'spriteTypes = { spriteType = { name = a texturefile = "one.dds" } }',
+        'spriteTypes = { spriteType = { name = a texturefile = "one.dds" noOfFrames = 3 } }',
         'spriteTypes = { spriteType = { name = a texturefile = "two.dds" } }',
     ]);
-    assert.equal(index.get('a'), 'one.dds');
+    assert.equal(index.get('a')?.textureFile, 'one.dds');
+    assert.equal(index.get('a')?.frames, 3);
 }
 
 // --- GameAssetStore (temp fixtures) ---------------------------------------------
@@ -316,6 +327,99 @@ function tgaHeader(width, height, bpp, descriptor) {
         rmSync(root, { recursive: true, force: true });
         rmSync(chineseRoot, { recursive: true, force: true });
     }
+}
+
+// --- GameAssetStore with mod roots (hover texture lookup) ------------------------
+
+{
+    const gameRoot = mkdtempSync(join(tmpdir(), 'pdc-hover-game-'));
+    const modRoot = mkdtempSync(join(tmpdir(), 'pdc-hover-mod-'));
+    try {
+        mkdirSync(join(gameRoot, 'interface'), { recursive: true });
+        mkdirSync(join(gameRoot, 'gfx', 'interface'), { recursive: true });
+        writeFileSync(
+            join(gameRoot, 'interface', 'vanilla.gfx'),
+            'spriteTypes = { spriteType = { name = "shared_icon" texturefile = "gfx/interface/shared.dds" } '
+                + 'spriteType = { name = "game_only" texturefile = "gfx/interface/game.dds" } }',
+        );
+        const red = withData(ddsHeader(2, 1, 0x40 | DDPF_ALPHAPIXELS, null), [0, 0, 255, 255, 0, 255, 0, 255]);
+        writeFileSync(join(gameRoot, 'gfx', 'interface', 'shared.dds'), red);
+        writeFileSync(join(gameRoot, 'gfx', 'interface', 'game.dds'), red);
+
+        // The mod redefines one sprite (from a nested interface/assets file)
+        // and drop-in replaces a vanilla texture at the same relative path.
+        mkdirSync(join(modRoot, 'interface', 'assets'), { recursive: true });
+        mkdirSync(join(modRoot, 'gfx', 'interface'), { recursive: true });
+        writeFileSync(
+            join(modRoot, 'interface', 'assets', 'mod.gfx'),
+            'spriteTypes = { spriteType = { name = "shared_icon" texturefile = "gfx/interface/mod.dds" } '
+                + 'spriteType = { name = "mod_only" texturefile = "gfx/interface/mod.dds" noOfFrames = 2 } }',
+        );
+        const green = withData(
+            ddsHeader(4, 1, 0x40 | DDPF_ALPHAPIXELS, null),
+            [0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255],
+        );
+        writeFileSync(join(modRoot, 'gfx', 'interface', 'mod.dds'), green);
+        writeFileSync(join(modRoot, 'gfx', 'interface', 'shared.dds'), green);
+
+        const store = new assets.GameAssetStore(gameRoot, undefined, [modRoot]);
+        // Mod definitions replace vanilla ones for the same sprite name; the
+        // nested interface/assets directory is part of the index.
+        assert.equal(store.spriteTexture('shared_icon')?.textureFile, 'gfx/interface/mod.dds');
+        assert.equal(store.spriteTexture('mod_only')?.frames, 2);
+        assert.equal(store.spriteTexture('game_only')?.textureFile, 'gfx/interface/game.dds');
+        // Texture resolution prefers the mod root, then the game root.
+        assert.equal(store.resolveTexture('gfx/interface/shared.dds'), join(modRoot, 'gfx', 'interface', 'shared.dds'));
+        assert.equal(store.resolveTexture('gfx/interface/game.dds'), join(gameRoot, 'gfx', 'interface', 'game.dds'));
+        assert.equal(store.resolveTexture('gfx/interface/missing.dds'), undefined);
+        assert.equal(store.resolveTexture('../escape.dds'), undefined);
+        // By-path decode returns dimensions alongside the data URL; missing
+        // files degrade to undefined.
+        const image = await store.textureFile(join(modRoot, 'gfx', 'interface', 'mod.dds'));
+        assert.ok(image?.url.startsWith('data:image/png;base64,'));
+        assert.equal(image?.width, 4);
+        assert.equal(image?.height, 1);
+        assert.equal(await store.textureFile(join(modRoot, 'gfx', 'interface', 'absent.dds')), undefined);
+        // The mission-preview path resolves mod textures through the same roots.
+        const urls = await store.spriteUrls(['mod_only']);
+        assert.ok(urls.mod_only?.startsWith('data:image/png;base64,'));
+    } finally {
+        rmSync(gameRoot, { recursive: true, force: true });
+        rmSync(modRoot, { recursive: true, force: true });
+    }
+}
+
+// --- hover texture assembly --------------------------------------------------------
+
+{
+    const hover = require(join(scriptDir, '..', 'out', 'hoverTextures.js'));
+    assert.equal(hover.extractSpriteHoverName('### sprite `GFX_x`\n\n#### Resolved definition'), 'GFX_x');
+    assert.equal(hover.extractSpriteHoverName('### event_modifier `GFX_x`'), undefined);
+    assert.equal(hover.extractSpriteHoverName('plain text'), undefined);
+
+    const line = '\t\ttexturefile = "gfx/interface/missions/conquest_1550.dds"';
+    assert.equal(
+        hover.texturefileValueAt(line, line.indexOf('"') + 5),
+        'gfx/interface/missions/conquest_1550.dds',
+    );
+    assert.equal(hover.texturefileValueAt(line, 2), undefined); // cursor on the key
+    assert.equal(hover.texturefileValueAt('icon = "GFX_x"', 8), undefined);
+    assert.equal(hover.texturefileValueAt('texturefile = "unterminated', 20), undefined);
+    assert.equal(hover.texturefileValueAt('texturefile = bare/texture.dds', 20), 'bare/texture.dds');
+    assert.equal(hover.texturefileValueAt('texturefile = bare/texture.dds', 5), undefined);
+
+    // A frame-strip sprite wider than the hover cap carries |width=400.
+    const preview = { name: 'GFX_x', rel: 'gfx/interface/x.dds', frames: 4, url: 'data:image/png;base64,AAA', width: 800 };
+    const appended = hover.appendTextureSection('### sprite `GFX_x`', preview);
+    assert.ok(appended.startsWith('### sprite `GFX_x`\n\n#### Texture\n\n- Path: `gfx/interface/x.dds`\n- Frames: 4\n\n'));
+    assert.ok(appended.endsWith('![GFX_x](data:image/png;base64,AAA|width=400)'));
+    // Single-frame, narrow sprites render at natural size without a suffix.
+    const single = hover.appendTextureSection('m', { name: 'GFX_y', rel: 'y.dds', url: 'data:image/png;base64,BBB', width: 90 });
+    assert.ok(!single.includes('Frames:'));
+    assert.ok(single.includes('![GFX_y](data:image/png;base64,BBB)'));
+    const standalone = hover.texturefileHoverMarkdown(preview);
+    assert.ok(standalone.startsWith('#### Texture\n\n- Path: `gfx/interface/x.dds`\n\n'));
+    assert.ok(standalone.includes('|width=400'));
 }
 
 console.log('assets contract OK');

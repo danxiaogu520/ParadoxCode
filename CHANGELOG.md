@@ -9,6 +9,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `.gfx` files get the same semantic depth as `.txt` files. All six GUI sprite block kinds
+  (`spriteType`, `textSpriteType`, `progressbartype`, `corneredTileSpriteType`,
+  `maskedShieldType`, `frameAnimatedSpriteType`) now carry key-level rules — per-key hover
+  documentation, key and value completion, unknown-key diagnostics, and validation for
+  `loadType`, `noOfFrames`, booleans, and the `animation`/`color`/`size` sub-blocks — on top of
+  full symbolization (the five previously invisible kinds join `spriteType` in the shared
+  engine namespace, so mission icons and event pictures resolve across all six).
+  `objectTypes`/`pdxmesh` blocks symbolize as a new `object` kind and validate their mesh keys;
+  `bitmapfonts`/`bitmapfont` blocks symbolize as `bitmap_font` (including vanilla's numbered
+  `2-bitmapfonts` root key in `chatfonts.gfx`) and validate the font keys.
+- Texture reference checking with a new `UnknownTexturePath` diagnostic (error severity,
+  ignorable via `paradoxcode.diagnosticIgnoreCodes`). The server builds a workspace texture
+  catalog from every source root's `gfx/` and `tutorial/` trees plus DLC pack directories and
+  resolves each `texturefile`-family value the way the engine does: separator and case
+  normalization, mod-over-game root priority, pack-relative DLC lookup, the `.tga`↔`.dds`
+  extension drift fallback, and a direct game-root probe for paths outside the harvested
+  directories. Stale-but-working references stay silent; a truly dangling path gets an error
+  with a same-directory did-you-mean. `texturefile` values also complete from the catalog
+  (slash-aware prefix replacement from the opening quote) and hover with their resolution
+  provenance (which root serves the file, and whether the extension fallback saved it); the
+  VS Code hover middleware appends the decoded texture preview on top of the server's
+  semantic hover instead of substituting for it. The full vanilla sweep stays at the reviewed
+  fingerprint — zero false positives across all 132 interface `.gfx` files.
+
 - Mission Preview renders titles with the game's own bitmap fonts and honours `§` colour codes.
   Titles blit glyph-by-glyph from the BMFont atlases the game uses — vanilla `vic_18` for English
   and the `zh-hans-16` DXT5 atlas for Chinese — with kerning, per-character CJK wrapping, and

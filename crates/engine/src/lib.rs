@@ -8,10 +8,12 @@ mod host;
 mod index_cache;
 mod query_cache;
 mod snapshot;
+mod texture;
 
 pub use host::AnalysisHost;
 pub use query_cache::{CacheDomain, SnapshotQueryCache};
 pub use snapshot::AnalysisSnapshot;
+pub use texture::{TextureCatalog, TextureCatalogHit, TextureResolution, normalize_asset_path};
 
 // Facade re-exports: downstream crates keep consuming these names through `engine::`.
 pub use index::{

@@ -1,9 +1,11 @@
-// Extension-host game-asset pipeline for the mission preview.
+// Extension-host game-asset pipeline for the mission preview and hover
+// texture previews.
 //
 // The language server stays text-only: every pixel the preview draws —
 // interface sprites (frame, arrows, mission icons) and the game's bitmap
 // fonts — is read, decoded, and cached here in the extension host, then
-// shipped to the webview as one-shot `data:image/png;base64,` payloads.
+// shipped to the webview as one-shot `data:image/png;base64,` payloads (or,
+// for hovers, embedded into the tooltip markdown).
 //
 // The DDS decoder, the `.gfx` sprite index, and the PNG encoder are ports of
 // the former Rust implementation (`crates/game/src/eu4/mission/texture/`);
@@ -21,6 +23,8 @@ export const FRAME_SPRITE = 'GFX_mission_icons_frame';
 const MAX_TEXTURE_DIMENSION = 4096;
 /** Maximum single asset file size read from disk (guards hostile files). */
 const MAX_ASSET_BYTES = 8 * 1024 * 1024;
+/** Maximum `.gfx` sources indexed per root (guards pathological trees). */
+const MAX_SPRITE_INDEX_FILES = 256;
 /** Steam app id of Europa Universalis IV (workshop content root). */
 const EU4_APP_ID = '236850';
 /** Steam installation directory name of Europa Universalis IV. */
@@ -507,6 +511,15 @@ export function parseBmFont(text: string): BmFont | undefined {
 export interface SpriteEntry {
     name: string;
     textureFile: string;
+    /** `noOfFrames` when the spriteType declares a horizontal frame strip. */
+    frames?: number;
+}
+
+/** One decoded texture file ready for markdown embedding. */
+export interface TextureImageData {
+    url: string;
+    width: number;
+    height: number;
 }
 
 /**
@@ -554,12 +567,18 @@ export function parseGfxSprites(source: string): SpriteEntry[] {
         blockStart.lastIndex = close;
         const name = block.match(/\bname\s*=\s*(?:"([^"]+)"|([A-Za-z0-9_.\-]+))/);
         const texture = block.match(/\btexturefile\s*=\s*(?:"([^"]+)"|(\S+))/);
+        const frames = block.match(/\bnoofframes\s*=\s*"?(\d+)/i);
         const nameValue = name?.[1] ?? name?.[2];
         const textureValue = texture?.[1] ?? texture?.[2];
+        const framesValue = frames ? Number(frames[1]) : undefined;
         if (nameValue && textureValue) {
             const normalized = normalizeTexturePath(textureValue);
             if (normalized !== '') {
-                entries.push({ name: nameValue, textureFile: normalized });
+                entries.push({
+                    name: nameValue,
+                    textureFile: normalized,
+                    frames: framesValue !== undefined && framesValue > 0 ? framesValue : undefined,
+                });
             }
         }
     }
@@ -567,16 +586,16 @@ export function parseGfxSprites(source: string): SpriteEntry[] {
 }
 
 /**
- * Builds a name -> normalized texture path map from several `.gfx` sources.
- * Earlier files win; repeated names (mod overrides) keep their first
- * occurrence, matching the game's `spriteType` lookup.
+ * Builds a name -> sprite entry map from several `.gfx` sources. Earlier
+ * files win; repeated names (mod overrides) keep their first occurrence,
+ * matching the game's `spriteType` lookup.
  */
-export function buildSpriteIndex(files: string[]): Map<string, string> {
-    const index = new Map<string, string>();
+export function buildSpriteIndex(files: string[]): Map<string, SpriteEntry> {
+    const index = new Map<string, SpriteEntry>();
     for (const source of files) {
         for (const entry of parseGfxSprites(source)) {
             if (!index.has(entry.name)) {
-                index.set(entry.name, entry.textureFile);
+                index.set(entry.name, entry);
             }
         }
     }
@@ -736,13 +755,21 @@ export interface FontAssets {
 export class GameAssetStore {
     private readonly gameDirectory: string | undefined;
     private readonly chineseFontDirectory: string | undefined;
-    private spriteIndex: Map<string, string> | undefined;
+    /** Mod roots (explicit mod directory, then workspace folders). */
+    private readonly modRoots: readonly string[];
+    private spriteIndex: Map<string, SpriteEntry> | undefined;
     private readonly spriteCache = new Map<string, { modified: number; url: string }>();
+    private readonly textureFileCache = new Map<string, { modified: number; image: TextureImageData }>();
     private fontCache: { modified: string; fonts: FontAssets } | undefined;
 
-    public constructor(gameDirectory: string | undefined, chineseFontDirectory: string | undefined) {
+    public constructor(
+        gameDirectory: string | undefined,
+        chineseFontDirectory: string | undefined,
+        modRoots: readonly string[] = [],
+    ) {
         this.gameDirectory = gameDirectory;
         this.chineseFontDirectory = chineseFontDirectory;
+        this.modRoots = modRoots;
     }
 
     /**
@@ -753,17 +780,20 @@ export class GameAssetStore {
      */
     public async spriteUrls(names: readonly string[]): Promise<Record<string, string>> {
         const urls: Record<string, string> = {};
-        if (!this.gameDirectory) {
+        if (!this.gameDirectory && this.modRoots.length === 0) {
             return urls;
         }
         const index = this.spriteIndex ?? this.loadSpriteIndex();
         this.spriteIndex = index;
         for (const name of names) {
-            const texturePath = index.get(name);
-            if (!texturePath) {
+            const entry = index.get(name);
+            if (!entry) {
                 continue;
             }
-            const file = path.join(this.gameDirectory, texturePath);
+            const file = this.resolveTexture(entry.textureFile);
+            if (!file) {
+                continue;
+            }
             const modified = this.fileModified(file);
             if (modified === undefined) {
                 continue;
@@ -772,14 +802,79 @@ export class GameAssetStore {
             if (cached && cached.modified === modified) {
                 continue;
             }
-            const url = await this.decodeFileUrl(file);
-            if (url === undefined) {
+            const image = await this.textureFile(file);
+            if (!image) {
                 continue;
             }
-            this.spriteCache.set(name, { modified, url });
-            urls[name] = url;
+            this.spriteCache.set(name, { modified, url: image.url });
+            urls[name] = image.url;
         }
         return urls;
+    }
+
+    /** Looks one sprite name up in the merged mod + game sprite index. */
+    public spriteTexture(name: string): SpriteEntry | undefined {
+        const index = this.spriteIndex ?? this.loadSpriteIndex();
+        this.spriteIndex = index;
+        return index.get(name);
+    }
+
+    /**
+     * Resolves one game-root-relative texture path to a file on disk, mod
+     * roots before the game installation: a drop-in texture replacement in
+     * the mod wins over the vanilla file it shadows.
+     */
+    public resolveTexture(texturePath: string): string | undefined {
+        const normalized = normalizeTexturePath(texturePath);
+        if (normalized === '') {
+            return undefined;
+        }
+        for (const root of [...this.modRoots, this.gameDirectory]) {
+            if (!root) {
+                continue;
+            }
+            const file = path.join(root, normalized);
+            try {
+                if (fs.statSync(file).isFile()) {
+                    return file;
+                }
+            } catch {
+                // Not present in this root; keep probing.
+            }
+        }
+        return undefined;
+    }
+
+    /**
+     * Decodes one texture file to a PNG data URL with its pixel size, cached
+     * by mtime. Missing or undecodable files yield `undefined` — a preview
+     * must never surface a decode error.
+     */
+    public async textureFile(file: string): Promise<TextureImageData | undefined> {
+        const modified = this.fileModified(file);
+        if (modified === undefined) {
+            return undefined;
+        }
+        const cached = this.textureFileCache.get(file);
+        if (cached && cached.modified === modified) {
+            return cached.image;
+        }
+        const bytes = await this.readBytes(file);
+        if (!bytes) {
+            return undefined;
+        }
+        try {
+            const decoded = decodeAtlasImage(bytes);
+            const image: TextureImageData = {
+                url: pngDataUrl(decoded),
+                width: decoded.width,
+                height: decoded.height,
+            };
+            this.textureFileCache.set(file, { modified, image });
+            return image;
+        } catch {
+            return undefined;
+        }
     }
 
     /**
@@ -854,40 +949,52 @@ export class GameAssetStore {
         }
     }
 
-    private loadSpriteIndex(): Map<string, string> {
-        const index = new Map<string, string>();
-        if (!this.gameDirectory) {
-            return index;
+    private loadSpriteIndex(): Map<string, SpriteEntry> {
+        const gameFiles = this.gameDirectory
+            ? this.readGfxFiles(path.join(this.gameDirectory, 'interface'))
+            : [];
+        const modFiles: string[] = [];
+        for (const root of this.modRoots) {
+            modFiles.push(...this.readGfxFiles(path.join(root, 'interface')));
         }
-        try {
-            const files = fs.readdirSync(path.join(this.gameDirectory, 'interface'))
-                .filter((file) => file.toLowerCase().endsWith('.gfx'))
-                .map((file) => {
-                    try {
-                        return fs.readFileSync(path.join(this.gameDirectory!, 'interface', file), 'latin1');
-                    } catch {
-                        return '';
-                    }
-                });
-            for (const [name, texture] of buildSpriteIndex(files)) {
-                index.set(name, texture);
-            }
-        } catch {
-            // No interface directory: sprite-less preview.
+        const index = buildSpriteIndex(gameFiles);
+        // Mod definitions replace vanilla ones for the same sprite name.
+        for (const [name, entry] of buildSpriteIndex(modFiles)) {
+            index.set(name, entry);
         }
         return index;
     }
 
-    private async decodeFileUrl(file: string): Promise<string | undefined> {
-        const bytes = await this.readBytes(file);
-        if (!bytes) {
-            return undefined;
-        }
-        try {
-            return pngDataUrl(decodeAtlasImage(bytes));
-        } catch {
-            return undefined;
-        }
+    /** Reads the `.gfx` sources under one `interface` directory (bounded,
+     * alphabetically ordered walk so first-wins merging stays deterministic). */
+    private readGfxFiles(interfaceDirectory: string): string[] {
+        const sources: string[] = [];
+        const walk = (directory: string, depth: number): void => {
+            if (depth > 3 || sources.length >= MAX_SPRITE_INDEX_FILES) {
+                return;
+            }
+            let entries: fs.Dirent[];
+            try {
+                entries = fs.readdirSync(directory, { withFileTypes: true });
+            } catch {
+                return; // Missing or unreadable: nothing to index here.
+            }
+            entries.sort((a, b) => a.name.localeCompare(b.name));
+            for (const entry of entries) {
+                const full = path.join(directory, entry.name);
+                if (entry.isDirectory()) {
+                    walk(full, depth + 1);
+                } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.gfx')) {
+                    try {
+                        sources.push(fs.readFileSync(full, 'latin1'));
+                    } catch {
+                        // Unreadable file: skip it.
+                    }
+                }
+            }
+        };
+        walk(interfaceDirectory, 0);
+        return sources;
     }
 
     private async readBytes(file: string): Promise<Uint8Array | undefined> {

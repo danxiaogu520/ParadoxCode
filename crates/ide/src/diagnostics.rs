@@ -1050,10 +1050,20 @@ fn validate_semantic_container(
                 // Unknown scope-command targets used to carry a dedicated
                 // `InvalidScopeCommand` code; the message keeps the wording,
                 // the code folds into `InvalidValue`.
+                let texture_value = property
+                    .scalar
+                    .as_ref()
+                    .and_then(|(value, _)| (!value.is_empty()).then(|| value.as_ref()))
+                    .filter(|_| {
+                        applicable
+                            .iter()
+                            .any(|rule| matches!(rule.value, rules::ValueMatcher::TexturePath))
+                    });
                 let diagnostic_code = match scope_value.as_ref() {
                     Some(ScopeValueMatch::Known {
                         compatible: false, ..
                     }) => DiagnosticCode::WrongScope,
+                    _ if texture_value.is_some() => DiagnosticCode::UnknownTexturePath,
                     _ => DiagnosticCode::InvalidValue,
                 };
                 let range = property
@@ -1101,6 +1111,17 @@ fn validate_semantic_container(
                         "target `{value_text}` resolves to scope `{actual}`, expected {}",
                         expected.as_deref().unwrap_or("any scope")
                     ),
+                    _ if texture_value.is_some() => {
+                        let value = texture_value.unwrap_or_default();
+                        let suggestion = best_suggestion(
+                            value,
+                            snapshot.texture_catalog().sibling_paths(value, 8),
+                        );
+                        format!(
+                            "texture file `{value}` not found in any mod, game, or DLC pack root{}",
+                            did_you_mean(suggestion)
+                        )
+                    }
                     _ => format!(
                         "invalid value `{value_text}` for `{}`{}",
                         property.key,
@@ -1145,6 +1166,22 @@ fn validate_semantic_container(
                 if diagnostic_code == DiagnosticCode::InvalidValue
                     && let Some((value, value_range)) = property.scalar.as_ref()
                     && let Some(candidate) = enum_value_suggestion(snapshot, applicable, value)
+                {
+                    let replacement = format!(
+                        "\"{}\"",
+                        candidate.replace('\\', "\\\\").replace('"', "\\\"")
+                    );
+                    diagnostic = diagnostic.with_fix(QuickFix::suggestion(
+                        format!("Did you mean '{candidate}'?"),
+                        *value_range,
+                        replacement,
+                    ));
+                }
+                if diagnostic_code == DiagnosticCode::UnknownTexturePath
+                    && let Some((_, value_range)) = property.scalar.as_ref()
+                    && let Some(value) = texture_value
+                    && let Some(candidate) =
+                        best_suggestion(value, snapshot.texture_catalog().sibling_paths(value, 8))
                 {
                     let replacement = format!(
                         "\"{}\"",

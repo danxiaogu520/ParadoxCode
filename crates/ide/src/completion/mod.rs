@@ -72,6 +72,17 @@ pub fn complete_with_cancellation(
     let mut member_cache = CompletionMemberCache::default();
     let semantic_context =
         semantic_completion_context_with_cancellation(snapshot, &input, position, cancellation)?;
+    // Texture paths contain slashes, which the word-range prefix cannot span;
+    // a dedicated entry point replaces from the scalar's opening quote.
+    if let Some(context) = semantic_context.as_ref()
+        && let Some(items) =
+            texture_path_completion(snapshot, &input, position, context, cancellation)?
+    {
+        return Ok(CompletionResult {
+            revision: snapshot.revision(),
+            items,
+        });
+    }
     let value_context = if semantic_context
         .as_ref()
         .is_some_and(|context| semantic_root_entry_uses_bare_values(snapshot, context))

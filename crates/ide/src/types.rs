@@ -105,6 +105,9 @@ pub enum DiagnosticCode {
     /// A scalar or block does not satisfy the selected semantic matcher,
     /// including unrecognised target and scope-name values.
     InvalidValue,
+    /// A texture-path value does not resolve to any mod, game, or DLC pack
+    /// texture file after extension fallback.
+    UnknownTexturePath,
     /// A semantic rule cardinality constraint was violated.
     Cardinality,
     /// A key or value is known to the semantic rule set but is used from the
@@ -163,6 +166,7 @@ impl DiagnosticCode {
         Self::UnknownLocalisationKey,
         Self::AmbiguousDefinition,
         Self::InvalidValue,
+        Self::UnknownTexturePath,
         Self::Cardinality,
         Self::WrongScope,
         Self::DynamicDefinitionCycle,
@@ -200,6 +204,7 @@ impl DiagnosticCode {
             Self::UnknownLocalisationKey => "UnknownLocalisationKey",
             Self::AmbiguousDefinition => "AmbiguousDefinition",
             Self::InvalidValue => "InvalidValue",
+            Self::UnknownTexturePath => "UnknownTexturePath",
             Self::Cardinality => "Cardinality",
             Self::WrongScope => "WrongScope",
             Self::DynamicDefinitionCycle => "DynamicDefinitionCycle",
@@ -242,6 +247,9 @@ impl DiagnosticCode {
             | Self::EmptyBlock => Severity::Warning,
             Self::Syntax
             | Self::InvalidValue
+            // A sprite whose texture cannot be resolved renders as nothing, so
+            // the dangling reference is an error at the reference site.
+            | Self::UnknownTexturePath
             | Self::Cardinality
             | Self::WrongScope
             | Self::DynamicDefinitionCycle

@@ -156,6 +156,10 @@ const FIRST_PARTY_FILES: &[SourceFile<'static>] = &[
         bytes: include_bytes!("../../../../rules/eu4/values/enums/diplomacy.json"),
     },
     SourceFile {
+        path: "values/enums/interface.json",
+        bytes: include_bytes!("../../../../rules/eu4/values/enums/interface.json"),
+    },
+    SourceFile {
         path: "values/enums/map.json",
         bytes: include_bytes!("../../../../rules/eu4/values/enums/map.json"),
     },
@@ -243,6 +247,10 @@ pub const RESOLVED_SYMBOL_KINDS: &[&str] = &[
     "scripted_trigger",
     "scripted_effect",
     "sprite",
+    // GUI sprite names, bitmap-font names, and engine object (pdxmesh) names each
+    // share one load-time namespace, so duplicate definitions shadow by name.
+    "bitmap_font",
+    "object",
     "static_modifier",
     "idea",
     "idea_group",

@@ -14,7 +14,7 @@ use crate::semantic::{
 };
 use crate::support::{ParsedInput, contains, truncate_hover_text};
 use crate::types::{CancellationToken, Cancelled};
-use engine::AnalysisSnapshot;
+use engine::{AnalysisSnapshot, SourceRootKind};
 use rules::{KeyMatcher, RuleShape, ValueMatcher};
 use text::TextSize;
 
@@ -72,7 +72,21 @@ pub(crate) fn semantic_value_hover_at(
     else {
         return Ok(None);
     };
-    let Some(property) = context.property.as_ref() else {
+    // A quoted scalar the cursor sits inside is folded into `container_property`
+    // (with `property` empty) and the property key is appended to the parent
+    // path; the rule governing the value itself lives one level up.
+    let Some(property) = [
+        context.property.as_ref(),
+        context.container_property.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    .find(|property| {
+        property
+            .scalar
+            .as_ref()
+            .is_some_and(|(_, range)| contains(*range, position))
+    }) else {
         return Ok(None);
     };
     let Some((value, value_range)) = property.scalar.as_ref() else {
@@ -81,7 +95,15 @@ pub(crate) fn semantic_value_hover_at(
     if !contains(*value_range, position) {
         return Ok(None);
     }
-    let candidates = semantic_rules_for_completion(snapshot, &context)
+    let mut rule_context = context.clone();
+    if rule_context
+        .parent_path
+        .last()
+        .is_some_and(|segment| segment.eq_ignore_ascii_case(&property.key))
+    {
+        rule_context.parent_path.pop();
+    }
+    let candidates = semantic_rules_for_completion(snapshot, &rule_context)
         .into_iter()
         .filter(|candidate| {
             matches!(candidate.rule.shape, RuleShape::Leaf)
@@ -116,12 +138,43 @@ pub(crate) fn semantic_value_hover_at(
             "does not match"
         },
     ));
+    if candidates
+        .iter()
+        .any(|candidate| matches!(candidate.rule.value, ValueMatcher::TexturePath))
+    {
+        model.push_section(texture_resolution_section(snapshot, value));
+    }
     model.extend_sections(semantic_rule_hover_for_candidates(
         snapshot,
         word,
         &candidates,
     ));
     Ok(Some(model))
+}
+
+/// Provenance for a `texture_path` value hover: the resolved absolute path,
+/// the source root serving it, and whether only the engine's extension
+/// fallback saved the reference.
+fn texture_resolution_section(snapshot: &AnalysisSnapshot, value: &str) -> String {
+    match snapshot.resolve_texture_path(value) {
+        Some(resolution) => {
+            let origin = match resolution.hit.root_kind {
+                SourceRootKind::CurrentMod => "the current mod",
+                SourceRootKind::Dependency => "a dependency mod",
+                SourceRootKind::Vanilla => "the game or a DLC pack",
+            };
+            let fallback = if resolution.extension_fallback {
+                "\n- note: resolved through the engine's `.tga`/`.dds` extension fallback"
+            } else {
+                ""
+            };
+            format!(
+                "- resolved: `{}`\n- found in: {origin}{fallback}",
+                resolution.hit.path
+            )
+        }
+        None => "- resolved: not found in any mod, game, or DLC pack root".to_owned(),
+    }
 }
 
 /// Hover title in the symbol-hover pattern: the rule-context category (or
@@ -585,6 +638,7 @@ pub(crate) fn semantic_value_hover_label(matcher: &ValueMatcher) -> String {
             .map_or_else(|| "scope".to_owned(), |value| format!("scope `{value}`")),
         ValueMatcher::Localisation => "localisation key".to_owned(),
         ValueMatcher::Filepath => "filepath".to_owned(),
+        ValueMatcher::TexturePath => "texture path".to_owned(),
         ValueMatcher::Dynamic(value) => format!("dynamic value `{value}`"),
         ValueMatcher::DynamicSet(value) => format!("dynamic value set `{value}`"),
         ValueMatcher::TypedPrefix {
