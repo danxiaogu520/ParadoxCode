@@ -109,6 +109,20 @@
 
 ## 8. 平台/工具链事实
 
+### 8.1 CLI 工具偏好
+
+有现代 CLI 工具可用时，优先使用它们，避免冗长的 PowerShell 等价写法：
+
+- 文本或代码搜索用 `rg`，不用 `Select-String`。
+- 文件发现用 `fd`，不用递归 `Get-ChildItem`。
+- 读取文件用 `bat --style=plain --paging=never`。
+- 只读取文件片段时用 `bat --line-range START:END`。
+- JSON 处理用 `jq`。
+- YAML 处理用 `yq`。
+- 结构化代码搜索和 AST 感知重构用 `ast-grep`。
+
+### 8.2 已知平台事实
+
 - VS Code hover 渲染图片三件套：data URI + `isTrusted` + `|width=N` 尾缀（单边另一边自适应）；`file://` 与自定义 scheme 在 hover 不渲染 → hover 贴图必须"服务端发名字、客户端解码拼接"。
 - 字节级 fixture（`crates/transcode/tests/corpus/`）用 `.gitattributes` `-text` 钉住 CRLF；改 .gitattributes 后必须 `git add --renormalize`（stat 未变时直接 add 是 no-op）。GitHub windows runner 默认 autocrlf=true 会掩盖换行差异，只有 ubuntu leg 真实暴露。改 edg_ktp 对拍文件必须 master/release 两边同时重生成。
 - ubuntu-latest 新镜像不预装 rustup：CI 里装 cargo 工具用 `${CARGO_HOME:-$HOME/.cargo}` + `mkdir -p`（`~` 在双引号内不展开）。
