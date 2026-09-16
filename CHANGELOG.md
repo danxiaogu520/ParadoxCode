@@ -7,7 +7,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [0.3.6] - 2026-09-16
+## [0.3.7] - 2026-09-16
 
 ### Added
 
@@ -20,7 +20,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   engine namespace, so mission icons and event pictures resolve across all six).
   `objectTypes`/`pdxmesh` blocks symbolize as a new `object` kind and validate their mesh keys;
   `bitmapfonts`/`bitmapfont` blocks symbolize as `bitmap_font` (including vanilla's numbered
-  `2-bitmapfonts` root key in `chatfonts.gfx`) and validate the font keys.
+  `2-bitmapfonts` root key in `chatfonts.gfx`) and validate the font keys. The legacy
+  animated-overlay keys `animationtime` and `animationtype` join the sprite key set.
 - Texture reference checking with a new `UnknownTexturePath` diagnostic (error severity,
   ignorable via `paradoxcode.diagnosticIgnoreCodes`). The server builds a workspace texture
   catalog from every source root's `gfx/` and `tutorial/` trees plus DLC pack directories and
@@ -32,8 +33,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (slash-aware prefix replacement from the opening quote) and hover with their resolution
   provenance (which root serves the file, and whether the extension fallback saved it); the
   VS Code hover middleware appends the decoded texture preview on top of the server's
-  semantic hover instead of substituting for it. The full vanilla sweep stays at the reviewed
-  fingerprint — zero false positives across all 132 interface `.gfx` files.
+  semantic hover instead of substituting for it. Existence checking is scoped to
+  root-relative texture references it can actually adjudicate: a pdxmesh `animation`'s
+  `type` (a compiled clip name such as `polearm_onehanded_attack_animation`, not a file
+  path), `effectFile` (the engine resolves the compiled gfx/FX shader by name — the
+  historical `.lua` spellings do not exist on disk even in vanilla), and `meshsettings`
+  texture overrides (bare file names resolved relative to the mesh's own directory) are
+  documented but not existence-checked. Across the full vanilla sweep the check fires only
+  on genuinely missing files.
 
 - Mission Preview renders titles with the game's own bitmap fonts and honours `§` colour codes.
   Titles blit glyph-by-glyph from the BMFont atlases the game uses — vanilla `vic_18` for English
@@ -155,7 +162,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   nested call. On the reproducing workspace a 50-second edit session with the old failure now
   costs 3.7 seconds of CPU total and publishes diagnostics; editing the declaring file itself
   stays busy per keystroke (each edit legitimately rebuilds the reports) and settles the moment
-  typing stops.
+  typing stops. The rebuilt dynamic-definition reports also surface on the batch validation
+  path: eighteen genuine `mechanic_type` typos in vanilla `common/parliament_bribes` that the
+  stale-drop loop previously discarded now publish like any other InvalidValue.
 
 ## [0.3.5] - 2026-09-13
 
