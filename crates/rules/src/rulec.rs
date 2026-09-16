@@ -1457,10 +1457,10 @@ mod tests {
             read_json(&root.join("rules/manifest.json")).expect("committed manifest");
         let (_, source_model) = load_source(&root.join("rules/eu4")).expect("source model");
         assert_eq!(source_model.file_categories.len(), 124);
-        assert_eq!(source_model.symbol_descriptors.len(), 2665);
-        assert_eq!(source_model.records.len(), 12_971);
-        assert_eq!(source_model.semantic.rules.len(), 8_438);
-        assert_eq!(source_model.semantic.enum_values.len(), 72);
+        assert_eq!(source_model.symbol_descriptors.len(), 2663);
+        assert_eq!(source_model.records.len(), 12_968);
+        assert_eq!(source_model.semantic.rules.len(), 8_435);
+        assert_eq!(source_model.semantic.enum_values.len(), 71);
         assert_eq!(source_model.semantic.type_root_keys.len(), 7);
         assert_eq!(source_model.semantic.type_root_scopes.len(), 4);
         assert_eq!(
@@ -1533,16 +1533,39 @@ mod tests {
                 "modifier rule {key} must use scopes {expected_scopes:?}"
             );
         }
-        let vanilla_modifier_enum = source_model
+        let vanilla_enum_fallback = source_model
             .semantic
             .rules
             .iter()
-            .find(|rule| rule.id == "eu4:modifier:vanilla_exported_keys")
-            .expect("Vanilla modifier enum fallback");
-        assert_eq!(
-            vanilla_modifier_enum.allowed_scopes,
-            ["country"],
-            "the vanilla export enum keys are country-class, closing the two-class modifier partition"
+            .find(|rule| rule.id == "eu4:modifier:vanilla_exported_keys");
+        assert!(
+            vanilla_enum_fallback.is_none(),
+            "the frozen export-key enum was replaced by the faction/power template families"
+        );
+        for retired in [
+            "eu4:modifier:<estate>_loyalty_equilibrium",
+            "modifiers:386:rule:root:modifiers:secondary_religion",
+            "modifiers:558:alias:modifier:secondary_religion",
+            "modifiers:675:alias:modifier:reduced_native_attacks",
+        ] {
+            assert!(
+                source_model
+                    .semantic
+                    .rules
+                    .iter()
+                    .all(|rule| rule.id != retired),
+                "retired modifier rule {retired} must stay removed"
+            );
+        }
+        let secondary_religion_flag = source_model
+            .semantic
+            .rules
+            .iter()
+            .find(|rule| rule.id.ends_with("root:event_modifier:secondary_religion"))
+            .expect("secondary_religion lives on the event-modifier definition layer");
+        assert!(
+            matches!(&secondary_religion_flag.value, ValueMatcher::Exact(value) if value == "yes"),
+            "secondary_religion is a yes-flag, not a numeric modifier"
         );
         // The engine-parameterized families are template rows: the concrete power
         // instances were removed in favour of workspace-member matching, and the
@@ -1581,6 +1604,23 @@ mod tests {
         };
         assert_eq!(parameter.type_domain(), Some("estate"));
         assert_eq!(parameter.strip_prefix.as_deref(), Some("estate_"));
+        let faction_influence = source_model
+            .semantic
+            .rules
+            .iter()
+            .find(|rule| rule.id == "eu4:modifier:<faction>_influence")
+            .expect("faction influence template rule");
+        let KeyMatcher::Template {
+            prefix,
+            parameter,
+            suffix,
+        } = &faction_influence.key
+        else {
+            panic!("faction influence family must use a template key matcher");
+        };
+        assert_eq!((prefix.as_str(), suffix.as_str()), ("", "_influence"));
+        assert_eq!(parameter.type_domain(), Some("faction"));
+        assert_eq!(parameter.strip_prefix, None);
         let top_level_exact = |context: &str, key: &str| {
             source_model
                 .semantic
