@@ -6,6 +6,8 @@
 // appends a `data:` image section — the same "server sends names, client
 // owns pixels" split the mission preview uses.
 
+import { toHoverImageUrl } from './hoverCards';
+
 /** Widest image a hover tooltip renders; wider textures scale down. */
 export const HOVER_IMAGE_MAX_WIDTH = 400;
 
@@ -30,6 +32,27 @@ export interface TexturePreview {
  */
 export function extractSpriteHoverName(markdown: string): string | undefined {
     return markdown.match(/^### sprite `([^`]+)`/m)?.[1];
+}
+
+/**
+ * Extracts the markdown payload from a hover's contents. VS Code's `Hover`
+ * class normalizes whatever the provider passes — including the single
+ * `MarkdownString` vscode-languageclient builds from `MarkupContent` — into a
+ * `contents` array, so both shapes must be accepted here; legacy
+ * `MarkedString` strings and code blocks are skipped.
+ */
+export function markdownFromHoverContents(contents: unknown): { value: string } | undefined {
+    const candidates = Array.isArray(contents) ? contents : [contents];
+    for (const candidate of candidates) {
+        if (typeof candidate !== 'object' || candidate === null) {
+            continue;
+        }
+        const { value, language } = candidate as { value?: unknown; language?: unknown };
+        if (typeof value === 'string' && language === undefined) {
+            return candidate as { value: string };
+        }
+    }
+    return undefined;
 }
 
 /**
@@ -74,7 +97,9 @@ export function texturefileValueAt(line: string, character: number): string | un
 /** Assembles the markdown image, capping the rendered hover width. */
 export function textureImageMarkdown(preview: TexturePreview): string {
     const suffix = preview.width > HOVER_IMAGE_MAX_WIDTH ? `|width=${HOVER_IMAGE_MAX_WIDTH}` : '';
-    return `![${preview.name}](${preview.url}${suffix})`;
+    // Large textures spill into the file cache: an inline data URL beyond
+    // VS Code's 100k hover markdown cap renders as literal source text.
+    return `![${preview.name}](${toHoverImageUrl(preview.url)}${suffix})`;
 }
 
 /** Appends a `#### Texture` section to an existing sprite hover. */

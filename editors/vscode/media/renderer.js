@@ -541,7 +541,9 @@
     }
 
     // Splits styled runs into wrap tokens: CJK characters break individually,
-    // Latin words (with their inner spaces) stay whole.
+    // Latin words stay whole and wrap at word boundaries — whitespace opens a
+    // new token (leading the word it precedes, stripped when that word starts
+    // a line).
     function tokenizeStyled(line) {
         const tokens = [];
         let word = null;
@@ -553,6 +555,15 @@
                         word = null;
                     }
                     tokens.push({ text: ch, color: run.color });
+                } else if (/\s/.test(ch)) {
+                    if (word && word.color === run.color && /^\s+$/.test(word.text)) {
+                        word.text += ch;
+                    } else {
+                        if (word) {
+                            tokens.push(word);
+                        }
+                        word = { text: ch, color: run.color };
+                    }
                 } else if (word && word.color === run.color) {
                     word.text += ch;
                 } else {
