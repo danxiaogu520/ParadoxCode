@@ -12804,19 +12804,6 @@
     },
     {
       "table": "aliases",
-      "logical_id": "modifiers:root:112",
-      "source_order": 11031,
-      "fields": {
-        "key": "alias[modifier:secondary_religion]",
-        "line": "794",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "bool"
-      }
-    },
-    {
-      "table": "aliases",
       "logical_id": "modifiers:root:113",
       "source_order": 11032,
       "fields": {
@@ -14676,21 +14663,6 @@
         "documentation": "Triple manpower on religious wars",
         "key": "alias[modifier:cb_on_government_enemies]",
         "line": "1201",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "bool"
-      }
-    },
-    {
-      "table": "aliases",
-      "logical_id": "modifiers:root:229",
-      "source_order": 11148,
-      "fields": {
-        "directives": "scope = country",
-        "documentation": "Reduces the rate of native attacks. NOTE: no localisation and exact rate, or if it works at all, is unknown.",
-        "key": "alias[modifier:reduced_native_attacks]",
-        "line": "1205",
         "operator": "=",
         "shape": "scalar",
         "source_file": "catalog.json",

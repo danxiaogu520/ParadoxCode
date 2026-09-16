@@ -39664,6 +39664,36 @@
     "line": 1397
   },
   {
+    "id": "common/modifiers_consolidated:30:rule:root:event_modifier:secondary_religion",
+    "context": "root:event_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "secondary_religion"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Event-modifier-only flag: the modifier disappears when the country changes its syncretic religion."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1396
+  },
+  {
     "id": "common/modifiers_consolidated:32:rule:root:static_modifier:picture",
     "context": "root:static_modifier",
     "parent_path": [],

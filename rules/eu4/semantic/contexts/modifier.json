@@ -10256,39 +10256,6 @@
     "line": 5951
   },
   {
-    "id": "modifiers:386:rule:root:modifiers:secondary_religion",
-    "context": "modifier",
-    "parent_path": [],
-    "key": {
-      "exact": "secondary_religion"
-    },
-    "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [
-      "Event-modifier-only flag (used as yes): when added to an event modifier, it disappears if the country changes religion (or syncretic religion)."
-    ],
-    "allowed_scopes": [
-      "country"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5952
-  },
-  {
     "id": "modifiers:387:rule:root:modifiers:settle_cost",
     "context": "modifier",
     "parent_path": [],
@@ -16438,34 +16405,6 @@
     "line": 6141
   },
   {
-    "id": "modifiers:558:alias:modifier:secondary_religion",
-    "context": "modifier",
-    "parent_path": [],
-    "key": {
-      "exact": "secondary_religion"
-    },
-    "operator": "=",
-    "value": "bool",
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": "modifiers:558:alias:modifier:secondary_religion",
-    "severity": null,
-    "required": false,
-    "documentation": [
-      "Event-modifier-only flag (used as yes): when added to an event modifier, it disappears if the country changes religion (or syncretic religion)."
-    ],
-    "allowed_scopes": [
-      "country"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 6142
-  },
-  {
     "id": "modifiers:559:alias:modifier:monarch_lifespan",
     "context": "modifier",
     "parent_path": [],
@@ -20579,34 +20518,6 @@
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6271
-  },
-  {
-    "id": "modifiers:675:alias:modifier:reduced_native_attacks",
-    "context": "modifier",
-    "parent_path": [],
-    "key": {
-      "exact": "reduced_native_attacks"
-    },
-    "operator": "=",
-    "value": "bool",
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": "modifiers:675:alias:modifier:reduced_native_attacks",
-    "severity": null,
-    "required": false,
-    "documentation": [
-      "Reduces the rate of native attacks. NOTE: no localisation and exact rate, or if it works at all, is unknown."
-    ],
-    "allowed_scopes": [
-      "country"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 6272
   },
   {
     "id": "modifiers:676:alias:modifier:no_cost_for_reinforcing",
@@ -27418,40 +27329,6 @@
     "line": 6485
   },
   {
-    "id": "eu4:modifier:vanilla_exported_keys",
-    "context": "modifier",
-    "parent_path": [],
-    "key": {
-      "enum": "vanilla_exported_modifier_keys"
-    },
-    "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
-    "documentation": [
-      "Numeric EU4 modifier keys exported by the current Vanilla game version."
-    ],
-    "allowed_scopes": [
-      "country"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 7003
-  },
-  {
     "id": "eu4:modifier:hull_size",
     "context": "modifier",
     "parent_path": [],
@@ -27869,17 +27746,16 @@
     "line": 0
   },
   {
-    "id": "eu4:modifier:<estate>_loyalty_equilibrium",
+    "id": "eu4:modifier:<faction>_influence",
     "context": "modifier",
     "parent_path": [],
     "key": {
       "template": {
         "prefix": "",
         "parameter": {
-          "type": "estate",
-          "strip_prefix": "estate_"
+          "type": "faction"
         },
-        "suffix": "_loyalty_equilibrium"
+        "suffix": "_influence"
       }
     },
     "operator": "=",
@@ -27891,11 +27767,11 @@
     },
     "shape": "leaf",
     "child_context": null,
-    "alternative_id": "eu4:modifier:<estate>_loyalty_equilibrium",
+    "alternative_id": "eu4:modifier:<faction>_influence",
     "severity": null,
     "required": false,
     "documentation": [
-      "Modifies the loyalty equilibrium of the specified estate."
+      "Adds to the monthly rate of faction influence; generated for all factions in common/factions."
     ],
     "allowed_scopes": [
       "country"
@@ -27905,7 +27781,7 @@
     "min_occurs": 0,
     "strict_min": true,
     "max_occurs": null,
-    "source_file": "estates-preload",
+    "source_file": "wiki-modifier-list",
     "line": 0
   },
   {
