@@ -6136,11 +6136,6 @@
       "case_sensitive": false
     },
     {
-      "kind_id": "modifier:reduced_native_attacks",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
       "kind_id": "modifier:reduced_stab_impacts",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
@@ -6222,11 +6217,6 @@
     },
     {
       "kind_id": "modifier:sea_repair",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
-      "kind_id": "modifier:secondary_religion",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },

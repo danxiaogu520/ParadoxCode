@@ -2851,8 +2851,10 @@ fn template_modifier_families_resolve_workspace_estates_and_powers() {
     let root = std::env::temp_dir().join(format!("ide-template-modifiers-{nonce}"));
     let estates = root.join("common/estates");
     let mechanics = root.join("common/government_mechanics");
+    let factions = root.join("common/factions");
     std::fs::create_dir_all(&estates).expect("estates directory");
     std::fs::create_dir_all(&mechanics).expect("mechanics directory");
+    std::fs::create_dir_all(&factions).expect("factions directory");
     std::fs::write(
         estates.join("00_test.txt"),
         "estate_my_guild = { icon = 1 }
@@ -2865,6 +2867,12 @@ fn template_modifier_families_resolve_workspace_estates_and_powers() {
 ",
     )
     .expect("mechanic source");
+    std::fs::write(
+        factions.join("00_test.txt"),
+        "my_guild_faction = { icon = 1 }
+",
+    )
+    .expect("faction source");
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -2880,9 +2888,9 @@ fn template_modifier_families_resolve_workspace_estates_and_powers() {
 ",
         "  my_guild_loyalty_modifier = 0.1
 ",
-        "  my_guild_loyalty_equilibrium = 0.1
-",
         "  my_guild_privilege_slots = 1
+",
+        "  my_guild_faction_influence = 0.1
 ",
         "  monthly_guild_power = 1
 ",
@@ -2895,8 +2903,8 @@ fn template_modifier_families_resolve_workspace_estates_and_powers() {
     let diagnostics = diagnostics(&host.snapshot(), &id);
     for key in [
         "my_guild_loyalty_modifier",
-        "my_guild_loyalty_equilibrium",
         "my_guild_privilege_slots",
+        "my_guild_faction_influence",
         "monthly_guild_power",
         "guild_power_gain_modifier",
     ] {
@@ -2907,6 +2915,20 @@ fn template_modifier_families_resolve_workspace_estates_and_powers() {
             "workspace-backed template modifier {key} must not be flagged: {diagnostics:?}"
         );
     }
+
+    let bad = DocumentId::new("file:///tmp/common/church_aspects/equilibrium.txt");
+    let text = "guild_aspect = { cost = 1 modifier = { my_guild_loyalty_equilibrium = 0.1 } }
+";
+    host.open_document(bad.clone(), 1, text.to_owned(), None)
+        .expect("open loyalty equilibrium aspect");
+    let diagnostics = crate::diagnostics(&host.snapshot(), &bad);
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::UnknownKey
+                && diagnostic.message.contains("my_guild_loyalty_equilibrium")),
+        "per-estate loyalty equilibrium must be spelled <estate>_loyalty_modifier: {diagnostics:?}"
+    );
 
     let bad = DocumentId::new("file:///tmp/common/church_aspects/stranger.txt");
     let text = "stranger_aspect = { cost = 1 modifier = { stranger_loyalty_modifier = 0.1 } }

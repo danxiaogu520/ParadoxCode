@@ -101601,19 +101601,6 @@
     },
     {
       "table": "rule_nodes",
-      "logical_id": "modifiers:modifiers:root:0:386",
-      "source_order": 10860,
-      "fields": {
-        "key": "secondary_religion",
-        "line": "391",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "country"
-      }
-    },
-    {
-      "table": "rule_nodes",
       "logical_id": "modifiers:modifiers:root:0:387",
       "source_order": 10861,
       "fields": {

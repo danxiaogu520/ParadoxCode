@@ -916,8 +916,10 @@ fn template_modifier_rules_complete_workspace_member_spellings() {
     let root = std::env::temp_dir().join(format!("ide-template-completion-{nonce}"));
     let estates = root.join("common/estates");
     let mechanics = root.join("common/government_mechanics");
+    let factions = root.join("common/factions");
     std::fs::create_dir_all(&estates).expect("estates directory");
     std::fs::create_dir_all(&mechanics).expect("mechanics directory");
+    std::fs::create_dir_all(&factions).expect("factions directory");
     std::fs::write(
         estates.join("00_test.txt"),
         "estate_my_guild = { icon = 1 }
@@ -930,6 +932,12 @@ fn template_modifier_rules_complete_workspace_member_spellings() {
 ",
     )
     .expect("mechanic source");
+    std::fs::write(
+        factions.join("00_test.txt"),
+        "my_guild_faction = { icon = 1 }
+",
+    )
+    .expect("faction source");
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -977,13 +985,17 @@ fn template_modifier_rules_complete_workspace_member_spellings() {
         "my_guild_loyalty_modifier",
         "my_guild_influence_modifier",
         "my_guild_privilege_slots",
-        "my_guild_loyalty_equilibrium",
     ] {
         assert!(
             offered.contains(&expected),
             "expected template spelling {expected}; offered: {offered:?}"
         );
     }
+    assert!(
+        !offered.contains(&"my_guild_loyalty_equilibrium"),
+        "per-estate loyalty equilibrium is spelled <estate>_loyalty_modifier; \
+         offered: {offered:?}"
+    );
     assert!(
         result
             .items
@@ -1010,6 +1022,26 @@ fn template_modifier_rules_complete_workspace_member_spellings() {
     assert!(
         offered.contains(&"monthly_guild_power"),
         "expected workspace power spelling; offered: {offered:?}"
+    );
+
+    let faction_id = DocumentId::new("file:///tmp/common/church_aspects/faction-completion.txt");
+    let text = "guild_aspect = { cost = 1 modifier = { my_guild_faction_";
+    host.open_document(faction_id.clone(), 1, text.to_owned(), None)
+        .expect("open faction completion site");
+    let snapshot = host.snapshot();
+    let result = complete(
+        &snapshot,
+        &faction_id,
+        u32::try_from(text.find("my_guild_faction_").expect("faction key") + 1).expect("position"),
+    );
+    let offered: Vec<&str> = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect();
+    assert!(
+        offered.contains(&"my_guild_faction_influence"),
+        "expected workspace faction spelling; offered: {offered:?}"
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
