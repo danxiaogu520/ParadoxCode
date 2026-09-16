@@ -1,9 +1,13 @@
 # Releasing ParadoxCode
 
 ParadoxCode publishes the server and editor extension as one immutable version. The release
-workflow does not make a GitHub Release public until the five native server archives, their five
-checksum sidecars, the VSIX, and the release sweep summary have all been built and verified.
-Visual Studio Marketplace publication remains a separate manual step.
+workflow uses only repository-owned source and fixtures: it builds five native server archives,
+their five checksum sidecars, and one VSIX, verifies the eleven-file payload, then publishes it
+once. Licensed game files and local Vanilla sweep output never enter GitHub Actions or Releases.
+
+Visual Studio Marketplace publication remains a separate manual acceptance step. Validation
+ownership across the complete development lifecycle is documented in
+[`docs/validation.md`](docs/validation.md).
 
 ## One-time publisher and repository setup
 
@@ -13,67 +17,69 @@ Visual Studio Marketplace publication remains a separate manual step.
    security updates in the GitHub repository settings.
 3. Keep the `main-protection` and `version-tags` repository rulesets active. `main` requires the
    `Conclusion` check; `v*` tags cannot be updated or deleted after creation.
-4. Keep the dedicated `paradoxcode-sweep` runner and repository Actions variables healthy. See
-   [`docs/runner-recovery.md`](docs/runner-recovery.md).
+4. Keep Marketplace credentials outside the repository and GitHub build jobs.
 
-## Before tagging
+## Release-preparation pull request
 
-1. Merge the release-preparation pull request and wait for its `Conclusion` check to succeed on
-   `main`.
-2. Confirm `Cargo.toml`, `editors/vscode/package.json`, and `editors/vscode/package-lock.json`
-   carry the intended version and that `CHANGELOG.md` has a dated entry for it.
-3. Run `cargo tools gates`. Do not tag if any local group fails.
-4. If the release intentionally changes diagnostic output, update
-   `editors/vscode/scripts/sweep-baseline.json` with the accepted fingerprint (taken from the
-   sweep report that produced it) through a reviewed pull request. The release sweep accepts
-   exactly that fingerprint and still fails on any other drift.
-5. Package the VSIX with `npm --prefix editors/vscode run package`, install it into a clean VS Code
-   profile, trust an EU4 Mod workspace, and open an EU4 file. Verify that the ParadoxCode status
-   item shows its check mark without configuring the server, completion and diagnostics work, and
-   the output reports a checksum-verified automatic installation.
-6. Review the generated VSIX contents and confirm no Vanilla files, caches, credentials, or
-   development artifacts are present.
+1. Choose the version according to the release scope. Keep fixes and maintenance separate from
+   unrelated high-risk features.
+2. Update `Cargo.toml`, `editors/vscode/package.json`, and
+   `editors/vscode/package-lock.json`; update the root and fuzz lockfiles where required.
+3. Move the relevant `CHANGELOG.md` entries from Unreleased into a dated version section. Update
+   current-version user documentation without duplicating historical release prose.
+4. Run the affected local groups from `docs/validation.md`. Package and install the VSIX into a
+   clean VS Code profile when extension startup, installation, or distribution changed.
+5. If diagnostic, rule, parser/HIR, index, or workspace-query behavior changed, run the local
+   Vanilla sweep as development evidence. Keep every generated report local and reduce any defect
+   found to a repository-owned regression fixture.
+6. Merge only after the pull request's required `Conclusion` check succeeds. Wait for the same
+   check to succeed on the resulting `main` commit.
+
+Local checks and sweep output do not authorize a release. The tagged commit's remote `Conclusion`
+is the source of truth.
 
 ## Publish
 
 Create and push an annotated version tag from the reviewed commit on `main`:
 
 ```bash
-git tag -a v0.3.7 -m "ParadoxCode 0.3.7"
-git push origin v0.3.7
+git tag -a vX.Y.Z -m "ParadoxCode X.Y.Z"
+git push origin vX.Y.Z
 ```
 
 The tag workflow performs these gates in order:
 
 1. Verify stable SemVer, annotated-tag form, ancestry from `main`, a successful `Conclusion` check,
    and the absence of an existing GitHub Release for the tag.
-2. Build and checksum all five native server archives, and build and audit the VSIX.
-3. Pass the packaged Windows archive to the self-hosted release sweep, compare its diagnostic
-   fingerprint with the previous release, and save `sweep-summary.json`.
-4. Reassemble and verify the twelve-file release payload.
+2. Build and checksum all five native server archives and verify that every binary reports the tag
+   version.
+3. Build, contract-test, audit, and package the VSIX at the same version.
+4. Reassemble and verify the eleven-file release payload.
 5. Create a draft Release, compare every uploaded asset name with the verified payload, and only
    then publish it. Repository release immutability locks the published assets and tag.
 
-The workflow intentionally has no overwrite path. A run may be manually dispatched for an
-unpublished annotated tag, but it cannot replace or modify an existing Release.
+The workflow intentionally has no overwrite path. It can be manually rerun for an unpublished
+annotated tag, but it cannot replace or modify an existing Release.
 
-## Recover an interrupted draft
+## Recover an interrupted release
 
-If the final publication job is interrupted after it creates a draft, inspect that draft and its
-workflow logs. Published releases must never be edited or deleted. For a draft only:
+First distinguish infrastructure interruption from a product defect:
 
-1. Confirm the Release is still marked Draft and record the failed workflow URL.
-2. Delete the incomplete draft in the GitHub UI without deleting or moving its tag.
-3. Re-run the Release workflow for the same unpublished tag.
-
-If a Release has already become public, fix any defect in a new patch version instead of modifying
-the published version.
+- For a transient build or GitHub interruption on an unpublished tag, rerun the Release workflow.
+- If the final job created an incomplete draft, confirm it is still a draft, record the failed run,
+  delete only that draft without deleting or moving its tag, then rerun the workflow.
+- If code or release metadata must change, repair it through a pull request and create a new patch
+  tag. Protected tags are never moved or deleted.
+- Published releases and their assets are never edited or replaced.
 
 ## Verify the public release
 
 1. Confirm the Release is immutable and carries exactly five server archives, five `.sha256`
-   sidecars, `paradoxcode-vscode-<version>.vsix`, and `sweep-summary.json`.
-2. Confirm the Release workflow's provenance, build, extension, sweep, and publish jobs all passed.
-3. Upload the VSIX manually to Visual Studio Marketplace. Subscribe from a clean VS Code profile
-   and repeat the installation smoke test without relying on a populated global server cache.
-4. Record public links and known limitations in the release notes and milestone.
+   sidecars, and `paradoxcode-vscode-<version>.vsix`.
+2. Confirm the Release workflow's provenance, build, extension, payload-verification, and publish
+   jobs all passed.
+3. Upload the released VSIX manually to Visual Studio Marketplace. From a clean VS Code profile,
+   install the Marketplace version and verify checksum-backed server installation, startup,
+   completion, and diagnostics without relying on a populated global server cache.
+4. Record the GitHub Release and Marketplace links, known limitations, and milestone completion in
+   the release notes or release issue.

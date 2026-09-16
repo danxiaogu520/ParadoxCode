@@ -1,6 +1,0 @@
-{
-  "fingerprint": "e0f594fcc334cac32acb6cbf4556fd507f1d55b2669fe9ff0989264de4afcdfb",
-  "previous_fingerprint": "269c1d11d1f75752edb3978a60824217297af747e4aeaaa7a0005f08177e3858",
-  "reason": "Texture existence checking is scoped to root-relative texture references it can adjudicate: pdxmesh animation clip names, gfx/FX shader-name effectFile references, and mesh-relative meshsettings textures stop being checked (2165 false UnknownTexturePath errors on the Vanilla sweep), the legacy animated-overlay keys animationtime/animationtype join the sprite animation key set (12 UnknownKey), and the remaining drift is genuine Vanilla content newly surfaced by the definitions-cache fix and sprite symbolization (31 truly missing texture files, 18 vanilla mechanic_type typos, 5 sprite name collisions).",
-  "established": "2026-09-16"
-}

@@ -82,17 +82,11 @@ that send only the deprecated `rootUri` field are intentionally unsupported and 
 
 ## Project status
 
-**Latest release: v0.3.5** (13 Sep 2026). The EU4 analysis and indexing features are implemented,
-tested, and released through the tag-driven release pipeline (see [Releases](#releases)). This
-release retires the typed-language editor surface for EU4 localisation prose (no diagnostics or
-identifier completion in `.yml` localisation documents; the decoded `pdcloc://` view opens
-automatically and remains the only reporter of the not-transcoded warning), makes completion's
-dynamic-contract inference cancellable so obsolete requests stop pinning a core, and hardens the
-release process into protected atomic releases (immutable assets, a packaged-artifact sweep,
-pinned GitHub Actions, and a host allowlist on the self-hosted runner). Early adopters should
-still expect rough edges while 0.x matures; please report problems
-through the issue templates so they can be fixed in the next
-release.
+**Latest release: v0.3.7** (16 Sep 2026). The EU4 analysis and indexing features are implemented,
+tested, and released through the tag-driven pipeline described under [Releases](#releases). See
+the [changelog](CHANGELOG.md) for the complete version history. Early adopters should still expect
+rough edges while 0.x matures; please report problems through the issue templates so they can be
+fixed in the next release.
 
 Known limitations of the current scope:
 
@@ -136,21 +130,21 @@ cargo build --locked --workspace
 cargo test --locked --workspace --all-targets
 ```
 
-Run the quality gates explicitly (or diagnose one group: `core`, `vscode`, `release`, `fuzz`,
-`core-fast`, `perf`). There are no commit hooks. CI uses the same local gate intent and adds its
-platform matrix, MSRV, dependency-policy, typo, and nightly fuzz checks on every pull request:
+Run the deterministic local checks explicitly, or select the affected group: `core`, `core-fast`,
+`vscode`, `policy`, `artifact`, `fuzz`, or `perf`. There are no commit hooks:
 
 ```bash
 cargo tools gates
 ```
 
 The alias comes from `.cargo/config.toml`; the long spelling is `cargo run -p tools -- gates`.
-The pull-request CI follows the `core-fast` group, which keeps correctness checks but excludes
-benchmark targets. The optimized benchmark suite is retained under the `perf` group and runs in
-the scheduled/manual Performance workflow. CI also runs the editor, fuzz, and dependency jobs on
-every pull request; fuzz is limited to its direct runtime dependencies, while the Windows
-release build runs in parallel with the Windows test/lint job. The `Conclusion` job is the stable
-aggregate required by branch protection.
+The default `all` group means all default deterministic local groups (optimized `perf` remains
+opt-in), not release readiness. Pull-request CI owns clean-checkout and cross-platform coverage,
+and its `Conclusion` job is the stable merge authority required by branch protection.
+Vulnerability feeds and optimized benchmarks run as scheduled audits so external changes cannot
+block an unrelated pull request. The complete mapping from local feedback through release and
+manual acceptance lives in
+[docs/validation.md](docs/validation.md).
 
 Validate and compile the developer-maintained first-party rule source with `bake`; the output
 can be placed in the ignored build directory for inspection:
@@ -290,12 +284,11 @@ records the schema version, source format, canonical `rule_hash`, and artifact c
 ## Releases
 
 Releases are tag-driven: pushing a protected, annotated `v0.x.y` tag verifies that its commit is on
-`main` with a successful `Conclusion` check, builds all five native `paradoxcode` archives and the
-VSIX, and runs the release sweep against the exact packaged Windows binary. Only after all gates
-pass does the workflow assemble and verify a draft with twelve assets, publish it, and let GitHub
-lock the release against later asset or tag changes. Visual Studio Marketplace publication is
-temporarily manual; download the attached VSIX and upload it from the publisher management page.
-Version history and per-release changes are tracked in
+`main` with a successful `Conclusion` check, builds five native `paradoxcode` archives, five
+checksum sidecars, and the VSIX, then verifies the eleven-file draft before publishing it once.
+GitHub Actions uses only repository-owned source and fixtures; licensed game files and local
+Vanilla sweep reports never enter CI or a Release. Visual Studio Marketplace publication remains
+manual. Version history and per-release changes are tracked in
 [CHANGELOG.md](CHANGELOG.md); the full release checklist lives in [RELEASING.md](RELEASING.md).
 
 ## Contributing

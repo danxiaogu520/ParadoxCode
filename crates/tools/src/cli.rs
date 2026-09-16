@@ -22,7 +22,7 @@ const USAGE: &str = "usage (cargo tools <command> ... or: cargo run -p tools -- 
   index dependency --id <id> --source <directory> --output <cache.pdcindex>
   setup vanilla [--game eu4] [--root <directory>]... [--source <game directory>]
   check policy|release|all [--root <repository root>]
-  gates [core|core-fast|perf|vscode|release|fuzz|all]... [--root <repository root>]
+  gates [core|core-fast|vscode|policy|artifact|fuzz|perf|all]... [--root <repository root>]
   release package --version <semver> --target <target> --binary <path> --output-dir <path> [--root <repository root>]
   release verify --version <semver> --directory <path> [--root <repository root>]";
 const SUPPORTED_GAME_INSTALLATIONS: &[GameInstallDescriptor] = &[game::eu4::INSTALL_DESCRIPTOR];
