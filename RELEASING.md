@@ -39,8 +39,8 @@ Visual Studio Marketplace publication remains a separate manual step.
 Create and push an annotated version tag from the reviewed commit on `main`:
 
 ```bash
-git tag -a v0.3.5 -m "ParadoxCode 0.3.5"
-git push origin v0.3.5
+git tag -a v0.3.6 -m "ParadoxCode 0.3.6"
+git push origin v0.3.6
 ```
 
 The tag workflow performs these gates in order:
