@@ -1457,10 +1457,10 @@ mod tests {
             read_json(&root.join("rules/manifest.json")).expect("committed manifest");
         let (_, source_model) = load_source(&root.join("rules/eu4")).expect("source model");
         assert_eq!(source_model.file_categories.len(), 124);
-        assert_eq!(source_model.symbol_descriptors.len(), 2663);
-        assert_eq!(source_model.records.len(), 12_968);
+        assert_eq!(source_model.symbol_descriptors.len(), 2657);
+        assert_eq!(source_model.records.len(), 12_962);
         assert_eq!(source_model.semantic.rules.len(), 8_435);
-        assert_eq!(source_model.semantic.enum_values.len(), 71);
+        assert_eq!(source_model.semantic.enum_values.len(), 63);
         assert_eq!(source_model.semantic.type_root_keys.len(), 7);
         assert_eq!(source_model.semantic.type_root_scopes.len(), 4);
         assert_eq!(
@@ -1504,7 +1504,7 @@ mod tests {
         assert_eq!(startup.this, "country");
         assert_eq!(startup.from, "any");
         assert!(!startup.documentation.is_empty());
-        assert_eq!(source_model.semantic.type_descriptors.len(), 155);
+        assert_eq!(source_model.semantic.type_descriptors.len(), 156);
         assert_eq!(source_model.semantic.localisation_bindings.len(), 189);
         assert_eq!(source_model.profile.scan_roots.len(), 126);
         for (key, expected_scopes) in [
@@ -1621,6 +1621,83 @@ mod tests {
         assert_eq!((prefix.as_str(), suffix.as_str()), ("", "_influence"));
         assert_eq!(parameter.type_domain(), Some("faction"));
         assert_eq!(parameter.strip_prefix, None);
+        // 2026-09-16 extraction: the frozen ancestor enum was replaced by a
+        // workspace type whose members splice off the boilerplate affixes of the
+        // declaring blocks (`ancestor_<key>_personality` -> `<key>`).
+        assert!(
+            !source_model
+                .semantic
+                .enum_values
+                .contains_key("ancestor_key"),
+            "the frozen ancestor enum was replaced by the ancestor_personality type"
+        );
+        let ancestor_descriptor = source_model
+            .semantic
+            .type_descriptors
+            .get("ancestor_personality")
+            .expect("ancestor personality value type");
+        assert_eq!(
+            ancestor_descriptor.path.as_deref(),
+            Some("game/common/ancestor_personalities")
+        );
+        assert_eq!(
+            ancestor_descriptor.name_strip_prefix.as_deref(),
+            Some("ancestor_")
+        );
+        assert_eq!(
+            ancestor_descriptor.name_strip_suffix.as_deref(),
+            Some("_personality")
+        );
+        assert_eq!(
+            ancestor_descriptor.splice_definition_name("ancestor_sage_personality"),
+            "sage"
+        );
+        assert_eq!(
+            ancestor_descriptor.splice_definition_name("free_thinker"),
+            "free_thinker"
+        );
+        let mut ancestor_key_rows = source_model
+            .semantic
+            .rules
+            .iter()
+            .filter(|rule| {
+                (rule.context.eq_ignore_ascii_case("effect")
+                    || rule.context.eq_ignore_ascii_case("trigger"))
+                    && rule
+                        .parent_path
+                        .first()
+                        .is_some_and(|parent| parent.contains("personality_ancestor"))
+                    && matches!(&rule.key, KeyMatcher::Exact(key) if key == "key")
+            })
+            .collect::<Vec<_>>();
+        ancestor_key_rows.sort_by(|left, right| left.id.cmp(&right.id));
+        assert_eq!(ancestor_key_rows.len(), 10);
+        assert!(ancestor_key_rows.iter().all(|rule| matches!(
+            &rule.value,
+            ValueMatcher::Type(type_name) if type_name == "ancestor_personality"
+        )));
+        for parent in [
+            "remove_ruler_personality",
+            "remove_queen_personality",
+            "remove_heir_personality",
+        ] {
+            let operand = source_model
+                .semantic
+                .rules
+                .iter()
+                .find(|rule| {
+                    rule.context.eq_ignore_ascii_case("effect")
+                        && rule.parent_path.first().is_some_and(|p| p == parent)
+                        && matches!(&rule.value, ValueMatcher::Type(_))
+                })
+                .unwrap_or_else(|| {
+                    panic!("leaf operand row for {parent} keeps a live type matcher")
+                });
+            assert!(
+                matches!(&operand.value, ValueMatcher::Type(type_name) if type_name == "ancestor_personalities"),
+                "{parent} operand accepts the full ancestor block name"
+            );
+        }
         let top_level_exact = |context: &str, key: &str| {
             source_model
                 .semantic
