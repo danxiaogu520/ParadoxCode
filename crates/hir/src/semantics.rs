@@ -859,12 +859,19 @@ fn push_type_definition(
                 .find(|child| child.key.eq_ignore_ascii_case(field))
         })
         .and_then(|child| {
-            child
-                .scalar
-                .as_ref()
-                .map(|scalar| (scalar.value.clone(), scalar.range))
+            child.scalar.as_ref().map(|scalar| {
+                (
+                    descriptor.splice_definition_name(&scalar.value).to_owned(),
+                    scalar.range,
+                )
+            })
         })
-        .unwrap_or_else(|| (property.key.clone(), property.key_range));
+        .unwrap_or_else(|| {
+            (
+                descriptor.splice_definition_name(&property.key).to_owned(),
+                property.key_range,
+            )
+        });
     if name.is_empty() || name.contains('$') {
         return;
     }

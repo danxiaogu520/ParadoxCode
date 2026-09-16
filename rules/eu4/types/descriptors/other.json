@@ -12,20 +12,6 @@
     "starts_with": null,
     "type_key_filter": null
   },
-  "alerts": {
-    "name": "alerts",
-    "path": "game/common",
-    "path_file": "alerts.txt",
-    "path_extension": null,
-    "path_strict": false,
-    "type_per_file": true,
-    "skip_root_paths": [],
-    "name_field": null,
-    "name_from_file": false,
-    "starts_with": null,
-    "type_key_filter": null,
-    "root_entries": "alerts"
-  },
   "advisor_id": {
     "name": "advisor_id",
     "path": "game/history/advisors",
@@ -82,6 +68,20 @@
     "starts_with": null,
     "type_key_filter": null
   },
+  "alerts": {
+    "name": "alerts",
+    "path": "game/common",
+    "path_file": "alerts.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null,
+    "root_entries": "alerts"
+  },
   "ambient_object": {
     "name": "ambient_object",
     "path": "game/map",
@@ -123,6 +123,21 @@
     "name_field": null,
     "name_from_file": false,
     "starts_with": null,
+    "type_key_filter": null
+  },
+  "ancestor_personality": {
+    "name": "ancestor_personality",
+    "path": "game/common/ancestor_personalities",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "name_strip_prefix": "ancestor_",
+    "name_strip_suffix": "_personality",
     "type_key_filter": null
   },
   "aspects_and_blessings": {
@@ -636,19 +651,6 @@
     "starts_with": null,
     "type_key_filter": null
   },
-  "government_mechanic": {
-    "name": "government_mechanic",
-    "path": "game/common/government_mechanics",
-    "path_file": null,
-    "path_extension": null,
-    "path_strict": false,
-    "type_per_file": false,
-    "skip_root_paths": [],
-    "name_field": null,
-    "name_from_file": false,
-    "starts_with": null,
-    "type_key_filter": null
-  },
   "government_attributes": {
     "name": "government_attributes",
     "path": "game/common/government_reforms",
@@ -662,6 +664,19 @@
         "custom_attributes"
       ]
     ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "government_mechanic": {
+    "name": "government_mechanic",
+    "path": "game/common/government_mechanics",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
     "name_field": null,
     "name_from_file": false,
     "starts_with": null,

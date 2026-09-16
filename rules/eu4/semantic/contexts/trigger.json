@@ -17741,14 +17741,16 @@
     },
     "operator": "=",
     "value": {
-      "enum": "ancestor_key"
+      "type": "ancestor_personality"
     },
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "triggers:1409:alias:trigger:ruler_has_personality_ancestor",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Short ancestor personality key; the engine resolves the ancestor_<key>_personality block defined in common/ancestor_personalities."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -17829,14 +17831,16 @@
     },
     "operator": "=",
     "value": {
-      "enum": "ancestor_key"
+      "type": "ancestor_personality"
     },
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "triggers:1411:alias:trigger:heir_has_personality_ancestor",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Short ancestor personality key; the engine resolves the ancestor_<key>_personality block defined in common/ancestor_personalities."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -17887,14 +17891,16 @@
     },
     "operator": "=",
     "value": {
-      "enum": "ancestor_key"
+      "type": "ancestor_personality"
     },
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "triggers:1413:alias:trigger:queen_has_personality_ancestor",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Short ancestor personality key; the engine resolves the ancestor_<key>_personality block defined in common/ancestor_personalities."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -17945,14 +17951,16 @@
     },
     "operator": "=",
     "value": {
-      "enum": "ancestor_key"
+      "type": "ancestor_personality"
     },
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "triggers:1415:alias:trigger:consort_has_personality_ancestor",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Short ancestor personality key; the engine resolves the ancestor_<key>_personality block defined in common/ancestor_personalities."
+    ],
     "allowed_scopes": [
       "any"
     ],

@@ -5359,14 +5359,16 @@
     },
     "operator": "=",
     "value": {
-      "enum": "ancestor_key"
+      "type": "ancestor_personality"
     },
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "effects:1153:alias:effect:add_ruler_personality_ancestor",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Short ancestor personality key; the engine resolves the ancestor_<key>_personality block defined in common/ancestor_personalities."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -5417,14 +5419,16 @@
     },
     "operator": "=",
     "value": {
-      "enum": "ancestor_key"
+      "type": "ancestor_personality"
     },
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "effects:1155:alias:effect:add_heir_personality_ancestor",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Short ancestor personality key; the engine resolves the ancestor_<key>_personality block defined in common/ancestor_personalities."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -5475,14 +5479,16 @@
     },
     "operator": "=",
     "value": {
-      "enum": "ancestor_key"
+      "type": "ancestor_personality"
     },
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "effects:1157:alias:effect:add_queen_personality_ancestor",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Short ancestor personality key; the engine resolves the ancestor_<key>_personality block defined in common/ancestor_personalities."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -5533,14 +5539,16 @@
     },
     "operator": "=",
     "value": {
-      "enum": "ancestor_key"
+      "type": "ancestor_personality"
     },
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "effects:1159:alias:effect:remove_ruler_personality_ancestor",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Short ancestor personality key; the engine resolves the ancestor_<key>_personality block defined in common/ancestor_personalities."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -5624,14 +5632,16 @@
     },
     "operator": "=",
     "value": {
-      "enum": "ancestor_key"
+      "type": "ancestor_personality"
     },
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "effects:1161:alias:effect:remove_heir_personality_ancestor",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Short ancestor personality key; the engine resolves the ancestor_<key>_personality block defined in common/ancestor_personalities."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -5682,14 +5692,16 @@
     },
     "operator": "=",
     "value": {
-      "enum": "ancestor_key"
+      "type": "ancestor_personality"
     },
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "effects:1163:alias:effect:remove_queen_personality_ancestor",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Short ancestor personality key; the engine resolves the ancestor_<key>_personality block defined in common/ancestor_personalities."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -5730,7 +5742,7 @@
     "line": 3729
   },
   {
-    "id": "effects:1164:leaf-value:effect:ancestor_$enum[ancestor_key]$_personality",
+    "id": "effects:1164:leaf-value:effect:<ancestor_personalities>",
     "context": "effect",
     "parent_path": [
       "remove_ruler_personality"
@@ -5738,14 +5750,16 @@
     "key": "any_scalar",
     "operator": null,
     "value": {
-      "exact": "ancestor_$enum[ancestor_key]$_personality"
+      "type": "ancestor_personalities"
     },
     "shape": "leaf_value",
     "child_context": null,
     "alternative_id": "effects:1165:alias:effect:remove_ruler_personality",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Ancestor personality block name from common/ancestor_personalities."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -5786,7 +5800,7 @@
     "line": 3731
   },
   {
-    "id": "effects:1166:leaf-value:effect:ancestor_$enum[ancestor_key]$_personality",
+    "id": "effects:1166:leaf-value:effect:<ancestor_personalities>",
     "context": "effect",
     "parent_path": [
       "remove_queen_personality"
@@ -5794,14 +5808,16 @@
     "key": "any_scalar",
     "operator": null,
     "value": {
-      "exact": "ancestor_$enum[ancestor_key]$_personality"
+      "type": "ancestor_personalities"
     },
     "shape": "leaf_value",
     "child_context": null,
     "alternative_id": "effects:1167:alias:effect:remove_queen_personality",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Ancestor personality block name from common/ancestor_personalities."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -5842,7 +5858,7 @@
     "line": 3733
   },
   {
-    "id": "effects:1168:leaf-value:effect:ancestor_$enum[ancestor_key]$_personality",
+    "id": "effects:1168:leaf-value:effect:<ancestor_personalities>",
     "context": "effect",
     "parent_path": [
       "remove_heir_personality"
@@ -5850,14 +5866,16 @@
     "key": "any_scalar",
     "operator": null,
     "value": {
-      "exact": "ancestor_$enum[ancestor_key]$_personality"
+      "type": "ancestor_personalities"
     },
     "shape": "leaf_value",
     "child_context": null,
     "alternative_id": "effects:1169:alias:effect:remove_heir_personality",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Ancestor personality block name from common/ancestor_personalities."
+    ],
     "allowed_scopes": [
       "any"
     ],

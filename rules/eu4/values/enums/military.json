@@ -47,32 +47,5 @@
     "streltsy",
     "tercio",
     "voc_indiamen"
-  ],
-  "special_unit_types": [
-    "banner_cavalry",
-    "banner_infantry",
-    "caravel_light",
-    "carolean_infantry",
-    "cawa_infantry",
-    "cossack_cavalry",
-    "cossack_infantry",
-    "galleass_galley",
-    "galleon_heavy",
-    "geobukseon_galley",
-    "hussars_cavalry",
-    "janissary_infantry",
-    "mamluks_cavalry",
-    "mamluks_infantry",
-    "man_of_war_heavy",
-    "man_of_war_light",
-    "marine_infantry",
-    "musketeer_infantry",
-    "qizilbash_cavalry",
-    "qizilbash_infantry",
-    "rajput_infantry",
-    "samurai_infantry",
-    "streltsy_infantry",
-    "tercio_infantry",
-    "voc_indiamen_light"
   ]
 }

@@ -2947,6 +2947,60 @@ fn template_modifier_families_resolve_workspace_estates_and_powers() {
 }
 
 #[test]
+fn ancestor_personality_keys_resolve_workspace_definitions() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ide-ancestor-keys-{nonce}"));
+    let ancestors = root.join("common/ancestor_personalities");
+    std::fs::create_dir_all(&ancestors).expect("ancestor directory");
+    std::fs::write(
+        ancestors.join("00_test.txt"),
+        "ancestor_sage_personality = { global_unrest = -1 fair_fights = yes }\n",
+    )
+    .expect("ancestor source");
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots()
+        .expect("scan ancestor personalities");
+
+    let id = DocumentId::new("file:///tmp/events/ancestor.txt");
+    let text = concat!(
+        "country_event = { id = test.1
+",
+        "  trigger = { ruler_has_personality_ancestor = { key = stranger } }
+",
+        "  immediate = { add_ruler_personality_ancestor = { key = sage } }
+",
+        "  option = { name = \"opt\" } }
+",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open ancestor event");
+
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.message.contains("`sage`")),
+        "the stripped workspace spelling `sage` must validate: {diagnostics:?}"
+    );
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue
+                && diagnostic.message.contains("stranger")),
+        "an ancestor key outside the workspace domain must stay an invalid value: {diagnostics:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn nested_government_mechanic_powers_feed_dynamic_value_validation() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

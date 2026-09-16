@@ -385,6 +385,106 @@ fn date_key_matcher_accepts_campaign_dates_only() {
 }
 
 #[test]
+fn type_descriptor_splices_boilerplate_affixes_from_definition_names() {
+    let descriptor = TypeDescriptor {
+        name: "ancestor_personality".to_owned(),
+        name_strip_prefix: Some("ancestor_".to_owned()),
+        name_strip_suffix: Some("_personality".to_owned()),
+        ..TypeDescriptor::default()
+    };
+    assert_eq!(
+        descriptor.splice_definition_name("ancestor_righteous_personality"),
+        "righteous"
+    );
+    assert_eq!(
+        descriptor.splice_definition_name("ANCESTOR_RIGHTEOUS_PERSONALITY"),
+        "RIGHTEOUS"
+    );
+    // Members declared without the affixes keep their spelling, mirroring how
+    // template parameters splice estates that never carried `estate_`.
+    assert_eq!(descriptor.splice_definition_name("my_guild"), "my_guild");
+    assert_eq!(
+        descriptor.splice_definition_name("personality"),
+        "personality"
+    );
+    let plain = TypeDescriptor::default();
+    assert_eq!(
+        plain.splice_definition_name("ancestor_sage_personality"),
+        "ancestor_sage_personality"
+    );
+}
+
+#[test]
+fn canonical_hash_includes_name_strip_metadata() {
+    let mut first = RulesModel {
+        game_id: "test-game".to_owned(),
+        ..RulesModel::default()
+    };
+    first.semantic.type_descriptors.insert(
+        "ancestor_personality".to_owned(),
+        TypeDescriptor {
+            name: "ancestor_personality".to_owned(),
+            name_strip_prefix: Some("ancestor_".to_owned()),
+            name_strip_suffix: Some("_personality".to_owned()),
+            ..TypeDescriptor::default()
+        },
+    );
+    let mut second = first.clone();
+    second
+        .semantic
+        .type_descriptors
+        .get_mut("ancestor_personality")
+        .expect("ancestor descriptor")
+        .name_strip_prefix = None;
+
+    assert_ne!(
+        RuleSet::from_model(first).rule_hash(),
+        RuleSet::from_model(second).rule_hash()
+    );
+}
+
+#[test]
+fn sqlite_round_trip_preserves_name_strip_metadata() {
+    let mut model = RulesModel {
+        game_id: "test-game".to_owned(),
+        ..RulesModel::default()
+    };
+    model.semantic.type_descriptors.insert(
+        "ancestor_personality".to_owned(),
+        TypeDescriptor {
+            name: "ancestor_personality".to_owned(),
+            name_strip_prefix: Some("ancestor_".to_owned()),
+            name_strip_suffix: Some("_personality".to_owned()),
+            ..TypeDescriptor::default()
+        },
+    );
+    let rules = RuleSet::from_model(model);
+    let directory = std::env::temp_dir().join(format!(
+        "pdc-strip-roundtrip-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&directory).expect("temp directory");
+    let artifact = directory.join("rules.pdcrules");
+    rules.write_sqlite(&artifact).expect("write artifact");
+    let loaded = RuleSet::load(&artifact).expect("load artifact");
+    let descriptor = loaded
+        .model()
+        .semantic
+        .type_descriptors
+        .get("ancestor_personality")
+        .expect("round-tripped descriptor");
+    assert_eq!(descriptor.name_strip_prefix.as_deref(), Some("ancestor_"));
+    assert_eq!(
+        descriptor.name_strip_suffix.as_deref(),
+        Some("_personality")
+    );
+    std::fs::remove_dir_all(directory).expect("cleanup");
+}
+
+#[test]
 fn canonical_hash_includes_dynamic_definition_metadata() {
     let descriptor = TypeDescriptor {
         name: "scripted_effect".to_owned(),
