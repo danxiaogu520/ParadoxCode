@@ -411,6 +411,12 @@ export class MissionPreviewPanel {
     private static assetStoreKey: string | undefined;
     /** Fonts are large payloads: post them once per store generation and panel. */
     private static postedFonts: { panel: vscode.WebviewPanel; key: string } | undefined;
+    /** Sprites are incremental payloads too: the panel that already received
+     * the full set. A rebuilt webview starts empty while this side's warm
+     * cache would suppress everything as already delivered, so a new panel
+     * forces a complete resend. Store rebuilds need no tracking here — a
+     * fresh store is cold and therefore ships everything anyway. */
+    private static postedSprites: { panel: vscode.WebviewPanel } | undefined;
 
     /** Builds the shared client-side asset store, rebuilt when its source
      * directories change. Shared with the hover texture preview middleware. */
@@ -449,7 +455,9 @@ export class MissionPreviewPanel {
 
     /** Decodes the sprites a payload references (frame, node icons, arrow
      * tiles) and pushes any newly loaded ones to the webview. Client-side
-     * decoding keeps every per-keystroke `missionPreview` response pure text. */
+     * decoding keeps every per-keystroke `missionPreview` response pure text.
+     * A panel that has not yet received the full set (first use, or a rebuild
+     * after close/reopen) gets the cached sprites resent too. */
     private static async postAssets(
         panel: vscode.WebviewPanel,
         payload: MissionPreview,
@@ -466,7 +474,9 @@ export class MissionPreviewPanel {
             }
         }
         const store = MissionPreviewPanel.store();
-        const textures = await store.spriteUrls([...wanted]);
+        const fullResend = MissionPreviewPanel.postedSprites?.panel !== panel;
+        const textures = await store.spriteUrls([...wanted], fullResend);
+        MissionPreviewPanel.postedSprites = { panel };
         const config = vscode.workspace.getConfiguration('paradoxcode');
         const fontsKey = MissionPreviewPanel.assetStoreKey ?? '';
         let fonts: FontAssets | undefined;

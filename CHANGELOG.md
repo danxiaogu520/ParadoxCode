@@ -28,6 +28,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   diagnostics fingerprint baseline/history, and the release workflow's sweep dependency. Release
   publication no longer depends on a maintainer workstation or a licensed EU4 installation.
 
+### Fixed
+
+- The mission preview no longer loses every game texture when its panel is closed and reopened in
+  the same session. Sprite delivery now tracks the receiving panel (as the bitmap fonts already
+  did), so a rebuilt webview forces a complete resend instead of being suppressed by the extension
+  host's warm cache. The client-side texture resolver also accepts the engine's `.tga`/`.dds`
+  extension drift, so a sprite whose file ships under the other spelling renders instead of
+  silently falling back to the schematic.
+
 ## [0.3.7] - 2026-09-16
 
 ### Added
