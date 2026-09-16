@@ -1817,14 +1817,14 @@
       "exact": "effectfile"
     },
     "operator": "=",
-    "value": "texture_path",
+    "value": "filepath",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
     "severity": null,
     "required": false,
     "documentation": [
-      "GUI shader effect driving the sprite's button states, a gfx/FX/*.lua file such as buttonstate.lua."
+      "GUI shader effect driving the sprite's button states, named after a gfx/FX shader such as buttonstate. The engine resolves the compiled shader by name, so the historical .lua spelling of these references no longer exists on disk even in vanilla."
     ],
     "allowed_scopes": [
       "any"
@@ -2030,6 +2030,71 @@
     "required": false,
     "documentation": [
       "Sound played when the sprite is clicked as a button."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:82:rule:root:sprite:animation:animationtime",
+    "context": "root:sprite",
+    "parent_path": [
+      "animation"
+    ],
+    "key": {
+      "exact": "animationtime"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": "0",
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Duration of one scrolling or rotating animation cycle of the animated overlay, in seconds."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:83:rule:root:sprite:animation:animationtype",
+    "context": "root:sprite",
+    "parent_path": [
+      "animation"
+    ],
+    "key": {
+      "exact": "animationtype"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Motion of the animated overlay: scrolling (the vanilla default), rotating, or pulsing."
     ],
     "allowed_scopes": [
       "any"
@@ -3338,14 +3403,14 @@
       "exact": "type"
     },
     "operator": "=",
-    "value": "texture_path",
+    "value": "any_scalar",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
     "severity": null,
     "required": false,
     "documentation": [
-      "Animation file bound to the clip, a .anim path under gfx/models."
+      "Animation clip bound to the state id: a shared clip name such as polearm_onehanded_attack_animation or seagulls_idle, resolved from the compiled unit animation set rather than a loose file path."
     ],
     "allowed_scopes": [
       "any"
@@ -3521,14 +3586,14 @@
       "exact": "texture_diffuse"
     },
     "operator": "=",
-    "value": "texture_path",
+    "value": "filepath",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
     "severity": null,
     "required": false,
     "documentation": [
-      "Diffuse texture override for the sub-mesh."
+      "Diffuse texture override for the sub-mesh, a bare file name resolved relative to the mesh's own directory rather than the game root."
     ],
     "allowed_scopes": [
       "any"
@@ -3551,14 +3616,14 @@
       "exact": "texture_normal"
     },
     "operator": "=",
-    "value": "texture_path",
+    "value": "filepath",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
     "severity": null,
     "required": false,
     "documentation": [
-      "Normal-map texture override for the sub-mesh."
+      "Normal-map texture override for the sub-mesh, a bare file name resolved relative to the mesh's own directory rather than the game root."
     ],
     "allowed_scopes": [
       "any"
@@ -3581,14 +3646,14 @@
       "exact": "texture_specular"
     },
     "operator": "=",
-    "value": "texture_path",
+    "value": "filepath",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
     "severity": null,
     "required": false,
     "documentation": [
-      "Specular texture override for the sub-mesh."
+      "Specular texture override for the sub-mesh, a bare file name resolved relative to the mesh's own directory rather than the game root."
     ],
     "allowed_scopes": [
       "any"
