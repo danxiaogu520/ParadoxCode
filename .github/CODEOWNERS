@@ -28,7 +28,6 @@
 
 # Tooling, quality gates, and releases
 /.cargo/ @danxiaogu520
-/.github/actionlint.yaml @danxiaogu520
 /.github/ @danxiaogu520
 
 # Fuzz targets
@@ -40,4 +39,5 @@
 /RELEASING.md @danxiaogu520
 /GOVERNANCE.md @danxiaogu520
 /CHANGELOG.md @danxiaogu520
-/docs/runner-recovery.md @danxiaogu520
+/AGENTS.md @danxiaogu520
+/docs/validation.md @danxiaogu520
