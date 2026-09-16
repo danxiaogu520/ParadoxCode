@@ -159,7 +159,7 @@ impl TextureCatalog {
             .any(|accepted| accepted.eq_ignore_ascii_case(extension))
     }
 
-    /// Returns up to [`MAX_PREFIX_RESULTS`] catalog paths starting with `prefix`.
+    /// Returns up to 200 catalog paths starting with `prefix`.
     #[must_use]
     pub fn paths_with_prefix(&self, prefix: &str) -> Vec<&str> {
         let normalized = normalize_asset_path(prefix);
