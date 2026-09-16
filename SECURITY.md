@@ -66,6 +66,5 @@ user's privileges. Defense-in-depth measures already in place include:
 - Workflow dependencies are pinned to reviewed commit SHAs. Release jobs use the short-lived,
   least-privilege repository `GITHUB_TOKEN`; no long-lived publishing credential is available to
   build or pull-request jobs.
-- The privileged Vanilla sweep runner has a host-local pre-job hook, stored outside repository
-  workspaces, that accepts only the protected release workflow or a manual health check from
-  `main`. Pull-request refs and alternate callers are rejected before checkout or project steps.
+- Licensed game installations and game-derived diagnostic reports stay on developer machines.
+  GitHub-hosted validation uses only repository-owned source, fixtures, and generated artifacts.

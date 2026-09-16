@@ -182,17 +182,9 @@ jobs:
           path: dist/*.vsix
           if-no-files-found: error
 
-  sweep:
-    name: Validate release against Vanilla
-    needs: [preflight, build, vscode]
-    uses: ./.github/workflows/sweep.yml
-    with:
-      release_tag: ${{ inputs.release_tag || github.ref_name }}
-      windows_artifact_name: server-x86_64-pc-windows-msvc
-
   publish:
     name: Publish immutable GitHub Release
-    needs: [preflight, build, vscode, sweep]
+    needs: [preflight, build, vscode]
     permissions:
       actions: read
       contents: write
@@ -215,10 +207,6 @@ jobs:
         with:
           name: vscode-extension
           path: dist/extension
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: release-sweep-summary
-          path: dist/sweep
       - name: Verify complete release payload
         shell: bash
         run: |
@@ -229,17 +217,11 @@ jobs:
             --directory dist/server \
             --root .
           test -s "dist/extension/paradoxcode-vscode-${version}.vsix"
-          test -s dist/sweep/sweep-summary.json
-          jq --exit-status \
-            --arg label "$RELEASE_TAG" \
-            '.label == $label and .gate.passed == true' \
-            dist/sweep/sweep-summary.json
 
           mkdir -p dist/release
           cp dist/server/* dist/release/
           cp dist/extension/*.vsix dist/release/
-          cp dist/sweep/sweep-summary.json dist/release/
-          test "$(find dist/release -maxdepth 1 -type f | wc -l)" -eq 12
+          test "$(find dist/release -maxdepth 1 -type f | wc -l)" -eq 11
       - name: Create, verify, and publish release
         env:
           GH_TOKEN: ${{ github.token }}

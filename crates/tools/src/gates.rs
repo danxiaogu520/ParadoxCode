@@ -1,17 +1,16 @@
 //! Local quality-gate runner.
 //!
-//! `tools gates` is the rust-analyzer-style replacement for the retired shell
-//! aggregator: every gate is a spawned cargo/npm invocation defined here in
-//! Rust, so the command surface stays linted, testable, and cross-platform.
-//! The groups mirror the CI jobs; contributors run the same commands CI runs.
+//! `tools gates` is the deterministic local validation entry point. It gives
+//! contributors fast feedback before a push; clean-checkout, cross-platform,
+//! MSRV, security, and publishing authority remain in remote CI.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::cli::CliError;
 
-/// One executable gate: a process to spawn (with optional env overrides) or
-/// the in-repository release checks that `tools check release` reports.
+/// One executable check: a process to spawn (with optional env overrides) or
+/// an in-process repository policy/artifact check.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GateAction {
     /// Spawn a process with the repository root as the working directory.
@@ -21,8 +20,10 @@ pub enum GateAction {
         args: Vec<String>,
         env: Vec<(String, String)>,
     },
+    /// Run repository policy and editor syntax checks in-process.
+    PolicyChecks,
     /// Run [`crate::check::check_release_artifact`] in-process.
-    ReleaseChecks,
+    ArtifactChecks,
 }
 
 fn cargo_step(args: &[&str], env: Vec<(String, String)>) -> GateAction {
@@ -94,37 +95,24 @@ pub fn gate_actions(group: &str) -> Option<Vec<GateAction>> {
             ],
             Vec::new(),
         )]),
-        "vscode" => Some(vec![
-            GateAction::Command {
-                name: "npm run test:ci (editors/vscode)".to_owned(),
-                program: "npm".to_owned(),
-                args: vec![
-                    "--prefix".to_owned(),
-                    "editors/vscode".to_owned(),
-                    "run".to_owned(),
-                    "test:ci".to_owned(),
-                ],
-                env: Vec::new(),
-            },
-            GateAction::Command {
-                name: "npm audit production dependencies (editors/vscode)".to_owned(),
-                program: "npm".to_owned(),
-                args: vec![
-                    "--prefix".to_owned(),
-                    "editors/vscode".to_owned(),
-                    "audit".to_owned(),
-                    "--omit=dev".to_owned(),
-                    "--audit-level=high".to_owned(),
-                ],
-                env: Vec::new(),
-            },
-        ]),
-        "release" => Some(vec![
+        "vscode" => Some(vec![GateAction::Command {
+            name: "npm run test:ci (editors/vscode)".to_owned(),
+            program: "npm".to_owned(),
+            args: vec![
+                "--prefix".to_owned(),
+                "editors/vscode".to_owned(),
+                "run".to_owned(),
+                "test:ci".to_owned(),
+            ],
+            env: Vec::new(),
+        }]),
+        "policy" => Some(vec![GateAction::PolicyChecks]),
+        "artifact" => Some(vec![
             cargo_step(
                 &["build", "--locked", "-p", "pdc", "--bin", "paradoxcode"],
                 Vec::new(),
             ),
-            GateAction::ReleaseChecks,
+            GateAction::ArtifactChecks,
         ]),
         // Stable-only gates for the standalone fuzz crate; the nightly
         // cargo-fuzz run loop lives in CI so this group stays buildable
@@ -147,7 +135,7 @@ pub fn gate_actions(group: &str) -> Option<Vec<GateAction>> {
         ]),
         "all" => {
             let mut actions = Vec::new();
-            for group in ["core", "vscode", "release", "fuzz"] {
+            for group in ["core", "vscode", "policy", "artifact", "fuzz"] {
                 actions.extend(gate_actions(group)?);
             }
             Some(actions)
@@ -226,7 +214,17 @@ pub fn run_gates(groups: &[String], root: &Path) -> Result<usize, CliError> {
                         return Err(CliError::CheckFailed);
                     }
                 }
-                GateAction::ReleaseChecks => {
+                GateAction::PolicyChecks => {
+                    eprintln!("==> tools check policy + editor syntax");
+                    let mut results = crate::check::check_project_policy(root);
+                    results.extend(crate::check::check_editor_syntax_parity(root));
+                    executed += 1;
+                    if !crate::check::report(&results) {
+                        eprintln!("gates {group} failed at: tools check policy");
+                        return Err(CliError::CheckFailed);
+                    }
+                }
+                GateAction::ArtifactChecks => {
                     eprintln!("==> tools check release");
                     let results = crate::check::check_release_artifact(root);
                     executed += 1;
@@ -268,7 +266,7 @@ mod tests {
                 GateAction::Command {
                     name, args, env, ..
                 } => Some((name, args, env)),
-                GateAction::ReleaseChecks => None,
+                GateAction::PolicyChecks | GateAction::ArtifactChecks => None,
             })
             .collect()
     }
@@ -309,10 +307,10 @@ mod tests {
     }
 
     #[test]
-    fn release_builds_pdc_then_reuses_the_release_checks() {
-        let actions = gate_actions("release").expect("known group");
+    fn artifact_builds_pdc_then_reuses_the_artifact_checks() {
+        let actions = gate_actions("artifact").expect("known group");
         assert!(matches!(actions[0], GateAction::Command { .. }));
-        assert_eq!(actions[1], GateAction::ReleaseChecks);
+        assert_eq!(actions[1], GateAction::ArtifactChecks);
         if let GateAction::Command { args, .. } = &actions[0] {
             assert!(
                 args.windows(2).any(|pair| pair == ["-p", "pdc"]),
@@ -322,18 +320,24 @@ mod tests {
     }
 
     #[test]
-    fn vscode_tests_and_audits_production_dependencies() {
+    fn vscode_runs_deterministic_contract_and_package_tests() {
         let commands = commands("vscode");
-        assert_eq!(commands.len(), 2, "{commands:?}");
+        assert_eq!(commands.len(), 1, "{commands:?}");
         assert!(commands[0].1.contains(&"test:ci".to_owned()));
-        assert!(commands[1].1.contains(&"audit".to_owned()));
-        assert!(commands[1].1.contains(&"--omit=dev".to_owned()));
+    }
+
+    #[test]
+    fn policy_runs_repository_checks_without_a_subprocess() {
+        assert_eq!(
+            gate_actions("policy").expect("known group"),
+            vec![GateAction::PolicyChecks]
+        );
     }
 
     #[test]
     fn all_expands_in_the_documented_order() {
         let mut expected = Vec::new();
-        for group in ["core", "vscode", "release", "fuzz"] {
+        for group in ["core", "vscode", "policy", "artifact", "fuzz"] {
             expected.extend(gate_actions(group).expect("known group"));
         }
         assert_eq!(gate_actions("all").expect("known group"), expected);

@@ -53,7 +53,7 @@ Linux（x86_64、aarch64）、macOS（x86_64、aarch64）与 Windows（x86_64）
 
 ## 项目状态
 
-**最新版本：v0.3.5**（2026-09-13）。EU4 分析与索引功能已实现、测试，并通过标签驱动的发布流水线发布（见[发布](#发布)）。本版本不再把 EU4 本地化文本当作类型化语言处理（`.yml` 本地化文档不再产出诊断与标识符补全；解码后的 `pdcloc://` 视图默认自动打开，并成为未转码警告的唯一上报者），让补全的动态契约推断可被取消以避免过期请求占满核心，并把发布流程加固为受保护的原子发布（资产不可变、对打包产物跑 sweep、锁定 GitHub Actions 版本、自托管 runner 主机 allowlist）。0.x 仍在早期成熟期，欢迎早期使用者通过 issue 模板反馈问题，以便在下一个版本中修复。
+**最新版本：v0.3.7**（2026-09-16）。EU4 分析与索引功能已实现、测试，并通过标签驱动的发布流水线发布（见[发布](#发布)）。完整版本历史见 [CHANGELOG.md](CHANGELOG.md)。0.x 仍在早期成熟期，欢迎早期使用者通过 issue 模板反馈问题，以便在下一个版本中修复。
 
 当前范围的已知限制：
 
@@ -94,7 +94,7 @@ cargo build --locked --workspace
 cargo test --locked --workspace --all-targets
 ```
 
-显式运行质量门禁套件，或只诊断某个分组（`core`、`vscode`、`release`、`fuzz`、`core-fast`、`perf`）。仓库不使用提交钩子；CI 遵循相同的本地门禁意图，并在每个 pull request 上增加平台矩阵、MSRV、依赖策略、拼写和 nightly fuzz 检查：
+显式运行确定性的本地检查，或只选择受影响的分组（`core`、`core-fast`、`vscode`、`policy`、`artifact`、`fuzz`、`perf`）。仓库不使用提交钩子：
 
 ```bash
 cargo tools gates
@@ -102,11 +102,7 @@ cargo tools gates
 
 别名定义在 `.cargo/config.toml`；完整写法是 `cargo run -p tools -- gates`。
 
-Pull Request CI 遵循 `core-fast` 分组：保留正确性检查，但不编译或运行 benchmark 目标。
-优化后的 benchmark 套件仍保留在 `perf` 分组中，由定时或手动触发的 Performance workflow 运行。
-CI 还会运行编辑器、fuzz 与依赖检查；fuzz 只绑定其直接运行时依赖，
-Windows release 构建则与 Windows 测试和 clippy 并行执行。分支保护将 `Conclusion`
-作为稳定的聚合必需检查。
+默认的 `all` 代表默认确定性本地分组（优化后的 `perf` 仍需显式运行），不代表已经具备发布资格。Pull Request CI 负责干净检出与跨平台覆盖，分支保护将其 `Conclusion` 聚合作为唯一合并权威。依赖漏洞数据库与优化 benchmark 作为定时审计运行，避免外部状态变化阻塞无关 PR。完整的本地反馈、合并门禁、定时审计、发布门禁和人工验收职责见 [docs/validation.md](docs/validation.md)。
 
 使用 `bake` 校验并编译开发者维护的第一方规则源；产物可放入被忽略的构建目录以供检视：
 
@@ -174,7 +170,7 @@ node editors/vscode/scripts/diagnose.mjs \
 
 ## 发布
 
-发布由标签驱动：推送受保护的 annotated `v0.x.y` 标签后，流水线会先确认目标提交位于 `main` 且 `Conclusion` 检查成功，再构建五个平台的原生 `paradoxcode` 归档和 VSIX，并用实际打包的 Windows 二进制执行 release sweep。所有门禁通过后，流水线才会组装并校验包含十二个资产的 Draft Release，随后公开并由 GitHub 锁定，禁止再修改资产或移动标签。Visual Studio Marketplace 发布暂时改为手动：从 Release 下载附加的 VSIX，再通过发布者管理页面上传。版本历史与各版本变更记录在 [CHANGELOG.md](CHANGELOG.md)；完整发布检查清单见 [RELEASING.md](RELEASING.md)。
+发布由标签驱动：推送受保护的 annotated `v0.x.y` 标签后，流水线会先确认目标提交位于 `main` 且 `Conclusion` 检查成功，再构建五个平台的原生 `paradoxcode` 归档、五个校验文件和 VSIX，并在一次发布前校验这十一项资产。GitHub Actions 只使用仓库自有源码与 fixture；受许可约束的游戏文件及本地 Vanilla sweep 报告绝不进入 CI 或 Release。Visual Studio Marketplace 发布仍为人工步骤。版本历史与各版本变更记录在 [CHANGELOG.md](CHANGELOG.md)；完整发布检查清单见 [RELEASING.md](RELEASING.md)。
 
 ## 贡献
 

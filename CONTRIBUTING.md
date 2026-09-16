@@ -28,10 +28,10 @@ LSP layer, or editor extensions.
 
 - Rust **1.98 or newer** (see `.github/workflows/ci.yml` for the enforced MSRV).
 - Node.js **24 LTS** for the VS Code extension.
-- Git. There are no commit hooks; run the quality gates before pushing. CI adds the platform,
-  MSRV, dependency-policy, typo, and nightly fuzz coverage that is impractical to reproduce in
-  every local environment (`cargo tools gates` with no arguments runs the full local suite; the
-  alias lives in `.cargo/config.toml`).
+- Git. There are no commit hooks. Run focused checks while developing and the affected local gate
+  groups before pushing. CI owns clean-checkout platform, MSRV, dependency-policy, typo, and
+  nightly fuzz coverage that is impractical to reproduce in every local environment. The complete
+  ownership matrix lives in [`docs/validation.md`](docs/validation.md).
 
 ## Building and testing
 
@@ -41,14 +41,16 @@ cargo test --locked --workspace --all-targets
 cargo clippy --locked --workspace --all-targets -- -D warnings
 ```
 
-Run the complete quality gates explicitly:
+Run every deterministic local group explicitly when a large change warrants it:
 
 ```bash
 cargo tools gates
 ```
 
-or a single group to diagnose a failure: `core`, `core-fast`, `perf`, `vscode`, `release`,
-`fuzz` (the long spelling without the cargo alias is `cargo run -p tools -- gates <group>`).
+or select only the affected group: `core`, `core-fast`, `vscode`, `policy`, `artifact`, `fuzz`,
+or `perf` (the long spelling without the cargo alias is
+`cargo run -p tools -- gates <group>`). `all` means all default deterministic **local** groups;
+optimized `perf` remains opt-in, and neither form is a release-readiness certificate.
 
 Pull-request CI follows the `core-fast` intent and leaves the optimized benchmark suite to the
 scheduled/manual `perf` workflow. Run the latter explicitly when changing performance-sensitive
@@ -58,10 +60,11 @@ code:
 cargo tools gates perf
 ```
 
-CI runs the editor, fuzz, and dependency jobs on every pull request. Fuzz is limited to
-its direct runtime dependencies, and the Windows release build runs in parallel with Windows
-tests and clippy. Branch protection requires the stable `Conclusion` aggregate rather than every
-individual job.
+CI runs the editor, fuzz, repository policy, artifact contract, and deterministic dependency jobs
+on every pull request. Fuzz is limited to its direct runtime dependencies, and the Windows release
+build runs in parallel with Windows tests and clippy. Branch protection requires the stable
+`Conclusion` aggregate rather than every individual job. External advisory databases and optimized
+benchmarks are scheduled audits rather than unrelated-PR blockers.
 
 Validate and compile the first-party EU4 rule source with `bake`:
 
@@ -86,6 +89,21 @@ A whole-Current-Mod diagnostic pass against a local Vanilla index is available t
   diagnose -- ...`; see the README for usage). Generated reports land in the
 ignored `diagnostic-reports/` directory and must not be committed.
 
+The full Vanilla sweep is also local-only. It is expected for changes that can alter
+workspace-wide diagnostics, rules, parsing/HIR semantics, indexing, or query behavior, and it
+requires an explicit server binary:
+
+```bash
+cargo build --locked --release -p pdc --bin paradoxcode
+node editors/vscode/scripts/sweep.mjs \
+  --server target/release/paradoxcode.exe \
+  --vanilla-source /path/to/eu4
+```
+
+Sweep reports can contain licensed game excerpts and machine-local paths. Keep them in the ignored
+`performance-results/` directory and never attach them to a pull request, issue, CI run, or Release.
+Convert every discovered defect into a minimal repository-owned regression fixture.
+
 ## Repository layout
 
 | Path | Purpose |
@@ -102,7 +120,7 @@ ignored `diagnostic-reports/` directory and must not be committed.
    code is written. Use the issue templates for bug reports and feature requests.
 2. **Make focused, reviewable changes.** Keep behavior-preserving refactors separate from new
    features, and add tests or fixtures that prove the behavior in the same change.
-3. **Run the local quality gates explicitly** and make sure the PR's `Conclusion` check passes.
+3. **Run the affected local groups explicitly** and make sure the PR's `Conclusion` check passes.
 4. **Open a pull request** describing the change, the tests run, and any residual risks.
 
 ### Commit message convention

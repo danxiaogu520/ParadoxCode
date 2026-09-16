@@ -7,6 +7,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Repository validation now has explicit lifecycle ownership: targeted local checks provide
+  developer feedback, the remote `Conclusion` check is the merge authority, scheduled security
+  and performance workflows are audits, and the tag workflow builds and verifies only
+  redistributable repository-owned release assets.
+- The full Vanilla sweep is now a local-only development audit. It requires an explicit server
+  binary, rejects a stale binary whose embedded rules hash differs from the checkout, records the
+  binary checksum and dirty-worktree state, and keeps all game-derived reports in the ignored
+  `performance-results/` directory. Licensed game data, diagnostic excerpts, fingerprints, and
+  sweep reports are no longer uploaded to Actions or attached to Releases.
+- Local gate groups are deterministic and purpose-specific; dependency vulnerability scans remain
+  in the scheduled remote security workflow rather than blocking unrelated local or pull-request
+  work when an external advisory database changes.
+
+### Removed
+
+- The self-hosted Vanilla sweep runner, its host guard and recovery runbook, the checked-in
+  diagnostics fingerprint baseline/history, and the release workflow's sweep dependency. Release
+  publication no longer depends on a maintainer workstation or a licensed EU4 installation.
+
 ## [0.3.7] - 2026-09-16
 
 ### Added

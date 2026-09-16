@@ -77,8 +77,8 @@ function normalizeDiagnostic(diagnostic, text) {
 }
 
 export function baseReport(options, files, skippedSymlinks, omittedSymlinks, depthLimitedDirectories) {
-  // A cold sweep deletes the cache before invoking the tool and the server
-  // rebuilds it during the session, so the input stats may not exist yet.
+  // A caller may intentionally start without a cache and let the server build
+  // it during the session, so the input stats may not exist yet.
   const cacheStat = existsSync(options.vanillaCache) ? statSync(options.vanillaCache) : null;
   return {
     schema_version: 1,

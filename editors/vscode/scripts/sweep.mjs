@@ -1,18 +1,17 @@
 #!/usr/bin/env node
 
 /**
- * Release sweep: the per-release performance and diagnostics gate.
+ * Local Vanilla sweep: a developer diagnostic and performance audit.
  *
  * Cold-starts the real ParadoxCode server, lets it discover or rebuild the
  * Vanilla index cache, diagnoses the full Vanilla workspace through virtual
  * overlays, and records how long every phase took together with a stable
- * fingerprint of the diagnostic output. Each run appends one summary line to
- * `performance-results/history.jsonl` so release-to-release regressions are
- * a plain text diff.
+ * fingerprint of the diagnostic output. Reports stay in the gitignored local
+ * `performance-results/` directory and are never release or CI artifacts.
  *
  * Cold protocol: this script never deletes caches itself (too easy to do by
- * accident while debugging). The release workflow deletes the cache files
- * before invoking it; for a local cold run remove the caches by hand first.
+ * accident while debugging). For a cold run, remove the dedicated cache by
+ * hand first.
  *
  * Phases are wall-clock around the shared lib calls; `server_phases` adds
  * the fine-grained numbers the server logs on startup (rules load, source
@@ -20,7 +19,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, appendFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { logicalRelative } from './lib/paths.mjs';
@@ -68,30 +67,26 @@ const VANILLA_SOURCE_CANDIDATES = [
 
 const USAGE = `Usage: node editors/vscode/scripts/sweep.mjs [options]
 
-Release sweep: cold-start the server, rebuild/verify the Vanilla cache, diagnose the
-full Vanilla workspace, and record phase timings plus a diagnostics fingerprint.
-Writes performance-results/sweep-<timestamp>.json and appends a summary line to
-performance-results/history.jsonl. For a true cold run delete the Vanilla cache
-first (the release workflow does this); this script never deletes caches itself.
+Local Vanilla sweep: cold-start an explicitly selected server, rebuild/verify the
+Vanilla cache, diagnose the full Vanilla workspace, and record phase timings plus
+a diagnostics fingerprint. Reports stay under the gitignored performance-results/
+directory. For a true cold run delete the Vanilla cache first; this script never
+deletes caches itself.
 
 Options:
   --vanilla-source PATH   Vanilla tree (default: PDC_SWEEP_VANILLA_SOURCE or the standard Steam path)
   --vanilla-cache PATH    Vanilla .pdcindex (default: user configuration)
-  --server PATH           paradoxcode executable (default: target/release, then target/debug)
+  --server PATH           paradoxcode executable to audit (required; no auto-detection)
   --output DIR            report directory (default: ${DEFAULT_OUTPUT_DIR})
-  --label NAME            release label recorded in the summary (default: git describe)
+  --label NAME            local run label recorded in the summary (default: git describe)
   --previous PATH         previous sweep summary to diff against
-  --expect-fingerprint SHA  reviewed fingerprint that accepts an intentional
-                          diagnostics drift (takes precedence over --previous)
   --timeout-ms N          session timeout (default: ${DEFAULT_TIMEOUT_MS})
   --file-timeout-ms N     per-request timeout (default: ${DEFAULT_FILE_TIMEOUT_MS})
   --batch-size N          files per diagnostic request (default: 16)
   --concurrency N         concurrent workers (default: 8)
   --memory-interval-ms N  server resource sampling interval (default: ${DEFAULT_MEMORY_INTERVAL_MS})
   --query-samples N       files sampled for per-query latencies (default: ${DEFAULT_QUERY_SAMPLES})
-  --fail-on LEVEL         error, warning, or none (default: none — the release
-                          gate is the diagnostics fingerprint against the previous
-                          sweep, not the absolute severity counts)
+  --fail-on LEVEL         error, warning, or none (default: none)
   --help                  show this help
 `;
 
@@ -141,7 +136,6 @@ function parseSweepArgs(argv) {
     ['--output', 'output'],
     ['--label', 'label'],
     ['--previous', 'previous'],
-    ['--expect-fingerprint', 'expectFingerprint'],
     ['--fail-on', 'failOn'],
   ]);
   for (let index = 0; index < argv.length; index += 1) {
@@ -163,16 +157,15 @@ function parseSweepArgs(argv) {
   if (!['error', 'warning', 'none'].includes(options.failOn)) {
     throw new CliUsageError('--fail-on must be error, warning, or none');
   }
-  if (
-    options.expectFingerprint !== undefined &&
-    !/^[0-9a-f]{64}$/.test(options.expectFingerprint)
-  ) {
-    throw new CliUsageError('--expect-fingerprint must be 64 lowercase hex characters');
-  }
   return options;
 }
 
 function resolveSweepOptions(raw) {
+  if (!raw.server) {
+    throw new CliUsageError(
+      '--server is required for a Vanilla sweep; build the intended binary and pass its explicit path',
+    );
+  }
   let vanillaSource = raw.vanillaSource;
   if (!vanillaSource) {
     vanillaSource = VANILLA_SOURCE_CANDIDATES.find((candidate) => existsSync(candidate));
@@ -182,8 +175,9 @@ function resolveSweepOptions(raw) {
       '--vanilla-source is required: pass the EU4 installation directory or set PDC_SWEEP_VANILLA_SOURCE',
     );
   }
-  // Reuse the diagnose CLI resolution: canonical paths, user-configured cache
-  // discovery, server auto-detection, and the overlay workspace setup.
+  // Reuse the diagnose CLI resolution for canonical paths, user-configured
+  // cache discovery, and overlay workspace setup. Requiring --server above
+  // prevents a stale target/debug binary from being selected implicitly.
   return resolveOptions({
     vanillaSource,
     vanillaCache: raw.vanillaCache,
@@ -213,6 +207,14 @@ function serverPhases(serverMessages) {
     if (match) phases.source_roots_ms = Number(match[1]);
   }
   return phases;
+}
+
+function activeRulesHash(serverMessages) {
+  for (const message of serverMessages) {
+    const match = /first-party rules ready.*\(hash ([0-9a-f]{64})\)/.exec(message);
+    if (match) return match[1];
+  }
+  return undefined;
 }
 
 /**
@@ -396,6 +398,7 @@ function vanillaBuildId(vanillaSource) {
 async function gitFacts() {
   try {
     const { stdout: commit } = await execFileAsync('git', ['rev-parse', 'HEAD'], { cwd: REPOSITORY_ROOT });
+    const { stdout: status } = await execFileAsync('git', ['status', '--porcelain'], { cwd: REPOSITORY_ROOT });
     let describe = undefined;
     try {
       const { stdout } = await execFileAsync('git', ['describe', '--tags', '--always'], { cwd: REPOSITORY_ROOT });
@@ -403,10 +406,26 @@ async function gitFacts() {
     } catch {
       // A repository without tags still records the commit.
     }
-    return { commit: commit.trim(), describe };
+    return { commit: commit.trim(), describe, dirty: status.trim().length > 0 };
   } catch {
     return {};
   }
+}
+
+async function serverFacts(server) {
+  const bytes = readFileSync(server);
+  let version;
+  try {
+    const { stdout } = await execFileAsync(server, ['--version']);
+    version = stdout.trim();
+  } catch {
+    version = undefined;
+  }
+  return {
+    path: server,
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+    version,
+  };
 }
 
 function summarize(previous, current) {
@@ -454,6 +473,7 @@ function summarize(previous, current) {
 async function run(raw) {
   const options = resolveSweepOptions(raw);
   const git = await gitFacts();
+  const server = await serverFacts(options.server);
   const started = Date.now();
   console.error(`Sweeping Vanilla at ${options.source}`);
 
@@ -520,6 +540,17 @@ async function run(raw) {
   }
   phases.total_ms = Date.now() - started;
 
+  const sourceRulesHash = report.inputs.rules.manifest_rule_hash;
+  const loadedRulesHash = activeRulesHash(report.server_messages);
+  if (!loadedRulesHash) {
+    addToolError(report, 'the server did not report its active first-party rules hash');
+  } else if (loadedRulesHash !== sourceRulesHash) {
+    addToolError(
+      report,
+      `server rules hash ${loadedRulesHash} does not match the checkout manifest ${sourceRulesHash}; rebuild the selected binary`,
+    );
+  }
+
   report.status = report.tool_errors.length
     ? 'incomplete'
     : shouldFail(report, raw.failOn)
@@ -528,9 +559,10 @@ async function run(raw) {
   const outputs = writeReports(report, resolve(raw.output));
 
   const summary = {
-    schema_version: 1,
+    schema_version: 2,
     label: raw.label || git.describe,
     git,
+    server,
     recorded_at: new Date().toISOString(),
     vanilla: vanillaBuildId(options.source),
     machine: {
@@ -538,7 +570,11 @@ async function run(raw) {
       release: os.release(),
       cpus: os.cpus().length,
     },
-    rules_hash: report.inputs.rules.manifest_rule_hash,
+    rules: {
+      source_manifest_hash: sourceRulesHash,
+      active_server_hash: loadedRulesHash,
+      match: loadedRulesHash === sourceRulesHash,
+    },
     files_selected: report.scan.diagnosable_files_selected,
     query_latencies: queryLatencies,
     summary: report.summary,
@@ -561,11 +597,7 @@ async function run(raw) {
   mkdirSync(outputDir, { recursive: true });
   const summaryPath = join(outputDir, `sweep-${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}.json`);
   writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
-  const historyPath = join(DEFAULT_OUTPUT_DIR, 'history.jsonl');
-  mkdirSync(DEFAULT_OUTPUT_DIR, { recursive: true });
-  appendFileSync(historyPath, `${JSON.stringify(summary)}\n`, 'utf8');
-
-  console.log(`Release sweep: ${report.status}`);
+  console.log(`Local Vanilla sweep: ${report.status}`);
   console.log(`Files analyzed: ${report.summary.files_analyzed}/${report.scan.diagnosable_files_selected ?? collected.files.length}`);
   console.log(
     `Diagnostics: ${report.summary.total_diagnostics} (errors ${report.summary.errors}, warnings ${report.summary.warnings})`,
@@ -579,16 +611,6 @@ async function run(raw) {
     );
   }
 
-  // Gate semantics: the Vanilla workspace carries a known nonzero error
-  // baseline under the current rules, so absolute severities cannot gate a
-  // release. With a baseline the gate is the diagnostics fingerprint — an
-  // identical fingerprint means behavior did not drift, whatever the error
-  // count; a drift means the release changed diagnostic output and must be
-  // looked at. A release that intentionally changes diagnostics records the
-  // accepted fingerprint in the reviewed sweep-baseline.json and passes it
-  // as --expect-fingerprint, which takes precedence over --previous.
-  // Without a baseline (first run) the gate falls back to the plain
-  // fail-on status.
   let previousSummary;
   if (raw.previous) {
     if (!existsSync(raw.previous)) {
@@ -597,58 +619,23 @@ async function run(raw) {
       previousSummary = JSON.parse(readFileSync(raw.previous, 'utf8'));
       console.log(`Comparison against ${raw.previous}:`);
       console.log(summarize(previousSummary, summary));
+      summary.comparison = {
+        previous_fingerprint: previousSummary.diagnostics_fingerprint ?? null,
+        drifted: previousSummary.diagnostics_fingerprint !== summary.diagnostics_fingerprint,
+      };
     }
   }
-  let gate;
-  if (raw.expectFingerprint) {
-    // A reviewed baseline file declares the one fingerprint a release may
-    // legitimately produce when it intentionally changes diagnostic output.
-    // The expectation takes precedence over --previous and is recorded in
-    // the summary so the published asset shows the accepted drift openly.
-    const accepted = raw.expectFingerprint === summary.diagnostics_fingerprint;
-    gate = accepted && report.tool_errors.length === 0;
-    console.log(
-      accepted
-        ? 'Gate: PASSED — diagnostics fingerprint matches the reviewed baseline'
-        : `Gate: FAILED — diagnostics fingerprint does not match the reviewed baseline: ${raw.expectFingerprint}`,
-    );
-  } else if (previousSummary) {
-    const drifted = previousSummary.diagnostics_fingerprint !== summary.diagnostics_fingerprint;
-    gate = !drifted && report.tool_errors.length === 0;
-    console.log(
-      drifted
-        ? 'Gate: FAILED — diagnostics drifted from the previous sweep'
-        : 'Gate: PASSED — diagnostics identical to the previous sweep',
-    );
-  } else {
-    gate = report.status === 'passed' && report.tool_errors.length === 0;
-    console.log(
-      `Gate: ${gate ? 'PASSED' : 'FAILED'} (no --previous baseline; gate follows the fail-on status)`,
-    );
-  }
-  summary.gate = {
-    mode: raw.expectFingerprint
-      ? 'expected-fingerprint'
-      : previousSummary
-        ? 'fingerprint'
-        : 'status',
-    passed: gate,
-    expected_fingerprint: raw.expectFingerprint ?? null,
-    previous_fingerprint: previousSummary?.diagnostics_fingerprint ?? null,
-  };
   writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
-  // Stable-named copy: the release workflow attaches this asset so the next
-  // release's sweep can pass it as --previous without name bookkeeping.
+  // Stable local copy for an explicit --previous comparison on a later run.
   const stableSummaryPath = join(outputDir, 'sweep-summary.json');
   writeFileSync(stableSummaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
   console.log(`Full report: ${outputs.jsonPath}`);
   console.log(`Summary: ${summaryPath}`);
   console.log(`Stable summary: ${stableSummaryPath}`);
-  console.log(`History: ${historyPath}`);
   if (report.tool_errors.length) {
     for (const error of report.tool_errors) console.error(`sweep: ${error}`);
   }
-  return gate ? 0 : 1;
+  return report.status === 'passed' ? 0 : 1;
 }
 
 async function main() {
@@ -657,7 +644,7 @@ async function main() {
     raw = parseSweepArgs(process.argv.slice(2));
   } catch (error) {
     if (error instanceof CliUsageError) {
-      console.error(error.message);
+      console.error(`${error.detail}\n\n${USAGE}`);
       return 2;
     }
     throw error;
@@ -669,7 +656,12 @@ async function main() {
   try {
     return await run(raw);
   } catch (error) {
-    console.error(`sweep: ${error instanceof Error ? error.message : String(error)}`);
+    const message = error instanceof CliUsageError
+      ? `${error.detail}\n\n${USAGE}`
+      : error instanceof Error
+        ? error.message
+        : String(error);
+    console.error(`sweep: ${message}`);
     return error instanceof CliUsageError ? 2 : 1;
   }
 }

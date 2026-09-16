@@ -160,10 +160,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - run: npm ci --prefix editors/vscode --no-audit --no-fund
-      - name: Audit production dependencies
-        run: npm --prefix editors/vscode audit --omit=dev --audit-level=high
-        # The extension check compiles with tsc and smoke-tests the preview
-        # contract against a cargo-built pdc, so both toolchains are present.
+      # The extension check compiles with tsc and smoke-tests the preview
+      # contract against a cargo-built pdc, so both toolchains are present.
       - run: npm --prefix editors/vscode run test:ci
 
   fuzz:
@@ -211,6 +209,7 @@ jobs:
       # Inline like rust-analyzer: build the shipped binary, then re-run the
       # release checks maintainers use locally (`cargo tools check release`).
       - run: cargo build --locked -p pdc --bin paradoxcode
+      - run: cargo run --locked -p tools -- check policy --root .
       - run: cargo run --locked -p tools -- check release --root .
 
   dependencies:
@@ -223,7 +222,9 @@ jobs:
       - uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
         with:
           tool: cargo-deny
-      - run: cargo deny check advisories licenses bans sources
+      # Lockfile-derived policy is deterministic for the PR. Advisory databases
+      # change independently of the patch and are audited by security.yml.
+      - run: cargo deny check licenses bans sources
 
   typo-check:
     name: Typo Check

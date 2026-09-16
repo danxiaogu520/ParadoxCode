@@ -59,6 +59,7 @@ export class CliUsageError extends Error {
   constructor(message) {
     super(`${message}\n\n${USAGE}`);
     this.name = 'CliUsageError';
+    this.detail = message;
   }
 }
 
@@ -286,8 +287,7 @@ export function resolveOptions(raw) {
     );
   }
   // The cache file may legitimately not exist yet: the server rebuilds a
-  // missing or unloadable cache in place from the discovered installation,
-  // and the release sweep's cold protocol deletes the file before every run.
+  // missing or unloadable cache in place from the discovered installation.
   // Only an existing non-file is a usage error.
   const cacheCandidate = resolve(vanillaCache);
   if (existsSync(cacheCandidate)) {

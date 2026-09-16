@@ -11,14 +11,21 @@
 ## Testing
 
 <!--
-List exactly what you ran and its result. Examples:
+List exactly what you ran and its result; do not substitute a generic "all gates" claim. Examples:
 - `cargo tools gates core` — passed
 - `cargo test -p ide rename` — passed
+- Local Vanilla sweep — not applicable (no diagnostic/rule/index behavior changed)
 -->
 
-- [ ] Local quality gates passed (`cargo tools gates`).
+- [ ] The affected local groups from `docs/validation.md` passed.
 - [ ] New behavior is covered by tests or fixtures in this PR.
-- [ ] CI is expected to pass for the touched groups (core / vscode / release).
+- [ ] No licensed game files, excerpts, sweep reports, or machine-local paths are included.
+
+<!--
+If this changes rules, diagnostics, parsing/HIR semantics, indexing, or workspace-wide queries,
+state whether a local Vanilla sweep was run and summarize only the conclusion. Never attach the
+game-derived report.
+-->
 
 ## Design and invariants
 
