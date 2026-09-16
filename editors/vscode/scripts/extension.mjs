@@ -359,6 +359,8 @@ const requiredSettings = [
   'paradoxcode.preview.gameFonts',
   'paradoxcode.preview.chineseFontMod',
   'paradoxcode.hover.texturePreview',
+  'paradoxcode.hover.missionCard',
+  'paradoxcode.hover.eventCard',
   'paradoxcode.diagnostics.severityOverrides',
   'paradoxcode.localisation.preferredLanguages',
   'paradoxcode.localisation.autoOpenDecoded',
@@ -389,6 +391,12 @@ if (manifest.contributes.configuration?.properties?.['paradoxcode.preview.chines
 // Hover texture previews are on unless opted out.
 if (manifest.contributes.configuration?.properties?.['paradoxcode.hover.texturePreview']?.default !== true) {
   fail('paradoxcode.hover.texturePreview must default to true');
+}
+if (manifest.contributes.configuration?.properties?.['paradoxcode.hover.missionCard']?.default !== true) {
+  fail('paradoxcode.hover.missionCard must default to true');
+}
+if (manifest.contributes.configuration?.properties?.['paradoxcode.hover.eventCard']?.default !== true) {
+  fail('paradoxcode.hover.eventCard must default to true');
 }
 // Whole-workspace diagnostics is opt-in from the editor: the manifest default
 // must be false and the resolved value must be forwarded unconditionally, or

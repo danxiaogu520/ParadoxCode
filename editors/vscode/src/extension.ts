@@ -21,13 +21,28 @@ import {
     attachFollowupCompletionTrigger,
     FOLLOWUP_COMPLETION_TRIGGER_COMMAND,
 } from './completionMiddleware';
-import { normalizeTexturePath } from './gameAssets';
+import { normalizeTexturePath, pngDataUrl } from './gameAssets';
 import {
     appendTextureSection,
     extractSpriteHoverName,
+    markdownFromHoverContents,
     texturefileHoverMarkdown,
     texturefileValueAt,
 } from './hoverTextures';
+import {
+    cachedCardDataUrl,
+    composeEventCard,
+    composeMissionCard,
+    eventCardMarkdown,
+    missionCardMarkdown,
+    parseHoverCardResponse,
+} from './hoverCards';
+import type {
+    HoverCardAssetWire,
+    HoverCardEventWire,
+    HoverCardMissionWire,
+    HoverCardWire,
+} from './hoverCards';
 import { findExecutableOnPath } from './serverPath';
 import { globToRegExp, pathRelative } from './paths';
 import {
@@ -640,7 +655,7 @@ function clientMiddleware(): NonNullable<LanguageClientOptions['middleware']> {
         },
         provideHover(document, position, token, next) {
             return Promise.resolve(next(document, position, token)).then((hover) =>
-                augmentHoverTexturePreview(document, position, hover),
+                augmentHoverTexturePreview(document, position, hover, token),
             );
         },
         handleDiagnostics(uri, diagnostics, next) {
@@ -678,31 +693,266 @@ function clientMiddleware(): NonNullable<LanguageClientOptions['middleware']> {
 /** Returns the markdown string of a hover whose contents the language
  * server produced as MarkupContent markdown (pdc's only hover shape). */
 function hoverMarkdownString(hover: vscode.Hover): vscode.MarkdownString | undefined {
-    const contents = hover.contents as unknown;
-    if (typeof contents !== 'object' || contents === null || Array.isArray(contents)) {
-        return undefined;
-    }
-    const candidate = contents as { value?: unknown; language?: unknown };
-    if (typeof candidate.value !== 'string' || candidate.language !== undefined) {
-        return undefined;
-    }
-    return contents as vscode.MarkdownString;
+    return markdownFromHoverContents(hover.contents) as vscode.MarkdownString | undefined;
+}
+
+/** Timeout for `pdc/hoverCard`: hover must answer, never hang. */
+const HOVER_CARD_TIMEOUT_MS = 1500;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`request timed out after ${ms}ms`)), ms);
+        promise.then(
+            (value) => {
+                clearTimeout(timer);
+                resolve(value);
+            },
+            (error) => {
+                clearTimeout(timer);
+                reject(error);
+            },
+        );
+    });
 }
 
 /**
- * Appends decoded texture previews to hovers. Sprite symbol hovers get a
- * `#### Texture` section; a hovered `texturefile` value in a `.gfx` file gets
- * the preview appended to the server's semantic value hover (the server now
- * resolves the path and reports provenance) or, when the server produced no
- * hover, a standalone preview. Every failure degrades to the untouched server
+ * Asks the server for a structured hover card (`pdc/hoverCard`): the
+ * mission/sprite/texture at this position with server-resolved texture
+ * paths. Any failure — old server without the method, cancellation,
+ * timeout, malformed payload — yields `undefined` so the caller falls
+ * back to the legacy hover paths.
+ */
+async function requestHoverCard(
+    document: vscode.TextDocument,
+    position: vscode.Position,
+    token: vscode.CancellationToken,
+): Promise<HoverCardWire | undefined> {
+    const server = client;
+    if (!server) {
+        return undefined;
+    }
+    try {
+        const payload = await withTimeout(
+            server.sendRequest('pdc/hoverCard', {
+                textDocument: { uri: document.uri.toString() },
+                position: { line: position.line, character: position.character },
+            }, token),
+            HOVER_CARD_TIMEOUT_MS,
+        );
+        return parseHoverCardResponse(payload)?.card;
+    } catch {
+        return undefined;
+    }
+}
+
+/** Appends a markdown section to the server hover (standalone when absent). */
+function combineHoverMarkdown(
+    hover: vscode.Hover | null | undefined,
+    section: string,
+): vscode.Hover | null {
+    const markdown = hover ? hoverMarkdownString(hover) : undefined;
+    if (hover && markdown) {
+        const augmented = new vscode.MarkdownString(`${markdown.value}\n\n${section}`);
+        augmented.isTrusted = true;
+        return new vscode.Hover(augmented, hover.range);
+    }
+    if (hover) {
+        // A non-markdown server hover keeps its own shape untouched.
+        return hover;
+    }
+    const standalone = new vscode.MarkdownString(section);
+    standalone.isTrusted = true;
+    return new vscode.Hover(standalone);
+}
+
+/**
+ * Renders the server's structured hover card: mission positions get the
+ * composed game-look mission card, event positions the composed event
+ * window, sprite and texture positions a single-texture preview. Returns
+ * `undefined` when this card cannot be rendered, letting the caller fall
+ * back to the legacy hover paths.
+ */
+async function augmentHoverWithCard(
+    hover: vscode.Hover | null | undefined,
+    card: HoverCardWire,
+): Promise<vscode.Hover | null | undefined> {
+    if (card.kind === 'mission') {
+        if (!card.mission) {
+            return undefined;
+        }
+        const section = await missionCardSection(card.mission, card.asset, card.cardAssets ?? {});
+        // A mission card that could not compose degrades to the plain
+        // server hover — the legacy paths have nothing for mission spans.
+        return section ? combineHoverMarkdown(hover, section) : hover ?? null;
+    }
+    if (card.kind === 'event') {
+        if (!card.event) {
+            return undefined;
+        }
+        const section = await eventCardSection(card.event, card.asset, card.cardAssets ?? {});
+        // Same degradation contract as the mission card.
+        return section ? combineHoverMarkdown(hover, section) : hover ?? null;
+    }
+    const asset = card.asset;
+    if (!asset) {
+        return undefined;
+    }
+    const store = MissionPreviewPanel.store();
+    const image = await store.textureFile(asset.path);
+    if (!image) {
+        return undefined;
+    }
+    const section = texturefileHoverMarkdown({
+        name: asset.sprite ?? path.basename(asset.path),
+        rel: asset.path,
+        url: image.url,
+        width: image.width,
+    });
+    return combineHoverMarkdown(hover, section);
+}
+
+/**
+ * Composes the game-look mission card — frame, icon underneath, trigger
+ * and reward corner markers, §-coloured title — and returns its markdown
+ * image section. `undefined` when no decodable assets are left.
+ */
+async function missionCardSection(
+    mission: HoverCardMissionWire,
+    asset: HoverCardAssetWire | undefined,
+    cardAssets: NonNullable<HoverCardWire['cardAssets']>,
+): Promise<string | undefined> {
+    const store = MissionPreviewPanel.store();
+    const load = (candidate: HoverCardAssetWire | undefined) =>
+        candidate ? store.textureRaster(candidate.path) : Promise.resolve(undefined);
+    const [frame, icon, triggerMarker, effectMarker, fonts] = await Promise.all([
+        load(cardAssets.frame),
+        load(asset),
+        load(cardAssets.triggerMarker),
+        load(cardAssets.effectMarker),
+        store.loadFontRasters(),
+    ]);
+    if (!frame && !icon) {
+        return undefined;
+    }
+    // Recompose only when the mission or any input asset changed: the key
+    // folds the mission identity and every asset path plus its mtime.
+    const stampAssets = [cardAssets.frame, asset, cardAssets.triggerMarker, cardAssets.effectMarker];
+    const cacheKey = [
+        mission.id,
+        mission.title?.value ?? '',
+        mission.hasTrigger ? '1' : '0',
+        mission.hasEffect ? '1' : '0',
+        ...stampAssets.map((candidate) => (candidate ? `${candidate.path}@${store.mtimeOf(candidate.path) ?? '?'}` : '-')),
+    ].join('\0');
+    const dataUrl = cachedCardDataUrl(cacheKey, () =>
+        pngDataUrl(composeMissionCard(mission, {
+            frame,
+            icon,
+            iconFrames: asset?.frames,
+            triggerMarker,
+            effectMarker,
+            effectMarkerFrames: cardAssets.effectMarker?.frames,
+            fonts,
+        })),
+    );
+    return missionCardMarkdown(dataUrl);
+}
+
+/**
+ * Composes the game-look event window — stacked background chrome, picture
+ * banner, §-coloured title/description, one button row per option — and
+ * returns its markdown image section. `undefined` when no decodable assets
+ * are left.
+ */
+async function eventCardSection(
+    event: HoverCardEventWire,
+    asset: HoverCardAssetWire | undefined,
+    cardAssets: NonNullable<HoverCardWire['cardAssets']>,
+): Promise<string | undefined> {
+    const store = MissionPreviewPanel.store();
+    const load = (candidate: HoverCardAssetWire | undefined) =>
+        candidate ? store.textureRaster(candidate.path) : Promise.resolve(undefined);
+    const [backgroundTop, backgroundMiddle, bottomS, bottomM, bottomL, optionButton, picture, fonts] =
+        await Promise.all([
+            load(cardAssets.backgroundTop),
+            load(cardAssets.backgroundMiddle),
+            load(cardAssets.backgroundBottomS),
+            load(cardAssets.backgroundBottomM),
+            load(cardAssets.backgroundBottomL),
+            load(cardAssets.optionButton),
+            load(asset),
+            store.loadFontRasters(),
+        ]);
+    if (!backgroundTop && !picture) {
+        return undefined;
+    }
+    // Recompose only when the event text or any input asset changed: the
+    // key folds the text payload and every asset path plus its mtime.
+    const stampAssets = [
+        cardAssets.backgroundTop,
+        cardAssets.backgroundMiddle,
+        cardAssets.backgroundBottomS,
+        cardAssets.backgroundBottomM,
+        cardAssets.backgroundBottomL,
+        cardAssets.optionButton,
+        asset,
+    ];
+    const cacheKey = [
+        event.id,
+        event.title?.value ?? '',
+        event.desc?.value ?? '',
+        ...event.options.map((option) => option.name?.value ?? option.nameKey),
+        ...stampAssets.map((candidate) => (candidate ? `${candidate.path}@${store.mtimeOf(candidate.path) ?? '?'}` : '-')),
+    ].join('\0');
+    const dataUrl = cachedCardDataUrl(cacheKey, () =>
+        pngDataUrl(composeEventCard(event, {
+            backgroundTop,
+            backgroundMiddle,
+            backgroundBottomS: bottomS,
+            backgroundBottomM: bottomM,
+            backgroundBottomL: bottomL,
+            optionButton,
+            picture,
+            fonts,
+        })),
+    );
+    return eventCardMarkdown(dataUrl);
+}
+
+/**
+ * Appends decoded texture previews to hovers. The server's structured
+ * hover card (mission/sprite/texture) is preferred; when the protocol is
+ * unavailable the legacy paths take over: sprite symbol hovers get a
+ * `#### Texture` section and a hovered `texturefile` value in a `.gfx`
+ * file gets the preview appended to the server's semantic hover or as a
+ * standalone section. Every failure degrades to the untouched server
  * hover — the preview must never fail.
  */
 async function augmentHoverTexturePreview(
     document: vscode.TextDocument,
     position: vscode.Position,
     hover: vscode.Hover | null | undefined,
+    token: vscode.CancellationToken,
 ): Promise<vscode.Hover | null | undefined> {
-    if (!vscode.workspace.getConfiguration('paradoxcode.hover').get<boolean>('texturePreview', true)) {
+    const hoverConfig = vscode.workspace.getConfiguration('paradoxcode.hover');
+    const texturePreview = hoverConfig.get<boolean>('texturePreview', true);
+    const missionCard = hoverConfig.get<boolean>('missionCard', true);
+    const eventCard = hoverConfig.get<boolean>('eventCard', true);
+    if (texturePreview || missionCard || eventCard) {
+        const card = await requestHoverCard(document, position, token);
+        const kindEnabled = card?.kind === 'mission'
+            ? missionCard
+            : card?.kind === 'event'
+                ? eventCard
+                : texturePreview;
+        if (card && kindEnabled) {
+            const handled = await augmentHoverWithCard(hover, card);
+            if (handled !== undefined) {
+                return handled;
+            }
+        }
+    }
+    if (!texturePreview) {
         return hover;
     }
     if (document.uri.fsPath.toLowerCase().endsWith('.gfx')) {
