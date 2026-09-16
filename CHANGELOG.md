@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-09-16
+
 ### Added
 
 - `.gfx` files get the same semantic depth as `.txt` files. All six GUI sprite block kinds
