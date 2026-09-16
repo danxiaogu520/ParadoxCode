@@ -131,6 +131,7 @@ pub(crate) fn is_snapshot_request(method: &str) -> bool {
             | "pdc/classifyPaths"
             | "pdc/textDiagnostics"
             | "pdc/missionPreview"
+            | "pdc/hoverCard"
     )
 }
 

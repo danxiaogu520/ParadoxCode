@@ -56,7 +56,7 @@ pub(crate) fn mission_diagnostics(
 
 /// True when `path` sits inside a `missions/` directory, the EU4 mission-file
 /// root (EU4 1.35+ format).
-fn is_mission_path(path: Option<&LogicalPath>) -> bool {
+pub(crate) fn is_mission_path(path: Option<&LogicalPath>) -> bool {
     path.and_then(|path| path.as_str().split('/').next())
         .is_some_and(|first| first.eq_ignore_ascii_case("missions"))
 }

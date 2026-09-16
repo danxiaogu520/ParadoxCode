@@ -9,6 +9,7 @@ mod dynamic_contracts;
 mod dynamic_cycles;
 mod dynamic_rules;
 mod hover;
+mod hover_card;
 mod inlay;
 mod lints;
 mod localisation;
@@ -32,6 +33,10 @@ pub use diagnostics::{
     source_file_diagnostics_with_cancellation, text_diagnostics_with_cancellation,
 };
 pub use hover::{hover, hover_with_cancellation};
+pub use hover_card::{
+    EventCardAssets, HoverCard, HoverCardAsset, HoverCardEvent, HoverCardEventOption,
+    HoverCardMission, MissionCardAssets, hover_card_with_cancellation,
+};
 pub use inlay::{MAX_SCOPE_INLAY_HINTS, scope_inlay_hints_with_cancellation};
 pub use localisation::{
     scripted_localisation_names, scripted_localisation_names_with_cancellation,

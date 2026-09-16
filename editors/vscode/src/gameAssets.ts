@@ -744,6 +744,23 @@ export interface FontAssets {
     chinese?: FontPayload;
 }
 
+/** One bitmap font with its atlas decoded to RGBA (unlike the webview payload). */
+export interface FontRaster {
+    id: 'english' | 'chinese';
+    lineHeight: number;
+    base: number;
+    chars: Map<number, BmChar>;
+    /** Kerning amounts keyed `first:second` (BMFont codepoints). */
+    kernings: Map<string, number>;
+    atlas: DecodedImage;
+}
+
+/** Decoded font pair for Node-side compositing (hover mission cards). */
+export interface FontBook {
+    english?: FontRaster;
+    chinese?: FontRaster;
+}
+
 /**
  * Loads and caches preview assets (interface sprites and bitmap fonts) for
  * one game installation plus an optional Chinese font mod directory.
@@ -760,7 +777,9 @@ export class GameAssetStore {
     private spriteIndex: Map<string, SpriteEntry> | undefined;
     private readonly spriteCache = new Map<string, { modified: number; url: string }>();
     private readonly textureFileCache = new Map<string, { modified: number; image: TextureImageData }>();
+    private readonly textureRasterCache = new Map<string, { modified: number; image: DecodedImage }>();
     private fontCache: { modified: string; fonts: FontAssets } | undefined;
+    private rasterCache: { modified: string; fonts: FontBook } | undefined;
 
     public constructor(
         gameDirectory: string | undefined,
@@ -878,37 +897,131 @@ export class GameAssetStore {
     }
 
     /**
+     * Decodes one texture file to raw RGBA for Node-side compositing (hover
+     * mission cards), cached by mtime. Same degradation contract as
+     * `textureFile`.
+     */
+    public async textureRaster(file: string): Promise<DecodedImage | undefined> {
+        const modified = this.fileModified(file);
+        if (modified === undefined) {
+            return undefined;
+        }
+        const cached = this.textureRasterCache.get(file);
+        if (cached && cached.modified === modified) {
+            return cached.image;
+        }
+        const bytes = await this.readBytes(file);
+        if (!bytes) {
+            return undefined;
+        }
+        try {
+            const image = decodeAtlasImage(bytes);
+            this.textureRasterCache.set(file, { modified, image });
+            return image;
+        } catch {
+            return undefined;
+        }
+    }
+
+    /** File mtime in ms, or `undefined` when the file is not readable. */
+    public mtimeOf(file: string): number | undefined {
+        return this.fileModified(file);
+    }
+
+    /**
      * Loads the preview font pair. `undefined` fields (or the whole result)
      * mean the corresponding font is unavailable and the renderer falls back
      * to its system-font path.
      */
     public async loadFonts(): Promise<FontAssets> {
-        const sources: { id: 'english' | 'chinese'; root: string | undefined }[] = [
-            { id: 'english', root: this.gameDirectory },
-            { id: 'chinese', root: this.chineseFontDirectory },
-        ];
-        const modifiedKey = sources.map(({ id, root }) => {
-            const font = root ? path.join(root, 'gfx', 'fonts', id === 'english' ? 'vic_18.fnt' : 'zh-hans-16.fnt') : '';
-            return `${id}:${root ? this.fileModified(font) ?? 'missing' : 'none'}`;
-        }).join('|');
+        const modifiedKey = this.fontModifiedKey();
         if (this.fontCache && this.fontCache.modified === modifiedKey) {
             return this.fontCache.fonts;
         }
         const fonts: FontAssets = {};
-        for (const { id, root } of sources) {
+        for (const { id, root } of this.fontSources()) {
             if (!root) {
                 continue;
             }
-            const payload = await this.loadFont(id, root);
-            if (payload) {
-                fonts[id] = payload;
+            const decoded = await this.readFont(id, root);
+            if (!decoded) {
+                continue;
             }
+            fonts[id] = {
+                id,
+                lineHeight: decoded.font.lineHeight,
+                base: decoded.font.base,
+                atlasUrl: pngDataUrl(decoded.atlas),
+                chars: [...decoded.font.chars.entries()].map(([charId, char]) => [
+                    charId,
+                    char.x,
+                    char.y,
+                    char.width,
+                    char.height,
+                    char.xOffset,
+                    char.yOffset,
+                    char.xAdvance,
+                ]),
+                kernings: decoded.font.kerningPairs,
+            };
         }
         this.fontCache = { modified: modifiedKey, fonts };
         return fonts;
     }
 
-    private async loadFont(id: 'english' | 'chinese', root: string): Promise<FontPayload | undefined> {
+    /**
+     * Loads the same font pair as decoded rasters for the hover-card
+     * compositor. Same mtime-cache and degradation contract as
+     * `loadFonts`: an absent entry just drops the card's title.
+     */
+    public async loadFontRasters(): Promise<FontBook> {
+        const modifiedKey = this.fontModifiedKey();
+        if (this.rasterCache && this.rasterCache.modified === modifiedKey) {
+            return this.rasterCache.fonts;
+        }
+        const fonts: FontBook = {};
+        for (const { id, root } of this.fontSources()) {
+            if (!root) {
+                continue;
+            }
+            const decoded = await this.readFont(id, root);
+            if (!decoded) {
+                continue;
+            }
+            fonts[id] = {
+                id,
+                lineHeight: decoded.font.lineHeight,
+                base: decoded.font.base,
+                chars: decoded.font.chars,
+                kernings: new Map(
+                    decoded.font.kerningPairs.map(([first, second, amount]) => [`${first}:${second}`, amount]),
+                ),
+                atlas: decoded.atlas,
+            };
+        }
+        this.rasterCache = { modified: modifiedKey, fonts };
+        return fonts;
+    }
+
+    private fontSources(): { id: 'english' | 'chinese'; root: string | undefined }[] {
+        return [
+            { id: 'english', root: this.gameDirectory },
+            { id: 'chinese', root: this.chineseFontDirectory },
+        ];
+    }
+
+    /** Cache key folding both fonts' .fnt mtimes ('missing'/'none' when absent). */
+    private fontModifiedKey(): string {
+        return this.fontSources().map(({ id, root }) => {
+            const font = root ? path.join(root, 'gfx', 'fonts', id === 'english' ? 'vic_18.fnt' : 'zh-hans-16.fnt') : '';
+            return `${id}:${root ? this.fileModified(font) ?? 'missing' : 'none'}`;
+        }).join('|');
+    }
+
+    private async readFont(
+        id: 'english' | 'chinese',
+        root: string,
+    ): Promise<{ font: BmFont; atlas: DecodedImage } | undefined> {
         const fontPath = path.join(root, 'gfx', 'fonts', id === 'english' ? 'vic_18' : 'zh-hans-16');
         const text = await this.readFile(fontPath + '.fnt');
         if (!text) {
@@ -926,24 +1039,7 @@ export class GameAssetStore {
             return undefined;
         }
         try {
-            const atlasUrl = pngDataUrl(decodeAtlasImage(atlasBytes));
-            return {
-                id,
-                lineHeight: font.lineHeight,
-                base: font.base,
-                atlasUrl,
-                chars: [...font.chars.entries()].map(([charId, char]) => [
-                    charId,
-                    char.x,
-                    char.y,
-                    char.width,
-                    char.height,
-                    char.xOffset,
-                    char.yOffset,
-                    char.xAdvance,
-                ]),
-                kernings: font.kerningPairs,
-            };
+            return { font, atlas: decodeAtlasImage(atlasBytes) };
         } catch {
             return undefined;
         }

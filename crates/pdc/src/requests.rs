@@ -29,7 +29,7 @@ use lsp_types::{
 use parser::format::format;
 use rules::ParserKind;
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 use text::{LineIndex, LogicalPath, Position, TextRange};
 
 use crate::protocol::{
@@ -176,6 +176,7 @@ impl SnapshotRequestContext {
             "pdc/classifyPaths" => self.classify_paths(params),
             "pdc/textDiagnostics" => self.text_diagnostics(params),
             "pdc/missionPreview" => self.mission_preview(params),
+            "pdc/hoverCard" => self.hover_card(params),
             _ => Err(RpcError::new(METHOD_NOT_FOUND, "method is not implemented")),
         }
     }
@@ -775,6 +776,88 @@ impl SnapshotRequestContext {
                     .map(|range| range_to_lsp(document.line_index(), document.text(), range)),
             },
             "hover response",
+        )
+    }
+
+    /// Structured hover-card payload for the extension's rendered previews:
+    /// the client's hover middleware asks which asset a position references
+    /// and composites the pixels itself, so the response carries paths and
+    /// provenance only (the same "server sends names, client owns pixels"
+    /// split as `pdc/missionPreview`).
+    /// Wire shape of one resolved localisation value.
+    fn loc_pair(pair: &(Option<String>, String)) -> Value {
+        json!({"language": pair.0, "value": pair.1})
+    }
+
+    fn hover_card(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let (id, position) = self.document_position(params)?;
+        self.ensure_active()?;
+        let Some(card) =
+            ide::hover_card_with_cancellation(&self.snapshot, &id, position, &self.cancellation)
+                .map_err(cancelled_error)?
+        else {
+            return Ok(Value::Null);
+        };
+        let asset_json = |asset: &ide::HoverCardAsset| {
+            json!({
+                "sprite": asset.sprite,
+                "path": asset.path,
+                "rootKind": asset.root_kind,
+                "extensionFallback": asset.extension_fallback,
+                "frames": asset.frames,
+            })
+        };
+        let mut card_json = json!({
+            "kind": card.kind,
+            "asset": card.asset.as_ref().map(asset_json),
+        });
+        if let Some(mission) = card.mission.as_ref() {
+            card_json["mission"] = json!({
+                "id": mission.id,
+                "icon": mission.icon,
+                "titleKey": mission.title_key,
+                "title": mission.title.as_ref().map(Self::loc_pair),
+                "hasTrigger": mission.has_trigger,
+                "hasEffect": mission.has_effect,
+                "required": mission.required,
+            });
+        }
+        if let Some(assets) = card.card_assets.as_ref() {
+            card_json["cardAssets"] = json!({
+                "frame": assets.frame.as_ref().map(asset_json),
+                "triggerMarker": assets.trigger_marker.as_ref().map(asset_json),
+                "effectMarker": assets.effect_marker.as_ref().map(asset_json),
+            });
+        }
+        if let Some(event) = card.event.as_ref() {
+            card_json["event"] = json!({
+                "id": event.id,
+                "picture": event.picture,
+                "titleKey": event.title_key,
+                "title": event.title.as_ref().map(Self::loc_pair),
+                "descKey": event.desc_key,
+                "desc": event.desc.as_ref().map(Self::loc_pair),
+                "options": event.options.iter().map(|option| {
+                    json!({
+                        "nameKey": option.name_key,
+                        "name": option.name.as_ref().map(Self::loc_pair),
+                    })
+                }).collect::<Vec<_>>(),
+            });
+        }
+        if let Some(assets) = card.event_assets.as_ref() {
+            card_json["cardAssets"] = json!({
+                "backgroundTop": assets.background_top.as_ref().map(asset_json),
+                "backgroundMiddle": assets.background_middle.as_ref().map(asset_json),
+                "backgroundBottomS": assets.background_bottom_s.as_ref().map(asset_json),
+                "backgroundBottomM": assets.background_bottom_m.as_ref().map(asset_json),
+                "backgroundBottomL": assets.background_bottom_l.as_ref().map(asset_json),
+                "optionButton": assets.option_button.as_ref().map(asset_json),
+            });
+        }
+        typed_value(
+            json!({"version": 1, "card": card_json}),
+            "hover card response",
         )
     }
 
