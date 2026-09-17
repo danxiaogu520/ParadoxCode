@@ -272,6 +272,14 @@ export class MissionPreviewPanel {
     private static assetStoreKey: string | undefined;
     /** Fonts are large payloads: post them once per store generation and panel. */
     private static postedFonts: { panel: vscode.WebviewPanel; key: string } | undefined;
+    /** Sprites are incremental payloads too: the names the receiving panel
+     * has already been sent. A rebuilt webview starts empty while this side's
+     * warm cache would suppress resends as already delivered, so any wanted
+     * name the panel has not received yet — first use, a rebuild after
+     * close/reopen, or a sprite decoded earlier for a previous panel — is
+     * force-resent. Store rebuilds need no tracking here: a fresh store is
+     * cold and therefore ships everything anyway. */
+    private static postedSprites: { panel: vscode.WebviewPanel; names: Set<string> } | undefined;
 
     /** Builds the shared client-side asset store, rebuilt when its source
      * directories change. Shared with the hover texture preview middleware. */
@@ -310,7 +318,9 @@ export class MissionPreviewPanel {
 
     /** Decodes the sprites a payload references (frame, node icons, arrow
      * tiles) and pushes any newly loaded ones to the webview. Client-side
-     * decoding keeps every per-keystroke `missionPreview` response pure text. */
+     * decoding keeps every per-keystroke `missionPreview` response pure text.
+     * Names this panel has not received yet are resent from the warm cache
+     * (see `postedSprites`). */
     private static async postAssets(
         panel: vscode.WebviewPanel,
         payload: MissionPreview,
@@ -327,7 +337,16 @@ export class MissionPreviewPanel {
             }
         }
         const store = MissionPreviewPanel.store();
-        const textures = await store.spriteUrls([...wanted]);
+        const delivered = MissionPreviewPanel.postedSprites?.panel === panel
+            ? MissionPreviewPanel.postedSprites.names
+            : new Set<string>();
+        const force = new Set<string>([...wanted].filter((name) => !delivered.has(name)));
+        const textures = await store.spriteUrls([...wanted], force);
+        const names = new Set<string>(delivered);
+        for (const name of Object.keys(textures)) {
+            names.add(name);
+        }
+        MissionPreviewPanel.postedSprites = { panel, names };
         const config = vscode.workspace.getConfiguration('paradoxcode');
         const fontsKey = MissionPreviewPanel.assetStoreKey ?? '';
         let fonts: FontAssets | undefined;

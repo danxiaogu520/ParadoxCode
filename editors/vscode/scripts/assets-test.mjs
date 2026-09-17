@@ -308,8 +308,11 @@ function tgaHeader(width, height, bpp, descriptor) {
         const urls = await store.spriteUrls(['test_icon', 'missing_icon']);
         assert.ok(urls.test_icon?.startsWith('data:image/png;base64,'));
         assert.equal(urls.missing_icon, undefined);
-        // Cached second fetch ships nothing new.
+        // Cached second fetch ships nothing new; names in the force set (what
+        // a rebuilt preview webview has not received) resend from the cache.
         assert.deepEqual(await store.spriteUrls(['test_icon']), {});
+        const forced = await store.spriteUrls(['test_icon'], new Set(['test_icon']));
+        assert.ok(forced.test_icon?.startsWith('data:image/png;base64,'));
         // Fonts decode with compact glyph rows and kerning pairs.
         const fonts = await store.loadFonts();
         assert.ok(fonts.english);
@@ -361,6 +364,18 @@ function tgaHeader(width, height, bpp, descriptor) {
         );
         writeFileSync(join(modRoot, 'gfx', 'interface', 'mod.dds'), green);
         writeFileSync(join(modRoot, 'gfx', 'interface', 'shared.dds'), green);
+        // A sprite whose texturefile spelling drifts from the shipped file.
+        writeFileSync(
+            join(modRoot, 'interface', 'assets', 'drift.gfx'),
+            'spriteTypes = { spriteType = { name = "drift_icon" texturefile = "gfx/interface/as_dds.tga" } }',
+        );
+        // Extension-drift fixtures: as_tga ships as .tga in the game root,
+        // as_dds ships as .dds in the mod root; the exact/drifted pair under
+        // exact_game exists in both spellings across the roots.
+        writeFileSync(join(gameRoot, 'gfx', 'interface', 'as_tga.tga'), red);
+        writeFileSync(join(modRoot, 'gfx', 'interface', 'as_dds.dds'), green);
+        writeFileSync(join(gameRoot, 'gfx', 'interface', 'exact_game.dds'), red);
+        writeFileSync(join(modRoot, 'gfx', 'interface', 'exact_game.tga'), green);
 
         const store = new assets.GameAssetStore(gameRoot, undefined, [modRoot]);
         // Mod definitions replace vanilla ones for the same sprite name; the
@@ -373,6 +388,28 @@ function tgaHeader(width, height, bpp, descriptor) {
         assert.equal(store.resolveTexture('gfx/interface/game.dds'), join(gameRoot, 'gfx', 'interface', 'game.dds'));
         assert.equal(store.resolveTexture('gfx/interface/missing.dds'), undefined);
         assert.equal(store.resolveTexture('../escape.dds'), undefined);
+        // Extension drift mirrors the server catalog: a `.dds` reference
+        // whose file ships as `.tga` (and vice versa) resolves, and an exact
+        // game-root hit beats a drifted mod-root hit.
+        assert.equal(store.resolveTexture('gfx/interface/as_tga.dds'), join(gameRoot, 'gfx', 'interface', 'as_tga.tga'));
+        assert.equal(store.resolveTexture('gfx/interface/as_dds.tga'), join(modRoot, 'gfx', 'interface', 'as_dds.dds'));
+        assert.equal(store.resolveTexture('gfx/interface/exact_game.dds'), join(gameRoot, 'gfx', 'interface', 'exact_game.dds'));
+        // Drift applies to .tga/.dds spellings only.
+        writeFileSync(join(gameRoot, 'gfx', 'interface', 'bitmap.png'), red);
+        assert.equal(store.resolveTexture('gfx/interface/bitmap.tga'), undefined);
+        // Resolution is case-insensitive like the game's own file lookup: a
+        // reference whose casing differs from the shipped file resolves, both
+        // for the exact spelling and through extension drift.
+        writeFileSync(join(gameRoot, 'gfx', 'interface', 'Mixed_Case.DDS'), red);
+        const fold = (value) => value.replaceAll('\\', '/').toLowerCase();
+        assert.equal(
+            fold(store.resolveTexture('GFX/Interface/mixed_case.dds')),
+            `${fold(gameRoot)}/gfx/interface/mixed_case.dds`,
+        );
+        assert.equal(
+            fold(store.resolveTexture('GFX/Interface/mixed_case.tga')),
+            `${fold(gameRoot)}/gfx/interface/mixed_case.dds`,
+        );
         // By-path decode returns dimensions alongside the data URL; missing
         // files degrade to undefined.
         const image = await store.textureFile(join(modRoot, 'gfx', 'interface', 'mod.dds'));
@@ -380,9 +417,11 @@ function tgaHeader(width, height, bpp, descriptor) {
         assert.equal(image?.width, 4);
         assert.equal(image?.height, 1);
         assert.equal(await store.textureFile(join(modRoot, 'gfx', 'interface', 'absent.dds')), undefined);
-        // The mission-preview path resolves mod textures through the same roots.
-        const urls = await store.spriteUrls(['mod_only']);
+        // The mission-preview path resolves mod textures through the same
+        // roots, including the extension-drifted sprite.
+        const urls = await store.spriteUrls(['mod_only', 'drift_icon']);
         assert.ok(urls.mod_only?.startsWith('data:image/png;base64,'));
+        assert.ok(urls.drift_icon?.startsWith('data:image/png;base64,'));
     } finally {
         rmSync(gameRoot, { recursive: true, force: true });
         rmSync(modRoot, { recursive: true, force: true });
