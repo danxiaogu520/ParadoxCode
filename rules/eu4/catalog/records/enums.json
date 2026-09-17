@@ -30,19 +30,6 @@
     },
     {
       "table": "enums",
-      "logical_id": "common/ancestor_personalities:common/ancestor_personalities:root:1:0",
-      "source_order": 377,
-      "fields": {
-        "child_count": "32",
-        "key": "enum[ancestor_key]",
-        "line": "22",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "enums",
       "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:4:2:11:1",
       "source_order": 627,
       "fields": {
@@ -273,19 +260,6 @@
         "key": "enum[hardcoded_legacygovernments]",
         "line": "975",
         "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "enums",
-      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:root:3:0",
-      "source_order": 1679,
-      "fields": {
-        "child_count": "99",
-        "key": "enum[government_icons]",
-        "line": "765",
-        "operator": "=",
-        "shape": "block",
         "source_file": "catalog.json"
       }
     },
@@ -723,19 +697,6 @@
     },
     {
       "table": "enums",
-      "logical_id": "enums:enums:root:0:21",
-      "source_order": 8886,
-      "fields": {
-        "child_count": "50",
-        "key": "enum[modifier_value]",
-        "line": "424",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "enums",
       "logical_id": "enums:enums:root:0:22",
       "source_order": 8937,
       "fields": {
@@ -905,19 +866,6 @@
     },
     {
       "table": "enums",
-      "logical_id": "enums:enums:root:0:34",
-      "source_order": 8999,
-      "fields": {
-        "child_count": "25",
-        "key": "enum[special_unit_types]",
-        "line": "554",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "enums",
       "logical_id": "enums:enums:root:0:35",
       "source_order": 9025,
       "fields": {
@@ -950,19 +898,6 @@
         "child_count": "3",
         "key": "enum[message_data_options]",
         "line": "592",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "enums",
-      "logical_id": "enums:enums:root:0:38",
-      "source_order": 9034,
-      "fields": {
-        "child_count": "65",
-        "key": "enum[estate_action_enum]",
-        "line": "597",
         "operator": "=",
         "shape": "block",
         "source_file": "catalog.json"
@@ -1028,19 +963,6 @@
         "child_count": "28",
         "key": "enum[DLCs]",
         "line": "55",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "enums",
-      "logical_id": "enums:enums:root:0:8",
-      "source_order": 8561,
-      "fields": {
-        "child_count": "132",
-        "key": "enum[DLCNUM]",
-        "line": "85",
         "operator": "=",
         "shape": "block",
         "source_file": "catalog.json"

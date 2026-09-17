@@ -7,6 +7,74 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Structured hover cards over a new `pdc/hoverCard` request: the server answers with a
+  versioned, pixel-free card payload (mission / sprite / texture) whose assets carry
+  TextureCatalog-resolved absolute paths plus root provenance (`currentMod` / `dependency` /
+  `vanilla`), extension-fallback flags, and frame counts — path resolution stays a single
+  server-owned source of truth while the client only reads, decodes, and caches files.
+  Hovering a mission inside a mission file composes the game-look mission card in the
+  extension host: the 103×123 frame with the icon underneath, trigger and reward corner
+  markers (frame strips crop to frame 0), and a §-coloured bitmap-font title (CJK-aware font
+  choice and per-character wrapping, centred, two lines), degrading to frame + icon +
+  markers when no font is available. Sprite and texture hovers render single-texture
+  previews from the server-resolved path. Any protocol failure — old server without the
+  method, timeout, malformed payload — falls back to the legacy hover paths unchanged.
+- `paradoxcode.hover.missionCard` (default on) toggles the composed mission card.
+- Event windows compose through the same protocol: hovering a
+  `country_event`/`province_event` block in an `events/` file renders the game's
+  564-wide event window — stacked background chrome (`GFX_event_bg_top/middle`
+  and the `bottom_S`/`_M`/`_L` pieces sized by option count), the picture
+  banner, §-coloured title and wrapped description, and one button row per
+  option. Event pictures resolve through the sprite index verbatim (vanilla
+  `eventpictures.gfx` names carry no `GFX_` prefix) with a prefixed fallback
+  for mods, and omitted title/desc keys default to `<id>.t`/`<id>.d` the way
+  the engine does. Controlled by `paradoxcode.hover.eventCard` (default on).
+  Event text follows the game's colours — white shadowed title and option
+  labels, black description — with § colours applied as authored; the whole
+  description wraps (Latin at word boundaries, CJK per character) and the
+  window grows with the tiled middle chrome to fit any length instead of
+  clipping at the engine's 128px description box. Mission titles fold beyond
+  two lines with a trailing `...` marker.
+
+### Fixed
+
+- Hover texture previews never appeared since the feature shipped: VS Code's `Hover` class
+  always wraps `contents` in an array, and the hover middleware's markdown extraction
+  returned early on arrays, silently dropping every sprite hover augmentation. The
+  extraction now accepts both the wrapped and the bare shape.
+- Hover images larger than VS Code's 100,000-character hover-markdown cap rendered as
+  literal markdown source: the renderer truncates oversized strings mid-data-URL, which
+  beheads the image syntax. Inline images beyond a 90k budget (composed cards and large
+  textures) now spill into a bounded temp-file cache referenced via `file:///` URIs, and
+  small images stay inline.
+- Latin text never wrapped in composed cards or the mission tree preview: the shared
+  tokenizer accumulated whole space-separated runs into single unbreakable tokens, so
+  only CJK content wrapped at all. Whitespace now opens wrap tokens, so Latin wraps at
+  word boundaries everywhere the pipeline renders text.
+
+### Changed
+
+- Repository validation now has explicit lifecycle ownership: targeted local checks provide
+  developer feedback, the remote `Conclusion` check is the merge authority, scheduled security
+  and performance workflows are audits, and the tag workflow builds and verifies only
+  redistributable repository-owned release assets.
+- The full Vanilla sweep is now a local-only development audit. It requires an explicit server
+  binary, rejects a stale binary whose embedded rules hash differs from the checkout, records the
+  binary checksum and dirty-worktree state, and keeps all game-derived reports in the ignored
+  `performance-results/` directory. Licensed game data, diagnostic excerpts, fingerprints, and
+  sweep reports are no longer uploaded to Actions or attached to Releases.
+- Local gate groups are deterministic and purpose-specific; dependency vulnerability scans remain
+  in the scheduled remote security workflow rather than blocking unrelated local or pull-request
+  work when an external advisory database changes.
+
+### Removed
+
+- The self-hosted Vanilla sweep runner, its host guard and recovery runbook, the checked-in
+  diagnostics fingerprint baseline/history, and the release workflow's sweep dependency. Release
+  publication no longer depends on a maintainer workstation or a licensed EU4 installation.
+
 ## [0.3.7] - 2026-09-16
 
 ### Added

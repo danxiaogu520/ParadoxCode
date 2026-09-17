@@ -1383,3 +1383,291 @@ fn initialize_reports_stages_via_log_message_and_work_done_progress() {
     );
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn hover_card_serves_mission_sprite_and_texture_payloads() {
+    let (root, root_uri) = temp_workspace_dir();
+    // The texture catalog resolves against on-disk files: ship the four
+    // textures the fixture sprites reference as minimal placeholder files
+    // (the catalog indexes by name and extension; pixels stay client-side).
+    let textures = root.join("gfx").join("interface").join("missions");
+    fs::create_dir_all(&textures).expect("create texture directory");
+    for name in [
+        "mission_alpha",
+        "mission_icons_frame",
+        "mission_trigger",
+        "mission_effect",
+    ] {
+        fs::write(textures.join(format!("{name}.dds")), b"placeholder").expect("texture file");
+    }
+    let gfx_text = "spriteTypes = {\n\
+\t\tspriteType = {\n\
+\t\t\tname = \"mission_alpha\"\n\
+\t\t\ttexturefile = \"gfx/interface/missions/mission_alpha.dds\"\n\
+\t\t}\n\
+\t\tspriteType = {\n\
+\t\t\tname = \"GFX_mission_icons_frame\"\n\
+\t\t\ttexturefile = \"gfx/interface/missions/mission_icons_frame.dds\"\n\
+\t\t}\n\
+\t\tspriteType = {\n\
+\t\t\tname = \"gfx_mission_trigger\"\n\
+\t\t\ttexturefile = \"gfx/interface/missions/mission_trigger.dds\"\n\
+\t\t}\n\
+\t\tspriteType = {\n\
+\t\t\tname = \"gfx_mission_effect\"\n\
+\t\t\ttexturefile = \"gfx/interface/missions/mission_effect.dds\"\n\
+\t\t\tnoOfFrames = 3\n\
+\t\t}\n\
+}\n";
+    let gfx_uri = format!("{root_uri}/interface/test_sprites.gfx");
+    let mission_text = "main_tree = {\n\tslot = 1\n\tprobe = {\n\t\tposition = 1\n\t\ticon = mission_alpha\n\t\ttrigger = { always = yes }\n\t\teffect = { add_stability = 1 }\n\t}\n}\n";
+    let mission_uri = format!("{root_uri}/missions/test.txt");
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":gfx_uri,"languageId":"eu4","version":1,"text":gfx_text}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":mission_uri,"languageId":"eu4","version":1,"text":mission_text}}}),
+        // Inside the `probe` mission block (on the icon value).
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/hoverCard","params":{"textDocument":{"uri":mission_uri},"position":{"line":4,"character":10}}}),
+        // On the `mission_alpha` sprite definition name in the open .gfx.
+        json!({"jsonrpc":"2.0","id":3,"method":"pdc/hoverCard","params":{"textDocument":{"uri":gfx_uri},"position":{"line":2,"character":12}}}),
+        // Inside a texturefile value in the open .gfx.
+        json!({"jsonrpc":"2.0","id":4,"method":"pdc/hoverCard","params":{"textDocument":{"uri":gfx_uri},"position":{"line":3,"character":25}}}),
+        // On the root key: nothing cardable.
+        json!({"jsonrpc":"2.0","id":5,"method":"pdc/hoverCard","params":{"textDocument":{"uri":gfx_uri},"position":{"line":0,"character":5}}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    let card = |id: i64| {
+        responses
+            .iter()
+            .find(|value| value["id"] == id)
+            .unwrap_or_else(|| panic!("hover card response {id}"))["result"]
+            .clone()
+    };
+
+    // Mission card: the icon asset plus the fixed node chrome, all resolved
+    // through the workspace catalog with current-mod provenance.
+    let mission = card(2);
+    assert_eq!(mission["version"], 1);
+    assert_eq!(mission["card"]["kind"], "mission");
+    assert_eq!(mission["card"]["mission"]["id"], "probe");
+    assert_eq!(mission["card"]["mission"]["icon"], "mission_alpha");
+    assert_eq!(mission["card"]["mission"]["titleKey"], "probe_title");
+    assert!(mission["card"]["mission"]["title"].is_null());
+    assert_eq!(mission["card"]["mission"]["hasTrigger"], true);
+    assert_eq!(mission["card"]["mission"]["hasEffect"], true);
+    assert_eq!(mission["card"]["asset"]["sprite"], "mission_alpha");
+    assert!(
+        mission["card"]["asset"]["path"]
+            .as_str()
+            .is_some_and(|path| path
+                .replace('\\', "/")
+                .ends_with("gfx/interface/missions/mission_alpha.dds"))
+    );
+    assert_eq!(mission["card"]["asset"]["rootKind"], "currentMod");
+    assert_eq!(mission["card"]["asset"]["extensionFallback"], false);
+    assert!(
+        mission["card"]["cardAssets"]["frame"]["path"]
+            .as_str()
+            .is_some_and(|path| path.contains("mission_icons_frame.dds"))
+    );
+    assert!(
+        mission["card"]["cardAssets"]["triggerMarker"]["path"]
+            .as_str()
+            .is_some_and(|path| path.contains("mission_trigger.dds"))
+    );
+    assert_eq!(mission["card"]["cardAssets"]["effectMarker"]["frames"], 3);
+
+    // Sprite card from the definition name.
+    let sprite = card(3);
+    assert_eq!(sprite["card"]["kind"], "sprite");
+    assert_eq!(sprite["card"]["asset"]["sprite"], "mission_alpha");
+    assert!(sprite["card"]["mission"].is_null());
+    assert!(
+        sprite["card"]["asset"]["path"]
+            .as_str()
+            .is_some_and(|path| path.contains("mission_alpha.dds"))
+    );
+
+    // Texture card from a texturefile value.
+    let texture = card(4);
+    assert_eq!(texture["card"]["kind"], "texture");
+    assert!(texture["card"]["asset"]["sprite"].is_null());
+    assert!(
+        texture["card"]["asset"]["path"]
+            .as_str()
+            .is_some_and(|path| path.contains("mission_alpha.dds"))
+    );
+    assert_eq!(texture["card"]["asset"]["rootKind"], "currentMod");
+
+    // A non-asset position yields null, not an error.
+    assert_eq!(card(5), serde_json::Value::Null);
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn hover_card_serves_event_window_payload() {
+    let (root, root_uri) = temp_workspace_dir();
+    // Event-window chrome plus one event picture as placeholder files; the
+    // second event's picture only exists under a GFX_-prefixed sprite name,
+    // exercising the fallback probe.
+    let interface = root.join("gfx").join("interface");
+    let pictures = root.join("gfx").join("event_pictures");
+    fs::create_dir_all(&interface).expect("create interface textures");
+    fs::create_dir_all(&pictures).expect("create picture textures");
+    for name in [
+        "events_BG_top",
+        "events_BG_middle",
+        "events_BG_bottom_S",
+        "events_BG_bottom_M",
+        "events_BG_bottom_L",
+        "event_button_547",
+    ] {
+        fs::write(interface.join(format!("{name}.dds")), b"placeholder").expect("texture file");
+    }
+    fs::write(pictures.join("demo_picture.dds"), b"placeholder").expect("texture file");
+    let gfx_text = "spriteTypes = {\n\
+\t\tspriteType = {\n\
+\t\t\tname = \"demo_picture\"\n\
+\t\t\ttexturefile = \"gfx/event_pictures/demo_picture.dds\"\n\
+\t\t}\n\
+\t\tspriteType = {\n\
+\t\t\tname = \"GFX_prefixed_picture\"\n\
+\t\t\ttexturefile = \"gfx/event_pictures/demo_picture.dds\"\n\
+\t\t}\n\
+\t\tspriteType = {\n\
+\t\t\tname = \"GFX_event_bg_top\"\n\
+\t\t\ttexturefile = \"gfx/interface/events_BG_top.dds\"\n\
+\t\t}\n\
+\t\tspriteType = {\n\
+\t\t\tname = \"GFX_event_bg_middle\"\n\
+\t\t\ttexturefile = \"gfx/interface/events_BG_middle.dds\"\n\
+\t\t}\n\
+\t\tspriteType = {\n\
+\t\t\tname = \"GFX_event_bg_bottom_S\"\n\
+\t\t\ttexturefile = \"gfx/interface/events_BG_bottom_S.dds\"\n\
+\t\t}\n\
+\t\tspriteType = {\n\
+\t\t\tname = \"GFX_event_bg_bottom_M\"\n\
+\t\t\ttexturefile = \"gfx/interface/events_BG_bottom_M.dds\"\n\
+\t\t}\n\
+\t\tspriteType = {\n\
+\t\t\tname = \"GFX_event_bg_bottom_L\"\n\
+\t\t\ttexturefile = \"gfx/interface/events_BG_bottom_L.dds\"\n\
+\t\t}\n\
+\t\ttextSpriteType = {\n\
+\t\t\tname = \"GFX_event_button_547\"\n\
+\t\t\ttexturefile = \"gfx/interface/event_button_547.dds\"\n\
+\t\t}\n\
+}\n";
+    let event_text = "normal_or_historical_nations = yes\n\
+country_event = {\n\
+\tid = demo_event.1\n\
+\ttitle = \"demo_event.1.t\"\n\
+\tdesc = \"demo_event.1.d\"\n\
+\tpicture = demo_picture\n\
+\tis_triggered_only = yes\n\
+\toption = {\n\
+\t\tname = \"demo_event.1.a\"\n\
+\t\teffect = { add_stability = 1 }\n\
+\t}\n\
+\toption = {\n\
+\t\tname = \"demo_event.1.b\"\n\
+\t}\n\
+}\n\
+country_event = {\n\
+\tid = demo_event.2\n\
+\tpicture = prefixed_picture\n\
+\toption = {\n\
+\t\tname = \"demo_event.2.a\"\n\
+\t}\n\
+}\n";
+    let gfx_uri = format!("{root_uri}/interface/test_event_sprites.gfx");
+    let event_uri = format!("{root_uri}/events/test_events.txt");
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":gfx_uri,"languageId":"eu4","version":1,"text":gfx_text}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":event_uri,"languageId":"eu4","version":1,"text":event_text}}}),
+        // Inside the first event block (on the title value).
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/hoverCard","params":{"textDocument":{"uri":event_uri},"position":{"line":3,"character":8}}}),
+        // Inside the second event block: picture resolves only via GFX_ prefix.
+        json!({"jsonrpc":"2.0","id":3,"method":"pdc/hoverCard","params":{"textDocument":{"uri":event_uri},"position":{"line":17,"character":12}}}),
+        // On the root scalar: nothing cardable.
+        json!({"jsonrpc":"2.0","id":4,"method":"pdc/hoverCard","params":{"textDocument":{"uri":event_uri},"position":{"line":0,"character":10}}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    let card = |id: i64| {
+        responses
+            .iter()
+            .find(|value| value["id"] == id)
+            .unwrap_or_else(|| panic!("hover card response {id}"))["result"]
+            .clone()
+    };
+
+    // Event card: fields in source order, the picture asset, and the fixed
+    // window chrome, all resolved through the workspace catalog.
+    let event = card(2);
+    assert_eq!(event["version"], 1);
+    assert_eq!(event["card"]["kind"], "event");
+    assert!(event["card"]["mission"].is_null());
+    assert_eq!(event["card"]["event"]["id"], "demo_event.1");
+    assert_eq!(event["card"]["event"]["picture"], "demo_picture");
+    assert_eq!(event["card"]["event"]["titleKey"], "demo_event.1.t");
+    assert_eq!(event["card"]["event"]["descKey"], "demo_event.1.d");
+    let options = event["card"]["event"]["options"].as_array().unwrap();
+    assert_eq!(options.len(), 2);
+    assert_eq!(options[0]["nameKey"], "demo_event.1.a");
+    assert_eq!(options[1]["nameKey"], "demo_event.1.b");
+    assert_eq!(event["card"]["asset"]["sprite"], "demo_picture");
+    assert!(event["card"]["asset"]["path"].as_str().is_some_and(|path| {
+        path.replace('\\', "/")
+            .ends_with("gfx/event_pictures/demo_picture.dds")
+    }));
+    assert_eq!(event["card"]["asset"]["rootKind"], "currentMod");
+    for (field, file) in [
+        ("backgroundTop", "events_BG_top.dds"),
+        ("backgroundMiddle", "events_BG_middle.dds"),
+        ("backgroundBottomS", "events_BG_bottom_S.dds"),
+        ("backgroundBottomM", "events_BG_bottom_M.dds"),
+        ("backgroundBottomL", "events_BG_bottom_L.dds"),
+        ("optionButton", "event_button_547.dds"),
+    ] {
+        assert!(
+            event["card"]["cardAssets"][field]["path"]
+                .as_str()
+                .is_some_and(|path| path.contains(file)),
+            "{field} must resolve to {file}"
+        );
+    }
+
+    // The prefixed-picture fallback resolves through GFX_<name>.
+    let fallback = card(3);
+    assert_eq!(fallback["card"]["kind"], "event");
+    assert_eq!(fallback["card"]["asset"]["sprite"], "GFX_prefixed_picture");
+    assert_eq!(
+        fallback["card"]["event"]["options"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+
+    // A non-event position yields null, not an error.
+    assert_eq!(card(4), serde_json::Value::Null);
+    fs::remove_dir_all(root).expect("cleanup");
+}
