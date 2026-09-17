@@ -47,11 +47,14 @@ pub fn hover_with_cancellation(
     if let Some((definition, reference)) = local_parameter_target(&input, position) {
         // The owner name lives directly on the HIR definition with the same range; going through
         // `semantic_data` here would lower the whole file just to recover one spelling.
-        let owner_name = input.hir.as_deref().and_then(|hir| {
+        let owner = input.hir.as_deref().and_then(|hir| {
             hir.definitions()
                 .iter()
                 .find(|candidate| candidate.range == definition.owner_range)
-                .map(|candidate| candidate.name.clone())
+                .map(|candidate| (candidate.kind.clone(), candidate.name.clone()))
+        });
+        let (owner_kind, owner_name) = owner.as_ref().map_or((None, None), |(kind, name)| {
+            (Some(kind.as_str()), Some(name.as_str()))
         });
         let occurrences = input
             .hir
@@ -62,16 +65,30 @@ pub fn hover_with_cancellation(
                     .count()
             })
             .unwrap_or(0);
-        let optional = input.hir.as_deref().is_some_and(|hir| {
-            !hir.parameter_is_required(definition.owner_range, &definition.name)
-        });
+        // Presence uses the invocation-form model (activation scoping) when the
+        // owning definition resolves with a template, so the definition-site
+        // hover agrees with the completion snippet's tabstops.
+        let optional = match (owner_kind, owner_name) {
+            (Some(kind), Some(name)) => {
+                dynamic::parameter_presence_required(snapshot, kind, name, &definition.name)
+                    .map(|required| !required)
+                    .unwrap_or_else(|| {
+                        input.hir.as_deref().is_some_and(|hir| {
+                            !hir.parameter_is_required(definition.owner_range, &definition.name)
+                        })
+                    })
+            }
+            _ => input.hir.as_deref().is_some_and(|hir| {
+                !hir.parameter_is_required(definition.owner_range, &definition.name)
+            }),
+        };
         let syntax = match reference.kind {
             hir::HirParameterReferenceKind::Substitution => "substitution",
             hir::HirParameterReferenceKind::KeySubstitution => "key substitution",
             hir::HirParameterReferenceKind::OpaqueTextSubstitution => "opaque text substitution",
             hir::HirParameterReferenceKind::Conditional => "conditional",
         };
-        let owner = owner_name.as_deref().map_or_else(
+        let owner = owner_name.map_or_else(
             || "scripted definition".to_owned(),
             |name| format!("scripted definition {}", code_span(name)),
         );
@@ -83,7 +100,7 @@ pub fn hover_with_cancellation(
                 "required/inferred"
             },
         );
-        if let Some(owner) = owner_name.as_deref()
+        if let Some(owner) = owner_name
             && let Some(contract) =
                 dynamic::dynamic_parameter_contract_lines(snapshot, None, owner, &definition.name)
         {

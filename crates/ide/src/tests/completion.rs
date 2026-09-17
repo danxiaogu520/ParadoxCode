@@ -1542,6 +1542,11 @@ fn scripted_definition_completion_snippet_includes_parameters() {
             "plain = { add_prestige = 1 }\n",
             "scalar = { add_prestige = $amount$ }\n",
             "optional_only = { [[value] add_prestige = $value$ ] }\n",
+            "tier = { if = { limit = { always = yes } add_base_tax = $type$ } ",
+            "else = { add_base_production = $type$ } }\n",
+            "grand = { hire_advisor = { type = $type$ } [[skill] skill = $skill$ ] }\n",
+            "both = { add_prestige = $zeta$ extend_province_modifier = ",
+            "{ name = $MODIFIER$ duration = $DURATION$ } }\n",
         ),
     )
     .expect("scripted effect definition");
@@ -1572,7 +1577,7 @@ fn scripted_definition_completion_snippet_includes_parameters() {
         .find(|item| item.label == "apply")
         .expect("scripted effect item");
     assert_eq!(snippet.kind, CompletionKind::DynamicDefinition);
-    assert_eq!(snippet.insert_text, "apply = {\n\tzeta = $1\n\t$0\n}");
+    assert_eq!(snippet.insert_text, "apply = {\n\tzeta = $0\n}");
 
     let trigger_id = DocumentId::new("file:///tmp/events/snippet-trigger.txt");
     let trigger_text = "country_event = { trigger = { ch";
@@ -1596,7 +1601,7 @@ fn scripted_definition_completion_snippet_includes_parameters() {
     );
     assert_eq!(
         crate::semantic::scripted_definition_snippet(&host.snapshot(), "scripted_effect", "scalar"),
-        "scalar = {\n\tamount = $1\n\t$0\n}"
+        "scalar = {\n\tamount = $0\n}"
     );
     assert_eq!(
         crate::semantic::scripted_definition_snippet(
@@ -1604,9 +1609,28 @@ fn scripted_definition_completion_snippet_includes_parameters() {
             "scripted_effect",
             "optional_only"
         ),
-        // Every parameter is `[[optional]]`, so the scalar form runs the
-        // definition with those chunks omitted.
-        "optional_only = yes"
+        // Every parameter sits inside a `[[optional]]` chunk, so the block
+        // skeleton carries no tabstops; the scalar form stays reserved for
+        // parameterless definitions.
+        "optional_only = {\n\t$0\n}"
+    );
+    assert_eq!(
+        crate::semantic::scripted_definition_snippet(&host.snapshot(), "scripted_effect", "tier"),
+        // Runtime-branch-local uses are still effectively required: the game
+        // substitutes the body textually regardless of which branch runs.
+        "tier = {\n\ttype = $0\n}"
+    );
+    assert_eq!(
+        crate::semantic::scripted_definition_snippet(&host.snapshot(), "scripted_effect", "grand"),
+        // `type = $type$` relays into a builtin effect (not a dynamic
+        // definition), so the same-named forwarding exemption does not apply.
+        "grand = {\n\ttype = $0\n}"
+    );
+    assert_eq!(
+        crate::semantic::scripted_definition_snippet(&host.snapshot(), "scripted_effect", "both"),
+        // Multiple tabstops: numbering runs over the prefilled parameters,
+        // with the final one doubling as the cursor's resting position.
+        "both = {\n\tzeta = $1\n\tMODIFIER = $2\n\tDURATION = $0\n}"
     );
     fs::remove_dir_all(root).expect("cleanup");
 }
