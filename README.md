@@ -82,7 +82,7 @@ that send only the deprecated `rootUri` field are intentionally unsupported and 
 
 ## Project status
 
-**Latest release: v0.3.7** (16 Sep 2026). The EU4 analysis and indexing features are implemented,
+**Latest release: v0.3.8** (17 Sep 2026). The EU4 analysis and indexing features are implemented,
 tested, and released through the tag-driven pipeline described under [Releases](#releases). See
 the [changelog](CHANGELOG.md) for the complete version history. Early adopters should still expect
 rough edges while 0.x matures; please report problems through the issue templates so they can be
