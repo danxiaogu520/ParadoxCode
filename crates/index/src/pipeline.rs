@@ -721,6 +721,7 @@ fn collect_semantic_type_definition(
         .as_deref()
         .and_then(|field| find_property(node, field, parsed))
         .or(Some(key))
+        .map(|name| descriptor.splice_definition_name(&name).to_owned())
     else {
         return;
     };

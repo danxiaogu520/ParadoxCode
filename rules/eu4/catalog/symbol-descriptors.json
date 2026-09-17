@@ -46,11 +46,6 @@
       "case_sensitive": false
     },
     {
-      "kind_id": "DLCNUM",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
       "kind_id": "DLCs",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
@@ -187,11 +182,6 @@
     },
     {
       "kind_id": "ancestor",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
-      "kind_id": "ancestor_key",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },
@@ -3986,11 +3976,6 @@
       "case_sensitive": false
     },
     {
-      "kind_id": "estate_action_enum",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
       "kind_id": "estate_agenda",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
@@ -4182,11 +4167,6 @@
     },
     {
       "kind_id": "government_attributes",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
-      "kind_id": "government_icons",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },
@@ -6136,11 +6116,6 @@
       "case_sensitive": false
     },
     {
-      "kind_id": "modifier:reduced_native_attacks",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
       "kind_id": "modifier:reduced_stab_impacts",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
@@ -6222,11 +6197,6 @@
     },
     {
       "kind_id": "modifier:sea_repair",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
-      "kind_id": "modifier:secondary_religion",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },
@@ -6407,11 +6377,6 @@
     },
     {
       "kind_id": "modifier_rule:modifier",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
-      "kind_id": "modifier_value",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },
@@ -8107,11 +8072,6 @@
     },
     {
       "kind_id": "selectable",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
-      "kind_id": "special_unit_types",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },

@@ -222,6 +222,16 @@ pub struct TypeDescriptor {
     pub name_from_file: bool,
     /// Optional first-party `starts_with` discriminator.
     pub starts_with: Option<String>,
+    /// Optional prefix removed from collected definition names.
+    ///
+    /// Some value domains spell their members without a boilerplate affix the declaring
+    /// blocks always carry: ancestor effects accept `righteous` while the block under
+    /// `common/ancestor_personalities` is named `ancestor_righteous_personality`.
+    #[serde(default)]
+    pub name_strip_prefix: Option<String>,
+    /// Optional suffix removed from collected definition names, after the prefix.
+    #[serde(default)]
+    pub name_strip_suffix: Option<String>,
     /// Optional filter for keys that instantiate this type, paired with its negation flag.
     ///
     /// Negated filters are represented by `negate = true`.
@@ -270,6 +280,33 @@ impl TypeDescriptor {
                     .any(|value| value.eq_ignore_ascii_case(child_key))
                     != *negate
             })
+    }
+
+    /// The value-domain spelling of a collected definition name: the declared
+    /// boilerplate affixes removed when the name carries them, the name verbatim
+    /// otherwise. Mirrors `TemplateParameter::splice_member` so members defined
+    /// without the affixes still resolve.
+    #[must_use]
+    pub fn splice_definition_name<'name>(&self, name: &'name str) -> &'name str {
+        let mut name = name;
+        if let Some(prefix) = self.name_strip_prefix.as_deref()
+            && !prefix.is_empty()
+            && name
+                .get(..prefix.len())
+                .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+        {
+            name = &name[prefix.len()..];
+        }
+        if let Some(suffix) = self.name_strip_suffix.as_deref()
+            && !suffix.is_empty()
+            && name.len() >= suffix.len()
+            && name
+                .get(name.len() - suffix.len()..)
+                .is_some_and(|tail| tail.eq_ignore_ascii_case(suffix))
+        {
+            name = &name[..name.len() - suffix.len()];
+        }
+        name
     }
 }
 
