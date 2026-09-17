@@ -552,6 +552,49 @@ function extensionDriftSpelling(normalized: string): string | undefined {
     return replacement === undefined ? undefined : `${normalized.slice(0, dot)}${replacement}`;
 }
 
+/** Probes `root`/`relative` for a file: verbatim first, then with the game's
+ * case-insensitive resolution — every path segment is matched against the
+ * directory listing ignoring case, because the engine ignores casing on every
+ * platform while `statSync` alone stays case-sensitive on Linux. */
+function probeFile(root: string, relative: string): string | undefined {
+    const direct = path.join(root, relative);
+    try {
+        if (fs.statSync(direct).isFile()) {
+            return direct;
+        }
+    } catch {
+        // Missing verbatim: fall through to the case-insensitive walk.
+    }
+    const folded = relative.toLowerCase();
+    let current = root;
+    let remaining = folded;
+    while (remaining !== '') {
+        const slash = remaining.indexOf('/');
+        const segment = slash === -1 ? remaining : remaining.slice(0, slash);
+        remaining = slash === -1 ? '' : remaining.slice(slash + 1);
+        let match: string | undefined;
+        try {
+            for (const name of fs.readdirSync(current)) {
+                if (name.toLowerCase() === segment) {
+                    match = name;
+                    break;
+                }
+            }
+        } catch {
+            return undefined;
+        }
+        if (match === undefined) {
+            return undefined;
+        }
+        current = path.join(current, match);
+    }
+    try {
+        return fs.statSync(current).isFile() ? current : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 /**
  * Parses one `.gfx` file and returns its `spriteType` entries in source
  * order. Brace matching keeps the scan tolerant of stray quotes and comments;
@@ -808,11 +851,11 @@ export class GameAssetStore {
      * Resolves sprite names to PNG data URLs. Unknown names and decode
      * failures are simply absent from the result; only newly loaded or
      * mtime-changed sprites are returned, so callers can push incremental
-     * `assets` messages without re-sending the world. `force` also returns
-     * cached entries, for a consumer that lost its accumulated set (a
-     * rebuilt preview webview).
+     * `assets` messages without re-sending the world. Names in `force` are
+     * also returned from the warm cache, for a consumer that lost part of
+     * its accumulated set (a rebuilt preview webview).
      */
-    public async spriteUrls(names: readonly string[], force = false): Promise<Record<string, string>> {
+    public async spriteUrls(names: readonly string[], force?: ReadonlySet<string>): Promise<Record<string, string>> {
         const urls: Record<string, string> = {};
         if (!this.gameDirectory && this.modRoots.length === 0) {
             return urls;
@@ -834,7 +877,7 @@ export class GameAssetStore {
             }
             const cached = this.spriteCache.get(name);
             if (cached && cached.modified === modified) {
-                if (force) {
+                if (force?.has(name)) {
                     urls[name] = cached.url;
                 }
                 continue;
@@ -859,9 +902,10 @@ export class GameAssetStore {
     /**
      * Resolves one game-root-relative texture path to a file on disk, mod
      * roots before the game installation: a drop-in texture replacement in
-     * the mod wins over the vanilla file it shadows. When the exact spelling
-     * is absent from every root, the `.tga`/`.dds` drift spelling is probed
-     * the same way, mirroring the server's texture catalog.
+     * the mod wins over the vanilla file it shadows. Probes are
+     * case-insensitive like the game's own resolution, and when the exact
+     * spelling is absent from every root the `.tga`/`.dds` drift spelling is
+     * probed the same way, mirroring the server's texture catalog.
      */
     public resolveTexture(texturePath: string): string | undefined {
         const normalized = normalizeTexturePath(texturePath);
@@ -878,13 +922,9 @@ export class GameAssetStore {
                 if (!root) {
                     continue;
                 }
-                const file = path.join(root, candidate);
-                try {
-                    if (fs.statSync(file).isFile()) {
-                        return file;
-                    }
-                } catch {
-                    // Not present in this root; keep probing.
+                const file = probeFile(root, candidate);
+                if (file !== undefined) {
+                    return file;
                 }
             }
         }

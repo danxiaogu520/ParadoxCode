@@ -78,11 +78,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - The mission preview no longer loses every game texture when its panel is closed and reopened in
-  the same session. Sprite delivery now tracks the receiving panel (as the bitmap fonts already
-  did), so a rebuilt webview forces a complete resend instead of being suppressed by the extension
-  host's warm cache. The client-side texture resolver also accepts the engine's `.tga`/`.dds`
-  extension drift, so a sprite whose file ships under the other spelling renders instead of
-  silently falling back to the schematic.
+  the same session. Sprite delivery now tracks which names each panel has received, so a rebuilt
+  webview — and any sprite a later refresh newly references after being decoded for a previous
+  panel — is resent instead of being suppressed by the extension host's warm cache. The
+  client-side texture resolver also accepts the engine's `.tga`/`.dds` extension drift and
+  case-insensitive path matching, so a sprite whose file ships under another spelling or casing
+  renders instead of silently falling back to the schematic.
 
 ## [0.3.7] - 2026-09-16
 

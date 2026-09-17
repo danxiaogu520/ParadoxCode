@@ -308,10 +308,10 @@ function tgaHeader(width, height, bpp, descriptor) {
         const urls = await store.spriteUrls(['test_icon', 'missing_icon']);
         assert.ok(urls.test_icon?.startsWith('data:image/png;base64,'));
         assert.equal(urls.missing_icon, undefined);
-        // Cached second fetch ships nothing new; a forced fetch (a rebuilt
-        // preview webview) resends the cached entry.
+        // Cached second fetch ships nothing new; names in the force set (what
+        // a rebuilt preview webview has not received) resend from the cache.
         assert.deepEqual(await store.spriteUrls(['test_icon']), {});
-        const forced = await store.spriteUrls(['test_icon'], true);
+        const forced = await store.spriteUrls(['test_icon'], new Set(['test_icon']));
         assert.ok(forced.test_icon?.startsWith('data:image/png;base64,'));
         // Fonts decode with compact glyph rows and kerning pairs.
         const fonts = await store.loadFonts();
@@ -397,6 +397,19 @@ function tgaHeader(width, height, bpp, descriptor) {
         // Drift applies to .tga/.dds spellings only.
         writeFileSync(join(gameRoot, 'gfx', 'interface', 'bitmap.png'), red);
         assert.equal(store.resolveTexture('gfx/interface/bitmap.tga'), undefined);
+        // Resolution is case-insensitive like the game's own file lookup: a
+        // reference whose casing differs from the shipped file resolves, both
+        // for the exact spelling and through extension drift.
+        writeFileSync(join(gameRoot, 'gfx', 'interface', 'Mixed_Case.DDS'), red);
+        const fold = (value) => value.replaceAll('\\', '/').toLowerCase();
+        assert.equal(
+            fold(store.resolveTexture('GFX/Interface/mixed_case.dds')),
+            `${fold(gameRoot)}/gfx/interface/mixed_case.dds`,
+        );
+        assert.equal(
+            fold(store.resolveTexture('GFX/Interface/mixed_case.tga')),
+            `${fold(gameRoot)}/gfx/interface/mixed_case.dds`,
+        );
         // By-path decode returns dimensions alongside the data URL; missing
         // files degrade to undefined.
         const image = await store.textureFile(join(modRoot, 'gfx', 'interface', 'mod.dds'));
