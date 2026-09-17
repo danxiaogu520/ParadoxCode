@@ -272,6 +272,8 @@ pub(crate) fn canonical_hash(model: &RulesModel) -> RuleHash {
         put_opt_str(&mut bytes, descriptor.name_field.as_deref());
         bytes.push(u8::from(descriptor.name_from_file));
         put_opt_str(&mut bytes, descriptor.starts_with.as_deref());
+        put_opt_str(&mut bytes, descriptor.name_strip_prefix.as_deref());
+        put_opt_str(&mut bytes, descriptor.name_strip_suffix.as_deref());
         match &descriptor.type_key_filter {
             Some((values, negate)) => {
                 bytes.push(1);

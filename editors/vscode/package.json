@@ -975,6 +975,16 @@
           "default": true,
           "markdownDescription": "%configuration.hover.texturePreview.description%"
         },
+        "paradoxcode.hover.missionCard": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%configuration.hover.missionCard.description%"
+        },
+        "paradoxcode.hover.eventCard": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%configuration.hover.eventCard.description%"
+        },
         "paradoxcode.localisation.transparentEncoding": {
           "type": "boolean",
           "default": true,

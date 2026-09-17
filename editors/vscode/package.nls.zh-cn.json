@@ -73,6 +73,8 @@
   "configuration.preview.gameFonts.description": "使用游戏位图字体渲染任务标题（原版 `vic_18`；中文字体取自定位到的汉化 mod），而非系统字体。",
   "configuration.preview.chineseFontMod.description": "提供中文位图字体（`gfx/fonts/zh-hans-16.fnt`）的 mod 文件夹路径。留空时自动在定位到的游戏安装的 Steam 创意工坊中发现最新的匹配 mod。",
   "configuration.hover.texturePreview.description": "在 sprite 悬停（`icon = …`、事件 `picture`、`.gfx` 内 sprite 定义以及 `texturefile` 路径值）后追加解码后的贴图图片。贴图优先从工作区 mod 解析，其次为定位到的游戏安装目录。",
+  "configuration.hover.missionCard.description": "在任务文件内悬停任务时渲染游戏同款任务卡（边框、图标、触发与奖励角标、位图字体标题）。贴图路径解析来自服务器索引；卡片使用与任务树预览相同的字体合成。",
+  "configuration.hover.eventCard.description": "在 `events/` 目录的事件文件内悬停事件时渲染游戏同款事件窗口（背景骨架、图片横幅、标题、描述、选项按钮）。贴图路径解析来自服务器索引；卡片使用与任务树预览相同的字体合成。",
   "commands.localisation.openDecoded.title": "以中文（解码）视图打开",
   "commands.localisation.revealOriginal.title": "打开原始转码文件",
   "commands.localisation.transcodeFile.title": "转码本地化文件",
