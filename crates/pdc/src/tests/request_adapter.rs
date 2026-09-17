@@ -1024,7 +1024,7 @@ fn memory_transport_negotiates_completion_snippet_support() {
         .iter()
         .find(|item| item["label"] == "apply")
         .expect("scripted effect item");
-    assert_eq!(apply["insertText"], "apply = {\n\tamount = $1\n\t$0\n}");
+    assert_eq!(apply["insertText"], "apply = {\n\tamount = $0\n}");
     assert_eq!(apply["insertTextFormat"], 2, "snippet format");
 
     let no_snippet = run(json!({}));

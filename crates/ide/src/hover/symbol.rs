@@ -93,7 +93,7 @@ pub(crate) fn hover_for_symbol(
                 model.push_section(localisation_preview_section(&previews));
             }
             if let Some(summary) = dynamic_definition_summary(snapshot, kind, name) {
-                let mut signature = dynamic_signature_hover(&summary);
+                let mut signature = dynamic_signature_hover(snapshot, &summary);
                 if crate::semantic::dynamic_definition_type(snapshot, kind) {
                     signature.push('\n');
                     signature.push_str(&crate::dynamic_contracts::contract_hover_line(

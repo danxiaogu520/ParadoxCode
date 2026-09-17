@@ -56,6 +56,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Scripted-effect/trigger completion now follows the invocation-form rule the game actually
+  enforces: a definition is scalar (`= yes` for effects, a boolean for triggers) if and only
+  if its body declares no `$PARAM$` at all; every parameterized definition completes as a
+  parameter block. Previously any definition whose parameters were all "optional" — runtime
+  `if`/`else`-branch-local uses, `[[chunk]]`-only uses, or same-named relays — completed as
+  `= yes`, which vanilla itself never writes (all of its parameterized calls are blocks, and
+  47 definitions fell into that gap). The block skeleton prefills one tabstop per
+  effectively-required parameter (the final one doubles as the cursor position, and no
+  trailing placeholder line remains); parameters whose every use sits inside a
+  `[[conditional]]` chunk or is forwarded into a nested dynamic call stay optional and get no
+  tabstop. Hover's callable signature and per-parameter presence lines now group by the same
+  activation-scoped partition, so hover, completion, and diagnostics agree. Scalar `= yes`
+  calls of definitions with effectively-required parameters gain the missing-parameter
+  diagnostic; block calls keep the existing branch-local leniency unchanged, and purely
+  chunk-parameterized definitions stay legally scalar.
 - Repository validation now has explicit lifecycle ownership: targeted local checks provide
   developer feedback, the remote `Conclusion` check is the merge authority, scheduled security
   and performance workflows are audits, and the tag workflow builds and verifies only

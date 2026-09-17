@@ -1614,6 +1614,13 @@ fn dynamic_summary_in_hir(
 
 /// Builds the canonical invocation snippet for a resolved dynamic definition signature. Snippet bodies
 /// use relative indentation only; the client re-indents multi-line snippets to the insertion line.
+///
+/// A definition is scalar (`= yes` for effects, a boolean for triggers) if and
+/// only if its body declares no `$PARAM$` at all; every parameterized
+/// definition completes as a parameter block with one tabstop per
+/// effectively-required parameter, the last of which doubles as the final
+/// cursor position. An invocation block only accepts parameter assignments,
+/// so the skeleton carries no trailing placeholder line.
 pub(crate) fn scripted_definition_snippet(
     snapshot: &AnalysisSnapshot,
     kind_name: &str,
@@ -1622,28 +1629,34 @@ pub(crate) fn scripted_definition_snippet(
     let Some(summary) = dynamic_definition_summary(snapshot, kind_name, definition_name) else {
         return format!("{definition_name} = {{\n\t$0\n}}");
     };
-    if summary
-        .parameters
-        .iter()
-        .all(|parameter| !parameter.required)
-    {
+    if summary.parameters.is_empty() {
         return format!("{definition_name} = yes");
     }
-    let inner_indent = "\t";
-    let mut body = String::new();
-    for (index, parameter) in summary
+    let tabstops = summary
         .parameters
         .iter()
-        .filter(|parameter| parameter.required)
-        .enumerate()
-    {
-        body.push_str(&format!(
-            "{inner_indent}{} = ${}\n",
-            parameter.name,
-            index + 1
-        ));
+        .filter(|parameter| {
+            crate::dynamic_rules::parameter_effectively_required(snapshot, &summary, parameter)
+        })
+        .map(|parameter| parameter.name.as_str())
+        .collect::<Vec<_>>();
+    if tabstops.is_empty() {
+        return format!("{definition_name} = {{\n\t$0\n}}");
     }
-    format!("{definition_name} = {{\n{body}{inner_indent}$0\n}}")
+    let inner_indent = "\t";
+    let last = tabstops.len() - 1;
+    let mut body = String::new();
+    for (index, name) in tabstops.iter().enumerate() {
+        // Tabstop numbering runs over the prefilled parameters only; the
+        // final one doubles as the cursor's resting position.
+        let stop = if index == last {
+            "$0".to_owned()
+        } else {
+            format!("${}", index + 1)
+        };
+        body.push_str(&format!("{inner_indent}{name} = {stop}\n"));
+    }
+    format!("{definition_name} = {{\n{body}}}")
 }
 
 pub(crate) fn semantic_key_matches(
