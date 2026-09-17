@@ -89,6 +89,8 @@ fn schema(connection: &Connection) -> Result<(), RulesError> {
             name_field TEXT,
             name_from_file INTEGER NOT NULL DEFAULT 0,
             starts_with TEXT,
+            name_strip_prefix TEXT,
+            name_strip_suffix TEXT,
             type_key_filter TEXT NOT NULL DEFAULT '',
             type_key_filter_negate INTEGER NOT NULL DEFAULT 0,
             root_entries TEXT,
@@ -175,6 +177,8 @@ fn ensure_semantic_columns(connection: &Connection) -> Result<(), RulesError> {
         ("type_key_filter", "TEXT NOT NULL DEFAULT ''"),
         ("type_key_filter_negate", "INTEGER NOT NULL DEFAULT 0"),
         ("root_entries", "TEXT"),
+        ("name_strip_prefix", "TEXT"),
+        ("name_strip_suffix", "TEXT"),
         ("dynamic_body_context", "TEXT"),
         ("dynamic_enabled", "INTEGER NOT NULL DEFAULT 0"),
         ("dynamic_replacement", "INTEGER NOT NULL DEFAULT 0"),
@@ -356,7 +360,7 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
     for (type_name, descriptor) in &rules.model.semantic.type_descriptors {
         let dynamic_definition = descriptor.dynamic_definition.as_ref();
         transaction.execute(
-            "INSERT INTO type_descriptors(type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, type_key_filter, type_key_filter_negate, root_entries, body_context, dynamic_body_context, dynamic_enabled, dynamic_replacement, dynamic_condition, dynamic_key, dynamic_opaque_text) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
+            "INSERT INTO type_descriptors(type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, name_strip_prefix, name_strip_suffix, type_key_filter, type_key_filter_negate, root_entries, body_context, dynamic_body_context, dynamic_enabled, dynamic_replacement, dynamic_condition, dynamic_key, dynamic_opaque_text) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
             params![
                 type_name,
                 descriptor.path,
@@ -373,6 +377,8 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
                 descriptor.name_field,
                 i64::from(descriptor.name_from_file),
                 descriptor.starts_with,
+                descriptor.name_strip_prefix,
+                descriptor.name_strip_suffix,
                 descriptor
                     .type_key_filter
                     .as_ref()
@@ -668,6 +674,20 @@ fn dynamic_definition_columns_available(connection: &Connection) -> Result<bool,
     Ok(true)
 }
 
+fn name_strip_columns_available(connection: &Connection) -> Result<bool, RulesError> {
+    for name in ["name_strip_prefix", "name_strip_suffix"] {
+        let present: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('type_descriptors') WHERE name = ?1",
+            params![name],
+            |row| row.get(0),
+        )?;
+        if present == 0 {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesError> {
     let mut rules = Vec::new();
     let mut statement = connection.prepare(
@@ -807,21 +827,26 @@ fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesEr
     } else {
         "NULL, 0, 0, 0, 0, 0"
     };
+    let name_strip_columns = if name_strip_columns_available(connection)? {
+        "name_strip_prefix, name_strip_suffix"
+    } else {
+        "NULL, NULL"
+    };
     let descriptor_query = format!(
-        "SELECT type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, type_key_filter, type_key_filter_negate, root_entries, body_context, {dynamic_definition_columns} FROM type_descriptors ORDER BY type_name"
+        "SELECT type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, {name_strip_columns}, type_key_filter, type_key_filter_negate, root_entries, body_context, {dynamic_definition_columns} FROM type_descriptors ORDER BY type_name"
     );
     let mut statement = connection.prepare(&descriptor_query)?;
     let rows = statement.query_map([], |row| {
         let type_name: String = row.get(0)?;
         let skip_root_paths: String = row.get(6)?;
-        let type_key_filter: String = row.get(10)?;
-        let type_key_filter_negate: bool = row.get::<_, i64>(11)? != 0;
-        let dynamic_body_context: Option<String> = row.get(14)?;
-        let dynamic_enabled: bool = row.get::<_, i64>(15)? != 0;
-        let dynamic_replacement: bool = row.get::<_, i64>(16)? != 0;
-        let dynamic_condition: bool = row.get::<_, i64>(17)? != 0;
-        let dynamic_key: bool = row.get::<_, i64>(18)? != 0;
-        let dynamic_opaque_text: bool = row.get::<_, i64>(19)? != 0;
+        let type_key_filter: String = row.get(12)?;
+        let type_key_filter_negate: bool = row.get::<_, i64>(13)? != 0;
+        let dynamic_body_context: Option<String> = row.get(16)?;
+        let dynamic_enabled: bool = row.get::<_, i64>(17)? != 0;
+        let dynamic_replacement: bool = row.get::<_, i64>(18)? != 0;
+        let dynamic_condition: bool = row.get::<_, i64>(19)? != 0;
+        let dynamic_key: bool = row.get::<_, i64>(20)? != 0;
+        let dynamic_opaque_text: bool = row.get::<_, i64>(21)? != 0;
         Ok(TypeDescriptor {
             name: type_name.clone(),
             path: row.get(1)?,
@@ -840,8 +865,10 @@ fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesEr
             name_field: row.get(7)?,
             name_from_file: row.get::<_, i64>(8)? != 0,
             starts_with: row.get(9)?,
-            root_entries: row.get(12)?,
-            body_context: row.get(13)?,
+            name_strip_prefix: row.get(10)?,
+            name_strip_suffix: row.get(11)?,
+            root_entries: row.get(14)?,
+            body_context: row.get(15)?,
             type_key_filter: if type_key_filter.is_empty() {
                 None
             } else {
