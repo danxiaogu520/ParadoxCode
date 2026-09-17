@@ -1902,8 +1902,7 @@ fn dynamic_layer_owns_value_diagnostic(
     if property.block_range.is_none() {
         return dynamic_invocation_summary(snapshot, rules, &property.key).is_some_and(|summary| {
             summary.parameters.iter().any(|parameter| {
-                parameter.required
-                    && !dynamic_parameter_is_runtime_optional(&summary, &parameter.name)
+                crate::dynamic_rules::parameter_effectively_required(snapshot, &summary, parameter)
             })
         });
     }
@@ -1989,12 +1988,13 @@ fn validate_dynamic_arguments(
     cancellation: &CancellationToken,
 ) -> Result<(), Cancelled> {
     // Scalar invocations (`stable = yes`) cannot bind anything, but fall
-    // through: a definition with required parameters must still get the
-    // dedicated missing-parameter message instead of only the generic
+    // through: a definition with effectively-required parameters must still
+    // get the dedicated missing-parameter message instead of only the generic
     // value mismatch.
     let Some(summary) = dynamic_invocation_summary(snapshot, rules, &property.key) else {
         return Ok(());
     };
+    let scalar_invocation = property.block_range.is_none();
 
     let mut counts = std::collections::BTreeMap::<String, usize>::new();
     for argument in &property.block {
@@ -2016,8 +2016,19 @@ fn validate_dynamic_arguments(
         .parameters
         .iter()
         .filter(|parameter| {
-            parameter.required
-                && !dynamic_parameter_is_runtime_optional(&summary, &parameter.name)
+            let demanded = if scalar_invocation {
+                // The scalar form exists only for parameterless (or purely
+                // activation-scoped) definitions; every effectively-required
+                // parameter is unbound, so demand all of them.
+                crate::dynamic_rules::parameter_effectively_required(snapshot, &summary, parameter)
+            } else {
+                // Block invocations keep the lenient indexed `required` flag:
+                // runtime-branch-local and forwarded parameters may be
+                // omitted by callers that avoid those branches.
+                parameter.required
+                    && !dynamic_parameter_is_runtime_optional(&summary, &parameter.name)
+            };
+            demanded
                 && !counts
                     .keys()
                     .any(|name| name.eq_ignore_ascii_case(&parameter.name))
@@ -2025,7 +2036,7 @@ fn validate_dynamic_arguments(
         .map(|parameter| format!("`{}`", parameter.name))
         .collect::<Vec<_>>();
     if !missing.is_empty() {
-        let hint = if property.block_range.is_none() {
+        let hint = if scalar_invocation {
             "; provide them in a parameter block"
         } else {
             ""

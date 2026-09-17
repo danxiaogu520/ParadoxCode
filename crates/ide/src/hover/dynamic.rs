@@ -53,6 +53,12 @@ pub(crate) fn dynamic_invocation_parameter_hover(
     else {
         return Ok(None);
     };
+    // Presence follows the invocation-form model (activation scoping when the
+    // definition lowered to a template), so the hover agrees with the snippet
+    // tabstops instead of the looser indexed `required` flag.
+    let effectively_required =
+        parameter_presence_required(snapshot, &owner_kind, &owner_name, &parameter.name)
+            .unwrap_or(parameter.required);
     let mut model = HoverModel::new(format!(
         "### parameter {} of scripted {}",
         code_span(&parameter.name),
@@ -60,7 +66,7 @@ pub(crate) fn dynamic_invocation_parameter_hover(
     ));
     let mut section = format!(
         "- Presence: `{}`",
-        if parameter.required {
+        if effectively_required {
             "required"
         } else {
             "optional"
@@ -197,7 +203,16 @@ fn key_render_forms(replayed: &crate::completion::ReplayedSites) -> Vec<(String,
 }
 
 /// Renders the `#### Callable signature` section for a dynamic definition symbol hover.
-pub(crate) fn dynamic_signature_hover(summary: &engine::DynamicDefinitionSummary) -> String {
+///
+/// The invocation form matches the completion snippet's model: scalar only
+/// for parameterless definitions, otherwise a named parameter block. Required
+/// and optional group by activation scoping — the same partition that picks
+/// snippet tabstops — so hover, completion, and diagnostics agree on which
+/// parameters an invocation may omit.
+pub(crate) fn dynamic_signature_hover(
+    snapshot: &AnalysisSnapshot,
+    summary: &engine::DynamicDefinitionSummary,
+) -> String {
     let invocation = match summary.parameters.len() {
         0 => format!("`{} = yes`", summary.name),
         _ => "named parameter block".to_owned(),
@@ -205,13 +220,17 @@ pub(crate) fn dynamic_signature_hover(summary: &engine::DynamicDefinitionSummary
     let required = summary
         .parameters
         .iter()
-        .filter(|parameter| parameter.required)
+        .filter(|parameter| {
+            crate::dynamic_rules::parameter_effectively_required(snapshot, summary, parameter)
+        })
         .map(|parameter| format!("`{}`", parameter.name))
         .collect::<Vec<_>>();
     let optional = summary
         .parameters
         .iter()
-        .filter(|parameter| !parameter.required)
+        .filter(|parameter| {
+            !crate::dynamic_rules::parameter_effectively_required(snapshot, summary, parameter)
+        })
         .map(|parameter| format!("`{}`", parameter.name))
         .collect::<Vec<_>>();
     let mut lines = vec![format!("- Invocation: {invocation}")];
@@ -225,4 +244,23 @@ pub(crate) fn dynamic_signature_hover(summary: &engine::DynamicDefinitionSummary
         lines.push("- Parameters: none".to_owned());
     }
     format!("#### Callable signature\n\n{}", lines.join("\n"))
+}
+
+/// Presence of one parameter of a resolved dynamic definition under the
+/// invocation-form model. Returns `None` when the definition or its template
+/// cannot be resolved, leaving callers to fall back to the indexed `required`
+/// flag.
+pub(crate) fn parameter_presence_required(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+    name: &str,
+    parameter: &str,
+) -> Option<bool> {
+    let template = crate::semantic::resolve_dynamic_definition(snapshot, kind, name)?
+        .summary
+        .template;
+    let template = template.as_ref()?;
+    Some(!crate::dynamic_rules::parameter_is_activation_scoped(
+        snapshot, template, parameter,
+    ))
 }

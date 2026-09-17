@@ -581,6 +581,70 @@ fn runtime_branch_dynamic_accepts_the_amount_only_legitimacy_call() {
 }
 
 #[test]
+fn scalar_invocation_demands_activation_scoped_parameters_but_spares_pure_chunks() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ide-scalar-branch-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&definitions).expect("definition directory");
+    std::fs::write(
+        definitions.join("00_scalar_branch.txt"),
+        concat!(
+            // `type` is used only inside runtime branches, but the scalar
+            // form substitutes nothing, so the call cannot omit it.
+            "tiered = { ",
+            "if = { limit = { always = yes } add_base_tax = $type$ } ",
+            "else = { add_base_production = $type$ } }\n",
+            // Every parameter sits inside an activation chunk; the scalar
+            // form runs the definition with the chunk dropped.
+            "chunked = { [[value] add_prestige = $value$ ] }\n",
+        ),
+    )
+    .expect("dynamic definitions");
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+    let id = DocumentId::new("file:///tmp/events/scalar-branch.txt");
+    let text = concat!(
+        "country_event = { id = fixture.1 immediate = { ",
+        "tiered = yes chunked = yes tiered = { } } ",
+        "option = { always = yes } }\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open calls");
+
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results.iter().any(|item| item.message.contains(
+            "dynamic definition `tiered` is missing required parameter(s): `type`; provide them in a parameter block"
+        )),
+        "scalar call must demand the runtime-branch-local parameter: {results:?}"
+    );
+    assert!(
+        results
+            .iter()
+            .filter(|item| item.message.contains("chunked"))
+            .all(|item| !item.message.contains("missing required parameter")),
+        "purely activation-scoped parameters stay omittable by the scalar form: {results:?}"
+    );
+    assert!(
+        results
+            .iter()
+            .filter(|item| item.message.contains("missing required parameter"))
+            .count()
+            == 1,
+        "the block call omitting the branch-local parameter stays lenient, and the scalar call reports exactly once: {results:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn cached_runtime_branch_dynamic_recomputes_optional_parameters_from_the_template() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

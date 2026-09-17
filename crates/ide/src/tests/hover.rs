@@ -1131,6 +1131,96 @@ fn dynamic_parameter_hovers_and_payload_arguments_are_diagnosable() {
 }
 
 #[test]
+fn signature_hover_groups_parameters_by_activation_scoping() {
+    use std::fs;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ide-signature-hover-{nonce}"));
+    let effects = root.join("common/scripted_effects");
+    fs::create_dir_all(&effects).expect("scripted effects directory");
+    let definitions_body = concat!(
+        // `type` is runtime-branch-local only, yet effectively required.
+        "tiered = { ",
+        "if = { limit = { always = yes } add_base_tax = $type$ } ",
+        "else = { add_base_production = $type$ } }\n",
+        // Every parameter sits inside an activation chunk.
+        "chunked = { [[value] add_prestige = $value$ ] }\n",
+        // `type = $type$` relays into a builtin effect, not a dynamic callee.
+        "grand = { hire_advisor = { type = $type$ } [[skill] skill = $skill$ ] }\n",
+    );
+    fs::write(effects.join("00_signature.txt"), definitions_body).expect("definitions");
+
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+
+    let id = DocumentId::new("file:///tmp/events/signature-hover.txt");
+    let text = concat!(
+        "country_event = { id = batch.1 immediate = { ",
+        "tiered = { type = base_tax } ",
+        "chunked = { } ",
+        "grand = { type = statesman } } }\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open call sites");
+    let snapshot = host.snapshot();
+
+    for (name, expected) in [
+        ("tiered", "- Required parameters: `type`"),
+        ("chunked", "- Optional parameters: `value`"),
+        (
+            "grand",
+            "- Required parameters: `type`\n- Optional parameters: `skill`",
+        ),
+    ] {
+        let position = u32::try_from(text.find(name).expect("call site") + 1).expect("position");
+        let hover = hover(&snapshot, &id, position).expect("signature hover");
+        assert!(
+            hover.contents.contains("#### Callable signature")
+                && hover.contents.contains("named parameter block")
+                && hover.contents.contains(expected),
+            "{name} signature must group by activation scoping: {}",
+            hover.contents
+        );
+    }
+
+    // The definition-site parameter hover agrees with the signature.
+    let definitions = DocumentId::new("file:///tmp/common/scripted_effects/00_signature.txt");
+    host.open_document(
+        definitions.clone(),
+        1,
+        definitions_body.to_owned(),
+        Some(AbsPath::normalize(&effects.join("00_signature.txt"))),
+    )
+    .expect("open definitions");
+    let definition_position = u32::try_from(
+        definitions_body
+            .find("$type$")
+            .expect("first type reference")
+            + 1,
+    )
+    .expect("position");
+    let parameter_hover = hover(&host.snapshot(), &definitions, definition_position)
+        .expect("definition-site parameter hover");
+    assert!(
+        parameter_hover
+            .contents
+            .contains("Presence: `required/inferred`"),
+        "runtime-branch-local parameters hover as required at the definition site: {}",
+        parameter_hover.contents
+    );
+
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn affixed_value_parameter_hover_names_the_render_and_expected_domain() {
     use std::fs;
 
