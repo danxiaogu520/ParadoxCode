@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.8] - 2026-09-17
+
 ### Added
 
 - Structured hover cards over a new `pdc/hoverCard` request: the server answers with a
@@ -53,6 +55,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   tokenizer accumulated whole space-separated runs into single unbreakable tokens, so
   only CJK content wrapped at all. Whitespace now opens wrap tokens, so Latin wraps at
   word boundaries everywhere the pipeline renders text.
+- The mission preview no longer loses every game texture when its panel is closed and reopened in
+  the same session. Sprite delivery now tracks which names each panel has received, so a rebuilt
+  webview — and any sprite a later refresh newly references after being decoded for a previous
+  panel — is resent instead of being suppressed by the extension host's warm cache. The
+  client-side texture resolver also accepts the engine's `.tga`/`.dds` extension drift and
+  case-insensitive path matching, so a sprite whose file ships under another spelling or casing
+  renders instead of silently falling back to the schematic.
+- The mission tree preview only previews mission files, and it no longer retargets behind the
+  user's back. The refresh gate is a single `missions/` path pattern (previously any EU4 document
+  or around 140 path patterns qualified, so events, decisions, and common files rendered pseudo
+  trees from their top-level blocks); focusing a non-mission file shows an empty state explaining
+  the requirement. When focus leaves text editors — most commonly clicking the preview canvas to
+  pan or zoom — the refresh fallback now resolves the document behind the last pushed preview
+  instead of the first open mission-like document in open order, which used to flip the panel to
+  another file and reset the viewport.
 
 ### Changed
 
@@ -71,6 +88,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   calls of definitions with effectively-required parameters gain the missing-parameter
   diagnostic; block calls keep the existing branch-local leniency unchanged, and purely
   chunk-parameterized definitions stay legally scalar.
+- First-party EU4 modifier catalog synced with a full wiki audit: the frozen 28-key
+  exported-modifier enum is replaced by the already-indexed `<faction>_influence` template family
+  (`pr_buccaneers_influence` validates again), the per-estate loyalty-equilibrium spelling is
+  retired in favour of `<estate>_loyalty_modifier` (only the all-estate form keeps the
+  equilibrium name), the long-removed `reduced_native_attacks` stops validating, and
+  `secondary_religion` moves from the numeric modifier context to the event-modifier flag layer
+  beside `religion` — a yes-flag that drops the modifier on syncretic-religion change.
+- Ancestor personalities follow the government-attributes pattern: the frozen import enum is
+  replaced by a workspace `ancestor_personality` type harvested from
+  `common/ancestor_personalities`, so mod-added personalities validate and complete and the nine
+  short keys the frozen enum had never gained are accepted. The
+  `remove_{ruler,queen,heir}_personality` operands resolve the full-name type instead of a dead
+  never-interpolated literal, and seven unreferenced legacy enums with their symbol kinds retire.
 - Repository validation now has explicit lifecycle ownership: targeted local checks provide
   developer feedback, the remote `Conclusion` check is the merge authority, scheduled security
   and performance workflows are audits, and the tag workflow builds and verifies only
@@ -89,16 +119,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The self-hosted Vanilla sweep runner, its host guard and recovery runbook, the checked-in
   diagnostics fingerprint baseline/history, and the release workflow's sweep dependency. Release
   publication no longer depends on a maintainer workstation or a licensed EU4 installation.
-
-### Fixed
-
-- The mission preview no longer loses every game texture when its panel is closed and reopened in
-  the same session. Sprite delivery now tracks which names each panel has received, so a rebuilt
-  webview — and any sprite a later refresh newly references after being decoded for a previous
-  panel — is resent instead of being suppressed by the extension host's warm cache. The
-  client-side texture resolver also accepts the engine's `.tga`/`.dds` extension drift and
-  case-insensitive path matching, so a sprite whose file ships under another spelling or casing
-  renders instead of silently falling back to the schematic.
 
 ## [0.3.7] - 2026-09-16
 
@@ -866,7 +886,10 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.5...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.8...HEAD
+[0.3.8]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.7...v0.3.8
+[0.3.7]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.6...v0.3.7
+[0.3.6]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.3...v0.3.5
 [0.3.3]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.1...v0.3.2
