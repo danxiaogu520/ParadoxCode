@@ -22,6 +22,7 @@
 - 全量 Vanilla sweep 是按风险运行的本地开发工具，不是提交、PR 或发布的门禁。必须显式传入要验证的 `--server`；脚本会核对服务器实际内嵌的规则哈希与当前 checkout，避免过期二进制产生假结论。报告只留在被忽略的 `performance-results/`，不得上传或提交。
 - 黄金对拍：`PDC_UPDATE_GOLDEN=1 cargo test -p ide golden_gfx_sprite_semantics`。
 - 规则改动后必须重烤并同步计数断言：`cargo run -p rules --bin bake -- build --source rules/eu4 --output <tmp> --manifest rules/manifest.json` + rulec.rs 计数。
+- 依赖更新策略：不使用 Dependabot / Renovate 等机器人（均已关闭，含安全警报）。CVE 由每周 `security.yml` 的 `cargo deny check advisories` 与 `npm audit --omit=dev` 定时扫描兜底，扫描亮红时立即定点升级受影响依赖并走 PR。例行新鲜度每月一次批量处理：根与 `fuzz/` 各跑 `cargo update`、`editors/vscode` 跑 `npm update`，本地 `cargo tools gates all` + `npm run check` + `npm run test:contract` 验证后走单个 PR；验证失败的依赖用 `cargo update -p <crate> --precise <旧版本>` 定点回退，不带进本批。GitHub Actions 引用按 SHA 锁定，人工按需升级。
 
 ## 3. 发布流程
 
