@@ -120,9 +120,12 @@ fn load_connection(
     {
         return Err(IndexCacheError::UnsupportedSchema(schema_version));
     }
-    // Previews are decoded by `transcode`; a codec bump changes their meaning, so
-    // caches written by a different codec are rebuilt instead of mixed in.
-    if metadata_text(connection, "codec_version")?.trim() != transcode::CODEC_VERSION.to_string() {
+    // Previews are decoded by `transcode`; a transcode version bump changes their
+    // meaning, so caches written by a different transcode version are rebuilt
+    // instead of mixed in.
+    if metadata_text(connection, "transcode_version")?.trim()
+        != transcode::TRANSCODE_VERSION.to_string()
+    {
         return Err(IndexCacheError::UnsupportedSchema(schema_version));
     }
     let table_counts = validate_table_limits(connection)?;

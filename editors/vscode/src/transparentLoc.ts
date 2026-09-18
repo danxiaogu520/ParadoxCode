@@ -40,7 +40,7 @@ export function realUriOf(uri: vscode.Uri): vscode.Uri | undefined {
 }
 
 /**
- * Selects the codec profile for a real file: localisation yml under a
+ * Selects the transcoder profile for a real file: localisation yml under a
  * `localisation/` directory uses the UTF-8/BOM form (paratranz `utf8eu4`);
  * files matching the configured script globs (workspace-relative) use the raw
  * single-byte form (`latin1eu4`). Anything else is not eligible for the
@@ -92,7 +92,7 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
     private readonly watchers = new Set<vscode.FileSystemWatcher>();
 
     constructor(
-        private readonly codec: Transcoder,
+        private readonly transcoder: Transcoder,
         private readonly diagnostics: vscode.DiagnosticCollection,
         private readonly log: vscode.OutputChannel,
     ) {}
@@ -143,14 +143,14 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
         const real = this.requireReal(uri);
         const profile = this.requireProfile(real);
         const bytes = new Uint8Array(await fs.readFile(real.fsPath));
-        const classification = this.codec.classify(bytes, profile);
+        const classification = this.transcoder.classify(bytes, profile);
         if (classification !== 'escaped') {
             // Iron rule ②: only whole files the classifier marks escaped get
             // decoded. Readable/Mixed content is shown as-is and reported.
             this.publishReadDiagnostics(uri, real, { classification, broken: 0 });
             return bytes;
         }
-        const decoded = this.codec.decode(bytes, profile);
+        const decoded = this.transcoder.decode(bytes, profile);
         if (decoded === 'invalid-utf8') {
             throw vscode.FileSystemError.Unavailable(
                 'an escaped localisation file must be valid UTF-8 — the bytes are damaged',
@@ -167,7 +167,7 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
     ): Promise<void> {
         const real = this.requireReal(uri);
         const profile = this.requireProfile(real);
-        const classification = this.codec.classify(content, profile);
+        const classification = this.transcoder.classify(content, profile);
         if (classification === 'escaped' || classification === 'mixed') {
             // The buffer already contains escape sequences — this is pasted
             // transcoded text, and encoding it again would double-encode.
@@ -180,7 +180,7 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
             void vscode.window.showErrorMessage(`ParadoxCode: ${message}`);
             throw vscode.FileSystemError.NoPermissions(message);
         }
-        const encoded = this.codec.encode(content, profile);
+        const encoded = this.transcoder.encode(content, profile);
         if ('unencodable' in encoded) {
             const points = encoded.unencodable
                 .map((point) => formatCodePoint(point.codePoint))
@@ -294,7 +294,7 @@ function commandResource(uri: vscode.Uri | undefined): vscode.Uri | undefined {
     return realUriOf(active) ?? active;
 }
 
-async function openDecodedView(codec: Transcoder, uri: vscode.Uri | undefined): Promise<void> {
+async function openDecodedView(transcoder: Transcoder, uri: vscode.Uri | undefined): Promise<void> {
     const real = commandResource(uri);
     if (!real || real.scheme !== 'file') {
         void vscode.window.showErrorMessage(
@@ -311,7 +311,7 @@ async function openDecodedView(codec: Transcoder, uri: vscode.Uri | undefined): 
         return;
     }
     const bytes = new Uint8Array(await fs.readFile(real.fsPath));
-    const classification = codec.classify(bytes, profile);
+    const classification = transcoder.classify(bytes, profile);
     if (classification === 'mixed') {
         void vscode.window.showErrorMessage(
             'ParadoxCode: this file mixes readable CJK with escape sequences; fix it manually first.',
@@ -346,7 +346,7 @@ async function revealOriginal(): Promise<void> {
  * the file first.
  */
 async function transcodeFile(
-    codec: Transcoder,
+    transcoder: Transcoder,
     uri: vscode.Uri | undefined,
     log: vscode.OutputChannel,
 ): Promise<void> {
@@ -364,7 +364,7 @@ async function transcodeFile(
         return;
     }
     const bytes = new Uint8Array(await fs.readFile(real.fsPath));
-    const classification = codec.classify(bytes, profile);
+    const classification = transcoder.classify(bytes, profile);
     if (classification === 'escaped') {
         void vscode.window.showInformationMessage(
             'ParadoxCode: file is already transcoded.',
@@ -377,7 +377,7 @@ async function transcodeFile(
         );
         return;
     }
-    const encoded = codec.encode(bytes, profile);
+    const encoded = transcoder.encode(bytes, profile);
     if ('unencodable' in encoded) {
         const points = encoded.unencodable
             .map((point) => formatCodePoint(point.codePoint))
@@ -393,7 +393,7 @@ async function transcodeFile(
     await fs.writeFile(real.fsPath, encoded.bytes);
     classificationStamps.delete(real.fsPath);
     // The file flipped readable → escaped, so the eye icon must appear now.
-    void updateDecodedEntryContext(codec, vscode.window.activeTextEditor?.document);
+    void updateDecodedEntryContext(transcoder, vscode.window.activeTextEditor?.document);
     log.appendLine(`transparentLoc: transcoded ${real.fsPath} (backup: ${backup})`);
     void vscode.window.showInformationMessage(
         `ParadoxCode: transcoded ${nodePath.basename(real.fsPath)} (backup: ${nodePath.basename(backup)}).`,
@@ -428,7 +428,7 @@ let contextUpdateSequence = 0;
  * clauses hide the eye icon instead of failing on click.
  */
 async function updateDecodedEntryContext(
-    codec: Transcoder,
+    transcoder: Transcoder,
     document: vscode.TextDocument | undefined,
 ): Promise<void> {
     const sequence = ++contextUpdateSequence;
@@ -448,7 +448,7 @@ async function updateDecodedEntryContext(
                     escaped = stamp.escaped;
                 } else {
                     const bytes = new Uint8Array(await fs.readFile(document.uri.fsPath));
-                    escaped = codec.classify(bytes, profile) === 'escaped';
+                    escaped = transcoder.classify(bytes, profile) === 'escaped';
                     classificationStamps.set(document.uri.fsPath, {
                         mtime: stats.mtimeMs,
                         size: stats.size,
@@ -476,7 +476,7 @@ async function updateDecodedEntryContext(
  * revealed later, and closing/reopening it should apply the setting again.
  */
 async function maybeAutoOpenDecodedView(
-    codec: Transcoder,
+    transcoder: Transcoder,
     document: vscode.TextDocument,
     opening: Set<string>,
 ): Promise<void> {
@@ -499,10 +499,10 @@ async function maybeAutoOpenDecodedView(
         } catch {
             return;
         }
-        if (codec.classify(bytes, profile) !== 'escaped') {
+        if (transcoder.classify(bytes, profile) !== 'escaped') {
             return;
         }
-        await openDecodedView(codec, document.uri);
+        await openDecodedView(transcoder, document.uri);
     } finally {
         opening.delete(key);
     }
@@ -520,10 +520,10 @@ export async function activateTransparentLocalisation(
     context: vscode.ExtensionContext,
     log: vscode.OutputChannel,
 ): Promise<vscode.Disposable> {
-    const codec = new Transcoder();
+    const transcoder = new Transcoder();
 
     const diagnostics = vscode.languages.createDiagnosticCollection('paradoxcode.transparent');
-    const provider = new PdclocFileSystemProvider(codec, diagnostics, log);
+    const provider = new PdclocFileSystemProvider(transcoder, diagnostics, log);
 
     const statusItem = vscode.window.createStatusBarItem(
         'paradoxcode.transparentLoc',
@@ -555,7 +555,7 @@ export async function activateTransparentLocalisation(
             if (!document) {
                 return;
             }
-            void maybeAutoOpenDecodedView(codec, document, openingDecodedViews).catch((error) => {
+            void maybeAutoOpenDecodedView(transcoder, document, openingDecodedViews).catch((error) => {
                 const message = error instanceof Error ? error.message : String(error);
                 log.appendLine(`transparentLoc: automatic decoded view failed: ${message}`);
             });
@@ -564,7 +564,7 @@ export async function activateTransparentLocalisation(
             if (!document) {
                 return;
             }
-            void updateDecodedEntryContext(codec, document).catch((error) => {
+            void updateDecodedEntryContext(transcoder, document).catch((error) => {
                 const message = error instanceof Error ? error.message : String(error);
                 log.appendLine(`transparentLoc: decoded-view context update failed: ${message}`);
             });
@@ -578,13 +578,13 @@ export async function activateTransparentLocalisation(
                 isCaseSensitive: true,
             }),
             vscode.commands.registerCommand('paradoxcode.localisation.openDecoded', (uri) =>
-                void openDecodedView(codec, uri),
+                void openDecodedView(transcoder, uri),
             ),
             vscode.commands.registerCommand('paradoxcode.localisation.revealOriginal', () =>
                 void revealOriginal(),
             ),
             vscode.commands.registerCommand('paradoxcode.localisation.transcodeFile', (uri) =>
-                void transcodeFile(codec, uri, log),
+                void transcodeFile(transcoder, uri, log),
             ),
             vscode.window.onDidChangeActiveTextEditor((editor) => {
                 updateStatus();

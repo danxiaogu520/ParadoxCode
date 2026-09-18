@@ -1,4 +1,4 @@
-// Contract test for the TypeScript codec twin (src/transcode.ts) against the
+// Contract test for the TypeScript transcode twin (src/transcode.ts) against the
 // Rust implementation (crates/transcode).
 //
 // Three layers of protection, in increasing strength:
@@ -24,15 +24,15 @@ const repoRoot = join(scriptDir, '..', '..', '..');
 const corpusRoot = join(repoRoot, 'crates', 'transcode', 'tests', 'corpus');
 
 // The TS module compiles to out/transcode.js; run after `npm run compile`.
-const codec = require(join(scriptDir, '..', 'out', 'transcode.js'));
+const transcode = require(join(scriptDir, '..', 'out', 'transcode.js'));
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 
-const PROFILE_LOCALISATION = codec.PROFILE_LOCALISATION;
-const PROFILE_SCRIPT = codec.PROFILE_SCRIPT;
-const PARATRANZ = codec.escapeSetMembers('paratranz');
-const DLL_FULL = codec.escapeSetMembers('dll-full');
+const PROFILE_LOCALISATION = transcode.PROFILE_LOCALISATION;
+const PROFILE_SCRIPT = transcode.PROFILE_SCRIPT;
+const PARATRANZ = transcode.escapeSetMembers('paratranz');
+const DLL_FULL = transcode.escapeSetMembers('dll-full');
 
 function assertBytesEqual(actual, expected, message) {
     // `assert/strict`'s deepEqual also compares prototypes, and a Buffer is not
@@ -55,9 +55,9 @@ function textToCps(text) {
 }
 
 // --- module surface ----------------------------------------------------------
-assert.equal(codec.CODEC_VERSION, 1, 'codec version must match the native crate');
+assert.equal(transcode.TRANSCODE_VERSION, 1, 'transcode version must match the native crate');
 
-const facade = new codec.Transcoder();
+const facade = new transcode.Transcoder();
 
 // --- Localisation profile round trip (BOM + CRLF kept structural) -------------
 const ymlText = '﻿l_english:\r\n edg_key:0 "发行本"\r\n other: "Straße Ära"\r\n';
@@ -175,11 +175,11 @@ if (process.env.PDC_SKIP_VECTORS !== '1') {
         if (vector.v === 'cp') {
             const text = String.fromCodePoint(vector.cp);
             const lanes = [
-                ['loc', codec.encodeText(text, PARATRANZ), (result) =>
+                ['loc', transcode.encodeText(text, PARATRANZ), (result) =>
                     'text' in result ? hex(encoder.encode(result.text)) : `R${result.unencodable[0].kind}`],
-                ['scr', codec.encodeFile(text, PROFILE_SCRIPT, PARATRANZ), (result) =>
+                ['scr', transcode.encodeFile(text, PROFILE_SCRIPT, PARATRANZ), (result) =>
                     'bytes' in result ? hex(result.bytes) : `R${result.unencodable[0].kind}`],
-                ['dll', codec.encodeFile(text, PROFILE_SCRIPT, DLL_FULL), (result) =>
+                ['dll', transcode.encodeFile(text, PROFILE_SCRIPT, DLL_FULL), (result) =>
                     'bytes' in result ? hex(result.bytes) : `R${result.unencodable[0].kind}`],
             ];
             for (const [lane, result, render] of lanes) {
@@ -197,18 +197,18 @@ if (process.env.PDC_SKIP_VECTORS !== '1') {
         }
         if (vector.v === 'seq') {
             const bytes = new Uint8Array(Buffer.from(vector.b, 'hex'));
-            const script = codec.decodeFile(bytes, PROFILE_SCRIPT);
+            const script = transcode.decodeFile(bytes, PROFILE_SCRIPT);
             assert.ok(typeof script === 'object');
             if (hexTextCps(script.text) !== vector.st || brokenList(script.broken) !== vector.sb) {
                 record(`seq ${vector.b}: script decode mismatch`);
                 return;
             }
-            if (codec.classifyFile(bytes, PROFILE_SCRIPT) !== vector.sc) {
+            if (transcode.classifyFile(bytes, PROFILE_SCRIPT) !== vector.sc) {
                 record(`seq ${vector.b}: script classification mismatch`);
                 return;
             }
             if (vector.ok === 1) {
-                const localisation = codec.decodeFile(bytes, PROFILE_LOCALISATION);
+                const localisation = transcode.decodeFile(bytes, PROFILE_LOCALISATION);
                 if (
                     typeof localisation !== 'object' ||
                     hexTextCps(localisation.text) !== vector.lt ||
@@ -217,18 +217,18 @@ if (process.env.PDC_SKIP_VECTORS !== '1') {
                     record(`seq ${vector.b}: localisation decode mismatch`);
                     return;
                 }
-                if (codec.classifyFile(bytes, PROFILE_LOCALISATION) !== vector.lc) {
+                if (transcode.classifyFile(bytes, PROFILE_LOCALISATION) !== vector.lc) {
                     record(`seq ${vector.b}: localisation classification mismatch`);
                     return;
                 }
             } else {
                 assert.equal(
-                    codec.decodeFile(bytes, PROFILE_LOCALISATION),
+                    transcode.decodeFile(bytes, PROFILE_LOCALISATION),
                     'invalid-utf8',
                     `seq ${vector.b} must be invalid UTF-8`,
                 );
                 assert.equal(
-                    codec.classifyFile(bytes, PROFILE_LOCALISATION),
+                    transcode.classifyFile(bytes, PROFILE_LOCALISATION),
                     'mixed',
                     `seq ${vector.b} must classify as mixed (invalid UTF-8)`,
                 );
@@ -238,7 +238,7 @@ if (process.env.PDC_SKIP_VECTORS !== '1') {
         }
         // text layer
         const text = cpsToText(parseCps(vector.t));
-        const encodedText = codec.encodeText(text, PARATRANZ);
+        const encodedText = transcode.encodeText(text, PARATRANZ);
         if (vector.err !== undefined) {
             if (!('unencodable' in encodedText)) {
                 record(`text ${vector.t}: expected refusal`);
@@ -260,13 +260,13 @@ if (process.env.PDC_SKIP_VECTORS !== '1') {
                 record(`text ${vector.t}: encode mismatch`);
                 return;
             }
-            const decodedText = codec.decodeText(encodedText.text);
+            const decodedText = transcode.decodeText(encodedText.text);
             if (hexTextCps(decodedText.text) !== vector.d || brokenList(decodedText.broken) !== vector.db) {
                 record(`text ${vector.t}: decode mismatch`);
                 return;
             }
         }
-        if (codec.classifyText(text) !== vector.c) {
+        if (transcode.classifyText(text) !== vector.c) {
             record(`text ${vector.t}: classification mismatch`);
             return;
         }
@@ -308,7 +308,7 @@ if (process.env.PDC_SKIP_VECTORS !== '1') {
 
     assert.equal(failures.length, 0, `differential vectors diverged:\n${failures.join('\n')}`);
     assert.ok(compared > 60000, `expected a full vector sweep, compared only ${compared}`);
-    console.log(`codec ts contract OK (${compared} differential vectors)`);
+    console.log(`transcode ts contract OK (${compared} differential vectors)`);
 } else {
-    console.log('codec ts contract OK (differential vectors skipped)');
+    console.log('transcode ts contract OK (differential vectors skipped)');
 }

@@ -26,7 +26,7 @@ use transcode::{
 };
 
 /// xorshift64* — deterministic, no dependencies, good enough for adversarial
-/// byte patterns (the codec has no statistical requirements).
+/// byte patterns (the transcoder has no statistical requirements).
 struct Rng(u64);
 
 impl Rng {

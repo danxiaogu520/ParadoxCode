@@ -9,6 +9,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Terminology: the transcode concept drops its historical `codec` naming.
+  `transcode::CODEC_VERSION` becomes `TRANSCODE_VERSION` (Rust and the TypeScript
+  twin alike), the crate's core module is renamed `codec.rs`→`escape.rs`, and the
+  index-cache metadata key `codec_version` becomes `transcode_version` (existing
+  index caches rebuild once, silently, through the built-in invalidation path).
+  The engine's cache-serialization modules (`index_cache/codec.rs`,
+  `position_codec`, `template_codec`) deliberately keep their names — they are
+  serialization codecs, not transcoders.
 - Mission and event hover cards anchor on tokens instead of whole blocks. A
   card now renders on the definition's block-name token (`<mission_name> = {`
   in a missions file, `country_event`/`province_event` at an event block's

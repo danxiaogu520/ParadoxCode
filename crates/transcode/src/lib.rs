@@ -3,7 +3,7 @@
 //!
 //! The patch ecosystem encodes every non-Latin-1 code point as a three-byte escape
 //! `[marker, low, high]` (marker `0x10`–`0x13`, low byte first) inside files that the
-//! unpatched game reads as CP1252/UTF-8 text. Two file profiles share one codec core:
+//! unpatched game reads as CP1252/UTF-8 text. Two file profiles share one escape core:
 //!
 //! * [`Profile::Localisation`] — `localisation/*.yml` (`paratranz` "utf8eu4"): UTF-8 with
 //!   BOM; every escaped byte is re-encoded through the CP1252 inverse mapping before it
@@ -26,23 +26,23 @@
 //! paratranz converter and 310 real transcoded script files (2026-09-11).
 
 mod classify;
-mod codec;
 mod cp1252;
+mod escape;
 
 pub use classify::{
     Classification, ClassificationCounts, classify_file, classify_text, classify_text_counts,
     is_raw_cjk,
 };
-pub use codec::{
+pub use cp1252::CP1252_MAP;
+pub use escape::{
     Decoded, InvalidUtf8, decode_file, decode_text, decode_value, encode_file, encode_text,
     file_unencodable_kind, script_roundtrip_is_canonical, unencodable_kind,
 };
-pub use cp1252::CP1252_MAP;
 
 /// Bumped whenever encoding output for identical input changes (escape set adjustments,
 /// compensation fixes). Consumers that persist decoded text (index caches, previews)
 /// must invalidate their entries when this value changes.
-pub const CODEC_VERSION: u32 = 1;
+pub const TRANSCODE_VERSION: u32 = 1;
 
 /// Selects the byte-level shape of escaped content: BOM/CRLF yml files versus raw
 /// single-byte script files. See the crate docs for the exact differences.
