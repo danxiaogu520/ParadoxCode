@@ -7,6 +7,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Mission and event hover cards anchor on tokens instead of whole blocks. A
+  card now renders on the definition's block-name token (`<mission_name> = {`
+  in a missions file, `country_event`/`province_event` at an event block's
+  head) and on references the resolver already knows: `event`-keyed values and
+  fire-event call blocks serve the referenced event's window, and
+  `required_missions` members serve the referenced mission's card (resolved
+  through the symbol layer, cross-file included). Positions inside block
+  bodies no longer card, so trigger/effect/option hovers keep the plain
+  semantic pipeline, and hovering an `icon`/`picture` value now falls through
+  to the more specific sprite preview instead of the whole-block card.
+
 ## [0.3.8] - 2026-09-17
 
 ### Added
