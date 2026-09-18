@@ -26,7 +26,7 @@ mod write;
 /// Current on-disk cache schema.
 ///
 /// Schema 14 decodes EU4dll-transcoded localisation values in persisted previews
-/// (tied to `transcode::CODEC_VERSION`); caches written before that hold the raw
+/// (tied to `transcode::TRANSCODE_VERSION`); caches written before that hold the raw
 /// escaped form. Schema 12 adds the `flag_writes` table (`dynamic_set` write sites)
 /// to shards. Schema 11 persisted localisation previews; schema 10 persists the exact
 /// selection range of definitions. Schema 9 invalidated indexes built
