@@ -1474,8 +1474,6 @@ fn hover_card_serves_mission_sprite_and_texture_payloads() {
     assert_eq!(mission["card"]["mission"]["icon"], "mission_alpha");
     assert_eq!(mission["card"]["mission"]["titleKey"], "probe_title");
     assert!(mission["card"]["mission"]["title"].is_null());
-    assert_eq!(mission["card"]["mission"]["hasTrigger"], true);
-    assert_eq!(mission["card"]["mission"]["hasEffect"], true);
     assert_eq!(mission["card"]["asset"]["sprite"], "mission_alpha");
     assert!(
         mission["card"]["asset"]["path"]
@@ -1491,12 +1489,6 @@ fn hover_card_serves_mission_sprite_and_texture_payloads() {
             .as_str()
             .is_some_and(|path| path.contains("mission_icons_frame.dds"))
     );
-    assert!(
-        mission["card"]["cardAssets"]["triggerMarker"]["path"]
-            .as_str()
-            .is_some_and(|path| path.contains("mission_trigger.dds"))
-    );
-    assert_eq!(mission["card"]["cardAssets"]["effectMarker"]["frames"], 3);
 
     // Sprite card from the definition name.
     let sprite = card(3);
@@ -1524,12 +1516,11 @@ fn hover_card_serves_mission_sprite_and_texture_payloads() {
     assert_eq!(card(5), serde_json::Value::Null);
 
     // The `probe_upstream` reference serves the referenced mission's card,
-    // with the target's own icon/trigger facts from the other file.
+    // with the target's own icon facts from the other file.
     let upstream = card(6);
     assert_eq!(upstream["card"]["kind"], "mission");
     assert_eq!(upstream["card"]["mission"]["id"], "probe_upstream");
     assert!(upstream["card"]["mission"]["icon"].is_null());
-    assert_eq!(upstream["card"]["mission"]["hasTrigger"], false);
     assert!(
         upstream["card"]["cardAssets"]["frame"]["path"]
             .as_str()

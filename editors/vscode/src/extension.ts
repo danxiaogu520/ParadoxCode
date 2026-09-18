@@ -812,9 +812,9 @@ async function augmentHoverWithCard(
 }
 
 /**
- * Composes the game-look mission card — frame, icon underneath, trigger
- * and reward corner markers, §-coloured title — and returns its markdown
- * image section. `undefined` when no decodable assets are left.
+ * Composes the game-look mission card — frame, icon underneath,
+ * §-coloured title — and returns its markdown image section. `undefined`
+ * when no decodable assets are left.
  */
 async function missionCardSection(
     mission: HoverCardMissionWire,
@@ -824,11 +824,9 @@ async function missionCardSection(
     const store = MissionPreviewPanel.store();
     const load = (candidate: HoverCardAssetWire | undefined) =>
         candidate ? store.textureRaster(candidate.path) : Promise.resolve(undefined);
-    const [frame, icon, triggerMarker, effectMarker, fonts] = await Promise.all([
+    const [frame, icon, fonts] = await Promise.all([
         load(cardAssets.frame),
         load(asset),
-        load(cardAssets.triggerMarker),
-        load(cardAssets.effectMarker),
         store.loadFontRasters(),
     ]);
     if (!frame && !icon) {
@@ -836,12 +834,10 @@ async function missionCardSection(
     }
     // Recompose only when the mission or any input asset changed: the key
     // folds the mission identity and every asset path plus its mtime.
-    const stampAssets = [cardAssets.frame, asset, cardAssets.triggerMarker, cardAssets.effectMarker];
+    const stampAssets = [cardAssets.frame, asset];
     const cacheKey = [
         mission.id,
         mission.title?.value ?? '',
-        mission.hasTrigger ? '1' : '0',
-        mission.hasEffect ? '1' : '0',
         ...stampAssets.map((candidate) => (candidate ? `${candidate.path}@${store.mtimeOf(candidate.path) ?? '?'}` : '-')),
     ].join('\0');
     const dataUrl = cachedCardDataUrl(cacheKey, () =>
@@ -849,9 +845,6 @@ async function missionCardSection(
             frame,
             icon,
             iconFrames: asset?.frames,
-            triggerMarker,
-            effectMarker,
-            effectMarkerFrames: cardAssets.effectMarker?.frames,
             fonts,
         })),
     );

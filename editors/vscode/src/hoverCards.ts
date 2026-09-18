@@ -2,10 +2,10 @@
 // twin of the webview's mission tree renderer. The server's `pdc/hoverCard`
 // response names *what* to draw (resolved texture paths, title text,
 // flags); this module turns that into pixels: the game's 103x123 mission
-// frame with the icon underneath, corner markers, and a §-coloured bitmap
-// title, or the game's 564-wide event window with stacked chrome, picture
-// banner, and option buttons. Everything here is plain Node (no vscode, no
-// canvas) so the contract tests can exercise the exact blending math.
+// frame with the icon underneath and a §-coloured bitmap title, or the
+// game's 564-wide event window with stacked chrome, picture banner, and
+// option buttons. Everything here is plain Node (no vscode, no canvas) so
+// the contract tests can exercise the exact blending math.
 
 import { createHash } from 'crypto';
 import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs';
@@ -40,8 +40,6 @@ export interface HoverCardMissionWire {
     icon: string;
     titleKey: string;
     title?: { language?: string; value: string } | null;
-    hasTrigger: boolean;
-    hasEffect: boolean;
     required: string[];
 }
 
@@ -63,8 +61,6 @@ export interface HoverCardEventWire {
 /** Chrome assets shared by both card kinds; each kind reads its own subset. */
 export interface HoverCardAssetsWire {
     frame?: HoverCardAssetWire;
-    triggerMarker?: HoverCardAssetWire;
-    effectMarker?: HoverCardAssetWire;
     backgroundTop?: HoverCardAssetWire;
     backgroundMiddle?: HoverCardAssetWire;
     backgroundBottomS?: HoverCardAssetWire;
@@ -92,10 +88,6 @@ const CARD_WIDTH = 103;
 const CARD_HEIGHT = 123;
 const ICON_X = 22;
 const ICON_Y = 20;
-const TRIGGER_MARKER_X = 0;
-const TRIGGER_MARKER_Y = 7;
-const EFFECT_MARKER_X = 70;
-const EFFECT_MARKER_Y = 7;
 const TITLE_X = 8;
 const TITLE_Y = 84;
 const TITLE_WIDTH = 96;
@@ -461,19 +453,14 @@ export interface MissionCardParts {
     /** The mission's icon strip; frame 0 is drawn under the frame. */
     icon?: DecodedImage;
     iconFrames?: number;
-    /** `gfx_mission_trigger` marker (33x33). */
-    triggerMarker?: DecodedImage;
-    /** `gfx_mission_effect` strip; frame 0 is the reward marker. */
-    effectMarker?: DecodedImage;
-    effectMarkerFrames?: number;
     fonts?: FontBook;
 }
 
 /**
- * Composes the game-look mission card: icon underneath the frame texture,
- * corner markers for trigger/effect, and the §-coloured title centred in
- * the frame's lower slot (two line-heights, top-aligned). Without a usable
- * font the card degrades to frame + icon + markers.
+ * Composes the game-look mission card: icon underneath the frame texture
+ * and the §-coloured title centred in the frame's lower slot (two
+ * line-heights, top-aligned). Without a usable font the card degrades to
+ * frame + icon.
  */
 export function composeMissionCard(mission: HoverCardMissionWire, parts: MissionCardParts): DecodedImage {
     const card = blankImage(CARD_WIDTH, CARD_HEIGHT);
@@ -482,12 +469,6 @@ export function composeMissionCard(mission: HoverCardMissionWire, parts: Mission
     }
     if (parts.frame) {
         blit(card, 0, 0, parts.frame);
-    }
-    if (mission.hasTrigger && parts.triggerMarker) {
-        blit(card, TRIGGER_MARKER_X, TRIGGER_MARKER_Y, parts.triggerMarker);
-    }
-    if (mission.hasEffect && parts.effectMarker) {
-        blitTinted(card, EFFECT_MARKER_X, EFFECT_MARKER_Y, parts.effectMarker, frameRect(parts.effectMarker, parts.effectMarkerFrames, 0), null);
     }
     drawMissionTitle(card, mission, parts.fonts ?? {});
     return card;
@@ -839,8 +820,6 @@ export function parseHoverCardResponse(value: unknown): HoverCardResponseWire | 
             icon: typeof record.icon === 'string' ? record.icon : '',
             titleKey: typeof record.titleKey === 'string' ? record.titleKey : '',
             title: parseLocText(record.title),
-            hasTrigger: record.hasTrigger === true,
-            hasEffect: record.hasEffect === true,
             required: Array.isArray(record.required)
                 ? record.required.filter((item): item is string => typeof item === 'string')
                 : [],
@@ -895,8 +874,6 @@ export function parseHoverCardResponse(value: unknown): HoverCardResponseWire | 
         const record = cardAssetsValue as Record<string, unknown>;
         cardAssets = {
             frame: parseAsset(record.frame),
-            triggerMarker: parseAsset(record.triggerMarker),
-            effectMarker: parseAsset(record.effectMarker),
             backgroundTop: parseAsset(record.backgroundTop),
             backgroundMiddle: parseAsset(record.backgroundMiddle),
             backgroundBottomS: parseAsset(record.backgroundBottomS),

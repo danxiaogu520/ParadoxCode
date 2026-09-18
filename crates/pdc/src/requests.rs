@@ -817,16 +817,12 @@ impl SnapshotRequestContext {
                 "icon": mission.icon,
                 "titleKey": mission.title_key,
                 "title": mission.title.as_ref().map(Self::loc_pair),
-                "hasTrigger": mission.has_trigger,
-                "hasEffect": mission.has_effect,
                 "required": mission.required,
             });
         }
         if let Some(assets) = card.card_assets.as_ref() {
             card_json["cardAssets"] = json!({
                 "frame": assets.frame.as_ref().map(asset_json),
-                "triggerMarker": assets.trigger_marker.as_ref().map(asset_json),
-                "effectMarker": assets.effect_marker.as_ref().map(asset_json),
             });
         }
         if let Some(event) = card.event.as_ref() {

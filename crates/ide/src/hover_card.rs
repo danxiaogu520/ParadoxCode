@@ -25,10 +25,6 @@ use crate::types::{CancellationToken, Cancelled, Location};
 
 /// Sprite of the mission-node frame (`countrymissionsview.gfx`).
 const MISSION_FRAME_SPRITE: &str = "GFX_mission_icons_frame";
-/// Conditions corner marker of a mission node.
-const MISSION_TRIGGER_MARKER_SPRITE: &str = "gfx_mission_trigger";
-/// Rewards corner marker of a mission node (a three-frame strip).
-const MISSION_EFFECT_MARKER_SPRITE: &str = "gfx_mission_effect";
 
 /// Event-window chrome (`interface/eventwindow.gfx`): stacked background
 /// pieces sized for 1–2 / 3–4 / 5+ options, plus the option button strip.
@@ -87,10 +83,6 @@ pub struct HoverCardMission {
     /// Resolved title localisation (language, value), when any language
     /// defines the key.
     pub title: Option<(Option<String>, String)>,
-    /// The mission declares a `trigger` block (conditions corner marker).
-    pub has_trigger: bool,
-    /// The mission declares an `effect` block (rewards corner marker).
-    pub has_effect: bool,
     /// Prerequisite mission ids in source order.
     pub required: Vec<String>,
 }
@@ -99,8 +91,6 @@ pub struct HoverCardMission {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MissionCardAssets {
     pub frame: Option<HoverCardAsset>,
-    pub trigger_marker: Option<HoverCardAsset>,
-    pub effect_marker: Option<HoverCardAsset>,
 }
 
 /// One event option: its localisation key and resolved text.
@@ -368,16 +358,6 @@ fn mission_card_for_mission(
         None => None,
     };
     let frame = sprite_asset(snapshot, MISSION_FRAME_SPRITE, cancellation)?;
-    let trigger_marker = if mission.trigger.is_some() {
-        sprite_asset(snapshot, MISSION_TRIGGER_MARKER_SPRITE, cancellation)?
-    } else {
-        None
-    };
-    let effect_marker = if mission.effect.is_some() {
-        sprite_asset(snapshot, MISSION_EFFECT_MARKER_SPRITE, cancellation)?
-    } else {
-        None
-    };
     if icon_asset.is_none() && frame.is_none() {
         // Nothing renders without at least a frame; a text-only hover is
         // already served by the semantic pipeline.
@@ -391,15 +371,9 @@ fn mission_card_for_mission(
             icon,
             title_key,
             title,
-            has_trigger: mission.trigger.is_some(),
-            has_effect: mission.effect.is_some(),
             required: mission.required.clone(),
         }),
-        card_assets: Some(MissionCardAssets {
-            frame,
-            trigger_marker,
-            effect_marker,
-        }),
+        card_assets: Some(MissionCardAssets { frame }),
         event: None,
         event_assets: None,
     }))
