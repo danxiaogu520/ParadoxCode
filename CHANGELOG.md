@@ -7,6 +7,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Renamed the editable source layer from Current Mod to Project across the server, extension,
+  scripts, and documentation: `SourceRootKind::Project`, hover-card and workspace-files
+  `rootKind`/`kind` value `project`, and the `paradoxcode.completion.sourceLayers` value
+  `project`. No legacy spellings are accepted: an existing Vanilla index cache rebuilds once
+  from the discovered installation, and a stale `currentMod` settings entry fails
+  initialization with the valid values listed.
+
+### Removed
+
+- The shared-project-file compatibility paths: the `projectConfig` initialization sentinel,
+  the `.pdx/project.toml` workspace probe, and the packaging guards asserting their absence.
+  Stale clients now receive the standard unknown-field rejection.
+
 ## [0.3.8] - 2026-09-17
 
 ### Added
