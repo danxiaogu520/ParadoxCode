@@ -9,6 +9,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Mission hover cards drop the trigger and reward corner markers. The game
+  interface (`countrymissionsview.gui`) shows those markers state-dependently,
+  but the card drew them statically whenever the mission declared
+  `trigger`/`effect` blocks — which modded missions almost always do — so every
+  card carried both badges piled on the frame. Cards now render the classic
+  frame + icon + title look only; the `pdc/hoverCard` wire stops carrying the
+  `triggerMarker`/`effectMarker` chrome assets and the `hasTrigger`/`hasEffect`
+  facts (protocol version stays 1 — both fields were optional in each
+  direction).
 - Terminology: the transcode concept drops its historical `codec` naming.
   `transcode::CODEC_VERSION` becomes `TRANSCODE_VERSION` (Rust and the TypeScript
   twin alike), the crate's core module is renamed `codec.rs`→`escape.rs`, and the
