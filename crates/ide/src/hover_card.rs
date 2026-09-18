@@ -1,11 +1,18 @@
 //! Structured hover-card payloads for the extension's rendered previews.
 //!
 //! The hover middleware owns pixels; this module owns paths. A card tells the
-//! client which asset file serves a hovered sprite, texture reference, or
-//! mission, resolved through the workspace [`TextureCatalog`] exactly the way
-//! the engine resolves it — so the client no longer re-derives paths with a
-//! second, weaker resolver. Every card is advisory: the client degrades to
-//! its legacy behaviour when a card is absent.
+//! client which asset file serves a hovered sprite, texture reference,
+//! mission, or event, resolved through the workspace [`TextureCatalog`] exactly
+//! the way the engine resolves it — so the client no longer re-derives paths
+//! with a second, weaker resolver. Every card is advisory: the client degrades
+//! to its legacy behaviour when a card is absent.
+//!
+//! Mission and event cards anchor on tokens, not whole blocks: the
+//! definition's block-name token (`<mission_name> = {`,
+//! `country_event`/`province_event = {`), or a reference the semantic layer
+//! already resolves (`required_missions` members, `event`-keyed values) —
+//! the same positions go-to-definition serves. Positions inside the block
+//! body never card, so logic hovers keep the plain semantic pipeline.
 
 use engine::{AnalysisSnapshot, DocumentId, SourceRootKind};
 use text::{LogicalPath, TextRange, TextSize};
@@ -13,7 +20,7 @@ use text::{LogicalPath, TextRange, TextSize};
 use crate::resolution::{
     localisation_values_by_key, semantic_data_with_cancellation, symbol_candidates_for_hover,
 };
-use crate::support::{ParsedInput, contains, input_for_document};
+use crate::support::{ParsedInput, contains, input_for_document, input_for_source_file};
 use crate::types::{CancellationToken, Cancelled, Location};
 
 /// Sprite of the mission-node frame (`countrymissionsview.gfx`).
@@ -150,9 +157,10 @@ pub struct HoverCard {
 /// Computes the hover card for a document position, if the position
 /// references something a card can render.
 ///
-/// Priority: a mission block in a missions file wins (its card includes the
-/// icon texture), then a texture-valued property in an interface `.gfx`
-/// document, then a sprite reference or definition anywhere.
+/// Priority: a hovered event/mission reference renders the referenced
+/// definition's card, then a definition's block-name token in a missions or
+/// events file renders its own card, then a texture-valued property in an
+/// interface `.gfx` document, then a sprite reference or definition anywhere.
 pub fn hover_card_with_cancellation(
     snapshot: &AnalysisSnapshot,
     document: &DocumentId,
@@ -163,6 +171,9 @@ pub fn hover_card_with_cancellation(
     let Some(input) = input_for_document(snapshot, document) else {
         return Ok(None);
     };
+    if let Some(card) = reference_card(snapshot, &input, position, cancellation)? {
+        return Ok(Some(card));
+    }
     if let Some(card) = mission_card(snapshot, &input, position, cancellation)? {
         return Ok(Some(card));
     }
@@ -173,6 +184,108 @@ pub fn hover_card_with_cancellation(
         return Ok(Some(card));
     }
     sprite_card(snapshot, &input, position, cancellation)
+}
+
+/// The call-site card: a hovered event or mission reference renders the card
+/// of the definition it resolves to, wherever that definition lives —
+/// answering "what does the referenced event or mission look like" without
+/// opening the target file. Event references ride the semantic reference
+/// layer (the same positions go-to-definition serves); mission prerequisites
+/// are bare block members the semantic layer does not reference, so they are
+/// spotted through the mission parse model instead. Both resolve targets
+/// through the shared symbol layer.
+fn reference_card(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: TextSize,
+    cancellation: &CancellationToken,
+) -> Result<Option<HoverCard>, Cancelled> {
+    if input.format != parser::FileFormat::Script
+        || !input
+            .profile
+            .game_id
+            .eq_ignore_ascii_case(game::eu4::GAME_ID)
+    {
+        return Ok(None);
+    }
+    let semantic = semantic_data_with_cancellation(snapshot, input, cancellation)?;
+    if let Some(reference) = semantic.references.iter().find(|reference| {
+        contains(reference.range, position) && reference.kind.eq_ignore_ascii_case("event")
+    }) {
+        let candidates =
+            symbol_candidates_for_hover(snapshot, &reference.kind, &reference.name, cancellation)?;
+        for candidate in &candidates {
+            cancellation.checkpoint()?;
+            let Some(target) = input_for_location(snapshot, &candidate.location) else {
+                continue;
+            };
+            let card = event_card_for_reference(
+                snapshot,
+                &target,
+                candidate.selection_range,
+                cancellation,
+            )?;
+            if card.is_some() {
+                return Ok(card);
+            }
+        }
+    }
+    if crate::mission::is_mission_path(input.path.as_ref()) {
+        cancellation.checkpoint()?;
+        let Some(name) = required_mission_at(&input.source, position) else {
+            return Ok(None);
+        };
+        let candidates = symbol_candidates_for_hover(snapshot, "mission", &name, cancellation)?;
+        for candidate in &candidates {
+            cancellation.checkpoint()?;
+            let Some(target) = input_for_location(snapshot, &candidate.location) else {
+                continue;
+            };
+            let card = mission_card_for_reference(
+                snapshot,
+                &target,
+                candidate.selection_range,
+                &name,
+                cancellation,
+            )?;
+            if card.is_some() {
+                return Ok(card);
+            }
+        }
+    }
+    Ok(None)
+}
+
+/// The `required_missions` member under `position`, if any: bare block
+/// members carry no semantic reference, so the parse model's prerequisite
+/// token ranges are the anchor.
+fn required_mission_at(source: &str, position: TextSize) -> Option<String> {
+    let loaded = game::eu4::mission::parse_file(source);
+    for mission in loaded
+        .file
+        .trees
+        .iter()
+        .flat_map(|tree| tree.missions.iter())
+    {
+        for (index, range) in mission.required_ranges.iter().enumerate() {
+            if contains(*range, position) {
+                return mission.required.get(index).cloned();
+            }
+        }
+    }
+    None
+}
+
+/// Loads the parsed input behind a definition location: the open overlay
+/// when one backs it (freshest text), else the indexed disk file.
+fn input_for_location(snapshot: &AnalysisSnapshot, location: &Location) -> Option<ParsedInput> {
+    if let Some(document) = location.document.as_ref()
+        && let Some(input) = input_for_document(snapshot, document)
+    {
+        return Some(input);
+    }
+    let file = location.file.as_ref()?;
+    input_for_source_file(snapshot, *file)
 }
 
 fn mission_card(
@@ -197,11 +310,55 @@ fn mission_card(
         .trees
         .iter()
         .flat_map(|tree| tree.missions.iter())
-        .find(|mission| contains(mission.span, position))
-        .cloned()
+        .find(|mission| contains(mission.id_range, position))
     else {
         return Ok(None);
     };
+    mission_card_for_mission(snapshot, mission, cancellation)
+}
+
+/// Renders the mission card for a reference's target: the mission in `target`
+/// whose key token is the definition selection, else the first with a
+/// matching id (name-keyed definitions and parsed ids share spelling).
+fn mission_card_for_reference(
+    snapshot: &AnalysisSnapshot,
+    target: &ParsedInput,
+    selection: TextRange,
+    name: &str,
+    cancellation: &CancellationToken,
+) -> Result<Option<HoverCard>, Cancelled> {
+    if !crate::mission::is_mission_path(target.path.as_ref()) {
+        return Ok(None);
+    }
+    cancellation.checkpoint()?;
+    let loaded = game::eu4::mission::parse_file(&target.source);
+    let mut by_name = None;
+    for mission in loaded
+        .file
+        .trees
+        .iter()
+        .flat_map(|tree| tree.missions.iter())
+    {
+        if contains(mission.id_range, selection.start()) {
+            return mission_card_for_mission(snapshot, mission, cancellation);
+        }
+        if by_name.is_none() && mission.id.eq_ignore_ascii_case(name) {
+            by_name = Some(mission);
+        }
+    }
+    match by_name {
+        Some(mission) => mission_card_for_mission(snapshot, mission, cancellation),
+        None => Ok(None),
+    }
+}
+
+/// Renders the mission card for one parsed mission: localised title, icon
+/// texture, and the fixed node chrome.
+fn mission_card_for_mission(
+    snapshot: &AnalysisSnapshot,
+    mission: &game::eu4::mission::Mission,
+    cancellation: &CancellationToken,
+) -> Result<Option<HoverCard>, Cancelled> {
     let title_key = format!("{}_title", mission.id);
     let titles = localisation_values_by_key(snapshot, &[title_key.as_str()], cancellation)?;
     let title = titles.get(&title_key).cloned();
@@ -230,13 +387,13 @@ fn mission_card(
         kind: "mission",
         asset: icon_asset,
         mission: Some(HoverCardMission {
-            id: mission.id,
+            id: mission.id.clone(),
             icon,
             title_key,
             title,
             has_trigger: mission.trigger.is_some(),
             has_effect: mission.effect.is_some(),
-            required: mission.required,
+            required: mission.required.clone(),
         }),
         card_assets: Some(MissionCardAssets {
             frame,
@@ -339,11 +496,12 @@ fn is_event_path(path: Option<&LogicalPath>) -> bool {
         .is_some_and(|first| first.eq_ignore_ascii_case("events"))
 }
 
-/// The event card: a hovered `country_event`/`province_event` block in an
-/// `events/` file renders as the in-game event window. Fields are read from
-/// the flat property list — block structure comes from each property's full
-/// range, key paths give nesting depth, and containment picks the children
-/// of this specific block among sibling events in the same file.
+/// The event card: a hovered `country_event`/`province_event` block-name
+/// token in an `events/` file renders that block as the in-game event window.
+/// Fields are read from the flat property list — block structure comes from
+/// each property's full range, key paths give nesting depth, and containment
+/// picks the children of this specific block among sibling events in the
+/// same file.
 fn event_card(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
@@ -368,11 +526,63 @@ fn event_card(
         property.top_level
             && (property.key.eq_ignore_ascii_case("country_event")
                 || property.key.eq_ignore_ascii_case("province_event"))
-            && contains(property.range, position)
+            && contains(property.key_range, position)
     }) else {
         return Ok(None);
     };
-    let block_range = block.range;
+    event_card_for_block(snapshot, input, block.range, cancellation)
+}
+
+/// Renders the event card for a reference's target: the top-level event
+/// block whose `id` token is the definition selection, else the one
+/// containing it.
+fn event_card_for_reference(
+    snapshot: &AnalysisSnapshot,
+    target: &ParsedInput,
+    selection: TextRange,
+    cancellation: &CancellationToken,
+) -> Result<Option<HoverCard>, Cancelled> {
+    let Some(hir) = target.hir.as_deref() else {
+        return Ok(None);
+    };
+    let properties = hir.properties();
+    let mut by_range = None;
+    for property in properties.iter().filter(|property| {
+        property.top_level
+            && (property.key.eq_ignore_ascii_case("country_event")
+                || property.key.eq_ignore_ascii_case("province_event"))
+    }) {
+        let id = properties
+            .iter()
+            .find(|nested| {
+                nested.path.len() == 2
+                    && nested.key.eq_ignore_ascii_case("id")
+                    && within(property.range, nested.range)
+            })
+            .and_then(|nested| nested.scalar.as_ref());
+        if id.is_some_and(|scalar| contains(scalar.range, selection.start())) {
+            return event_card_for_block(snapshot, target, property.range, cancellation);
+        }
+        if by_range.is_none() && contains(property.range, selection.start()) {
+            by_range = Some(property.range);
+        }
+    }
+    match by_range {
+        Some(block_range) => event_card_for_block(snapshot, target, block_range, cancellation),
+        None => Ok(None),
+    }
+}
+
+fn event_card_for_block(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    block_range: TextRange,
+    cancellation: &CancellationToken,
+) -> Result<Option<HoverCard>, Cancelled> {
+    let Some(hir) = input.hir.as_deref() else {
+        return Ok(None);
+    };
+    let properties = hir.properties();
     // Direct children of the event block: paths include each property's
     // own key, so a child of the block has a two-element path.
     let child_scalar = |key: &str| -> Option<String> {
