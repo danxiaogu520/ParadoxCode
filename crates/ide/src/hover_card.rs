@@ -61,7 +61,7 @@ pub struct HoverCardAsset {
     pub sprite: Option<String>,
     /// Absolute path of the serving file on this machine.
     pub path: String,
-    /// Kind of the source root serving the file (`currentMod`/`dependency`/`vanilla`).
+    /// Kind of the source root serving the file (`project`/`dependency`/`vanilla`).
     pub root_kind: String,
     /// The `.tga`/`.dds` extension drift fallback saved this reference.
     pub extension_fallback: bool,
@@ -578,7 +578,7 @@ fn asset_from(
         sprite: sprite.map(str::to_owned),
         path: resolution.hit.path.as_path().to_string_lossy().into_owned(),
         root_kind: match resolution.hit.root_kind {
-            SourceRootKind::CurrentMod => "currentMod",
+            SourceRootKind::Project => "project",
             SourceRootKind::Dependency => "dependency",
             SourceRootKind::Vanilla => "vanilla",
         }

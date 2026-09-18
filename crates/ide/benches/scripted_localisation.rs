@@ -68,7 +68,7 @@ fn main() {
     );
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     let scan = host.refresh_source_roots().expect("scan fixture");

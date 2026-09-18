@@ -81,7 +81,7 @@ fn main() {
     let mut host = AnalysisHost::with_profile(game::eu4::bootstrap_rules(), game::eu4::profile());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&fixture.root),
     )]));
 

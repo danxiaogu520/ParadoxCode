@@ -194,7 +194,7 @@ fn area_scope_transition_keeps_province_trigger_valid() {
     fs::write(&area_path, "tripolitania_area = { 1 2 }\n").expect("area source");
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("index area definitions");
@@ -252,7 +252,7 @@ fn eu4_normal_type_selector_applies_mission_rules_to_custom_root_names() {
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     let path = root.join("missions/EDG_Bavarian_Missions.txt");
@@ -706,7 +706,7 @@ fn workspace_type_child_key_selects_only_one_transition() {
     let mut host = eu4_host(RuleSet::from_model(model));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
-        kind: SourceRootKind::CurrentMod,
+        kind: SourceRootKind::Project,
         path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
@@ -786,7 +786,7 @@ fn eu4_dynamic_culture_definition_is_used_by_semantic_type_matcher() {
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
-        kind: SourceRootKind::CurrentMod,
+        kind: SourceRootKind::Project,
         path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
@@ -826,7 +826,7 @@ fn eu4_country_tag_definition_feeds_dynamic_enum_matcher() {
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
-        kind: SourceRootKind::CurrentMod,
+        kind: SourceRootKind::Project,
         path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
@@ -865,7 +865,7 @@ fn eu4_flag_definition_feeds_dynamic_value_matcher() {
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
-        kind: SourceRootKind::CurrentMod,
+        kind: SourceRootKind::Project,
         path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
@@ -907,7 +907,7 @@ fn eu4_scripted_effect_params_are_owner_qualified() {
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
-        kind: SourceRootKind::CurrentMod,
+        kind: SourceRootKind::Project,
         path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
@@ -1025,7 +1025,7 @@ fn unresolved_dynamic_signature_keeps_parameter_blocks_open_world() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots()
@@ -1088,7 +1088,7 @@ fn eu4_legacy_governments_use_eu4_reform_semantics() {
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
-        kind: SourceRootKind::CurrentMod,
+        kind: SourceRootKind::Project,
         path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
@@ -1128,7 +1128,7 @@ fn membership_caches_do_not_leak_across_hosts_with_equal_revisions() {
         let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         )]));
         host.refresh_source_roots().expect("scan definitions");

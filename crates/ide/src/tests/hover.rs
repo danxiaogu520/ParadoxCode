@@ -80,7 +80,7 @@ fn symbol_hover_explains_active_and_shadowed_source_roots() {
         },
         SourceRoot {
             id: SourceRootId::new(2),
-            kind: SourceRootKind::CurrentMod,
+            kind: SourceRootKind::Project,
             path: AbsPath::normalize(&current),
             order: 0,
             writable: true,
@@ -98,7 +98,7 @@ fn symbol_hover_explains_active_and_shadowed_source_roots() {
             .contents
             .contains("#### Resolved definition\n\n- Source root:")
     );
-    assert!(hover.contents.contains("Source root: Current Mod"));
+    assert!(hover.contents.contains("Source root: Project"));
     assert!(hover.contents.contains("#### Shadowed definitions:"));
     assert!(hover.contents.contains("Shadowed definitions:"));
     assert!(hover.contents.contains("Vanilla"));
@@ -413,7 +413,7 @@ fn hover_prefers_nonempty_localisation_preview_over_empty_sibling() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     let localisation = DocumentId::new("file:///tmp/localisation/test.yml");
@@ -517,7 +517,7 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
         current.join("localisation/l_english.yml"),
         "l_english:\nshared_title:0 \"English Mod\"\ncurrent_only_title:0 \"Current Only Title\"\n",
     )
-    .expect("Current Mod localisation");
+    .expect("Project localisation");
 
     // Vanilla runs through the same cache-installed path the LSP uses, which is
     // what retains its localisation previews for the derived text lookup.
@@ -533,12 +533,12 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&current),
     )]));
     host.install_index_cache(cache)
         .expect("install Vanilla cache");
-    host.refresh_source_roots().expect("scan Current Mod");
+    host.refresh_source_roots().expect("scan Project");
 
     let snapshot = host.snapshot();
     crate::ALL_SEMANTICS_CALLS.with(|calls| calls.set(0));
@@ -562,7 +562,7 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
         );
     });
 
-    // A Current Mod override beats the installed Vanilla definition at higher priority.
+    // A Project override beats the installed Vanilla definition at higher priority.
     let (_, value) = resolved.get("shared_title").expect("mod override");
     assert_eq!(value, "English Mod");
     // Keys defined only in one root still resolve from the index.
@@ -585,7 +585,7 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
     let mut french_host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     french_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&current),
     )]));
     french_host.set_preferred_localisation_languages(vec!["french".to_owned()]);
@@ -594,9 +594,7 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
             IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("rebuild Vanilla cache"),
         )
         .expect("install Vanilla cache with French preference");
-    french_host
-        .refresh_source_roots()
-        .expect("scan Current Mod");
+    french_host.refresh_source_roots().expect("scan Project");
     let preferred = crate::localisation_values_by_key(
         &french_host.snapshot(),
         &["lang_title"],
@@ -612,7 +610,7 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
 }
 
 /// The localisation total order (design doc §7.2): layer order
-/// (current mod > dependency > vanilla) dominates, and within a layer all
+/// (project > dependency > vanilla) dominates, and within a layer all
 /// files — `l_*` directories and `replace/` alike — are equal, with the
 /// later-read definition winning. Resolution is per (key, language), so a
 /// key that only exists outside the preferred language still resolves.
@@ -636,7 +634,7 @@ fn localisation_values_by_key_apply_the_layer_then_read_order_total_order() {
         "l_english:\nlayered_title:0 \"Vanilla Layer\"\n",
     )
     .expect("vanilla english");
-    // The dependency path sorts after every current-mod path; a naive
+    // The dependency path sorts after every project path; a naive
     // path-only ordering would let it win. Layer order must dominate.
     std::fs::write(
         dependency.join("localisation/zzz_dep_l_english.yml"),
@@ -684,7 +682,7 @@ fn localisation_values_by_key_apply_the_layer_then_read_order_total_order() {
         },
         SourceRoot {
             id: SourceRootId::new(3),
-            kind: SourceRootKind::CurrentMod,
+            kind: SourceRootKind::Project,
             path: AbsPath::normalize(&current),
             order: 2,
             writable: true,
@@ -700,12 +698,12 @@ fn localisation_values_by_key_apply_the_layer_then_read_order_total_order() {
     )
     .expect("resolve total-order keys");
 
-    // The current-mod layer wins even though the dependency file sorts later
+    // The project layer wins even though the dependency file sorts later
     // in read order, and vanilla loses to both.
     let (language, value) = resolved.get("layered_title").expect("layered title");
     assert_eq!(value, "Current Layer");
     assert_eq!(language.as_deref(), Some("l_english"));
-    // Within the current-mod layer, the later-read replace/ file overrides
+    // Within the project layer, the later-read replace/ file overrides
     // the earlier-read l_english file for the same key and language.
     let (language, value) = resolved.get("within_title").expect("within-layer title");
     assert_eq!(value, "Current Replace Override");
@@ -725,7 +723,7 @@ fn custom_tooltip_hover_shows_localisation_preview_inside_mission_effects() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     let localisation = DocumentId::new("file:///tmp/localisation/test.yml");
@@ -767,7 +765,7 @@ fn typed_symbol_hover_shows_definition_localisation_preview() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     let localisation = DocumentId::new("file:///tmp/localisation/test.yml");
@@ -819,7 +817,7 @@ fn optional_type_localisation_hover_shows_existing_preview() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     host.open_document(
@@ -859,7 +857,7 @@ fn same_name_type_localisation_hover_shows_existing_preview() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
     )]));
     host.open_document(
@@ -942,7 +940,7 @@ fn cache_only_optional_type_hover_shows_existing_preview() {
     let mut host = AnalysisHost::with_profile(rules, profile);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&current),
     )]));
     host.install_index_cache(cache)
@@ -1005,7 +1003,7 @@ fn vanilla_cache_localisation_hover_shows_derived_text_without_source_state() {
     let mut host = eu4_host(game::eu4::bootstrap_rules());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&current),
     )]));
     host.install_index_cache(cache)
@@ -1051,7 +1049,7 @@ fn dynamic_parameter_hovers_and_payload_arguments_are_diagnosable() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -1156,7 +1154,7 @@ fn signature_hover_groups_parameters_by_activation_scoping() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -1237,7 +1235,7 @@ fn affixed_value_parameter_hover_names_the_render_and_expected_domain() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -1286,7 +1284,7 @@ fn dynamic_parameter_hover_replays_bindings_aware_sites() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -1422,7 +1420,7 @@ fn event_hover_falls_back_to_the_generated_title_key() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -1548,7 +1546,7 @@ fn semantic_hover_infers_modifier_kind_from_workspace_membership() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan modifier root");
@@ -1633,7 +1631,7 @@ fn texturefile_value_hover_reports_resolution_provenance() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan texture root");
@@ -1658,7 +1656,7 @@ fn texturefile_value_hover_reports_resolution_provenance() {
         "drift resolution notes the engine fallback: {drift_hover:?}"
     );
     assert!(
-        drift_hover.contents.contains("the current mod"),
+        drift_hover.contents.contains("the project"),
         "resolution names the providing root: {drift_hover:?}"
     );
 

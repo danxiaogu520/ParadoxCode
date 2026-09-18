@@ -527,7 +527,7 @@ pub(crate) struct InFlightFormatCommand {
     pub(crate) progress_token: Option<String>,
 }
 
-/// Aggregate outcome of one `pdc/formatWorkspace` pass over the Current Mod.
+/// Aggregate outcome of one `pdc/formatWorkspace` pass over the Project.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct WorkspaceFormatSummary {
     pub(crate) total_files: usize,
@@ -566,12 +566,12 @@ pub(crate) struct WorkspaceDiagnosticPublication {
 #[derive(Debug)]
 pub(crate) struct WorkspaceValidationResult {
     pub(crate) summary: WorkspaceValidationSummary,
-    /// Notifications for the bounded prefix of closed Current Mod files. Files beyond the
+    /// Notifications for the bounded prefix of closed Project files. Files beyond the
     /// publication budget remain represented by `current_uris` so previously published entries
     /// can be retained rather than flooding the client with clears.
     pub(crate) publications: Vec<WorkspaceDiagnosticPublication>,
     pub(crate) current_uris: Vec<String>,
-    /// Whether this validation walked the whole Current Mod. A full walk
+    /// Whether this validation walked the whole Project. A full walk
     /// answers the queued post-ready pass; an incremental watched-file batch
     /// covers only the files it touched and must leave that pass queued.
     pub(crate) full_workspace: bool,
@@ -682,7 +682,7 @@ pub struct LspServer {
     /// Per-category severity remapping applied to all analysis diagnostics at the protocol edge.
     pub(crate) diagnostic_severity_overrides: Arc<BTreeMap<String, Option<Severity>>>,
     /// Whether automatic and explicit workspace refreshes also publish diagnostics for closed
-    /// Current Mod files. The bounded publication path is enabled by default and can be disabled
+    /// Project files. The bounded publication path is enabled by default and can be disabled
     /// by clients that only want diagnostics for open documents.
     pub(crate) workspace_wide_diagnostics: bool,
     /// Whether an automatic closed-file validation pass is waiting for a quiet worker slot.
@@ -863,7 +863,7 @@ impl LspServer {
     }
 
     /// Publishes the bounded closed-file diagnostic batch returned by a workspace worker and
-    /// clears entries that disappeared from the refreshed Current Mod. Files beyond the worker's
+    /// clears entries that disappeared from the refreshed Project. Files beyond the worker's
     /// publication budget remain in `workspace_diagnostic_uris`, so a large workspace does not
     /// generate a second storm of empty notifications just because it was truncated.
     pub(crate) fn publish_workspace_diagnostics<W: Write>(
