@@ -551,11 +551,11 @@ function tgaHeader(width, height, bpp, descriptor) {
     const cjkFont = glyphFont('chinese', [0x6d4b, 0x8bd5], 10);
     const blankMission = {
         id: 'probe', icon: 'GFX_probe', titleKey: 'probe_title',
-        title: null, hasTrigger: false, hasEffect: false, required: [],
+        title: null, required: [],
     };
 
     // Card geometry: 103x123 canvas; the icon shows through a translucent
-    // frame at (22,20); corner markers draw only for their flags.
+    // frame at (22,20).
     {
         const frame = makeImage(103, 123, [0, 0, 0, 128]);
         const icon = makeImage(59, 63, [255, 0, 0, 255]);
@@ -564,25 +564,18 @@ function tgaHeader(width, height, bpp, descriptor) {
         assert.equal(card.height, 123);
         assert.ok(near(px(card, 40, 40), [127, 0, 0, 255])); // icon under the half-frame
         assert.deepEqual(px(card, 5, 5), [0, 0, 0, 128]); // frame alone
-        assert.deepEqual(px(card, 16, 23), [0, 0, 0, 128]); // no trigger marker
-        assert.deepEqual(px(card, 85, 20), [0, 0, 0, 128]); // no effect marker
 
-        const trigger = makeImage(33, 33, [0, 0, 255, 255]);
-        // 66-wide strip, white in frame 0's 22 columns and red beyond: if the
-        // frame crop failed, the red would bleed into the card.
-        const effect = makeImage(66, 33, [255, 0, 0, 255]);
+        // 66-wide icon strip, white in frame 0's 22 columns and red beyond:
+        // if the frame crop failed, the red would bleed into the card.
+        const strip = makeImage(66, 33, [255, 0, 0, 255]);
         for (let x = 0; x < 22; x += 1) {
             for (let y = 0; y < 33; y += 1) {
-                effect.pixels.set([255, 255, 255, 255], (y * effect.width + x) * 4);
+                strip.pixels.set([255, 255, 255, 255], (y * strip.width + x) * 4);
             }
         }
-        const flagged = cards.composeMissionCard(
-            { ...blankMission, hasTrigger: true, hasEffect: true },
-            { frame, icon, triggerMarker: trigger, effectMarker: effect, effectMarkerFrames: 3 },
-        );
-        assert.deepEqual(px(flagged, 16, 23), [0, 0, 255, 255]); // trigger marker at (0,7)
-        assert.deepEqual(px(flagged, 90, 20), [255, 255, 255, 255]); // effect frame 0 (22px wide)
-        assert.deepEqual(px(flagged, 93, 20), [0, 0, 0, 128]); // beyond the cropped frame
+        const cropped = cards.composeMissionCard(blankMission, { frame, icon: strip, iconFrames: 3 });
+        assert.ok(near(px(cropped, 30, 30), [127, 127, 127, 255])); // icon frame 0 (22px wide)
+        assert.deepEqual(px(cropped, 46, 30), [0, 0, 0, 128]); // beyond the cropped frame
     }
 
     // Title: centred, baseline-placed glyphs from the atlas; §R tints red.
@@ -646,7 +639,7 @@ function tgaHeader(width, height, bpp, descriptor) {
         assert.deepEqual(px(card, 40, 105), [0, 0, 0, 128]);
     }
 
-    // No font at all: the card degrades to frame + icon + markers.
+    // No font at all: the card degrades to frame + icon.
     {
         const card = cards.composeMissionCard(
             { ...blankMission, title: { language: 'l_english', value: 'AB' } },
@@ -679,20 +672,18 @@ function tgaHeader(width, height, bpp, descriptor) {
             mission: {
                 id: 'p', icon: 'GFX_p', titleKey: 'k',
                 title: { language: 'l_english', value: 'v' },
-                hasTrigger: true, hasEffect: false, required: ['q'],
+                required: ['q'],
             },
             asset: { sprite: 's', path: 'C:/x.dds', rootKind: 'currentMod', extensionFallback: false, frames: 2 },
             cardAssets: {
                 frame: { path: 'C:/f.dds', rootKind: 'vanilla', extensionFallback: false },
-                triggerMarker: { path: 'C:/t.dds', rootKind: 'vanilla', extensionFallback: false },
-                effectMarker: { path: 'C:/e.dds', rootKind: 'vanilla', extensionFallback: false, frames: 3 },
             },
         },
     });
     assert.equal(parsed.card.kind, 'mission');
     assert.equal(parsed.card.mission.title.value, 'v');
     assert.equal(parsed.card.asset.frames, 2);
-    assert.equal(parsed.card.cardAssets.effectMarker.frames, 3);
+    assert.equal(parsed.card.cardAssets.frame.path, 'C:/f.dds');
     const sprite = cards.parseHoverCardResponse({
         version: 1,
         card: { kind: 'sprite', asset: { path: 'x.dds', rootKind: 'dependency', extensionFallback: true, frames: 2.5 } },
