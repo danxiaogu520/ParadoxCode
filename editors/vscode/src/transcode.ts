@@ -1,7 +1,7 @@
 // TypeScript twin of crates/transcode (the EU4dll escape transcoder).
 //
 // The algorithm is fixed and shared with the Rust crate by *equivalence*, not
-// by shared source: scripts/codec-ts-test.mjs pins this implementation to the
+// by shared source: scripts/transcode.mjs pins this implementation to the
 // Rust one with (a) the EDG-KTP golden corpus byte for byte and (b) an
 // exhaustive code-point sweep plus deterministic random-sequence vectors
 // emitted by `cargo run -p transcode --bin transcode-vectors`. Any change to
@@ -16,7 +16,7 @@
 //   rejects; safeFromCodePoint substitutes U+FFFD exactly like the Rust
 //   char::from_u32(...).unwrap_or path.
 
-export const CODEC_VERSION = 1;
+export const TRANSCODE_VERSION = 1;
 
 export const PROFILE_LOCALISATION = 0 as const;
 export const PROFILE_SCRIPT = 1 as const;
@@ -300,7 +300,7 @@ export function classifyText(text: string): Classification {
 
 const utf8Encoder = new TextEncoder();
 // ignoreBOM keeps the structural U+FEFF inside the decoded string, matching the
-// codec's passthrough semantics (VS Code itself treats the BOM separately).
+// transcoder's passthrough semantics (VS Code itself treats the BOM separately).
 const utf8Decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 
 export function encodeFile(
@@ -417,7 +417,7 @@ export class Transcoder {
         try {
             input = utf8Decoder.decode(bytes);
         } catch {
-            throw new Error('codec encode input is not valid UTF-8');
+            throw new Error('transcode encode input is not valid UTF-8');
         }
         return encodeFile(input, profile, PARATRANZ_SET);
     }
