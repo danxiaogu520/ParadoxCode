@@ -91,9 +91,9 @@ export function baseReport(options, files, skippedSymlinks, omittedSymlinks, dep
         external_source: false,
         ...firstPartyRuleMetadata(),
       },
-      mode: options.vanillaSource ? 'vanilla-source' : 'current-mod',
+      mode: options.vanillaSource ? 'vanilla-source' : 'project',
       source: options.source,
-      current_mod: options.vanillaSource ? null : options.mod,
+      project: options.vanillaSource ? null : options.mod,
       workspace: options.workspace,
       vanilla_cache: {
         path: options.vanillaCache,
@@ -185,7 +185,7 @@ function markdownEscape(value) {
 function renderMarkdown(report) {
   const { summary } = report;
   const lines = [
-    '# Current Mod diagnostic report',
+    '# Project diagnostic report',
     '',
     `- Status: **${report.status}**`,
     `- Generated: ${report.generated_at}`,
@@ -300,7 +300,7 @@ export function writeReports(report, outputDir) {
   mkdirSync(outputDir, { recursive: true });
   report.files.sort((left, right) => left.path.localeCompare(right.path));
   const stamp = report.generated_at.replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-  const base = join(outputDir, `current-mod-${stamp}`);
+  const base = join(outputDir, `project-${stamp}`);
   const jsonPath = `${base}.json`;
   const markdownPath = `${base}.md`;
   writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');

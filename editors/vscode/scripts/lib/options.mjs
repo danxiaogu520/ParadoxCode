@@ -1,5 +1,5 @@
 /**
- * CLI contract for the Current Mod diagnostic tool: argument parsing, path
+ * CLI contract for the Project diagnostic tool: argument parsing, path
  * validation, user-configuration discovery, and the effective-options
  * resolution that turns raw flags into the session inputs every other module
  * consumes. Owns the usage text so `--help` and `CliUsageError` render the
@@ -23,11 +23,11 @@ export const CHECKPOINT_FILE_INTERVAL = 128;
 
 export const USAGE = `Usage: node editors/vscode/scripts/diagnose.mjs (--mod PATH | --vanilla-source PATH) [options]
 
-Diagnose every EU4 source file in a Current Mod using the embedded first-party rules and a local
-Vanilla index cache. The default output is diagnostic-reports/current-mod-<timestamp>.{json,md}.
+Diagnose every EU4 source file in a Project using the embedded first-party rules and a local
+Vanilla index cache. The default output is diagnostic-reports/project-<timestamp>.{json,md}.
 
 Required:
-  --mod PATH                 Current Mod directory
+  --mod PATH                 Project directory
   --vanilla-source PATH      Vanilla source tree; diagnose through virtual overlays backed by its cache
 
 Options:
@@ -139,8 +139,8 @@ export function parseArgs(argv) {
 
   const valueOptions = new Map([
     ['--mod', 'mod'],
-    ['--current-mod', 'mod'],
-    ['--current-mode', 'mod'],
+    ['--project', 'mod'],
+    ['--projecte', 'mod'],
     ['--vanilla-source', 'vanillaSource'],
     ['--vanilla-cache', 'vanillaCache'],
     ['--vanilla', 'vanillaCache'],

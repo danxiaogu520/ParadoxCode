@@ -896,13 +896,13 @@
           "items": {
             "type": "string",
             "enum": [
-              "currentMod",
+              "project",
               "dependencies",
               "vanilla"
             ]
           },
           "default": [
-            "currentMod",
+            "project",
             "dependencies",
             "vanilla"
           ],

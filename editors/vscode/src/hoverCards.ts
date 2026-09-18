@@ -30,7 +30,7 @@ export interface HoverCardAssetWire {
     sprite?: string;
     /** Absolute path on this machine; the client only reads and decodes. */
     path: string;
-    rootKind: 'currentMod' | 'dependency' | 'vanilla';
+    rootKind: 'project' | 'dependency' | 'vanilla';
     extensionFallback: boolean;
     frames?: number;
 }
@@ -788,7 +788,7 @@ function parseAsset(value: unknown): HoverCardAssetWire | undefined {
     return {
         sprite: typeof record.sprite === 'string' ? record.sprite : undefined,
         path: record.path,
-        rootKind: rootKind === 'currentMod' || rootKind === 'dependency' || rootKind === 'vanilla' ? rootKind : 'vanilla',
+        rootKind: rootKind === 'project' || rootKind === 'dependency' || rootKind === 'vanilla' ? rootKind : 'vanilla',
         extensionFallback: record.extensionFallback === true,
         frames: typeof frames === 'number' && frames >= 1 ? Math.floor(frames) : undefined,
     };
