@@ -17,7 +17,7 @@ pub enum Classification {
     /// Refuse both transformations and report a diagnostic.
     Mixed,
     /// No CJK and no escape sequences (pure ASCII or Latin-1 script bytes): a
-    /// fixed point of the codec, no transformation needed or performed.
+    /// fixed point of the transcoder, no transformation needed or performed.
     Ascii,
 }
 
@@ -134,7 +134,7 @@ pub fn is_raw_cjk(code_point: u32) -> bool {
 mod tests {
     use super::*;
     use crate::EscapeSet;
-    use crate::codec::{decode_text, encode_text};
+    use crate::escape::{decode_text, encode_text};
 
     fn escaped(text: &str) -> String {
         encode_text(text, EscapeSet::Paratranz).unwrap()
