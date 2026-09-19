@@ -146,19 +146,17 @@ block an unrelated pull request. The complete mapping from local feedback throug
 manual acceptance lives in
 [docs/validation.md](docs/validation.md).
 
-Validate and compile the developer-maintained first-party rule source with `bake`; the output
-can be placed in the ignored build directory for inspection:
+Validate the developer-maintained first-party rule source and regenerate its release manifest
+with `bake`:
 
 ```bash
 cargo run -p rules --bin bake -- build \
   --source rules/eu4 \
-  --output target/rules/eu4.pdcrules \
-  --manifest target/rules/manifest.json
+  --manifest rules/manifest.json
 ```
 
-Official `paradoxcode` binaries embed the first-party JSON source and generate a validated SQLite rules
-artifact in the user cache on first use or when the source `rule_hash` changes. The generated
-artifact is not committed to the repository.
+Official `paradoxcode` binaries embed the first-party JSON source and compile it straight into
+the in-memory rule set at startup; there is no persisted rules artifact.
 
 The EU4 source is intentionally split by responsibility. `catalog/` contains file categories,
 symbol descriptors, and normalized records; `semantic/` contains executable rule alternatives

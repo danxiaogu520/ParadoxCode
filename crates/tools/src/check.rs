@@ -9,8 +9,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use sha2::{Digest, Sha256};
-
 const REPOSITORY: &str = "https://github.com/danxiaogu520/ParadoxCode";
 
 /// A simple check that either passes or produces a message.
@@ -565,11 +563,6 @@ pub fn check_release_artifact(root: &Path) -> Vec<CheckResult> {
         "rules source",
         "rules/eu4 source directory is missing",
     ));
-    results.push(check(
-        !root.join("rules/eu4.pdcrules").exists(),
-        "no committed rules artifact",
-        "rules/eu4.pdcrules must be generated in a user or release cache, not committed",
-    ));
     if !source_path.is_dir() || !manifest_path.is_file() {
         results.push(CheckResult::fail(
             "rules manifest",
@@ -610,9 +603,8 @@ pub fn check_release_artifact(root: &Path) -> Vec<CheckResult> {
         ));
         return results;
     }
-    let generated_path = temporary_directory.join("eu4.pdcrules");
     let generated_manifest_path = temporary_directory.join("manifest.json");
-    match rules::rulec::compile(&source_path, &generated_path, &generated_manifest_path) {
+    match rules::rulec::compile(&source_path, &generated_manifest_path) {
         Ok(generated_manifest) => {
             results.push(CheckResult::pass("rules source compilation"));
             results.push(check(
@@ -623,60 +615,36 @@ pub fn check_release_artifact(root: &Path) -> Vec<CheckResult> {
                     generated_manifest.rule_hash
                 ),
             ));
-            let actual_sha: String = fs::read(&generated_path)
-                .map(|bytes| {
-                    Sha256::digest(&bytes)
-                        .iter()
-                        .map(|byte| format!("{byte:02x}"))
-                        .collect()
-                })
-                .unwrap_or_default();
-            results.push(check(
-                actual_sha == generated_manifest.artifact_sha256,
-                "rules artifact checksum",
-                format!("generated rules artifact checksum mismatch: {actual_sha}"),
-            ));
-            match rules::RuleSet::load(&generated_path) {
-                Ok(rules) => {
+            match game::eu4::first_party_rules() {
+                Ok(embedded) => {
+                    let (_, source_model) = match rules::rulec::load_source(&source_path) {
+                        Ok(loaded) => loaded,
+                        Err(error) => {
+                            results.push(CheckResult::fail(
+                                "embedded rules validation",
+                                error.to_string(),
+                            ));
+                            let _ = fs::remove_dir_all(&temporary_directory);
+                            return results;
+                        }
+                    };
+                    let source_rules = rules::RuleSet::from_model(source_model);
                     results.push(check(
-                        rules.schema_version() == generated_manifest.schema_version,
-                        "rules schema version",
-                        format!(
-                            "schema version mismatch: {} vs {}",
-                            rules.schema_version(),
-                            generated_manifest.schema_version
-                        ),
+                        embedded == source_rules,
+                        "embedded rules match source",
+                        "embedded first-party JSON bundle differs from the compiled source",
                     ));
                     results.push(check(
-                        rules.rule_hash().to_hex() == generated_manifest.rule_hash,
-                        "rules rule_hash",
-                        format!(
-                            "rule_hash mismatch: {} vs {}",
-                            rules.rule_hash().to_hex(),
-                            generated_manifest.rule_hash
-                        ),
-                    ));
-                    results.push(check(
-                        rules.game_id() == generated_manifest.game_id && rules.game_id() == "eu4",
+                        source_rules.game_id() == generated_manifest.game_id
+                            && source_rules.game_id() == "eu4",
                         "rules game_id",
-                        format!("game/profile mismatch: {} vs eu4", rules.game_id()),
+                        format!("game/profile mismatch: {} vs eu4", source_rules.game_id()),
                     ));
-                    match game::eu4::first_party_rules() {
-                        Ok(embedded) => results.push(check(
-                            embedded == rules,
-                            "embedded rules match source",
-                            "embedded first-party JSON bundle differs from the compiled source",
-                        )),
-                        Err(error) => results.push(CheckResult::fail(
-                            "embedded rules validation",
-                            error.to_string(),
-                        )),
-                    }
-                    results.push(CheckResult::pass("rules foreign keys enabled"));
                 }
-                Err(error) => {
-                    results.push(CheckResult::fail("rules validation", error.to_string()));
-                }
+                Err(error) => results.push(CheckResult::fail(
+                    "embedded rules validation",
+                    error.to_string(),
+                )),
             }
         }
         Err(error) => {
