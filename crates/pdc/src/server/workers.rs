@@ -1835,6 +1835,11 @@ impl LspServer {
             let rules = self.host.snapshot().rules().clone();
             let profile = self.host.snapshot().game_profile().clone();
             let scan_limits = self.host.snapshot().scan_limits();
+            let preferred_localisation_languages = self
+                .host
+                .snapshot()
+                .preferred_localisation_languages()
+                .to_vec();
             let current_rule_hash = rules.rule_hash().to_hex();
             let progress_token = format!("pdc-vanilla-{}", progress_nonce());
             let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
@@ -1893,6 +1898,7 @@ impl LspServer {
                         .as_deref()
                         .map(|callback| callback as &(dyn Fn(usize, usize) + Sync)),
                     scan_limits,
+                    preferred_localisation_languages: &preferred_localisation_languages,
                     cancellation: &worker_cancellation,
                 });
                 let _ = sender.send(TransportEvent::VanillaSetup(IndexSetupResult { result }));
@@ -1995,6 +2001,11 @@ impl LspServer {
             let rules = self.host.snapshot().rules().clone();
             let profile = self.host.snapshot().game_profile().clone();
             let scan_limits = self.host.snapshot().scan_limits();
+            let preferred_localisation_languages = self
+                .host
+                .snapshot()
+                .preferred_localisation_languages()
+                .to_vec();
             let current_rule_hash = rules.rule_hash().to_hex();
             let progress_token = format!("pdc-dependency-{}", progress_nonce());
             let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
@@ -2041,6 +2052,7 @@ impl LspServer {
                     profile,
                     current_rule_hash,
                     scan_limits,
+                    &preferred_localisation_languages,
                     Some(&log),
                     progress
                         .as_deref()
