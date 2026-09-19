@@ -37,6 +37,9 @@ pub struct AnalysisSnapshot {
     pub(crate) preferred_localisation_languages: Arc<[String]>,
     pub(crate) completion_source_layers: Arc<[SourceRootKind]>,
     pub(crate) texture_catalog: Arc<crate::texture::TextureCatalog>,
+    /// Invalidation generation of the texture catalog at snapshot build time;
+    /// see [`AnalysisSnapshot::texture_catalog_generation`].
+    pub(crate) texture_catalog_generation: u64,
 }
 
 impl AnalysisSnapshot {
@@ -50,6 +53,15 @@ impl AnalysisSnapshot {
     #[must_use]
     pub fn rules(&self) -> &RuleSet {
         &self.rules
+    }
+
+    /// Texture-catalog invalidation generation captured by this snapshot.
+    /// Distinct values mean the workspace asset catalog was rebuilt in
+    /// between, which workspace-context fingerprints must treat as a
+    /// diagnostics input change.
+    #[must_use]
+    pub const fn texture_catalog_generation(&self) -> u64 {
+        self.texture_catalog_generation
     }
 
     /// Returns the immutable game-specific interpretation selected for this snapshot.

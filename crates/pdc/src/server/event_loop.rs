@@ -1326,6 +1326,7 @@ impl LspServer {
                                             "totalWarnings": workspace.summary.total_warnings,
                                             "totalInfos": workspace.summary.total_infos,
                                             "totalHints": workspace.summary.total_hints,
+                                            "reusedFiles": workspace.reused_files,
                                         }),
                                         (WorkspaceCommand::Reindex, _) => json!({
                                             "revision": snapshot.revision(),

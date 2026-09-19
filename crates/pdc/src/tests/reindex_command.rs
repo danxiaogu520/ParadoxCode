@@ -152,6 +152,116 @@ fn validate_workspace_returns_a_bounded_diagnostic_summary() {
 }
 
 #[test]
+fn validate_workspace_reuses_cached_diagnostics_until_inputs_change() {
+    let (root, root_uri) = temp_workspace_dir();
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("events directory");
+    let source = events.join("cached-invalid.txt");
+    fs::write(&source, "scope = nowhere\n").expect("invalid source");
+    let changed_source = source.clone();
+    // Scripted delivery is immediate, so every step below waits for the
+    // previous response frame in the shared output; without that, the disk
+    // rewrite of the id-4 action races the id-3 validation worker.
+    let output = SharedOutput::new();
+    let wait_for_response = |output: &SharedOutput, id: i64| {
+        let output = output.clone();
+        move || {
+            output.wait_for(|value| value["id"] == id && value.get("result").is_some());
+        }
+    };
+    let input = ScriptedReader::new([
+        (
+            json!({
+                "jsonrpc":"2.0",
+                "id":1,
+                "method":"initialize",
+                "params":{
+                    "workspaceFolders":[{"uri":root_uri,"name":"test"}],
+                    "capabilities":{},
+                    "initializationOptions":{"workspaceWideDiagnostics":true}
+                }
+            }),
+            None,
+        ),
+        (
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            None,
+        ),
+        (
+            json!({
+                "jsonrpc":"2.0",
+                "id":2,
+                "method":"workspace/executeCommand",
+                "params":{"command":"validateWorkspace","arguments":[]}
+            }),
+            Some(Box::new(wait_for_response(&output, 1)) as Box<dyn FnOnce() + Send>),
+        ),
+        (
+            json!({
+                "jsonrpc":"2.0",
+                "id":3,
+                "method":"workspace/executeCommand",
+                "params":{"command":"validateWorkspace","arguments":[]}
+            }),
+            Some(Box::new(wait_for_response(&output, 2)) as Box<dyn FnOnce() + Send>),
+        ),
+        (
+            json!({
+                "jsonrpc":"2.0",
+                "id":4,
+                "method":"workspace/executeCommand",
+                "params":{"command":"validateWorkspace","arguments":[]}
+            }),
+            Some(Box::new({
+                let wait = wait_for_response(&output, 3);
+                move || {
+                    wait();
+                    fs::write(changed_source, "").expect("write fixed source");
+                }
+            }) as Box<dyn FnOnce() + Send>),
+        ),
+        (
+            json!({"jsonrpc":"2.0","id":5,"method":"shutdown","params":{}}),
+            Some(Box::new(wait_for_response(&output, 4)) as Box<dyn FnOnce() + Send>),
+        ),
+        (json!({"jsonrpc":"2.0","method":"exit"}), None),
+    ]);
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(input, output.clone())
+        .expect("transport");
+    let responses = decode_frames(&output.bytes());
+    let response_for = |id: i64| {
+        responses
+            .iter()
+            .find(|value| value["id"] == id)
+            .unwrap_or_else(|| panic!("validateWorkspace {id} response"))
+    };
+    let first = response_for(2);
+    assert_eq!(first["error"], Value::Null);
+    assert_eq!(first["result"]["totalFiles"], 1);
+    let first_errors = first["result"]["totalErrors"].as_u64().unwrap_or(0);
+    assert!(first_errors > 0, "fixture must produce diagnostics");
+
+    // Nothing changed between the two runs: the file is served from the
+    // diagnostics cache and the summary stays identical.
+    let second = response_for(3);
+    assert_eq!(second["error"], Value::Null);
+    assert_eq!(second["result"]["reusedFiles"], 1);
+    assert_eq!(second["result"]["validatedFiles"], 1);
+    assert_eq!(second["result"]["totalErrors"], first_errors);
+
+    // The on-disk rewrite changes the file's own content hash, so its entry
+    // misses and the file is recomputed against the fixed source.
+    let third = response_for(4);
+    assert_eq!(third["error"], Value::Null);
+    assert_eq!(third["result"]["reusedFiles"], 0);
+    assert_eq!(third["result"]["validatedFiles"], 1);
+    assert_eq!(third["result"]["totalErrors"], 0);
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn validate_workspace_filters_open_document_severity_overrides() {
     let (root, root_uri) = temp_workspace_dir();
     let events = root.join("events");

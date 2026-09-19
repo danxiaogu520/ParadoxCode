@@ -570,9 +570,39 @@ pub(crate) struct WorkspaceDiagnosticPublication {
     /// the worker lets the publish loop skip files whose payload hash matches
     /// the last published one and embeds the remaining bytes via `RawValue`,
     /// so unchanged files never rebuild or re-serialize a `Value` tree.
-    pub(crate) payload: Box<serde_json::value::RawValue>,
+    pub(crate) payload: std::sync::Arc<serde_json::value::RawValue>,
     pub(crate) hash: u64,
 }
+
+/// Post-filter per-file diagnostic counts, kept so a cache hit can
+/// contribute to `WorkspaceValidationSummary` without recomputation.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct DiagnosticCounts {
+    pub(crate) errors: usize,
+    pub(crate) warnings: usize,
+    pub(crate) infos: usize,
+    pub(crate) hints: usize,
+    pub(crate) has_error: bool,
+}
+
+/// One file's computed workspace diagnostics, reusable by a later pass when
+/// the file's own content hash, the workspace context fingerprint, and the
+/// diagnostics-filter fingerprint all still match. The serialized payload is
+/// present only when the file entered the publication prefix; a payload-less
+/// entry still reuses the summary counts, and the pass's budget check keeps
+/// such files unpublished exactly as the compute path would.
+#[derive(Clone, Debug)]
+pub(crate) struct CachedWorkspaceDiagnostics {
+    pub(crate) content: u64,
+    pub(crate) context: u64,
+    pub(crate) filters: u64,
+    pub(crate) counts: DiagnosticCounts,
+    pub(crate) payload: Option<(std::sync::Arc<serde_json::value::RawValue>, u64)>,
+}
+
+/// Per-file workspace diagnostics cache shared with validation workers.
+pub(crate) type WorkspaceDiagnosticsCache =
+    std::sync::RwLock<std::collections::BTreeMap<engine::SourceFileId, CachedWorkspaceDiagnostics>>;
 
 #[derive(Debug)]
 pub(crate) struct WorkspaceValidationResult {
@@ -586,6 +616,11 @@ pub(crate) struct WorkspaceValidationResult {
     /// answers the queued post-ready pass; an incremental watched-file batch
     /// covers only the files it touched and must leave that pass queued.
     pub(crate) full_workspace: bool,
+    /// Freshly computed and actually published diagnostics to merge into the
+    /// workspace diagnostics cache.
+    pub(crate) cache_updates: Vec<(engine::SourceFileId, CachedWorkspaceDiagnostics)>,
+    /// How many files this pass reused from the diagnostics cache.
+    pub(crate) reused_files: usize,
 }
 
 #[derive(Debug)]
@@ -720,6 +755,10 @@ pub struct LspServer {
     /// URIs for which the last workspace pass published closed-file diagnostics. This lets a
     /// subsequent pass clear deleted or ignored files without retaining diagnostic payloads.
     pub(crate) workspace_published_diagnostics: BTreeMap<String, u64>,
+    /// Per-file workspace diagnostics cache. Validation passes skip files
+    /// whose own content, the workspace context fingerprint, and the
+    /// diagnostics filters all match their cached entry.
+    pub(crate) workspace_diagnostics_cache: std::sync::Arc<WorkspaceDiagnosticsCache>,
     /// Notifications queued by a live setting change; drained by the transport loop so the
     /// configuration handler remains a pure state transition.
     pub(crate) workspace_diagnostic_clear_queue: Vec<String>,
@@ -777,6 +816,7 @@ impl LspServer {
             scan_retries: 0,
             scan_retry_limit: crate::MAX_BACKGROUND_SCAN_RETRIES,
             workspace_published_diagnostics: BTreeMap::new(),
+            workspace_diagnostics_cache: std::sync::Arc::default(),
             workspace_diagnostic_clear_queue: Vec::new(),
             scan_gate: None,
             startup_log: Vec::new(),
@@ -920,6 +960,28 @@ impl LspServer {
             )?;
             self.workspace_published_diagnostics
                 .insert(publication.uri.clone(), publication.hash);
+        }
+        // Merge freshly computed entries into the diagnostics cache; on a
+        // full pass also drop entries for files that left the workspace.
+        if !result.cache_updates.is_empty() || result.full_workspace {
+            let live = result.full_workspace.then(|| {
+                self.host
+                    .snapshot()
+                    .source_files()
+                    .keys()
+                    .copied()
+                    .collect::<std::collections::BTreeSet<_>>()
+            });
+            let mut cache = self
+                .workspace_diagnostics_cache
+                .write()
+                .expect("workspace diagnostics cache lock");
+            for (id, entry) in &result.cache_updates {
+                cache.insert(*id, entry.clone());
+            }
+            if let Some(live) = live {
+                cache.retain(|id, _| live.contains(id));
+            }
         }
         Ok(())
     }

@@ -7,7 +7,7 @@ use std::fs;
 /// loop can diff by hash and reuse the payload without rebuilding a Value tree.
 fn encode_workspace_publication<T: serde::Serialize>(
     values: T,
-) -> Result<(Box<serde_json::value::RawValue>, u64), serde_json::Error> {
+) -> Result<(std::sync::Arc<serde_json::value::RawValue>, u64), serde_json::Error> {
     use std::hash::{Hash, Hasher};
     let bytes = serde_json::to_vec(&values)?;
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -16,8 +16,37 @@ fn encode_workspace_publication<T: serde::Serialize>(
     // serde_json 1.0.151 只有 from_string；to_vec 的产物必为合法 UTF-8
     let json = String::from_utf8(bytes)
         .map_err(|error| serde_json::Error::io(std::io::Error::other(error)))?;
-    let payload = serde_json::value::RawValue::from_string(json)?;
+    let payload = std::sync::Arc::from(serde_json::value::RawValue::from_string(json)?);
     Ok((payload, hash))
+}
+
+/// Cheap in-memory content hash used by the diagnostics cache key.
+fn content_fingerprint(source: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    source.hash(&mut hasher);
+    hasher.finish()
+}
+
+/// Fingerprint of the diagnostics filters applied to every publication, so a
+/// settings change (ignored codes, severity overrides) invalidates the cache
+/// even though content and context are unchanged.
+fn diagnostics_filters_fingerprint(
+    ignored_diagnostic_codes: &HashSet<String>,
+    diagnostic_severity_overrides: &BTreeMap<String, Option<Severity>>,
+) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    let mut codes = ignored_diagnostic_codes.iter().collect::<Vec<_>>();
+    codes.sort();
+    for code in codes {
+        code.hash(&mut hasher);
+    }
+    for (code, severity) in diagnostic_severity_overrides {
+        code.hash(&mut hasher);
+        format!("{severity:?}").hash(&mut hasher);
+    }
+    hasher.finish()
 }
 
 /// Validates every parsed Project source file in a refreshed candidate and aggregates the
@@ -30,6 +59,7 @@ fn workspace_validation_result(
     ignored_diagnostic_codes: &HashSet<String>,
     diagnostic_severity_overrides: &BTreeMap<String, Option<Severity>>,
     publish_diagnostics: bool,
+    diagnostics_cache: &std::sync::Arc<WorkspaceDiagnosticsCache>,
 ) -> Result<WorkspaceValidationResult, WorkspaceError> {
     let snapshot = host.snapshot();
     let base_revision = snapshot.revision();
@@ -80,6 +110,13 @@ fn workspace_validation_result(
     let mut publications = Vec::new();
     let cancellation = CancellationToken::new();
     let mut published_files = 0usize;
+    let mut cache_updates = Vec::new();
+    let mut reused_files = 0usize;
+    // Cache keys: one workspace context fingerprint for the whole pass plus a
+    // per-file content hash. Computed once here so the workers only compare.
+    let context_fingerprint = engine::workspace_context_fingerprint(&snapshot);
+    let filters_fingerprint =
+        diagnostics_filters_fingerprint(ignored_diagnostic_codes, diagnostic_severity_overrides);
 
     // Closed-file diagnostics are independent per file; computing them on one
     // thread made a full-mod pass take minutes of wall time (the same pass is
@@ -87,11 +124,24 @@ fn workspace_validation_result(
     // indexes are computed on a bounded worker set; ordering-sensitive summary
     // counting and the bounded publication prefix are assembled sequentially
     // below from the per-index results.
-    struct FileOutcome {
-        filtered: Vec<ide::Diagnostic>,
-        source: std::sync::Arc<str>,
-        line_index: LineIndex,
-        closed_uri: Option<String>,
+    enum FileOutcome {
+        Computed {
+            filtered: Vec<ide::Diagnostic>,
+            source: std::sync::Arc<str>,
+            line_index: LineIndex,
+            closed_uri: Option<String>,
+            file_id: engine::SourceFileId,
+            content: u64,
+        },
+        /// Cache hit: content, context, and filters all match the cached
+        /// entry, so the counts are reused as-is and the payload (when the
+        /// file belongs to the publication prefix) comes straight from the
+        /// cache.
+        Reused {
+            uri: String,
+            counts: crate::server::DiagnosticCounts,
+            payload: Option<(std::sync::Arc<serde_json::value::RawValue>, u64)>,
+        },
     }
     let outcomes = std::sync::Mutex::new((0..files.len()).map(|_| None).collect::<Vec<_>>());
     let write_outcome = |index: usize, outcome: FileOutcome| {
@@ -148,11 +198,16 @@ fn workspace_validation_result(
                         );
                         write_outcome(
                             index,
-                            FileOutcome {
+                            FileOutcome::Computed {
                                 filtered,
                                 source,
                                 line_index,
                                 closed_uri: None,
+                                // Overlay documents are always recomputed; the
+                                // id/content fields only feed cache updates,
+                                // which overlays never produce.
+                                file_id: file.id,
+                                content: content_fingerprint(&document.text_handle()),
                             },
                         );
                         continue;
@@ -160,6 +215,32 @@ fn workspace_validation_result(
                     let Some(state) = snapshot.file_state(file.id) else {
                         continue;
                     };
+                    // Cache hit: the file's own content, the workspace context,
+                    // and the diagnostics filters all match the last published
+                    // entry, so neither the reparse nor the recomputation can
+                    // change the payload.
+                    let content = content_fingerprint(state.source());
+                    if let Some(uri) = FileUri::from_path(&file.physical_path)
+                        .ok()
+                        .map(|uri| uri.as_str().to_owned())
+                        && let Some(entry) = diagnostics_cache
+                            .read()
+                            .expect("workspace diagnostics cache lock")
+                            .get(&file.id)
+                        && entry.content == content
+                        && entry.context == context_fingerprint
+                        && entry.filters == filters_fingerprint
+                    {
+                        write_outcome(
+                            index,
+                            FileOutcome::Reused {
+                                uri,
+                                counts: entry.counts,
+                                payload: entry.payload.clone(),
+                            },
+                        );
+                        continue;
+                    }
                     let Ok(diagnostics) = source_file_diagnostics_with_cancellation(
                         &snapshot,
                         file.id,
@@ -178,13 +259,15 @@ fn workspace_validation_result(
                     );
                     write_outcome(
                         index,
-                        FileOutcome {
+                        FileOutcome::Computed {
                             filtered,
                             source: state.source_handle(),
                             line_index,
                             closed_uri: FileUri::from_path(&file.physical_path)
                                 .ok()
                                 .map(|uri| uri.as_str().to_owned()),
+                            file_id: file.id,
+                            content,
                         },
                     );
                 }
@@ -199,54 +282,113 @@ fn workspace_validation_result(
         .expect("validation outcome lock poisoned");
 
     for outcome in outcomes.into_iter().flatten() {
-        let filtered = outcome.filtered;
-        let line_index = outcome.line_index;
-        let source = outcome.source;
-        let closed_uri = outcome.closed_uri;
-        summary.validated_files = summary.validated_files.saturating_add(1);
-        let mut file_has_error = false;
-        for diagnostic in &filtered {
-            match diagnostic.severity {
-                Severity::Error => {
-                    file_has_error = true;
-                    summary.total_errors = summary.total_errors.saturating_add(1);
+        match outcome {
+            FileOutcome::Reused {
+                uri,
+                counts,
+                payload,
+            } => {
+                reused_files = reused_files.saturating_add(1);
+                summary.validated_files = summary.validated_files.saturating_add(1);
+                summary.total_errors = summary.total_errors.saturating_add(counts.errors);
+                summary.total_warnings = summary.total_warnings.saturating_add(counts.warnings);
+                summary.total_infos = summary.total_infos.saturating_add(counts.infos);
+                summary.total_hints = summary.total_hints.saturating_add(counts.hints);
+                if counts.has_error {
+                    summary.files_with_errors = summary.files_with_errors.saturating_add(1);
                 }
-                Severity::Warning => {
-                    summary.total_warnings = summary.total_warnings.saturating_add(1);
-                }
-                Severity::Information => {
-                    summary.total_infos = summary.total_infos.saturating_add(1);
-                }
-                Severity::Hint => {
-                    summary.total_hints = summary.total_hints.saturating_add(1);
+                current_uris.push(uri.clone());
+                if publish_diagnostics
+                    && published_files < MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS
+                    && let Some((payload, hash)) = payload
+                {
+                    publications.push(WorkspaceDiagnosticPublication { uri, payload, hash });
+                    published_files = published_files.saturating_add(1);
                 }
             }
-        }
-        if file_has_error {
-            summary.files_with_errors = summary.files_with_errors.saturating_add(1);
-        }
-        if let Some(uri) = closed_uri {
-            current_uris.push(uri.clone());
-            if publish_diagnostics && published_files < MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS {
-                let values = diagnostic_values_for_text_with_ignored_and_overrides(
-                    filtered,
-                    Some(&snapshot),
-                    &line_index,
-                    &source,
-                    &HashSet::new(),
-                    diagnostic_severity_overrides,
-                );
-                let payload = encode_workspace_publication(values).map_err(|error| {
-                    WorkspaceError::Io(io::Error::other(format!(
-                        "failed to serialize workspace diagnostics: {error}"
-                    )))
-                })?;
-                publications.push(WorkspaceDiagnosticPublication {
-                    uri,
-                    payload: payload.0,
-                    hash: payload.1,
-                });
-                published_files = published_files.saturating_add(1);
+            FileOutcome::Computed {
+                filtered,
+                source,
+                line_index,
+                closed_uri,
+                file_id,
+                content,
+            } => {
+                summary.validated_files = summary.validated_files.saturating_add(1);
+                let mut file_has_error = false;
+                let mut counts = crate::server::DiagnosticCounts {
+                    errors: 0,
+                    warnings: 0,
+                    infos: 0,
+                    hints: 0,
+                    has_error: false,
+                };
+                for diagnostic in &filtered {
+                    match diagnostic.severity {
+                        Severity::Error => {
+                            file_has_error = true;
+                            counts.errors += 1;
+                            summary.total_errors = summary.total_errors.saturating_add(1);
+                        }
+                        Severity::Warning => {
+                            counts.warnings += 1;
+                            summary.total_warnings = summary.total_warnings.saturating_add(1);
+                        }
+                        Severity::Information => {
+                            counts.infos += 1;
+                            summary.total_infos = summary.total_infos.saturating_add(1);
+                        }
+                        Severity::Hint => {
+                            counts.hints += 1;
+                            summary.total_hints = summary.total_hints.saturating_add(1);
+                        }
+                    }
+                }
+                counts.has_error = file_has_error;
+                if file_has_error {
+                    summary.files_with_errors = summary.files_with_errors.saturating_add(1);
+                }
+                if let Some(uri) = closed_uri {
+                    current_uris.push(uri.clone());
+                    let mut cached_payload = None;
+                    if publish_diagnostics
+                        && published_files < MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS
+                    {
+                        let values = diagnostic_values_for_text_with_ignored_and_overrides(
+                            filtered,
+                            Some(&snapshot),
+                            &line_index,
+                            &source,
+                            &HashSet::new(),
+                            diagnostic_severity_overrides,
+                        );
+                        let payload = encode_workspace_publication(values).map_err(|error| {
+                            WorkspaceError::Io(io::Error::other(format!(
+                                "failed to serialize workspace diagnostics: {error}"
+                            )))
+                        })?;
+                        publications.push(WorkspaceDiagnosticPublication {
+                            uri,
+                            payload: std::sync::Arc::clone(&payload.0),
+                            hash: payload.1,
+                        });
+                        cached_payload = Some(payload);
+                        published_files = published_files.saturating_add(1);
+                    }
+                    // Every computed closed file is cached so a no-change pass
+                    // skips its reparse and recomputation entirely, not just
+                    // the bounded publication prefix.
+                    cache_updates.push((
+                        file_id,
+                        crate::server::CachedWorkspaceDiagnostics {
+                            content,
+                            context: context_fingerprint,
+                            filters: filters_fingerprint,
+                            counts,
+                            payload: cached_payload,
+                        },
+                    ));
+                }
             }
         }
     }
@@ -255,6 +397,8 @@ fn workspace_validation_result(
         publications,
         current_uris,
         full_workspace: true,
+        cache_updates,
+        reused_files,
     })
 }
 
@@ -381,6 +525,8 @@ fn changed_files_validation_result(
         publications,
         current_uris,
         full_workspace: false,
+        cache_updates: Vec::new(),
+        reused_files: 0,
     })
 }
 
@@ -606,6 +752,7 @@ impl LspServer {
         let worker_cancellation = cancellation.clone();
         let publish_workspace_diagnostics = self.workspace_wide_diagnostics;
         let ignored_diagnostic_codes = Arc::clone(&self.ignored_diagnostic_codes);
+        let diagnostics_cache = std::sync::Arc::clone(&self.workspace_diagnostics_cache);
         let diagnostic_severity_overrides = Arc::clone(&self.diagnostic_severity_overrides);
         let mut candidate = self.host.clone();
         let sender = event_sender.clone();
@@ -631,6 +778,7 @@ impl LspServer {
                                     &ignored_diagnostic_codes,
                                     &diagnostic_severity_overrides,
                                     publish_workspace_diagnostics,
+                                    &diagnostics_cache,
                                 )
                             })
                             .transpose()?;
@@ -794,6 +942,7 @@ impl LspServer {
         let cancellation = WorkspaceScanToken::new();
         let worker_cancellation = cancellation.clone();
         let ignored_diagnostic_codes = Arc::clone(&self.ignored_diagnostic_codes);
+        let diagnostics_cache = std::sync::Arc::clone(&self.workspace_diagnostics_cache);
         let diagnostic_severity_overrides = Arc::clone(&self.diagnostic_severity_overrides);
         let candidate = self.host.clone();
         let sender = event_sender.clone();
@@ -810,6 +959,7 @@ impl LspServer {
                     &ignored_diagnostic_codes,
                     &diagnostic_severity_overrides,
                     true,
+                    &diagnostics_cache,
                 )
             }))
             .unwrap_or_else(|_| {
@@ -872,6 +1022,7 @@ impl LspServer {
         let sender = event_sender.clone();
         let publish_workspace_diagnostics = self.workspace_wide_diagnostics;
         let ignored_diagnostic_codes = Arc::clone(&self.ignored_diagnostic_codes);
+        let diagnostics_cache = std::sync::Arc::clone(&self.workspace_diagnostics_cache);
         let diagnostic_severity_overrides = Arc::clone(&self.diagnostic_severity_overrides);
         self.background_reindex_due = None;
         *in_flight = Some(InFlightBackgroundReindex {
@@ -891,6 +1042,7 @@ impl LspServer {
                                     &ignored_diagnostic_codes,
                                     &diagnostic_severity_overrides,
                                     true,
+                                    &diagnostics_cache,
                                 )
                             })
                             .transpose()?;
@@ -1204,6 +1356,7 @@ impl LspServer {
         let sender = event_sender.clone();
         let publish_workspace_diagnostics = self.workspace_wide_diagnostics;
         let ignored_diagnostic_codes = Arc::clone(&self.ignored_diagnostic_codes);
+        let diagnostics_cache = std::sync::Arc::clone(&self.workspace_diagnostics_cache);
         let diagnostic_severity_overrides = Arc::clone(&self.diagnostic_severity_overrides);
         *in_flight = Some(InFlightDiskChanges {
             base_revision,
@@ -1223,6 +1376,7 @@ impl LspServer {
                                         &ignored_diagnostic_codes,
                                         &diagnostic_severity_overrides,
                                         true,
+                                        &diagnostics_cache,
                                     )
                                 })
                                 .transpose()?;

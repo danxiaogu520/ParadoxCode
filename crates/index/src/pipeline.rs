@@ -435,10 +435,8 @@ pub fn build_file_state_with_cache(
         profile,
         parse_cache.map(|cache| (file, cache)),
     );
-    let mut shard = match (parsed.as_ref(), hir.as_deref()) {
-        (Some(ParsedSource::Text(parsed)), Some(hir)) => {
-            shard_from_parsed(file, parsed, hir, rules)
-        }
+    let shard = match (parsed.as_ref(), hir.as_deref()) {
+        (Some(ParsedSource::Text(parsed)), Some(hir)) => shard_for_source(file, parsed, hir, rules),
         (Some(ParsedSource::Text(parsed)), None) => FileIndexShard {
             file_id: file.id,
             definitions: Vec::new(),
@@ -458,15 +456,6 @@ pub fn build_file_state_with_cache(
             syntax_error_count: 0,
         },
     };
-    let mut seen_definitions = BTreeSet::new();
-    shard.definitions.retain(|definition| {
-        seen_definitions.insert((
-            definition.kind.clone(),
-            definition.name.clone(),
-            definition.file_id,
-            definition.range,
-        ))
-    });
     let shared_source = match parsed.as_ref() {
         Some(ParsedSource::Text(parsed)) => parsed.source_handle(),
         None => Arc::from(source.as_str()),
@@ -517,6 +506,31 @@ pub fn position_ranges_for_state(state: &FileState) -> Vec<(TextRange, PositionR
                 .map(|position| (reference.range, position))
         }))
         .collect()
+}
+
+/// Builds the index shard for one parsed source, applying the same definition
+/// deduplication the scan path uses. Public so the diagnostics-cache context
+/// fingerprint can derive a shard from an overlay document's resident trees
+/// through the identical code path — identical text therefore yields an
+/// identical [`FileIndexShard::contribution_fingerprint`] whether the text
+/// came from disk or from an overlay.
+pub fn shard_for_source(
+    file: &SourceFile,
+    parsed: &ParsedFile,
+    hir: &HirFile,
+    rules: &RuleSet,
+) -> FileIndexShard {
+    let mut shard = shard_from_parsed(file, parsed, hir, rules);
+    let mut seen_definitions = BTreeSet::new();
+    shard.definitions.retain(|definition| {
+        seen_definitions.insert((
+            definition.kind.clone(),
+            definition.name.clone(),
+            definition.file_id,
+            definition.range,
+        ))
+    });
+    shard
 }
 
 fn shard_from_parsed(

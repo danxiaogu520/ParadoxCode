@@ -4,12 +4,14 @@
 //! must not depend on editor protocol types. The underlying data model is provided by the
 //! `vfs`, `hir`, and `index` crates and re-exported here as the stable facade.
 
+mod fingerprint;
 mod host;
 mod index_cache;
 mod query_cache;
 mod snapshot;
 mod texture;
 
+pub use fingerprint::workspace_context_fingerprint;
 pub use host::AnalysisHost;
 pub use query_cache::{CacheDomain, SnapshotQueryCache};
 pub use snapshot::AnalysisSnapshot;

@@ -19,7 +19,7 @@ pub use index::{
 pub use pipeline::{
     SourceLoadContext, SourceReadJob, build_file_state, build_file_state_with_cache,
     empty_file_state, load_source_files, parse_source, position_ranges_for_state,
-    prepare_document_snapshot, staged_overlay_document, unparsed_document,
+    prepare_document_snapshot, shard_for_source, staged_overlay_document, unparsed_document,
 };
 
 thread_local! {
