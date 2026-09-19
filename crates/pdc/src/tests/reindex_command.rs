@@ -855,10 +855,22 @@ fn deferred_exit_waits_for_the_ready_pass_queued_behind_a_disk_change() {
             value["method"] == "textDocument/publishDiagnostics"
                 && value["params"]["uri"] == source_uri
         })
-        .count();
+        .collect::<Vec<_>>();
+    // The disk rewrite lands while the gated scan is still in flight, so the
+    // watched-file batch and the queued ready pass both validate the same
+    // final (fixed) source. Identical payloads are now suppressed on publish,
+    // so a second frame is no longer guaranteed; what must hold is that at
+    // least one publication happened before `exit` and that it reflects the
+    // rewritten source.
     assert!(
-        publications >= 2,
+        !publications.is_empty(),
         "the watched-file republication or the queued ready pass was skipped before `exit` ran"
+    );
+    assert!(
+        publications
+            .last()
+            .is_some_and(|value| value["params"]["diagnostics"] == json!([])),
+        "the final publication must reflect the rewritten fixed source: {publications:?}"
     );
     fs::remove_dir_all(root).expect("cleanup");
 }

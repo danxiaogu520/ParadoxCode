@@ -35,8 +35,9 @@ use crate::protocol::{
     diagnostic_values_with_ignored_and_overrides, diagnostics_notification, document_error,
     filter_diagnostics_with_ignored_and_overrides, is_execute_command_message,
     is_exit_notification, is_initialize_control_message, is_snapshot_request,
-    is_snapshot_request_message, log_message_notification, parse_file_uri_str, request_id_from_lsp,
-    show_info_notification, show_warning_notification, typed_params,
+    is_snapshot_request_message, log_message_notification, parse_file_uri_str,
+    raw_diagnostics_notification, request_id_from_lsp, show_info_notification,
+    show_warning_notification, typed_params,
 };
 use crate::requests::SnapshotRequestContext;
 use crate::text::{apply_text_change, changed_document_len, lsp_range_to_text_range};
@@ -565,7 +566,12 @@ pub(crate) struct WorkspaceValidationSummary {
 #[derive(Debug)]
 pub(crate) struct WorkspaceDiagnosticPublication {
     pub(crate) uri: String,
-    pub(crate) values: Value,
+    /// Pre-serialized diagnostics payload plus its hash. Serializing once in
+    /// the worker lets the publish loop skip files whose payload hash matches
+    /// the last published one and embeds the remaining bytes via `RawValue`,
+    /// so unchanged files never rebuild or re-serialize a `Value` tree.
+    pub(crate) payload: Box<serde_json::value::RawValue>,
+    pub(crate) hash: u64,
 }
 
 #[derive(Debug)]
@@ -713,7 +719,7 @@ pub struct LspServer {
     scan_retry_limit: u8,
     /// URIs for which the last workspace pass published closed-file diagnostics. This lets a
     /// subsequent pass clear deleted or ignored files without retaining diagnostic payloads.
-    pub(crate) workspace_diagnostic_uris: BTreeSet<String>,
+    pub(crate) workspace_published_diagnostics: BTreeMap<String, u64>,
     /// Notifications queued by a live setting change; drained by the transport loop so the
     /// configuration handler remains a pure state transition.
     pub(crate) workspace_diagnostic_clear_queue: Vec<String>,
@@ -770,7 +776,7 @@ impl LspServer {
             deferred_setup_events: DeferredSetupEvents::default(),
             scan_retries: 0,
             scan_retry_limit: crate::MAX_BACKGROUND_SCAN_RETRIES,
-            workspace_diagnostic_uris: BTreeSet::new(),
+            workspace_published_diagnostics: BTreeMap::new(),
             workspace_diagnostic_clear_queue: Vec::new(),
             scan_gate: None,
             startup_log: Vec::new(),
@@ -887,8 +893,9 @@ impl LspServer {
             self.workspace_diagnostics_pending = false;
             let current = result.current_uris.iter().cloned().collect::<BTreeSet<_>>();
             let stale = self
-                .workspace_diagnostic_uris
-                .difference(&current)
+                .workspace_published_diagnostics
+                .keys()
+                .filter(|uri| !current.contains(*uri))
                 .cloned()
                 .collect::<Vec<_>>();
             for uri in stale
@@ -896,24 +903,23 @@ impl LspServer {
                 .take(crate::MAX_WORKSPACE_DIAGNOSTIC_CLEARS)
             {
                 write_message(output, &diagnostics_notification(&uri, json!([]), None))?;
-                self.workspace_diagnostic_uris.remove(&uri);
+                self.workspace_published_diagnostics.remove(&uri);
             }
         }
         for publication in &result.publications {
+            // Identical payloads are skipped instead of re-sent: the client
+            // retains the previous publication, so a no-change pass costs one
+            // map lookup per file instead of a full Value rebuild.
+            if self.workspace_published_diagnostics.get(&publication.uri) == Some(&publication.hash)
+            {
+                continue;
+            }
             write_message(
                 output,
-                &diagnostics_notification(&publication.uri, publication.values.clone(), None),
+                &raw_diagnostics_notification(&publication.uri, &publication.payload),
             )?;
-            if publication
-                .values
-                .as_array()
-                .is_some_and(|diagnostics| diagnostics.is_empty())
-            {
-                self.workspace_diagnostic_uris.remove(&publication.uri);
-            } else {
-                self.workspace_diagnostic_uris
-                    .insert(publication.uri.clone());
-            }
+            self.workspace_published_diagnostics
+                .insert(publication.uri.clone(), publication.hash);
         }
         Ok(())
     }
@@ -937,7 +943,7 @@ impl LspServer {
     /// Removes one closed-file publication when that path becomes an open overlay. The regular
     /// document diagnostic worker will publish the overlay result independently.
     pub(crate) fn clear_workspace_diagnostic_uri(&mut self, uri: &str) {
-        if self.workspace_diagnostic_uris.remove(uri) {
+        if self.workspace_published_diagnostics.remove(uri).is_some() {
             self.workspace_diagnostic_clear_queue.push(uri.to_owned());
         }
     }
