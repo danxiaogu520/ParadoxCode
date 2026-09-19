@@ -56,6 +56,10 @@ pub struct AnalysisHost {
     /// Lazily built asset catalog keyed by the live `roots` pointer; see
     /// [`AnalysisHost::texture_catalog`].
     texture_catalog: Arc<crate::texture::TextureCatalogCache>,
+    /// Bumped every time the texture catalog is invalidated, so
+    /// workspace-context fingerprints can distinguish catalog rebuilds whose
+    /// `roots` key did not change (texture-only disk events).
+    texture_catalog_generation: Arc<std::sync::atomic::AtomicU64>,
     /// Live revision shared across host clones. `revision` itself is cloned by
     /// value, so a worker holding a cloned host would otherwise observe a frozen
     /// counter and never notice that the originating host advanced past it.
@@ -104,6 +108,7 @@ impl AnalysisHost {
                 SourceRootKind::Vanilla,
             ]),
             texture_catalog: Arc::new(std::sync::Mutex::new(None)),
+            texture_catalog_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             revision_watch: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
     }
@@ -1189,6 +1194,9 @@ impl AnalysisHost {
             preferred_localisation_languages: Arc::clone(&self.preferred_localisation_languages),
             completion_source_layers: Arc::clone(&self.completion_source_layers),
             texture_catalog: self.texture_catalog(),
+            texture_catalog_generation: self
+                .texture_catalog_generation
+                .load(std::sync::atomic::Ordering::Acquire),
         }
     }
 
@@ -1220,6 +1228,8 @@ impl AnalysisHost {
             .lock()
             .expect("texture catalog lock")
             .take();
+        self.texture_catalog_generation
+            .fetch_add(1, std::sync::atomic::Ordering::Release);
     }
 }
 
