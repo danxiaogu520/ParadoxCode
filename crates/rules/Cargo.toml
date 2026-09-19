@@ -15,7 +15,6 @@ publish = false
 rustc-hash = "2"
 parser = { path = "../parser" }
 text = { path = "../text" }
-rusqlite = { version = "0.40", features = ["bundled"] }
 rayon = "1.11"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -104,16 +104,15 @@ cargo tools gates
 
 默认的 `all` 代表默认确定性本地分组（优化后的 `perf` 仍需显式运行），不代表已经具备发布资格。Pull Request CI 负责干净检出与跨平台覆盖，分支保护将其 `Conclusion` 聚合作为唯一合并权威。依赖漏洞数据库与优化 benchmark 作为定时审计运行，避免外部状态变化阻塞无关 PR。完整的本地反馈、合并门禁、定时审计、发布门禁和人工验收职责见 [docs/validation.md](docs/validation.md)。
 
-使用 `bake` 校验并编译开发者维护的第一方规则源；产物可放入被忽略的构建目录以供检视：
+使用 `bake` 校验开发者维护的第一方规则源并重新生成发布 manifest：
 
 ```bash
 cargo run -p rules --bin bake -- build \
   --source rules/eu4 \
-  --output target/rules/eu4.pdcrules \
-  --manifest target/rules/manifest.json
+  --manifest rules/manifest.json
 ```
 
-官方 `paradoxcode` 二进制内嵌第一方 JSON 规则源，并在首次使用或源 `rule_hash` 变化时，在用户缓存中生成经过校验的 SQLite 规则工件。生成工件不会提交到仓库。
+官方 `paradoxcode` 二进制内嵌第一方 JSON 规则源，启动时直接编译进内存规则集；不存在持久化的规则工件。
 
 EU4 规则源按职责拆分：`catalog/` 保存文件类别、符号描述符与规范化记录，`semantic/` 按
 effect、trigger、modifier、on_action 以及 event、decision、mission、history 等目录语义组织规则，

@@ -9,6 +9,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The rules pipeline drops its SQLite artifact layer. First-party rules compile from the
+  embedded JSON source straight into the in-memory rule set at every startup — measured
+  faster than loading the old ~20 MB user cache — so `rules.pdcrules` is no longer
+  materialized under the cache root, and upgrades best-effort remove artifacts left by
+  earlier releases. The canonical `rule_hash` computation stays: it remains the identity
+  key that decides vanilla-index and dependency-cache reuse. `bake` loses its `--output`
+  flag and now only validates the source and regenerates `rules/manifest.json`;
+  `schema_version` and `artifact_sha256` retire with the artifact, and the `rules`
+  crate no longer depends on `rusqlite`.
 - Mission hover cards drop the trigger and reward corner markers. The game
   interface (`countrymissionsview.gui`) shows those markers state-dependently,
   but the card drew them statically whenever the mission declared

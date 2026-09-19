@@ -1082,10 +1082,14 @@ impl UserPaths {
         self.cache_root.join(game_id).join("vanilla.pdcindex")
     }
 
-    /// Returns the user-local compiled first-party rules artifact location for one game.
-    #[must_use]
-    pub fn rules_cache(&self, game_id: &str) -> PathBuf {
-        self.cache_root.join(game_id).join("rules.pdcrules")
+    /// Removes rule artifacts left by releases that persisted a compiled rules cache.
+    ///
+    /// Rules are compiled from the embedded source at startup; the best-effort cleanup keeps
+    /// upgrades from orphaning multi-megabyte files under the cache root.
+    pub fn remove_legacy_rule_caches(&self, game_id: &str) {
+        for name in ["rules.pdcrules", "rules.pdxrules"] {
+            let _ = fs::remove_file(self.cache_root.join(game_id).join(name));
+        }
     }
 }
 
