@@ -1220,6 +1220,7 @@ impl AnalysisHost {
                 .texture_catalog_generation
                 .load(std::sync::atomic::Ordering::Acquire),
             reference_sources: Arc::clone(&self.reference_sources),
+            parse_cache: self.parse_cache.clone(),
         }
     }
 
