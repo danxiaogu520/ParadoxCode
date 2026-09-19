@@ -40,6 +40,9 @@ pub struct AnalysisSnapshot {
     /// Invalidation generation of the texture catalog at snapshot build time;
     /// see [`AnalysisSnapshot::texture_catalog_generation`].
     pub(crate) texture_catalog_generation: u64,
+    /// Persistent parse cache, when configured; see
+    /// [`AnalysisSnapshot::parse_cache`].
+    pub(crate) parse_cache: Option<vfs::ParseCache>,
     /// Lazy symbol-reference stores of installed caches; see
     /// [`AnalysisSnapshot::lazy_references_for`].
     pub(crate) reference_sources: Arc<
@@ -67,6 +70,15 @@ impl AnalysisSnapshot {
     #[must_use]
     pub const fn texture_catalog_generation(&self) -> u64 {
         self.texture_catalog_generation
+    }
+
+    /// The persistent parse cache, when the host was configured with one.
+    /// Transient reparses consult it first: loading a validated CST from
+    /// disk is ~9x cheaper than reparsing (see the `parse_cache_speed`
+    /// example), and entries are checked against the live source hash.
+    #[must_use]
+    pub fn parse_cache(&self) -> Option<&vfs::ParseCache> {
+        self.parse_cache.as_ref()
     }
 
     /// References for one `(kind, name)` pair served lazily from installed

@@ -107,7 +107,14 @@ pub(crate) fn input_for_source_file(
         ParserKind::Asset | ParserKind::SyntaxOnly => return None,
     };
     let source = state.source_handle();
-    let parsed = Arc::new(parse(format, &source));
+    // Consult the persistent parse cache before reparsing: entries are
+    // validated against the live source hash, and loading beats reparsing
+    // by ~9x (see the engine `parse_cache_speed` example). A miss or an
+    // unconfigured cache falls back to the plain reparse below.
+    let parsed = snapshot
+        .parse_cache()
+        .and_then(|cache| cache.load(file, format, &source))
+        .map_or_else(|| Arc::new(parse(format, &source)), Arc::new);
     let hir = Arc::new(lower_with_profile(
         (*parsed).clone(),
         &file.logical_path,
