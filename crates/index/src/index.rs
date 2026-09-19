@@ -605,6 +605,46 @@ pub struct FileIndexShard {
     pub syntax_error_count: usize,
 }
 
+impl FileIndexShard {
+    /// Hash of everything this file contributes to *other* files' diagnostics:
+    /// definition identities (kind, name, active), dynamic-definition
+    /// signatures and templates, retained attribute summaries, and flag
+    /// writes. Source ranges are excluded (own-file positions); references are
+    /// excluded because forward diagnostics never read them. The workspace
+    /// context fingerprint for the diagnostics cache is built from these —
+    /// a missing input family here would surface as stale cross-file
+    /// diagnostics, so extend this hash whenever the shard grows a field
+    /// that diagnostics of another file can observe.
+    pub fn contribution_fingerprint(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        for definition in &self.definitions {
+            definition.kind.hash(&mut hasher);
+            definition.name.hash(&mut hasher);
+            definition.active.hash(&mut hasher);
+        }
+        for dynamic in &self.dynamic_definitions {
+            dynamic.kind.hash(&mut hasher);
+            dynamic.name.hash(&mut hasher);
+            for parameter in &dynamic.parameters {
+                parameter.name.hash(&mut hasher);
+                parameter.required.hash(&mut hasher);
+            }
+            if let Some(template) = &dynamic.template {
+                format!("{template:?}").hash(&mut hasher);
+            }
+        }
+        for attributes in &self.definition_attributes {
+            format!("{attributes:?}").hash(&mut hasher);
+        }
+        for write in &self.flag_writes {
+            write.kind.hash(&mut hasher);
+            write.name.hash(&mut hasher);
+        }
+        hasher.finish()
+    }
+}
+
 /// Workspace-wide symbol index made from immutable file shards.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct DefinitionPointer {
