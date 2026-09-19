@@ -544,37 +544,29 @@ impl LspServer {
                         for warning in warnings {
                             write_message(&mut output, &show_warning_notification(warning))?;
                         }
-                        if self.scan_pending {
-                            // The initial scan commits by swapping the host;
-                            // running cache installs concurrently would let the
-                            // swap clobber them, so the inputs wait for the
-                            // scan completion event.
-                            self.pending_cache_setup = PendingCacheSetup {
-                                index_cache,
-                                dependency_caches,
-                                auto_vanilla,
-                            };
-                        } else {
-                            let spawned = self.spawn_background_cache_workers(
-                                scope,
-                                &event_sender,
-                                index_cache,
-                                dependency_caches,
-                                auto_vanilla,
-                                &mut output,
-                            )?;
-                            in_flight_index = spawned.index;
-                            index_progress_token = spawned.index_progress_token;
-                            in_flight_dependency = spawned.dependency;
-                            dependency_progress_token = spawned.dependency_progress_token;
-                        }
-                        // Readiness requires not just idle workers but also no
-                        // deferred setup: a stashed cache spawn or a scan that
-                        // has not started yet leaves every slot momentarily
-                        // empty without the workspace being complete.
-                        let setup_idle = !self.scan_pending
-                            && self.pending_cache_setup.index_cache.is_none()
-                            && self.pending_cache_setup.dependency_caches.is_empty();
+                        // Cache workers start immediately, overlapping their
+                        // load with the workspace scan. Only the *install*
+                        // (host mutation) must wait for the scan's host
+                        // commit, and that ordering is enforced by deferring
+                        // the setup events in their handlers below.
+                        let spawned = self.spawn_background_cache_workers(
+                            scope,
+                            &event_sender,
+                            index_cache,
+                            dependency_caches,
+                            auto_vanilla,
+                            &mut output,
+                        )?;
+                        in_flight_index = spawned.index;
+                        index_progress_token = spawned.index_progress_token;
+                        in_flight_dependency = spawned.dependency;
+                        dependency_progress_token = spawned.dependency_progress_token;
+                        // Readiness requires idle workers and no scan still
+                        // to start or finish; a scheduled-but-unspawned scan
+                        // leaves every slot momentarily empty without the
+                        // workspace being complete.
+                        let setup_idle =
+                            !self.scan_pending && self.deferred_setup_events.events.is_empty();
                         if in_flight_index.is_none()
                             && in_flight_dependency.is_none()
                             && in_flight_scan.is_none()
@@ -827,25 +819,12 @@ impl LspServer {
                                 }
                             }
                         }
-                        // Cache installs deferred behind the scan start can proceed once the scan
-                        // reaches a terminal outcome, including bounded retry exhaustion.
-                        let pending = std::mem::take(&mut self.pending_cache_setup);
-                        if pending.index_cache.is_some()
-                            || !pending.dependency_caches.is_empty()
-                            || pending.auto_vanilla.is_some()
-                        {
-                            let spawned = self.spawn_background_cache_workers(
-                                scope,
-                                &event_sender,
-                                pending.index_cache,
-                                pending.dependency_caches,
-                                pending.auto_vanilla,
-                                &mut output,
-                            )?;
-                            in_flight_index = spawned.index;
-                            index_progress_token = spawned.index_progress_token;
-                            in_flight_dependency = spawned.dependency;
-                            dependency_progress_token = spawned.dependency_progress_token;
+                        // Cache installs deferred behind an uncommitted scan can
+                        // proceed once the scan reaches a terminal outcome,
+                        // including bounded retry exhaustion. Requeueing keeps
+                        // arrival order and reuses the normal handler path.
+                        for event in std::mem::take(&mut self.deferred_setup_events).events {
+                            let _ = event_sender.send(event);
                         }
                         if in_flight_index.is_none()
                             && in_flight_dependency.is_none()
@@ -873,6 +852,20 @@ impl LspServer {
                         }
                     }
                     TransportEvent::DependencySetup(result) => {
+                        if self.scan_pending || in_flight_scan.is_some() {
+                            // Same deferral as VanillaSetup: the loads overlap
+                            // the scan; only the install must wait for the
+                            // scan's host commit.
+                            self.trace_decision(
+                                &mut output,
+                                "dependency setup finished before the scan committed; install deferred"
+                                    .to_owned(),
+                            )?;
+                            self.deferred_setup_events
+                                .events
+                                .push(TransportEvent::DependencySetup(result));
+                            continue;
+                        }
                         in_flight_dependency = None;
                         self.trace_decision(
                             &mut output,
@@ -1033,6 +1026,21 @@ impl LspServer {
                         }
                     }
                     TransportEvent::VanillaSetup(result) => {
+                        if self.scan_pending || in_flight_scan.is_some() {
+                            // The load overlapped the scan and won the race;
+                            // installing now would let the scan's host commit
+                            // clobber the install. Stash the whole event and
+                            // replay it once the scan is terminal.
+                            self.trace_decision(
+                                &mut output,
+                                "vanilla setup finished before the scan committed; install deferred"
+                                    .to_owned(),
+                            )?;
+                            self.deferred_setup_events
+                                .events
+                                .push(TransportEvent::VanillaSetup(result));
+                            continue;
+                        }
                         in_flight_index = None;
                         self.trace_decision(
                             &mut output,
