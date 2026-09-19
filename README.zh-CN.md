@@ -29,7 +29,7 @@ ParadoxCode **与 Paradox Interactive 无任何关联，也未获得其背书**�
 - 规则证明的作用域转换可通过有界的 `textDocument/inlayHint` 注解显示。
 - 冲突感知的重命名（仅限可写的 Mod 源）。
 - 保守的格式化器，拒绝改写不安全或残缺的文件。
-- 跨「未保存缓冲区 → 当前 Mod → 有序依赖 Mod → 本地持久化 Vanilla 索引」的工作区解析。
+- 跨「未保存缓冲区 → 项目 → 有序依赖 Mod → 本地持久化 Vanilla 索引」的工作区解析。
 - stdio 语言服务器（`paradoxcode`），支持取消、过期结果保护与不可变分析快照，并能对活跃 Mod 根做定向文件监听更新。
 - VS Code 扩展：零配置、带校验和的服务器自动安装，首次使用引导（walkthrough），以及实时任务树预览（贴图节点、缩放、源码跳转、PNG/JSON 导出）。
 - 精确版本服务器下载：SHA-256 校验、受限解压、有界流式传输与自校验可执行缓存。
@@ -136,11 +136,11 @@ effect、trigger、modifier、on_action 以及 event、decision、mission、hist
 
 在设置了 `index` 时，依赖不会实时扫描；修改依赖后，删除过期的缓存文件并重启语言服务器（命令面板 **Reload ParadoxCode Language Server**），缓存会自动重建。删除 `index` 字段可回退到实时扫描。
 
-使用下面的开发脚本，对照该 Vanilla 缓存对完整 Current Mod 做一次可重复的诊断遍历。它会通过真实的服务器传输逐文件打开相关资源，并把 JSON 与 Markdown 报告写入被忽略的 `diagnostic-reports/` 目录：
+使用下面的开发脚本，对照该 Vanilla 缓存对完整 Project 做一次可重复的诊断遍历。它会通过真实的服务器传输逐文件打开相关资源，并把 JSON 与 Markdown 报告写入被忽略的 `diagnostic-reports/` 目录：
 
 ```bash
 node editors/vscode/scripts/diagnose.mjs \
-  --mod /path/to/current-mod \
+  --mod /path/to/project \
   --vanilla-cache /path/to/vanilla.pdcindex
 ```
 

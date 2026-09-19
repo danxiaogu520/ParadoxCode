@@ -1,4 +1,4 @@
-//! Memory-attribution probe for a full Current-Mod scan.
+//! Memory-attribution probe for a full Project scan.
 //!
 //! Loads the embedded EU4 rules, scans one workspace root, and prints the
 //! retained size of every per-file component (source text, CST nodes and
@@ -48,11 +48,11 @@ fn main() {
     let rules = game::eu4::first_party_rules().expect("rules");
     let profile = game::eu4::profile();
     let mut host = AnalysisHost::with_profile(rules, profile);
-    // Mirrors the LSP: the Current Mod takes root id u32::MAX and the vanilla
+    // Mirrors the LSP: the Project takes root id u32::MAX and the vanilla
     // index cache installs its own root at id 0 before the first scan.
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(u32::MAX),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     phase_rss("rules");

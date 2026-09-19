@@ -17,15 +17,6 @@ const localisationConfiguration = readJson('localisation-language-configuration.
 if (!manifest.files?.includes('node_modules/**')) {
   fail('production node_modules must be included in the VSIX file allowlist');
 }
-if (manifest.activationEvents?.includes('workspaceContains:.pdc/project.toml')) {
-  fail('the extension must not activate from the removed shared project configuration');
-}
-if (manifest.contributes?.configuration?.properties?.['paradoxcode.projectConfig']) {
-  fail('the removed paradoxcode.projectConfig setting must not be exposed');
-}
-if (existsSync(join(root, 'src', 'sharedConfig.ts'))) {
-  fail('the removed sharedConfig module must not be packaged');
-}
 for (const dependency of ['vscode-languageclient']) {
   if (typeof manifest.dependencies?.[dependency] !== 'string') {
     fail(`runtime dependency ${dependency} must remain in dependencies`);

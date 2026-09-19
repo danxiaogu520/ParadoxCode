@@ -412,7 +412,7 @@ pub(crate) fn watched_files_registration(
         .filter(|root| {
             matches!(
                 root.kind,
-                SourceRootKind::CurrentMod | SourceRootKind::Dependency
+                SourceRootKind::Project | SourceRootKind::Dependency
             )
         })
         .collect::<Vec<_>>();

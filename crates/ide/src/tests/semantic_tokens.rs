@@ -79,7 +79,7 @@ fn indexed_dynamic_definition_names_use_the_function_token_color() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots()

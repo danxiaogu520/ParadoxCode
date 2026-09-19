@@ -763,7 +763,7 @@ pub struct PrepareRenameResult {
 /// One editor-neutral text edit in a rename plan.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorkspaceTextEdit {
-    /// The source location to replace.  Rename only produces locations in writable current-Mod
+    /// The source location to replace.  Rename only produces locations in writable project
     /// files or open overlays.
     pub location: Location,
     /// The replacement identifier.

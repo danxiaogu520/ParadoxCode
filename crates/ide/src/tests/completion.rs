@@ -16,7 +16,7 @@ fn workspace_member_index_tracks_overlay_open_and_close() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan scripted effects");
@@ -238,7 +238,7 @@ fn on_action_event_block_completion_excludes_namespace_headers() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("index event document");
@@ -504,7 +504,7 @@ fn leaf_value_container_completion_offers_typed_workspace_members() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("index mission document");
@@ -835,7 +835,7 @@ fn leaf_value_clause_bare_value_completion_offers_typed_workspace_members() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("index mission document");
@@ -941,7 +941,7 @@ fn template_modifier_rules_complete_workspace_member_spellings() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots()
@@ -1559,7 +1559,7 @@ fn scripted_definition_completion_snippet_includes_parameters() {
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
-        kind: SourceRootKind::CurrentMod,
+        kind: SourceRootKind::Project,
         path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
@@ -1655,7 +1655,7 @@ fn dynamic_call_blocks_complete_only_the_owners_parameter_keys() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -1705,7 +1705,7 @@ fn dynamic_argument_values_follow_direct_and_nested_body_constraints() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -1780,7 +1780,7 @@ fn dynamic_affixed_value_arguments_complete_stripped_members() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -1826,7 +1826,7 @@ fn dynamic_bare_parameter_infers_quoted_effect_completion_context() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -1874,7 +1874,7 @@ fn dynamic_argument_value_inference_handles_conditionals_scope_and_conflicts() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -2022,7 +2022,7 @@ fn non_enumerable_dynamic_value_constraints_suppress_generic_fallback() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -2199,7 +2199,7 @@ fn vanilla_cache_dynamic_templates_preserve_nested_conditional_and_scope_semanti
 }
 
 #[test]
-fn current_mod_dynamic_template_overrides_cached_vanilla_template() {
+fn project_dynamic_template_overrides_cached_vanilla_template() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -2239,10 +2239,10 @@ fn current_mod_dynamic_template_overrides_cached_vanilla_template() {
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&current),
     )]));
-    host.refresh_source_roots().expect("scan current Mod");
+    host.refresh_source_roots().expect("scan project");
     host.install_index_cache(cache).expect("install cache");
     let id = DocumentId::new("file:///tmp/events/priority-dynamic.txt");
     let text = "country_event = { immediate = { priority_dynamic = { VALUE =  } } }\n";
@@ -2253,7 +2253,7 @@ fn current_mod_dynamic_template_overrides_cached_vanilla_template() {
 
     assert!(
         items.iter().any(|item| item.label == "current_dynamic_tip"),
-        "current Mod dynamic template did not win: {items:?}"
+        "project dynamic template did not win: {items:?}"
     );
     assert!(
         items
@@ -2275,7 +2275,7 @@ fn dynamic_bodies_complete_owner_local_dollar_parameters() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     let id = DocumentId::new("file:///tmp/common/scripted_effects/00_complete.txt");
@@ -2315,7 +2315,7 @@ fn dollar_completion_does_not_leak_parameters_between_dynamic_owners() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     let id = DocumentId::new("file:///tmp/common/scripted_effects/00_complete.txt");
@@ -2353,7 +2353,7 @@ fn dynamic_dollar_completion_marks_key_usage() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     let id = DocumentId::new("file:///tmp/common/scripted_effects/00_complete.txt");
@@ -2512,7 +2512,7 @@ fn fuzzy_completion_prefers_prefix_over_substring_matches() {
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
-        kind: SourceRootKind::CurrentMod,
+        kind: SourceRootKind::Project,
         path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
@@ -3837,7 +3837,7 @@ fn closed_flag_kinds_complete_indexed_overlay_and_engine_seeded_names() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -3908,7 +3908,7 @@ fn dynamic_definition_completion_filters_by_entry_contract_at_call_sites() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -4002,7 +4002,7 @@ fn dynamic_trigger_completion_filters_by_entry_contract() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan triggers");
@@ -4067,7 +4067,7 @@ fn dynamic_contract_report_honors_completion_cancellation() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan triggers");
@@ -4105,7 +4105,7 @@ fn dynamic_definition_completion_keeps_all_contracts_under_unknown_scope() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -4154,7 +4154,7 @@ fn dynamic_key_position_parameter_completes_command_names() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -4213,7 +4213,7 @@ fn dynamic_affixed_key_parameter_completes_stripped_key_members() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -4287,7 +4287,7 @@ fn dynamic_key_position_parameter_respects_site_scope() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -4339,7 +4339,7 @@ fn dynamic_body_completion_seeds_scope_from_own_contract() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -4408,7 +4408,7 @@ fn dynamic_trigger_body_completion_seeds_scope_from_own_contract() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan triggers");
@@ -4606,7 +4606,7 @@ fn luck_root_completion_offers_workspace_country_tags() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan country tags");
@@ -4652,7 +4652,7 @@ fn texturefile_value_completes_from_the_workspace_catalog() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan texture roots");

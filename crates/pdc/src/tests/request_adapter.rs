@@ -303,7 +303,7 @@ fn workspace_files_exposes_active_source_roots_without_contents() {
         .find(|value| value["id"] == 2)
         .expect("workspace files response");
     let roots = response["result"]["roots"].as_array().expect("roots");
-    assert!(roots.iter().any(|root| root["kind"] == "currentMod"));
+    assert!(roots.iter().any(|root| root["kind"] == "project"));
     let files = response["result"]["files"].as_array().expect("files");
     let loaded = files
         .iter()
@@ -1222,7 +1222,7 @@ fn memory_transport_formats_safe_text_and_refuses_recovered_syntax() {
 }
 
 #[test]
-fn memory_transport_rename_covers_current_mod_disk_references() {
+fn memory_transport_rename_covers_project_disk_references() {
     let nonce = std::process::id();
     let root = std::env::temp_dir().join(format!("pdc-rename-{nonce}"));
     let target_path = root.join("events/target.txt");
@@ -1466,7 +1466,7 @@ fn hover_card_serves_mission_sprite_and_texture_payloads() {
     };
 
     // Mission card: the icon asset plus the fixed node chrome, all resolved
-    // through the workspace catalog with current-mod provenance.
+    // through the workspace catalog with project provenance.
     let mission = card(2);
     assert_eq!(mission["version"], 1);
     assert_eq!(mission["card"]["kind"], "mission");
@@ -1482,7 +1482,7 @@ fn hover_card_serves_mission_sprite_and_texture_payloads() {
                 .replace('\\', "/")
                 .ends_with("gfx/interface/missions/mission_alpha.dds"))
     );
-    assert_eq!(mission["card"]["asset"]["rootKind"], "currentMod");
+    assert_eq!(mission["card"]["asset"]["rootKind"], "project");
     assert_eq!(mission["card"]["asset"]["extensionFallback"], false);
     assert!(
         mission["card"]["cardAssets"]["frame"]["path"]
@@ -1510,7 +1510,7 @@ fn hover_card_serves_mission_sprite_and_texture_payloads() {
             .as_str()
             .is_some_and(|path| path.contains("mission_alpha.dds"))
     );
-    assert_eq!(texture["card"]["asset"]["rootKind"], "currentMod");
+    assert_eq!(texture["card"]["asset"]["rootKind"], "project");
 
     // A non-asset position yields null, not an error.
     assert_eq!(card(5), serde_json::Value::Null);
@@ -1669,7 +1669,7 @@ country_event = {\n\
         path.replace('\\', "/")
             .ends_with("gfx/event_pictures/demo_picture.dds")
     }));
-    assert_eq!(event["card"]["asset"]["rootKind"], "currentMod");
+    assert_eq!(event["card"]["asset"]["rootKind"], "project");
     for (field, file) in [
         ("backgroundTop", "events_BG_top.dds"),
         ("backgroundMiddle", "events_BG_middle.dds"),

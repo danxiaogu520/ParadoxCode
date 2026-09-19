@@ -99,7 +99,7 @@ impl AnalysisHost {
             scan_limits: WorkspaceScanLimits::default(),
             preferred_localisation_languages: Arc::from([]),
             completion_source_layers: Arc::from([
-                SourceRootKind::CurrentMod,
+                SourceRootKind::Project,
                 SourceRootKind::Dependency,
                 SourceRootKind::Vanilla,
             ]),
@@ -392,7 +392,7 @@ impl AnalysisHost {
         let mut index = WorkspaceIndex::from_shards_with_rules(shards, self.rules.as_ref());
         // Source-file IDs were checked for collisions above, so the cached and existing position
         // keys are disjoint. Merge the existing snapshot positions in one pass: calling
-        // `replace_position_ranges` once per Current Mod file would repeatedly rebuild the
+        // `replace_position_ranges` once per Project file would repeatedly rebuild the
         // complete (often-million-entry) position map and turn cache installation quadratic.
         let cached_position_count = cached_positions.len();
         let existing_positions = self.index.position_ranges();
@@ -685,7 +685,7 @@ impl AnalysisHost {
         Ok(report)
     }
 
-    /// Applies a batch of Current Mod/Dependency disk events with one atomic snapshot commit.
+    /// Applies a batch of Project/Dependency disk events with one atomic snapshot commit.
     ///
     /// Only changed file states and their index shards are rebuilt. Open overlays remain intact,
     /// and a persistent Vanilla root is never read or watched through this path.
@@ -726,7 +726,7 @@ impl AnalysisHost {
                 .filter(|root| {
                     matches!(
                         root.kind,
-                        SourceRootKind::CurrentMod | SourceRootKind::Dependency
+                        SourceRootKind::Project | SourceRootKind::Dependency
                     )
                 })
                 .filter(|root| change.path.starts_with(&root.path))
