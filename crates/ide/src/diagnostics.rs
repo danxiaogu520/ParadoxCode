@@ -23,6 +23,7 @@ use hir::{
 };
 use parser::{FileFormat, SyntaxError};
 use rules::{KeyMatcher, RuleShape, entry_wrapper_reroutes};
+use std::sync::Arc;
 use text::TextRange;
 
 /// Single finalization point for diagnostics emitted by syntax, semantic, and reference passes.
@@ -1703,11 +1704,37 @@ fn validate_semantic_container(
 /// Enum values are normally sourced from the first-party model.  Workspace members are included
 /// as well because several EU4 enums intentionally alias dynamic definition kinds (for example
 /// country tags); the same visibility rules used by completion and semantic matching apply.
+///
+/// Memoized per snapshot revision: bulk passes hit the same unknown values across
+/// many files, and each miss otherwise rescans every candidate list.
 fn enum_value_suggestion(
     snapshot: &AnalysisSnapshot,
     rules: &[&rules::SemanticRule],
     value: &str,
 ) -> Option<String> {
+    let revision = snapshot.revision();
+    let mut enum_names = rules
+        .iter()
+        .filter_map(|rule| match &rule.value {
+            rules::ValueMatcher::Enum(name) => Some(name.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    enum_names.sort_unstable();
+    enum_names.dedup();
+    let lowered = value.to_ascii_lowercase();
+    if let Some(cached) = probe_query_cache::<Option<String>>(
+        snapshot,
+        revision,
+        &[
+            "enum-value-suggestion:",
+            &enum_names.join("\u{1f}"),
+            ":",
+            &lowered,
+        ],
+    ) {
+        return cached.as_ref().clone();
+    }
     let mut candidates = Vec::new();
     for rule in rules {
         let rules::ValueMatcher::Enum(enum_name) = &rule.value else {
@@ -1727,12 +1754,46 @@ fn enum_value_suggestion(
     }
     candidates.sort_by_key(|candidate| candidate.to_ascii_lowercase());
     candidates.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
-    best_suggestion(value, candidates.iter().map(String::as_str)).map(str::to_owned)
+    let suggestion =
+        best_suggestion(value, candidates.iter().map(String::as_str)).map(str::to_owned);
+    snapshot.query_cache().insert(
+        revision,
+        engine::CacheDomain::Documents,
+        format!(
+            "enum-value-suggestion:{}\u{1f}:{}",
+            enum_names.join("\u{1f}"),
+            lowered
+        ),
+        Arc::new(suggestion.clone()),
+    );
+    suggestion
 }
 
 /// Finds a unique close indexed localisation key for a missing reference.
+///
+/// Memoized per snapshot revision for the same reason as
+/// [`enum_value_suggestion`]: a bulk pass reports the same missing keys across
+/// many files, and each lookup otherwise walks the whole localisation key
+/// universe with bounded edit distance.
 fn localisation_key_suggestion(snapshot: &AnalysisSnapshot, name: &str) -> Option<String> {
-    best_suggestion(name, localisation_key_index(snapshot).iter()).map(str::to_owned)
+    let revision = snapshot.revision();
+    let lowered = name.to_ascii_lowercase();
+    if let Some(cached) = probe_query_cache::<Option<String>>(
+        snapshot,
+        revision,
+        &["localisation-key-suggestion:", &lowered],
+    ) {
+        return cached.as_ref().clone();
+    }
+    let suggestion =
+        best_suggestion(name, localisation_key_index(snapshot).iter()).map(str::to_owned);
+    snapshot.query_cache().insert(
+        revision,
+        engine::CacheDomain::Documents,
+        format!("localisation-key-suggestion:{}", lowered),
+        Arc::new(suggestion.clone()),
+    );
+    suggestion
 }
 
 fn property_contains_parameter_token(property: &ScriptProperty) -> bool {
