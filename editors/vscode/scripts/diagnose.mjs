@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Run a whole-Current-Mod diagnostic pass through the real ParadoxCode server JSON-RPC transport.
+ * Run a whole-Project diagnostic pass through the real ParadoxCode server JSON-RPC transport.
  *
  * The language server remains the source of truth for parsing, first-party EU4 rules, Vanilla
  * resolution, and diagnostics. This script only opens each relevant file, collects the normal
@@ -128,7 +128,7 @@ async function run(rawOptions) {
       ? 'failed'
       : 'passed';
   const output = writeReports(report, resolve(options.output));
-  console.log(`Current Mod diagnostics: ${report.status}`);
+  console.log(`Project diagnostics: ${report.status}`);
   console.log(`Files analyzed: ${report.summary.files_analyzed}/${report.scan.relevant_files_discovered}`);
   console.log(`Diagnostics: ${report.summary.total_diagnostics} (errors ${report.summary.errors}, warnings ${report.summary.warnings})`);
   console.log(`JSON report: ${output.jsonPath}`);

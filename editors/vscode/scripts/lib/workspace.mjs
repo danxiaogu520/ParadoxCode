@@ -53,7 +53,7 @@ export function collectSourceFiles(root, maxFiles) {
       files.push(path);
       if (files.length > maxFiles) {
         throw new CliUsageError(
-          `Current Mod contains more than --max-files ${maxFiles} relevant files`,
+          `Project contains more than --max-files ${maxFiles} relevant files`,
         );
       }
     }

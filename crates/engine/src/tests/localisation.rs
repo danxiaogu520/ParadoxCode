@@ -38,7 +38,7 @@ fn transcoded_localisation_previews_decode_to_readable_values() {
     let mut host = eu4_host();
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan roots");
@@ -94,7 +94,7 @@ fn single_triple_values_still_decode() {
     let mut host = eu4_host();
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan roots");

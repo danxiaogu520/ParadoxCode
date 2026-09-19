@@ -96,7 +96,7 @@ fn game_age_abilities_defined_in_the_current_file_validate_their_effects() {
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("index ability source");
@@ -152,7 +152,7 @@ fn game_age_ability_in_an_initially_empty_index_is_a_definition() {
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     let id = DocumentId::new("file:///tmp/common/ages/empty-target.txt");
@@ -234,7 +234,7 @@ fn eu4_replace_scope_links_populate_from_intrinsics() {
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
 
@@ -339,7 +339,7 @@ fn dynamic_scope_mismatch_surfaces_at_the_call_site() {
     let mut host = eu4_host(RuleSet::from_model(model));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definition");

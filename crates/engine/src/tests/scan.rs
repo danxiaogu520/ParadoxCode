@@ -22,7 +22,7 @@ fn persistent_parse_cache_skips_reparsing_matching_disk_source() {
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
             SourceRoot::new(
                 SourceRootId::new(1),
-                SourceRootKind::CurrentMod,
+                SourceRootKind::Project,
                 AbsPath::normalize(&root),
             ),
         ]));
@@ -69,7 +69,7 @@ fn physical_path_lookup_follows_scan_and_targeted_disk_changes() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -140,7 +140,7 @@ fn recoverable_file_failures_do_not_abort_the_workspace_scan() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -196,7 +196,7 @@ fn eu4_legacy_windows1252_text_is_decoded_before_indexing() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -245,7 +245,7 @@ fn game_encoded_text_with_control_characters_keeps_surrounding_definitions() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -297,7 +297,7 @@ country_event = { id = after_close.1 }\n",
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -346,7 +346,7 @@ fn malformed_quoted_value_does_not_discard_the_parent_or_sibling() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -384,7 +384,7 @@ fn depth_limit_skips_nested_subtrees_with_a_reported_issue() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -420,7 +420,7 @@ fn file_limit_failure_preserves_the_previous_snapshot() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -464,7 +464,7 @@ fn cancelled_scan_preserves_the_previous_snapshot_atomically() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -511,7 +511,7 @@ fn opaque_binary_assets_are_indexed_without_reading_them_as_utf8() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -634,7 +634,7 @@ fn eu4_scan_uses_the_explicit_script_folder_whitelist() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -789,7 +789,7 @@ fn directory_symlinks_are_reported_and_never_followed() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -833,7 +833,7 @@ fn workspace_scan_skips_tool_generated_directories() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -906,7 +906,7 @@ fn workspace_scan_filters_prune_files_before_budget_and_targeted_updates() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));

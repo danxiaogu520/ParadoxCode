@@ -507,7 +507,7 @@ impl SnapshotRequestContext {
             .snapshot
             .source_roots()
             .iter()
-            .filter(|root| root.kind == SourceRootKind::CurrentMod)
+            .filter(|root| root.kind == SourceRootKind::Project)
             .map(|root| root.id)
             .collect::<std::collections::BTreeSet<_>>();
         let mut files = self
@@ -581,7 +581,7 @@ impl SnapshotRequestContext {
 
     /// Returns the immutable source-root/file view used by the VS Code Explorer contribution.
     /// The response contains no file contents: it is only a stable, read-only navigation model
-    /// for current Mod, dependency, and Vanilla roots.
+    /// for project, dependency, and Vanilla roots.
     fn workspace_files(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         if params.is_some() {
             // Keep this request intentionally parameterless so clients cannot turn it into an
@@ -600,7 +600,7 @@ impl SnapshotRequestContext {
                 let kind = match root.kind {
                     SourceRootKind::Vanilla => "vanilla",
                     SourceRootKind::Dependency => "dependency",
-                    SourceRootKind::CurrentMod => "currentMod",
+                    SourceRootKind::Project => "project",
                 };
                 serde_json::json!({
                     "id": root.id.get(),
@@ -817,16 +817,12 @@ impl SnapshotRequestContext {
                 "icon": mission.icon,
                 "titleKey": mission.title_key,
                 "title": mission.title.as_ref().map(Self::loc_pair),
-                "hasTrigger": mission.has_trigger,
-                "hasEffect": mission.has_effect,
                 "required": mission.required,
             });
         }
         if let Some(assets) = card.card_assets.as_ref() {
             card_json["cardAssets"] = json!({
                 "frame": assets.frame.as_ref().map(asset_json),
-                "triggerMarker": assets.trigger_marker.as_ref().map(asset_json),
-                "effectMarker": assets.effect_marker.as_ref().map(asset_json),
             });
         }
         if let Some(event) = card.event.as_ref() {

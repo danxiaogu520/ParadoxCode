@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 
 use super::*;
 
-/// One whole `pdc/formatWorkspace` pass over a mixed Current Mod workspace.
+/// One whole `pdc/formatWorkspace` pass over a mixed Project workspace.
 ///
 /// The four script fixtures pin every summary bucket and the on-disk outcome:
 /// a messy file is rewritten to canonical text, an already-canonical file is

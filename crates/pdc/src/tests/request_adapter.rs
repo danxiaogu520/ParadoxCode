@@ -303,7 +303,7 @@ fn workspace_files_exposes_active_source_roots_without_contents() {
         .find(|value| value["id"] == 2)
         .expect("workspace files response");
     let roots = response["result"]["roots"].as_array().expect("roots");
-    assert!(roots.iter().any(|root| root["kind"] == "currentMod"));
+    assert!(roots.iter().any(|root| root["kind"] == "project"));
     let files = response["result"]["files"].as_array().expect("files");
     let loaded = files
         .iter()
@@ -1222,7 +1222,7 @@ fn memory_transport_formats_safe_text_and_refuses_recovered_syntax() {
 }
 
 #[test]
-fn memory_transport_rename_covers_current_mod_disk_references() {
+fn memory_transport_rename_covers_project_disk_references() {
     let nonce = std::process::id();
     let root = std::env::temp_dir().join(format!("pdc-rename-{nonce}"));
     let target_path = root.join("events/target.txt");
@@ -1420,22 +1420,35 @@ fn hover_card_serves_mission_sprite_and_texture_payloads() {
 \t\t}\n\
 }\n";
     let gfx_uri = format!("{root_uri}/interface/test_sprites.gfx");
-    let mission_text = "main_tree = {\n\tslot = 1\n\tprobe = {\n\t\tposition = 1\n\t\ticon = mission_alpha\n\t\ttrigger = { always = yes }\n\t\teffect = { add_stability = 1 }\n\t}\n}\n";
+    let mission_text = "main_tree = {\n\tslot = 1\n\tprobe = {\n\t\tposition = 1\n\t\ticon = mission_alpha\n\t\trequired_missions = { probe_upstream }\n\t\ttrigger = { always = yes }\n\t\teffect = { add_stability = 1 }\n\t}\n}\n";
     let mission_uri = format!("{root_uri}/missions/test.txt");
+    // The `probe_upstream` prerequisite lives in a second missions file: the
+    // call-site card resolves through the symbol layer, not the hovered file.
+    let upstream_text =
+        "other_tree = {\n\tslot = 2\n\tprobe_upstream = {\n\t\tposition = 1\n\t}\n}\n";
+    let upstream_uri = format!("{root_uri}/missions/other.txt");
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":gfx_uri,"languageId":"eu4","version":1,"text":gfx_text}}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":mission_uri,"languageId":"eu4","version":1,"text":mission_text}}}),
-        // Inside the `probe` mission block (on the icon value).
-        json!({"jsonrpc":"2.0","id":2,"method":"pdc/hoverCard","params":{"textDocument":{"uri":mission_uri},"position":{"line":4,"character":10}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":upstream_uri,"languageId":"eu4","version":1,"text":upstream_text}}}),
+        // On the `probe` block-name token: the mission card.
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/hoverCard","params":{"textDocument":{"uri":mission_uri},"position":{"line":2,"character":4}}}),
         // On the `mission_alpha` sprite definition name in the open .gfx.
         json!({"jsonrpc":"2.0","id":3,"method":"pdc/hoverCard","params":{"textDocument":{"uri":gfx_uri},"position":{"line":2,"character":12}}}),
         // Inside a texturefile value in the open .gfx.
         json!({"jsonrpc":"2.0","id":4,"method":"pdc/hoverCard","params":{"textDocument":{"uri":gfx_uri},"position":{"line":3,"character":25}}}),
         // On the root key: nothing cardable.
         json!({"jsonrpc":"2.0","id":5,"method":"pdc/hoverCard","params":{"textDocument":{"uri":gfx_uri},"position":{"line":0,"character":5}}}),
-        json!({"jsonrpc":"2.0","id":6,"method":"shutdown","params":{}}),
+        // On the `probe_upstream` reference in `required_missions`: the
+        // referenced mission's card, resolved across files.
+        json!({"jsonrpc":"2.0","id":6,"method":"pdc/hoverCard","params":{"textDocument":{"uri":mission_uri},"position":{"line":5,"character":26}}}),
+        // Inside the trigger body: nothing cardable.
+        json!({"jsonrpc":"2.0","id":7,"method":"pdc/hoverCard","params":{"textDocument":{"uri":mission_uri},"position":{"line":6,"character":16}}}),
+        // On the `icon` value: the sprite card, not the mission card.
+        json!({"jsonrpc":"2.0","id":8,"method":"pdc/hoverCard","params":{"textDocument":{"uri":mission_uri},"position":{"line":4,"character":10}}}),
+        json!({"jsonrpc":"2.0","id":9,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
     ]);
     let mut output = Vec::new();
@@ -1453,7 +1466,7 @@ fn hover_card_serves_mission_sprite_and_texture_payloads() {
     };
 
     // Mission card: the icon asset plus the fixed node chrome, all resolved
-    // through the workspace catalog with current-mod provenance.
+    // through the workspace catalog with project provenance.
     let mission = card(2);
     assert_eq!(mission["version"], 1);
     assert_eq!(mission["card"]["kind"], "mission");
@@ -1461,8 +1474,6 @@ fn hover_card_serves_mission_sprite_and_texture_payloads() {
     assert_eq!(mission["card"]["mission"]["icon"], "mission_alpha");
     assert_eq!(mission["card"]["mission"]["titleKey"], "probe_title");
     assert!(mission["card"]["mission"]["title"].is_null());
-    assert_eq!(mission["card"]["mission"]["hasTrigger"], true);
-    assert_eq!(mission["card"]["mission"]["hasEffect"], true);
     assert_eq!(mission["card"]["asset"]["sprite"], "mission_alpha");
     assert!(
         mission["card"]["asset"]["path"]
@@ -1471,19 +1482,13 @@ fn hover_card_serves_mission_sprite_and_texture_payloads() {
                 .replace('\\', "/")
                 .ends_with("gfx/interface/missions/mission_alpha.dds"))
     );
-    assert_eq!(mission["card"]["asset"]["rootKind"], "currentMod");
+    assert_eq!(mission["card"]["asset"]["rootKind"], "project");
     assert_eq!(mission["card"]["asset"]["extensionFallback"], false);
     assert!(
         mission["card"]["cardAssets"]["frame"]["path"]
             .as_str()
             .is_some_and(|path| path.contains("mission_icons_frame.dds"))
     );
-    assert!(
-        mission["card"]["cardAssets"]["triggerMarker"]["path"]
-            .as_str()
-            .is_some_and(|path| path.contains("mission_trigger.dds"))
-    );
-    assert_eq!(mission["card"]["cardAssets"]["effectMarker"]["frames"], 3);
 
     // Sprite card from the definition name.
     let sprite = card(3);
@@ -1505,10 +1510,30 @@ fn hover_card_serves_mission_sprite_and_texture_payloads() {
             .as_str()
             .is_some_and(|path| path.contains("mission_alpha.dds"))
     );
-    assert_eq!(texture["card"]["asset"]["rootKind"], "currentMod");
+    assert_eq!(texture["card"]["asset"]["rootKind"], "project");
 
     // A non-asset position yields null, not an error.
     assert_eq!(card(5), serde_json::Value::Null);
+
+    // The `probe_upstream` reference serves the referenced mission's card,
+    // with the target's own icon facts from the other file.
+    let upstream = card(6);
+    assert_eq!(upstream["card"]["kind"], "mission");
+    assert_eq!(upstream["card"]["mission"]["id"], "probe_upstream");
+    assert!(upstream["card"]["mission"]["icon"].is_null());
+    assert!(
+        upstream["card"]["cardAssets"]["frame"]["path"]
+            .as_str()
+            .is_some_and(|path| path.contains("mission_icons_frame.dds"))
+    );
+
+    // A position inside the trigger body never cards.
+    assert_eq!(card(7), serde_json::Value::Null);
+
+    // The `icon` value falls through to the sprite card.
+    let icon_sprite = card(8);
+    assert_eq!(icon_sprite["card"]["kind"], "sprite");
+    assert_eq!(icon_sprite["card"]["asset"]["sprite"], "mission_alpha");
     fs::remove_dir_all(root).expect("cleanup");
 }
 
@@ -1576,7 +1601,7 @@ country_event = {\n\
 \tis_triggered_only = yes\n\
 \toption = {\n\
 \t\tname = \"demo_event.1.a\"\n\
-\t\teffect = { add_stability = 1 }\n\
+\t\teffect = { event = demo_event.2 }\n\
 \t}\n\
 \toption = {\n\
 \t\tname = \"demo_event.1.b\"\n\
@@ -1596,13 +1621,19 @@ country_event = {\n\
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":gfx_uri,"languageId":"eu4","version":1,"text":gfx_text}}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":event_uri,"languageId":"eu4","version":1,"text":event_text}}}),
-        // Inside the first event block (on the title value).
-        json!({"jsonrpc":"2.0","id":2,"method":"pdc/hoverCard","params":{"textDocument":{"uri":event_uri},"position":{"line":3,"character":8}}}),
-        // Inside the second event block: picture resolves only via GFX_ prefix.
-        json!({"jsonrpc":"2.0","id":3,"method":"pdc/hoverCard","params":{"textDocument":{"uri":event_uri},"position":{"line":17,"character":12}}}),
+        // On the first block's `country_event` token: its event card.
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/hoverCard","params":{"textDocument":{"uri":event_uri},"position":{"line":1,"character":5}}}),
+        // On the second block's `country_event` token: picture resolves only
+        // via GFX_ prefix.
+        json!({"jsonrpc":"2.0","id":3,"method":"pdc/hoverCard","params":{"textDocument":{"uri":event_uri},"position":{"line":15,"character":5}}}),
+        // On the `demo_event.2` reference inside the option effect: the
+        // referenced event's card.
+        json!({"jsonrpc":"2.0","id":4,"method":"pdc/hoverCard","params":{"textDocument":{"uri":event_uri},"position":{"line":9,"character":24}}}),
+        // On the `id` value inside the first block: nothing cardable.
+        json!({"jsonrpc":"2.0","id":5,"method":"pdc/hoverCard","params":{"textDocument":{"uri":event_uri},"position":{"line":2,"character":6}}}),
         // On the root scalar: nothing cardable.
-        json!({"jsonrpc":"2.0","id":4,"method":"pdc/hoverCard","params":{"textDocument":{"uri":event_uri},"position":{"line":0,"character":10}}}),
-        json!({"jsonrpc":"2.0","id":5,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"pdc/hoverCard","params":{"textDocument":{"uri":event_uri},"position":{"line":0,"character":10}}}),
+        json!({"jsonrpc":"2.0","id":7,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
     ]);
     let mut output = Vec::new();
@@ -1638,7 +1669,7 @@ country_event = {\n\
         path.replace('\\', "/")
             .ends_with("gfx/event_pictures/demo_picture.dds")
     }));
-    assert_eq!(event["card"]["asset"]["rootKind"], "currentMod");
+    assert_eq!(event["card"]["asset"]["rootKind"], "project");
     for (field, file) in [
         ("backgroundTop", "events_BG_top.dds"),
         ("backgroundMiddle", "events_BG_middle.dds"),
@@ -1667,7 +1698,19 @@ country_event = {\n\
         1
     );
 
+    // The `demo_event.2` reference inside the option effect serves the
+    // referenced event's card — the same payload as hovering its own block.
+    let referenced = card(4);
+    assert_eq!(referenced["card"]["kind"], "event");
+    assert_eq!(referenced["card"]["event"]["id"], "demo_event.2");
+    assert_eq!(
+        referenced["card"]["asset"]["sprite"],
+        "GFX_prefixed_picture"
+    );
+
+    // A position on the `id` value inside a block never cards.
+    assert_eq!(card(5), serde_json::Value::Null);
     // A non-event position yields null, not an error.
-    assert_eq!(card(4), serde_json::Value::Null);
+    assert_eq!(card(6), serde_json::Value::Null);
     fs::remove_dir_all(root).expect("cleanup");
 }
