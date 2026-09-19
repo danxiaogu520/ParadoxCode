@@ -20,7 +20,7 @@ fn encode_workspace_publication<T: serde::Serialize>(
     Ok((payload, hash))
 }
 
-/// Validates every parsed Current Mod source file in a refreshed candidate and aggregates the
+/// Validates every parsed Project source file in a refreshed candidate and aggregates the
 /// result for the explicit `validateWorkspace` command. The source-root refresh has already
 /// produced a deterministic file set; sorting here keeps the cancellation and count semantics
 /// stable even when the underlying map representation changes.
@@ -40,7 +40,7 @@ fn workspace_validation_result(
             snapshot
                 .source_roots()
                 .iter()
-                .any(|root| root.id == file.root_id && root.kind == SourceRootKind::CurrentMod)
+                .any(|root| root.id == file.root_id && root.kind == SourceRootKind::Project)
         })
         .filter(|file| {
             // Frontends may have been evicted after an earlier validation
@@ -384,7 +384,7 @@ fn changed_files_validation_result(
     })
 }
 
-/// Outcome of formatting one Current Mod file during a `pdc/formatWorkspace` pass.
+/// Outcome of formatting one Project file during a `pdc/formatWorkspace` pass.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum WorkspaceFileFormatOutcome {
     Formatted,
@@ -443,7 +443,7 @@ fn format_workspace_file(path: &AbsPath) -> WorkspaceFileFormatOutcome {
     }
 }
 
-/// Formats every Current Mod script file in place and aggregates the outcome
+/// Formats every Project script file in place and aggregates the outcome
 /// for the explicit `pdc/formatWorkspace` command. Localisation files are out
 /// of scope by design; vanilla and dependency roots are read-only reference
 /// material and never written.
@@ -460,7 +460,7 @@ fn format_workspace_files(
             snapshot
                 .source_roots()
                 .iter()
-                .any(|root| root.id == file.root_id && root.kind == SourceRootKind::CurrentMod)
+                .any(|root| root.id == file.root_id && root.kind == SourceRootKind::Project)
         })
         .filter(|file| {
             snapshot
@@ -654,7 +654,7 @@ impl LspServer {
     }
 
     /// Starts an explicit `pdc/formatWorkspace` request. The worker formats
-    /// Current Mod script files straight to disk; completion never swaps the
+    /// Project script files straight to disk; completion never swaps the
     /// host — the watched-file pipeline and clean open-document reloads pick
     /// the rewrites up — so unlike the reindex commands there is no
     /// revision-checked commit to lose.

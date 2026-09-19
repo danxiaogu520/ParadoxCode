@@ -96,7 +96,7 @@ impl TextureCatalog {
     /// Resolves one raw `.gfx` path value against the catalog and, as a fallback
     /// for paths outside the walked directories, against the roots directly.
     ///
-    /// Root priority follows the workspace order (current mod first); the first
+    /// Root priority follows the workspace order (project first); the first
     /// providing root wins so hover provenance reflects load order.
     #[must_use]
     pub fn resolve(&self, roots: &[SourceRoot], raw: &str) -> Option<TextureResolution> {

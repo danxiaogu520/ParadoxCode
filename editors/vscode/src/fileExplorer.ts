@@ -3,7 +3,7 @@ import { LanguageClient } from 'vscode-languageclient/node';
 
 export interface WorkspaceFileRoot {
     id: number;
-    kind: 'vanilla' | 'dependency' | 'currentMod' | string;
+    kind: 'vanilla' | 'dependency' | 'project' | string;
     path: string;
     order: number;
     writable: boolean;
@@ -38,8 +38,8 @@ interface FileNode {
 
 function rootLabel(root: WorkspaceFileRoot): string {
     switch (root.kind) {
-        case 'currentMod':
-            return 'Current Mod';
+        case 'project':
+            return 'Project';
         case 'dependency':
             return `Dependency · ${root.path}`;
         case 'vanilla':
@@ -80,7 +80,7 @@ export class LoadedFilesProvider implements vscode.TreeDataProvider<ExplorerNode
             item.description = node.root.writable ? 'editable' : 'read-only';
             item.contextValue = `paradoxcode.root.${node.root.kind}`;
             item.iconPath = new vscode.ThemeIcon(
-                node.root.kind === 'currentMod' ? 'folder-opened' : 'library',
+                node.root.kind === 'project' ? 'folder-opened' : 'library',
             );
             return item;
         }

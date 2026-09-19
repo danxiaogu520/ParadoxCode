@@ -40,7 +40,7 @@ fn background_reindex_options_are_bounded_and_default_to_opt_in() {
         Some(json!({
             "vanillaMode": "cacheOnly",
             "preferredLocalisationLanguages": ["French", "english", "french"],
-            "completionSourceLayers": ["currentMod", "dependencies"],
+            "completionSourceLayers": ["project", "dependencies"],
             "performanceProfile": "conservative",
             "diagnosticSeverityOverrides": {
                 "WrongScope": "warning",
@@ -60,7 +60,7 @@ fn background_reindex_options_are_bounded_and_default_to_opt_in() {
     );
     assert_eq!(
         advanced.completion_source_layers,
-        [SourceRootKind::CurrentMod, SourceRootKind::Dependency,]
+        [SourceRootKind::Project, SourceRootKind::Dependency,]
     );
     assert_eq!(
         advanced.performance_profile,
@@ -118,7 +118,7 @@ fn background_reindex_options_are_bounded_and_default_to_opt_in() {
 }
 
 #[test]
-fn workspace_root_is_scanned_as_current_mod_without_editor_override() {
+fn workspace_root_is_scanned_as_project_without_editor_override() {
     let (root, root_uri) = temp_workspace_dir();
     fs::create_dir_all(root.join("common/country_tags")).expect("country tags directory");
     fs::create_dir_all(root.join("missions")).expect("missions directory");
@@ -336,7 +336,7 @@ fn editor_options_load_ordered_dependencies_and_keep_them_read_only() {
         current.join("events/definitions.txt"),
         "country_event = { id = shared.1 }\n",
     )
-    .expect("current mod");
+    .expect("project");
     let reference_path = current.join("events/reference.txt");
     fs::write(&reference_path, "event = dependency.1\nevent = vanilla.1\n")
         .expect("current reference");
@@ -368,7 +368,7 @@ fn editor_options_load_ordered_dependencies_and_keep_them_read_only() {
     assert_eq!(roots[1].order, 1);
     assert_eq!(roots[2].kind, engine::SourceRootKind::Dependency);
     assert_eq!(roots[2].order, 2);
-    assert_eq!(roots[3].kind, engine::SourceRootKind::CurrentMod);
+    assert_eq!(roots[3].kind, engine::SourceRootKind::Project);
     assert_eq!(roots[3].order, 3);
     let active = snapshot
         .index()
@@ -1401,42 +1401,25 @@ fn unsuccessful_automatic_discovery_is_recorded_and_not_repeated() {
 }
 
 #[test]
-fn legacy_project_file_is_rejected_without_being_read() {
-    let (root, _) = temp_workspace_dir();
-    fs::create_dir_all(root.join(".pdx")).expect("config directory");
-    fs::write(root.join(".pdx/project.toml"), "this is not TOML").expect("write legacy file");
-    let canonical_root = dunce::canonicalize(&root).expect("canonical root");
-    let error = super::resolve_source_roots(
-        Some(&canonical_root),
-        None,
-        &engine::WorkspaceScanToken::new(),
-    )
-    .expect_err("legacy shared config must be rejected");
-    assert_eq!(error.code, INVALID_PARAMS);
-    assert!(
-        error
-            .message
-            .contains("shared .pdx/project.toml configuration is no longer supported")
-    );
-    fs::remove_dir_all(root).expect("cleanup");
-}
-
-#[test]
-fn removed_project_config_option_is_rejected_explicitly() {
+fn completion_source_layers_reject_non_canonical_spelling() {
     let (root, _) = temp_workspace_dir();
     let canonical_root = dunce::canonicalize(&root).expect("canonical root");
-    let error = super::resolve_source_roots(
-        Some(&canonical_root),
-        Some(json!({"projectConfig": ".pdx/project.toml"})),
-        &engine::WorkspaceScanToken::new(),
-    )
-    .expect_err("removed projectConfig option must be rejected");
-    assert_eq!(error.code, INVALID_PARAMS);
-    assert!(
-        error
-            .message
-            .contains("projectConfig is no longer supported")
-    );
+    for stale in ["currentmod", "current_mod", "current-mod", "CurrentMod"] {
+        let error = super::resolve_source_roots(
+            Some(&canonical_root),
+            Some(json!({"completionSourceLayers": [stale]})),
+            &engine::WorkspaceScanToken::new(),
+        )
+        .expect_err("non-canonical layer spelling must be rejected");
+        assert_eq!(error.code, INVALID_PARAMS);
+        assert!(
+            error
+                .message
+                .contains("must be project, dependencies, or vanilla"),
+            "unexpected error for {stale}: {}",
+            error.message
+        );
+    }
     fs::remove_dir_all(root).expect("cleanup");
 }
 
@@ -1459,7 +1442,7 @@ fn indexed_dependencies_are_excluded_from_live_scanning() {
         &engine::WorkspaceScanToken::new(),
     )
     .expect("inline initializationOptions");
-    // Only the live dependency and the current mod participate in real-time scanning.
+    // Only the live dependency and the project participate in real-time scanning.
     assert_eq!(resolved.roots.len(), 2);
     assert!(
         resolved
@@ -1481,7 +1464,7 @@ fn indexed_dependencies_are_excluded_from_live_scanning() {
         canonical_root.join("cache/cached-dep.pdcindex")
     );
     assert_eq!(resolved.roots[0].order, 1, "live dependency order");
-    assert_eq!(resolved.roots[1].order, 3, "current mod order");
+    assert_eq!(resolved.roots[1].order, 3, "project order");
 }
 
 #[test]

@@ -39,7 +39,7 @@ and Paradox Interactive are trademarks of their respective owners.
 - Rule-proven scope transitions are available as bounded `textDocument/inlayHint` annotations.
 - Conflict-aware rename restricted to writable Mod sources.
 - A conservative formatter that refuses to rewrite unsafe or malformed files.
-- Workspace resolution across unsaved buffers, the current Mod, ordered dependency Mods, and a
+- Workspace resolution across unsaved buffers, the project, ordered dependency Mods, and a
   persistent local Vanilla index.
 - A stdio language server (`paradoxcode`) with cancellation, stale-result protection, and immutable
   analysis snapshots, including targeted watched-file updates for live Mod roots.
@@ -146,19 +146,17 @@ block an unrelated pull request. The complete mapping from local feedback throug
 manual acceptance lives in
 [docs/validation.md](docs/validation.md).
 
-Validate and compile the developer-maintained first-party rule source with `bake`; the output
-can be placed in the ignored build directory for inspection:
+Validate the developer-maintained first-party rule source and regenerate its release manifest
+with `bake`:
 
 ```bash
 cargo run -p rules --bin bake -- build \
   --source rules/eu4 \
-  --output target/rules/eu4.pdcrules \
-  --manifest target/rules/manifest.json
+  --manifest rules/manifest.json
 ```
 
-Official `paradoxcode` binaries embed the first-party JSON source and generate a validated SQLite rules
-artifact in the user cache on first use or when the source `rule_hash` changes. The generated
-artifact is not committed to the repository.
+Official `paradoxcode` binaries embed the first-party JSON source and compile it straight into
+the in-memory rule set at startup; there is no persisted rules artifact.
 
 The EU4 source is intentionally split by responsibility. `catalog/` contains file categories,
 symbol descriptors, and normalized records; `semantic/` contains executable rule alternatives
@@ -227,7 +225,7 @@ Completion sources can be narrowed independently of fixed source resolution prio
 language is present.
 
 Initialization completion, watched-file refreshes, quiet background re-scans, and explicit
-workspace refreshes publish diagnostics for closed Current Mod files by default, bounded to 2,000
+workspace refreshes publish diagnostics for closed Project files by default, bounded to 2,000
 files per pass. `paradoxcode.workspaceWideDiagnostics` controls this; turned off, the Problems
 view remains limited to open documents. `validateWorkspace` still computes its complete
 summary when publication is disabled.
@@ -240,18 +238,18 @@ different diagnostic.
 For an immediate refresh, invoke the advertised LSP `workspace/executeCommand` command
 `pdc/reindexWorkspace`. It uses the same cancellation, serialized-worker, and revision-checked
 commit path as the quiet pass and returns the new snapshot revision and source-file count.
-For a complete Current Mod validation pass, invoke `validateWorkspace`; it performs the same
+For a complete Project validation pass, invoke `validateWorkspace`; it performs the same
 refresh and returns bounded counts for discovered/validated files and diagnostics by severity
 (`totalFiles`, `validatedFiles`, `filesWithErrors`, `totalErrors`, `totalWarnings`, `totalInfos`,
 and `totalHints`).
 
-Run a repeatable whole-Current-Mod diagnostic pass against that Vanilla cache with the development
+Run a repeatable whole-Project diagnostic pass against that Vanilla cache with the development
 script below. It opens each relevant file through the real server transport and writes ignored
 JSON and Markdown reports under `diagnostic-reports/`:
 
 ```bash
 node editors/vscode/scripts/diagnose.mjs \
-  --mod /path/to/current-mod \
+  --mod /path/to/project \
   --vanilla-cache /path/to/vanilla.pdcindex
 ```
 

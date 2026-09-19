@@ -1,8 +1,9 @@
-//! Game-independent PDX rules schema, runtime, and first-party compiler.
+//! Game-independent PDX rules runtime and first-party compiler.
 //!
-//! This crate owns the normalized runtime model, read-only loading, validation, the canonical
-//! logical hash, and the first-party rule compiler (`bake`). The SQLite layout is
-//! deliberately boring so the runtime remains inspectable without an authoring-format parser.
+//! This crate owns the normalized runtime model, validation, the canonical logical hash, and
+//! the first-party rule compiler (`bake`). Rules ship as the embedded JSON source bundle and
+//! are compiled straight into the in-memory query indexes; there is no persisted rules
+//! artifact.
 
 pub mod rulec;
 
@@ -11,7 +12,6 @@ mod matcher;
 mod model;
 mod profile;
 mod runtime;
-mod sqlite;
 
 pub use canonical::RuleHash;
 pub use matcher::{FileMatcher, KeyMatcher, TemplateParameter, TypedPrefixOperand, ValueMatcher};
@@ -29,9 +29,6 @@ pub use profile::{
     ProfileTextMatcher, ProfileTokenDefinitionRule, ProfileValueDefinitionRule, SourceEncoding,
 };
 pub use runtime::{RuleSet, RulesError};
-
-/// The first runtime schema version reserved for the generated rule database.
-pub const CURRENT_SCHEMA_VERSION: u32 = 26;
 
 #[cfg(test)]
 mod tests;

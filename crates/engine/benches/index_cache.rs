@@ -282,7 +282,7 @@ fn main() {
         display_millis(dense_install)
     );
 
-    // Mixed fixture: an already-indexed Current Mod plus a dense Vanilla cache.  This is the
+    // Mixed fixture: an already-indexed Project plus a dense Vanilla cache.  This is the
     // scenario in which per-file position replacement used to rescan the complete cache map.
     let mixed_current_files = mixed_current_file_count();
     let mixed_current_entries = mixed_current_entries();
@@ -291,13 +291,13 @@ fn main() {
         AnalysisHost::with_profile(game::eu4::bootstrap_rules(), game::eu4::profile());
     mixed_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(u32::MAX),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&mixed_current_fixture.root),
     )]));
     let (mixed_scan, mixed_report) = measured(|| {
         mixed_host
             .refresh_source_roots()
-            .expect("scan mixed Current Mod fixture")
+            .expect("scan mixed Project fixture")
     });
     assert_eq!(mixed_report.indexed_files, mixed_current_files);
     let mixed_current_positions = mixed_host.snapshot().index().position_ranges().len();
@@ -315,17 +315,17 @@ fn main() {
     assert_eq!(
         mixed_snapshot.index().position_ranges().len(),
         expected_positions,
-        "mixed install must retain Current Mod and Vanilla positions"
+        "mixed install must retain Project and Vanilla positions"
     );
     black_box(mixed_snapshot);
     println!(
-        "\nmixed workspace: {mixed_current_files} Current Mod file(s) x {mixed_current_entries} entries + {dense_files} Vanilla file(s) x {dense_entries} entries"
+        "\nmixed workspace: {mixed_current_files} Project file(s) x {mixed_current_entries} entries + {dense_files} Vanilla file(s) x {dense_entries} entries"
     );
     println!(
-        "mixed Current Mod positions: {mixed_current_positions}; expected merged positions: {expected_positions}"
+        "mixed Project positions: {mixed_current_positions}; expected merged positions: {expected_positions}"
     );
     println!(
-        "mixed scan Current Mod: {:>10.3} ms",
+        "mixed scan Project: {:>10.3} ms",
         display_millis(mixed_scan)
     );
     println!(

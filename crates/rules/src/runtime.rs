@@ -3,43 +3,17 @@ use crate::matcher::KeyMatcher;
 use crate::model::{
     FileCategory, RuleShape, RulesModel, SemanticModel, SemanticRule, TypeRootScope,
 };
-use crate::{CURRENT_SCHEMA_VERSION, sqlite};
 use text::LogicalPath;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
 use std::fmt;
-use std::fs;
-use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
 
-static EMBEDDED_LOAD_SEQUENCE: AtomicU64 = AtomicU64::new(0);
-
-/// Errors from rule construction, validation, or SQLite loading.
+/// Errors from rule construction, validation, or first-party source compilation.
 #[derive(Debug)]
 pub enum RulesError {
-    /// Filesystem failure while materializing an embedded artifact.
-    Io(std::io::Error),
-    /// SQLite or filesystem error.
-    Sql(rusqlite::Error),
-    /// An invalid schema version was found.
-    SchemaVersion(u32),
-    /// The stored canonical hash disagrees with logical contents.
-    HashMismatch { stored: String, computed: String },
-    /// A malformed digest.
-    InvalidHash(String),
-    /// An unsupported parser name.
-    InvalidParser(String),
-    /// An unsupported file policy.
-    InvalidResolutionPolicy(String),
-    /// An unsupported symbol policy.
-    InvalidSymbolPolicy(String),
-    /// A required metadata key is absent.
-    MissingMetadata(String),
-    /// The artifact belongs to a different game profile.
+    /// The rules belong to a different game profile.
     GameMismatch { expected: String, actual: String },
-    /// An unknown persisted semantic rule shape was found.
-    InvalidRuleShape(String),
     /// The first-party JSON source could not be compiled into a runtime rule set.
     Source(String),
 }
@@ -47,34 +21,11 @@ pub enum RulesError {
 impl fmt::Display for RulesError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Io(error) => write!(formatter, "rules I/O error: {error}"),
-            Self::Sql(error) => write!(formatter, "rules SQLite error: {error}"),
-            Self::SchemaVersion(version) => {
-                write!(formatter, "unsupported rules schema version: {version}")
-            }
-            Self::HashMismatch { stored, computed } => {
-                write!(
-                    formatter,
-                    "rules hash mismatch: stored {stored}, computed {computed}"
-                )
-            }
-            Self::InvalidHash(value) => write!(formatter, "invalid rule hash: {value}"),
-            Self::InvalidParser(value) => write!(formatter, "invalid parser kind: {value}"),
-            Self::InvalidResolutionPolicy(value) => {
-                write!(formatter, "invalid file resolution policy: {value}")
-            }
-            Self::InvalidSymbolPolicy(value) => {
-                write!(formatter, "invalid symbol resolution policy: {value}")
-            }
-            Self::MissingMetadata(key) => write!(formatter, "missing rules metadata: {key}"),
             Self::GameMismatch { expected, actual } => {
                 write!(
                     formatter,
                     "rules game mismatch: expected {expected}, found {actual}"
                 )
-            }
-            Self::InvalidRuleShape(value) => {
-                write!(formatter, "invalid semantic rule shape: {value}")
             }
             Self::Source(message) => write!(formatter, "first-party rule source error: {message}"),
         }
@@ -83,22 +34,9 @@ impl fmt::Display for RulesError {
 
 impl std::error::Error for RulesError {}
 
-impl From<rusqlite::Error> for RulesError {
-    fn from(error: rusqlite::Error) -> Self {
-        Self::Sql(error)
-    }
-}
-
-impl From<std::io::Error> for RulesError {
-    fn from(error: std::io::Error) -> Self {
-        Self::Io(error)
-    }
-}
-
 /// An immutable runtime rule set.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RuleSet {
-    pub(crate) schema_version: u32,
     pub(crate) rule_hash: RuleHash,
     pub(crate) model: RulesModel,
     pub(crate) exact_semantic_rules: FxHashMap<Box<str>, Vec<usize>>,
@@ -133,7 +71,6 @@ impl RuleSet {
     #[must_use]
     pub fn empty() -> Self {
         Self {
-            schema_version: CURRENT_SCHEMA_VERSION,
             rule_hash: RuleHash::empty(),
             model: RulesModel {
                 game_id: String::new(),
@@ -271,7 +208,6 @@ impl RuleSet {
             }
         }
         Self {
-            schema_version: CURRENT_SCHEMA_VERSION,
             rule_hash,
             model,
             exact_semantic_rules,
@@ -311,7 +247,7 @@ impl RuleSet {
         &self.model
     }
 
-    /// Returns the data-only profile carried by this rules artifact.
+    /// Returns the data-only profile carried by this rule set.
     #[must_use]
     pub const fn profile(&self) -> &crate::GameProfile {
         &self.model.profile
@@ -617,51 +553,6 @@ impl RuleSet {
                 actual: self.game_id().to_owned(),
             })
         }
-    }
-
-    /// Writes a complete self-owned SQLite artifact.
-    pub fn write_sqlite(&self, path: &Path) -> Result<(), RulesError> {
-        sqlite::write(path, self)
-    }
-
-    /// Loads, validates, and freezes a SQLite artifact.
-    pub fn load(path: &Path) -> Result<Self, RulesError> {
-        sqlite::load(path)
-    }
-
-    /// Loads an embedded SQLite artifact without exposing a user-selectable rules path.
-    ///
-    /// SQLite 3.32 does not expose a safe borrowed-byte connection. The official composition
-    /// root therefore materializes its compile-time bytes to a process-unique temporary file,
-    /// validates the complete logical model, and removes the file before returning.
-    pub fn load_embedded(bytes: &[u8]) -> Result<Self, RulesError> {
-        let sequence = EMBEDDED_LOAD_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "paradoxcode-rules-{}-{sequence}.pdcrules",
-            std::process::id()
-        ));
-        let result = (|| {
-            let mut options = fs::OpenOptions::new();
-            options.write(true).create_new(true);
-            use std::io::Write as _;
-            let mut file = options.open(&path)?;
-            file.write_all(bytes)?;
-            file.sync_all()?;
-            drop(file);
-            Self::load(&path)
-        })();
-        let cleanup = fs::remove_file(&path);
-        match (result, cleanup) {
-            (Ok(rules), Ok(())) => Ok(rules),
-            (Err(error), _) => Err(error),
-            (Ok(_), Err(error)) => Err(RulesError::Io(error)),
-        }
-    }
-
-    /// Returns the schema version.
-    #[must_use]
-    pub const fn schema_version(&self) -> u32 {
-        self.schema_version
     }
 
     /// Returns the canonical content hash.

@@ -159,7 +159,7 @@ fn texture_resolution_section(snapshot: &AnalysisSnapshot, value: &str) -> Strin
     match snapshot.resolve_texture_path(value) {
         Some(resolution) => {
             let origin = match resolution.hit.root_kind {
-                SourceRootKind::CurrentMod => "the current mod",
+                SourceRootKind::Project => "the project",
                 SourceRootKind::Dependency => "a dependency mod",
                 SourceRootKind::Vanilla => "the game or a DLC pack",
             };

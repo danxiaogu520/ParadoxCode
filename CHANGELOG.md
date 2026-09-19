@@ -7,6 +7,57 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- The rules pipeline drops its SQLite artifact layer. First-party rules compile from the
+  embedded JSON source straight into the in-memory rule set at every startup — measured
+  faster than loading the old ~20 MB user cache — so `rules.pdcrules` is no longer
+  materialized under the cache root, and upgrades best-effort remove artifacts left by
+  earlier releases. The canonical `rule_hash` computation stays: it remains the identity
+  key that decides vanilla-index and dependency-cache reuse. `bake` loses its `--output`
+  flag and now only validates the source and regenerates `rules/manifest.json`;
+  `schema_version` and `artifact_sha256` retire with the artifact, and the `rules`
+  crate no longer depends on `rusqlite`.
+- Mission hover cards drop the trigger and reward corner markers. The game
+  interface (`countrymissionsview.gui`) shows those markers state-dependently,
+  but the card drew them statically whenever the mission declared
+  `trigger`/`effect` blocks — which modded missions almost always do — so every
+  card carried both badges piled on the frame. Cards now render the classic
+  frame + icon + title look only; the `pdc/hoverCard` wire stops carrying the
+  `triggerMarker`/`effectMarker` chrome assets and the `hasTrigger`/`hasEffect`
+  facts (protocol version stays 1 — both fields were optional in each
+  direction).
+- Terminology: the transcode concept drops its historical `codec` naming.
+  `transcode::CODEC_VERSION` becomes `TRANSCODE_VERSION` (Rust and the TypeScript
+  twin alike), the crate's core module is renamed `codec.rs`→`escape.rs`, and the
+  index-cache metadata key `codec_version` becomes `transcode_version` (existing
+  index caches rebuild once, silently, through the built-in invalidation path).
+  The engine's cache-serialization modules (`index_cache/codec.rs`,
+  `position_codec`, `template_codec`) deliberately keep their names — they are
+  serialization codecs, not transcoders.
+- Mission and event hover cards anchor on tokens instead of whole blocks. A
+  card now renders on the definition's block-name token (`<mission_name> = {`
+  in a missions file, `country_event`/`province_event` at an event block's
+  head) and on references the resolver already knows: `event`-keyed values and
+  fire-event call blocks serve the referenced event's window, and
+  `required_missions` members serve the referenced mission's card (resolved
+  through the symbol layer, cross-file included). Positions inside block
+  bodies no longer card, so trigger/effect/option hovers keep the plain
+  semantic pipeline, and hovering an `icon`/`picture` value now falls through
+  to the more specific sprite preview instead of the whole-block card.
+- Renamed the editable source layer from Current Mod to Project across the server, extension,
+  scripts, and documentation: `SourceRootKind::Project`, hover-card and workspace-files
+  `rootKind`/`kind` value `project`, and the `paradoxcode.completion.sourceLayers` value
+  `project`. No legacy spellings are accepted: an existing Vanilla index cache rebuilds once
+  from the discovered installation, and a stale `currentMod` settings entry fails
+  initialization with the valid values listed.
+
+### Removed
+
+- The shared-project-file compatibility paths: the `projectConfig` initialization sentinel,
+  the `.pdx/project.toml` workspace probe, and the packaging guards asserting their absence.
+  Stale clients now receive the standard unknown-field rejection.
+
 ## [0.3.8] - 2026-09-17
 
 ### Added

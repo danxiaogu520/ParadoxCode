@@ -66,13 +66,12 @@ build runs in parallel with Windows tests and clippy. Branch protection requires
 `Conclusion` aggregate rather than every individual job. External advisory databases and optimized
 benchmarks are scheduled audits rather than unrelated-PR blockers.
 
-Validate and compile the first-party EU4 rule source with `bake`:
+Validate the first-party EU4 rule source and regenerate its release manifest with `bake`:
 
 ```bash
 cargo run -p rules --bin bake -- build \
   --source rules/eu4 \
-  --output target/rules/eu4.pdcrules \
-  --manifest target/rules/manifest.json
+  --manifest rules/manifest.json
 ```
 
 Cross-check scripted flag names against a real game installation with `flag-audit`: it
@@ -84,7 +83,7 @@ inputs behind the unknown-flag diagnostic:
 cargo run -p rules --bin flag-audit -- --source rules/eu4 --game /path/to/eu4
 ```
 
-A whole-Current-Mod diagnostic pass against a local Vanilla index is available through
+A whole-Project diagnostic pass against a local Vanilla index is available through
 `node editors/vscode/scripts/diagnose.mjs` (or `npm --prefix editors/vscode run
   diagnose -- ...`; see the README for usage). Generated reports land in the
 ignored `diagnostic-reports/` directory and must not be committed.
@@ -173,11 +172,11 @@ These are the invariants the repository enforces; please keep them in mind in ev
   resource and time bounds.
 - **Syntax errors never block analysis.** Parsers produce loss-aware CSTs even on malformed input;
   unrecognized constructs lower to `Unknown*` nodes instead of panicking.
-- **One authoritative rule source.** `rules/eu4/*.json` is the only rule authority. Generated
-  SQLite artifacts are never hand-maintained, `.cwt` files are never rule input, and the runtime
-  accepts no external rule paths.
-- **`rule_hash` is content-based.** It hashes canonical logical content, not artifact bytes, so it
-  is unaffected by rowids, page layout, timestamps, or import order.
+- **One authoritative rule source.** `rules/eu4/*.json` is the only rule authority; binaries
+  compile the embedded bundle straight into the in-memory rule set. `.cwt` files are never rule
+  input, and the runtime accepts no external rule paths.
+- **`rule_hash` is content-based.** It hashes canonical logical content, not source byte layout,
+  so it is unaffected by formatting, fragment ordering, or import order.
 
 ### Testing guidance
 

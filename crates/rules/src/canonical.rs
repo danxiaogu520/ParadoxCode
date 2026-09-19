@@ -1,6 +1,5 @@
 use crate::matcher::{KeyMatcher, TypedPrefixOperand, ValueMatcher};
 use crate::model::RulesModel;
-use crate::runtime::RulesError;
 use sha2::{Digest, Sha256};
 use std::fmt;
 /// A stable digest of canonical rule content.
@@ -30,19 +29,6 @@ impl RuleHash {
     #[must_use]
     pub fn to_hex(self) -> String {
         self.0.iter().map(|byte| format!("{byte:02x}")).collect()
-    }
-
-    /// Parses a lower-case or upper-case hexadecimal SHA-256 digest.
-    pub fn from_hex(value: &str) -> Result<Self, RulesError> {
-        if value.len() != 64 {
-            return Err(RulesError::InvalidHash(value.to_owned()));
-        }
-        let mut bytes = [0_u8; 32];
-        for (index, slot) in bytes.iter_mut().enumerate() {
-            *slot = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16)
-                .map_err(|_| RulesError::InvalidHash(value.to_owned()))?;
-        }
-        Ok(Self(bytes))
     }
 }
 

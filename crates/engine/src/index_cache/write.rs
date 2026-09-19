@@ -216,11 +216,11 @@ fn write_cache(
         ),
         ("path_encoding", path_encoding.to_owned().into_bytes()),
         ("source_root", source_root),
-        // Persisted localisation previews are decoded by `transcode`; a codec
-        // change alters their meaning, so the reader rejects mismatches.
+        // Persisted localisation previews are decoded by `transcode`; a transcode
+        // version change alters their meaning, so the reader rejects mismatches.
         (
-            "codec_version",
-            transcode::CODEC_VERSION.to_string().into_bytes(),
+            "transcode_version",
+            transcode::TRANSCODE_VERSION.to_string().into_bytes(),
         ),
     ] {
         transaction.execute(

@@ -12,12 +12,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::{
-    FileCategory, GameProfile, RuleRecord, RuleSet, RulesError, RulesModel, SemanticModel,
-    SymbolDescriptor, TypeRootScope,
+    FileCategory, GameProfile, RuleRecord, RuleSet, RulesModel, SemanticModel, SymbolDescriptor,
+    TypeRootScope,
 };
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use sha2::{Digest, Sha256};
 
 /// Current version of the developer-maintained source layout.
 pub const SOURCE_FORMAT_VERSION: u32 = 10;
@@ -124,8 +123,6 @@ struct LocalisationBindingConditionSource {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ArtifactManifest {
-    /// Rules artifact schema version.
-    pub schema_version: u32,
     /// First-party source layout version.
     pub source_format_version: u32,
     /// Game profile identity.
@@ -134,8 +131,6 @@ pub struct ArtifactManifest {
     pub target_game_version: String,
     /// Canonical logical content hash.
     pub rule_hash: String,
-    /// SHA-256 of the generated artifact bytes.
-    pub artifact_sha256: String,
     /// Number of executable semantic rule alternatives.
     pub semantic_rule_count: usize,
     /// Number of file categories.
@@ -157,8 +152,6 @@ pub enum CompileError {
         path: PathBuf,
         source: serde_json::Error,
     },
-    /// Normalized rules runtime rejected the generated artifact.
-    Rules(RulesError),
     /// Source metadata or cross-record invariants are invalid.
     Validation(String),
 }
@@ -180,19 +173,12 @@ impl fmt::Display for CompileError {
                     path.display()
                 )
             }
-            Self::Rules(error) => write!(formatter, "generated rules are invalid: {error}"),
             Self::Validation(message) => write!(formatter, "invalid first-party rules: {message}"),
         }
     }
 }
 
 impl std::error::Error for CompileError {}
-
-impl From<RulesError> for CompileError {
-    fn from(error: RulesError) -> Self {
-        Self::Rules(error)
-    }
-}
 
 /// Loads and validates one complete first-party source tree.
 pub fn load_source(source: &Path) -> Result<(SourceManifest, RulesModel), CompileError> {
@@ -298,9 +284,9 @@ fn parse_semantic_fragments(
 /// Requires an explicit source scope declaration and normalizes
 /// `allowed_scopes = ["any"]` to the canonical unrestricted form (an empty list).
 ///
-/// The two spellings are logically identical, so the compiled model, canonical
-/// hash, and SQLite artifact keep exactly one representation; the declaration
-/// remains visible in the JSON source as authoring intent. Combining `any`
+/// The two spellings are logically identical, so the compiled model and canonical
+/// hash keep exactly one representation; the declaration remains visible in the
+/// JSON source as authoring intent. Combining `any`
 /// with a concrete scope is a source error: `any` already admits every scope,
 /// so a second entry is either redundant or contradictory.
 fn normalize_explicit_any(rule: &mut crate::SemanticRule) -> Result<(), CompileError> {
@@ -544,61 +530,39 @@ fn decode_localisation_bindings(
         .collect()
 }
 
-/// Compiles source into a validated SQLite artifact and release manifest.
-pub fn compile(
-    source: &Path,
-    output: &Path,
-    manifest_output: &Path,
-) -> Result<ArtifactManifest, CompileError> {
+/// Compiles validated first-party source into the release manifest.
+///
+/// The runtime consumes the embedded JSON bundle directly; this developer entry point exists
+/// to keep `rules/manifest.json` in sync with the source tree, so the manifest is written
+/// atomically after the complete source validation succeeds.
+pub fn compile(source: &Path, manifest_output: &Path) -> Result<ArtifactManifest, CompileError> {
     let (source_manifest, model) = load_source(source)?;
     let rules = RuleSet::from_model(model);
-    if let Some(parent) = output.parent() {
-        fs::create_dir_all(parent).map_err(|source| CompileError::Io {
-            path: parent.to_owned(),
-            source,
-        })?;
-    }
-    let temporary = temporary_path(output);
+    let artifact_manifest = ArtifactManifest {
+        source_format_version: source_manifest.source_format_version,
+        game_id: source_manifest.game_id,
+        target_game_version: source_manifest.target_game_version,
+        rule_hash: rules.rule_hash().to_hex(),
+        semantic_rule_count: rules.model().semantic.rules.len(),
+        file_category_count: rules.model().file_categories.len(),
+        symbol_descriptor_count: rules.model().symbol_descriptors.len(),
+    };
+    let temporary = temporary_path(manifest_output);
     if temporary.exists() {
         fs::remove_file(&temporary).map_err(|source| CompileError::Io {
             path: temporary.clone(),
             source,
         })?;
     }
-    rules.write_sqlite(&temporary)?;
-    let loaded = RuleSet::load(&temporary)?;
-    if loaded != rules {
-        return Err(CompileError::Validation(
-            "generated artifact does not round-trip to the source model".to_owned(),
-        ));
-    }
-    let bytes = fs::read(&temporary).map_err(|source| CompileError::Io {
-        path: temporary.clone(),
-        source,
-    })?;
-    let artifact_manifest = ArtifactManifest {
-        schema_version: loaded.schema_version(),
-        source_format_version: source_manifest.source_format_version,
-        game_id: source_manifest.game_id,
-        target_game_version: source_manifest.target_game_version,
-        rule_hash: loaded.rule_hash().to_hex(),
-        artifact_sha256: Sha256::digest(&bytes)
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect(),
-        semantic_rule_count: loaded.model().semantic.rules.len(),
-        file_category_count: loaded.model().file_categories.len(),
-        symbol_descriptor_count: loaded.model().symbol_descriptors.len(),
-    };
-    write_json(manifest_output, &artifact_manifest)?;
-    if output.exists() {
-        fs::remove_file(output).map_err(|source| CompileError::Io {
-            path: output.to_owned(),
+    write_json(&temporary, &artifact_manifest)?;
+    if manifest_output.exists() {
+        fs::remove_file(manifest_output).map_err(|source| CompileError::Io {
+            path: manifest_output.to_owned(),
             source,
         })?;
     }
-    fs::rename(&temporary, output).map_err(|source| CompileError::Io {
-        path: output.to_owned(),
+    fs::rename(&temporary, manifest_output).map_err(|source| CompileError::Io {
+        path: manifest_output.to_owned(),
         source,
     })?;
     Ok(artifact_manifest)
@@ -1128,7 +1092,7 @@ fn temporary_path(output: &Path) -> PathBuf {
     let name = output
         .file_name()
         .and_then(|name| name.to_str())
-        .unwrap_or("rules.pdcrules");
+        .unwrap_or("manifest.json");
     output.with_file_name(format!(".{name}.{}.tmp", std::process::id()))
 }
 
@@ -1910,12 +1874,8 @@ mod tests {
             .as_nanos();
         let directory = std::env::temp_dir().join(format!("bake-test-{nonce}"));
         fs::create_dir_all(&directory).expect("temporary directory");
-        let actual = compile(
-            &root.join("rules/eu4"),
-            &directory.join("eu4.pdcrules"),
-            &directory.join("manifest.json"),
-        )
-        .expect("compile committed first-party source");
+        let actual = compile(&root.join("rules/eu4"), &directory.join("manifest.json"))
+            .expect("compile committed first-party source");
         assert_eq!(actual, expected);
         fs::remove_dir_all(directory).expect("cleanup");
     }

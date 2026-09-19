@@ -1,17 +1,15 @@
 use super::{
-    CURRENT_SCHEMA_VERSION, DynamicDefinitionDescriptor, DynamicDefinitionUsage, FileCategory,
-    FileMatcher, FileResolutionPolicy, GameProfile, KeyMatcher, ParserKind, ProfileMatchMode,
+    DynamicDefinitionDescriptor, DynamicDefinitionUsage, FileCategory, FileMatcher,
+    FileResolutionPolicy, GameProfile, KeyMatcher, ParserKind, ProfileMatchMode,
     ProfileTextMatcher, RuleRecord, RuleSet, RuleShape, RulesModel, SemanticRule, TypeDescriptor,
     TypeRootScope, ValueMatcher,
 };
 use std::collections::BTreeMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 use text::LogicalPath;
 
 #[test]
-fn empty_rules_have_a_stable_schema_identity() {
+fn empty_rules_carry_the_placeholder_hash() {
     let rules = RuleSet::empty();
-    assert_eq!(rules.schema_version(), CURRENT_SCHEMA_VERSION);
     assert_eq!(rules.rule_hash().as_bytes(), [0; 32]);
 }
 
@@ -444,47 +442,6 @@ fn canonical_hash_includes_name_strip_metadata() {
 }
 
 #[test]
-fn sqlite_round_trip_preserves_name_strip_metadata() {
-    let mut model = RulesModel {
-        game_id: "test-game".to_owned(),
-        ..RulesModel::default()
-    };
-    model.semantic.type_descriptors.insert(
-        "ancestor_personality".to_owned(),
-        TypeDescriptor {
-            name: "ancestor_personality".to_owned(),
-            name_strip_prefix: Some("ancestor_".to_owned()),
-            name_strip_suffix: Some("_personality".to_owned()),
-            ..TypeDescriptor::default()
-        },
-    );
-    let rules = RuleSet::from_model(model);
-    let directory = std::env::temp_dir().join(format!(
-        "pdc-strip-roundtrip-{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos()
-    ));
-    std::fs::create_dir_all(&directory).expect("temp directory");
-    let artifact = directory.join("rules.pdcrules");
-    rules.write_sqlite(&artifact).expect("write artifact");
-    let loaded = RuleSet::load(&artifact).expect("load artifact");
-    let descriptor = loaded
-        .model()
-        .semantic
-        .type_descriptors
-        .get("ancestor_personality")
-        .expect("round-tripped descriptor");
-    assert_eq!(descriptor.name_strip_prefix.as_deref(), Some("ancestor_"));
-    assert_eq!(
-        descriptor.name_strip_suffix.as_deref(),
-        Some("_personality")
-    );
-    std::fs::remove_dir_all(directory).expect("cleanup");
-}
-
-#[test]
 fn canonical_hash_includes_dynamic_definition_metadata() {
     let descriptor = TypeDescriptor {
         name: "scripted_effect".to_owned(),
@@ -656,12 +613,7 @@ fn type_descriptor_dynamic_metadata_is_strict_and_defaults_old_sources() {
 }
 
 #[test]
-fn sqlite_round_trip_validates_logical_hash() {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let path = std::env::temp_dir().join(format!("paradoxcode-rules-{nonce}.pdcrules"));
+fn from_model_freezes_scope_registers_and_game_identity() {
     let mut model = RulesModel {
         game_id: "test-game".to_owned(),
         ..RulesModel::default()
@@ -696,14 +648,11 @@ fn sqlite_round_trip_validates_logical_hash() {
             },
         )]),
     );
-    let rules = RuleSet::from_model(model);
-    rules.write_sqlite(&path).expect("write rules");
-    let loaded = RuleSet::load(&path).expect("load rules");
-    assert_eq!(loaded, rules);
+    let loaded = RuleSet::from_model(model);
     assert_eq!(loaded.game_id(), "test-game");
     let registers = loaded
         .type_root_scope_registers("on_action", "on_mercenary_recruited")
-        .expect("persisted scope registers");
+        .expect("frozen scope registers");
     assert_eq!(registers.root, "mercenary_company");
     assert_eq!(registers.this, "province");
     assert_eq!(registers.from, "country");
@@ -713,7 +662,6 @@ fn sqlite_round_trip_validates_logical_hash() {
         loaded.ensure_game("another-game"),
         Err(super::RulesError::GameMismatch { .. })
     ));
-    std::fs::remove_file(path).expect("remove temporary rules");
 }
 
 #[test]

@@ -51,7 +51,7 @@ export async function spawnServer(options) {
 export async function handshake(client, options) {
   const initializeParams = {
     processId: process.pid,
-    clientInfo: { name: 'paradoxcode-current-mod-diagnostics', version: '1' },
+    clientInfo: { name: 'paradoxcode-project-diagnostics', version: '1' },
     workspaceFolders: [{ uri: fileUri(options.workspace), name: 'diagnostic-workspace' }],
     capabilities: {
       window: { workDoneProgress: true },

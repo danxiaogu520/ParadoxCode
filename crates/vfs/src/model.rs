@@ -47,7 +47,7 @@ impl SourceRoot {
     /// Creates a root with an order derived from its stable ID.
     #[must_use]
     pub fn new(id: SourceRootId, kind: SourceRootKind, path: AbsPath) -> Self {
-        let writable = matches!(kind, SourceRootKind::CurrentMod);
+        let writable = matches!(kind, SourceRootKind::Project);
         Self {
             id,
             kind,
@@ -63,15 +63,15 @@ impl SourceRoot {
 /// Every layer is an ordered game-data source and overrides lower layers; the role is an
 /// identity and display attribute only. Priority arithmetic never consults the kind: it is
 /// derived exclusively from the globally unique [`SourceRoot::order`] assigned by the workspace
-/// configuration (Vanilla 0, dependencies 1..n, Current Mod n+1).
+/// configuration (Vanilla 0, dependencies 1..n, Project n+1).
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SourceRootKind {
     /// The base game-data layer (for EU4: the local Vanilla installation or its cache).
     Vanilla,
     /// An explicitly ordered dependency Mod layer.
     Dependency,
-    /// The current Mod layer being edited, which also carries the workspace overlay.
-    CurrentMod,
+    /// The project layer being edited, which also carries the workspace overlay.
+    Project,
 }
 
 /// Stable identity for a discovered source file.

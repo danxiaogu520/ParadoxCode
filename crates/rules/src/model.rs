@@ -1,5 +1,4 @@
 use crate::matcher::{FileMatcher, KeyMatcher, ValueMatcher};
-use crate::runtime::RulesError;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 use text::LogicalPath;
@@ -26,20 +25,6 @@ impl ParserKind {
             Self::SyntaxOnly => "syntax-only".to_owned(),
         }
     }
-
-    pub(crate) fn parse(value: &str) -> Result<Self, RulesError> {
-        Ok(match value {
-            "script" => Self::Script,
-            "localisation" => Self::Localisation,
-            // Legacy CSV dialects are mapped to syntax-only so that compiled
-            // rule artifacts from earlier versions remain loadable without
-            // requiring a full rule rebuild.
-            "csv-comma" | "csv-tab" | "csv-semicolon" => Self::SyntaxOnly,
-            "asset" => Self::Asset,
-            "syntax-only" => Self::SyntaxOnly,
-            other => return Err(RulesError::InvalidParser(other.to_owned())),
-        })
-    }
 }
 
 /// File-level conflict behavior used by source-root resolution.
@@ -62,15 +47,6 @@ impl FileResolutionPolicy {
             Self::ReplaceDirectory => "replace-directory",
         }
     }
-
-    pub(crate) fn parse(value: &str) -> Result<Self, RulesError> {
-        match value {
-            "replace-by-relative-path" => Ok(Self::ReplaceByRelativePath),
-            "merge" => Ok(Self::Merge),
-            "replace-directory" => Ok(Self::ReplaceDirectory),
-            other => Err(RulesError::InvalidResolutionPolicy(other.to_owned())),
-        }
-    }
 }
 
 /// Symbol-level conflict behavior used by the index.
@@ -91,15 +67,6 @@ impl SymbolResolutionPolicy {
             Self::ReplaceBySymbol => "replace-by-symbol",
             Self::Merge => "merge",
             Self::Unique => "unique",
-        }
-    }
-
-    pub(crate) fn parse(value: &str) -> Result<Self, RulesError> {
-        match value {
-            "replace-by-symbol" => Ok(Self::ReplaceBySymbol),
-            "merge" => Ok(Self::Merge),
-            "unique" => Ok(Self::Unique),
-            other => Err(RulesError::InvalidSymbolPolicy(other.to_owned())),
         }
     }
 }
@@ -385,17 +352,6 @@ impl RuleShape {
             Self::Leaf => "leaf",
             Self::LeafValue => "leaf-value",
             Self::ValueClause => "value-clause",
-        }
-    }
-
-    pub(crate) fn parse(value: &str) -> Result<Self, RulesError> {
-        match value {
-            "node" => Ok(Self::Node),
-            "quoted-script" => Ok(Self::QuotedScript),
-            "leaf" => Ok(Self::Leaf),
-            "leaf-value" => Ok(Self::LeafValue),
-            "value-clause" => Ok(Self::ValueClause),
-            other => Err(RulesError::InvalidRuleShape(other.to_owned())),
         }
     }
 }

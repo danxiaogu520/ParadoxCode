@@ -21,7 +21,7 @@ fn targeted_disk_changes_replace_one_shard_without_overwriting_an_overlay() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -146,7 +146,7 @@ fn targeted_disk_changes_reindex_a_localisation_shard() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -199,7 +199,7 @@ fn source_file_ids_do_not_shift_when_an_earlier_path_is_added() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -255,7 +255,7 @@ fn unchanged_file_states_are_reused_and_only_changed_files_advance() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -359,7 +359,7 @@ fn one_overlay_edit_parses_and_lowers_exactly_once_in_a_populated_workspace() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -566,7 +566,7 @@ fn close_restores_the_backing_disk_candidate() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(path.parent().expect("temp parent")),
         ),
     ]));
@@ -658,7 +658,7 @@ fn roots_overlay_and_shards_preserve_shadowed_semantic_definitions() {
         },
         SourceRoot {
             id: SourceRootId::new(3),
-            kind: SourceRootKind::CurrentMod,
+            kind: SourceRootKind::Project,
             path: AbsPath::normalize(&current),
             order: 2,
             writable: true,
@@ -815,7 +815,7 @@ fn declaring_document_edits_move_the_definitions_cache_domain() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
