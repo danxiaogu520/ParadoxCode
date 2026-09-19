@@ -51,7 +51,7 @@ pub(super) fn load_cancellable(
     path: &Path,
     cancellation: &WorkspaceScanToken,
 ) -> Result<IndexCache, IndexCacheError> {
-    load_cancellable_with(path, cancellation, true, None, None)
+    load_cancellable_with(path, cancellation, true, None, None, &[])
 }
 
 /// Loads a cache while skipping the derivation of symbol lookup maps.
@@ -63,7 +63,7 @@ pub(super) fn load_cancellable_for_install(
     path: &Path,
     cancellation: &WorkspaceScanToken,
 ) -> Result<IndexCache, IndexCacheError> {
-    load_cancellable_with(path, cancellation, false, None, None)
+    load_cancellable_with(path, cancellation, false, None, None, &[])
 }
 
 /// [`load_cancellable_for_install`] with `(done, total)` row-level progress reports.
@@ -78,16 +78,26 @@ pub(super) fn load_cancellable_for_install_with_progress(
     cancellation: &WorkspaceScanToken,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     rules: Option<&rules::RuleSet>,
+    preferred_localisation_languages: &[String],
 ) -> Result<IndexCache, IndexCacheError> {
-    load_cancellable_with(path, cancellation, false, progress, rules)
+    load_cancellable_with(
+        path,
+        cancellation,
+        false,
+        progress,
+        rules,
+        preferred_localisation_languages,
+    )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn load_cancellable_with(
     path: &Path,
     cancellation: &WorkspaceScanToken,
     build_lookup_maps: bool,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     rules: Option<&rules::RuleSet>,
+    preferred_localisation_languages: &[String],
 ) -> Result<IndexCache, IndexCacheError> {
     if cancellation.is_cancelled() {
         return Err(IndexCacheError::Cancelled);
@@ -108,14 +118,23 @@ fn load_cancellable_with(
     let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let cancellation = cancellation.clone();
     let _ = connection.progress_handler(1_000, Some(move || cancellation.is_cancelled()));
-    load_connection(&connection, build_lookup_maps, progress, rules).map_err(map_interrupted)
+    load_connection(
+        &connection,
+        build_lookup_maps,
+        progress,
+        rules,
+        preferred_localisation_languages,
+    )
+    .map_err(map_interrupted)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn load_connection(
     connection: &Connection,
     build_lookup_maps: bool,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     rules: Option<&rules::RuleSet>,
+    preferred_localisation_languages: &[String],
 ) -> Result<IndexCache, IndexCacheError> {
     validate_database_identity(connection)?;
     let schema_version = metadata_text(connection, "schema_version")?
@@ -199,7 +218,14 @@ fn load_connection(
         localisation_previews,
         file_fingerprints,
         file_metadata_fingerprints,
-    ) = load_index(connection, &root, build_lookup_maps, &mut progress, rules)?;
+    ) = load_index(
+        connection,
+        &root,
+        build_lookup_maps,
+        &mut progress,
+        rules,
+        preferred_localisation_languages,
+    )?;
     if indexed_files != source_files.len() {
         return Err(IndexCacheError::InvalidData(format!(
             "metadata records {indexed_files} files but cache contains {}",
@@ -364,12 +390,14 @@ fn validate_table_limits(connection: &Connection) -> Result<[usize; 8], IndexCac
     Ok(counts)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn load_index(
     connection: &Connection,
     root: &SourceRoot,
     build_lookup_maps: bool,
     progress: &mut LoadProgress<'_>,
     rules: Option<&rules::RuleSet>,
+    preferred_localisation_languages: &[String],
 ) -> Result<LoadedIndex, IndexCacheError> {
     let mut source_files = BTreeMap::new();
     let mut shards = BTreeMap::new();
@@ -498,8 +526,13 @@ fn load_index(
         }
     }
     progress.report(definition_count.saturating_add(reference_count));
-    let localisation_previews =
-        load_localisation_previews(connection, &shards, &localisation_ranges)?;
+    let localisation_previews = load_localisation_previews(
+        connection,
+        &shards,
+        &localisation_ranges,
+        rules.is_some(),
+        preferred_localisation_languages,
+    )?;
     drop(localisation_ranges);
     progress.report(localisation_previews.len());
     let positions = load_navigation_positions(connection)?;
@@ -764,12 +797,51 @@ fn load_localisation_previews(
     connection: &Connection,
     shards: &BTreeMap<SourceFileId, Arc<FileIndexShard>>,
     localisation_ranges: &HashSet<(SourceFileId, TextRange)>,
+    lazy_mode: bool,
+    preferred_localisation_languages: &[String],
 ) -> Result<LocalisationPreviewMap, IndexCacheError> {
-    let mut statement = connection.prepare(
+    // In lazy mode the preferred-language filter the install would apply
+    // anyway moves into SQL, so three quarters of the rows (EU4 vanilla
+    // stores four languages) are never read. English always loads: the
+    // install-time retention keeps it as the fallback language. Row
+    // languages are the YAML headers verbatim (`l_english`); strip the
+    // prefix for comparison.
+    let sql = if lazy_mode {
+        let mut kept: Vec<String> = preferred_localisation_languages
+            .iter()
+            .map(|language| language.to_ascii_lowercase())
+            .collect();
+        kept.push("english".to_owned());
+        kept.sort();
+        kept.dedup();
+        let placeholders = kept.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+        format!(
+            "SELECT file_id, range_start, range_end, language, value
+             FROM localisation_previews
+             WHERE language IS NULL OR language = ''
+                OR substr(language, 1, 2) <> 'l_'
+                OR lower(substr(language, 3)) IN ({placeholders})
+             ORDER BY file_id, range_start, range_end"
+        )
+    } else {
         "SELECT file_id, range_start, range_end, language, value
-         FROM localisation_previews ORDER BY file_id, range_start, range_end",
-    )?;
-    let rows = statement.query_map([], |row| {
+         FROM localisation_previews ORDER BY file_id, range_start, range_end"
+            .to_owned()
+    };
+    let kept_languages: Vec<String> = if lazy_mode {
+        let mut kept: Vec<String> = preferred_localisation_languages
+            .iter()
+            .map(|language| language.to_ascii_lowercase())
+            .collect();
+        kept.push("english".to_owned());
+        kept.sort();
+        kept.dedup();
+        kept
+    } else {
+        Vec::new()
+    };
+    let mut statement = connection.prepare(&sql)?;
+    let rows = statement.query_map(rusqlite::params_from_iter(kept_languages.iter()), |row| {
         Ok((
             row.get::<_, Vec<u8>>(0)?,
             row.get::<_, i64>(1)?,
