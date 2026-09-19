@@ -553,6 +553,20 @@ pub(crate) fn diagnostics_notification(uri: &str, values: Value, version: Option
     })
 }
 
+/// Same wire shape as [`diagnostics_notification`] for workspace publications
+/// whose diagnostics the validation worker already serialized once; embedding
+/// the `RawValue` avoids rebuilding a `Value` tree per published file.
+pub(crate) fn raw_diagnostics_notification(
+    uri: &str,
+    diagnostics: &serde_json::value::RawValue,
+) -> Value {
+    json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "method": "textDocument/publishDiagnostics",
+        "params": {"uri": uri, "diagnostics": diagnostics},
+    })
+}
+
 pub(crate) fn log_message_notification(typ: MessageType, message: String) -> Value {
     let typ = match typ {
         MessageType::ERROR => 1,
