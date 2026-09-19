@@ -11,7 +11,8 @@ use sha2::{Digest, Sha256};
 use text::AbsPath;
 
 use crate::{
-    AnalysisSnapshot, SourceFile, SourceFileId, SourceRoot, SourceRootKind, WorkspaceScanToken,
+    AnalysisSnapshot, SourceFile, SourceFileId, SourceRoot, SourceRootId, SourceRootKind,
+    WorkspaceScanToken,
 };
 use index::{LocalisationPreviewMap, PositionMap, WorkspaceIndex};
 
@@ -19,9 +20,12 @@ mod codec;
 mod position_codec;
 mod preview;
 mod read;
+mod references_store;
 mod refresh;
 mod template_codec;
 mod write;
+
+pub use references_store::ReferenceIndexStore;
 
 /// Current on-disk cache schema.
 ///
@@ -101,11 +105,26 @@ pub struct IndexCache {
     source_files: BTreeMap<SourceFileId, SourceFile>,
     index: WorkspaceIndex,
     localisation_previews: LocalisationPreviewMap,
+    /// Set when non-dynamic symbol references were skipped at load time so
+    /// installation can attach a lazy [`ReferenceIndexStore`] for them.
+    reference_source: Option<std::path::PathBuf>,
     file_fingerprints: BTreeMap<SourceFileId, String>,
     file_metadata_fingerprints: BTreeMap<SourceFileId, Option<String>>,
 }
 
 impl IndexCache {
+    /// Path the lazy reference store should read skipped references from,
+    /// present only when non-dynamic references were skipped at load time.
+    pub(crate) fn reference_source(&self) -> Option<&std::path::Path> {
+        self.reference_source.as_deref()
+    }
+
+    /// The root this cache was built for; installation keys its lazy
+    /// reference store (if any) by this id.
+    pub(crate) fn root_id(&self) -> SourceRootId {
+        self.root.id
+    }
+
     /// Consumes a validated cache so installation can move its large semantic index.
     pub(crate) fn into_parts(mut self) -> IndexParts {
         // Move the position table out instead of cloning it; the caller rebuilds the index.
@@ -210,6 +229,7 @@ impl IndexCache {
             source_files: snapshot.source_files().clone(),
             index: snapshot.index().clone(),
             localisation_previews,
+            reference_source: None,
             file_fingerprints,
             file_metadata_fingerprints,
         })
@@ -269,12 +289,16 @@ impl IndexCache {
     ///
     /// The totals are derived from the table-limit validation pass, so the first report fires
     /// before any row is materialized and the final report lands after cross-table validation.
+    /// Passing `rules` opts into lazy symbol references: only dynamic-definition-kind
+    /// references are materialized and the cache records its path so an installed
+    /// host can serve the remaining kinds on demand from the cache file.
     pub fn load_cancellable_for_install_with_progress(
         path: &Path,
         cancellation: &WorkspaceScanToken,
         progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+        rules: Option<&rules::RuleSet>,
     ) -> Result<Self, IndexCacheError> {
-        read::load_cancellable_for_install_with_progress(path, cancellation, progress)
+        read::load_cancellable_for_install_with_progress(path, cancellation, progress, rules)
     }
 
     /// Atomically replaces a recognized cache database in one SQLite transaction.

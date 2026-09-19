@@ -10,7 +10,7 @@ use text::{AbsPath, LogicalPath, TextRange};
 use crate::query_cache::SnapshotQueryCache;
 use index::prepare_document_snapshot;
 use index::{DocumentSnapshot, FileState, PreparedDocument};
-use index::{LocalisationPreviewMap, WorkspaceIndex};
+use index::{LocalisationPreviewMap, Reference, WorkspaceIndex};
 use vfs::scan::root_priority;
 use vfs::{
     DocumentId, DocumentSource, LocalisationPreview, ResolvedCandidate, SourceFile, SourceFileId,
@@ -40,6 +40,11 @@ pub struct AnalysisSnapshot {
     /// Invalidation generation of the texture catalog at snapshot build time;
     /// see [`AnalysisSnapshot::texture_catalog_generation`].
     pub(crate) texture_catalog_generation: u64,
+    /// Lazy symbol-reference stores of installed caches; see
+    /// [`AnalysisSnapshot::lazy_references_for`].
+    pub(crate) reference_sources: Arc<
+        std::collections::BTreeMap<vfs::SourceRootId, Arc<crate::index_cache::ReferenceIndexStore>>,
+    >,
 }
 
 impl AnalysisSnapshot {
@@ -62,6 +67,18 @@ impl AnalysisSnapshot {
     #[must_use]
     pub const fn texture_catalog_generation(&self) -> u64 {
         self.texture_catalog_generation
+    }
+
+    /// References for one `(kind, name)` pair served lazily from installed
+    /// cache files — the kinds that were skipped at load time. Concatenating
+    /// the per-store vectors mirrors what a fully materialized index would
+    /// have answered; callers keep their own ordering/dedup rules.
+    pub fn lazy_references_for(&self, kind: &str, name: &str) -> Vec<Reference> {
+        let mut references = Vec::new();
+        for store in self.reference_sources.values() {
+            references.extend(store.references_for(kind, name).iter().cloned());
+        }
+        references
     }
 
     /// Returns the immutable game-specific interpretation selected for this snapshot.

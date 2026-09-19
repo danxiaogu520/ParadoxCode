@@ -150,6 +150,14 @@ pub fn references_with_cancellation(
             consider_reference(&reference)?;
         }
     }
+    // Installed caches may serve references lazily from disk; merge them so
+    // find-references answers stay identical to a fully materialized index.
+    for reference in snapshot.lazy_references_for(kind.as_str(), name.as_str()) {
+        cancellation.checkpoint()?;
+        if let Some(reference) = indexed_reference(snapshot, &reference) {
+            consider_reference(&reference)?;
+        }
+    }
     result.sort_by_key(|location| {
         (
             location
@@ -352,6 +360,16 @@ pub fn rename_with_cancellation(
             continue;
         }
         if let Some(reference) = indexed_reference(snapshot, reference) {
+            consider_reference(&reference)?;
+        }
+    }
+    // Lazy installed-cache references participate in rename exactly as the
+    // materialized ones above did.
+    for reference in snapshot.lazy_references_for(target.kind.as_str(), target.name.as_str()) {
+        cancellation
+            .checkpoint()
+            .map_err(|Cancelled| RenameFailure::Cancelled)?;
+        if let Some(reference) = indexed_reference(snapshot, &reference) {
             consider_reference(&reference)?;
         }
     }

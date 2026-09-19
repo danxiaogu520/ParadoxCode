@@ -982,3 +982,103 @@ fn dependency_index_cache_rejects_an_unrelated_configured_root() {
     ));
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn lazy_reference_load_serves_skipped_kinds_from_disk() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("engine-lazy-refs-{nonce}"));
+    let vanilla = root.join("vanilla");
+    fs::create_dir_all(vanilla.join("events")).expect("events directory");
+    fs::create_dir_all(vanilla.join("common/scripted_effects"))
+        .expect("scripted effects directory");
+    fs::write(
+        vanilla.join("events/definitions.txt"),
+        "country_event = { id = vanilla.1 }\n",
+    )
+    .expect("event definition");
+    fs::write(
+        vanilla.join("common/scripted_effects/fixture.txt"),
+        "effect_a = { fire_event = vanilla.1 }\n",
+    )
+    .expect("dynamic definition with a call site");
+
+    let mut vanilla_host = eu4_host();
+    vanilla_host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Vanilla,
+            AbsPath::normalize(&fs::canonicalize(&vanilla).expect("canonical Vanilla root")),
+        ),
+    ]));
+    vanilla_host.refresh_source_roots().expect("scan Vanilla");
+    let rules = vanilla_host.snapshot().rules().clone();
+    let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
+    let cache_path = root.join("cache/vanilla.pdcindex");
+    cache.save(&cache_path).expect("save cache");
+
+    let full = IndexCache::load(&cache_path).expect("full load materializes all references");
+    let lazy = IndexCache::load_cancellable_for_install_with_progress(
+        &cache_path,
+        &WorkspaceScanToken::new(),
+        None,
+        Some(&rules),
+    )
+    .expect("lazy load");
+
+    let materialized = |index: &crate::WorkspaceIndex| -> std::collections::BTreeSet<(String, String, u64, text::TextRange)> {
+        index
+            .references_iter()
+            .map(|reference| {
+                (
+                    reference.kind.to_string(),
+                    reference.name.to_string(),
+                    reference.file_id.get(),
+                    reference.range,
+                )
+            })
+            .collect()
+    };
+    let full_refs = materialized(full.index());
+    assert!(
+        !full_refs.is_empty(),
+        "fixture must harvest at least one reference"
+    );
+    let lazy_refs = materialized(lazy.index());
+    assert!(
+        lazy_refs.len() < full_refs.len(),
+        "lazy load must skip the non-dynamic reference kinds"
+    );
+
+    fs::create_dir_all(root.join("current/events")).expect("current directory");
+    let mut host = eu4_host();
+    host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(u32::MAX),
+            SourceRootKind::Project,
+            AbsPath::normalize(
+                &fs::canonicalize(root.join("current")).expect("canonical current root"),
+            ),
+        ),
+    ]));
+    host.install_index_cache(lazy).expect("install lazy cache");
+    let snapshot = host.snapshot();
+    let mut reconstructed = materialized(snapshot.index());
+    for (kind, name, ..) in &full_refs {
+        for reference in snapshot.lazy_references_for(kind, name) {
+            reconstructed.insert((
+                reference.kind.to_string(),
+                reference.name.to_string(),
+                reference.file_id.get(),
+                reference.range,
+            ));
+        }
+    }
+    assert_eq!(
+        full_refs, reconstructed,
+        "lazy store plus materialized dynamic references must reconstruct the full set"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}

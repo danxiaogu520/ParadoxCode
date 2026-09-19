@@ -100,6 +100,7 @@ pub(crate) fn run_index_cache_load_with_options(
             path,
             &cancellation.workspace,
             progress,
+            Some(&rules),
         ) {
             Ok(loaded) => loaded,
             Err(error) => {
