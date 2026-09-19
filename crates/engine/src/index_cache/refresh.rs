@@ -244,6 +244,7 @@ pub(super) fn refresh_cancellable(
         source_files: files,
         index,
         localisation_previews: previews,
+        reference_source: None,
         file_fingerprints,
         file_metadata_fingerprints,
     })
