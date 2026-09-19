@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
@@ -51,7 +51,7 @@ pub(super) fn load_cancellable(
     path: &Path,
     cancellation: &WorkspaceScanToken,
 ) -> Result<IndexCache, IndexCacheError> {
-    load_cancellable_with(path, cancellation, true, None)
+    load_cancellable_with(path, cancellation, true, None, None)
 }
 
 /// Loads a cache while skipping the derivation of symbol lookup maps.
@@ -63,19 +63,23 @@ pub(super) fn load_cancellable_for_install(
     path: &Path,
     cancellation: &WorkspaceScanToken,
 ) -> Result<IndexCache, IndexCacheError> {
-    load_cancellable_with(path, cancellation, false, None)
+    load_cancellable_with(path, cancellation, false, None, None)
 }
 
 /// [`load_cancellable_for_install`] with `(done, total)` row-level progress reports.
 ///
-/// The totals are derived from the table-limit validation pass, so the first report fires
+/// Totals are derived from the table-limit validation pass, so the first report fires
 /// before any row is materialized and the final report lands after cross-table validation.
+/// Passing `rules` opts into lazy symbol references: only dynamic-definition-kind
+/// references are materialized, and the cache records its path so installed hosts
+/// can serve the remaining kinds on demand via `ReferenceIndexStore`.
 pub(super) fn load_cancellable_for_install_with_progress(
     path: &Path,
     cancellation: &WorkspaceScanToken,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+    rules: Option<&rules::RuleSet>,
 ) -> Result<IndexCache, IndexCacheError> {
-    load_cancellable_with(path, cancellation, false, progress)
+    load_cancellable_with(path, cancellation, false, progress, rules)
 }
 
 fn load_cancellable_with(
@@ -83,6 +87,7 @@ fn load_cancellable_with(
     cancellation: &WorkspaceScanToken,
     build_lookup_maps: bool,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+    rules: Option<&rules::RuleSet>,
 ) -> Result<IndexCache, IndexCacheError> {
     if cancellation.is_cancelled() {
         return Err(IndexCacheError::Cancelled);
@@ -103,13 +108,14 @@ fn load_cancellable_with(
     let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let cancellation = cancellation.clone();
     let _ = connection.progress_handler(1_000, Some(move || cancellation.is_cancelled()));
-    load_connection(&connection, build_lookup_maps, progress).map_err(map_interrupted)
+    load_connection(&connection, build_lookup_maps, progress, rules).map_err(map_interrupted)
 }
 
 fn load_connection(
     connection: &Connection,
     build_lookup_maps: bool,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+    rules: Option<&rules::RuleSet>,
 ) -> Result<IndexCache, IndexCacheError> {
     validate_database_identity(connection)?;
     let schema_version = metadata_text(connection, "schema_version")?
@@ -193,7 +199,7 @@ fn load_connection(
         localisation_previews,
         file_fingerprints,
         file_metadata_fingerprints,
-    ) = load_index(connection, &root, build_lookup_maps, &mut progress)?;
+    ) = load_index(connection, &root, build_lookup_maps, &mut progress, rules)?;
     if indexed_files != source_files.len() {
         return Err(IndexCacheError::InvalidData(format!(
             "metadata records {indexed_files} files but cache contains {}",
@@ -216,6 +222,9 @@ fn load_connection(
         source_files,
         index,
         localisation_previews,
+        // Lazy-reference mode: non-dynamic references were skipped, so record
+        // where the on-demand store should read them from.
+        reference_source: rules.map(|_| connection.path().map_or_else(PathBuf::new, PathBuf::from)),
         file_fingerprints,
         file_metadata_fingerprints,
     })
@@ -360,6 +369,7 @@ fn load_index(
     root: &SourceRoot,
     build_lookup_maps: bool,
     progress: &mut LoadProgress<'_>,
+    rules: Option<&rules::RuleSet>,
 ) -> Result<LoadedIndex, IndexCacheError> {
     let mut source_files = BTreeMap::new();
     let mut shards = BTreeMap::new();
@@ -465,7 +475,7 @@ fn load_index(
     progress.report(dynamic_count);
     let attribute_count = load_definition_attributes(connection, &mut shards)?;
     progress.report(attribute_count);
-    let reference_count = load_references(connection, &mut shards)?;
+    let reference_count = load_references(connection, &mut shards, rules)?;
     progress.report(reference_count);
     let flag_write_count = load_flag_writes(connection, &mut shards)?;
     progress.report(flag_write_count);
@@ -495,12 +505,16 @@ fn load_index(
     let positions = load_navigation_positions(connection)?;
     progress.report(positions.len());
     for ((file_id, range), position) in &positions {
-        if !known_ranges.contains(&(file_id, range)) {
+        if !known_ranges.contains(&(file_id, range)) && rules.is_none() {
             return Err(IndexCacheError::InvalidData(format!(
                 "navigation position references unknown range {}..{}",
                 range.start(),
                 range.end()
             )));
+            // Lazy-reference mode deliberately skips this membership check:
+            // the non-dynamic reference rows the position may belong to were
+            // not materialized, and the cache was validated strictly at
+            // build time.
         }
         if position.start > position.end {
             return Err(IndexCacheError::InvalidData(
@@ -864,21 +878,74 @@ fn load_definitions(
 fn load_references(
     connection: &Connection,
     shards: &mut BTreeMap<SourceFileId, Arc<FileIndexShard>>,
+    rules: Option<&rules::RuleSet>,
 ) -> Result<usize, IndexCacheError> {
+    // With rules available, only dynamic-definition-kind references are
+    // loaded: the dynamic call graph consumes exactly those, and every other
+    // kind is served lazily from the cache file by `ReferenceIndexStore`.
+    // Without rules (build-tool verification) everything loads as before.
+    let dynamic_kinds: Option<Vec<String>> = match rules {
+        Some(rules) => {
+            let mut kinds: Vec<String> = Vec::new();
+            for kind in connection
+                .prepare("SELECT DISTINCT kind FROM symbol_references")?
+                .query_map([], |row| row.get::<_, String>(0))?
+            {
+                let kind = kind?;
+                if rules.dynamic_definition_context(&kind).is_some() {
+                    kinds.push(kind);
+                }
+            }
+            Some(kinds)
+        }
+        None => None,
+    };
     let mut rows_loaded = 0usize;
-    let mut statement = connection.prepare(
-        "SELECT file_id, kind, name, range_start, range_end
-         FROM symbol_references ORDER BY file_id, ordinal",
-    )?;
-    let rows = statement.query_map([], |row| {
-        Ok((
-            row.get::<_, Vec<u8>>(0)?,
-            row.get::<_, String>(1)?,
-            row.get::<_, String>(2)?,
-            row.get::<_, i64>(3)?,
-            row.get::<_, i64>(4)?,
-        ))
-    })?;
+    type ReferenceRow = Result<(Vec<u8>, String, String, i64, i64), rusqlite::Error>;
+    let rows: Box<dyn Iterator<Item = ReferenceRow>> = match &dynamic_kinds {
+        Some(kinds) if kinds.is_empty() => return Ok(0),
+        Some(kinds) => {
+            let placeholders = kinds.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+            let sql = format!(
+                "SELECT file_id, kind, name, range_start, range_end
+                     FROM symbol_references WHERE kind IN ({placeholders})
+                     ORDER BY file_id, ordinal"
+            );
+            let mut statement = connection.prepare(&sql)?;
+            let mapped = statement
+                .query_map(rusqlite::params_from_iter(kinds.iter()), |row| {
+                    Ok((
+                        row.get::<_, Vec<u8>>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, i64>(3)?,
+                        row.get::<_, i64>(4)?,
+                    ))
+                })?
+                .collect::<Vec<_>>()
+                .into_iter();
+            Box::new(mapped)
+        }
+        None => {
+            let mut statement = connection.prepare(
+                "SELECT file_id, kind, name, range_start, range_end
+                     FROM symbol_references ORDER BY file_id, ordinal",
+            )?;
+            let mapped = statement
+                .query_map([], |row| {
+                    Ok((
+                        row.get::<_, Vec<u8>>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, i64>(3)?,
+                        row.get::<_, i64>(4)?,
+                    ))
+                })?
+                .collect::<Vec<_>>()
+                .into_iter();
+            Box::new(mapped)
+        }
+    };
     for row in rows {
         let (file_id, kind, name, start, end) = row?;
         let file_id = decode_file_id(&file_id)?;

@@ -60,6 +60,10 @@ pub struct AnalysisHost {
     /// workspace-context fingerprints can distinguish catalog rebuilds whose
     /// `roots` key did not change (texture-only disk events).
     texture_catalog_generation: Arc<std::sync::atomic::AtomicU64>,
+    /// Lazy symbol-reference stores keyed by the installed root each cache
+    /// came from; see [`crate::index_cache::ReferenceIndexStore`].
+    reference_sources:
+        Arc<std::collections::BTreeMap<SourceRootId, Arc<crate::index_cache::ReferenceIndexStore>>>,
     /// Live revision shared across host clones. `revision` itself is cloned by
     /// value, so a worker holding a cloned host would otherwise observe a frozen
     /// counter and never notice that the originating host advanced past it.
@@ -109,6 +113,7 @@ impl AnalysisHost {
             ]),
             texture_catalog: Arc::new(std::sync::Mutex::new(None)),
             texture_catalog_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            reference_sources: Arc::default(),
             revision_watch: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
     }
@@ -282,6 +287,8 @@ impl AnalysisHost {
         let mut cached_positions = PositionMap::new();
         let mut cached_previews = LocalisationPreviewMap::new();
         let mut cached_root_ids = BTreeSet::new();
+        let mut lazy_reference_sources =
+            Vec::<(SourceRootId, Arc<crate::index_cache::ReferenceIndexStore>)>::new();
 
         for cache in caches {
             if cache.metadata().game_id != self.rules.game_id()
@@ -291,6 +298,14 @@ impl AnalysisHost {
                     expected: self.profile.game_id.clone(),
                     actual: cache.metadata().game_id.clone(),
                 });
+            }
+            if let Some(path) = cache.reference_source() {
+                // Keyed by root so a reinstalled cache replaces its own lazy
+                // store instead of accumulating one per install.
+                lazy_reference_sources.push((
+                    cache.root_id(),
+                    Arc::new(crate::index_cache::ReferenceIndexStore::new(path)),
+                ));
             }
             let (_, cached_root, cache_files, cached_index, cache_positions, mut cache_previews) =
                 cache.into_parts();
@@ -425,6 +440,13 @@ impl AnalysisHost {
         self.index = Arc::new(index);
         self.localisation_previews = Arc::new(localisation_previews);
         self.installed_caches.extend(cached_root_ids);
+        if !lazy_reference_sources.is_empty() {
+            let mut sources = (*self.reference_sources).clone();
+            for (root_id, store) in lazy_reference_sources {
+                sources.insert(root_id, store);
+            }
+            self.reference_sources = Arc::new(sources);
+        }
         self.advance_revision();
         Ok(())
     }
@@ -1197,6 +1219,7 @@ impl AnalysisHost {
             texture_catalog_generation: self
                 .texture_catalog_generation
                 .load(std::sync::atomic::Ordering::Acquire),
+            reference_sources: Arc::clone(&self.reference_sources),
         }
     }
 

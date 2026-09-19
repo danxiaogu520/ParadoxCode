@@ -134,6 +134,7 @@ pub(crate) fn run_dependency_cache_load(
             &config.index_path,
             cancellation,
             progress,
+            Some(&rules),
         ) {
             Ok(loaded) => loaded,
             Err(error) => {
