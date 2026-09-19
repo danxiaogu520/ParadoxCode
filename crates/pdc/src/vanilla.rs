@@ -35,6 +35,7 @@ pub(crate) struct IndexCacheLoadRequest<'a> {
     pub(crate) log: Option<&'a (dyn Fn(&str) + Sync)>,
     pub(crate) progress: Option<&'a (dyn Fn(usize, usize) + Sync)>,
     pub(crate) scan_limits: WorkspaceScanLimits,
+    pub(crate) preferred_localisation_languages: &'a [String],
     pub(crate) cancellation: &'a IndexSetupCancellation,
 }
 
@@ -68,6 +69,7 @@ pub(crate) fn run_index_cache_load_with_options(
         log,
         progress,
         scan_limits,
+        preferred_localisation_languages,
         cancellation,
     } = request;
     let context = VanillaIndexContext {
@@ -101,6 +103,7 @@ pub(crate) fn run_index_cache_load_with_options(
             &cancellation.workspace,
             progress,
             Some(&rules),
+            preferred_localisation_languages,
         ) {
             Ok(loaded) => loaded,
             Err(error) => {

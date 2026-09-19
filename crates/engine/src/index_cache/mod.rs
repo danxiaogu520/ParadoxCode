@@ -297,8 +297,15 @@ impl IndexCache {
         cancellation: &WorkspaceScanToken,
         progress: Option<&(dyn Fn(usize, usize) + Sync)>,
         rules: Option<&rules::RuleSet>,
+        preferred_localisation_languages: &[String],
     ) -> Result<Self, IndexCacheError> {
-        read::load_cancellable_for_install_with_progress(path, cancellation, progress, rules)
+        read::load_cancellable_for_install_with_progress(
+            path,
+            cancellation,
+            progress,
+            rules,
+            preferred_localisation_languages,
+        )
     }
 
     /// Atomically replaces a recognized cache database in one SQLite transaction.

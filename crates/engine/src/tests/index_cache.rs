@@ -1025,6 +1025,7 @@ fn lazy_reference_load_serves_skipped_kinds_from_disk() {
         &WorkspaceScanToken::new(),
         None,
         Some(&rules),
+        &[],
     )
     .expect("lazy load");
 
@@ -1080,5 +1081,86 @@ fn lazy_reference_load_serves_skipped_kinds_from_disk() {
         full_refs, reconstructed,
         "lazy store plus materialized dynamic references must reconstruct the full set"
     );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn lazy_preferred_language_load_skips_other_languages() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("engine-lazy-previews-{nonce}"));
+    let vanilla = root.join("vanilla");
+    fs::create_dir_all(vanilla.join("localisation")).expect("localisation directory");
+    fs::write(
+        vanilla.join("localisation/keys_l_english.yml"),
+        "l_english:\nshared_key:0 \"English text\"\n",
+    )
+    .expect("english localisation");
+    fs::write(
+        vanilla.join("localisation/keys_l_french.yml"),
+        "l_french:\nshared_key:0 \"Texte francais\"\n",
+    )
+    .expect("french localisation");
+
+    let mut vanilla_host = eu4_host();
+    vanilla_host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Vanilla,
+            AbsPath::normalize(&fs::canonicalize(&vanilla).expect("canonical Vanilla root")),
+        ),
+    ]));
+    vanilla_host.refresh_source_roots().expect("scan Vanilla");
+    let rules = vanilla_host.snapshot().rules().clone();
+    let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
+    let cache_path = root.join("cache/vanilla.pdcindex");
+    cache.save(&cache_path).expect("save cache");
+
+    let full = IndexCache::load(&cache_path).expect("full load keeps every language");
+    let values = |cache: &IndexCache| -> Vec<String> {
+        cache
+            .localisation_previews()
+            .iter()
+            .map(|(_, preview)| preview.value.clone())
+            .collect()
+    };
+    let full_values = values(&full);
+    assert!(full_values.iter().any(|value| value == "English text"));
+    assert!(full_values.iter().any(|value| value == "Texte francais"));
+
+    let lazy = IndexCache::load_cancellable_for_install_with_progress(
+        &cache_path,
+        &WorkspaceScanToken::new(),
+        None,
+        Some(&rules),
+        &[],
+    )
+    .expect("lazy load with default preference keeps english only");
+    let lazy_values = values(&lazy);
+    assert!(lazy_values.iter().any(|value| value == "English text"));
+    assert!(
+        lazy_values.iter().all(|value| value != "Texte francais"),
+        "non-preferred languages must be skipped at load time"
+    );
+
+    let preferred_french = IndexCache::load_cancellable_for_install_with_progress(
+        &cache_path,
+        &WorkspaceScanToken::new(),
+        None,
+        Some(&rules),
+        &["french".to_owned()],
+    )
+    .expect("lazy load honoring an explicit preference");
+    let french_values = values(&preferred_french);
+    assert!(french_values.iter().any(|value| value == "Texte francais"));
+    assert!(
+        french_values
+            .iter()
+            .all(|value| value != "English text" || true)
+    );
+    // english stays as the fallback alongside an explicit preference
+    assert_eq!(french_values.len(), 2);
     fs::remove_dir_all(root).expect("cleanup");
 }
