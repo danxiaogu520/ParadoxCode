@@ -318,7 +318,7 @@ struct InFlightParse {
 }
 
 #[derive(Debug)]
-struct ParseResult {
+pub(crate) struct ParseResult {
     id: DocumentId,
     version: i64,
     prepared: Option<PreparedDocument>,
@@ -331,7 +331,7 @@ struct InFlightDiagnostics {
 }
 
 #[derive(Debug)]
-struct DiagnosticsResult {
+pub(crate) struct DiagnosticsResult {
     id: DocumentId,
     uri: String,
     version: i64,
@@ -468,15 +468,20 @@ pub(crate) struct CacheWorkersSpawned {
     pub(crate) dependency_progress_token: Option<String>,
 }
 
-/// Inputs for background cache workers, stashed while the initial workspace
-/// scan runs so cache installs never race the scan's host commit.
-#[derive(Debug, Default)]
-pub(crate) struct PendingCacheSetup {
-    pub(crate) index_cache: Option<PathBuf>,
-    pub(crate) dependency_caches: Vec<DependencyIndexCache>,
-    /// User-level automatic Vanilla configuration captured by the initialize
-    /// handshake, replayed when the deferred workers finally start.
-    pub(crate) auto_vanilla: Option<AutoVanillaConfiguration>,
+/// Cache setup events (Vanilla/dependency installs) whose worker finished
+/// before the initial scan committed; replayed through the transport channel
+/// once the scan reaches a terminal outcome, so installs never race the
+/// scan's host commit.
+#[derive(Default)]
+pub(crate) struct DeferredSetupEvents {
+    pub(crate) events: Vec<TransportEvent>,
+}
+
+impl std::fmt::Debug for DeferredSetupEvents {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // 载荷（IndexCache 等）没有 Debug；对 LspServer 的 Debug 输出而言数量足够
+        write!(f, "DeferredSetupEvents({})", self.events.len())
+    }
 }
 
 /// In-flight initial background workspace scan.
@@ -620,7 +625,7 @@ pub(crate) struct ScanSetupResult {
     pub(crate) result: Result<(AnalysisHost, WorkspaceScanReport), WorkspaceError>,
 }
 
-enum TransportEvent {
+pub(crate) enum TransportEvent {
     Input(Result<Option<Value>, LspError>),
     Initialize(Box<InitializeTaskResult>),
     Parse(ParseResult),
@@ -695,8 +700,10 @@ pub struct LspServer {
     /// during the initialize handshake when live roots exist; the scan worker
     /// commits while the live revision is unchanged and retries otherwise.
     pub(crate) scan_pending: bool,
-    /// Cache worker inputs deferred until the initial background scan commits.
-    pub(crate) pending_cache_setup: PendingCacheSetup,
+    /// Cache setup events (Vanilla/dependency installs) whose worker finished
+    /// before the initial scan committed; replayed once the scan reaches a
+    /// terminal outcome, so installs never race the scan's host commit.
+    pub(crate) deferred_setup_events: DeferredSetupEvents,
     /// Consecutive background-scan attempts that lost the revision race. After
     /// a bounded number of retries the scan is abandoned with an explicit
     /// warning instead of looping forever under continuous edits.
@@ -760,7 +767,7 @@ impl LspServer {
             workspace_diagnostics_pending: false,
             client_trace: "off".to_owned(),
             scan_pending: false,
-            pending_cache_setup: PendingCacheSetup::default(),
+            deferred_setup_events: DeferredSetupEvents::default(),
             scan_retries: 0,
             scan_retry_limit: crate::MAX_BACKGROUND_SCAN_RETRIES,
             workspace_diagnostic_uris: BTreeSet::new(),

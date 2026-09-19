@@ -1608,9 +1608,11 @@ impl LspServer {
     }
 
     /// Spawns the Vanilla/dependency cache workers configured by the
-    /// initialize handshake. Called either right after the initialize response
-    /// (no live scan pending) or once the initial background scan commits, so
-    /// in-place cache installs never race the scan's host swap.
+    /// initialize handshake, immediately after the initialize response so the
+    /// cache loads overlap the initial background scan. The workers only read
+    /// their inputs and build in-memory caches; the resulting install events
+    /// are deferred by the event loop until the scan commits, so in-place
+    /// cache installs never race the scan's host swap.
     ///
     /// Returns the in-flight slots and progress tokens for the event loop's
     /// completion handling; `is_load` marks the bounded cache-load flavor
