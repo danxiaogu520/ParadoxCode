@@ -386,9 +386,13 @@ impl LspServer {
             self.workspace_wide_diagnostics = enabled;
             if !enabled {
                 self.workspace_diagnostics_pending = false;
-                self.workspace_diagnostic_clear_queue
-                    .extend(self.workspace_diagnostic_uris.iter().cloned());
-                self.workspace_diagnostic_uris.clear();
+                self.workspace_diagnostic_clear_queue.extend(
+                    self.workspace_published_diagnostics
+                        .keys()
+                        .cloned()
+                        .collect::<Vec<_>>(),
+                );
+                self.workspace_published_diagnostics.clear();
             } else {
                 self.request_workspace_diagnostics();
             }

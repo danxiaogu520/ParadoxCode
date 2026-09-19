@@ -3,6 +3,23 @@ use crate::MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS;
 use crate::uri::FileUri;
 use std::fs;
 
+/// Serializes workspace diagnostics once and hashes the bytes so the publish
+/// loop can diff by hash and reuse the payload without rebuilding a Value tree.
+fn encode_workspace_publication<T: serde::Serialize>(
+    values: T,
+) -> Result<(Box<serde_json::value::RawValue>, u64), serde_json::Error> {
+    use std::hash::{Hash, Hasher};
+    let bytes = serde_json::to_vec(&values)?;
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    let hash = hasher.finish();
+    // serde_json 1.0.151 只有 from_string；to_vec 的产物必为合法 UTF-8
+    let json = String::from_utf8(bytes)
+        .map_err(|error| serde_json::Error::io(std::io::Error::other(error)))?;
+    let payload = serde_json::value::RawValue::from_string(json)?;
+    Ok((payload, hash))
+}
+
 /// Validates every parsed Current Mod source file in a refreshed candidate and aggregates the
 /// result for the explicit `validateWorkspace` command. The source-root refresh has already
 /// produced a deterministic file set; sorting here keeps the cancellation and count semantics
@@ -219,12 +236,16 @@ fn workspace_validation_result(
                     &HashSet::new(),
                     diagnostic_severity_overrides,
                 );
-                let values = serde_json::to_value(values).map_err(|error| {
+                let payload = encode_workspace_publication(values).map_err(|error| {
                     WorkspaceError::Io(io::Error::other(format!(
                         "failed to serialize workspace diagnostics: {error}"
                     )))
                 })?;
-                publications.push(WorkspaceDiagnosticPublication { uri, values });
+                publications.push(WorkspaceDiagnosticPublication {
+                    uri,
+                    payload: payload.0,
+                    hash: payload.1,
+                });
                 published_files = published_files.saturating_add(1);
             }
         }
@@ -273,9 +294,15 @@ fn changed_files_validation_result(
         };
         if change.kind == DiskFileChangeKind::Deleted {
             current_uris.push(uri.clone());
+            let payload = encode_workspace_publication(Vec::<Value>::new()).map_err(|error| {
+                WorkspaceError::Io(io::Error::other(format!(
+                    "failed to serialize changed-file diagnostics: {error}"
+                )))
+            })?;
             publications.push(WorkspaceDiagnosticPublication {
                 uri,
-                values: Value::Array(Vec::new()),
+                payload: payload.0,
+                hash: payload.1,
             });
             summary.validated_files = summary.validated_files.saturating_add(1);
             continue;
@@ -338,12 +365,16 @@ fn changed_files_validation_result(
             &HashSet::new(),
             diagnostic_severity_overrides,
         );
-        let values = serde_json::to_value(values).map_err(|error| {
+        let payload = encode_workspace_publication(values).map_err(|error| {
             WorkspaceError::Io(io::Error::other(format!(
                 "failed to serialize changed-file diagnostics: {error}"
             )))
         })?;
-        publications.push(WorkspaceDiagnosticPublication { uri, values });
+        publications.push(WorkspaceDiagnosticPublication {
+            uri,
+            payload: payload.0,
+            hash: payload.1,
+        });
     }
     Ok(WorkspaceValidationResult {
         summary,
