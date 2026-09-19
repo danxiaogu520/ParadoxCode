@@ -140,7 +140,6 @@ export function parseArgs(argv) {
   const valueOptions = new Map([
     ['--mod', 'mod'],
     ['--project', 'mod'],
-    ['--projecte', 'mod'],
     ['--vanilla-source', 'vanillaSource'],
     ['--vanilla-cache', 'vanillaCache'],
     ['--vanilla', 'vanillaCache'],
