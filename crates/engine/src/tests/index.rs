@@ -132,7 +132,7 @@ fn parallel_file_state_materialization_is_deterministic() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -167,7 +167,7 @@ fn type_per_file_definition_is_emitted_once_without_generic_pseudo_members() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));
@@ -287,7 +287,7 @@ fn identity_only_host_does_not_leak_eu4_dynamic_symbols() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&root),
         ),
     ]));

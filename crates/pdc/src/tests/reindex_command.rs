@@ -257,7 +257,7 @@ fn workspace_wide_diagnostics_can_be_disabled_without_changing_validation() {
 }
 
 #[test]
-fn initial_ready_pass_publishes_closed_current_mod_diagnostics() {
+fn initial_ready_pass_publishes_closed_project_diagnostics() {
     let (root, root_uri) = temp_workspace_dir();
     let events = root.join("events");
     fs::create_dir_all(&events).expect("events directory");

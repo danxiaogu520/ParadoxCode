@@ -514,7 +514,7 @@ pub(super) fn root_kind_name(kind: SourceRootKind) -> &'static str {
     match kind {
         SourceRootKind::Vanilla => "vanilla",
         SourceRootKind::Dependency => "dependency",
-        SourceRootKind::CurrentMod => "current_mod",
+        SourceRootKind::Project => "project",
     }
 }
 
@@ -523,7 +523,32 @@ pub(super) fn parse_root_kind(name: &str) -> Result<SourceRootKind, IndexCacheEr
     match name {
         "vanilla" => Ok(SourceRootKind::Vanilla),
         "dependency" => Ok(SourceRootKind::Dependency),
-        "current_mod" => Ok(SourceRootKind::CurrentMod),
+        "project" => Ok(SourceRootKind::Project),
         _ => Err(IndexCacheError::InvalidMetadata("root_kind")),
+    }
+}
+
+#[cfg(test)]
+mod root_kind_tests {
+    use super::{SourceRootKind, parse_root_kind, root_kind_name};
+
+    #[test]
+    fn root_kind_spelling_round_trips_canonical_names_only() {
+        for kind in [
+            SourceRootKind::Vanilla,
+            SourceRootKind::Dependency,
+            SourceRootKind::Project,
+        ] {
+            assert_eq!(parse_root_kind(root_kind_name(kind)).unwrap(), kind);
+        }
+    }
+
+    #[test]
+    fn parse_root_kind_rejects_non_canonical_spelling() {
+        // The pre-rename spelling must stay rejected so stale caches rebuild
+        // instead of being silently accepted.
+        for name in ["current_mod", "currentMod", "currentmod", ""] {
+            assert!(parse_root_kind(name).is_err(), "{name} must not parse");
+        }
     }
 }

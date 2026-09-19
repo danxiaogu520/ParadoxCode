@@ -24,8 +24,8 @@ it and the output channel contains the actionable error.
 
 Use **Choose EU4 Installation / Vanilla Data** if automatic Vanilla discovery cannot find the game.
 Select the installation folder containing `eu4.exe` plus `common`, `events`, `missions`, `decisions`,
-and `localisation`; the server validates the folder, builds the local Vanilla index, and retries
-without requiring a project file. The same directory also enables mission textures. Use **Export
+and `localisation`; the server validates the folder, builds the local Vanilla index, and retries.
+The same directory also enables mission textures. Use **Export
 Workspace Diagnostics** to share a bounded JSON report, and **Reload ParadoxCode Language Server**
 after changing external workspace resources. Files anywhere below the workspace's `localisation/`
 directory are automatically assigned the separate **Localisation** language, including nested files.
@@ -93,12 +93,12 @@ on the next server restart; preview settings take effect immediately.
 | `paradoxcode.serverPath` | `""` | Explicit `pdc` executable path. |
 | `paradoxcode.serverInstallDirectory` | `""` | Machine-local verified server download directory. |
 | `paradoxcode.server.installPolicy` | `"auto"` | Automatic server install policy: `auto`, `prompt`, or `never`. |
-| `paradoxcode.modDirectory` | `""` | Current Mod directory; empty uses the workspace root. |
+| `paradoxcode.modDirectory` | `""` | Project directory; empty uses the workspace root. |
 | `paradoxcode.dependencies` | `[]` | Ordered dependency roots (`id`, `path`, optional `index`). |
 | `paradoxcode.gameDirectory` | `""` | EU4 installation root for textures and guided Vanilla setup. |
 | `paradoxcode.vanillaIndexCache` | `""` | Persistent `.pdcindex` cache path. |
 | `paradoxcode.vanilla.mode` | `"auto"` | Vanilla policy: `auto`, `cacheOnly`, or `disabled`. |
-| `paradoxcode.workspaceWideDiagnostics` | `false` | Publish diagnostics for closed Current Mod files. Off by default; opened files are always validated. |
+| `paradoxcode.workspaceWideDiagnostics` | `false` | Publish diagnostics for closed Project files. Off by default; opened files are always validated. |
 | `paradoxcode.backgroundReindexIntervalMinutes` | `0` | Quiet full re-scan interval; `0` disables it. |
 | `paradoxcode.backgroundReindexIdleSeconds` | `15` | Required editor-idle window before a quiet re-scan. |
 | `paradoxcode.ignoreFilePatterns` | `[]` | File globs excluded from workspace discovery. |
@@ -111,7 +111,7 @@ on the next server restart; preview settings take effect immediately.
 | `paradoxcode.localisation.transparentEncoding` | `true` | Enable the `pdcloc://` decoded read/write view over EU4dll-transcoded files. |
 | `paradoxcode.localisation.autoOpenDecoded` | `true` | Automatically open eligible transcoded files in the decoded view. |
 | `paradoxcode.localisation.transparentScriptGlobs` | `["**/*.txt"]` | Workspace-relative globs of script files eligible for the decoded view (`latin1eu4`). Readable UTF-8 (BOM) files never enter the decoded view. |
-| `paradoxcode.completion.sourceLayers` | `[currentMod, dependencies, vanilla]` | Completion layers to include; resolution priority is unchanged. |
+| `paradoxcode.completion.sourceLayers` | `[project, dependencies, vanilla]` | Completion layers to include; resolution priority is unchanged. |
 | `paradoxcode.performance.profile` | `"balanced"` | Bounded scan concurrency: `conservative`, `balanced`, or `fast`. |
 | `paradoxcode.preview.refreshMode` | `"always"` | Preview refresh timing: `always`, `onSave`, or `manual`. |
 | `paradoxcode.preview.zoomSensitivity` | `1` | Wheel zoom multiplier. |

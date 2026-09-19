@@ -648,7 +648,7 @@ pub fn stable_file_id(root: SourceRootId, logical: &LogicalPath) -> u64 {
 /// Priority of one source root during overlay resolution.
 ///
 /// Priorities come exclusively from the globally unique `order` assigned by the workspace
-/// configuration (Vanilla 0, dependencies 1..n, Current Mod n+1). The root kind is a layer
+/// configuration (Vanilla 0, dependencies 1..n, Project n+1). The root kind is a layer
 /// identity and never participates in priority arithmetic.
 pub fn root_priority(root: &SourceRoot) -> u64 {
     u64::from(root.order)

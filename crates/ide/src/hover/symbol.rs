@@ -223,7 +223,7 @@ pub(crate) fn symbol_source_root(snapshot: &AnalysisSnapshot, location: &Locatio
     match root.map(|root| root.kind) {
         Some(SourceRootKind::Vanilla) => "Vanilla".to_owned(),
         Some(SourceRootKind::Dependency) => "Dependency".to_owned(),
-        Some(SourceRootKind::CurrentMod) => "Current Mod".to_owned(),
+        Some(SourceRootKind::Project) => "Project".to_owned(),
         None if location.document.is_some() => "Open overlay".to_owned(),
         None => "Unknown source root".to_owned(),
     }

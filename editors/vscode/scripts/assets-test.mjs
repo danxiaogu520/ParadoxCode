@@ -674,7 +674,7 @@ function tgaHeader(width, height, bpp, descriptor) {
                 title: { language: 'l_english', value: 'v' },
                 required: ['q'],
             },
-            asset: { sprite: 's', path: 'C:/x.dds', rootKind: 'currentMod', extensionFallback: false, frames: 2 },
+            asset: { sprite: 's', path: 'C:/x.dds', rootKind: 'project', extensionFallback: false, frames: 2 },
             cardAssets: {
                 frame: { path: 'C:/f.dds', rootKind: 'vanilla', extensionFallback: false },
             },

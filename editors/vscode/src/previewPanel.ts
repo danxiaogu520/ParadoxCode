@@ -294,7 +294,7 @@ export class MissionPreviewPanel {
             : undefined;
         // The mod side of the texture lookup: an explicit mod directory,
         // else the workspace folders — the same roots the server treats as
-        // the Current Mod source root.
+        // the Project source root.
         const modRoots: string[] = [];
         const modDirectory = config.get<string>('modDirectory', '');
         if (modDirectory.trim() !== '') {

@@ -25,7 +25,7 @@ fn lit(literal: &str) -> DynamicAffixSegment {
     DynamicAffixSegment::Literal(literal.to_owned())
 }
 
-/// Opens one scripted-effects file as a current-mod workspace and returns the
+/// Opens one scripted-effects file as a project workspace and returns the
 /// snapshot to derive dynamic rule rows from.
 fn definitions_snapshot(body: &str) -> engine::AnalysisHost {
     let nonce = std::time::SystemTime::now()
@@ -39,7 +39,7 @@ fn definitions_snapshot(body: &str) -> engine::AnalysisHost {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");

@@ -929,7 +929,7 @@ mod tests {
     fn strict_profile_prevents_generic_script_fallback_under_common() {
         let root = SourceRoot::new(
             SourceRootId::new(0),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&PathBuf::from("C:/fixture")),
         );
         let profile = strict_common_profile();
@@ -950,7 +950,7 @@ mod tests {
     fn strict_profile_keeps_an_exact_common_file_parseable() {
         let root = SourceRoot::new(
             SourceRootId::new(0),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&PathBuf::from("C:/fixture")),
         );
         let profile = strict_common_profile();

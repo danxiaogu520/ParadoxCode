@@ -50,7 +50,7 @@ export function diagnosticItemPath(item, root) {
   const candidateKey = pathKey(candidate);
   if (candidateKey !== rootKey && !candidateKey.startsWith(`${rootKey}${sep}`)) {
     throw new LspProtocolError(
-      `pdc/workspaceDiagnostics returned a path outside the Current Mod: ${item.logicalPath}`,
+      `pdc/workspaceDiagnostics returned a path outside the Project: ${item.logicalPath}`,
     );
   }
   return candidate;

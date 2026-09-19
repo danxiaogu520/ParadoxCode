@@ -1366,7 +1366,7 @@ pub(crate) fn definition_priority(snapshot: &AnalysisSnapshot, definition: &Defi
     match root.kind {
         engine::SourceRootKind::Vanilla => 0,
         engine::SourceRootKind::Dependency => 1_000 + u64::from(root.order),
-        engine::SourceRootKind::CurrentMod => 10_000 + u64::from(root.order),
+        engine::SourceRootKind::Project => 10_000 + u64::from(root.order),
     }
 }
 
@@ -1483,7 +1483,7 @@ pub(crate) fn definition_priority_for_file(snapshot: &AnalysisSnapshot, id: Sour
     match root.kind {
         engine::SourceRootKind::Vanilla => 0,
         engine::SourceRootKind::Dependency => 1_000 + u64::from(root.order),
-        engine::SourceRootKind::CurrentMod => 10_000 + u64::from(root.order),
+        engine::SourceRootKind::Project => 10_000 + u64::from(root.order),
     }
 }
 pub(crate) fn symbol_at(

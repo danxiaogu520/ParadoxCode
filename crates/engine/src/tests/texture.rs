@@ -29,7 +29,7 @@ fn catalog_normalizes_spellings_and_prioritizes_earlier_roots() {
     fs::write(game_root.join("gfx/interface/only_game.tga"), b"").expect("game texture");
 
     let roots = [
-        source_root(1, SourceRootKind::CurrentMod, &mod_root),
+        source_root(1, SourceRootKind::Project, &mod_root),
         source_root(2, SourceRootKind::Vanilla, &game_root),
     ];
     let catalog = TextureCatalog::build(&roots);
@@ -39,7 +39,7 @@ fn catalog_normalizes_spellings_and_prioritizes_earlier_roots() {
     let resolution = catalog
         .resolve(&roots, "\"\\\\gfx//Interface\\SHARED.dds\"")
         .expect("normalized hit");
-    assert_eq!(resolution.hit.root_kind, SourceRootKind::CurrentMod);
+    assert_eq!(resolution.hit.root_kind, SourceRootKind::Project);
     assert!(!resolution.extension_fallback);
 
     let game_only = catalog
@@ -101,7 +101,7 @@ fn catalog_probes_game_root_relative_paths_outside_harvested_directories() {
     fs::create_dir_all(mod_root.join("map/terrain")).expect("dir");
     fs::write(mod_root.join("map/terrain/offroad.bmp"), b"").expect("file");
 
-    let roots = [source_root(1, SourceRootKind::CurrentMod, &mod_root)];
+    let roots = [source_root(1, SourceRootKind::Project, &mod_root)];
     let catalog = TextureCatalog::build(&roots);
 
     assert!(
@@ -142,7 +142,7 @@ fn snapshot_rebuilds_the_texture_catalog_when_watched_assets_change() {
     let mut host = eu4_host();
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![source_root(
         1,
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         &mod_root,
     )]));
     host.refresh_source_roots().expect("scan");

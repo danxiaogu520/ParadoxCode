@@ -663,7 +663,7 @@ pub(crate) fn writable_location(snapshot: &AnalysisSnapshot, location: &Location
             .source_roots()
             .iter()
             .find(|root| root.id == source_file.root_id)
-            .is_some_and(|root| matches!(root.kind, engine::SourceRootKind::CurrentMod));
+            .is_some_and(|root| matches!(root.kind, engine::SourceRootKind::Project));
     }
     if let Some(document_id) = location.document.as_ref()
         && let Some(document) = snapshot.document(document_id)
@@ -673,7 +673,7 @@ pub(crate) fn writable_location(snapshot: &AnalysisSnapshot, location: &Location
         }
         return document.path().is_none_or(|path| {
             root_for_path(snapshot, path)
-                .is_some_and(|root| matches!(root.kind, engine::SourceRootKind::CurrentMod))
+                .is_some_and(|root| matches!(root.kind, engine::SourceRootKind::Project))
         });
     }
     false

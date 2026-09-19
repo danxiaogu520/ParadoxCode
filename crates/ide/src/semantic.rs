@@ -2915,9 +2915,9 @@ pub(crate) fn completion_source_file_allowed(
     snapshot.completion_source_layer_enabled(root.kind)
 }
 
-/// Open overlays are always owned by the Current Mod layer for completion filtering.
+/// Open overlays are always owned by the Project layer for completion filtering.
 pub(crate) fn completion_overlay_allowed(snapshot: &AnalysisSnapshot) -> bool {
-    snapshot.completion_source_layer_enabled(SourceRootKind::CurrentMod)
+    snapshot.completion_source_layer_enabled(SourceRootKind::Project)
 }
 
 fn workspace_kind_has_members(snapshot: &AnalysisSnapshot, type_name: &str) -> bool {

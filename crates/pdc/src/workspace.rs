@@ -52,9 +52,6 @@ pub(crate) enum PerformanceProfile {
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
 struct WorkspaceInitializationOptions {
-    /// Compatibility sentinel for clients that still send the removed shared project file.
-    /// The value is never read; initialization fails with an actionable migration message.
-    project_config: Option<Value>,
     mod_directory: Option<PathBuf>,
     dependencies: Option<Vec<DependencyConfiguration>>,
     vanilla_index_cache: Option<PathBuf>,
@@ -72,7 +69,7 @@ struct WorkspaceInitializationOptions {
     /// Optional diagnostic categories hidden from published LSP diagnostics.
     #[serde(alias = "ignoreDiagnosticCodes")]
     ignored_error_codes: Option<Vec<String>>,
-    /// Whether workspace scans publish diagnostics for closed Current Mod files.
+    /// Whether workspace scans publish diagnostics for closed Project files.
     workspace_wide_diagnostics: Option<bool>,
     /// Vanilla symbol source policy. Defaults to automatic discovery/build.
     vanilla_mode: Option<String>,
@@ -117,7 +114,7 @@ pub(crate) struct ResolvedSourceRoots {
     pub(crate) scan_filters: WorkspaceScanFilters,
     /// Canonical wire-facing diagnostic categories hidden from LSP output.
     pub(crate) ignored_diagnostic_codes: Vec<String>,
-    /// Whether workspace refreshes publish diagnostics for closed Current Mod files.
+    /// Whether workspace refreshes publish diagnostics for closed Project files.
     pub(crate) workspace_wide_diagnostics: bool,
     /// Vanilla symbol source policy selected for this workspace.
     pub(crate) vanilla_mode: VanillaMode,
@@ -161,20 +158,6 @@ pub(crate) fn resolve_source_roots(
         },
     )?;
     let base = client_root.map(Path::to_path_buf);
-    if inline.project_config.is_some() {
-        return Err(RpcError::new(
-            INVALID_PARAMS,
-            "projectConfig is no longer supported; configure pdc in your editor settings instead",
-        ));
-    }
-    if let Some(workspace_root) = base.as_deref()
-        && workspace_root.join(".pdx").join("project.toml").is_file()
-    {
-        return Err(RpcError::new(
-            INVALID_PARAMS,
-            "the shared .pdx/project.toml configuration is no longer supported; remove it and configure your editor settings instead",
-        ));
-    }
     let project = inline;
     let background_reindex_interval_minutes = project
         .background_reindex_interval_minutes
@@ -237,7 +220,7 @@ pub(crate) fn resolve_source_roots(
         .transpose()?;
     let vanilla_explicit = vanilla_index_cache.is_some();
 
-    let current_mod = match project.mod_directory.as_deref() {
+    let project_mod = match project.mod_directory.as_deref() {
         Some(path) => Some(resolve_directory(path, base.as_deref(), "modDirectory")?),
         None => client_root
             .filter(|path| path.is_dir())
@@ -322,8 +305,8 @@ pub(crate) fn resolve_source_roots(
         .iter()
         .map(|(_, path, _)| path)
         .collect::<Vec<_>>();
-    if let Some(current_mod) = current_mod.as_ref() {
-        paths.push(current_mod);
+    if let Some(project_mod) = project_mod.as_ref() {
+        paths.push(project_mod);
     }
     for (index, left) in paths.iter().enumerate() {
         for right in paths.iter().skip(index + 1) {
@@ -346,7 +329,7 @@ pub(crate) fn resolve_source_roots(
     for (order, (id, path, index)) in configured.into_iter().enumerate() {
         // Orders are globally unique across all layers: 0 belongs to the Vanilla layer, live
         // dependencies and cached dependencies share the 1..=n range in configuration order,
-        // and the Current Mod takes n+1.
+        // and the Project takes n+1.
         let order = u32::try_from(order)
             .map_err(|_| {
                 RpcError::new(
@@ -366,10 +349,10 @@ pub(crate) fn resolve_source_roots(
             None => roots.push(root),
         }
     }
-    if let Some(path) = current_mod.clone() {
+    if let Some(path) = project_mod.clone() {
         let mut current_root = SourceRoot::new(
             SourceRootId::new(u32::MAX),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&path),
         );
         current_root.order = u32::try_from(dependency_count)
@@ -383,7 +366,7 @@ pub(crate) fn resolve_source_roots(
         roots.push(current_root);
     }
     Ok(ResolvedSourceRoots {
-        workspace_root: current_mod
+        workspace_root: project_mod
             .or(base)
             .map(|path| AbsPath::canonicalize(&path).unwrap_or_else(|_| AbsPath::normalize(&path))),
         roots,
@@ -485,7 +468,7 @@ pub(crate) fn normalize_completion_source_layers(
 ) -> Result<Vec<SourceRootKind>, RpcError> {
     if values.is_empty() {
         return Ok(vec![
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             SourceRootKind::Dependency,
             SourceRootKind::Vanilla,
         ]);
@@ -493,14 +476,14 @@ pub(crate) fn normalize_completion_source_layers(
     let mut normalized = Vec::with_capacity(values.len());
     for value in values {
         let layer = match value.trim().to_ascii_lowercase().as_str() {
-            "currentmod" | "current_mod" | "current-mod" => SourceRootKind::CurrentMod,
+            "project" => SourceRootKind::Project,
             "dependency" | "dependencies" => SourceRootKind::Dependency,
             "vanilla" => SourceRootKind::Vanilla,
             value => {
                 return Err(RpcError::new(
                     INVALID_PARAMS,
                     format!(
-                        "completionSourceLayers entries must be currentMod, dependencies, or vanilla (got {value})"
+                        "completionSourceLayers entries must be project, dependencies, or vanilla (got {value})"
                     ),
                 ));
             }

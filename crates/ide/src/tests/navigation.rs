@@ -30,7 +30,7 @@ fn navigation_and_rename_include_references_inside_quoted_script() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots()
@@ -114,7 +114,7 @@ fn references_find_quoted_script_symbols_in_unopened_workspace_files() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan workspace");
@@ -203,7 +203,7 @@ fn dynamic_calls_resolve_scalar_and_block_forms_with_overlay_priority() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan definitions");
@@ -359,7 +359,7 @@ fn local_parameter_navigation_stays_within_its_scripted_definition() {
     let mut host = eu4_host(game::eu4::bootstrap_rules());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     let id = DocumentId::new("file:///tmp/parameters.txt");
@@ -519,7 +519,7 @@ fn navigation_targets_the_name_in_an_indexed_definition() {
     let mut host = eu4_host(game::eu4::bootstrap_rules());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan event definition");
@@ -587,7 +587,7 @@ fn navigation_targets_event_id_in_an_indexed_definition_from_a_call_block() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan event definition");
@@ -656,7 +656,7 @@ fn gfx_sprite_families_and_mesh_font_kinds_are_symbolized() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan gfx roots");

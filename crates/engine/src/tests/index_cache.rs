@@ -563,7 +563,7 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(u32::MAX),
-            SourceRootKind::CurrentMod,
+            SourceRootKind::Project,
             AbsPath::normalize(&fs::canonicalize(&current).expect("canonical current root")),
         ),
     ]));
@@ -892,20 +892,20 @@ fn batch_dependency_cache_install_rebuilds_the_workspace_index_once() {
     }
 
     let current = root.join("current");
-    fs::create_dir_all(current.join("events")).expect("current mod directory");
+    fs::create_dir_all(current.join("events")).expect("project directory");
     fs::write(
         current.join("events/current.txt"),
         "country_event = { id = current.1 }\n",
     )
-    .expect("current mod definition");
+    .expect("project definition");
     let current_root = SourceRoot::new(
         SourceRootId::new(u32::MAX),
-        SourceRootKind::CurrentMod,
-        AbsPath::normalize(&fs::canonicalize(&current).expect("canonical current mod root")),
+        SourceRootKind::Project,
+        AbsPath::normalize(&fs::canonicalize(&current).expect("canonical project root")),
     );
     let mut host = AnalysisHost::with_profile(rules, game::eu4::profile());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![current_root]));
-    host.refresh_source_roots().expect("scan current mod");
+    host.refresh_source_roots().expect("scan project");
     let before_install = host.snapshot().revision();
 
     host.install_index_caches(caches)

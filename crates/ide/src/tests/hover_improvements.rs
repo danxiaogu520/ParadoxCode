@@ -104,7 +104,7 @@ fn template_modifier_keys_report_their_rule_family_hint() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
+        SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan estates");

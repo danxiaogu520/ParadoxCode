@@ -507,7 +507,7 @@ impl SnapshotRequestContext {
             .snapshot
             .source_roots()
             .iter()
-            .filter(|root| root.kind == SourceRootKind::CurrentMod)
+            .filter(|root| root.kind == SourceRootKind::Project)
             .map(|root| root.id)
             .collect::<std::collections::BTreeSet<_>>();
         let mut files = self
@@ -581,7 +581,7 @@ impl SnapshotRequestContext {
 
     /// Returns the immutable source-root/file view used by the VS Code Explorer contribution.
     /// The response contains no file contents: it is only a stable, read-only navigation model
-    /// for current Mod, dependency, and Vanilla roots.
+    /// for project, dependency, and Vanilla roots.
     fn workspace_files(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         if params.is_some() {
             // Keep this request intentionally parameterless so clients cannot turn it into an
@@ -600,7 +600,7 @@ impl SnapshotRequestContext {
                 let kind = match root.kind {
                     SourceRootKind::Vanilla => "vanilla",
                     SourceRootKind::Dependency => "dependency",
-                    SourceRootKind::CurrentMod => "currentMod",
+                    SourceRootKind::Project => "project",
                 };
                 serde_json::json!({
                     "id": root.id.get(),

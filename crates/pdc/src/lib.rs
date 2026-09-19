@@ -44,7 +44,7 @@ pub(crate) const MAX_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
 pub(crate) const MAX_COMPLETION_RESULTS: usize = 512;
 pub(crate) const MAX_WORKSPACE_SYMBOL_RESULTS: usize = 256;
 pub(crate) const MAX_WORKSPACE_DIAGNOSTIC_FILES: usize = 128;
-/// Maximum number of closed Current Mod files that one workspace validation pass publishes.
+/// Maximum number of closed Project files that one workspace validation pass publishes.
 /// Explicit validation still counts every file; the cap only protects the JSON-RPC client from
 /// a notification storm on very large mods.
 pub(crate) const MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS: usize = 2_000;
