@@ -821,7 +821,7 @@ impl LspServer {
                         }
                         // Cache installs deferred behind an uncommitted scan can
                         // proceed once the scan reaches a terminal outcome,
-                        // including bounded retry exhaustion. Requeueing keeps
+                        // including bounded retry exhaustion. Requeuing keeps
                         // arrival order and reuses the normal handler path.
                         for event in std::mem::take(&mut self.deferred_setup_events).events {
                             let _ = event_sender.send(event);
