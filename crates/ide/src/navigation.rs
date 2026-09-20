@@ -172,6 +172,97 @@ pub fn references_with_cancellation(
     Ok(result)
 }
 
+/// Script-zone definition kinds that currently define the given name, case-insensitively.
+///
+/// Localisation-file definitions are excluded so name-driven agent queries stay in the script
+/// zone; scripted localisation (`defined_text`) is a script-file definition and is retained.
+#[must_use]
+pub fn symbol_kinds_for_name(snapshot: &AnalysisSnapshot, name: &str) -> Vec<String> {
+    let mut kinds = Vec::new();
+    for definition in snapshot.index().definitions_iter() {
+        if !definition.active
+            || definition.kind.eq_ignore_ascii_case("localisation")
+            || !definition.name.eq_ignore_ascii_case(name)
+        {
+            continue;
+        }
+        if !kinds
+            .iter()
+            .any(|kind: &String| kind.eq_ignore_ascii_case(&definition.kind))
+        {
+            kinds.push(definition.kind.to_string());
+        }
+    }
+    kinds.sort();
+    kinds
+}
+
+/// Resolves the definition and references of a script-zone symbol addressed by kind and name,
+/// without a cursor position. Mirrors `references_with_cancellation` once the symbol is known.
+/// Returns `None` when the kind and name do not resolve to a unique active winner.
+pub fn symbol_references_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+    name: &str,
+    include_declaration: bool,
+    cancellation: &CancellationToken,
+) -> Result<Option<(Location, Vec<Location>)>, Cancelled> {
+    cancellation.checkpoint()?;
+    let all = all_semantics_for_symbol(snapshot, cancellation, &[name])?;
+    let Resolution::Unique(target) = resolve_symbol(snapshot, &all, kind, name) else {
+        return Ok(None);
+    };
+    let definition = definition_selection_location(&target);
+    let mut result = Vec::new();
+    if include_declaration {
+        result.push(definition.clone());
+    }
+    let mut consider_reference = |reference: &ReferenceInternal| -> Result<(), Cancelled> {
+        cancellation.checkpoint()?;
+        if &*reference.kind != kind || !same_name(&reference.name, name) {
+            return Ok(());
+        }
+        if let Resolution::Unique(candidate) = resolve_symbol(snapshot, &all, kind, &reference.name)
+            && same_location(&candidate.location, &target.location)
+        {
+            result.push(reference.location());
+        }
+        Ok(())
+    };
+    for reference in &all.references {
+        consider_reference(reference)?;
+    }
+    for (file_id, reference) in snapshot.index().references_iter() {
+        cancellation.checkpoint()?;
+        if &*reference.kind != kind || !same_name(&reference.name, name) {
+            continue;
+        }
+        if let Some(reference) = indexed_reference(snapshot, file_id, reference) {
+            consider_reference(&reference)?;
+        }
+    }
+    // Installed caches may serve references lazily from disk; merge them so name-driven
+    // lookups stay identical to cursor-driven find-references.
+    for (file_id, reference) in snapshot.lazy_references_for(kind, name) {
+        cancellation.checkpoint()?;
+        if let Some(reference) = indexed_reference(snapshot, file_id, &reference) {
+            consider_reference(&reference)?;
+        }
+    }
+    result.sort_by_key(|location| {
+        (
+            location
+                .path
+                .as_ref()
+                .map_or(String::new(), |path| path.as_str().to_owned()),
+            location.range.start(),
+        )
+    });
+    result.dedup();
+    cancellation.checkpoint()?;
+    Ok(Some((definition, result)))
+}
+
 /// Returns the identifier range when the cursor is on a uniquely resolved, writable symbol.
 pub fn prepare_rename(
     snapshot: &AnalysisSnapshot,

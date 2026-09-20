@@ -134,6 +134,9 @@ pub(crate) fn is_snapshot_request(method: &str) -> bool {
             | "pdc/hoverCard"
             | "pdc/ruleSearch"
             | "pdc/localisationSearch"
+            | "pdc/symbolSearch"
+            | "pdc/symbolReferences"
+            | "pdc/workspaceSummary"
     )
 }
 
