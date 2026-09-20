@@ -5,43 +5,80 @@ import { acquireAgentClient, withTimeout } from './server';
 import { capList, capText, collapseWhitespace } from './budget';
 
 /**
- * The five read-only agent tools. Each function validates its input, issues one LSP
- * request on the shared client, and shapes the response into compact text sized for a
- * chat context. Errors are thrown as plain Errors; the registration layer converts
- * them into tool-result text so the model can react and retry.
+ * The eleven read-only agent tools, split into a script zone (workspace, search, context,
+ * diagnostics, references, symbol_references, rules, validate_text) and a localisation zone
+ * (loc_get, loc_search, loc_list). The two zones never cross: script tools reject
+ * localisation paths with a pointer into the loc zone, and loc tools only ever answer with
+ * localisation definitions. Each function validates its input, issues one LSP request on the
+ * shared client, and shapes the response into compact text sized for a chat context. Errors
+ * are thrown as plain Errors; the registration layer converts them into tool-result text so
+ * the model can react and retry.
  */
 
 const REQUEST_TIMEOUT_MS = 120_000;
 const AVAILABILITY_WAIT_MS = 30_000;
 const DEFAULT_SEARCH_LIMIT = 20;
 const MAX_SEARCH_LIMIT = 50;
+const MAX_SYMBOL_SEARCH_LIMIT = 100;
+const DEFAULT_DIAGNOSTIC_FILES = 16;
+const MAX_DIAGNOSTIC_FILES = 128;
+
+const LOCALISATION_POINTER = 'That is a localisation file; localisation keys belong to the '
+    + 'localisation zone. Use paradoxcode_loc_get (exact key) or paradoxcode_loc_list '
+    + '(key prefix) instead.';
 
 export interface ValidateTextInput {
     files: { path: string; text: string }[];
 }
 
-export interface SearchSymbolsInput {
+export interface SearchInput {
     query: string;
     limit?: number;
 }
 
-export interface SearchRulesInput {
+export interface RulesInput {
     context?: string;
     key?: string;
     scope?: string;
     limit?: number;
 }
 
-export interface SearchLocalisationInput {
-    key?: string;
-    text?: string;
-    limit?: number;
-}
-
-export interface HoverInfoInput {
+export interface ContextInput {
     path: string;
     line: number;
     character?: number;
+}
+
+export interface DiagnosticsInput {
+    files?: string[];
+    limit?: number;
+    offset?: number;
+}
+
+export interface ReferencesInput {
+    path: string;
+    line: number;
+    character?: number;
+}
+
+export interface SymbolReferencesInput {
+    name: string;
+    kind?: string;
+    limit?: number;
+}
+
+export interface LocGetInput {
+    key: string;
+}
+
+export interface LocSearchInput {
+    text: string;
+    limit?: number;
+}
+
+export interface LocListInput {
+    keyPrefix: string;
+    limit?: number;
 }
 
 const SEVERITY_LABELS: Record<number, string> = {
@@ -51,19 +88,11 @@ const SEVERITY_LABELS: Record<number, string> = {
     4: 'hint',
 };
 
-const SYMBOL_KIND_LABELS: Record<number, string> = {
-    1: 'file', 2: 'module', 3: 'namespace', 4: 'package', 5: 'class', 6: 'method',
-    7: 'property', 8: 'field', 9: 'constructor', 10: 'enum', 11: 'interface', 12: 'function',
-    13: 'variable', 14: 'constant', 15: 'string', 16: 'number', 17: 'boolean', 18: 'array',
-    19: 'object', 20: 'key', 21: 'null', 22: 'enum member', 23: 'struct', 24: 'event',
-    25: 'operator', 26: 'type parameter',
-};
-
-function searchLimit(limit: number | undefined): number {
+function searchLimit(limit: number | undefined, max: number = MAX_SEARCH_LIMIT): number {
     if (typeof limit !== 'number' || !Number.isFinite(limit)) {
         return DEFAULT_SEARCH_LIMIT;
     }
-    return Math.min(Math.max(1, Math.trunc(limit)), MAX_SEARCH_LIMIT);
+    return Math.min(Math.max(1, Math.trunc(limit)), max);
 }
 
 function trimToUndefined(value: string | undefined): string | undefined {
@@ -111,9 +140,10 @@ function resolveFileUri(path: string): vscode.Uri | undefined {
     return undefined;
 }
 
-interface TextDiagnosticsResponse {
-    path: string;
-    diagnostics?: unknown[];
+/** True when a path addresses a localisation-zone file (the `localisation/` tree). */
+function isLocalisationPath(path: string): boolean {
+    const normalised = path.replace(/\\/g, '/').toLowerCase();
+    return normalised.startsWith('localisation/') || normalised.includes('/localisation/');
 }
 
 function describeDiagnostic(diagnostic: Record<string, unknown>): string {
@@ -127,77 +157,315 @@ function describeDiagnostic(diagnostic: Record<string, unknown>): string {
     return `${location}${codePart}(${severity}) ${message}`;
 }
 
-export async function runValidateText(
-    input: ValidateTextInput,
+// ---------------------------------------------------------------------------
+// Script zone
+// ---------------------------------------------------------------------------
+
+interface WorkspaceSummaryResponse {
+    gameId?: unknown;
+    ruleHash?: unknown;
+    revision?: unknown;
+    roots?: { kind?: unknown; path?: unknown; order?: unknown; writable?: unknown }[];
+    fileCounts?: { script?: unknown; localisation?: unknown; total?: unknown };
+    scan?: {
+        discoveredFiles?: unknown;
+        indexedFiles?: unknown;
+        legacyEncodedFiles?: unknown;
+        skippedEntries?: unknown;
+        issues?: unknown;
+    };
+}
+
+export async function runWorkspace(
+    _input: Record<string, never>,
     token: vscode.CancellationToken,
 ): Promise<string> {
-    const files = (Array.isArray(input.files) ? input.files : [])
-        .filter((file): file is { path: string; text: string } =>
-            typeof file?.path === 'string' && typeof file?.text === 'string')
-        .slice(0, 16);
-    if (files.length === 0) {
-        return 'No files to validate: pass between 1 and 16 {path, text} entries.';
-    }
     const client = await acquireAgentClient(AVAILABILITY_WAIT_MS, token);
-    const results = await withTimeout(
-        client.sendRequest<TextDiagnosticsResponse[]>('pdc/textDiagnostics', { files }, token),
+    const summary = await withTimeout(
+        client.sendRequest<WorkspaceSummaryResponse>('pdc/workspaceSummary', undefined, token),
         REQUEST_TIMEOUT_MS,
-        'Validation',
+        'Workspace summary',
     );
-    const sections: string[] = [];
-    for (const result of Array.isArray(results) ? results : []) {
-        const diagnostics = Array.isArray(result.diagnostics) ? result.diagnostics : [];
-        const { items, omitted } = capList(diagnostics, 30);
-        const lines = items.map((diagnostic) =>
-            describeDiagnostic(diagnostic as Record<string, unknown>));
-        if (omitted > 0) {
-            lines.push(`… (+${omitted} more diagnostics)`);
-        }
-        sections.push(diagnostics.length === 0
-            ? `${result.path}: clean (0 diagnostics)`
-            : `${result.path}: ${diagnostics.length} diagnostic(s)\n${lines.join('\n')}`);
-    }
-    return capText(sections.join('\n\n'), 8192);
+    const roots = (Array.isArray(summary?.roots) ? summary.roots : [])
+        .map((root) => `${String(root.kind ?? '?')} root ${formatFileReference(String(root.path ?? '?'))}`
+            + (root.writable === false ? ' (read-only)' : ''));
+    const counts = summary?.fileCounts ?? {};
+    const scan = summary?.scan ?? {};
+    const lines = [
+        `Game: ${String(summary?.gameId ?? 'unknown')} (rules ${String(summary?.ruleHash ?? 'unknown').slice(0, 12)}…, revision ${String(summary?.revision ?? '?')})`,
+        `Files: ${String(counts.script ?? '?')} script, ${String(counts.localisation ?? '?')} localisation (${String(counts.total ?? '?')} total)`,
+        `Scan: ${String(scan.indexedFiles ?? '?')} indexed of ${String(scan.discoveredFiles ?? '?')} discovered`
+        + `, ${String(scan.issues ?? '?')} issue(s)`,
+        ...roots,
+    ];
+    return capText(lines.join('\n'), 4096);
 }
 
-interface WorkspaceSymbolEntry {
-    name?: unknown;
-    kind?: unknown;
-    location?: { uri?: unknown; range?: { start?: { line?: unknown } } };
+interface SymbolSearchResponse {
+    symbols?: { name?: unknown; kind?: unknown; uri?: unknown; line?: unknown; path?: unknown }[];
+    truncated?: boolean;
 }
 
-export async function runSearchSymbols(
-    input: SearchSymbolsInput,
+export async function runSearch(
+    input: SearchInput,
     token: vscode.CancellationToken,
 ): Promise<string> {
     const query = (input.query ?? '').trim();
     if (query.length < 2) {
         return 'Query too short: pass at least 2 characters of a symbol name.';
     }
-    const limit = searchLimit(input.limit);
+    const limit = searchLimit(input.limit, MAX_SYMBOL_SEARCH_LIMIT);
     const client = await acquireAgentClient(AVAILABILITY_WAIT_MS, token);
-    const symbols = await withTimeout(
-        client.sendRequest<WorkspaceSymbolEntry[]>('workspace/symbol', { query }, token),
+    const result = await withTimeout(
+        client.sendRequest<SymbolSearchResponse>('pdc/symbolSearch', { query, limit }, token),
         REQUEST_TIMEOUT_MS,
         'Symbol search',
     );
-    const entries = Array.isArray(symbols) ? symbols : [];
-    if (entries.length === 0) {
-        return `No indexed symbols match "${query}" (project, dependencies, and Vanilla are searched).`;
+    const symbols = Array.isArray(result?.symbols) ? result.symbols : [];
+    if (symbols.length === 0) {
+        return `No script symbols match "${query}" (project, dependencies, and Vanilla are searched; `
+            + 'localisation keys are excluded — use the loc tools for those).';
     }
-    const { items, omitted } = capList(entries, limit);
-    const lines = items.map((symbol) => {
+    const lines = symbols.map((symbol) => {
         const name = String(symbol.name ?? '<unnamed>');
-        const kind = SYMBOL_KIND_LABELS[Number(symbol.kind)] ?? `kind ${String(symbol.kind)}`;
-        const uri = typeof symbol.location?.uri === 'string' ? symbol.location.uri : '';
-        const line = Number(symbol.location?.range?.start?.line);
-        const suffix = Number.isInteger(line) && line >= 0 ? `:${line + 1}` : '';
-        return `${name} (${kind}) — ${formatFileReference(uri)}${suffix}`;
+        const kind = String(symbol.kind ?? 'unknown');
+        const location = trimToUndefined(String(symbol.path ?? ''))
+            ?? (typeof symbol.uri === 'string' ? formatFileReference(symbol.uri) : '?');
+        const line = Number(symbol.line);
+        const suffix = Number.isInteger(line) && line >= 1 ? `:${line}` : '';
+        return `${name} (${kind}) — ${location}${suffix}`;
+    });
+    if (result.truncated === true) {
+        lines.push(`… (truncated at ${limit} symbols; refine the query or raise the limit up to ${MAX_SYMBOL_SEARCH_LIMIT})`);
+    }
+    return capText(`Symbols matching "${query}":\n${lines.join('\n')}`, 8192);
+}
+
+export async function runContext(
+    input: ContextInput,
+    token: vscode.CancellationToken,
+): Promise<string> {
+    const path = (input.path ?? '').trim();
+    const line = Math.trunc(Number(input.line));
+    const character = Math.max(0, Math.trunc(Number(input.character ?? 0)));
+    if (!path) {
+        return 'Pass the file path (absolute, file: URI, or workspace-relative).';
+    }
+    if (isLocalisationPath(path)) {
+        return LOCALISATION_POINTER;
+    }
+    if (!Number.isInteger(line) || line < 1) {
+        return 'Lines are 1-based: pass line >= 1.';
+    }
+    const uri = resolveFileUri(path);
+    if (!uri) {
+        return `Could not resolve "${path}" to an existing file (tried absolute form and every workspace folder).`;
+    }
+    if (isLocalisationPath(uri.fsPath)) {
+        return LOCALISATION_POINTER;
+    }
+    const client = await acquireAgentClient(AVAILABILITY_WAIT_MS, token);
+    const hover = await withTimeout(
+        client.sendRequest<{ contents?: { value?: unknown } } | null>(
+            'textDocument/hover',
+            {
+                textDocument: { uri: uri.toString() },
+                position: { line: line - 1, character },
+            },
+            token,
+        ),
+        REQUEST_TIMEOUT_MS,
+        'Hover',
+    );
+    const contents = hover?.contents;
+    const value = contents && typeof contents === 'object' && 'value' in contents
+        ? String(contents.value ?? '')
+        : '';
+    if (!value.trim()) {
+        return `No hover information at ${formatFileReference(uri.toString())}:${line}:${character}.`;
+    }
+    return capText(collapseWhitespace(value), 2048);
+}
+
+interface WorkspaceDiagnosticsItem {
+    uri?: unknown;
+    logicalPath?: unknown;
+    diagnostics?: unknown[];
+}
+
+interface WorkspaceDiagnosticsResponse {
+    offset?: unknown;
+    nextOffset?: unknown;
+    total?: unknown;
+    items?: WorkspaceDiagnosticsItem[];
+}
+
+export async function runDiagnostics(
+    input: DiagnosticsInput,
+    token: vscode.CancellationToken,
+): Promise<string> {
+    const files = (Array.isArray(input.files) ? input.files : [])
+        .map((file) => (typeof file === 'string' ? file.trim() : ''))
+        .filter(Boolean);
+    if (files.length === 0 && input.files !== undefined) {
+        return 'Pass at least one non-empty logical path in files, or omit files to diagnose the whole workspace.';
+    }
+    const limit = typeof input.limit === 'number' && Number.isFinite(input.limit)
+        ? Math.min(Math.max(1, Math.trunc(input.limit)), MAX_DIAGNOSTIC_FILES)
+        : DEFAULT_DIAGNOSTIC_FILES;
+    const offset = Math.max(0, Math.trunc(Number(input.offset ?? 0)));
+    const client = await acquireAgentClient(AVAILABILITY_WAIT_MS, token);
+    const result = await withTimeout(
+        client.sendRequest<WorkspaceDiagnosticsResponse>(
+            'pdc/workspaceDiagnostics',
+            { offset, limit, parser: 'script', ...(files.length > 0 ? { files } : {}) },
+            token,
+        ),
+        REQUEST_TIMEOUT_MS,
+        'Workspace diagnostics',
+    );
+    const items = Array.isArray(result?.items) ? result.items : [];
+    const total = Number(result?.total ?? items.length);
+    if (items.length === 0) {
+        return `No script files to diagnose (total ${total}).`;
+    }
+    const sections: string[] = [];
+    for (const item of items) {
+        const logicalPath = String(item.logicalPath ?? '<unknown>');
+        const diagnostics = Array.isArray(item.diagnostics) ? item.diagnostics : [];
+        const { items: shown, omitted } = capList(diagnostics, 30);
+        const lines = shown.map((diagnostic) =>
+            describeDiagnostic(diagnostic as Record<string, unknown>));
+        if (omitted > 0) {
+            lines.push(`… (+${omitted} more diagnostics)`);
+        }
+        sections.push(diagnostics.length === 0
+            ? `${logicalPath}: clean (0 diagnostics)`
+            : `${logicalPath}: ${diagnostics.length} diagnostic(s)\n${lines.join('\n')}`);
+    }
+    const nextOffset = Number(result?.nextOffset);
+    if (Number.isInteger(nextOffset) && nextOffset > 0) {
+        sections.push(`… (showing ${items.length} of ${total} files; pass offset=${nextOffset} for the next page)`);
+    }
+    return capText(sections.join('\n\n'), 8192);
+}
+
+export async function runReferences(
+    input: ReferencesInput,
+    token: vscode.CancellationToken,
+): Promise<string> {
+    const path = (input.path ?? '').trim();
+    const line = Math.trunc(Number(input.line));
+    const character = Math.max(0, Math.trunc(Number(input.character ?? 0)));
+    if (!path) {
+        return 'Pass the file path (absolute, file: URI, or workspace-relative).';
+    }
+    if (isLocalisationPath(path)) {
+        return LOCALISATION_POINTER;
+    }
+    if (!Number.isInteger(line) || line < 1) {
+        return 'Lines are 1-based: pass line >= 1.';
+    }
+    const uri = resolveFileUri(path);
+    if (!uri) {
+        return `Could not resolve "${path}" to an existing file (tried absolute form and every workspace folder).`;
+    }
+    if (isLocalisationPath(uri.fsPath)) {
+        return LOCALISATION_POINTER;
+    }
+    const client = await acquireAgentClient(AVAILABILITY_WAIT_MS, token);
+    const references = await withTimeout(
+        client.sendRequest<{ uri?: unknown; range?: { start?: { line?: unknown } } }[]>(
+            'textDocument/references',
+            {
+                textDocument: { uri: uri.toString() },
+                position: { line: line - 1, character },
+                context: { includeDeclaration: true },
+            },
+            token,
+        ),
+        REQUEST_TIMEOUT_MS,
+        'References',
+    );
+    const entries = Array.isArray(references) ? references : [];
+    if (entries.length === 0) {
+        return `No references at ${formatFileReference(uri.toString())}:${line}:${character}. `
+            + 'The position must point at a symbol in a file the workspace has indexed; '
+            + 'for name-driven lookup use paradoxcode_symbol_references.';
+    }
+    const { items, omitted } = capList(entries, MAX_SYMBOL_SEARCH_LIMIT);
+    const lines = items.map((reference) => {
+        const referenceUri = typeof reference.uri === 'string' ? reference.uri : '';
+        const referenceLine = Number(reference.range?.start?.line);
+        const suffix = Number.isInteger(referenceLine) && referenceLine >= 0 ? `:${referenceLine + 1}` : '';
+        return `- ${formatFileReference(referenceUri)}${suffix}`;
     });
     if (omitted > 0) {
-        lines.push(`… (+${omitted} more symbols; refine the query or raise the limit up to ${MAX_SEARCH_LIMIT})`);
+        lines.push(`… (+${omitted} more references)`);
     }
-    return capText(`Symbols matching "${query}":\n${lines.join('\n')}`, 4096);
+    return capText(`References (${entries.length}):\n${lines.join('\n')}`, 8192);
+}
+
+interface SymbolReferencesResponse {
+    matched?: boolean;
+    reason?: unknown;
+    candidates?: { kind?: unknown; name?: unknown; definition?: unknown }[];
+    symbol?: { name?: unknown; kind?: unknown; definition?: { uri?: unknown; line?: unknown; path?: unknown } };
+    references?: { uri?: unknown; line?: unknown; path?: unknown }[];
+    truncated?: boolean;
+    total?: unknown;
+}
+
+function describeSymbolLocation(location: { uri?: unknown; line?: unknown; path?: unknown }): string {
+    const path = trimToUndefined(String(location.path ?? ''))
+        ?? (typeof location.uri === 'string' ? formatFileReference(location.uri) : '?');
+    const line = Number(location.line);
+    return Number.isInteger(line) && line >= 1 ? `${path}:${line}` : path;
+}
+
+export async function runSymbolReferences(
+    input: SymbolReferencesInput,
+    token: vscode.CancellationToken,
+): Promise<string> {
+    const name = trimToUndefined(input.name);
+    const kind = trimToUndefined(input.kind);
+    if (!name) {
+        return 'Pass the symbol name (for example an event id or a scripted effect name).';
+    }
+    const limit = searchLimit(input.limit, MAX_SYMBOL_SEARCH_LIMIT);
+    const client = await acquireAgentClient(AVAILABILITY_WAIT_MS, token);
+    const result = await withTimeout(
+        client.sendRequest<SymbolReferencesResponse>(
+            'pdc/symbolReferences',
+            { name, kind, limit },
+            token,
+        ),
+        REQUEST_TIMEOUT_MS,
+        'Symbol references',
+    );
+    if (result?.matched !== true) {
+        const reason = trimToUndefined(String(result?.reason ?? ''))
+            ?? 'the name does not resolve to a unique active definition.';
+        const candidates = (Array.isArray(result?.candidates) ? result.candidates : [])
+            .map((candidate) => `${String(candidate.name ?? name)} (${String(candidate.kind ?? '?')})`);
+        const candidatePart = candidates.length > 0
+            ? `\nCandidates:\n${candidates.map((entry) => `- ${entry}`).join('\n')}`
+            : '';
+        return `No unique symbol for "${name}": ${reason}${candidatePart}`;
+    }
+    const definition = result.symbol?.definition;
+    const header = `${String(result.symbol?.name ?? name)} (${String(result.symbol?.kind ?? '?')})`
+        + (definition ? ` defined at ${describeSymbolLocation(definition)}` : '');
+    const references = Array.isArray(result?.references) ? result.references : [];
+    const total = Number(result?.total ?? references.length);
+    const lines = references.map((reference) => `- ${describeSymbolLocation(reference)}`);
+    if (result?.truncated === true) {
+        lines.push(`… (truncated at ${limit} of ${total} references; raise the limit up to ${MAX_SYMBOL_SEARCH_LIMIT})`);
+    }
+    if (references.length === 0) {
+        return `${header}\nNo references found.`;
+    }
+    return capText(`${header}\nReferences (${total}):\n${lines.join('\n')}`, 8192);
 }
 
 interface RuleSearchEntry {
@@ -215,8 +483,8 @@ interface RuleSearchResponse {
     truncated?: boolean;
 }
 
-export async function runSearchRules(
-    input: SearchRulesInput,
+export async function runRules(
+    input: RulesInput,
     token: vscode.CancellationToken,
 ): Promise<string> {
     const context = trimToUndefined(input.context);
@@ -265,6 +533,43 @@ export async function runSearchRules(
     return capText(`Rules matching ${filters}:\n${lines.join('\n')}`, 6144);
 }
 
+export async function runValidateText(
+    input: ValidateTextInput,
+    token: vscode.CancellationToken,
+): Promise<string> {
+    const files = (Array.isArray(input.files) ? input.files : [])
+        .filter((file): file is { path: string; text: string } =>
+            typeof file?.path === 'string' && typeof file?.text === 'string')
+        .slice(0, 16);
+    if (files.length === 0) {
+        return 'No files to validate: pass between 1 and 16 {path, text} entries.';
+    }
+    const client = await acquireAgentClient(AVAILABILITY_WAIT_MS, token);
+    const results = await withTimeout(
+        client.sendRequest<{ path: string; diagnostics?: unknown[] }[]>('pdc/textDiagnostics', { files }, token),
+        REQUEST_TIMEOUT_MS,
+        'Validation',
+    );
+    const sections: string[] = [];
+    for (const result of Array.isArray(results) ? results : []) {
+        const diagnostics = Array.isArray(result.diagnostics) ? result.diagnostics : [];
+        const { items, omitted } = capList(diagnostics, 30);
+        const lines = items.map((diagnostic) =>
+            describeDiagnostic(diagnostic as Record<string, unknown>));
+        if (omitted > 0) {
+            lines.push(`… (+${omitted} more diagnostics)`);
+        }
+        sections.push(diagnostics.length === 0
+            ? `${result.path}: clean (0 diagnostics)`
+            : `${result.path}: ${diagnostics.length} diagnostic(s)\n${lines.join('\n')}`);
+    }
+    return capText(sections.join('\n\n'), 8192);
+}
+
+// ---------------------------------------------------------------------------
+// Localisation zone
+// ---------------------------------------------------------------------------
+
 interface LocalisationSearchHit {
     key?: unknown;
     language?: unknown;
@@ -277,82 +582,80 @@ interface LocalisationSearchResponse {
     truncated?: boolean;
 }
 
-export async function runSearchLocalisation(
-    input: SearchLocalisationInput,
+function describeLocalisationHit(hit: LocalisationSearchHit): string {
+    const value = trimToUndefined(String(hit.value ?? '')) ?? '<no preview>';
+    const language = trimToUndefined(String(hit.language ?? '')) ?? 'unknown language';
+    const file = trimToUndefined(String(hit.file ?? '')) ?? 'unknown file';
+    return `${String(hit.key ?? '<unknown>')} = "${collapseWhitespace(value)}" (${language}) — ${file}`;
+}
+
+async function localisationSearch(
+    params: { key?: string; text?: string; keyMatch?: string; limit: number },
     token: vscode.CancellationToken,
-): Promise<string> {
-    const key = trimToUndefined(input.key);
-    const text = trimToUndefined(input.text);
-    if (!key && !text) {
-        return 'Pass at least one of key or text (key matches localisation key names, text matches displayed values).';
-    }
-    const limit = searchLimit(input.limit);
+): Promise<LocalisationSearchResponse> {
     const client = await acquireAgentClient(AVAILABILITY_WAIT_MS, token);
-    const result = await withTimeout(
-        client.sendRequest<LocalisationSearchResponse>(
-            'pdc/localisationSearch',
-            { key, text, limit },
-            token,
-        ),
+    return withTimeout(
+        client.sendRequest<LocalisationSearchResponse>('pdc/localisationSearch', params, token),
         REQUEST_TIMEOUT_MS,
         'Localisation search',
     );
-    const hits = Array.isArray(result?.hits) ? result.hits : [];
-    if (hits.length === 0) {
-        return 'No localisation entries match. Keys are matched case-insensitively as substrings across the project, dependencies, and Vanilla.';
-    }
-    const lines = hits.map((hit) => {
-        const value = trimToUndefined(String(hit.value ?? '')) ?? '<no preview>';
-        const language = trimToUndefined(String(hit.language ?? '')) ?? 'unknown language';
-        const file = trimToUndefined(String(hit.file ?? '')) ?? 'unknown file';
-        return `${String(hit.key ?? '<unknown>')} = "${collapseWhitespace(value)}" (${language}) — ${file}`;
-    });
-    if (result.truncated === true) {
-        lines.push(`… (truncated at ${limit} entries; narrow the query or raise the limit up to ${MAX_SEARCH_LIMIT})`);
-    }
-    return capText(lines.join('\n'), 4096);
 }
 
-interface HoverResponse {
-    contents?: { value?: unknown };
-}
-
-export async function runHoverInfo(
-    input: HoverInfoInput,
+export async function runLocGet(
+    input: LocGetInput,
     token: vscode.CancellationToken,
 ): Promise<string> {
-    const path = (input.path ?? '').trim();
-    const line = Math.trunc(Number(input.line));
-    const character = Math.max(0, Math.trunc(Number(input.character ?? 0)));
-    if (!path) {
-        return 'Pass the file path (absolute, file: URI, or workspace-relative).';
+    const key = trimToUndefined(input.key);
+    if (!key) {
+        return 'Pass the exact localisation key (matching is case-insensitive).';
     }
-    if (!Number.isInteger(line) || line < 1) {
-        return 'Lines are 1-based: pass line >= 1.';
+    const result = await localisationSearch({ key, keyMatch: 'exact', limit: 1 }, token);
+    const hits = Array.isArray(result?.hits) ? result.hits : [];
+    if (hits.length === 0) {
+        return `No localisation key "${key}" is defined. Use paradoxcode_loc_list with the key's `
+            + 'family prefix to see which neighbouring keys exist.';
     }
-    const uri = resolveFileUri(path);
-    if (!uri) {
-        return `Could not resolve "${path}" to an existing file (tried absolute form and every workspace folder).`;
+    return capText(describeLocalisationHit(hits[0]), 2048);
+}
+
+export async function runLocSearch(
+    input: LocSearchInput,
+    token: vscode.CancellationToken,
+): Promise<string> {
+    const text = trimToUndefined(input.text);
+    if (!text) {
+        return 'Pass the text filter (matched case-insensitively against displayed values).';
     }
-    const client = await acquireAgentClient(AVAILABILITY_WAIT_MS, token);
-    const hover = await withTimeout(
-        client.sendRequest<HoverResponse | null>(
-            'textDocument/hover',
-            {
-                textDocument: { uri: uri.toString() },
-                position: { line: line - 1, character },
-            },
-            token,
-        ),
-        REQUEST_TIMEOUT_MS,
-        'Hover',
-    );
-    const contents = hover?.contents;
-    const value = contents && typeof contents === 'object' && 'value' in contents
-        ? String(contents.value ?? '')
-        : '';
-    if (!value.trim()) {
-        return `No hover information at ${formatFileReference(uri.toString())}:${line}:${character}.`;
+    const limit = searchLimit(input.limit);
+    const result = await localisationSearch({ text, limit }, token);
+    const hits = Array.isArray(result?.hits) ? result.hits : [];
+    if (hits.length === 0) {
+        return 'No localisation entries mention that text across the project, dependencies, and Vanilla.';
     }
-    return capText(collapseWhitespace(value), 2048);
+    const lines = hits.map(describeLocalisationHit);
+    if (result.truncated === true) {
+        lines.push(`… (truncated at ${limit} entries; narrow the text or raise the limit up to ${MAX_SEARCH_LIMIT})`);
+    }
+    return capText(`Localisation matching "${text}":\n${lines.join('\n')}`, 4096);
+}
+
+export async function runLocList(
+    input: LocListInput,
+    token: vscode.CancellationToken,
+): Promise<string> {
+    const keyPrefix = trimToUndefined(input.keyPrefix);
+    if (!keyPrefix) {
+        return 'Pass the key prefix (for example "my_event.1." to enumerate one event\'s key family).';
+    }
+    const limit = searchLimit(input.limit);
+    const result = await localisationSearch({ key: keyPrefix, keyMatch: 'prefix', limit }, token);
+    const hits = Array.isArray(result?.hits) ? result.hits : [];
+    if (hits.length === 0) {
+        return `No localisation keys start with "${keyPrefix}".`;
+    }
+    const lines = hits.map(describeLocalisationHit);
+    if (result.truncated === true) {
+        lines.push(`… (truncated at ${limit} entries; extend the prefix or raise the limit up to ${MAX_SEARCH_LIMIT})`);
+    }
+    return capText(`Keys under "${keyPrefix}" (${hits.length}${result.truncated === true ? '+' : ''}):\n${lines.join('\n')}`, 4096);
 }

@@ -136,6 +136,30 @@ fn scripted_localisation_names_cached_with_cancellation(
     Ok(names)
 }
 
+/// How a localisation key filter is matched against definition names.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum LocalisationKeyMatch {
+    /// Case-insensitive substring (legacy behaviour).
+    #[default]
+    Substring,
+    /// Case-insensitive equality; a key lookup returns zero or one hit and never truncates.
+    Exact,
+    /// Case-insensitive anchored prefix; enumerates one dotted key family.
+    Prefix,
+}
+
+impl LocalisationKeyMatch {
+    fn matches(self, name: &str, query: &str) -> bool {
+        let name = name.to_ascii_lowercase();
+        let query = query.to_ascii_lowercase();
+        match self {
+            LocalisationKeyMatch::Substring => name.contains(query.as_str()),
+            LocalisationKeyMatch::Exact => name == query,
+            LocalisationKeyMatch::Prefix => name.starts_with(query.as_str()),
+        }
+    }
+}
+
 /// One localisation definition site that matched a search query.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LocalisationSearchHit {
@@ -165,16 +189,17 @@ pub struct LocalisationSearchResult {
 /// The search walks the persisted workspace index (Vanilla, dependency, and project files on
 /// disk); open-but-unsaved editor overlays are outside this view, mirroring the on-disk
 /// lifetime of a mod under development. Only definitions that currently win symbol resolution
-/// are retained, so one key yields one hit at its effective definition site. Value matching
-/// runs against the bounded decoded preview, case-insensitively.
+/// are retained, so one key yields one hit at its effective definition site. Key matching
+/// follows `key_match` (substring by default); value matching runs against the bounded decoded
+/// preview, case-insensitively.
 pub fn localisation_search_with_cancellation(
     snapshot: &AnalysisSnapshot,
     key: Option<&str>,
     value: Option<&str>,
+    key_match: LocalisationKeyMatch,
     limit: usize,
     cancellation: &CancellationToken,
 ) -> Result<LocalisationSearchResult, Cancelled> {
-    let key_query = key.map(str::to_ascii_lowercase);
     let value_query = value.map(str::to_ascii_lowercase);
     let mut hits = Vec::new();
     let mut truncated = false;
@@ -186,8 +211,8 @@ pub fn localisation_search_with_cancellation(
         if !definition.active || !definition.kind.eq_ignore_ascii_case("localisation") {
             continue;
         }
-        if let Some(query) = key_query.as_deref()
-            && !definition.name.to_ascii_lowercase().contains(query)
+        if let Some(query) = key
+            && !key_match.matches(&definition.name, query)
         {
             continue;
         }
