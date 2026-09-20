@@ -346,18 +346,19 @@ cmd_bench() {
 }
 
 cmd_baseline() {
-  local name="" skip_bench=0 skip_sweep=0 force=0 repeat="$BENCH_REPEAT" prev_flag=""
-  for arg in "$@"; do
-    case "$arg" in
-      --skip-bench) skip_bench=1 ;;
-      --skip-sweep) skip_sweep=1 ;;
-      --force) force=1 ;;
-      *) [ "$prev_flag" = "--repeat" ] && repeat="$arg" || name="$arg" ;;
+  local name="" skip_bench=0 skip_sweep=0 force=0 repeat="$BENCH_REPEAT"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --skip-bench) skip_bench=1; shift ;;
+      --skip-sweep) skip_sweep=1; shift ;;
+      --force) force=1; shift ;;
+      --repeat) repeat="$2"; shift 2 ;;
+      *) name="$1"; shift ;;
     esac
-    prev_flag="$arg"
   done
   [ -n "$name" ] || die "用法: ./perf.sh baseline <name> [--skip-bench|--skip-sweep|--repeat N|--force]"
-  [[ "$name" =~ ^[A-Za-z0-9._-]+$ ]] || die "基线名只允许 [A-Za-z0-9._-]"
+  [[ "$name" =~ ^[A-Za-z0-9._-]+$ ]] || die "基线名只允许 [A-Za-z0-9._-] 且不能以 - 开头"
+  case "$name" in -*) die "基线名不能以 - 开头";; esac
   local dir="$BASELINES_DIR/$name"
   if [ -e "$dir" ] && [ "$force" != 1 ]; then die "基线已存在：$dir（--force 覆盖）"; fi
   rm -rf "$dir"; mkdir -p "$dir/sweep"
