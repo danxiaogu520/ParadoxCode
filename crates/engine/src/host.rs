@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use rules::{GameProfile, ParserKind, RuleSet};
-use text::{AbsPath, LogicalPath};
+use text::{AbsPath, LogicalPath, TextRange};
 
 use crate::index_cache::{IndexCache, IndexCacheError};
 use crate::query_cache::SnapshotQueryCache;
@@ -25,10 +25,11 @@ use vfs::scan::{
     source_priorities, stable_file_id,
 };
 use vfs::{
-    DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId, DocumentSource, SourceFile,
-    SourceFileId, SourceRoot, SourceRootId, SourceRootKind, TextChange, WorkspaceChange,
-    WorkspaceError, WorkspaceScanFilters, WorkspaceScanIssueKind, WorkspaceScanLimits,
-    WorkspaceScanReport, WorkspaceScanToken,
+    DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId, DocumentSource,
+    LocalisationPreview, SourceFile, SourceFileId, SourceRoot, SourceRootId, SourceRootKind,
+    TextChange, WorkspaceChange, WorkspaceError, WorkspaceScanFilters, WorkspaceScanIssueKind,
+    WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
+    localisation_previews_from_parsed,
 };
 
 /// Mutable owner of workspace state.
@@ -46,6 +47,12 @@ pub struct AnalysisHost {
     index: Arc<WorkspaceIndex>,
     scan_report: Arc<WorkspaceScanReport>,
     installed_caches: BTreeSet<SourceRootId>,
+    /// Previews derived from scanned file states, preferred-language-filtered.
+    /// Assembled into `localisation_previews` at commit time; never served
+    /// directly so overlay-open files can be excluded per snapshot.
+    scanned_localisation_previews: Arc<LocalisationPreviewMap>,
+    /// Previews loaded from installed index caches.
+    installed_localisation_previews: Arc<LocalisationPreviewMap>,
     localisation_previews: Arc<LocalisationPreviewMap>,
     query_cache: Arc<SnapshotQueryCache>,
     parse_cache: Option<ParseCache>,
@@ -100,6 +107,8 @@ impl AnalysisHost {
             index: Arc::new(WorkspaceIndex::empty()),
             scan_report: Arc::new(WorkspaceScanReport::default()),
             installed_caches: BTreeSet::new(),
+            scanned_localisation_previews: Arc::new(LocalisationPreviewMap::new()),
+            installed_localisation_previews: Arc::new(LocalisationPreviewMap::new()),
             localisation_previews: Arc::new(LocalisationPreviewMap::new()),
             query_cache: Arc::new(SnapshotQueryCache::new()),
             parse_cache: None,
@@ -217,6 +226,8 @@ impl AnalysisHost {
             WorkspaceChange::SetSourceRoots(roots) => {
                 self.roots = Arc::from(roots);
                 self.installed_caches = BTreeSet::new();
+                self.scanned_localisation_previews = Arc::new(LocalisationPreviewMap::new());
+                self.installed_localisation_previews = Arc::new(LocalisationPreviewMap::new());
                 self.localisation_previews = Arc::new(LocalisationPreviewMap::new());
             }
             WorkspaceChange::SetWorkspaceRoot(root) => self.workspace_root = root,
@@ -432,13 +443,28 @@ impl AnalysisHost {
         let priorities = source_priorities(&roots, &files);
         index.resolve_priorities(&priorities, self.rules.as_ref());
 
-        let mut localisation_previews = (*self.localisation_previews).clone();
-        localisation_previews.merge(cached_previews);
+        // Cache installation owns the preview identity of its files: drop any
+        // scanned entries for them so the serving map never mixes the two
+        // renderings per range, then rebuild the serving set.
+        let installed_files = cached_previews
+            .iter()
+            .map(|((file_id, _), _)| file_id)
+            .collect::<rustc_hash::FxHashSet<SourceFileId>>();
+        let installed = {
+            let mut installed = (*self.installed_localisation_previews).clone();
+            installed.merge(cached_previews);
+            Arc::new(installed)
+        };
+        {
+            let scanned = Arc::make_mut(&mut self.scanned_localisation_previews);
+            scanned.retain_files(|file_id| !installed_files.contains(&file_id));
+        }
         self.roots = Arc::from(roots);
         self.source_files = Arc::new(files);
         self.source_file_paths = Arc::new(source_file_paths(&self.source_files));
         self.index = Arc::new(index);
-        self.localisation_previews = Arc::new(localisation_previews);
+        self.installed_localisation_previews = installed;
+        self.rebuild_serving_localisation_previews();
         self.installed_caches.extend(cached_root_ids);
         if !lazy_reference_sources.is_empty() {
             let mut sources = (*self.reference_sources).clone();
@@ -505,6 +531,103 @@ impl AnalysisHost {
             .or_else(|| after.strip_suffix(".yaml"))
             .unwrap_or(after);
         (!language.is_empty()).then_some(language)
+    }
+
+    /// Assembles the scanned preview set from file states. States built by the
+    /// scan pipeline already carry preferred-rendering previews (see
+    /// `FileState::cache_only`); this only groups them by file and applies the
+    /// same preferred-language retention as cache installation.
+    fn collect_scanned_localisation_previews(
+        file_states: &BTreeMap<SourceFileId, Arc<FileState>>,
+        files: &BTreeMap<SourceFileId, SourceFile>,
+        preferred: &[String],
+    ) -> LocalisationPreviewMap {
+        let mut previews = LocalisationPreviewMap::new();
+        for (file_id, state) in file_states {
+            previews.replace_file_shared(
+                *file_id,
+                Self::scanned_entries_handle_for_state(state, files.get(file_id), preferred),
+            );
+        }
+        previews
+    }
+
+    /// One file's preview entries under the preferred-language retention
+    /// policy, shared with the state's own vector when possible: cached
+    /// previews when the state carries them, otherwise a fresh extraction
+    /// from the retained frontend; `None` when filtered out.
+    fn scanned_entries_handle_for_state(
+        state: &FileState,
+        file: Option<&SourceFile>,
+        preferred: &[String],
+    ) -> Option<Arc<Vec<(TextRange, LocalisationPreview)>>> {
+        let retained = file.is_none_or(|file| {
+            Self::localisation_path_language(file.logical_path.as_str()).is_none_or(|language| {
+                language.eq_ignore_ascii_case("english")
+                    || preferred
+                        .iter()
+                        .any(|preferred| preferred.eq_ignore_ascii_case(language))
+            })
+        });
+        if !retained {
+            return None;
+        }
+        if let Some(cached) = state.cached_localisation_previews.as_ref() {
+            return Some(Arc::clone(cached));
+        }
+        match state.parsed() {
+            Some(index::ParsedSource::Text(parsed)) => {
+                let entries = localisation_previews_from_parsed(parsed);
+                (!entries.is_empty()).then(|| Arc::new(entries))
+            }
+            None => None,
+        }
+    }
+
+    /// Rebuilds the serving preview map from the installed and scanned sets,
+    /// excluding files whose current text lives in an open overlay document.
+    /// Installed entries win on duplicate ranges (cache install owns those
+    /// files' identity once it has replaced their scanned states).
+    fn rebuild_serving_localisation_previews(&mut self) {
+        let mut merged = (*self.scanned_localisation_previews).clone();
+        let overlay_files = self.overlay_source_file_ids();
+        merged.retain_files(|file_id| !overlay_files.contains(&file_id));
+        merged.merge((*self.installed_localisation_previews).clone());
+        self.localisation_previews = Arc::new(merged);
+    }
+
+    /// Refreshes one file's serving entries after its overlay state changed.
+    /// An open overlay must not serve scan-derived text; a closed one restores
+    /// the scanned entries (other documents for the same path still suppress).
+    fn refresh_serving_previews_for_file(&mut self, file_id: SourceFileId) {
+        let still_overlaid = self.documents.values().any(|document| {
+            document.source == DocumentSource::Overlay
+                && document
+                    .path
+                    .as_ref()
+                    .and_then(|path| self.source_file_paths.get(path))
+                    .is_some_and(|overlay_file| *overlay_file == file_id)
+        });
+        let serving = Arc::make_mut(&mut self.localisation_previews);
+        if still_overlaid {
+            serving.remove_file(file_id);
+        } else {
+            let handle = self
+                .scanned_localisation_previews
+                .file_entries_handle(file_id);
+            serving.replace_file_shared(file_id, handle);
+        }
+    }
+
+    /// Returns the source files whose live text currently lives in an open
+    /// overlay document.
+    fn overlay_source_file_ids(&self) -> rustc_hash::FxHashSet<SourceFileId> {
+        self.documents
+            .values()
+            .filter(|document| document.source == DocumentSource::Overlay)
+            .filter_map(|document| document.path.as_ref())
+            .filter_map(|path| self.source_file_paths.get(path).copied())
+            .collect()
     }
 
     /// Scans all configured roots in stable order and atomically refreshes source files and shards.
@@ -723,6 +846,12 @@ impl AnalysisHost {
             })
         });
         self.file_states = Arc::new(file_states);
+        self.scanned_localisation_previews = Arc::new(Self::collect_scanned_localisation_previews(
+            &self.file_states,
+            &self.source_files,
+            &self.preferred_localisation_languages,
+        ));
+        self.rebuild_serving_localisation_previews();
         self.index = Arc::new(index);
         self.scan_report = Arc::new(report.clone());
         self.advance_revision();
@@ -761,6 +890,7 @@ impl AnalysisHost {
         let mut index = self.index.as_ref().clone();
         let mut report = WorkspaceScanReport::default();
         let mut changed = false;
+        let mut preview_files: Vec<SourceFileId> = Vec::new();
 
         for change in changes {
             cancellation.checkpoint()?;
@@ -830,6 +960,7 @@ impl AnalysisHost {
                     let priorities = source_priorities(&self.roots, &files);
                     index.remove_shard_resolved(id, &priorities, self.rules.as_ref());
                     index.remove_position_ranges(id);
+                    preview_files.push(id);
                     changed = true;
                 }
                 continue;
@@ -899,6 +1030,7 @@ impl AnalysisHost {
             files.insert(id, source_file);
             paths.insert(change.path.clone(), id);
             file_states.insert(id, Arc::clone(&state));
+            preview_files.push(id);
             let priorities = source_priorities(&self.roots, &files);
             index.replace_shard_resolved(state.shard_handle(), &priorities, self.rules.as_ref());
             report.indexed_files = report.indexed_files.saturating_add(1);
@@ -910,6 +1042,22 @@ impl AnalysisHost {
             self.source_files = Arc::new(files);
             self.source_file_paths = Arc::new(paths);
             self.file_states = Arc::new(file_states);
+            {
+                let scanned = Arc::make_mut(&mut self.scanned_localisation_previews);
+                for id in &preview_files {
+                    let entries = self.file_states.get(id).and_then(|state| {
+                        Self::scanned_entries_handle_for_state(
+                            state,
+                            self.source_files.get(id),
+                            &self.preferred_localisation_languages,
+                        )
+                    });
+                    scanned.replace_file_shared(*id, entries);
+                }
+            }
+            for id in &preview_files {
+                self.refresh_serving_previews_for_file(*id);
+            }
             self.index = Arc::new(index);
             self.scan_report = Arc::new(report.clone());
             self.advance_revision();
@@ -961,7 +1109,16 @@ impl AnalysisHost {
             path,
         );
         let declares_dynamic_definitions = self.document_declares_dynamic_definitions(&document);
+        let overlay_file = document
+            .path
+            .as_ref()
+            .and_then(|path| self.source_file_paths.get(path).copied());
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
+        // The overlay now owns this file's live text; scan-derived previews
+        // must stop serving until the document closes.
+        if let Some(file_id) = overlay_file {
+            self.refresh_serving_previews_for_file(file_id);
+        }
         self.advance_document_revision();
         if declares_dynamic_definitions {
             self.query_cache.advance_definitions(self.revision);
@@ -1136,6 +1293,10 @@ impl AnalysisHost {
         // like editing one; the restored index candidate counts too (an edit
         // that removed every definition must still invalidate).
         let mut declares_dynamic_definitions = self.document_declares_dynamic_definitions(current);
+        let overlay_file = current
+            .path
+            .as_ref()
+            .and_then(|path| self.source_file_paths.get(path).copied());
         Arc::make_mut(&mut self.documents).remove(id);
         if let Some(path) = path {
             let mut report = WorkspaceScanReport::default();
@@ -1156,6 +1317,11 @@ impl AnalysisHost {
                     self.document_declares_dynamic_definitions(&document);
                 Arc::make_mut(&mut self.documents).insert(id.clone(), document);
             }
+        }
+        // With the overlay gone the scan-derived previews for this file may
+        // serve again (unless another overlay still owns the path).
+        if let Some(file_id) = overlay_file {
+            self.refresh_serving_previews_for_file(file_id);
         }
         self.advance_document_revision();
         if declares_dynamic_definitions {
