@@ -54,7 +54,7 @@ pub fn hover_with_cancellation(
                 .map(|candidate| (candidate.kind.clone(), candidate.name.clone()))
         });
         let (owner_kind, owner_name) = owner.as_ref().map_or((None, None), |(kind, name)| {
-            (Some(kind.as_str()), Some(name.as_str()))
+            (Some(kind.as_ref()), Some(name.as_str()))
         });
         let occurrences = input
             .hir

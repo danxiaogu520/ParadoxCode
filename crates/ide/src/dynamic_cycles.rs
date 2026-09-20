@@ -121,7 +121,7 @@ pub(crate) fn dynamic_cycle_report(
 
 /// One live dynamic-definition definition in the call graph.
 struct DynamicNode {
-    kind: String,
+    kind: Arc<str>,
     name: String,
     /// Lowercased parameter names used in key position inside the template.
     dynamic_key_params: Vec<String>,
@@ -134,7 +134,7 @@ fn build_cycle_report(
     cancellation.checkpoint()?;
     // Node names come from both live surfaces: the workspace index (file-backed
     // definitions) and open overlay documents, matching resolve order.
-    let mut candidates: Vec<(String, String)> = Vec::new();
+    let mut candidates: Vec<(Arc<str>, String)> = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for definition in snapshot.index().definitions_iter() {
         if !dynamic_definition_type(snapshot, &definition.kind) {
@@ -144,7 +144,7 @@ fn build_cycle_report(
             definition.kind.to_ascii_lowercase(),
             definition.name.to_ascii_lowercase(),
         )) {
-            candidates.push((definition.kind.to_string(), definition.name.to_string()));
+            candidates.push((definition.kind.clone(), definition.name.to_string()));
         }
     }
     for document in snapshot
@@ -163,7 +163,7 @@ fn build_cycle_report(
                 definition.kind.to_ascii_lowercase(),
                 definition.name.to_ascii_lowercase(),
             )) {
-                candidates.push((definition.kind.clone(), definition.name.clone()));
+                candidates.push((definition.kind.clone(), definition.name.to_string()));
             }
         }
     }
@@ -372,7 +372,7 @@ fn collect_call_site_bindings(
     }
     // Overlay sites change with every edit, so they are always recomputed;
     // only open documents participate, which keeps this half cheap.
-    let mut overlay_sites: Vec<(DocumentId, String, String, TextRange)> = Vec::new();
+    let mut overlay_sites: Vec<(DocumentId, Arc<str>, String, TextRange)> = Vec::new();
     for document in snapshot
         .documents()
         .values()
@@ -529,7 +529,7 @@ fn token_has_parameter(token: &TemplateToken) -> bool {
 
 fn first_parameter_name(token: &TemplateToken) -> Option<&str> {
     token.fragments.iter().find_map(|fragment| match fragment {
-        TemplateFragment::Parameter { name, .. } => Some(name.as_str()),
+        TemplateFragment::Parameter { name, .. } => Some(name.as_ref()),
         _ => None,
     })
 }

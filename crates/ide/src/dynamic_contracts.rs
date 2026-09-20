@@ -699,7 +699,7 @@ fn build_contract_report(
     cancellation: &CancellationToken,
 ) -> Result<DynamicContractReport, Cancelled> {
     let profile = snapshot.game_profile();
-    let mut candidates: Vec<(String, String)> = Vec::new();
+    let mut candidates: Vec<(Arc<str>, String)> = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for definition in snapshot.index().definitions_iter() {
         if !dynamic_definition_type(snapshot, &definition.kind) {
@@ -709,7 +709,7 @@ fn build_contract_report(
             definition.kind.to_ascii_lowercase(),
             definition.name.to_ascii_lowercase(),
         )) {
-            candidates.push((definition.kind.to_string(), definition.name.to_string()));
+            candidates.push((definition.kind.clone(), definition.name.to_string()));
         }
     }
     for document in snapshot
@@ -728,7 +728,7 @@ fn build_contract_report(
                 definition.kind.to_ascii_lowercase(),
                 definition.name.to_ascii_lowercase(),
             )) {
-                candidates.push((definition.kind.clone(), definition.name.clone()));
+                candidates.push((definition.kind.clone(), definition.name.to_string()));
             }
         }
     }

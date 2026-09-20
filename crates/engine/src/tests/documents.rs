@@ -565,7 +565,7 @@ fn prepared_document_commit_rejects_superseded_text_and_version() {
     assert!(document.hir().is_some_and(|hir| {
         hir.definitions()
             .iter()
-            .any(|definition| definition.kind == "event" && definition.name == "current.1")
+            .any(|definition| definition.kind.as_ref() == "event" && definition.name == "current.1")
     }));
 }
 

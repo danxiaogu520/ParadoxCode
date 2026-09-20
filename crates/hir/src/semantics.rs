@@ -1,5 +1,7 @@
 //! Rule/profile-aware definitions, references, and localisation semantics.
 
+use std::sync::Arc;
+
 use parser::parse_quoted_script;
 use rules::{GameProfile, KeyMatcher, ProfileDefinitionRule, RuleSet, RuleShape, TypeDescriptor};
 use text::{LogicalPath, TextRange, TextSize};
@@ -406,10 +408,11 @@ pub(super) fn lower_semantics(
     Vec<HirReference>,
     Vec<DefinitionAttributes>,
 ) {
+    let localisation_kind: Arc<str> = vfs::intern_shard_string("localisation");
     let mut definitions = localisation_entries
         .iter()
         .map(|entry| HirDefinition {
-            kind: "localisation".to_owned(),
+            kind: localisation_kind.clone(),
             name: entry.name.clone(),
             range: entry.range,
             selection_range: entry.name_range,
@@ -437,7 +440,7 @@ pub(super) fn lower_semantics(
                             definition_range: definition.range,
                             attribute_keys: property_children[property_index]
                                 .iter()
-                                .map(|&child| properties[child].key.clone())
+                                .map(|&child| vfs::intern_shard_string(&properties[child].key))
                                 .collect(),
                         });
                     }
@@ -456,7 +459,7 @@ pub(super) fn lower_semantics(
                         && nested_property(properties, property_index, &rule.absent_field).is_none()
                     {
                         definitions.push(HirDefinition {
-                            kind: rule.kind.clone(),
+                            kind: vfs::intern_shard_string(&rule.kind),
                             name: property.key.clone(),
                             range: property.range,
                             selection_range: property.key_range,
@@ -473,7 +476,7 @@ pub(super) fn lower_semantics(
                     for &child_index in &property_children[property_index] {
                         let child = &properties[child_index];
                         definitions.push(HirDefinition {
-                            kind: rule.kind.clone(),
+                            kind: vfs::intern_shard_string(&rule.kind),
                             name: child.key.clone(),
                             range: child.range,
                             selection_range: child.key_range,
@@ -500,7 +503,7 @@ pub(super) fn lower_semantics(
                 && !scalar.value.is_empty()
             {
                 definitions.push(HirDefinition {
-                    kind: kind.to_owned(),
+                    kind: vfs::intern_shard_string(kind),
                     name: scalar.value.clone(),
                     range: scalar.range,
                     selection_range: scalar.range,
@@ -520,7 +523,7 @@ pub(super) fn lower_semantics(
             };
             if !scalar.value.is_empty() {
                 definitions.push(HirDefinition {
-                    kind: rule.kind.clone(),
+                    kind: vfs::intern_shard_string(&rule.kind),
                     name: scalar.value.clone(),
                     range: named.range,
                     selection_range: scalar.range,
@@ -574,8 +577,9 @@ pub(super) fn lower_semantics(
     }
 
     if let Some(category) = logical_path.and_then(|path| rules.classify(path)) {
+        let category_kind: Arc<str> = vfs::intern_shard_string(&category.id);
         references.extend(bare_values.iter().map(|value| HirReference {
-            kind: category.id.clone(),
+            kind: category_kind.clone(),
             name: value.value.clone(),
             range: value.range,
             origin: HirReferenceOrigin::Category,
@@ -676,7 +680,7 @@ fn quoted_script_value_definitions(
                 continue;
             };
             definitions.push(HirDefinition {
-                kind: kind.to_owned(),
+                kind: vfs::intern_shard_string(kind),
                 name: value.value.clone(),
                 range,
                 selection_range,
@@ -713,7 +717,7 @@ fn semantic_type_definitions(
                 .map_or(file_name, |(stem, _)| stem);
             if !name.is_empty() {
                 definitions.push(HirDefinition {
-                    kind: descriptor.name.clone(),
+                    kind: vfs::intern_shard_string(&descriptor.name),
                     name: name.to_owned(),
                     range: properties
                         .iter()
@@ -774,6 +778,7 @@ fn scripted_localisation_definitions(
         return Vec::new();
     }
     let mut definitions = Vec::new();
+    let defined_text_kind: Arc<str> = vfs::intern_shard_string("defined_text");
     for property in properties.iter().filter(|property| property.top_level) {
         for child in immediate_children(properties, property)
             .filter(|child| child.key.eq_ignore_ascii_case("name"))
@@ -785,7 +790,7 @@ fn scripted_localisation_definitions(
                 continue;
             }
             definitions.push(HirDefinition {
-                kind: "defined_text".to_owned(),
+                kind: defined_text_kind.clone(),
                 name: scalar.value.clone(),
                 range: property.range,
                 selection_range: scalar.range,
@@ -876,7 +881,7 @@ fn push_type_definition(
         return;
     }
     definitions.push(HirDefinition {
-        kind: descriptor.name.clone(),
+        kind: vfs::intern_shard_string(&descriptor.name),
         name,
         range: property.range,
         selection_range,
@@ -927,7 +932,7 @@ fn dynamic_definition_references(
                 continue;
             }
             references.push(HirReference {
-                kind: type_name.clone(),
+                kind: vfs::intern_shard_string(type_name),
                 name: property.key.clone(),
                 range: property.key_range,
                 origin: HirReferenceOrigin::DynamicDefinition,
@@ -1053,7 +1058,7 @@ fn semantic_localisation_reference(
     let matches = rules.exact_semantic_rules(&property.key).any(matches_rule)
         || enum_localisation_rules.iter().copied().any(matches_rule);
     matches.then_some(HirReference {
-        kind: "localisation".to_owned(),
+        kind: "localisation".into(),
         name: scalar.value.clone(),
         range: scalar.range,
         origin: HirReferenceOrigin::Semantic,
@@ -1150,7 +1155,7 @@ fn semantic_typed_references(
         // agree on the workspace kind; otherwise navigation must not guess an interpretation.
         if kinds.len() == 1 {
             references.push(HirReference {
-                kind: kinds.remove(0),
+                kind: vfs::intern_shard_string(kinds.remove(0).as_str()),
                 name: scalar.value.clone(),
                 range: scalar.range,
                 origin: HirReferenceOrigin::SemanticTyped,
@@ -1309,7 +1314,7 @@ pub(super) fn derived_localisation_references(
             {
                 if let Some(template) = binding.template.as_deref() {
                     references.push(HirReference {
-                        kind: "localisation".to_owned(),
+                        kind: "localisation".into(),
                         name: template.replace('$', &name),
                         range,
                         origin: HirReferenceOrigin::DerivedLocalisation,
@@ -1344,7 +1349,7 @@ pub(super) fn derived_localisation_references(
                     continue;
                 }
                 references.push(HirReference {
-                    kind: "localisation".to_owned(),
+                    kind: "localisation".into(),
                     name: field_value.value.clone(),
                     range: field_value.range,
                     origin: HirReferenceOrigin::DerivedLocalisation,
@@ -1526,7 +1531,7 @@ fn definition_from_rule(
         .and_then(|field| nested_property(properties, property_index, field))
         .and_then(|nested| nested.scalar.as_ref());
     HirDefinition {
-        kind: rule.kind.clone(),
+        kind: vfs::intern_shard_string(&rule.kind),
         name: named.map_or_else(|| property.key.clone(), |scalar| scalar.value.clone()),
         range: property.range,
         selection_range: named.map_or(property.key_range, |scalar| scalar.range),
@@ -1558,7 +1563,7 @@ fn reference_from_property(
         return None;
     }
     Some(HirReference {
-        kind: rule.kind.clone(),
+        kind: vfs::intern_shard_string(&rule.kind),
         name: scalar.value.clone(),
         range: scalar.range,
         origin: HirReferenceOrigin::Profile,

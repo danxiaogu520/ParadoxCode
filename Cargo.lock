@@ -354,6 +354,7 @@ dependencies = [
  "rules",
  "rustc-hash",
  "text",
+ "vfs",
 ]
 
 [[package]]

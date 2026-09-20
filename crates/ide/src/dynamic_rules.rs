@@ -191,7 +191,7 @@ pub(crate) struct DynamicValueSiteRow {
     /// means unrestricted).
     pub(crate) matcher_scopes: Vec<Vec<String>>,
     /// The statement's operator, for operator-sensitive replays.
-    pub(crate) operator: Option<String>,
+    pub(crate) operator: Option<Arc<str>>,
 }
 
 /// One affixed scalar usage (`type = $RT$_rebels`, `school = hanafii_$S$`):
@@ -336,7 +336,7 @@ pub(crate) enum DynamicScopeStep {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DynamicAffixSegment {
     Literal(String),
-    Parameter(String),
+    Parameter(Arc<str>),
 }
 
 /// Why a body statement can never run.
@@ -374,7 +374,7 @@ pub(crate) struct DynamicBodyFinding {
 #[derive(Clone, Debug)]
 pub(crate) struct DynamicRuleRow {
     /// Dynamic symbol kind, such as `scripted_effect`.
-    pub(crate) kind: String,
+    pub(crate) kind: Arc<str>,
     pub(crate) name: String,
     /// Semantic context the body executes in (`effect` / `trigger`).
     pub(crate) context: String,
@@ -514,7 +514,7 @@ fn build_dynamic_rule_report(
     cancellation: &CancellationToken,
 ) -> Result<DynamicRuleReport, Cancelled> {
     let profile = snapshot.game_profile();
-    let mut candidates: Vec<(String, String)> = Vec::new();
+    let mut candidates: Vec<(Arc<str>, String)> = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for definition in snapshot.index().definitions_iter() {
         if !dynamic_definition_type(snapshot, &definition.kind) {
@@ -524,7 +524,7 @@ fn build_dynamic_rule_report(
             definition.kind.to_ascii_lowercase(),
             definition.name.to_ascii_lowercase(),
         )) {
-            candidates.push((definition.kind.to_string(), definition.name.to_string()));
+            candidates.push((definition.kind.clone(), definition.name.to_string()));
         }
     }
     for document in snapshot
@@ -543,7 +543,7 @@ fn build_dynamic_rule_report(
                 definition.kind.to_ascii_lowercase(),
                 definition.name.to_ascii_lowercase(),
             )) {
-                candidates.push((definition.kind.clone(), definition.name.clone()));
+                candidates.push((definition.kind.clone(), definition.name.to_string()));
             }
         }
     }
@@ -1959,7 +1959,7 @@ fn token_parameters(token: &TemplateToken) -> impl Iterator<Item = &str> {
         .fragments
         .iter()
         .filter_map(|fragment| match fragment {
-            TemplateFragment::Parameter { name, .. } => Some(name.as_str()),
+            TemplateFragment::Parameter { name, .. } => Some(name.as_ref()),
             TemplateFragment::Literal(_) => None,
         })
 }

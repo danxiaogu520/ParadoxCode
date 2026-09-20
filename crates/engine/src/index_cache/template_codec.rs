@@ -1,5 +1,7 @@
 //! Versioned serialization for source-independent scripted-dynamic template IR.
 
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 use text::TextRange;
 
@@ -210,7 +212,7 @@ fn require_range(range: TextRange, owner: TextRange) -> Result<(), IndexCacheErr
 impl From<&Template> for EncodedTemplate {
     fn from(template: &Template) -> Self {
         Self {
-            kind: template.kind.clone(),
+            kind: template.kind.as_ref().to_owned(),
             name: template.name.clone(),
             definition_range: template.definition_range.into(),
             body_range: template.body_range.into(),
@@ -225,7 +227,7 @@ impl EncodedTemplate {
         budget.text(&self.kind)?;
         budget.text(&self.name)?;
         Ok(Template {
-            kind: self.kind,
+            kind: Arc::from(self.kind),
             name: self.name,
             definition_range: decode_range(self.definition_range)?,
             body_range: decode_range(self.body_range)?,
@@ -265,7 +267,7 @@ impl Property {
         Ok(TemplateProperty {
             key: self.key.into_model(budget)?,
             range: decode_range(self.range)?,
-            operator: self.operator,
+            operator: self.operator.map(Arc::from),
             value: self.value.into_model(budget)?,
         })
     }
@@ -287,7 +289,7 @@ impl Conditional {
     fn into_model(self, budget: &mut Budget) -> Result<TemplateConditional, IndexCacheError> {
         budget.text(&self.name)?;
         Ok(TemplateConditional {
-            name: self.name,
+            name: Arc::from(self.name),
             negated: self.negated,
             range: decode_range(self.range)?,
             items: decode_items(self.items, budget)?,
@@ -320,7 +322,7 @@ impl Fragment {
             Self::Parameter { name, range } => {
                 budget.text(&name)?;
                 Ok(TemplateFragment::Parameter {
-                    name,
+                    name: Arc::from(name),
                     range: decode_range(range)?,
                 })
             }
@@ -349,7 +351,7 @@ impl From<&TemplateProperty> for Property {
         Self {
             key: (&property.key).into(),
             range: property.range.into(),
-            operator: property.operator.clone(),
+            operator: property.operator.as_deref().map(str::to_owned),
             value: (&property.value).into(),
         }
     }
@@ -370,7 +372,7 @@ impl From<&TemplateValue> for Value {
 impl From<&TemplateConditional> for Conditional {
     fn from(conditional: &TemplateConditional) -> Self {
         Self {
-            name: conditional.name.clone(),
+            name: conditional.name.as_ref().to_owned(),
             negated: conditional.negated,
             range: conditional.range.into(),
             items: conditional.items.iter().map(Item::from).collect(),
@@ -393,7 +395,7 @@ impl From<&TemplateFragment> for Fragment {
         match fragment {
             TemplateFragment::Literal(value) => Self::Literal(value.clone()),
             TemplateFragment::Parameter { name, range } => Self::Parameter {
-                name: name.clone(),
+                name: name.as_ref().to_owned(),
                 range: (*range).into(),
             },
         }

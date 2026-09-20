@@ -2294,7 +2294,7 @@ fn branch_active_record_token(
                 .iter()
                 .any(|recorded| recorded.eq_ignore_ascii_case(name))
         {
-            missing.push(name.clone());
+            missing.push(name.as_ref().to_owned());
         }
     }
 }

@@ -16,6 +16,7 @@ rustc-hash = "2"
 parser = { path = "../parser" }
 rules = { path = "../rules" }
 text = { path = "../text" }
+vfs = { path = "../vfs" }
 
 [lints]
 workspace = true
