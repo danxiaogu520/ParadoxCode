@@ -1184,7 +1184,8 @@
     "perf:compare": "node scripts/compare.mjs",
     "package": "npm run compile && vsce package",
     "perf:probe": "node scripts/probe.mjs",
-    "sweep": "node scripts/sweep.mjs"
+    "sweep": "node scripts/sweep.mjs",
+    "mcp": "node scripts/mcp.mjs"
   },
   "dependencies": {
     "vscode-languageclient": "^10.1.1"

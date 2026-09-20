@@ -520,4 +520,43 @@ for (const key of [chatParticipant.description, ...(chatParticipant.commands ?? 
   }
 }
 
+// The stdio MCP server must ship the same tool surface: its manifest is read
+// at runtime from contributes.languageModelTools (single source of truth), so
+// the MCP face cannot drift from the VS Code face, and its instructions must
+// carry the same hard tool discipline as the participant prompt.
+for (const relative of [
+  'scripts/mcp.mjs',
+  'scripts/lib/mcpServer.mjs',
+  'scripts/lib/mcpTools.mjs',
+  'scripts/lib/mcpBoot.mjs',
+]) {
+  if (!existsSync(join(root, relative))) {
+    fail(`MCP server source missing: ${relative}`);
+  }
+}
+const mcpToolsSource = readFileSync(join(root, 'scripts', 'lib', 'mcpTools.mjs'), 'utf8');
+if (!mcpToolsSource.includes('languageModelTools')) {
+  fail('mcpTools must derive its manifest from contributes.languageModelTools at runtime');
+}
+const { MCP_INSTRUCTIONS, readToolManifest } = await import('./lib/mcpTools.mjs');
+const mcpManifestTools = readToolManifest();
+const mcpNames = mcpManifestTools.map((tool) => tool.name).sort();
+const lmNames = agentTools.map((tool) => tool.name).sort();
+if (JSON.stringify(mcpNames) !== JSON.stringify(lmNames)) {
+  fail(`the MCP tool manifest must mirror languageModelTools: ${JSON.stringify({ mcpNames, lmNames })}`);
+}
+for (const tool of mcpManifestTools) {
+  if (typeof tool.description !== 'string' || tool.description.length < 40) {
+    fail(`MCP tool ${tool.name} needs a descriptive description`);
+  }
+  if (tool.inputSchema?.type !== 'object') {
+    fail(`MCP tool ${tool.name} needs an object inputSchema`);
+  }
+}
+for (const marker of ['validate-text', 'search-rules', 'search-symbols', 'UnknownLocalisationKey']) {
+  if (!MCP_INSTRUCTIONS.includes(marker)) {
+    fail(`MCP instructions must carry the tool-discipline marker: ${marker}`);
+  }
+}
+
 console.log('extension contract OK');
