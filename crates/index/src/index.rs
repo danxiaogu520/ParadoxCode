@@ -200,10 +200,12 @@ impl<'map> Iterator for PositionMapIter<'map> {
 ///
 /// A flat `BTreeMap<(SourceFileId, TextRange), LocalisationPreview>` stores one tree entry for
 /// every localisation line. Grouping ranges by file keeps lookup deterministic while avoiding
-/// the per-entry tree-node overhead for the hundreds of thousands of Vanilla previews.
+/// the per-entry tree-node overhead for the hundreds of thousands of Vanilla previews. Each
+/// file's entries live behind one shared slice so assembling a map from file states copies
+/// handles, not preview text.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct LocalisationPreviewMap {
-    by_file: BTreeMap<SourceFileId, Vec<(TextRange, LocalisationPreview)>>,
+    by_file: BTreeMap<SourceFileId, Arc<Vec<(TextRange, LocalisationPreview)>>>,
     len: usize,
 }
 
@@ -249,6 +251,24 @@ impl LocalisationPreviewMap {
         }
     }
 
+    /// Returns one file's entries in range order, or an empty slice when the
+    /// file has none retained.
+    #[must_use]
+    pub fn file_entries(&self, file_id: SourceFileId) -> &[(TextRange, LocalisationPreview)] {
+        self.by_file
+            .get(&file_id)
+            .map_or(&[][..], |entries| entries)
+    }
+
+    /// Returns one file's shared entry handle without copying the previews.
+    #[must_use]
+    pub fn file_entries_handle(
+        &self,
+        file_id: SourceFileId,
+    ) -> Option<Arc<Vec<(TextRange, LocalisationPreview)>>> {
+        self.by_file.get(&file_id).map(Arc::clone)
+    }
+
     /// Replaces all previews belonging to one file.
     pub fn replace_file(
         &mut self,
@@ -260,6 +280,26 @@ impl LocalisationPreviewMap {
         if entries.is_empty() {
             return;
         }
+        self.len = self.len.saturating_add(entries.len());
+        self.by_file.insert(file_id, Arc::new(entries));
+    }
+
+    /// Replaces one file's previews with an already-extracted, range-sorted
+    /// entry vector without copying the preview text. Passing `None` (or an
+    /// empty vector) removes the file's entries.
+    pub fn replace_file_shared(
+        &mut self,
+        file_id: SourceFileId,
+        entries: Option<Arc<Vec<(TextRange, LocalisationPreview)>>>,
+    ) {
+        self.remove_file(file_id);
+        let Some(entries) = entries.filter(|entries| !entries.is_empty()) else {
+            return;
+        };
+        debug_assert!(
+            entries.windows(2).all(|pair| pair[0].0 < pair[1].0),
+            "shared preview entries must be sorted by range"
+        );
         self.len = self.len.saturating_add(entries.len());
         self.by_file.insert(file_id, entries);
     }
@@ -278,18 +318,37 @@ impl LocalisationPreviewMap {
 
     /// Merges another map without flattening its already grouped vectors.
     pub fn merge(&mut self, other: Self) {
-        self.merge_grouped(other.by_file);
+        self.merge_shared(other.by_file);
     }
 
     fn merge_grouped(
         &mut self,
         grouped: BTreeMap<SourceFileId, Vec<(TextRange, LocalisationPreview)>>,
     ) {
-        for (file_id, additions) in grouped {
-            let mut merged = self.by_file.remove(&file_id).unwrap_or_default();
-            merged.extend(additions);
-            let merged = sort_preview_entries(merged);
-            self.by_file.insert(file_id, merged);
+        let shared = grouped
+            .into_iter()
+            .filter(|(_, entries)| !entries.is_empty())
+            .map(|(file_id, entries)| (file_id, Arc::new(sort_preview_entries(entries))));
+        self.merge_shared(shared.collect());
+    }
+
+    /// Merges per-file shared slices: files present on only one side attach
+    /// their handle without copying; overlapping files materialize once.
+    fn merge_shared(
+        &mut self,
+        additions: BTreeMap<SourceFileId, Arc<Vec<(TextRange, LocalisationPreview)>>>,
+    ) {
+        for (file_id, added) in additions {
+            if let Some(existing) = self.by_file.remove(&file_id) {
+                let mut merged = existing.as_ref().clone();
+                merged.extend(added.iter().cloned());
+                let merged = sort_preview_entries(merged);
+                self.len = self.len.saturating_add(merged.len());
+                self.by_file.insert(file_id, Arc::new(merged));
+            } else {
+                self.len = self.len.saturating_add(added.len());
+                self.by_file.insert(file_id, added);
+            }
         }
         self.recount_len();
     }
@@ -318,7 +377,7 @@ impl LocalisationPreviewMap {
             let entries = sort_preview_entries(entries);
             map.len = map.len.saturating_add(entries.len());
             if !entries.is_empty() {
-                map.by_file.insert(file_id, entries);
+                map.by_file.insert(file_id, Arc::new(entries));
             }
         }
         map
@@ -345,7 +404,7 @@ impl LocalisationPreviewMap {
     }
 
     fn recount_len(&mut self) {
-        self.len = self.by_file.values().map(Vec::len).sum();
+        self.len = self.by_file.values().map(|entries| entries.len()).sum();
     }
 }
 
@@ -369,7 +428,7 @@ pub struct LocalisationPreviewMapIter<'map> {
     outer: std::collections::btree_map::Iter<
         'map,
         SourceFileId,
-        Vec<(TextRange, LocalisationPreview)>,
+        Arc<Vec<(TextRange, LocalisationPreview)>>,
     >,
     current_file: Option<SourceFileId>,
     current: Option<std::slice::Iter<'map, (TextRange, LocalisationPreview)>>,
