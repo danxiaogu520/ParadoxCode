@@ -162,4 +162,38 @@ suite('ParadoxCode VS Code extension host', () => {
     assert.equal(walkthrough.steps[3].id, 'vanillaData');
     assert.deepEqual(walkthrough.steps[3].completionEvents, ['onContext:paradoxcodeVanillaReady']);
   });
+
+  test('agent budget helpers bound lists and text', () => {
+    const { capList, capText, collapseWhitespace } = require('../../out/agent/budget.js');
+    assert.deepEqual(capList([1, 2, 3], 5), { items: [1, 2, 3], omitted: 0 });
+    assert.deepEqual(capList([1, 2, 3, 4], 2), { items: [1, 2], omitted: 2 });
+    assert.equal(capText('short', 10), 'short');
+    const capped = capText('x'.repeat(50), 10);
+    assert.ok(capped.startsWith('x'.repeat(10)));
+    assert.ok(capped.includes('(+40 more characters)'));
+    assert.equal(collapseWhitespace(' a \n\t b  c '), 'a b c');
+  });
+
+  test('agent server accessor reports an unavailable client as a retryable error', async () => {
+    const { acquireAgentClient, setAgentClient } = require('../../out/agent/server.js');
+    setAgentClient(undefined);
+    await assert.rejects(
+      acquireAgentClient(10),
+      (error) => error instanceof Error && error.name === 'AgentServerUnavailableError'
+        && /not running/.test(error.message),
+    );
+  });
+
+  test('agent tools register on hosts with the Language Model Tools API', () => {
+    const { registerAgentTools } = require('../../out/agent/register.js');
+    const disposables = registerAgentTools();
+    if ('lm' in vscode && typeof vscode.lm?.registerTool === 'function') {
+      assert.equal(disposables.length, 5, 'all five analysis tools must register');
+      for (const disposable of disposables) {
+        disposable.dispose();
+      }
+    } else {
+      assert.equal(disposables.length, 0);
+    }
+  });
 });

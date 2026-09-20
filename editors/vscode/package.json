@@ -14,7 +14,7 @@
     "url": "https://github.com/danxiaogu520/ParadoxCode/issues"
   },
   "engines": {
-    "vscode": "^1.91.0"
+    "vscode": "^1.99.0"
   },
   "capabilities": {
     "untrustedWorkspaces": {
@@ -188,6 +188,138 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "languageModelTools": [
+      {
+        "name": "paradoxcode-validate-text",
+        "displayName": "ParadoxCode: Validate Script Text",
+        "modelDescription": "Validate Paradox EU4 script text (1-16 files) against the embedded EU4 rules and the indexed workspace/Vanilla data without writing anything to disk. Pass each file as {path, text} where path is the mod-relative logical path (for example \"events/my_event.txt\" or \"localisation/mod_l_english.yml\"). Returns per-file diagnostics with stable codes (UnknownKey, InvalidValue, WrongScope, UnknownLocalisationKey, ...), 1-based line numbers, and messages. Use it to verify drafted mod files before or after writing them.",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "files"
+          ],
+          "properties": {
+            "files": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "required": [
+                  "path",
+                  "text"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "Logical mod path such as events/my_event.txt"
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "Full file content to validate"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "paradoxcode-search-symbols",
+        "displayName": "ParadoxCode: Search Symbols",
+        "modelDescription": "Search the indexed EU4 symbol table (project mod, dependency mods, and Vanilla) for definitions such as events, decisions, tags, missions, or scripted triggers/effects by name substring. Returns matching symbol names with their kind and file location. Use it before drafting to discover what the game or existing mods already define.",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "query"
+          ],
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Symbol name substring (at least 2 characters)"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum entries to return (1-50, default 20)"
+            }
+          }
+        }
+      },
+      {
+        "name": "paradoxcode-search-rules",
+        "displayName": "ParadoxCode: Search Rules",
+        "modelDescription": "Search the embedded first-party EU4 semantic rule database. Filters (case-insensitive, at least one required): context (exact or prefix, for example trigger, effect, type:event), key (substring of the rule key, for example add_army_tradition), scope (substring of an allowed scope; rules valid in any scope match every scope query). Entries document the expected shape, allowed scopes, and documentation text. Use it to learn which keys are valid, what they accept, and in which scopes they work before writing them.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "context": {
+              "type": "string",
+              "description": "Semantic root such as trigger, effect, or type:event"
+            },
+            "key": {
+              "type": "string",
+              "description": "Substring of the rule key"
+            },
+            "scope": {
+              "type": "string",
+              "description": "Substring of an allowed scope, for example country"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum entries to return (1-50, default 20)"
+            }
+          }
+        }
+      },
+      {
+        "name": "paradoxcode-search-localisation",
+        "displayName": "ParadoxCode: Search Localisation",
+        "modelDescription": "Search indexed EU4 localisation entries (project mod, dependencies, and Vanilla) by key substring and/or displayed-value substring, both case-insensitive. Returns the winning definition per key with its value, language, and file. Use it to find usable localisation keys, check what a key displays, or reverse-search text to its key before referencing it from events or decisions.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "Substring of the localisation key"
+            },
+            "text": {
+              "type": "string",
+              "description": "Substring of the displayed value"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum entries to return (1-50, default 20)"
+            }
+          }
+        }
+      },
+      {
+        "name": "paradoxcode-hover-info",
+        "displayName": "ParadoxCode: Hover Info",
+        "modelDescription": "Look up the rule-driven hover explanation at one position of an indexed EU4 script or localisation file (project, dependency, or Vanilla). Input uses a 1-based line and 0-based UTF-16 character column. Returns the semantic documentation for the key or value at that position. Use it to ask what a specific key means or accepts in context.",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "path",
+            "line"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Absolute path, file: URI, or workspace-relative path of an indexed file"
+            },
+            "line": {
+              "type": "number",
+              "description": "1-based line number"
+            },
+            "character": {
+              "type": "number",
+              "description": "0-based UTF-16 character column (default 0)"
+            }
+          }
+        }
+      }
+    ],
     "languages": [
       {
         "id": "eu4",
@@ -1029,7 +1161,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.5.1",
-    "@types/vscode": "1.91.0",
+    "@types/vscode": "1.99.0",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^3.2.2",
     "mocha": "^12.0.1",
