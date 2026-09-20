@@ -132,6 +132,8 @@ pub(crate) fn is_snapshot_request(method: &str) -> bool {
             | "pdc/textDiagnostics"
             | "pdc/missionPreview"
             | "pdc/hoverCard"
+            | "pdc/ruleSearch"
+            | "pdc/localisationSearch"
     )
 }
 

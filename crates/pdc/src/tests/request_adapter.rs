@@ -76,6 +76,183 @@ fn text_diagnostics_analyzes_caller_supplied_files_without_opening_overlays() {
 }
 
 #[test]
+fn rule_search_matches_semantic_rules_with_bounded_results() {
+    let (root, root_uri) = temp_workspace_dir();
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/ruleSearch","params":{"key":"add_army_tradition"}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"pdc/ruleSearch","params":{"context":"effect","scope":"country","limit":3}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"pdc/ruleSearch","params":{}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"pdc/ruleSearch","params":{"key":"army","limit":0}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+
+    let exact = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("exact key search response");
+    let rules = exact["result"]["rules"].as_array().expect("rule entries");
+    assert!(
+        rules
+            .iter()
+            .any(|rule| rule["key"] == "add_army_tradition" && rule["context"] == "effect"),
+        "expected the add_army_tradition effect rule: {exact}"
+    );
+    for rule in rules {
+        assert!(
+            rule["key"]
+                .as_str()
+                .is_some_and(|key| key.contains("add_army_tradition"))
+        );
+        assert!(rule["id"].as_str().is_some());
+        assert!(rule["shape"].as_str().is_some());
+        assert!(rule["allowedScopes"].is_array());
+    }
+
+    let bounded = responses
+        .iter()
+        .find(|value| value["id"] == 3)
+        .expect("bounded search response");
+    let entries = bounded["result"]["rules"]
+        .as_array()
+        .expect("bounded entries");
+    assert_eq!(entries.len(), 3);
+    assert_eq!(bounded["result"]["truncated"], json!(true));
+    for entry in entries {
+        assert!(
+            entry["context"]
+                .as_str()
+                .is_some_and(|context| context.to_ascii_lowercase().starts_with("effect"))
+        );
+        let scopes = entry["allowedScopes"].as_array().expect("allowed scopes");
+        assert!(scopes.is_empty() || scopes.iter().any(|scope| scope == "country"));
+    }
+
+    let unfiltered = responses
+        .iter()
+        .find(|value| value["id"] == 4)
+        .expect("unfiltered search response");
+    assert_eq!(unfiltered["error"]["code"], json!(INVALID_PARAMS));
+
+    let zero_limit = responses
+        .iter()
+        .find(|value| value["id"] == 5)
+        .expect("zero-limit search response");
+    assert_eq!(zero_limit["error"]["code"], json!(INVALID_PARAMS));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn localisation_search_matches_indexed_keys_and_values() {
+    let (root, root_uri) = temp_workspace_dir();
+    let localisation = root.join("localisation");
+    fs::create_dir_all(&localisation).expect("create localisation directory");
+    fs::write(
+        localisation.join("search_l_english.yml"),
+        "l_english:\n search_greeting:0 \"Hello traveler\"\n search_farewell:0 \"Goodbye\"\n",
+    )
+    .expect("write localisation file");
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/localisationSearch","params":{"key":"search_greet"}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"pdc/localisationSearch","params":{"text":"goodbye"}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"pdc/localisationSearch","params":{"key":"search_","text":"hello"}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"pdc/localisationSearch","params":{"key":"search","limit":1}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"pdc/localisationSearch","params":{"key":"missing_key_xyz"}}),
+        json!({"jsonrpc":"2.0","id":7,"method":"pdc/localisationSearch","params":{}}),
+        json!({"jsonrpc":"2.0","id":8,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+
+    let by_key = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("key search response");
+    let hits = by_key["result"]["hits"]
+        .as_array()
+        .expect("key search hits");
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0]["key"], "search_greeting");
+    assert_eq!(hits[0]["value"], "Hello traveler");
+    assert_eq!(hits[0]["language"], "l_english");
+    assert!(
+        hits[0]["file"]
+            .as_str()
+            .is_some_and(|file| file.ends_with("search_l_english.yml"))
+    );
+    assert_eq!(by_key["result"]["truncated"], json!(false));
+
+    let by_value = responses
+        .iter()
+        .find(|value| value["id"] == 3)
+        .expect("value search response");
+    let hits = by_value["result"]["hits"]
+        .as_array()
+        .expect("value search hits");
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0]["key"], "search_farewell");
+    assert_eq!(hits[0]["value"], "Goodbye");
+
+    let combined = responses
+        .iter()
+        .find(|value| value["id"] == 4)
+        .expect("combined search response");
+    let hits = combined["result"]["hits"]
+        .as_array()
+        .expect("combined hits");
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0]["key"], "search_greeting");
+
+    let limited = responses
+        .iter()
+        .find(|value| value["id"] == 5)
+        .expect("limited search response");
+    assert_eq!(
+        limited["result"]["hits"]
+            .as_array()
+            .expect("limited hits")
+            .len(),
+        1
+    );
+    assert_eq!(limited["result"]["truncated"], json!(true));
+
+    let empty = responses
+        .iter()
+        .find(|value| value["id"] == 6)
+        .expect("empty search response");
+    assert_eq!(
+        empty["result"]["hits"]
+            .as_array()
+            .expect("empty hits")
+            .len(),
+        0
+    );
+    assert_eq!(empty["result"]["truncated"], json!(false));
+
+    let unfiltered = responses
+        .iter()
+        .find(|value| value["id"] == 7)
+        .expect("unfiltered search response");
+    assert_eq!(unfiltered["error"]["code"], json!(INVALID_PARAMS));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn localisation_documents_publish_no_diagnostics_or_completion() {
     let (root, root_uri) = temp_workspace_dir();
     let localisation = root.join("localisation");

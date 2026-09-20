@@ -7,7 +7,8 @@ use game::eu4::mission::geometry::{self, ArrowGlyph};
 use ide::{
     CancellationToken, Cancelled, CompletionKind, SemanticToken, SemanticTokenType,
     complete_with_cancellation, completion_resolve, definition_with_cancellation,
-    document_symbols_with_cancellation, hover_with_cancellation, localisation_values_by_key,
+    document_symbols_with_cancellation, hover_with_cancellation,
+    localisation_search_with_cancellation, localisation_values_by_key,
     prepare_rename_with_cancellation, quick_fixes_with_cancellation, references_with_cancellation,
     rename_with_cancellation, scope_inlay_hints_with_cancellation,
     semantic_tokens_in_range_with_cancellation, semantic_tokens_with_cancellation,
@@ -27,7 +28,7 @@ use lsp_types::{
     TextDocumentPositionParams, TextEdit, Uri, WorkspaceEdit, WorkspaceSymbolParams,
 };
 use parser::format::format;
-use rules::ParserKind;
+use rules::{KeyMatcher, ParserKind, RuleShape};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use text::{LineIndex, LogicalPath, Position, TextRange};
@@ -63,6 +64,9 @@ const MAX_CLASSIFIED_PATHS: usize = 4_096;
 const MAX_WORKSPACE_FILES: usize = 32_768;
 const MAX_TEXT_DIAGNOSTIC_FILES: usize = 16;
 const MAX_TEXT_DIAGNOSTIC_BYTES: usize = 16 * 1024 * 1024;
+const DEFAULT_AGENT_SEARCH_LIMIT: usize = 20;
+const MAX_AGENT_SEARCH_LIMIT: usize = 50;
+const MAX_RULE_DOCUMENTATION_CHARS: usize = 400;
 
 fn completion_sort_text(sort_score: u32, ordinal: usize) -> String {
     // `ordinal` preserves the analysis order when a client (such as VS Code) receives several
@@ -79,6 +83,114 @@ mod completion_sort_tests {
         assert_eq!(completion_sort_text(22_010_000, 7), "220100000007");
         assert!(completion_sort_text(22_010_000, 0) < completion_sort_text(22_010_000, 1));
         assert!(completion_sort_text(22_010_000, 511) < completion_sort_text(22_010_001, 0));
+    }
+}
+
+/// Trims a search filter and drops it when empty, so whitespace-only filters behave like
+/// absent filters instead of matching everything (or nothing).
+fn trimmed_search_filter(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|value| !value.is_empty())
+}
+
+/// Resolves the agent-search limit: defaulted, bounded, and never zero.
+fn agent_search_limit(limit: Option<usize>) -> Result<usize, RpcError> {
+    match limit {
+        None => Ok(DEFAULT_AGENT_SEARCH_LIMIT),
+        Some(0) => Err(RpcError::new(
+            INVALID_PARAMS,
+            "search limit must be at least 1",
+        )),
+        Some(limit) => Ok(limit.min(MAX_AGENT_SEARCH_LIMIT)),
+    }
+}
+
+/// Compact display form of a semantic-rule key matcher. Exact matchers surface their literal
+/// key; structural matchers keep the member domain visible so search results can explain what
+/// the rule accepts.
+fn key_matcher_label(matcher: &KeyMatcher) -> String {
+    match matcher {
+        KeyMatcher::Exact(key) => key.clone(),
+        KeyMatcher::Type(domain) => format!("<{domain}>"),
+        KeyMatcher::Enum(domain) => format!("<{domain}>"),
+        KeyMatcher::Template {
+            prefix,
+            parameter,
+            suffix,
+        } => {
+            let domain = parameter
+                .type_domain()
+                .or_else(|| parameter.enum_domain())
+                .unwrap_or("member");
+            format!("{prefix}<{domain}>{suffix}")
+        }
+        KeyMatcher::AnyScalar => "<any key>".to_owned(),
+        KeyMatcher::Int { .. } => "<integer key>".to_owned(),
+        KeyMatcher::Date => "<date key>".to_owned(),
+        KeyMatcher::Dynamic(name) => format!("<dynamic: {name}>"),
+    }
+}
+
+fn rule_shape_label(shape: RuleShape) -> &'static str {
+    match shape {
+        RuleShape::Node => "node",
+        RuleShape::QuotedScript => "quotedScript",
+        RuleShape::Leaf => "leaf",
+        RuleShape::LeafValue => "leafValue",
+        RuleShape::ValueClause => "valueClause",
+    }
+}
+
+/// Joins a rule's documentation comments into one bounded string.
+fn bounded_documentation(documentation: &[String]) -> String {
+    let joined = documentation.join(" ");
+    let mut bounded = joined
+        .chars()
+        .take(MAX_RULE_DOCUMENTATION_CHARS)
+        .collect::<String>();
+    if bounded.len() < joined.len() {
+        bounded.push('…');
+    }
+    bounded
+}
+
+#[cfg(test)]
+mod rule_search_label_tests {
+    use super::{KeyMatcher, bounded_documentation, key_matcher_label};
+
+    #[test]
+    fn key_matcher_labels_exact_and_structural_domains() {
+        assert_eq!(
+            key_matcher_label(&KeyMatcher::Exact("add_army_tradition".to_owned())),
+            "add_army_tradition"
+        );
+        assert_eq!(
+            key_matcher_label(&KeyMatcher::Type("country_tag".to_owned())),
+            "<country_tag>"
+        );
+        assert_eq!(key_matcher_label(&KeyMatcher::AnyScalar), "<any key>");
+        assert_eq!(
+            key_matcher_label(&KeyMatcher::Template {
+                prefix: "monthly_".to_owned(),
+                parameter: rules::TemplateParameter {
+                    type_name: None,
+                    enum_name: Some("government_mechanic".to_owned()),
+                    strip_prefix: None,
+                },
+                suffix: "_power".to_owned(),
+            }),
+            "monthly_<government_mechanic>_power"
+        );
+    }
+
+    #[test]
+    fn bounded_documentation_appends_marker_only_when_truncated() {
+        assert_eq!(bounded_documentation(&[]), "");
+        let short = vec!["one".to_owned(), "two".to_owned()];
+        assert_eq!(bounded_documentation(&short), "one two");
+        let long = vec!["x".repeat(1_000)];
+        let bounded = bounded_documentation(&long);
+        assert_eq!(bounded.chars().count(), 401);
+        assert!(bounded.ends_with('…'));
     }
 }
 
@@ -106,6 +218,23 @@ struct TextDiagnosticInput {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct TextDiagnosticsParams {
     files: Vec<TextDiagnosticInput>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct RuleSearchParams {
+    context: Option<String>,
+    key: Option<String>,
+    scope: Option<String>,
+    limit: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct LocalisationSearchParams {
+    key: Option<String>,
+    text: Option<String>,
+    limit: Option<usize>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -177,6 +306,8 @@ impl SnapshotRequestContext {
             "pdc/textDiagnostics" => self.text_diagnostics(params),
             "pdc/missionPreview" => self.mission_preview(params),
             "pdc/hoverCard" => self.hover_card(params),
+            "pdc/ruleSearch" => self.rule_search(params),
+            "pdc/localisationSearch" => self.localisation_search(params),
             _ => Err(RpcError::new(METHOD_NOT_FOUND, "method is not implemented")),
         }
     }
@@ -239,6 +370,115 @@ impl SnapshotRequestContext {
             }));
         }
         Ok(Value::Array(results))
+    }
+
+    /// Bounded search over the embedded first-party semantic-rule database. Filters are
+    /// case-insensitive: `context` matches exactly or by prefix, `key` matches the key
+    /// matcher's display form by substring, and `scope` matches a listed allowed scope or the
+    /// unrestricted declaration. Read-only with respect to workspace state: only the active
+    /// rule set is consulted.
+    fn rule_search(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let params = typed_params::<RuleSearchParams>(params, "rule search")?;
+        let context = trimmed_search_filter(params.context.as_deref());
+        let key = trimmed_search_filter(params.key.as_deref());
+        let scope = trimmed_search_filter(params.scope.as_deref());
+        if context.is_none() && key.is_none() && scope.is_none() {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                "rule search requires at least one of context, key, or scope",
+            ));
+        }
+        let limit = agent_search_limit(params.limit)?;
+        self.ensure_active()?;
+
+        let context_query = context.map(str::to_ascii_lowercase);
+        let key_query = key.map(str::to_ascii_lowercase);
+        let scope_query = scope.map(str::to_ascii_lowercase);
+        let mut entries = Vec::new();
+        let mut truncated = false;
+        for rule in self.snapshot.rules().semantic_rules() {
+            if let Some(query) = context_query.as_deref()
+                && !rule.context.to_ascii_lowercase().starts_with(query)
+            {
+                continue;
+            }
+            let label = key_matcher_label(&rule.key);
+            if let Some(query) = key_query.as_deref()
+                && !label.to_ascii_lowercase().contains(query)
+            {
+                continue;
+            }
+            if let Some(query) = scope_query.as_deref()
+                && !rule.allowed_scopes.is_empty()
+                && !rule
+                    .allowed_scopes
+                    .iter()
+                    .any(|allowed| allowed.to_ascii_lowercase().contains(query))
+            {
+                continue;
+            }
+            if entries.len() == limit {
+                truncated = true;
+                break;
+            }
+            entries.push(serde_json::json!({
+                "id": rule.id,
+                "context": rule.context,
+                "parentPath": rule.parent_path,
+                "key": label,
+                "shape": rule_shape_label(rule.shape),
+                "allowedScopes": rule.allowed_scopes,
+                "pushScope": rule.push_scope,
+                "deprecated": rule.deprecated,
+                "required": rule.required,
+                "documentation": bounded_documentation(&rule.documentation),
+            }));
+        }
+        Ok(serde_json::json!({ "rules": entries, "truncated": truncated }))
+    }
+
+    /// Bounded search over indexed localisation definitions by key and/or value substring.
+    /// Hits carry the winning definition site of each key together with its bounded decoded
+    /// preview and logical file path.
+    fn localisation_search(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let params = typed_params::<LocalisationSearchParams>(params, "localisation search")?;
+        let key = trimmed_search_filter(params.key.as_deref());
+        let text = trimmed_search_filter(params.text.as_deref());
+        if key.is_none() && text.is_none() {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                "localisation search requires at least one of key or text",
+            ));
+        }
+        let limit = agent_search_limit(params.limit)?;
+        self.ensure_active()?;
+
+        let result = localisation_search_with_cancellation(
+            &self.snapshot,
+            key,
+            text,
+            limit,
+            &self.cancellation,
+        )
+        .map_err(cancelled_error)?;
+        let hits = result
+            .hits
+            .iter()
+            .map(|hit| {
+                let file = self
+                    .snapshot
+                    .source_files()
+                    .get(&hit.file_id)
+                    .map(|file| file.logical_path.as_str());
+                serde_json::json!({
+                    "key": hit.key,
+                    "language": hit.language,
+                    "value": hit.value,
+                    "file": file,
+                })
+            })
+            .collect::<Vec<_>>();
+        Ok(serde_json::json!({ "hits": hits, "truncated": result.truncated }))
     }
 
     /// Mission-tree preview for caller-supplied document text: the same

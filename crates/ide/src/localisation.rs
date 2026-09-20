@@ -8,7 +8,7 @@
 
 use std::sync::Arc;
 
-use engine::{AnalysisSnapshot, DocumentSource};
+use engine::{AnalysisSnapshot, DocumentSource, SourceFileId};
 use parser::{CstKind, CstNode, FileFormat};
 use text::{TextRange, TextSize};
 
@@ -133,6 +133,85 @@ fn scripted_localisation_names_cached_with_cancellation(
         Arc::clone(&names),
     );
     Ok(names)
+}
+
+/// One localisation definition site that matched a search query.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LocalisationSearchHit {
+    /// The localisation key (`name: "value"`'s name).
+    pub key: String,
+    /// The most recent language header preceding the entry, when one was present.
+    pub language: Option<String>,
+    /// The bounded decoded preview value of this definition site, when retained.
+    pub value: Option<String>,
+    /// File containing the definition.
+    pub file_id: SourceFileId,
+    /// Range of the whole localisation entry in the file.
+    pub range: TextRange,
+}
+
+/// A bounded localisation search result.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LocalisationSearchResult {
+    /// Matched definition sites, in deterministic index order.
+    pub hits: Vec<LocalisationSearchHit>,
+    /// Whether further matches existed beyond the requested limit.
+    pub truncated: bool,
+}
+
+/// Searches indexed localisation definitions by key and/or value substring.
+///
+/// The search walks the persisted workspace index (Vanilla, dependency, and project files on
+/// disk); open-but-unsaved editor overlays are outside this view, mirroring the on-disk
+/// lifetime of a mod under development. Only definitions that currently win symbol resolution
+/// are retained, so one key yields one hit at its effective definition site. Value matching
+/// runs against the bounded decoded preview, case-insensitively.
+pub fn localisation_search_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    key: Option<&str>,
+    value: Option<&str>,
+    limit: usize,
+    cancellation: &CancellationToken,
+) -> Result<LocalisationSearchResult, Cancelled> {
+    let key_query = key.map(str::to_ascii_lowercase);
+    let value_query = value.map(str::to_ascii_lowercase);
+    let mut hits = Vec::new();
+    let mut truncated = false;
+    cancellation.checkpoint()?;
+    for (index, definition) in snapshot.index().definitions_iter().enumerate() {
+        if index & 1023 == 0 {
+            cancellation.checkpoint()?;
+        }
+        if !definition.active || !definition.kind.eq_ignore_ascii_case("localisation") {
+            continue;
+        }
+        if let Some(query) = key_query.as_deref()
+            && !definition.name.to_ascii_lowercase().contains(query)
+        {
+            continue;
+        }
+        let preview = snapshot.localisation_preview(definition.file_id, definition.range);
+        if let Some(query) = value_query.as_deref() {
+            let Some(preview) = preview else {
+                continue;
+            };
+            if !preview.value.to_ascii_lowercase().contains(query) {
+                continue;
+            }
+        }
+        if hits.len() == limit {
+            truncated = true;
+            break;
+        }
+        hits.push(LocalisationSearchHit {
+            key: definition.name.to_string(),
+            language: preview.and_then(|preview| preview.language.clone()),
+            value: preview.map(|preview| preview.value.clone()),
+            file_id: definition.file_id,
+            range: definition.range,
+        });
+    }
+    Ok(LocalisationSearchResult { hits, truncated })
 }
 
 /// The `$NAME$` fragment at a position inside a localisation value. The inner
