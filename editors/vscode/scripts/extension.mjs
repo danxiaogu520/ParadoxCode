@@ -497,4 +497,27 @@ for (const name of expectedAgentTools) {
   }
 }
 
+const chatParticipant = manifest.contributes?.chatParticipants?.find(
+  (entry) => entry.id === 'paradoxcode.modding',
+);
+if (!chatParticipant || chatParticipant.name !== 'paradox' || chatParticipant.isSticky !== true) {
+  fail('the @paradox chat participant must be contributed with name "paradox" and isSticky');
+}
+const expectedParticipantCommands = ['validate', 'symbols', 'rules', 'loc', 'hover'];
+const participantCommands = (chatParticipant.commands ?? []).map((entry) => entry.name);
+for (const name of expectedParticipantCommands) {
+  if (!participantCommands.includes(name)) {
+    fail(`chat participant command missing: ${name}`);
+  }
+}
+for (const key of [chatParticipant.description, ...(chatParticipant.commands ?? []).map((entry) => entry.description)]) {
+  if (typeof key !== 'string' || !key.startsWith('%')) {
+    fail(`chat participant strings must use NLS references, found ${key}`);
+  }
+  const resolved = key.slice(1, -1);
+  if (!(resolved in nls) || !(resolved in zh)) {
+    fail(`chat participant NLS key missing from a locale: ${resolved}`);
+  }
+}
+
 console.log('extension contract OK');

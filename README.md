@@ -50,6 +50,10 @@ and Paradox Interactive are trademarks of their respective owners.
   files against the full rules, search indexed symbols and localisation, query the embedded
   rule database, and look up hover semantics — all served by the already-running language
   server.
+- A `@paradox` chat participant that runs its own EU4-modding agent loop over the same tools
+  (domain system prompt, model from the active chat selection), with deterministic
+  `/validate`, `/symbols`, `/rules`, `/loc`, and `/hover` commands that keep working without
+  a chat model.
 - Exact-version server downloads with SHA-256 verification, restricted extraction, bounded
   streaming, and self-validating executable caches.
 
