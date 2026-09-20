@@ -705,6 +705,23 @@ impl AnalysisHost {
         cancellation.checkpoint()?;
         self.source_files = Arc::new(files);
         self.source_file_paths = Arc::new(source_file_paths(&self.source_files));
+        // Project files always have resident state text, and the LSP range
+        // conversions prefer the text branch (see `location_range_to_lsp`),
+        // so their position-table entries are never consulted — dropping them
+        // saves ~24 bytes per indexed symbol (~44 MiB on a ~8k-file mod).
+        // Vanilla/Dependency roots keep theirs: cache builds read the table to
+        // write `navigation_positions`, and installed files have no text to
+        // derive positions from. Unknown roots are kept conservatively.
+        let roots = &self.roots;
+        let source_files = &self.source_files;
+        index.position_ranges.retain_files(|file_id| {
+            source_files.get(&file_id).is_none_or(|file| {
+                roots
+                    .iter()
+                    .find(|root| root.id == file.root_id)
+                    .is_none_or(|root| root.kind != SourceRootKind::Project)
+            })
+        });
         self.file_states = Arc::new(file_states);
         self.index = Arc::new(index);
         self.scan_report = Arc::new(report.clone());
