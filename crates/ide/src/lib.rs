@@ -39,6 +39,7 @@ pub use hover_card::{
 };
 pub use inlay::{MAX_SCOPE_INLAY_HINTS, scope_inlay_hints_with_cancellation};
 pub use localisation::{
+    LocalisationSearchHit, LocalisationSearchResult, localisation_search_with_cancellation,
     scripted_localisation_names, scripted_localisation_names_with_cancellation,
 };
 pub use navigation::{
