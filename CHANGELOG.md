@@ -7,8 +7,74 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-21
+
+### Added
+
+- Extension-internal agent surface: five read-only tools over the running server, a `@paradox`
+  chat participant, and a stdio MCP endpoint. Two new snapshot requests expose the server's
+  own knowledge to tooling without touching workspace state — `pdc/ruleSearch` (bounded
+  search over the embedded first-party rule database by context / key / scope, each entry
+  carrying shape, allowed and push scopes, flags, and bounded documentation) and
+  `pdc/localisationSearch` (search indexed localisation definitions across vanilla,
+  dependencies, and project by key or decoded value; both require a filter and report
+  truncation). On top of them the extension registers five `vscode.lm` tools that ride the
+  already-running language-server client — `paradoxcode-validate-text` (in-memory diagnostics
+  for up to 16 unsaved files), `-search-symbols`, `-search-rules`, `-search-localisation`, and
+  `-hover-info` — all read-only, every result shaped through shared output budgets, and
+  operational failures returned as readable tool results the model can react to. The
+  `@paradox` chat participant (`paradoxcode.modding`) runs plain prompts through a bounded
+  agent loop (12 tool rounds, chat-model fallback, and a domain prompt with hard tool
+  discipline — validate every draft before calling it done, look up allowed scopes instead
+  of guessing) and offers deterministic `/validate` `/symbols` `/rules` `/loc` `/hover`
+  commands that keep working without any chat model. The same five tools are exposed to any
+  Model Context Protocol client through a dependency-free stdio server
+  (`editors/vscode/scripts/mcp.mjs`, hand-written ndjson JSON-RPC): the tool manifest is
+  read at runtime from the same `languageModelTools` contribution the extension registers
+  from, workspace roots resolve from `--workspace` / `PDC_MCP_WORKSPACE`, the client's
+  roots, or the working directory (the home directory excluded), and root changes re-boot
+  the language server against the new root. The extension's engine requirement moves to
+  `^1.99.0` for the language-model API.
+- `lab/perf` performance lab for local development: a single-entry workflow
+  (`lab/perf/perf.sh` with portable defaults and a runbook) covering baseline snapshots,
+  warm/median A/B comparison with noise marking, full-corpus sweeps through the existing
+  `sweep.mjs`, a Linux-native cwtools-rs control group, corpus import filtered to the
+  server's scan categories, and samply/perf profiling. Scripts are tracked; run outputs,
+  machine-local overrides, control binaries, and game-data corpus copies stay gitignored.
+
 ### Changed
 
+- Startup and whole-workspace validation performance round. Vanilla and dependency cache
+  loads now overlap the initial workspace scan instead of serializing behind it (deferred
+  setup events preserve install ordering), cutting `pdc/ready` on a ~10k-file corpus from
+  ~7.0 s to ~4.6 s and warm sweep session boot by two orders of magnitude. Workspace
+  validation skips republishing identical diagnostics and consults a per-file cache keyed
+  on the file's content hash, a workspace context fingerprint (rules hash, profile
+  identity, language preference, source roots, a texture-catalog generation, and every
+  file's effective contribution), and the diagnostics filter — a back-to-back no-change
+  `validateWorkspace` reuses every file (~33 s → ~1.2 s on the ~8k-file reference corpus).
+  Steady-state query paths get cheaper throughout: workspace suggestion lookups memoize
+  per snapshot revision, installed-cache references load lazily by kind, cached
+  localisation previews filter by preferred language at load, transient reparses of
+  evicted closed files serve byte-identical trees from the persistent parse cache (~9×
+  cheaper than reparsing), Project position-table entries prune at scan commit,
+  cardinality occurrence counting hashes case-folded keys instead of linear-probing
+  key-dense containers (cold diagnostics latency −9.7% on the interactive benchmark),
+  the per-reference file id drops out of the index, and HIR kind spellings intern through
+  the process pool. Diagnostics output is byte-identical across the round.
+- Missing-entry Cardinality diagnostics anchor on the owning block key instead of the
+  container's opening brace: `some_block = { … }` missing a required entry now squiggles
+  `some_block` — where the fix belongs — and agrees with `MissingLimit` on `if` blocks;
+  over-quota findings keep anchoring on the first excess entry, and the file root keeps
+  the first-character anchor.
+- Typed rule hovers gain localisation previews, and symbol previews cover every resolvable
+  binding. Block-scope keys classified by `KeyMatcher::Type` rules — an event option's
+  `…_area = { … }`, country-tag and province-id blocks — now append the workspace
+  localisation preview when every typed candidate agrees on one kind (mirroring the
+  typed-reference convention), instead of never attempting localisation at all. Symbol
+  previews render every resolvable explicit reference, implicit same-name key, and
+  binding-template row as labelled entries (a decision shows `name` and `desc` side by
+  side), deduplicated and capped, instead of returning on the first strategy hit.
 - The rules pipeline drops its SQLite artifact layer. First-party rules compile from the
   embedded JSON source straight into the in-memory rule set at every startup — measured
   faster than loading the old ~20 MB user cache — so `rules.pdcrules` is no longer
@@ -937,7 +1003,8 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.8...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.8...v0.4.0
 [0.3.8]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.5...v0.3.6
