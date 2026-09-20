@@ -188,9 +188,9 @@ fn main() {
         shard_definitions, shard_references
     );
     println!(
-        "index position ranges: {} x ~64B = {:.0} MiB",
+        "index position ranges: {} x 24B entries (+vec slack, btree nodes per file) = {:.0} MiB",
         position_ranges,
-        mib((position_ranges * 64) as f64)
+        mib((position_ranges * 24) as f64)
     );
     println!(
         "state cached previews: {cached_preview_entries} = {:.0} MiB",
