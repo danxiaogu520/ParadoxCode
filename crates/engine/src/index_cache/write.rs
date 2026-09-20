@@ -337,7 +337,15 @@ fn write_cache(
                     attributes.kind, attributes.name
                 )));
             }
-            let keys_payload = serde_json::to_string(&attributes.attribute_keys).map_err(|_| {
+            // Serialize through `&str` so the payload does not depend on
+            // serde's opt-in `rc` feature reaching this crate by feature
+            // unification.
+            let keys: Vec<&str> = attributes
+                .attribute_keys
+                .iter()
+                .map(|key| key.as_ref())
+                .collect();
+            let keys_payload = serde_json::to_string(&keys).map_err(|_| {
                 IndexCacheError::InvalidData("attribute keys are not encodable".into())
             })?;
             insert_definition_attributes.execute(params![

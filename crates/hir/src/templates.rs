@@ -89,7 +89,7 @@ fn template_items<'t>(
                     .filter(|child| child.kind() != CstKind::ParameterCondition)
                     .collect::<Vec<_>>();
                 items.push(TemplateItem::Conditional(TemplateConditional {
-                    name: conditional.name.clone(),
+                    name: vfs::intern_shard_string(&conditional.name),
                     negated: conditional.negated,
                     range: conditional.range,
                     items: template_items(syntax, body.iter().copied(), conditionals, references)?,
@@ -129,7 +129,7 @@ fn template_property(
         .and_then(|operator| syntax.text(operator.range()))
         .map(str::trim)
         .filter(|operator| !operator.is_empty())
-        .map(str::to_owned);
+        .map(vfs::intern_shard_string);
     let value = node
         .children()
         .find(|child| child.kind() == CstKind::Value)?
@@ -188,7 +188,7 @@ fn template_token(
             ));
         }
         fragments.push(TemplateFragment::Parameter {
-            name: reference.name.clone(),
+            name: vfs::intern_shard_string(&reference.name),
             range: reference.range,
         });
         cursor = reference.range.end();

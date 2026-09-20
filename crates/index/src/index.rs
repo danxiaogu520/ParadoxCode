@@ -447,7 +447,7 @@ pub struct DynamicParameterSignature {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DynamicDefinitionSummary {
     /// Dynamic symbol kind, for example `scripted_effect`.
-    pub kind: String,
+    pub kind: Arc<str>,
     /// Definition name as written in source.
     pub name: String,
     /// Full range of the owning symbol definition.

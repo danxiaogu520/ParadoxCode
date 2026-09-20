@@ -650,10 +650,13 @@ fn load_definition_attributes(
             )));
         }
         shard.definition_attributes.push(DefinitionAttributes {
-            kind,
+            kind: vfs::intern_shard_string(&kind),
             name,
             definition_range,
-            attribute_keys,
+            attribute_keys: attribute_keys
+                .into_iter()
+                .map(|key| vfs::intern_shard_string(&key))
+                .collect(),
         });
         rows_loaded = rows_loaded.saturating_add(1);
     }
@@ -720,7 +723,7 @@ fn load_dynamic_definitions(
             .map(|payload| template_codec::decode(payload, &kind, &name, definition_range))
             .transpose()?;
         shard.dynamic_definitions.push(DynamicDefinitionSummary {
-            kind,
+            kind: vfs::intern_shard_string(&kind),
             name,
             definition_range,
             parameters: Vec::new(),

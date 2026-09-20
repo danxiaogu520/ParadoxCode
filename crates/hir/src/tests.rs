@@ -147,8 +147,8 @@ fn quoted_string_values_are_not_localisation_references() {
     let localisation = hir
         .references()
         .iter()
-        .filter(|reference| reference.kind == "localisation")
-        .map(|reference| reference.name.as_str())
+        .filter(|reference| reference.kind.as_ref() == "localisation")
+        .map(|reference| reference.name.as_ref())
         .collect::<Vec<_>>();
     assert!(
         !localisation.contains(&" "),
@@ -173,7 +173,7 @@ fn required_type_localisation_templates_expand_from_dynamic_members() {
         .references()
         .iter()
         .filter(|reference| reference.origin == HirReferenceOrigin::DerivedLocalisation)
-        .map(|reference| reference.name.as_str())
+        .map(|reference| reference.name.as_ref())
         .collect::<Vec<_>>();
     assert!(derived.contains(&"mission_one_title"));
     assert!(derived.contains(&"mission_one_desc"));
@@ -210,7 +210,7 @@ fn explicit_type_localisation_fields_are_associated_with_instances() {
         .expect("event title range");
     let hover_references = super::derived_localisation_references_for_hover(&hir, &path, &rules);
     assert!(hover_references.iter().any(|reference| {
-        reference.kind == "localisation"
+        reference.kind.as_ref() == "localisation"
             && reference.name == "event_one_title"
             && reference.range == title_range
     }));
@@ -237,7 +237,7 @@ fn subtype_conditions_gate_type_localisation_templates() {
         .references()
         .iter()
         .filter(|reference| reference.origin == HirReferenceOrigin::DerivedLocalisation)
-        .map(|reference| reference.name.as_str())
+        .map(|reference| reference.name.as_ref())
         .collect::<Vec<_>>();
     assert!(derived.contains(&"country_idea_start"));
     assert!(!derived.contains(&"other_idea_start"));
@@ -396,7 +396,7 @@ fn dynamic_lowering_keeps_body_context_calls_and_local_parameter_uses() {
 
     assert!(hir.references().iter().any(|reference| {
         reference.origin == HirReferenceOrigin::DynamicDefinition
-            && reference.kind == "scripted_effect"
+            && reference.kind.as_ref() == "scripted_effect"
             && reference.name == "apply_effect"
     }));
     let body_property = hir
@@ -454,7 +454,7 @@ fn dynamic_lowering_keeps_body_context_calls_and_local_parameter_uses() {
     assert_eq!(trigger_root.context, "trigger");
     assert!(trigger_hir.references().iter().any(|reference| {
         reference.origin == HirReferenceOrigin::DynamicDefinition
-            && reference.kind == "scripted_trigger"
+            && reference.kind.as_ref() == "scripted_trigger"
             && reference.name == "apply_trigger"
     }));
 }
@@ -492,9 +492,9 @@ fn dynamic_templates_preserve_order_conditionals_and_token_fragments() {
     assert_eq!(
         first.key.fragments,
         [
-            TemplateFragment::Literal("prefix_".to_owned()),
+            TemplateFragment::Literal("prefix_".into()),
             TemplateFragment::Parameter {
-                name: "TARGET".to_owned(),
+                name: "TARGET".into(),
                 range: hir
                     .parameter_references()
                     .iter()
@@ -509,13 +509,13 @@ fn dynamic_templates_preserve_order_conditionals_and_token_fragments() {
     };
     assert!(matches!(
         value.fragments.as_slice(),
-        [TemplateFragment::Parameter { name, .. }] if name == "VALUE"
+        [TemplateFragment::Parameter { name, .. }] if name.as_ref() == "VALUE"
     ));
 
     let TemplateItem::Conditional(optional) = &template.items[1] else {
         panic!("second item must be conditional");
     };
-    assert_eq!(optional.name, "OPTION");
+    assert_eq!(optional.name.as_ref(), "OPTION");
     assert!(!optional.negated);
     assert!(matches!(
         optional.items.as_slice(),
@@ -525,7 +525,7 @@ fn dynamic_templates_preserve_order_conditionals_and_token_fragments() {
     let TemplateItem::Conditional(skipped) = &template.items[2] else {
         panic!("third item must be conditional");
     };
-    assert_eq!(skipped.name, "SKIP");
+    assert_eq!(skipped.name.as_ref(), "SKIP");
     assert!(skipped.negated);
     assert!(matches!(
         skipped.items.as_slice(),
@@ -589,7 +589,7 @@ fn dynamic_lowering_retains_scalar_candidates_for_signature_resolution() {
         .iter()
         .filter(|reference| {
             reference.origin == HirReferenceOrigin::DynamicDefinition
-                && reference.kind == "scripted_effect"
+                && reference.kind.as_ref() == "scripted_effect"
                 && reference.name == "apply_effect"
         })
         .collect::<Vec<_>>();
@@ -629,7 +629,7 @@ fn dynamic_lowering_rejects_non_scalar_block_matchers() {
 
     assert!(!hir.references().iter().any(|reference| {
         reference.origin == HirReferenceOrigin::DynamicDefinition
-            && reference.kind == "scripted_effect"
+            && reference.kind.as_ref() == "scripted_effect"
             && reference.name == "apply_effect"
     }));
 }
@@ -644,17 +644,18 @@ fn profile_aware_lowering_produces_shared_typed_definitions_and_references() {
     let hir = lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile());
 
     assert!(hir.definitions().iter().any(|definition| {
-        definition.kind == "event"
+        definition.kind.as_ref() == "event"
             && definition.name == "profile.1"
             && definition.selection_range != definition.range
     }));
     assert!(
         hir.definitions()
             .iter()
-            .any(|definition| definition.kind == "country_flag" && definition.name == "seen")
+            .any(|definition| definition.kind.as_ref() == "country_flag"
+                && definition.name == "seen")
     );
     assert!(hir.references().iter().any(|reference| {
-        reference.kind == "localisation" && reference.name == "profile_title"
+        reference.kind.as_ref() == "localisation" && reference.name == "profile_title"
     }));
 }
 
@@ -668,7 +669,9 @@ fn profile_aware_lowering_indexes_definitions_inside_quoted_effect_arguments() {
     let definition = hir
         .definitions()
         .iter()
-        .find(|definition| definition.kind == "country_flag" && definition.name == "embedded_flag")
+        .find(|definition| {
+            definition.kind.as_ref() == "country_flag" && definition.name == "embedded_flag"
+        })
         .expect("embedded flag definition");
     assert_eq!(
         &source[usize::try_from(definition.selection_range.start()).expect("start")
@@ -693,7 +696,7 @@ fn first_party_semantic_localisation_rules_produce_references_without_profile_sh
 
     assert!(hir.references().iter().any(|reference| {
         reference.origin == HirReferenceOrigin::Semantic
-            && reference.kind == "localisation"
+            && reference.kind.as_ref() == "localisation"
             && reference.name == "semantic_title"
     }));
 }
@@ -715,7 +718,7 @@ fn first_party_typed_values_produce_workspace_symbol_references() {
         .filter(|reference| reference.origin == HirReferenceOrigin::SemanticTyped)
         .collect::<Vec<_>>();
     assert_eq!(typed.len(), 1, "typed references: {typed:?}");
-    assert_eq!(typed[0].kind, "event");
+    assert_eq!(typed[0].kind.as_ref(), "event");
     assert_eq!(typed[0].name, "declared.1");
     let reference_start =
         u32::try_from(source.rfind("declared.1").expect("call id")).expect("reference offset");
@@ -766,7 +769,7 @@ fn identity_only_profile_does_not_create_game_specific_typed_facts() {
     assert!(
         !hir.references()
             .iter()
-            .any(|reference| reference.kind == "localisation")
+            .any(|reference| reference.kind.as_ref() == "localisation")
     );
 }
 
@@ -1122,7 +1125,7 @@ fn mission_trigger_boolean_containers_still_extract_scripted_references() {
     assert!(
         hir.references()
             .iter()
-            .any(|reference| reference.kind == "scripted_trigger"
+            .any(|reference| reference.kind.as_ref() == "scripted_trigger"
                 && reference.name == "has_fort_building_trigger"),
         "scripted trigger reference must be extracted from mission trigger blocks"
     );
@@ -1137,7 +1140,7 @@ fn mission_trigger_boolean_containers_still_extract_scripted_references() {
     assert_eq!(
         hir.references()
             .iter()
-            .filter(|reference| reference.kind == "scripted_trigger"
+            .filter(|reference| reference.kind.as_ref() == "scripted_trigger"
                 && reference.name == "has_fort_building_trigger")
             .count(),
         2,
