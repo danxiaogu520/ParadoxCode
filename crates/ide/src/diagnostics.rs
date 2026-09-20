@@ -837,25 +837,31 @@ fn validate_semantic_container(
     if trigger_like || effect_like {
         lint_conditional_siblings(properties, enclosing_key, diagnostics);
     }
-    // Case-folded occurrence counting with a linear scan: containers repeat a handful of
-    // distinct keys, and the scan avoids lowercasing and cloning a String per property.
-    let mut counts: Vec<(&str, u32)> = Vec::new();
+    // Case-folded occurrence counting for the cardinality check: a folded
+    // hash map keeps lookups O(1) on key-dense containers (events,
+    // on_actions) where the previous linear probe went quadratic, and the
+    // Cow borrow keeps already-lowercase keys — the conventional spelling —
+    // allocation-free on every hit.
+    let mut counts: rustc_hash::FxHashMap<Box<str>, u32> = rustc_hash::FxHashMap::default();
     for property in properties {
         cancellation.checkpoint()?;
         let fact_scope = hir
             .and_then(|hir| hir.scope_fact(property.key_range, context))
             .map(|fact| scope_context_from_hir(snapshot.game_profile_handle(), &fact.state));
         let scope = fact_scope.as_ref().unwrap_or(scope);
-        let count = match counts
-            .iter_mut()
-            .find(|(seen, _)| seen.eq_ignore_ascii_case(&property.key))
-        {
+        let folded: std::borrow::Cow<'_, str> =
+            if property.key.bytes().any(|byte| byte.is_ascii_uppercase()) {
+                std::borrow::Cow::Owned(property.key.to_ascii_lowercase())
+            } else {
+                std::borrow::Cow::Borrowed(property.key.as_ref())
+            };
+        let count = match counts.get_mut(folded.as_ref()) {
             Some(entry) => {
-                entry.1 = entry.1.saturating_add(1);
-                entry.1
+                *entry = entry.saturating_add(1);
+                *entry
             }
             None => {
-                counts.push((property.key.as_ref(), 1));
+                counts.insert(folded.into_owned().into_boxed_str(), 1);
                 1
             }
         };
