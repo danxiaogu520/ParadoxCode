@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use crate::Reference;
+use crate::{Reference, SourceFileId};
 
 impl std::fmt::Debug for ReferenceIndexStore {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -26,8 +26,8 @@ impl std::fmt::Debug for ReferenceIndexStore {
 /// LRU's bookkeeping.
 const MEMO_CAP: usize = 4096;
 
-/// Memo value: all references for one `(kind, name)` pair.
-type MemoEntry = Arc<Vec<Reference>>;
+/// Memo value: all references for one `(kind, name)` pair, with file ids.
+type MemoEntry = Arc<Vec<(SourceFileId, Reference)>>;
 type MemoKey = (Box<str>, Box<str>);
 
 pub struct ReferenceIndexStore {
@@ -47,8 +47,10 @@ impl ReferenceIndexStore {
         }
     }
 
-    /// All references for one `(kind, name)` pair, case-insensitive.
-    pub fn references_for(&self, kind: &str, name: &str) -> Arc<Vec<Reference>> {
+    /// All references for one `(kind, name)` pair, case-insensitive, each
+    /// paired with its referencing file id (the row carries it; materialized
+    /// references derive it from the owning shard instead).
+    pub fn references_for(&self, kind: &str, name: &str) -> Arc<Vec<(SourceFileId, Reference)>> {
         let key = (
             kind.to_ascii_lowercase().into_boxed_str(),
             name.to_ascii_lowercase().into_boxed_str(),
@@ -65,7 +67,7 @@ impl ReferenceIndexStore {
         loaded
     }
 
-    fn query(&self, kind: &str, name: &str) -> Vec<Reference> {
+    fn query(&self, kind: &str, name: &str) -> Vec<(SourceFileId, Reference)> {
         let Ok(connection) = rusqlite::Connection::open_with_flags(
             &self.path,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
@@ -109,12 +111,14 @@ impl ReferenceIndexStore {
             let Ok(range) = super::codec::decode_range(start, end) else {
                 continue;
             };
-            references.push(Reference {
-                kind: vfs::intern_shard_string(&ref_kind),
-                name: vfs::intern_shard_string(&ref_name),
-                file_id: file,
-                range,
-            });
+            references.push((
+                file,
+                Reference {
+                    kind: vfs::intern_shard_string(&ref_kind),
+                    name: vfs::intern_shard_string(&ref_name),
+                    range,
+                },
+            ));
         }
         references
     }

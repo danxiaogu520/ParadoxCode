@@ -522,7 +522,7 @@ fn load_index(
             }
         }
         for reference in &shard.references {
-            known_ranges.insert((reference.file_id, reference.range));
+            known_ranges.insert((shard.file_id, reference.range));
         }
     }
     progress.report(definition_count.saturating_add(reference_count));
@@ -1035,7 +1035,6 @@ fn load_references(
             .push(Reference {
                 kind: vfs::intern_shard_string(&kind),
                 name: vfs::intern_shard_string(&name),
-                file_id,
                 range,
             });
         rows_loaded = rows_loaded.saturating_add(1);

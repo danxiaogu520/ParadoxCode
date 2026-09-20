@@ -485,9 +485,8 @@ pub struct Reference {
     pub kind: Arc<str>,
     /// Referenced name, interned through the process pool.
     pub name: Arc<str>,
-    /// Referencing file.
-    pub file_id: SourceFileId,
-    /// Source range of the reference.
+    /// Source range of the reference. The referencing file is the owning
+    /// shard's `file_id` — one id per ~2M references beat storing it per row.
     pub range: TextRange,
 }
 
@@ -963,10 +962,13 @@ impl WorkspaceIndex {
 
     /// Iterates over references from every retained file shard.
     #[must_use = "iterate the retained references"]
-    pub fn references_iter(&self) -> impl Iterator<Item = &Reference> {
-        self.shards
-            .values()
-            .flat_map(|shard| shard.references.iter())
+    pub fn references_iter(&self) -> impl Iterator<Item = (SourceFileId, &Reference)> {
+        self.shards.values().flat_map(|shard| {
+            shard
+                .references
+                .iter()
+                .map(|reference| (shard.file_id, reference))
+        })
     }
 
     /// Returns a cached editor position for one indexed byte range, if available.

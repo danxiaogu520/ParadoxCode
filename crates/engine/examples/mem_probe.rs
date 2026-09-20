@@ -235,7 +235,7 @@ fn main() {
             }
         }
         let mut reference_entries = 0usize;
-        for reference in index.references_iter() {
+        for (_, reference) in index.references_iter() {
             reference_entries += 1;
             name_uses += 1;
             if name_pool.insert(std::sync::Arc::as_ptr(&reference.name) as *const u8 as usize) {

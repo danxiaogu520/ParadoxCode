@@ -85,7 +85,7 @@ impl AnalysisSnapshot {
     /// cache files — the kinds that were skipped at load time. Concatenating
     /// the per-store vectors mirrors what a fully materialized index would
     /// have answered; callers keep their own ordering/dedup rules.
-    pub fn lazy_references_for(&self, kind: &str, name: &str) -> Vec<Reference> {
+    pub fn lazy_references_for(&self, kind: &str, name: &str) -> Vec<(SourceFileId, Reference)> {
         let mut references = Vec::new();
         for store in self.reference_sources.values() {
             references.extend(store.references_for(kind, name).iter().cloned());

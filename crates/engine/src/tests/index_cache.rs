@@ -83,7 +83,7 @@ fn vanilla_cache_preserves_dynamic_definition_references_without_hir() {
             .file_state(*file_id)
             .is_some_and(|state| state.parsed().is_none() && state.hir().is_none())
     }));
-    assert!(snapshot.index().references_iter().any(|reference| {
+    assert!(snapshot.index().references_iter().any(|(_, reference)| {
         reference.kind.as_ref() == "scripted_effect" && reference.name.as_ref() == "cached_effect"
     }));
     let signature = snapshot
@@ -112,7 +112,7 @@ fn vanilla_cache_preserves_dynamic_definition_references_without_hir() {
     let cache_path = root.join("cache/vanilla.pdcindex");
     cache.save(&cache_path).expect("save cache");
     let loaded = IndexCache::load(&cache_path).expect("load cache");
-    assert!(loaded.index().references_iter().any(|reference| {
+    assert!(loaded.index().references_iter().any(|(_, reference)| {
         reference.kind.as_ref() == "scripted_effect" && reference.name.as_ref() == "cached_effect"
     }));
     assert_eq!(
@@ -833,7 +833,7 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
         snapshot.file_state(definition.file_id).is_none(),
         "cached dependency files are never materialized"
     );
-    assert!(snapshot.index().references_iter().any(|reference| {
+    assert!(snapshot.index().references_iter().any(|(_, reference)| {
         &*reference.kind == "scripted_effect" && &*reference.name == "dep_cached_effect"
     }));
     let dynamic_after_install = snapshot
@@ -844,7 +844,7 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
     let kinds = snapshot
         .index()
         .references_iter()
-        .map(|reference| (&*reference.kind, &*reference.name))
+        .map(|(_, reference)| (&*reference.kind, &*reference.name))
         .collect::<Vec<_>>();
     assert!(
         kinds.contains(&("scripted_effect", "dep_cached_effect")),
@@ -1032,11 +1032,11 @@ fn lazy_reference_load_serves_skipped_kinds_from_disk() {
     let materialized = |index: &crate::WorkspaceIndex| -> std::collections::BTreeSet<(String, String, u64, text::TextRange)> {
         index
             .references_iter()
-            .map(|reference| {
+            .map(|(file_id, reference)| {
                 (
                     reference.kind.to_string(),
                     reference.name.to_string(),
-                    reference.file_id.get(),
+                    file_id.get(),
                     reference.range,
                 )
             })
@@ -1068,11 +1068,11 @@ fn lazy_reference_load_serves_skipped_kinds_from_disk() {
     let snapshot = host.snapshot();
     let mut reconstructed = materialized(snapshot.index());
     for (kind, name, ..) in &full_refs {
-        for reference in snapshot.lazy_references_for(kind, name) {
+        for (file_id, reference) in snapshot.lazy_references_for(kind, name) {
             reconstructed.insert((
                 reference.kind.to_string(),
                 reference.name.to_string(),
-                reference.file_id.get(),
+                file_id.get(),
                 reference.range,
             ));
         }

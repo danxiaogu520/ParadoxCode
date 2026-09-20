@@ -1395,15 +1395,14 @@ pub(crate) fn index_definition(
 /// callability filters used when exhaustive semantic workspaces were built.
 pub(crate) fn indexed_reference(
     snapshot: &AnalysisSnapshot,
+    file_id: SourceFileId,
     reference: &Reference,
 ) -> Option<ReferenceInternal> {
     if dynamic_definition_type(snapshot, &reference.kind) {
         if !workspace_member(snapshot, &reference.kind, &reference.name) {
             return None;
         }
-        if let Some(hir) = snapshot
-            .file_state(reference.file_id)
-            .and_then(|state| state.hir())
+        if let Some(hir) = snapshot.file_state(file_id).and_then(|state| state.hir())
             && !dynamic_reference_range_is_callable(
                 snapshot,
                 hir,
@@ -1417,14 +1416,14 @@ pub(crate) fn indexed_reference(
     }
     let path = snapshot
         .source_files()
-        .get(&reference.file_id)
+        .get(&file_id)
         .map(|file| file.logical_path.clone());
     Some(ReferenceInternal {
         kind: reference.kind.to_string(),
         name: reference.name.to_string(),
         range: reference.range,
         document: None,
-        file: Some(reference.file_id),
+        file: Some(file_id),
         path,
     })
 }

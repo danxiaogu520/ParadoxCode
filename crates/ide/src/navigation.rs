@@ -141,20 +141,20 @@ pub fn references_with_cancellation(
     for reference in &all.references {
         consider_reference(reference)?;
     }
-    for reference in snapshot.index().references_iter() {
+    for (file_id, reference) in snapshot.index().references_iter() {
         cancellation.checkpoint()?;
         if &*reference.kind != kind.as_str() || !same_name(&reference.name, &name) {
             continue;
         }
-        if let Some(reference) = indexed_reference(snapshot, reference) {
+        if let Some(reference) = indexed_reference(snapshot, file_id, reference) {
             consider_reference(&reference)?;
         }
     }
     // Installed caches may serve references lazily from disk; merge them so
     // find-references answers stay identical to a fully materialized index.
-    for reference in snapshot.lazy_references_for(kind.as_str(), name.as_str()) {
+    for (file_id, reference) in snapshot.lazy_references_for(kind.as_str(), name.as_str()) {
         cancellation.checkpoint()?;
-        if let Some(reference) = indexed_reference(snapshot, &reference) {
+        if let Some(reference) = indexed_reference(snapshot, file_id, &reference) {
             consider_reference(&reference)?;
         }
     }
@@ -352,24 +352,26 @@ pub fn rename_with_cancellation(
     for reference in &all.references {
         consider_reference(reference)?;
     }
-    for reference in snapshot.index().references_iter() {
+    for (file_id, reference) in snapshot.index().references_iter() {
         cancellation
             .checkpoint()
             .map_err(|Cancelled| RenameFailure::Cancelled)?;
         if &*reference.kind != target.kind.as_str() || !same_name(&reference.name, &target.name) {
             continue;
         }
-        if let Some(reference) = indexed_reference(snapshot, reference) {
+        if let Some(reference) = indexed_reference(snapshot, file_id, reference) {
             consider_reference(&reference)?;
         }
     }
     // Lazy installed-cache references participate in rename exactly as the
     // materialized ones above did.
-    for reference in snapshot.lazy_references_for(target.kind.as_str(), target.name.as_str()) {
+    for (file_id, reference) in
+        snapshot.lazy_references_for(target.kind.as_str(), target.name.as_str())
+    {
         cancellation
             .checkpoint()
             .map_err(|Cancelled| RenameFailure::Cancelled)?;
-        if let Some(reference) = indexed_reference(snapshot, &reference) {
+        if let Some(reference) = indexed_reference(snapshot, file_id, &reference) {
             consider_reference(&reference)?;
         }
     }
