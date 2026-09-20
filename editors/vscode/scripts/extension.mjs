@@ -462,4 +462,39 @@ for (const relative of ['README.md', 'package.nls.json', 'package.nls.zh-cn.json
   }
 }
 
+// The agent tool layer needs the Language Model Tools API stabilized in 1.99; the two
+// versions must move together or vsce rejects the mismatched pair.
+if (manifest.engines?.vscode !== '^1.99.0') {
+  fail(`agent tooling requires engines.vscode ^1.99.0, found ${manifest.engines?.vscode}`);
+}
+if (manifest.devDependencies?.['@types/vscode'] !== '1.99.0') {
+  fail(`agent tooling requires @types/vscode 1.99.0, found ${manifest.devDependencies?.['@types/vscode']}`);
+}
+const agentTools = manifest.contributes?.languageModelTools ?? [];
+const expectedAgentTools = [
+  'paradoxcode-validate-text',
+  'paradoxcode-search-symbols',
+  'paradoxcode-search-rules',
+  'paradoxcode-search-localisation',
+  'paradoxcode-hover-info',
+];
+if (agentTools.length !== expectedAgentTools.length) {
+  fail(`exactly ${expectedAgentTools.length} agent tools must be declared, found ${agentTools.length}`);
+}
+for (const name of expectedAgentTools) {
+  const tool = agentTools.find((entry) => entry.name === name);
+  if (!tool) {
+    fail(`agent tool contribution missing: ${name}`);
+  }
+  if (typeof tool.modelDescription !== 'string' || tool.modelDescription.length < 40) {
+    fail(`agent tool ${name} needs a descriptive modelDescription`);
+  }
+  if (tool.inputSchema?.type !== 'object') {
+    fail(`agent tool ${name} needs an object inputSchema`);
+  }
+  if (tool.canBeReferencedInPrompt === true) {
+    fail(`agent tool ${name} must not opt into manual prompt references`);
+  }
+}
+
 console.log('extension contract OK');

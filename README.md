@@ -46,6 +46,10 @@ and Paradox Interactive are trademarks of their respective owners.
 - A VS Code extension with zero-configuration, checksum-verified server setup, a first-run
   walkthrough, and a live mission-tree preview (texture-backed nodes, zoom, source navigation,
   PNG/JSON export).
+- Read-only language-model tools (`vscode.lm`) so VS Code agent mode can validate drafted EU4
+  files against the full rules, search indexed symbols and localisation, query the embedded
+  rule database, and look up hover semantics — all served by the already-running language
+  server.
 - Exact-version server downloads with SHA-256 verification, restricted extraction, bounded
   streaming, and self-validating executable caches.
 
