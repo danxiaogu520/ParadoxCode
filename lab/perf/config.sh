@@ -36,9 +36,9 @@ PDC_GAME_ID="${PDC_GAME_ID:-eu4}"
 # --- 对照组：cwtools-rs ---
 # native（默认，公平模式）：Linux 构建的 cwtools，二进制收在本 lab 的 bin/ 下（ignored）。
 CWTOOLS_NATIVE_BIN="${CWTOOLS_NATIVE_BIN:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bin/cwtools}"
-# 构建来源仓库与 interop 备用 exe 属机器本地信息，放 config.local.sh，例如：
+# 构建来源仓库与规则目录属机器本地信息，放 config.local.sh，例如：
 #   CWTOOLS_REPO=/path/to/cwtools-rs          # native 构建来源（checkout 完整仓库）
-#   CWTOOLS_EXE=$CWTOOLS_REPO/target/release/cwtools.exe   # interop 模式用
+#   CWTOOLS_RULES=/path/to/cwtools-eu4-config # EU4 .cwt 规则目录
 # native 构建的独立 target 目录（不写来源仓库）
 CWTOOLS_NATIVE_TARGET="${CWTOOLS_NATIVE_TARGET:-$HOME/.cache/paradoxcode-perf/cwtools-target}"
 CWTOOLS_GAME="${CWTOOLS_GAME:-eu4}"

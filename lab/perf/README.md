@@ -9,7 +9,7 @@ ParadoxCode 的本地性能优化循环工作流。**脚本与文档入库公开
 | 路径 | 入库 | 内容 |
 | --- | --- | --- |
 | `lab/perf/perf.sh`、`config.sh`、`README.md` | ✅ | 工作流脚本、可移植默认配置、本手册 |
-| `lab/perf/config.local.sh` | ❌ | 机器本地覆盖（对照组来源仓库路径、interop exe 等） |
+| `lab/perf/config.local.sh` | ❌ | 机器本地覆盖（对照组来源仓库与规则路径等） |
 | `lab/perf/bin/` | ❌ | native 对照组二进制（本地构建的 cwtools） |
 | `lab/perf/runs/`、`baselines/`、`profiles/` | ❌ | 单次运行记录、基线快照、画像产物 |
 | `data/`（整个目录） | ❌ | 游戏语料的本地副本（见下） |
@@ -23,12 +23,13 @@ EDG 归墟之门模组语料（`data/mods/entrance_to_the_desolate_ground`）。
 
 ## 公平性设计（实验组 vs 对照组）
 
-对照组是 [cwtools-rs](https://github.com/MillenniumDawn/cwtools)。公平比较的三个对齐条件，
-缺一不可：
+对照组是 [cwtools-rs](https://github.com/MillenniumDawn/cwtools)。实验室的一切**执行与写入都留在
+WSL/Linux 侧**：不运行 Windows 二进制、不向 Windows 侧写任何文件；对 `/mnt/c` 只有只读的
+源访问（`import-corpus` 搬语料、对照组从参考 checkout 读源码构建）。公平比较的三个对齐
+条件，缺一不可：
 
-1. **平台统一**：默认 `control` 用 **Linux native 构建**的 cwtools（`control --build` 后收在
-   `lab/perf/bin/cwtools`），与 ParadoxCode 同为 Linux 进程。`--interop` 模式（直接跑参考
-   checkout 里的 Windows `cwtools.exe`）只作参考，**勿与 native 数字混比**。
+1. **平台统一**：`control` 用 **Linux native 构建**的 cwtools（`control --build` 后收在
+   `lab/perf/bin/cwtools`），与 ParadoxCode 同为 Linux 进程。
 2. **文件系统统一**：两边都读 `data/vanilla`（WSL ext4 原生盘），排除 9p 挂载 `/mnt/c`
    的系统性慢读。
 3. **语料统一**：同一棵 vanilla 树（`import-corpus` 的清单写入 `data/manifest.json`）。
@@ -46,9 +47,9 @@ cd lab/perf
 ./perf.sh status              # 语料 / 对照组 / 基线 总览
 ```
 
-机器本地路径（对照组来源仓库 `CWTOOLS_REPO`、interop 备用 exe、`.cwt` 规则目录
-`CWTOOLS_RULES`）写在 `config.local.sh`（模板见 `config.sh` 注释）。语料来源默认取标准
-Steam 安装/workshop 路径，可用 `PDC_VANILLA_ORIGIN` / `EDG_WORKSHOP_SOURCE` 覆盖。
+机器本地路径（对照组来源仓库 `CWTOOLS_REPO`、`.cwt` 规则目录 `CWTOOLS_RULES`）写在
+`config.local.sh`（模板见 `config.sh` 注释）。语料来源默认取标准 Steam 安装/workshop
+路径，可用 `PDC_VANILLA_ORIGIN` / `EDG_WORKSHOP_SOURCE` 覆盖。
 
 ## 命令手册
 
@@ -104,11 +105,10 @@ Steam 安装/workshop 路径，可用 `PDC_VANILLA_ORIGIN` / `EDG_WORKSHOP_SOURC
 ### control —— 对照组
 
 ```bash
-./perf.sh control                    # native（默认）：lab/perf/bin/cwtools，读 data/vanilla
+./perf.sh control                    # native：lab/perf/bin/cwtools，读 data/vanilla
 ./perf.sh control --runs 8 --warmup 2
 ./perf.sh control --timings-only     # 只要 CWTOOLS_TIMINGS 相位
-./perf.sh control --build            # 重建 native 二进制（CWTOOLS_REPO 有更新时）
-./perf.sh control --interop          # Windows exe 参考模式（NTFS IO，勿与 native 混比）
+./perf.sh control --build            # 重建二进制（CWTOOLS_REPO 有更新时）
 ```
 
 每次记录 hyperfine 的 min/mean/max/stddev、`[t] load / validate-config / validate-loc`
@@ -151,12 +151,11 @@ samply 优先（`cargo install samply`，产物可拖 Firefox Profiler），否�
 
 ## 平台事实（WSL 侧，踩过的坑）
 
-- WSL→Windows 环境变量默认不透传：interop 相位计时的 `CWTOOLS_TIMINGS` 由脚本经
-  `WSLENV` 中继（无标志形式；`/u` 方向标志在本机不生效）。
-- Windows exe 参数必须 `wslpath -w` 成 Windows 路径；报告经 `\\wsl.localhost\<distro>\…`
-  UNC 路径写回 WSL 侧。
+- 实验室只在 Linux 侧执行与写入：不跑 Windows exe，不做 `wslpath` / `WSLENV` 这类跨系统
+  操作；`/mnt/c` 仅只读（搬语料、读构建源码），且 9p 慢读已由 `data/` 本地化绕开。
 - hyperfine 的每个位置参数是一条独立命令：带参数命令需整体 `%q` 转义为单个字符串。
-- 9p 读 `/mnt/c` 慢是环境事实：语料本地化（`data/`）后已绕开。
+- Ubuntu 的 `/usr/bin/perf` 包装脚本会因 WSL2 内核版本拒跑，用
+  `/usr/lib/linux-tools/<ver>/perf` 实体二进制（脚本已自动选择）。
 
 ## 与仓库既有设施的关系
 
@@ -169,8 +168,6 @@ samply 优先（`cargo install samply`，产物可拖 Firefox Profiler），否�
 
 ## 已知限制
 
-- 对照组量级参照的前提是 native + `data/vanilla`；interop 模式的 IO 优势（NTFS 原生）使
-  其数字系统性偏快。
 - 基线二进制副本在规则哈希演进出 checkout 后无法再被 sweep 接受（sweep 的防呆设计）；
   其历史使命由当时记录的 `sweep-summary.json` 承担。
 - cwtools 的 EU4 `.cwt` 配置自身带少量规则告警，且两工具诊断语义不同——对照只看吞吐量级。
