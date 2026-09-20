@@ -2030,16 +2030,14 @@ fn empty_dynamic_calls_map_required_cardinality_to_the_call() {
         .expect("open call");
 
     let results = diagnostics(&host.snapshot(), &id);
-    let container_brace =
-        u32::try_from(source.find("immediate = {").expect("immediate") + "immediate = ".len())
-            .expect("range");
+    let immediate_key = u32::try_from(source.find("immediate").expect("immediate")).expect("range");
     // Body-container cardinality now surfaces through the ordinary container
     // check at the invocation's own container, unprefixed by expansion
     // bookkeeping.
     assert!(
         results.iter().any(|diagnostic| {
             diagnostic.code == DiagnosticCode::Cardinality
-                && diagnostic.range.start() == container_brace
+                && diagnostic.range.start() == immediate_key
                 && diagnostic.message.contains("fixture_required")
                 && !diagnostic.message.contains("in expansion of")
         }),

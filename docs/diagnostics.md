@@ -69,8 +69,9 @@ nothing in game, so the finding is an error; it can be muted per code with
 ## Cardinality
 
 A required key or list entry is missing, or a key/list appears more often
-than allowed. Block findings anchor on the opening brace of the block that
-misses the entry; over-quota findings anchor on the entry past the quota
+than allowed. Block findings anchor on the key that owns the block
+(`some_block = { ... }`); the file root, which owns no key, anchors on its
+opening brace. Over-quota findings anchor on the entry past the quota
 and render as unnecessary (dimmed) code, since removing that entry is the
 fix.
 

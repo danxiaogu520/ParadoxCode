@@ -91,7 +91,7 @@ diagnostics:
   expected: a whole number of at least 1
 - code=UnknownKey severity=Error certainty=certain range=1047..1056
   message: unknown key `bogus_key` in a `sprite` definition
-- code=Cardinality severity=Error certainty=certain range=1181..1182
+- code=Cardinality severity=Error certainty=certain range=1168..1178
   message: this block is missing required key `name`
 - code=UnknownTexturePath severity=Error certainty=certain range=1199..1226
   message: texture file `gfx/interface/missing.dds` not found in any mod, game, or DLC pack root
@@ -99,5 +99,5 @@ diagnostics:
   message: texture file `gfx/interface/nope.mesh` not found in any mod, game, or DLC pack root
 - code=UnknownKey severity=Error certainty=certain range=1430..1439
   message: unknown key `wrong_key` in an `object` definition
-- code=Cardinality severity=Error certainty=certain range=1608..1609
+- code=Cardinality severity=Error certainty=certain range=1595..1605
   message: this block is missing required key `name`

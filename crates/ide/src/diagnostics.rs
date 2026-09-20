@@ -529,6 +529,7 @@ pub(crate) fn semantic_rule_diagnostics(
             cancellation,
             block_container: true,
             container_range: parsed.root().range(),
+            container_key_range: None,
             quoted_scripts: &mut quoted_scripts,
             quoted_script_depth: 0,
             scope_diagnostics_deferred: false,
@@ -580,6 +581,7 @@ pub(crate) fn semantic_rule_diagnostics(
                     cancellation,
                     block_container: child.block_range.is_some(),
                     container_range: child.block_range.unwrap_or(child.key_range),
+                    container_key_range: Some(child.key_range),
                     quoted_scripts: &mut quoted_scripts,
                     quoted_script_depth: 0,
                     scope_diagnostics_deferred: false,
@@ -694,6 +696,7 @@ pub(crate) fn semantic_rule_diagnostics(
                 cancellation,
                 block_container: property.block_range.is_some(),
                 container_range: property.block_range.unwrap_or(property.key_range),
+                container_key_range: Some(property.key_range),
                 quoted_scripts: &mut quoted_scripts,
                 quoted_script_depth: 0,
                 scope_diagnostics_deferred: false,
@@ -744,6 +747,11 @@ struct SemanticValidationInput<'data, 'hir, 'session, 'cancel> {
     cancellation: &'data CancellationToken,
     block_container: bool,
     container_range: TextRange,
+    /// Range of the key owning this container, when there is one (a property
+    /// block such as `some_block = { ... }`). "This block ..." cardinality
+    /// findings anchor here; the file root, which owns no key, falls back to
+    /// the opening brace of `container_range`.
+    container_key_range: Option<TextRange>,
     quoted_scripts: &'session mut QuotedScriptSession<'cancel>,
     quoted_script_depth: usize,
     /// True when scope decisions for this subtree belong to the dynamic-contract
@@ -810,6 +818,7 @@ fn validate_semantic_container(
         cancellation,
         block_container,
         container_range,
+        container_key_range,
         quoted_scripts,
         quoted_script_depth,
         scope_diagnostics_deferred,
@@ -1372,6 +1381,7 @@ fn validate_semantic_container(
                     cancellation,
                     block_container: property.block_range.is_some(),
                     container_range: property.block_range.unwrap_or(property.key_range),
+                    container_key_range: Some(property.key_range),
                     quoted_scripts,
                     quoted_script_depth,
                     scope_diagnostics_deferred,
@@ -1476,6 +1486,7 @@ fn validate_semantic_container(
                     cancellation,
                     block_container: true,
                     container_range: property.block_range.unwrap_or(property.key_range),
+                    container_key_range: Some(property.key_range),
                     quoted_scripts,
                     quoted_script_depth,
                     scope_diagnostics_deferred,
@@ -1493,6 +1504,7 @@ fn validate_semantic_container(
                     cancellation,
                     block_container: true,
                     container_range: property.block_range.unwrap_or(property.key_range),
+                    container_key_range: Some(property.key_range),
                     quoted_scripts,
                     quoted_script_depth,
                     scope_diagnostics_deferred,
@@ -1516,6 +1528,7 @@ fn validate_semantic_container(
             cancellation,
             block_container: property.block_range.is_some(),
             container_range: property.block_range.unwrap_or(property.key_range),
+            container_key_range: Some(property.key_range),
             quoted_scripts,
             quoted_script_depth,
             scope_diagnostics_deferred,
@@ -1575,15 +1588,19 @@ fn validate_semantic_container(
             diagnostics.push(diagnostic);
         }
     }
-    // "This block ..." cardinality findings anchor on the opening brace of the
-    // block itself: underlining a sibling property for a *missing* key invites
-    // the wrong fix, and a whole-block squiggle hides the actual content.
-    let block_anchor = if block_container {
-        TextRange::new(container_range.start(), container_range.start() + 1)
-            .unwrap_or(container_range)
-    } else {
-        container_range
-    };
+    // "This block ..." cardinality findings anchor on the key that owns the
+    // block (`some_block = { ... }`): underlining a sibling property for a
+    // *missing* key invites the wrong fix, and a whole-block squiggle hides
+    // the actual content. Keyless containers (the file root) keep the
+    // opening brace of `container_range` as the anchor.
+    let block_anchor = container_key_range.unwrap_or_else(|| {
+        if block_container {
+            TextRange::new(container_range.start(), container_range.start() + 1)
+                .unwrap_or(container_range)
+        } else {
+            container_range
+        }
+    });
     let empty_range = properties.first().map_or_else(
         || {
             bare_values
@@ -1893,6 +1910,7 @@ fn validate_quoted_script(
         cancellation,
         block_container: true,
         container_range: range,
+        container_key_range: Some(property.key_range),
         quoted_scripts,
         quoted_script_depth: depth.saturating_add(1),
         scope_diagnostics_deferred,

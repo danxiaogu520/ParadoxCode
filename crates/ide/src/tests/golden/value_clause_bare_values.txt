@@ -3,7 +3,7 @@
 //   terrain = { color = { 1 2 300 } }
 //   
 diagnostics:
-- code=Cardinality severity=Error certainty=certain range=20..21
+- code=Cardinality severity=Error certainty=certain range=12..17
   message: this list must contain at least 3 whole numbers between 0 and 255, but contains 2
 - code=InvalidValue severity=Error certainty=certain range=26..29
   message: value `300` is out of range
