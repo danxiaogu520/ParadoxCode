@@ -6,6 +6,7 @@
 //! ordinary `defined_text` symbol family; this module adds the snapshot query and the editor
 //! behaviour that consumes it.
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use engine::{AnalysisSnapshot, DocumentSource, SourceFileId};
@@ -355,6 +356,26 @@ pub(crate) fn localisation_previews_for_name(
     Ok(previews)
 }
 
+/// One rendered localisation preview line: the resolved text for one key
+/// candidate in one language.  The label names the binding field (or the
+/// explicit source field) that produced the key, when known.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct LocalisationPreviewRow {
+    pub label: Option<String>,
+    pub language: Option<String>,
+    pub value: String,
+}
+
+/// Maximum languages rendered per labelled field; further languages collapse
+/// into a count line so a vanilla key defined in every shipped language
+/// cannot flood the tooltip.
+const MAX_PREVIEW_LANGUAGES: usize = 4;
+
+/// Maximum labelled fields rendered; further fields collapse into a count
+/// line.  Binding rows per kind are few (≤5), so this mostly bounds
+/// definition bodies carrying many explicit localisation references.
+const MAX_PREVIEW_FIELDS: usize = 6;
+
 /// Finds the localisation previews for a non-localisation symbol definition.
 ///
 /// Type-instance localisation mappings are indexed as ordinary localisation references at the
@@ -363,36 +384,31 @@ pub(crate) fn localisation_previews_for_name(
 /// generated localisation key. Type descriptors may also use the implicit same-name convention
 /// without a localisation-binding row. Finally, the per-family generated templates
 /// (`$_title`, `$.t`, `building_$`, …) are tried for every definition — the
-/// coverage matrix — and only shown when the generated key actually resolves;
-/// this closes, among others, events without an explicit `title` (the engine
-/// falls back to `<id>.t`, verified against vanilla) and mod-authored
-/// definitions whose family convention needs no in-file reference at all.
+/// coverage matrix — and only shown when the generated key actually resolves.
+///
+/// Every strategy contributes its resolvable rows instead of the first match winning: a
+/// definition may carry an explicit `title` while its `desc` template also resolves, and the
+/// hover shows both, one labelled field per row group. Rows repeating a `(language, value)`
+/// pair already shown are dropped.
 pub(crate) fn symbol_localisation_preview(
     snapshot: &AnalysisSnapshot,
     kind: &str,
     symbol_name: &str,
     definition: &ResolutionDefinition,
     cancellation: &CancellationToken,
-) -> Result<Vec<(Option<String>, String)>, Cancelled> {
+) -> Result<Vec<LocalisationPreviewRow>, Cancelled> {
     if kind.eq_ignore_ascii_case("localisation") {
-        return localisation_previews_for_name(snapshot, symbol_name, cancellation);
+        let previews = localisation_previews_for_name(snapshot, symbol_name, cancellation)?;
+        return Ok(unlabelled_preview_rows(&previews));
     }
-    let semantic = &snapshot.rules().model().semantic;
-    let has_binding = semantic
-        .localisation_bindings
-        .iter()
-        .any(|binding| binding.type_name.eq_ignore_ascii_case(kind));
-    let is_type_definition = semantic
-        .type_descriptors
-        .keys()
-        .any(|type_name| type_name.eq_ignore_ascii_case(kind));
-    if !has_binding && !is_type_definition {
+    if !kind_is_localisation_displayable(snapshot, kind) {
         return Ok(Vec::new());
     }
 
     let full_range = definition.location.range;
     let selection_range = definition.selection_range;
     let mut references = Vec::<(String, TextRange)>::new();
+    let mut label_input = None;
     if let Some(document) = definition.location.document.as_ref() {
         if let Some(input) = input_for_document(snapshot, document) {
             references.extend(localisation_references_for_hover(
@@ -400,6 +416,7 @@ pub(crate) fn symbol_localisation_preview(
                 &input,
                 cancellation,
             )?);
+            label_input = Some(input);
         }
     } else if let Some(file) = definition.location.file {
         if let Some(input) = input_for_source_file(snapshot, file) {
@@ -408,6 +425,7 @@ pub(crate) fn symbol_localisation_preview(
                 &input,
                 cancellation,
             )?);
+            label_input = Some(input);
         } else {
             references.extend(
                 snapshot
@@ -428,21 +446,112 @@ pub(crate) fn symbol_localisation_preview(
         )
     });
     references.dedup();
-    for (name, _) in references {
+
+    let mut rows = Vec::new();
+    let mut seen = BTreeSet::<(Option<String>, String)>::new();
+    for (name, range) in references {
         cancellation.checkpoint()?;
         let previews = localisation_previews_for_name(snapshot, &name, cancellation)?;
-        if !previews.is_empty() {
-            return Ok(previews);
+        if previews.is_empty() {
+            continue;
         }
+        let label = generated_key_field(snapshot, kind, symbol_name, &name)
+            .map(str::to_owned)
+            .or_else(|| {
+                label_input
+                    .as_ref()
+                    .and_then(|input| enclosing_field_label(input, range))
+            });
+        push_preview_rows(&mut rows, &mut seen, label, &previews);
     }
-    if is_type_definition {
+    collect_generated_preview_rows(
+        snapshot,
+        kind,
+        symbol_name,
+        is_type_definition(snapshot, kind),
+        &mut rows,
+        &mut seen,
+        cancellation,
+    )?;
+    Ok(rows)
+}
+
+/// Same-name and generated-template localisation previews for a typed token
+/// whose definition site is not at hand — the rule-layer hovers over
+/// `Type`-matched scope links (`tripolitania_area = { … }`) and typed scalar
+/// values. Localisation keys resolve on their own, so no definition lookup
+/// participates.
+pub(crate) fn typed_name_localisation_previews(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+    name: &str,
+    cancellation: &CancellationToken,
+) -> Result<Vec<LocalisationPreviewRow>, Cancelled> {
+    if !kind_is_localisation_displayable(snapshot, kind) {
+        return Ok(Vec::new());
+    }
+    let mut rows = Vec::new();
+    let mut seen = BTreeSet::<(Option<String>, String)>::new();
+    collect_generated_preview_rows(
+        snapshot,
+        kind,
+        name,
+        is_type_definition(snapshot, kind),
+        &mut rows,
+        &mut seen,
+        cancellation,
+    )?;
+    Ok(rows)
+}
+
+/// Whether hover localisation previews apply to a kind: it carries
+/// localisation bindings or is a type descriptor (the implicit same-name
+/// convention).
+pub(crate) fn kind_is_localisation_displayable(snapshot: &AnalysisSnapshot, kind: &str) -> bool {
+    has_localisation_binding(snapshot, kind) || is_type_definition(snapshot, kind)
+}
+
+fn has_localisation_binding(snapshot: &AnalysisSnapshot, kind: &str) -> bool {
+    snapshot
+        .rules()
+        .model()
+        .semantic
+        .localisation_bindings
+        .iter()
+        .any(|binding| binding.type_name.eq_ignore_ascii_case(kind))
+}
+
+fn is_type_definition(snapshot: &AnalysisSnapshot, kind: &str) -> bool {
+    snapshot
+        .rules()
+        .model()
+        .semantic
+        .type_descriptors
+        .keys()
+        .any(|type_name| type_name.eq_ignore_ascii_case(kind))
+}
+
+/// Appends the implicit same-name row (for type descriptors) and every
+/// generated-template row whose key resolves, labelling each group with the
+/// binding field.
+fn collect_generated_preview_rows(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+    symbol_name: &str,
+    same_name: bool,
+    rows: &mut Vec<LocalisationPreviewRow>,
+    seen: &mut BTreeSet<(Option<String>, String)>,
+    cancellation: &CancellationToken,
+) -> Result<(), Cancelled> {
+    if same_name {
         cancellation.checkpoint()?;
         let previews = localisation_previews_for_name(snapshot, symbol_name, cancellation)?;
-        if !previews.is_empty() {
-            return Ok(previews);
-        }
+        push_preview_rows(rows, seen, None, &previews);
     }
-    for binding in semantic
+    for binding in snapshot
+        .rules()
+        .model()
+        .semantic
         .localisation_bindings
         .iter()
         .filter(|binding| binding.type_name.eq_ignore_ascii_case(kind))
@@ -453,11 +562,132 @@ pub(crate) fn symbol_localisation_preview(
         let name = template.replace('$', symbol_name);
         cancellation.checkpoint()?;
         let previews = localisation_previews_for_name(snapshot, &name, cancellation)?;
-        if !previews.is_empty() {
-            return Ok(previews);
+        push_preview_rows(rows, seen, Some(binding.field.clone()), &previews);
+    }
+    Ok(())
+}
+
+/// Appends one row per `(language, value)` not already shown; empty values
+/// and repeats of an identical `(language, value)` pair are dropped.
+fn push_preview_rows(
+    rows: &mut Vec<LocalisationPreviewRow>,
+    seen: &mut BTreeSet<(Option<String>, String)>,
+    label: Option<String>,
+    previews: &[(Option<String>, String)],
+) {
+    for (language, value) in previews {
+        if value.is_empty() || !seen.insert((language.clone(), value.clone())) {
+            continue;
+        }
+        rows.push(LocalisationPreviewRow {
+            label: label.clone(),
+            language: language.clone(),
+            value: value.clone(),
+        });
+    }
+}
+
+/// Wraps per-language previews of one key as unlabelled rows.
+pub(crate) fn unlabelled_preview_rows(
+    previews: &[(Option<String>, String)],
+) -> Vec<LocalisationPreviewRow> {
+    previews
+        .iter()
+        .map(|(language, value)| LocalisationPreviewRow {
+            label: None,
+            language: language.clone(),
+            value: value.clone(),
+        })
+        .collect()
+}
+
+/// The binding field whose generated template expands to `key` for this
+/// instance, when one exists — labels derived-template references hovering a
+/// definition (`event_one.1.t` → `title_default`).
+fn generated_key_field<'a>(
+    snapshot: &'a AnalysisSnapshot,
+    kind: &str,
+    symbol_name: &str,
+    key: &str,
+) -> Option<&'a str> {
+    snapshot
+        .rules()
+        .model()
+        .semantic
+        .localisation_bindings
+        .iter()
+        .filter(|binding| binding.type_name.eq_ignore_ascii_case(kind))
+        .find_map(|binding| {
+            let template = binding.template.as_deref()?;
+            template
+                .replace('$', symbol_name)
+                .eq_ignore_ascii_case(key)
+                .then_some(binding.field.as_str())
+        })
+}
+
+/// The key of the property whose scalar value sits at `range` — labels
+/// explicit localisation references with their source field (`title = …`).
+fn enclosing_field_label(input: &ParsedInput, range: TextRange) -> Option<String> {
+    let hir = input.hir.as_deref()?;
+    hir.properties()
+        .iter()
+        .find(|property| {
+            property
+                .scalar
+                .as_ref()
+                .is_some_and(|scalar| text_range_within(range, scalar.range))
+        })
+        .map(|property| property.key.to_string())
+}
+
+/// Formats the localisation-preview section over labelled row groups: one
+/// line per language in parallel, capped per field, with trailing count
+/// lines for further languages and fields.
+pub(crate) fn localisation_preview_section(rows: &[LocalisationPreviewRow]) -> String {
+    let mut lines = Vec::new();
+    let mut fields_shown = 0;
+    let mut fields_hidden = 0usize;
+    let mut start = 0;
+    while start < rows.len() {
+        let label = rows[start].label.clone();
+        let end = start
+            + rows[start..]
+                .iter()
+                .position(|row| row.label != label)
+                .unwrap_or(rows.len() - start);
+        let group = &rows[start..end];
+        start = end;
+        if fields_shown == MAX_PREVIEW_FIELDS {
+            fields_hidden += 1;
+            continue;
+        }
+        fields_shown += 1;
+        let title = label.as_deref().unwrap_or("Localisation");
+        let shown = group.len().min(MAX_PREVIEW_LANGUAGES);
+        lines.extend(
+            group[..shown]
+                .iter()
+                .map(|row| {
+                    format!(
+                        "- {}{}: \"{}\"",
+                        title,
+                        row.language
+                            .as_deref()
+                            .map_or_else(String::new, |language| format!(" ({language})")),
+                        row.value
+                    )
+                })
+                .collect::<Vec<_>>(),
+        );
+        if group.len() > shown {
+            lines.push(format!("- … and {} more languages", group.len() - shown));
         }
     }
-    Ok(Vec::new())
+    if fields_hidden > 0 {
+        lines.push(format!("- … and {fields_hidden} more fields"));
+    }
+    format!("#### Localisation preview\n\n{}", lines.join("\n"))
 }
 
 fn localisation_references_for_hover(
