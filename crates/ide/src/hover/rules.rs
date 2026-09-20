@@ -57,6 +57,14 @@ pub(crate) fn semantic_rule_hover_at(
         word,
         &candidates,
     ));
+    append_typed_localisation_section(
+        snapshot,
+        word,
+        &candidates,
+        RuleHoverPosition::Key,
+        &mut model,
+        cancellation,
+    )?;
     Ok(Some(model))
 }
 
@@ -149,7 +157,86 @@ pub(crate) fn semantic_value_hover_at(
         word,
         &candidates,
     ));
+    append_typed_localisation_section(
+        snapshot,
+        word,
+        &candidates,
+        RuleHoverPosition::Value,
+        &mut model,
+        cancellation,
+    )?;
     Ok(Some(model))
+}
+
+/// Which side of a rule the hovered word sits on: the property key (block
+/// keys, scope links) or the scalar value.
+#[derive(Clone, Copy)]
+enum RuleHoverPosition {
+    Key,
+    Value,
+}
+
+/// Appends a localisation-preview section to a rule hover when the word is
+/// governed by `Type` matchers that agree on one workspace kind
+/// (`area.used` scope links, typed scalar values).  A `Type` match already
+/// implies the token resolved against that kind's indexed definitions, so the
+/// preview needs no further resolution gate — only a displayable kind and a
+/// key that actually resolves.
+fn append_typed_localisation_section(
+    snapshot: &AnalysisSnapshot,
+    word: &str,
+    candidates: &[SemanticCompletionRule<'_, '_>],
+    position: RuleHoverPosition,
+    model: &mut HoverModel,
+    cancellation: &CancellationToken,
+) -> Result<(), Cancelled> {
+    let Some(kind) = agreed_typed_kind(candidates, position) else {
+        return Ok(());
+    };
+    if !crate::localisation::kind_is_localisation_displayable(snapshot, &kind) {
+        return Ok(());
+    }
+    let rows =
+        crate::localisation::typed_name_localisation_previews(snapshot, &kind, word, cancellation)?;
+    if !rows.is_empty() {
+        model.has_localisation_preview = true;
+        model.push_section(crate::localisation::localisation_preview_section(&rows));
+    }
+    Ok(())
+}
+
+/// The one workspace kind every `Type`-matched candidate agrees on, using the
+/// matcher for the hovered position.  Disagreement means the word has several
+/// typed interpretations; the preview must not guess between them, mirroring
+/// the typed-reference convention in HIR lowering.
+fn agreed_typed_kind(
+    candidates: &[SemanticCompletionRule<'_, '_>],
+    position: RuleHoverPosition,
+) -> Option<String> {
+    let mut kinds = BTreeSet::new();
+    for candidate in candidates {
+        let type_name = match position {
+            RuleHoverPosition::Key => match &candidate.rule.key {
+                KeyMatcher::Type(type_name) => Some(type_name.as_str()),
+                _ => None,
+            },
+            RuleHoverPosition::Value => match &candidate.rule.value {
+                ValueMatcher::Type(type_name) => Some(type_name.as_str()),
+                _ => None,
+            },
+        };
+        if let Some(type_name) = type_name {
+            let base = type_name
+                .split_once('.')
+                .map_or(type_name, |(base, _)| base);
+            kinds.insert(base.to_owned());
+        }
+    }
+    if kinds.len() == 1 {
+        kinds.into_iter().next()
+    } else {
+        None
+    }
 }
 
 /// Provenance for a `texture_path` value hover: the resolved absolute path,

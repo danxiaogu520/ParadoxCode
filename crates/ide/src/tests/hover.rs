@@ -806,7 +806,7 @@ fn typed_symbol_hover_shows_definition_localisation_preview() {
     assert!(
         result
             .contents
-            .contains("Localisation (l_english): \"Event Title\""),
+            .contains("title (l_english): \"Event Title\""),
         "typed symbol hover should include its definition's localisation: {}",
         result.contents
     );
@@ -844,9 +844,7 @@ fn optional_type_localisation_hover_shows_existing_preview() {
         u32::try_from(source.find("region_one").expect("region name") + 1).expect("position");
     let result = hover(&host.snapshot(), &definition, position).expect("region hover");
     assert!(
-        result
-            .contents
-            .contains("Localisation (l_english): \"Region One\""),
+        result.contents.contains("name (l_english): \"Region One\""),
         "optional type mappings should contribute existing localisation previews: {}",
         result.contents
     );
@@ -888,6 +886,98 @@ fn same_name_type_localisation_hover_shows_existing_preview() {
             .contents
             .contains("Localisation (l_english): \"Europe\""),
         "same-name type localisations should contribute existing previews: {}",
+        result.contents
+    );
+}
+
+#[test]
+fn scope_link_rule_hover_shows_typed_localisation_preview() {
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::Project,
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
+    )]));
+    host.open_document(
+        DocumentId::new("file:///tmp/localisation/test.yml"),
+        1,
+        "l_english:\ntest_area:0 \"Test Area\"\n".to_owned(),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/localisation/test.yml",
+        ))),
+    )
+    .expect("open localisation");
+    host.open_document(
+        DocumentId::new("file:///tmp/map/area.txt"),
+        1,
+        "test_area = { 1 2 }\n".to_owned(),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/map/area.txt",
+        ))),
+    )
+    .expect("open area");
+    let event = DocumentId::new("file:///tmp/events/ev.txt");
+    let source = "country_event = {\n\tid = ev.1\n\toption = {\n\t\ttest_area = {\n\t\t}\n\t}\n}\n";
+    host.open_document(
+        event.clone(),
+        1,
+        source.to_owned(),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/events/ev.txt",
+        ))),
+    )
+    .expect("open event");
+    let position =
+        u32::try_from(source.find("test_area").expect("area scope link") + 1).expect("position");
+    let result = hover(&host.snapshot(), &event, position).expect("area scope-link hover");
+    assert!(
+        result
+            .contents
+            .contains("Localisation (l_english): \"Test Area\""),
+        "typed scope-link block keys should show their localisation preview: {}",
+        result.contents
+    );
+}
+
+#[test]
+fn bound_kind_hover_shows_every_template_preview() {
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::Project,
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
+    )]));
+    host.open_document(
+        DocumentId::new("file:///tmp/localisation/test.yml"),
+        1,
+        "l_english:\nregion_two:0 \"Region Two\"\nshort_region_two:0 \"Region 2\"\n".to_owned(),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/localisation/test.yml",
+        ))),
+    )
+    .expect("open localisation");
+    let definition = DocumentId::new("file:///tmp/common/colonial_regions/test.txt");
+    let source = "region_two = { }\n";
+    host.open_document(
+        definition.clone(),
+        1,
+        source.to_owned(),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/common/colonial_regions/test.txt",
+        ))),
+    )
+    .expect("open colonial region");
+    let position =
+        u32::try_from(source.find("region_two").expect("region name") + 1).expect("position");
+    let result = hover(&host.snapshot(), &definition, position).expect("region hover");
+    assert!(
+        result
+            .contents
+            .contains("- name (l_english): \"Region Two\"")
+            && result
+                .contents
+                .contains("- short (l_english): \"Region 2\""),
+        "every resolvable binding template should contribute a labelled preview row: {}",
         result.contents
     );
 }
