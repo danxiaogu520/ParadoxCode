@@ -149,20 +149,20 @@ pub struct HirLocalisationEntry {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DefinitionAttributes {
     /// Dynamic symbol kind matching the HIR definition.
-    pub kind: String,
+    pub kind: Arc<str>,
     /// Definition name as written in source.
     pub name: String,
     /// Full range of the owning symbol definition.
     pub definition_range: TextRange,
     /// Direct body property keys in source order, as written.
-    pub attribute_keys: Vec<String>,
+    pub attribute_keys: Vec<Arc<str>>,
 }
 
 /// One profile-interpreted symbol definition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HirDefinition {
     /// Stable workspace symbol kind.
-    pub kind: String,
+    pub kind: Arc<str>,
     /// Declared symbol spelling.
     pub name: String,
     /// Full declaration range.
@@ -175,7 +175,7 @@ pub struct HirDefinition {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HirReference {
     /// Stable target symbol kind.
-    pub kind: String,
+    pub kind: Arc<str>,
     /// Referenced symbol spelling.
     pub name: String,
     /// Exact source range of the reference.
@@ -268,7 +268,7 @@ pub enum TemplateFragment {
     /// One owner-local parameter slot.
     Parameter {
         /// Parameter spelling without delimiters.
-        name: String,
+        name: Arc<str>,
         /// Exact definition-side range of the delimited occurrence.
         range: TextRange,
     },
@@ -296,7 +296,7 @@ pub struct TemplateProperty {
     /// Full definition-side property range.
     pub range: TextRange,
     /// Operator spelling recovered by the parser.
-    pub operator: Option<String>,
+    pub operator: Option<Arc<str>>,
     /// Scalar or block value.
     pub value: TemplateValue,
 }
@@ -305,7 +305,7 @@ pub struct TemplateProperty {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TemplateConditional {
     /// Parameter spelling without `!`.
-    pub name: String,
+    pub name: Arc<str>,
     /// Whether the body is active when the parameter is absent.
     pub negated: bool,
     /// Full definition-side conditional range.
@@ -329,7 +329,7 @@ pub enum TemplateItem {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Template {
     /// Dynamic symbol kind, such as `scripted_effect`.
-    pub kind: String,
+    pub kind: Arc<str>,
     /// Definition name as written in source.
     pub name: String,
     /// Full owning definition range.

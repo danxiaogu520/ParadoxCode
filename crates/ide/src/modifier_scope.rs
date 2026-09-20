@@ -143,7 +143,7 @@ fn report_application(
         }
     }
     let application = scope.to_ascii_lowercase();
-    let mut report = |class: &str, keys: &[String], allowed: bool| {
+    let mut report = |class: &str, keys: &[Arc<str>], allowed: bool| {
         if keys.is_empty() {
             return;
         }
@@ -228,7 +228,7 @@ fn definition_attribute_keys(
     snapshot: &AnalysisSnapshot,
     kind: &str,
     name: &str,
-) -> Option<Vec<String>> {
+) -> Option<Vec<Arc<str>>> {
     let mut overlay_hits: Vec<DefinitionAttributes> = Vec::new();
     for document in snapshot
         .documents()

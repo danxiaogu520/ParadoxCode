@@ -169,7 +169,10 @@ fn definition_attribute_summaries_survive_live_and_cached_indexing() {
         .clone();
     assert_eq!(
         live.attribute_keys,
-        vec!["global_tax_modifier".to_owned(), "local_unrest".to_owned()]
+        vec![
+            std::sync::Arc::from("global_tax_modifier"),
+            std::sync::Arc::from("local_unrest")
+        ]
     );
 
     let cache = IndexCache::from_snapshot(&snapshot).expect("build cache");

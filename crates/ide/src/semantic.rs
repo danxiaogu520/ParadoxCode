@@ -1604,7 +1604,7 @@ fn dynamic_summary_in_hir(
         })
         .collect();
     DynamicDefinitionSummary {
-        kind: kind.to_owned(),
+        kind: Arc::from(kind),
         name: name.to_owned(),
         definition_range: owner_range,
         parameters,
