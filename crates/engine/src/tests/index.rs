@@ -328,17 +328,16 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
         selection_range: range,
         active: true,
     };
-    let reference = |file_id, name: &str| Reference {
+    let reference = |name: &str| Reference {
         kind: "event".into(),
         name: name.into(),
-        file_id,
         range,
     };
     let mut index = WorkspaceIndex::from_shards([
         FileIndexShard {
             file_id: first_file,
             definitions: vec![definition(first_file, "old.1")],
-            references: vec![reference(first_file, "old.1")],
+            references: vec![reference("old.1")],
             dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
@@ -347,7 +346,7 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
         FileIndexShard {
             file_id: second_file,
             definitions: vec![definition(second_file, "untouched.1")],
-            references: vec![reference(second_file, "untouched.1")],
+            references: vec![reference("untouched.1")],
             dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
@@ -358,7 +357,7 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
     index.replace_shard(FileIndexShard {
         file_id: first_file,
         definitions: vec![definition(first_file, "new.1")],
-        references: vec![reference(first_file, "new.1")],
+        references: vec![reference("new.1")],
         dynamic_definitions: Vec::new(),
         definition_attributes: Vec::new(),
         flag_writes: Vec::new(),

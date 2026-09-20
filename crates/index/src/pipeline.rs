@@ -866,7 +866,6 @@ fn collect_hir_semantics(
         references.push(Reference {
             kind: vfs::intern_shard_string(&reference.kind),
             name: vfs::intern_shard_string(&reference.name),
-            file_id: file.id,
             range: reference.range,
         });
     }
