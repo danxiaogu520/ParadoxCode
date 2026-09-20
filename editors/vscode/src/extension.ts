@@ -11,6 +11,8 @@ import {
 } from 'vscode-languageclient/node';
 
 import { FileTeeDebugChannel } from './debugChannel';
+import { registerAgentTools } from './agent/register';
+import { setAgentClient } from './agent/server';
 import { LoadedFilesProvider } from './fileExplorer';
 import { MissionPreviewPanel } from './previewPanel';
 import {
@@ -1332,6 +1334,9 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
         }
         client = createClient(resolution);
         const currentClient = client;
+        // Publish the fresh instance for the agent tool layer before start() resolves:
+        // tools poll for a Running client, so early calls simply wait.
+        setAgentClient(currentClient);
         currentClient.onDidChangeState((event) => {
             if (client !== currentClient) {
                 return;
@@ -1392,6 +1397,7 @@ async function stopClient(loadedFiles?: LoadedFilesProvider): Promise<void> {
     if (client) {
         const previous = client;
         client = undefined;
+        setAgentClient(undefined);
         updateStatus(State.Stopped);
         log.appendLine('language server client stopped');
         try {
@@ -1586,6 +1592,10 @@ export function activate(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
         loadedFilesProvider,
         vscode.window.registerTreeDataProvider('paradoxcode.loadedFiles', loadedFilesProvider),
+        // Agent tools are read-only queries over the shared language-server client; they
+        // register whenever the host exposes the Language Model Tools API and stay inert
+        // (never invoked) on hosts without a chat provider.
+        ...registerAgentTools(),
     );
 
     // Transparent localisation (pdcloc:// decoded views) is independent of the
