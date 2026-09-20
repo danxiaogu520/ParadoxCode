@@ -316,7 +316,7 @@ fn collect_call_site_bindings(
         Some(cached) => cached,
         None => {
             let mut file_sites: Vec<(SourceFileId, String, String, TextRange)> = Vec::new();
-            for reference in snapshot.index().references_iter() {
+            for (file_id, reference) in snapshot.index().references_iter() {
                 if !dynamic_definition_type(snapshot, &reference.kind) {
                     continue;
                 }
@@ -326,7 +326,7 @@ fn collect_call_site_bindings(
                 );
                 if wanted.contains(&key) {
                     file_sites.push((
-                        reference.file_id,
+                        file_id,
                         reference.kind.to_string(),
                         reference.name.to_string(),
                         reference.range,
