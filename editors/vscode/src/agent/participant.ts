@@ -1,27 +1,34 @@
 import * as vscode from 'vscode';
 import { AGENT_TOOL_SPECS, buildSystemPrompt } from './prompt';
 import {
-    runHoverInfo, runSearchLocalisation, runSearchRules, runSearchSymbols, runValidateText,
-    type SearchLocalisationInput, type SearchRulesInput,
+    runContext, runDiagnostics, runLocGet, runLocList, runLocSearch, runReferences, runRules,
+    runSearch, runSymbolReferences, runValidateText, runWorkspace,
+    type RulesInput, type SearchInput, type ValidateTextInput,
 } from './tools';
 
 /**
  * The @paradox chat participant: a deep agent loop over the shared tool layer. The model
  * comes from the chat request (the user's selected model) with a Copilot fallback, the
- * system prompt encodes EU4 modding discipline, and tools are invoked as direct function
- * calls — no manual referencing. Slash commands run the same tools deterministically for
- * hosts without a chat model.
+ * system prompt encodes EU4 modding discipline and the script/localisation zone split, and
+ * tools are invoked as direct function calls — no manual referencing. Slash commands run
+ * the same tools deterministically for hosts without a chat model.
  */
 
 const MAX_TOOL_ROUNDS = 12;
 const HISTORY_TURNS = 6;
 
 const TOOL_RUNNERS: Record<string, (input: never, token: vscode.CancellationToken) => Promise<string>> = {
-    'paradoxcode-validate-text': runValidateText as typeof TOOL_RUNNERS['paradoxcode-validate-text'],
-    'paradoxcode-search-symbols': runSearchSymbols as typeof TOOL_RUNNERS['paradoxcode-search-symbols'],
-    'paradoxcode-search-rules': runSearchRules as typeof TOOL_RUNNERS['paradoxcode-search-rules'],
-    'paradoxcode-search-localisation': runSearchLocalisation as typeof TOOL_RUNNERS['paradoxcode-search-localisation'],
-    'paradoxcode-hover-info': runHoverInfo as typeof TOOL_RUNNERS['paradoxcode-hover-info'],
+    'paradoxcode_workspace': runWorkspace as typeof TOOL_RUNNERS['paradoxcode_workspace'],
+    'paradoxcode_search': runSearch as typeof TOOL_RUNNERS['paradoxcode_search'],
+    'paradoxcode_context': runContext as typeof TOOL_RUNNERS['paradoxcode_context'],
+    'paradoxcode_diagnostics': runDiagnostics as typeof TOOL_RUNNERS['paradoxcode_diagnostics'],
+    'paradoxcode_references': runReferences as typeof TOOL_RUNNERS['paradoxcode_references'],
+    'paradoxcode_symbol_references': runSymbolReferences as typeof TOOL_RUNNERS['paradoxcode_symbol_references'],
+    'paradoxcode_rules': runRules as typeof TOOL_RUNNERS['paradoxcode_rules'],
+    'paradoxcode_validate_text': runValidateText as typeof TOOL_RUNNERS['paradoxcode_validate_text'],
+    'paradoxcode_loc_get': runLocGet as typeof TOOL_RUNNERS['paradoxcode_loc_get'],
+    'paradoxcode_loc_search': runLocSearch as typeof TOOL_RUNNERS['paradoxcode_loc_search'],
+    'paradoxcode_loc_list': runLocList as typeof TOOL_RUNNERS['paradoxcode_loc_list'],
 };
 
 const DEGRADATION_MESSAGE = [
@@ -29,9 +36,9 @@ const DEGRADATION_MESSAGE = [
     '',
     'The deterministic commands keep working without a model:',
     '- `@paradox /validate` — validate the active editor file',
-    '- `@paradox /symbols <query>` — search indexed symbols',
+    '- `@paradox /symbols <query>` — search indexed script symbols',
     '- `@paradox /rules context=trigger key=... ` — search the rule database',
-    '- `@paradox /loc key=... ` — search localisation',
+    '- `@paradox /loc key=... | text=... | prefix=...` — address or discover localisation',
     '- `@paradox /hover` — hover lookup at the cursor',
     '',
     'To enable conversational answers, sign in to GitHub Copilot or install another chat provider.',
@@ -72,8 +79,8 @@ async function handleParadoxRequest(
 }
 
 /** Parses `context=x key=y scope=z` tokens; bare tokens fall back to a key filter. */
-export function parseRuleFilters(prompt: string): SearchRulesInput {
-    const filters: SearchRulesInput = {};
+export function parseRuleFilters(prompt: string): RulesInput {
+    const filters: RulesInput = {};
     for (const token of prompt.split(/\s+/).filter(Boolean)) {
         const separator = token.indexOf('=');
         if (separator <= 0) {
@@ -91,31 +98,64 @@ export function parseRuleFilters(prompt: string): SearchRulesInput {
     return filters;
 }
 
-/** Parses `key=x text=y` tokens; a bare single word searches keys, bare multi-word text searches values. */
-export function parseLocalisationQuery(prompt: string): SearchLocalisationInput {
-    const query: SearchLocalisationInput = {};
-    for (const token of prompt.split(/\s+/).filter(Boolean)) {
-        const separator = token.indexOf('=');
-        if (separator <= 0) {
+/** The resolved `/loc` query: exact key address, value search, or key-prefix family list. */
+export interface LocalisationQuery {
+    mode: 'get' | 'search' | 'list';
+    key?: string;
+    text?: string;
+    keyPrefix?: string;
+}
+
+/** Parses `key=x`, `text=y`, or `prefix=z` tokens; token values run to the next mode token or
+ * the end of the prompt, a bare word addresses a key exactly, bare multi-word text searches
+ * displayed values. */
+export function parseLocalisationQuery(prompt: string): LocalisationQuery {
+    let key: string | undefined;
+    let text: string | undefined;
+    let keyPrefix: string | undefined;
+    const segments = prompt.trim().split(/\s+(?=(?:key|text|prefix)=)/).filter(Boolean);
+    for (const segment of segments) {
+        const match = /^(key|text|prefix)=/.exec(segment);
+        if (!match) {
             continue;
         }
-        const prefix = token.slice(0, separator);
-        const value = token.slice(separator + 1);
-        if (prefix === 'key' || prefix === 'text') {
-            query[prefix] = value;
+        const value = segment.slice(match[0].length).trim();
+        if (!value) {
+            continue;
+        }
+        if (match[1] === 'key') {
+            key = value;
+        } else if (match[1] === 'text') {
+            text = value;
+        } else {
+            keyPrefix = value;
         }
     }
-    if (!query.key && !query.text) {
-        const trimmed = prompt.trim();
-        if (trimmed) {
-            if (trimmed.includes(' ')) {
-                query.text = trimmed;
-            } else {
-                query.key = trimmed;
-            }
-        }
+    if (key) {
+        return { mode: 'get', key };
     }
-    return query;
+    if (text) {
+        return { mode: 'search', text };
+    }
+    if (keyPrefix) {
+        return { mode: 'list', keyPrefix };
+    }
+    const trimmed = prompt.trim();
+    if (!trimmed) {
+        return { mode: 'get' };
+    }
+    if (trimmed.includes(' ')) {
+        return { mode: 'search', text: trimmed };
+    }
+    return { mode: 'get', key: trimmed };
+}
+
+function parseSearchInput(prompt: string): SearchInput {
+    const filters = parseRuleFilters(prompt);
+    if (!filters.context && !filters.scope) {
+        return { query: filters.key ?? prompt.trim() };
+    }
+    return { query: filters.key ?? '' };
 }
 
 async function runSlashCommand(
@@ -134,21 +174,31 @@ async function runSlashCommand(
             const path = vscode.workspace.asRelativePath(editor.document.uri);
             stream.progress('ParadoxCode: validating…');
             stream.markdown(await runValidateText(
-                { files: [{ path, text: editor.document.getText() }] },
+                { files: [{ path, text: editor.document.getText() }] } as ValidateTextInput,
                 token,
             ));
             return {};
         }
         case 'symbols': {
-            stream.markdown(await runSearchSymbols({ query: prompt }, token));
+            stream.markdown(await runSearch(parseSearchInput(prompt), token));
             return {};
         }
         case 'rules': {
-            stream.markdown(await runSearchRules(parseRuleFilters(prompt), token));
+            stream.markdown(await runRules(parseRuleFilters(prompt), token));
             return {};
         }
         case 'loc': {
-            stream.markdown(await runSearchLocalisation(parseLocalisationQuery(prompt), token));
+            const query = parseLocalisationQuery(prompt);
+            if (query.mode === 'list') {
+                stream.markdown(await runLocList({ keyPrefix: query.keyPrefix ?? '' }, token));
+            } else if (query.mode === 'search') {
+                stream.markdown(await runLocSearch({ text: query.text ?? '' }, token));
+            } else if (query.key) {
+                stream.markdown(await runLocGet({ key: query.key }, token));
+            } else {
+                stream.markdown('Pass a key (key=event.1.t), a text filter (text=Templar), '
+                    + 'or a key prefix (prefix=event.1.).');
+            }
             return {};
         }
         case 'hover': {
@@ -158,7 +208,7 @@ async function runSlashCommand(
                 return {};
             }
             const selection = editor.selection.active;
-            stream.markdown(await runHoverInfo({
+            stream.markdown(await runContext({
                 path: editor.document.uri.toString(),
                 line: selection.line + 1,
                 character: selection.character,
@@ -229,7 +279,7 @@ async function runAgentLoop(
         }
         const results: vscode.LanguageModelToolResultPart[] = [];
         for (const call of toolCalls) {
-            stream.progress(`ParadoxCode: running ${call.name.replace('paradoxcode-', '')}…`);
+            stream.progress(`ParadoxCode: running ${call.name.replace('paradoxcode_', '')}…`);
             results.push(new vscode.LanguageModelToolResultPart(call.callId, [
                 new vscode.LanguageModelTextPart(await executeToolCall(call, token)),
             ]));
@@ -240,7 +290,18 @@ async function runAgentLoop(
             results,
         ));
     }
-    stream.markdown('\n\nReached the tool-round budget for one answer; ask me to continue.');
+    // Tool budget exhausted: force a wrap-up answer from the gathered results instead of
+    // giving up, so broad tasks still produce a (partial) synthesis.
+    messages.push(vscode.LanguageModelChatMessage.User(
+        'Tool budget exhausted for this answer. Do not call any more tools. Answer now from '
+        + 'the results already gathered, and state which parts you could not verify.',
+    ));
+    const wrapUp = await model.sendRequest(messages, {}, token);
+    for await (const part of wrapUp.stream) {
+        if (part instanceof vscode.LanguageModelTextPart) {
+            stream.markdown(part.value);
+        }
+    }
     return {};
 }
 

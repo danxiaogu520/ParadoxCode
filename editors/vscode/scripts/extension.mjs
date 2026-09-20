@@ -472,11 +472,17 @@ if (manifest.devDependencies?.['@types/vscode'] !== '1.99.0') {
 }
 const agentTools = manifest.contributes?.languageModelTools ?? [];
 const expectedAgentTools = [
-  'paradoxcode-validate-text',
-  'paradoxcode-search-symbols',
-  'paradoxcode-search-rules',
-  'paradoxcode-search-localisation',
-  'paradoxcode-hover-info',
+  'paradoxcode_workspace',
+  'paradoxcode_search',
+  'paradoxcode_context',
+  'paradoxcode_diagnostics',
+  'paradoxcode_references',
+  'paradoxcode_symbol_references',
+  'paradoxcode_rules',
+  'paradoxcode_validate_text',
+  'paradoxcode_loc_get',
+  'paradoxcode_loc_search',
+  'paradoxcode_loc_list',
 ];
 if (agentTools.length !== expectedAgentTools.length) {
   fail(`exactly ${expectedAgentTools.length} agent tools must be declared, found ${agentTools.length}`);
@@ -553,7 +559,15 @@ for (const tool of mcpManifestTools) {
     fail(`MCP tool ${tool.name} needs an object inputSchema`);
   }
 }
-for (const marker of ['validate-text', 'search-rules', 'search-symbols', 'UnknownLocalisationKey']) {
+for (const marker of [
+  'paradoxcode_validate_text',
+  'paradoxcode_rules',
+  'paradoxcode_search',
+  'paradoxcode_loc_get',
+  'paradoxcode_loc_list',
+  'UnknownLocalisationKey',
+  'Zone discipline',
+]) {
   if (!MCP_INSTRUCTIONS.includes(marker)) {
     fail(`MCP instructions must carry the tool-discipline marker: ${marker}`);
   }
