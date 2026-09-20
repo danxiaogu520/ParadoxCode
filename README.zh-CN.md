@@ -34,6 +34,7 @@ ParadoxCode **与 Paradox Interactive 无任何关联，也未获得其背书**�
 - VS Code 扩展：零配置、带校验和的服务器自动安装，首次使用引导（walkthrough），以及实时任务树预览（贴图节点、缩放、源码跳转、PNG/JSON 导出）。
 - 只读语言模型工具（`vscode.lm`）：让 VS Code 的 agent 模式用完整规则库验证草稿文件、检索已索引的符号与本地化条目、查询内嵌规则数据库、查阅悬停语义——全部由已在运行的语言服务器提供。
 - `@paradox` 聊天参与者：在同一套工具上运行自带 EU4 模组写作领域提示词的 agent 循环（模型取当前聊天选中的模型），并提供 `/validate`、`/symbols`、`/rules`、`/loc`、`/hover` 确定性命令，无聊天模型时依然可用。
+- stdio MCP 服务器（`editors/vscode/scripts/mcp.mjs`）：把同样的五个只读工具暴露给任意 Model Context Protocol 客户端——手写换行分隔 JSON-RPC，零 SDK 依赖，工具清单与扩展贡献点同源。
 - 精确版本服务器下载：SHA-256 校验、受限解压、有界流式传输与自校验可执行缓存。
 
 ## 快速开始
@@ -52,6 +53,26 @@ VS Code 的 **Get Started** 页面提供 **Start using ParadoxCode** 引导，�
 ### 独立二进制
 
 Linux（x86_64、aarch64）、macOS（x86_64、aarch64）与 Windows（x86_64）的独立 `paradoxcode` 二进制以 `.tar.gz` / `.zip` 归档形式附在每个 [GitHub Release](https://github.com/danxiaogu520/ParadoxCode/releases) 上，并带有 `.sha256` 校验文件。语言服务器内嵌第一方 EU4 规则源，绝不导入外部规则文件。
+
+### MCP 服务器
+
+同样的五个只读 agent 工具还以 stdio [Model Context Protocol](https://modelcontextprotocol.io) 服务器形式提供，MCP 客户端可以在 VS Code 之外验证草稿、查询规则库。需要本仓库的 checkout 与一份已构建（或从 Release 下载）的 `paradoxcode` 二进制：
+
+```json
+{
+  "mcpServers": {
+    "paradoxcode": {
+      "command": "node",
+      "args": [
+        "/path/to/ParadoxCode/editors/vscode/scripts/mcp.mjs",
+        "--server", "/path/to/paradoxcode"
+      ]
+    }
+  }
+}
+```
+
+待索引的工作区根按以下顺序解析：`--workspace PATH` 参数（或 `PDC_MCP_WORKSPACE` 环境变量）→ MCP 客户端的 roots → 当前工作目录。单条服务器请求以 120 秒为上限（`--timeout-ms` 可调）；诊断日志输出到 stderr。工具清单与扩展的语言模型工具来自同一份清单、逐一对应；`--help` 列出全部选项。
 
 ## 项目状态
 

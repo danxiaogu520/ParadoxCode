@@ -54,6 +54,9 @@ and Paradox Interactive are trademarks of their respective owners.
   (domain system prompt, model from the active chat selection), with deterministic
   `/validate`, `/symbols`, `/rules`, `/loc`, and `/hover` commands that keep working without
   a chat model.
+- A stdio MCP server (`editors/vscode/scripts/mcp.mjs`) that exposes the same five read-only
+  tools to any Model Context Protocol client — hand-rolled newline-delimited JSON-RPC with no
+  SDK dependency, its tool manifest mirrored from the extension's contributions.
 - Exact-version server downloads with SHA-256 verification, restricted extraction, bounded
   streaming, and self-validating executable caches.
 
@@ -87,6 +90,33 @@ EU4 rule source and never imports external rule files.
 `paradoxcode` requires modern LSP initialization with at least one `workspaceFolders` entry. Clients
 that send only the deprecated `rootUri` field are intentionally unsupported and receive an
 `INVALID_PARAMS` response; use a current LSP client or upgrade the editor integration.
+
+### MCP server
+
+The same five read-only agent tools are also exposed as a stdio
+[Model Context Protocol](https://modelcontextprotocol.io) server, so MCP clients can validate
+drafts and query the rule database outside VS Code. It needs a checkout of this repository and
+a built (or downloaded) `paradoxcode` binary:
+
+```json
+{
+  "mcpServers": {
+    "paradoxcode": {
+      "command": "node",
+      "args": [
+        "/path/to/ParadoxCode/editors/vscode/scripts/mcp.mjs",
+        "--server", "/path/to/paradoxcode"
+      ]
+    }
+  }
+}
+```
+
+The workspace root to index is resolved in order: the `--workspace PATH` option (or
+`PDC_MCP_WORKSPACE`), the MCP client's roots, then the working directory. Each server request
+is bounded by a 120 s timeout (`--timeout-ms`); diagnostics go to stderr. The tool list mirrors
+the extension's language-model tools one-to-one from the same manifest, and `--help` documents
+every option.
 
 ## Project status
 

@@ -6,7 +6,7 @@
 // Default: `cargo run --quiet -p pdc --bin paradoxcode` (repo checkout).
 
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { delimiter, dirname, join } from 'node:path';
@@ -322,3 +322,190 @@ try {
 
 const pathFailures = process.exitCode === 1;
 console.log(pathFailures ? 'serverPath FAILED' : 'serverPath OK');
+
+// ---------------------------------------------------------------------------
+// MCP server contract: boot scripts/mcp.mjs over stdio, verify the handshake,
+// the tool manifest mirroring package.json, and one real tool round trip.
+// ---------------------------------------------------------------------------
+
+async function runMcpSession(serverBinary) {
+  const fixtureDir = mkdtempSync(join(tmpdir(), 'paradoxcode-mcp-'));
+  let child;
+  try {
+    child = spawn(process.execPath, [
+      join(here, 'mcp.mjs'),
+      '--server', serverBinary,
+      '--workspace', fixtureDir,
+      '--timeout-ms', '120000',
+    ], { stdio: ['pipe', 'pipe', 'inherit'], cwd: workspaceRoot });
+
+    const waiters = [];
+    let buffer = '';
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      buffer += chunk;
+      let newline;
+      while ((newline = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        if (!line) continue;
+        let message;
+        try {
+          message = JSON.parse(line);
+        } catch {
+          fail(`mcp output is not newline-delimited JSON: ${line.slice(0, 120)}`);
+          continue;
+        }
+        const index = message.id === undefined
+          ? -1
+          : waiters.findIndex((waiter) => waiter.id === message.id);
+        if (index >= 0) {
+          const [waiter] = waiters.splice(index, 1);
+          clearTimeout(waiter.timer);
+          waiter.resolve(message);
+        }
+      }
+    });
+    const exited = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
+
+    const request = (id, method, params, timeoutMs = 120_000) => {
+      child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          const index = waiters.findIndex((waiter) => waiter.id === id);
+          if (index >= 0) waiters.splice(index, 1);
+          reject(new Error(`timed out waiting for the mcp response to ${method}`));
+        }, timeoutMs);
+        waiters.push({ id, resolve, reject, timer });
+      });
+    };
+    const notify = (method, params) => {
+      child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method, params })}\n`);
+    };
+
+    const init = await request(1, 'initialize', {
+      protocolVersion: '2025-06-18',
+      capabilities: {},
+      clientInfo: { name: 'smoke', version: '0' },
+    });
+    if (init.error) {
+      fail(`mcp initialize failed: ${JSON.stringify(init.error)}`);
+    } else {
+      const result = init.result ?? {};
+      if (result.serverInfo?.name !== 'paradoxcode-mcp') {
+        fail(`mcp serverInfo.name must be paradoxcode-mcp, got ${JSON.stringify(result.serverInfo)}`);
+      }
+      if (result.protocolVersion !== '2025-06-18') {
+        fail(`mcp must negotiate protocolVersion 2025-06-18, got ${JSON.stringify(result.protocolVersion)}`);
+      }
+      if (typeof result.capabilities?.tools !== 'object') {
+        fail('mcp initialize must advertise the tools capability');
+      }
+      if (typeof result.instructions !== 'string' || !result.instructions.includes('validate-text')) {
+        fail('mcp instructions must be a string carrying the tool discipline');
+      }
+    }
+
+    notify('notifications/initialized', {});
+
+    const list = await request(2, 'tools/list', {});
+    if (list.error) {
+      fail(`mcp tools/list failed: ${JSON.stringify(list.error)}`);
+    } else {
+      const tools = list.result?.tools;
+      if (!Array.isArray(tools) || tools.length === 0) {
+        fail('mcp tools/list must return a non-empty tools array');
+      } else {
+        const expected = manifest.contributes.languageModelTools.map((tool) => tool.name).sort();
+        const actual = tools.map((tool) => tool.name).sort();
+        if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+          fail(`mcp tools/list must mirror languageModelTools: ${JSON.stringify({ actual, expected })}`);
+        }
+        for (const tool of tools) {
+          if (typeof tool.description !== 'string' || tool.description.length === 0) {
+            fail(`mcp tool ${tool.name} needs a description`);
+          }
+          if (tool.inputSchema?.type !== 'object') {
+            fail(`mcp tool ${tool.name} needs an object inputSchema`);
+          }
+        }
+      }
+    }
+
+    // First tool call also covers the async language-server boot path.
+    const rules = await request(3, 'tools/call', {
+      name: 'paradoxcode-search-rules',
+      arguments: { key: 'add_army_tradition' },
+    }, 180_000);
+    if (rules.error) {
+      fail(`mcp search-rules failed: ${JSON.stringify(rules.error)}`);
+    } else if (rules.result?.isError) {
+      fail(`mcp search-rules returned an error result: ${JSON.stringify(rules.result)}`);
+    } else {
+      const text = rules.result?.content?.[0]?.text ?? '';
+      if (rules.result?.content?.[0]?.type !== 'text' || !text.includes('add_army_tradition')) {
+        fail(`mcp search-rules must surface the add_army_tradition rule, got: ${text.slice(0, 200)}`);
+      }
+    }
+
+    const guidance = await request(4, 'tools/call', {
+      name: 'paradoxcode-search-rules',
+      arguments: {},
+    });
+    if (guidance.error || guidance.result?.isError) {
+      fail(`mcp empty search-rules must return guidance text, got: ${JSON.stringify(guidance)}`);
+    } else if (!guidance.result?.content?.[0]?.text.includes('at least one')) {
+      fail('mcp empty search-rules must explain the required filters');
+    }
+
+    const validation = await request(5, 'tools/call', {
+      name: 'paradoxcode-validate-text',
+      arguments: {
+        files: [{ path: 'events/mcp_smoke.txt', text: 'bad_key = yes\n' }],
+      },
+    }, 180_000);
+    if (validation.error || validation.result?.isError) {
+      fail(`mcp validate-text must succeed, got: ${JSON.stringify(validation)}`);
+    } else {
+      const text = validation.result?.content?.[0]?.text ?? '';
+      if (!text.includes('mcp_smoke.txt') || !text.includes('diagnostic')) {
+        fail(`mcp validate-text must report the file's diagnostics, got: ${text.slice(0, 200)}`);
+      }
+    }
+
+    const ping = await request(6, 'ping', {});
+    if (ping.error || JSON.stringify(ping.result) !== '{}') {
+      fail(`mcp ping must answer an empty result, got: ${JSON.stringify(ping)}`);
+    }
+
+    child.stdin.end();
+    const code = await exited;
+    if (code !== 0) {
+      fail(`mcp server must exit cleanly after stdin closes, got code ${code}`);
+    }
+  } finally {
+    child?.kill('SIGKILL');
+    rmSync(fixtureDir, { recursive: true, force: true });
+  }
+}
+
+const explicitServer = serverArgs.length === 1 ? serverArgs[0] : undefined;
+let mcpServerBinary = explicitServer;
+if (!mcpServerBinary) {
+  const executableName = process.platform === 'win32' ? 'paradoxcode.exe' : 'paradoxcode';
+  for (const build of ['debug', 'release']) {
+    const candidate = join(workspaceRoot, 'target', build, executableName);
+    if (existsSync(candidate)) {
+      mcpServerBinary = candidate;
+      break;
+    }
+  }
+}
+if (!mcpServerBinary) {
+  fail('mcp smoke requires a built paradoxcode binary (pass one explicitly or build target/debug)');
+} else {
+  await runMcpSession(mcpServerBinary);
+}
+
+const mcpFailures = process.exitCode === 1;
+console.log(mcpFailures ? 'mcp FAILED' : 'mcp OK');

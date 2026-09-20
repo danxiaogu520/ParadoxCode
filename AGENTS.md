@@ -49,7 +49,7 @@
 
 - 生命周期职责固定：本地分组负责快速反馈；PR 与 `main` 的 `Conclusion` 负责合并；Security 与 Performance 工作流负责定时审计；标签工作流负责可再分发资产；干净 profile 与 Marketplace 是人工验收。不要用一个阶段的结果替代另一个阶段的授权。
 - Vanilla sweep 只比较和解释本地诊断 / 性能变化，不维护仓库指纹基线，也不作为 PASS/FAIL 发布契约。`--previous` 只生成辅助差异；工具错误、服务器失败和用户显式 `--fail-on` 仍会让本地命令失败。服务器真实规则哈希取自 `server_messages`，checkout 哈希取自 `rules/manifest.json`，两者不一致时拒绝继续。
-- scripts 布局（`editors/vscode/scripts/`）：单词命名入口（diagnose / probe / compare / transcode / extension / package / host / smoke / sweep）+ lib 分工（options / workspace / overlay / diagnosis / report / client / sampler / paths）；入口全是薄壳，sweep 直接 import 相位函数。改诊断或性能链路时先动 lib 再动入口。transcode.mjs 含 Rust↔TS 差分向量对拍（74,549 条，`PDC_SKIP_VECTORS=1` 可跳过）。
+- scripts 布局（`editors/vscode/scripts/`）：单词命名入口（diagnose / probe / compare / transcode / extension / package / host / smoke / sweep / mcp）+ lib 分工（options / workspace / overlay / diagnosis / report / client / sampler / paths / mcpServer / mcpTools / mcpBoot）；入口全是薄壳，sweep 直接 import 相位函数。改诊断或性能链路时先动 lib 再动入口。transcode.mjs 含 Rust↔TS 差分向量对拍（74,549 条，`PDC_SKIP_VECTORS=1` 可跳过）。mcp.mjs 是 stdio MCP 服务器（手写 ndjson JSON-RPC，零 npm 依赖；工具清单运行时读 package.json 的 `languageModelTools`，工具整形与 `src/agent/tools.ts` 是行为孪生，改其一必须同步另一个）。
 - 服务端用户目录按平台解析（权威在 `crates/game` 的 `UserPaths::platform`）：Windows 的 config 位于 **%APPDATA%\ParadoxCode（Roaming，不是 LOCALAPPDATA）**，缓存根位于 %LOCALAPPDATA%\ParadoxCode\cache；WSL/Linux 的 config 位于 `~/.config/paradoxcode/`，缓存根位于 `~/.cache/paradoxcode/`。
 - npm 的 `--prefix … run` 传相对 `--server` 路径会以 editors/vscode 为工作目录解析而失败（用直接 node 调用或绝对路径）。
 - sweep 冷启动协议：客户端对缺失的 vanilla 缓存放行（服务器端支持在显式缓存缺失时自动发现并原位重建）。
