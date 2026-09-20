@@ -10,12 +10,12 @@
 #   ./perf.sh baseline <name>         建基线：构建 + 基准 + 全量 sweep，存入 baselines/<name>/
 #   ./perf.sh sweep [--label X]       单独跑一次全量 sweep（--previous 传基线 summary 可看漂移）
 #   ./perf.sh ab [baseline]           A/B：当前工作区 vs 基线（基准指标 + sweep 相位 + 诊断漂移）
-#   ./perf.sh control [--runs N]      对照组：cwtools-rs（Linux native，默认）跑同一语料；
-#                                     --interop 用 Windows exe；--build 强制重建 native 二进制
+#   ./perf.sh control [--runs N]      对照组：cwtools-rs（Linux native）跑同一语料；
+#                                     --build 强制重建二进制；--timings-only 只采样相位
 #   ./perf.sh profile <目标>          采样画像：bench:<名称> 或 sweep（samply / perf 自动选择）
 #
-# 公平性设计：默认实验组（sweep）与对照组（native cwtools）都在本机 Linux 上读同一份
-# data/ 语料副本（ext4），同 OS、同文件系统、同语料。interop 模式仅供参考，勿与 native 混比。
+# 公平性设计：实验组（sweep）与对照组（native cwtools）都在本机 Linux 上读同一份
+# data/ 语料副本（ext4），同 OS、同文件系统、同语料。
 # 位置与约定见同目录 README.md。结果只落 runs/ baselines/ profiles/（gitignore），绝不进 CI/PR。
 
 set -euo pipefail
@@ -309,7 +309,6 @@ cmd_status() {
   else
     echo "  native   缺（./perf.sh control --build）"
   fi
-  [ -n "${CWTOOLS_EXE:-}" ] && echo "  interop  $("$CWTOOLS_EXE" --version 2>/dev/null || echo 不可用)"
   echo
   if [ -L "$BASELINES_DIR/current" ]; then
     local name meta
@@ -496,50 +495,33 @@ cmd_ab() {
 }
 
 cmd_control() {
-  local runs="$CONTROL_RUNS" warmup="$CONTROL_WARMUP" mode=native build=0 timings_only=0
+  local runs="$CONTROL_RUNS" warmup="$CONTROL_WARMUP" build=0 timings_only=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --runs) runs="$2"; shift 2 ;;
       --warmup) warmup="$2"; shift 2 ;;
-      --interop) mode=interop; shift ;;
       --build) build=1; shift ;;
       --timings-only) timings_only=1; shift ;;
       *) die "未知参数: $1" ;;
     esac
   done
 
-  if [ "$mode" = native ] && { [ "$build" = 1 ] || [ ! -x "$CWTOOLS_NATIVE_BIN" ]; }; then
+  if [ "$build" = 1 ] || [ ! -x "$CWTOOLS_NATIVE_BIN" ]; then
     build_control_native
   fi
 
-  local run exe version
-  run="$(new_run_dir control-$mode)"
-  # --rules 按模式分别注入（interop 需转 Windows 路径）
-  local args=(validate --game "$CWTOOLS_GAME" -q --report-type json)
-
-  if [ "$mode" = native ]; then
-    exe="$CWTOOLS_NATIVE_BIN"
-    version="$("$exe" --version) $(sha256sum "$exe" | cut -c1-16)"
-    args+=(--rules "${CWTOOLS_RULES:?需在 config.local.sh 配置 CWTOOLS_RULES}" --directory "$PDC_VANILLA_SOURCE" --output-file "$run/report.json")
-  else
-    exe="${CWTOOLS_EXE:-}"
-    { [ -n "$exe" ] && [ -x "$exe" ]; } || die "interop 需在 config.local.sh 配置 CWTOOLS_EXE（推荐默认 native 模式）"
-    version="$("$exe" --version)"
-    # Windows exe 只认 Windows 路径：语料、规则、输出全部经 wslpath 转换
-    args+=(
-      --directory "$(wslpath -w "$PDC_VANILLA_SOURCE")"
-      --rules "$(wslpath -w "${CWTOOLS_RULES:?需在 config.local.sh 配置 CWTOOLS_RULES}")"
-      --output-file "$(wslpath -w "$run/report.json")"
-    )
-  fi
-  c_info "对照组[%s]: %s，语料 = %s（与实验组同一棵树）" "$mode" "$version" "$PDC_VANILLA_SOURCE"
+  local exe version
+  exe="$CWTOOLS_NATIVE_BIN"
+  version="$("$exe" --version) $(sha256sum "$exe" | cut -c1-16)"
+  local run
+  run="$(new_run_dir control-native)"
+  local args=(validate --game "$CWTOOLS_GAME" -q --report-type json
+    --rules "${CWTOOLS_RULES:?需在 config.local.sh 配置 CWTOOLS_RULES}"
+    --directory "$PDC_VANILLA_SOURCE"
+    --output-file "$run/report.json")
+  c_info "对照组[native]: %s，语料 = %s（与实验组同一棵树）" "$version" "$PDC_VANILLA_SOURCE"
 
   c_info "采样相位计时（CWTOOLS_TIMINGS=1，[t] 行走 stderr）…"
-  # WSL→Windows 的环境变量默认不透传；CWTOOLS_TIMINGS 必须经 WSLENV 中继。
-  # 实测带 /u 方向标志的形式不生效，用无标志（双向）形式。
-  if [ "$mode" = interop ]; then
-    export WSLENV="${WSLENV:+$WSLENV:}CWTOOLS_TIMINGS"
-  fi
   # cwtools 以 linter 语义退出：0=干净，1=存在 Error 级诊断（属正常）；>1 才是运行失败
   local exit_code=0
   CWTOOLS_TIMINGS=1 "$exe" "${args[@]}" > /dev/null 2> "$run/timings-stderr.log" || exit_code=$?
@@ -567,7 +549,7 @@ cmd_control() {
   # 历史行：时间 模式 版本 min mean 相位…
   [ -f "$RUNS_DIR/control-history.tsv" ] || printf '时间\t模式\t版本\tmin\tmean\t相位\n' > "$RUNS_DIR/control-history.tsv"
   {
-    printf '%s\t%s\t%s\t' "$(date -Is)" "$mode" "$version"
+    printf '%s\t%s\t%s\t' "$(date -Is)" native "$version"
     if [ -f "$run/hyperfine.json" ]; then
       jq -r '"\(.results[0].min)\t\(.results[0].mean)\t"' "$run/hyperfine.json"
     else
