@@ -46,15 +46,18 @@ and Paradox Interactive are trademarks of their respective owners.
 - A VS Code extension with zero-configuration, checksum-verified server setup, a first-run
   walkthrough, and a live mission-tree preview (texture-backed nodes, zoom, source navigation,
   PNG/JSON export).
-- Read-only language-model tools (`vscode.lm`) so VS Code agent mode can validate drafted EU4
-  files against the full rules, search indexed symbols and localisation, query the embedded
-  rule database, and look up hover semantics — all served by the already-running language
-  server.
+- Read-only language-model tools (`vscode.lm`) so VS Code agent mode can work with the indexed
+  workspace: a workspace summary, script-zone symbol search, hover semantics, diagnostics,
+  position- and name-based reference lookup, the embedded rule database, and in-memory draft
+  validation — all served by the already-running language server. Localisation queries live in
+  their own zone (exact `loc_get`, fuzzy `loc_search`, prefix `loc_list`) and the two zones never
+  cross.
 - A `@paradox` chat participant that runs its own EU4-modding agent loop over the same tools
   (domain system prompt, model from the active chat selection), with deterministic
   `/validate`, `/symbols`, `/rules`, `/loc`, and `/hover` commands that keep working without
-  a chat model.
-- A stdio MCP server (`editors/vscode/scripts/mcp.mjs`) that exposes the same five read-only
+  a chat model. When the tool-round budget runs out, the loop forces a final no-tools answer
+  from what it already gathered instead of stalling.
+- A stdio MCP server (`editors/vscode/scripts/mcp.mjs`) that exposes the same eleven read-only
   tools to any Model Context Protocol client — hand-rolled newline-delimited JSON-RPC with no
   SDK dependency, its tool manifest mirrored from the extension's contributions.
 - Exact-version server downloads with SHA-256 verification, restricted extraction, bounded
@@ -93,10 +96,14 @@ that send only the deprecated `rootUri` field are intentionally unsupported and 
 
 ### MCP server
 
-The same five read-only agent tools are also exposed as a stdio
+The same eleven read-only agent tools are also exposed as a stdio
 [Model Context Protocol](https://modelcontextprotocol.io) server, so MCP clients can validate
-drafts and query the rule database outside VS Code. It needs a checkout of this repository and
-a built (or downloaded) `paradoxcode` binary:
+drafts and query the rule database outside VS Code. Script-zone tools (`workspace`, `search`,
+`context`, `diagnostics`, `references`, `symbol_references`, `rules`, `validate_text`) and
+localisation-zone tools (`loc_get` exact lookup, `loc_search` fuzzy reverse search, `loc_list`
+prefix listing) are strictly separated; result caps (for example 100 symbol-search entries,
+20 localisation hits by default) are declared in each tool description. It needs a checkout of
+this repository and a built (or downloaded) `paradoxcode` binary:
 
 ```json
 {

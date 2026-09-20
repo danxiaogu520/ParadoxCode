@@ -253,6 +253,445 @@ fn localisation_search_matches_indexed_keys_and_values() {
 }
 
 #[test]
+fn localisation_search_key_match_modes_address_exact_and_prefix() {
+    let (root, root_uri) = temp_workspace_dir();
+    let localisation = root.join("localisation");
+    fs::create_dir_all(&localisation).expect("create localisation directory");
+    fs::write(
+        localisation.join("modes_l_english.yml"),
+        "l_english:\n modes.1.t:0 \"Title\"\n modes.1.d:0 \"Description\"\n modes.2.t:0 \"Other\"\n",
+    )
+    .expect("write localisation file");
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/localisationSearch","params":{"key":"modes.1.t","keyMatch":"exact"}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"pdc/localisationSearch","params":{"key":"modes.1","keyMatch":"exact"}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"pdc/localisationSearch","params":{"key":"modes.1.","keyMatch":"prefix"}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"pdc/localisationSearch","params":{"key":"MODES.1.T","keyMatch":"exact"}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"pdc/localisationSearch","params":{"key":"modes.1.t","keyMatch":"glob"}}),
+        json!({"jsonrpc":"2.0","id":7,"method":"pdc/localisationSearch","params":{"key":"modes","limit":1}}),
+        json!({"jsonrpc":"2.0","id":8,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+
+    let exact_hit = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("exact hit response");
+    let hits = exact_hit["result"]["hits"].as_array().expect("exact hits");
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0]["key"], "modes.1.t");
+    assert_eq!(hits[0]["value"], "Title");
+
+    let exact_miss = responses
+        .iter()
+        .find(|value| value["id"] == 3)
+        .expect("exact miss response");
+    assert_eq!(
+        exact_miss["result"]["hits"]
+            .as_array()
+            .expect("exact miss hits")
+            .len(),
+        0
+    );
+
+    let prefix = responses
+        .iter()
+        .find(|value| value["id"] == 4)
+        .expect("prefix response");
+    let hits = prefix["result"]["hits"].as_array().expect("prefix hits");
+    assert_eq!(hits.len(), 2);
+    assert!(hits.iter().all(|hit| {
+        hit["key"]
+            .as_str()
+            .is_some_and(|key| key.starts_with("modes.1."))
+    }));
+    assert_eq!(prefix["result"]["truncated"], json!(false));
+
+    let case_insensitive = responses
+        .iter()
+        .find(|value| value["id"] == 5)
+        .expect("case-insensitive exact response");
+    assert_eq!(
+        case_insensitive["result"]["hits"]
+            .as_array()
+            .expect("case-insensitive hits")
+            .len(),
+        1
+    );
+
+    let invalid_mode = responses
+        .iter()
+        .find(|value| value["id"] == 6)
+        .expect("invalid key match response");
+    assert_eq!(invalid_mode["error"]["code"], json!(INVALID_PARAMS));
+
+    let default_substring = responses
+        .iter()
+        .find(|value| value["id"] == 7)
+        .expect("default substring response");
+    assert_eq!(default_substring["result"]["truncated"], json!(true));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+fn write_agent_symbol_fixture(root: &std::path::Path) {
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("create events directory");
+    fs::write(
+        events.join("agent_symbol_test.txt"),
+        "country_event = { id = agent_sym.1 title = agent_sym.1.t desc = agent_sym.1.d }\n",
+    )
+    .expect("write event file");
+    let scripted = root.join("common").join("scripted_effects");
+    fs::create_dir_all(&scripted).expect("create scripted effects directory");
+    fs::write(
+        scripted.join("agent_effects.txt"),
+        "agent_shared_effect = { add_army_tradition = 1 }\nagent_dual_name = { add_army_tradition = 2 }\n",
+    )
+    .expect("write scripted effect file");
+    let triggers = root.join("common").join("scripted_triggers");
+    fs::create_dir_all(&triggers).expect("create scripted triggers directory");
+    fs::write(
+        triggers.join("agent_triggers.txt"),
+        "agent_dual_name = { always = yes }\n",
+    )
+    .expect("write scripted trigger file");
+    fs::write(
+        events.join("agent_symbol_caller.txt"),
+        "country_event = { id = agent_sym.2 option = { name = opt agent_shared_effect = yes } }\n",
+    )
+    .expect("write caller file");
+    let localisation = root.join("localisation");
+    fs::create_dir_all(&localisation).expect("create localisation directory");
+    fs::write(
+        localisation.join("agent_l_english.yml"),
+        "l_english:\n agent_sym.1.t:0 \"Title\"\n agent_sym.1.d:0 \"Description\"\n",
+    )
+    .expect("write localisation file");
+}
+
+#[test]
+fn symbol_search_finds_script_symbols_and_excludes_localisation_zone() {
+    let (root, root_uri) = temp_workspace_dir();
+    write_agent_symbol_fixture(&root);
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/symbolSearch","params":{"query":"agent_sym"}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"pdc/symbolSearch","params":{"query":"   "}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"pdc/symbolSearch","params":{"query":"agent","limit":0}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+
+    let search = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("symbol search response");
+    let symbols = search["result"]["symbols"].as_array().expect("symbols");
+    assert!(
+        symbols
+            .iter()
+            .any(|symbol| symbol["name"] == "agent_sym.1" && symbol["kind"] == "event"),
+        "expected the fixture event symbol: {search}"
+    );
+    for symbol in symbols {
+        assert_ne!(
+            symbol["kind"], "localisation",
+            "localisation definitions must stay outside symbol search: {search}"
+        );
+        assert!(symbol["uri"].as_str().is_some());
+        assert!(symbol["line"].as_u64().is_some());
+    }
+
+    let blank = responses
+        .iter()
+        .find(|value| value["id"] == 3)
+        .expect("blank query response");
+    assert_eq!(blank["error"]["code"], json!(INVALID_PARAMS));
+
+    let zero_limit = responses
+        .iter()
+        .find(|value| value["id"] == 4)
+        .expect("zero-limit response");
+    assert_eq!(zero_limit["error"]["code"], json!(INVALID_PARAMS));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn symbol_references_resolves_names_without_a_position() {
+    let (root, root_uri) = temp_workspace_dir();
+    write_agent_symbol_fixture(&root);
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/symbolReferences","params":{"name":"agent_shared_effect"}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"pdc/symbolReferences","params":{"name":"agent_sym.1"}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"pdc/symbolReferences","params":{"name":"agent_dual_name"}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"pdc/symbolReferences","params":{"name":"agent_sym.1","kind":"scripted_effect"}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"pdc/symbolReferences","params":{"name":"does_not_exist_anywhere"}}),
+        json!({"jsonrpc":"2.0","id":7,"method":"pdc/symbolReferences","params":{"name":"  "}}),
+        json!({"jsonrpc":"2.0","id":8,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+
+    let by_name = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("name-driven references response");
+    assert_eq!(by_name["result"]["matched"], json!(true), "{by_name}");
+    assert_eq!(
+        by_name["result"]["symbol"]["name"],
+        "agent_shared_effect".to_string()
+    );
+    assert_eq!(
+        by_name["result"]["symbol"]["kind"],
+        "scripted_effect".to_string()
+    );
+    assert!(
+        by_name["result"]["symbol"]["definition"]["line"]
+            .as_u64()
+            .is_some(),
+        "definition carries a 1-based line: {by_name}"
+    );
+    let references = by_name["result"]["references"]
+        .as_array()
+        .expect("references");
+    assert!(
+        references.iter().any(|reference| reference["uri"]
+            .as_str()
+            .is_some_and(|uri| uri.ends_with("agent_symbol_caller.txt"))),
+        "expected the caller file among references: {by_name}"
+    );
+    assert_eq!(by_name["result"]["truncated"], json!(false));
+
+    let single_kind = responses
+        .iter()
+        .find(|value| value["id"] == 3)
+        .expect("single-kind name response");
+    assert_eq!(
+        single_kind["result"]["matched"],
+        json!(true),
+        "a name defined under one kind resolves without the kind parameter: {single_kind}"
+    );
+    assert_eq!(single_kind["result"]["symbol"]["kind"], "event".to_string());
+
+    let ambiguous = responses
+        .iter()
+        .find(|value| value["id"] == 4)
+        .expect("ambiguous name response");
+    assert_eq!(ambiguous["result"]["matched"], json!(false));
+    assert!(
+        ambiguous["result"]["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("kind parameter")),
+        "ambiguity explains the kind retry: {ambiguous}"
+    );
+    let candidates = ambiguous["result"]["candidates"]
+        .as_array()
+        .expect("candidates");
+    assert!(
+        candidates
+            .iter()
+            .any(|candidate| candidate["kind"] == "scripted_effect")
+            && candidates
+                .iter()
+                .any(|candidate| candidate["kind"] == "scripted_trigger"),
+        "both defining kinds appear as candidates: {ambiguous}"
+    );
+
+    let narrowed = responses
+        .iter()
+        .find(|value| value["id"] == 5)
+        .expect("kind-narrowed response");
+    assert_eq!(
+        narrowed["result"]["matched"],
+        json!(false),
+        "wrong kind must not match: {narrowed}"
+    );
+
+    let unknown = responses
+        .iter()
+        .find(|value| value["id"] == 6)
+        .expect("unknown name response");
+    assert_eq!(unknown["result"]["matched"], json!(false));
+    assert!(
+        unknown["result"]["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("no active script-zone definition")),
+        "{unknown}"
+    );
+
+    let blank = responses
+        .iter()
+        .find(|value| value["id"] == 7)
+        .expect("blank name response");
+    assert_eq!(blank["error"]["code"], json!(INVALID_PARAMS));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn workspace_summary_reports_identity_roots_and_zone_counts() {
+    let (root, root_uri) = temp_workspace_dir();
+    write_agent_symbol_fixture(&root);
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/workspaceSummary"}),
+        json!({"jsonrpc":"2.0","id":3,"method":"pdc/workspaceSummary","params":{"anything":true}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+
+    let summary = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("workspace summary response");
+    assert_eq!(summary["result"]["gameId"], "eu4".to_string());
+    assert!(
+        summary["result"]["ruleHash"]
+            .as_str()
+            .is_some_and(|hash| hash.len() == 64 && hash.chars().all(|c| c.is_ascii_hexdigit())),
+        "rule hash renders as 64 hex characters: {summary}"
+    );
+    assert!(summary["result"]["revision"].as_u64().is_some());
+    let roots = summary["result"]["roots"].as_array().expect("roots");
+    assert!(
+        roots
+            .iter()
+            .any(|root| root["kind"] == "project" && root["writable"] == json!(true)),
+        "the workspace folder registers as a writable project root: {summary}"
+    );
+    let counts = &summary["result"]["fileCounts"];
+    assert!(counts["script"].as_u64().is_some_and(|count| count >= 3));
+    assert!(
+        counts["localisation"]
+            .as_u64()
+            .is_some_and(|count| count >= 1)
+    );
+    assert_eq!(
+        counts["total"].as_u64(),
+        Some(counts["script"].as_u64().unwrap() + counts["localisation"].as_u64().unwrap()),
+        "fixture contributes only script and localisation files: {summary}"
+    );
+    let scan = &summary["result"]["scan"];
+    assert!(
+        scan["indexedFiles"]
+            .as_u64()
+            .is_some_and(|count| count >= 4)
+    );
+
+    let rejected = responses
+        .iter()
+        .find(|value| value["id"] == 3)
+        .expect("parameter rejection response");
+    assert_eq!(rejected["error"]["code"], json!(INVALID_PARAMS));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn workspace_diagnostics_filters_by_parser_zone_and_logical_paths() {
+    let (root, root_uri) = temp_workspace_dir();
+    write_agent_symbol_fixture(&root);
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/workspaceDiagnostics","params":{"limit":32}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"pdc/workspaceDiagnostics","params":{"limit":32,"parser":"script"}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"pdc/workspaceDiagnostics","params":{"limit":32,"parser":"localisation"}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"pdc/workspaceDiagnostics","params":{"limit":32,"files":["events/agent_symbol_caller.txt"]}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"pdc/workspaceDiagnostics","params":{"limit":32,"parser":"glob"}}),
+        json!({"jsonrpc":"2.0","id":7,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+
+    let unfiltered = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("unfiltered response");
+    let unfiltered_total = unfiltered["result"]["total"].as_u64().expect("total");
+
+    let script_only = responses
+        .iter()
+        .find(|value| value["id"] == 3)
+        .expect("script-zone response");
+    let script_items = script_only["result"]["items"].as_array().expect("items");
+    assert!(
+        script_items.iter().all(|item| item["logicalPath"]
+            .as_str()
+            .is_some_and(|path| !path.starts_with("localisation/"))),
+        "script-zone diagnostics never include localisation files: {script_only}"
+    );
+    assert_eq!(
+        script_only["result"]["total"].as_u64().unwrap(),
+        unfiltered_total - 1,
+        "exactly the one localisation file drops out: {script_only}"
+    );
+
+    let localisation_only = responses
+        .iter()
+        .find(|value| value["id"] == 4)
+        .expect("localisation-zone response");
+    let localisation_items = localisation_only["result"]["items"]
+        .as_array()
+        .expect("items");
+    assert_eq!(localisation_items.len(), 1);
+    assert!(
+        localisation_items[0]["logicalPath"]
+            .as_str()
+            .is_some_and(|path| path.starts_with("localisation/"))
+    );
+
+    let by_file = responses
+        .iter()
+        .find(|value| value["id"] == 5)
+        .expect("file-filtered response");
+    assert_eq!(by_file["result"]["total"], json!(1));
+    assert_eq!(
+        by_file["result"]["items"][0]["logicalPath"],
+        "events/agent_symbol_caller.txt".to_string()
+    );
+
+    let invalid_parser = responses
+        .iter()
+        .find(|value| value["id"] == 6)
+        .expect("invalid parser response");
+    assert_eq!(invalid_parser["error"]["code"], json!(INVALID_PARAMS));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn localisation_documents_publish_no_diagnostics_or_completion() {
     let (root, root_uri) = temp_workspace_dir();
     let localisation = root.join("localisation");

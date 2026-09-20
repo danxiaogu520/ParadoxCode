@@ -5,14 +5,15 @@ use engine::{AnalysisSnapshot, DocumentId, ParsedSource, SourceRootKind};
 use game::eu4::mission::Severity;
 use game::eu4::mission::geometry::{self, ArrowGlyph};
 use ide::{
-    CancellationToken, Cancelled, CompletionKind, SemanticToken, SemanticTokenType,
-    complete_with_cancellation, completion_resolve, definition_with_cancellation,
-    document_symbols_with_cancellation, hover_with_cancellation,
+    CancellationToken, Cancelled, CompletionKind, LocalisationKeyMatch, SemanticToken,
+    SemanticTokenType, complete_with_cancellation, completion_resolve,
+    definition_with_cancellation, document_symbols_with_cancellation, hover_with_cancellation,
     localisation_search_with_cancellation, localisation_values_by_key,
     prepare_rename_with_cancellation, quick_fixes_with_cancellation, references_with_cancellation,
     rename_with_cancellation, scope_inlay_hints_with_cancellation,
     semantic_tokens_in_range_with_cancellation, semantic_tokens_with_cancellation,
-    source_file_diagnostics_with_cancellation, text_diagnostics_with_cancellation,
+    source_file_diagnostics_with_cancellation, symbol_kinds_for_name,
+    symbol_references_with_cancellation, text_diagnostics_with_cancellation,
     workspace_symbols_with_cancellation,
 };
 use lsp_types::{
@@ -66,6 +67,7 @@ const MAX_TEXT_DIAGNOSTIC_FILES: usize = 16;
 const MAX_TEXT_DIAGNOSTIC_BYTES: usize = 16 * 1024 * 1024;
 const DEFAULT_AGENT_SEARCH_LIMIT: usize = 20;
 const MAX_AGENT_SEARCH_LIMIT: usize = 50;
+const MAX_SYMBOL_SEARCH_LIMIT: usize = 100;
 const MAX_RULE_DOCUMENTATION_CHARS: usize = 400;
 
 fn completion_sort_text(sort_score: u32, ordinal: usize) -> String {
@@ -94,13 +96,22 @@ fn trimmed_search_filter(value: Option<&str>) -> Option<&str> {
 
 /// Resolves the agent-search limit: defaulted, bounded, and never zero.
 fn agent_search_limit(limit: Option<usize>) -> Result<usize, RpcError> {
+    symbol_search_limit_inner(limit, MAX_AGENT_SEARCH_LIMIT)
+}
+
+/// Resolves the script-symbol search limit: defaulted, bounded to 100, and never zero.
+fn symbol_search_limit(limit: Option<usize>) -> Result<usize, RpcError> {
+    symbol_search_limit_inner(limit, MAX_SYMBOL_SEARCH_LIMIT)
+}
+
+fn symbol_search_limit_inner(limit: Option<usize>, max: usize) -> Result<usize, RpcError> {
     match limit {
         None => Ok(DEFAULT_AGENT_SEARCH_LIMIT),
         Some(0) => Err(RpcError::new(
             INVALID_PARAMS,
             "search limit must be at least 1",
         )),
-        Some(limit) => Ok(limit.min(MAX_AGENT_SEARCH_LIMIT)),
+        Some(limit) => Ok(limit.min(max)),
     }
 }
 
@@ -199,6 +210,31 @@ mod rule_search_label_tests {
 struct WorkspaceDiagnosticsParams {
     offset: usize,
     limit: Option<usize>,
+    /// Restricts the response to these logical paths, applied before pagination so `total`
+    /// reflects the filtered set.
+    files: Option<Vec<String>>,
+    /// Restricts the response to one parser zone; absent keeps both script and localisation
+    /// files, matching the pre-existing behaviour.
+    parser: Option<WorkspaceDiagnosticsParser>,
+}
+
+/// Parser-zone filter for `pdc/workspaceDiagnostics`.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+enum WorkspaceDiagnosticsParser {
+    Script,
+    Localisation,
+}
+
+impl WorkspaceDiagnosticsParser {
+    fn accepts(self, parser: &ParserKind) -> bool {
+        match self {
+            WorkspaceDiagnosticsParser::Script => matches!(parser, ParserKind::Script),
+            WorkspaceDiagnosticsParser::Localisation => {
+                matches!(parser, ParserKind::Localisation)
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -229,11 +265,48 @@ struct RuleSearchParams {
     limit: Option<usize>,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+enum LocalisationKeyMatchWire {
+    Substring,
+    Exact,
+    Prefix,
+}
+
+impl From<LocalisationKeyMatchWire> for LocalisationKeyMatch {
+    fn from(wire: LocalisationKeyMatchWire) -> Self {
+        match wire {
+            LocalisationKeyMatchWire::Substring => LocalisationKeyMatch::Substring,
+            LocalisationKeyMatchWire::Exact => LocalisationKeyMatch::Exact,
+            LocalisationKeyMatchWire::Prefix => LocalisationKeyMatch::Prefix,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct LocalisationSearchParams {
     key: Option<String>,
     text: Option<String>,
+    /// How `key` is matched: `substring` (default), `exact`, or `prefix`.
+    #[serde(default)]
+    key_match: Option<LocalisationKeyMatchWire>,
+    limit: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct SymbolSearchParams {
+    query: String,
+    limit: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct SymbolReferencesParams {
+    name: String,
+    /// Optional symbol kind used to disambiguate names defined under several kinds.
+    kind: Option<String>,
     limit: Option<usize>,
 }
 
@@ -308,6 +381,9 @@ impl SnapshotRequestContext {
             "pdc/hoverCard" => self.hover_card(params),
             "pdc/ruleSearch" => self.rule_search(params),
             "pdc/localisationSearch" => self.localisation_search(params),
+            "pdc/symbolSearch" => self.symbol_search(params),
+            "pdc/symbolReferences" => self.symbol_references(params),
+            "pdc/workspaceSummary" => self.workspace_summary(params),
             _ => Err(RpcError::new(METHOD_NOT_FOUND, "method is not implemented")),
         }
     }
@@ -450,6 +526,9 @@ impl SnapshotRequestContext {
                 "localisation search requires at least one of key or text",
             ));
         }
+        let key_match = params
+            .key_match
+            .map_or(LocalisationKeyMatch::Substring, LocalisationKeyMatch::from);
         let limit = agent_search_limit(params.limit)?;
         self.ensure_active()?;
 
@@ -457,6 +536,7 @@ impl SnapshotRequestContext {
             &self.snapshot,
             key,
             text,
+            key_match,
             limit,
             &self.cancellation,
         )
@@ -479,6 +559,207 @@ impl SnapshotRequestContext {
             })
             .collect::<Vec<_>>();
         Ok(serde_json::json!({ "hits": hits, "truncated": result.truncated }))
+    }
+
+    /// One agent-facing location: the file URI, a 1-based line, and the logical path when the
+    /// location sits in an indexed disk file.
+    fn location_value(&self, location: &ide::Location) -> Result<Value, RpcError> {
+        let lsp = location_to_lsp(&self.snapshot, location).ok_or_else(|| {
+            RpcError::new(
+                INVALID_PARAMS,
+                "location does not resolve to a workspace file",
+            )
+        })?;
+        Ok(serde_json::json!({
+            "uri": lsp.uri.as_str(),
+            "line": lsp.range.start.line + 1,
+            "path": location.path.as_ref().map(|path| path.as_str()),
+        }))
+    }
+
+    /// Bounded script-zone symbol discovery. Reuses the `workspace/symbol` scoring (prefix,
+    /// substring, then fuzzy) while excluding localisation-file definitions, keeping agent
+    /// search in the script zone; scripted localisation (`defined_text`) stays searchable.
+    fn symbol_search(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let params = typed_params::<SymbolSearchParams>(params, "symbol search")?;
+        let query = trimmed_search_filter(Some(params.query.as_str()))
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "symbol search requires a query"))?;
+        let limit = symbol_search_limit(params.limit)?;
+        self.ensure_active()?;
+        let symbols =
+            workspace_symbols_with_cancellation(&self.snapshot, query, &self.cancellation)
+                .map_err(cancelled_error)?;
+        let mut hits = Vec::new();
+        let mut truncated = false;
+        for symbol in symbols {
+            if symbol.kind.eq_ignore_ascii_case("localisation") {
+                continue;
+            }
+            if hits.len() == limit {
+                truncated = true;
+                break;
+            }
+            let Some(lsp) = location_to_lsp(&self.snapshot, &symbol.location) else {
+                continue;
+            };
+            hits.push(serde_json::json!({
+                "name": symbol.name,
+                "kind": symbol.kind,
+                "uri": lsp.uri.as_str(),
+                "line": lsp.range.start.line + 1,
+                "path": symbol.location.path.as_ref().map(|path| path.as_str()),
+            }));
+        }
+        Ok(serde_json::json!({ "symbols": hits, "truncated": truncated }))
+    }
+
+    /// Name-addressed find-references for script-zone symbols: resolves the active winner for
+    /// the given name (optionally disambiguated by kind), then returns its definition and
+    /// reference locations without needing an open document or a cursor position.
+    fn symbol_references(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let params = typed_params::<SymbolReferencesParams>(params, "symbol references")?;
+        let name = trimmed_search_filter(Some(params.name.as_str()))
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "symbol references requires a name"))?;
+        let kind = trimmed_search_filter(params.kind.as_deref());
+        let limit = symbol_search_limit(params.limit)?;
+        self.ensure_active()?;
+        let kinds = kind.map_or_else(
+            || symbol_kinds_for_name(&self.snapshot, name),
+            |kind| vec![kind.to_owned()],
+        );
+        let mut matches = Vec::new();
+        for kind in &kinds {
+            match symbol_references_with_cancellation(
+                &self.snapshot,
+                kind,
+                name,
+                true,
+                &self.cancellation,
+            ) {
+                Ok(Some((definition, references))) => {
+                    matches.push((kind.clone(), definition, references));
+                }
+                Ok(None) => {}
+                Err(Cancelled) => return Err(cancelled_error(Cancelled)),
+            }
+        }
+        if matches.is_empty() {
+            return Ok(serde_json::json!({
+                "matched": false,
+                "reason": if kinds.is_empty() {
+                    "no active script-zone definition defines that name"
+                } else {
+                    "the kind and name do not resolve to a unique active definition"
+                },
+                "candidates": Vec::<Value>::new(),
+            }));
+        }
+        if matches.len() > 1 {
+            let candidates = matches
+                .iter()
+                .map(|(kind, definition, _)| {
+                    Ok(serde_json::json!({
+                        "kind": kind,
+                        "name": name,
+                        "definition": self.location_value(definition)?,
+                    }))
+                })
+                .collect::<Result<Vec<_>, RpcError>>()?;
+            return Ok(serde_json::json!({
+                "matched": false,
+                "reason": "several kinds define that name; retry with the kind parameter",
+                "candidates": candidates,
+            }));
+        }
+        let Some((kind, definition, references)) = matches.into_iter().next() else {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                "symbol references matched nothing",
+            ));
+        };
+        let total = references.len();
+        let mut items = Vec::new();
+        let mut truncated = false;
+        for reference in &references {
+            if items.len() == limit {
+                truncated = true;
+                break;
+            }
+            items.push(self.location_value(reference)?);
+        }
+        Ok(serde_json::json!({
+            "matched": true,
+            "symbol": {
+                "name": name,
+                "kind": kind,
+                "definition": self.location_value(&definition)?,
+            },
+            "references": items,
+            "truncated": truncated,
+            "total": total,
+        }))
+    }
+
+    /// Agent-facing workspace orientation: game identity, embedded rule hash, source roots,
+    /// file counts by parser zone, and the last scan's counters. Intentionally parameterless
+    /// like `pdc/workspaceFiles`.
+    fn workspace_summary(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        if params.is_some() {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                "workspace summary does not accept parameters",
+            ));
+        }
+        self.ensure_active()?;
+        let roots = self
+            .snapshot
+            .source_roots()
+            .iter()
+            .map(|root| {
+                let kind = match root.kind {
+                    SourceRootKind::Vanilla => "vanilla",
+                    SourceRootKind::Dependency => "dependency",
+                    SourceRootKind::Project => "project",
+                };
+                serde_json::json!({
+                    "kind": kind,
+                    "path": root.path,
+                    "order": root.order,
+                    "writable": root.writable,
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut script_files = 0_usize;
+        let mut localisation_files = 0_usize;
+        for file in self.snapshot.source_files().values() {
+            let Some(category) = self.snapshot.rules().classify(&file.logical_path) else {
+                continue;
+            };
+            match &category.parser {
+                ParserKind::Script => script_files += 1,
+                ParserKind::Localisation => localisation_files += 1,
+                ParserKind::Asset | ParserKind::SyntaxOnly => {}
+            }
+        }
+        let scan = self.snapshot.scan_report();
+        Ok(serde_json::json!({
+            "gameId": self.snapshot.game_profile().game_id,
+            "ruleHash": self.snapshot.rules().rule_hash().to_hex(),
+            "revision": self.snapshot.revision(),
+            "roots": roots,
+            "fileCounts": {
+                "script": script_files,
+                "localisation": localisation_files,
+                "total": self.snapshot.source_files().len(),
+            },
+            "scan": {
+                "discoveredFiles": scan.discovered_files,
+                "indexedFiles": scan.indexed_files,
+                "legacyEncodedFiles": scan.legacy_encoded_files,
+                "skippedEntries": scan.skipped_entries,
+                "issues": scan.issues.len(),
+            },
+        }))
     }
 
     /// Mission-tree preview for caller-supplied document text: the same
@@ -750,6 +1031,13 @@ impl SnapshotRequestContext {
             .filter(|root| root.kind == SourceRootKind::Project)
             .map(|root| root.id)
             .collect::<std::collections::BTreeSet<_>>();
+        let files_filter = params.files.as_deref().map(|files| {
+            files
+                .iter()
+                .map(|file| file.trim())
+                .filter(|file| !file.is_empty())
+                .collect::<std::collections::BTreeSet<_>>()
+        });
         let mut files = self
             .snapshot
             .source_files()
@@ -764,12 +1052,18 @@ impl SnapshotRequestContext {
                         .snapshot
                         .rules()
                         .classify(&file.logical_path)
-                        .is_some_and(|category| {
-                            matches!(
+                        .is_some_and(|category| match params.parser {
+                            None => matches!(
                                 category.parser,
                                 ParserKind::Script | ParserKind::Localisation
-                            )
+                            ),
+                            Some(wanted) => wanted.accepts(&category.parser),
                         })
+            })
+            .filter(|file| {
+                files_filter
+                    .as_ref()
+                    .is_none_or(|filter| filter.contains(file.logical_path.as_str()))
             })
             .collect::<Vec<_>>();
         files.sort_by(|left, right| {

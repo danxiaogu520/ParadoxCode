@@ -401,7 +401,7 @@ async function runMcpSession(serverBinary) {
       if (typeof result.capabilities?.tools !== 'object') {
         fail('mcp initialize must advertise the tools capability');
       }
-      if (typeof result.instructions !== 'string' || !result.instructions.includes('validate-text')) {
+      if (typeof result.instructions !== 'string' || !result.instructions.includes('paradoxcode_validate_text')) {
         fail('mcp instructions must be a string carrying the tool discipline');
       }
     }
@@ -434,46 +434,72 @@ async function runMcpSession(serverBinary) {
 
     // First tool call also covers the async language-server boot path.
     const rules = await request(3, 'tools/call', {
-      name: 'paradoxcode-search-rules',
+      name: 'paradoxcode_rules',
       arguments: { key: 'add_army_tradition' },
     }, 180_000);
     if (rules.error) {
-      fail(`mcp search-rules failed: ${JSON.stringify(rules.error)}`);
+      fail(`mcp rules failed: ${JSON.stringify(rules.error)}`);
     } else if (rules.result?.isError) {
-      fail(`mcp search-rules returned an error result: ${JSON.stringify(rules.result)}`);
+      fail(`mcp rules returned an error result: ${JSON.stringify(rules.result)}`);
     } else {
       const text = rules.result?.content?.[0]?.text ?? '';
       if (rules.result?.content?.[0]?.type !== 'text' || !text.includes('add_army_tradition')) {
-        fail(`mcp search-rules must surface the add_army_tradition rule, got: ${text.slice(0, 200)}`);
+        fail(`mcp rules must surface the add_army_tradition rule, got: ${text.slice(0, 200)}`);
       }
     }
 
     const guidance = await request(4, 'tools/call', {
-      name: 'paradoxcode-search-rules',
+      name: 'paradoxcode_rules',
       arguments: {},
     });
     if (guidance.error || guidance.result?.isError) {
-      fail(`mcp empty search-rules must return guidance text, got: ${JSON.stringify(guidance)}`);
+      fail(`mcp empty rules must return guidance text, got: ${JSON.stringify(guidance)}`);
     } else if (!guidance.result?.content?.[0]?.text.includes('at least one')) {
-      fail('mcp empty search-rules must explain the required filters');
+      fail('mcp empty rules must explain the required filters');
     }
 
     const validation = await request(5, 'tools/call', {
-      name: 'paradoxcode-validate-text',
+      name: 'paradoxcode_validate_text',
       arguments: {
         files: [{ path: 'events/mcp_smoke.txt', text: 'bad_key = yes\n' }],
       },
     }, 180_000);
     if (validation.error || validation.result?.isError) {
-      fail(`mcp validate-text must succeed, got: ${JSON.stringify(validation)}`);
+      fail(`mcp validate_text must succeed, got: ${JSON.stringify(validation)}`);
     } else {
       const text = validation.result?.content?.[0]?.text ?? '';
       if (!text.includes('mcp_smoke.txt') || !text.includes('diagnostic')) {
-        fail(`mcp validate-text must report the file's diagnostics, got: ${text.slice(0, 200)}`);
+        fail(`mcp validate_text must report the file's diagnostics, got: ${text.slice(0, 200)}`);
       }
     }
 
-    const ping = await request(6, 'ping', {});
+    const workspace = await request(6, 'tools/call', {
+      name: 'paradoxcode_workspace',
+      arguments: {},
+    }, 180_000);
+    if (workspace.error || workspace.result?.isError) {
+      fail(`mcp workspace must succeed, got: ${JSON.stringify(workspace)}`);
+    } else {
+      const text = workspace.result?.content?.[0]?.text ?? '';
+      if (!text.includes('Game: eu4')) {
+        fail(`mcp workspace must report the game identity, got: ${text.slice(0, 200)}`);
+      }
+    }
+
+    const locGet = await request(7, 'tools/call', {
+      name: 'paradoxcode_loc_get',
+      arguments: { key: 'definitely_missing_localisation_key_xyz' },
+    }, 180_000);
+    if (locGet.error || locGet.result?.isError) {
+      fail(`mcp loc_get must succeed, got: ${JSON.stringify(locGet)}`);
+    } else {
+      const text = locGet.result?.content?.[0]?.text ?? '';
+      if (!text.includes('No localisation key')) {
+        fail(`mcp loc_get must report the miss with guidance, got: ${text.slice(0, 200)}`);
+      }
+    }
+
+    const ping = await request(8, 'ping', {});
     if (ping.error || JSON.stringify(ping.result) !== '{}') {
       fail(`mcp ping must answer an empty result, got: ${JSON.stringify(ping)}`);
     }

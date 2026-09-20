@@ -188,7 +188,7 @@ suite('ParadoxCode VS Code extension host', () => {
     const { registerAgentTools } = require('../../out/agent/register.js');
     const disposables = registerAgentTools();
     if ('lm' in vscode && typeof vscode.lm?.registerTool === 'function') {
-      assert.equal(disposables.length, 5, 'all five analysis tools must register');
+      assert.equal(disposables.length, 11, 'all eleven agent tools must register');
       for (const disposable of disposables) {
         disposable.dispose();
       }
@@ -211,9 +211,12 @@ suite('ParadoxCode VS Code extension host', () => {
     const { buildSystemPrompt } = require('../../out/agent/prompt.js');
     const prompt = buildSystemPrompt();
     for (const marker of [
-      'validate-text',
-      'search-rules',
-      'search-symbols',
+      'paradoxcode_validate_text',
+      'paradoxcode_rules',
+      'paradoxcode_search',
+      'paradoxcode_loc_get',
+      'paradoxcode_loc_list',
+      'Zone discipline',
       'UnknownLocalisationKey',
       'WrongScope',
       'localisation',
@@ -229,11 +232,12 @@ suite('ParadoxCode VS Code extension host', () => {
     });
     assert.deepEqual(parseRuleFilters('add_core'), { key: 'add_core' });
     assert.deepEqual(parseRuleFilters('scope=estate add_core'), { scope: 'estate', key: 'add_core' });
-    assert.deepEqual(parseLocalisationQuery('key=greeting'), { key: 'greeting' });
-    assert.deepEqual(parseLocalisationQuery('text=Hello traveler'), { text: 'Hello traveler' });
-    assert.deepEqual(parseLocalisationQuery('greeting'), { key: 'greeting' });
-    assert.deepEqual(parseLocalisationQuery('Hello traveler'), { text: 'Hello traveler' });
-    assert.deepEqual(parseLocalisationQuery(''), {});
+    assert.deepEqual(parseLocalisationQuery('key=greeting'), { mode: 'get', key: 'greeting' });
+    assert.deepEqual(parseLocalisationQuery('text=Hello traveler'), { mode: 'search', text: 'Hello traveler' });
+    assert.deepEqual(parseLocalisationQuery('prefix=my_event.1.'), { mode: 'list', keyPrefix: 'my_event.1.' });
+    assert.deepEqual(parseLocalisationQuery('greeting'), { mode: 'get', key: 'greeting' });
+    assert.deepEqual(parseLocalisationQuery('Hello traveler'), { mode: 'search', text: 'Hello traveler' });
+    assert.deepEqual(parseLocalisationQuery(''), { mode: 'get' });
   });
 
   test('paradox participant registers on hosts with the Chat API', () => {

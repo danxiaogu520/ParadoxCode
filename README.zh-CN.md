@@ -32,9 +32,9 @@ ParadoxCode **与 Paradox Interactive 无任何关联，也未获得其背书**�
 - 跨「未保存缓冲区 → 项目 → 有序依赖 Mod → 本地持久化 Vanilla 索引」的工作区解析。
 - stdio 语言服务器（`paradoxcode`），支持取消、过期结果保护与不可变分析快照，并能对活跃 Mod 根做定向文件监听更新。
 - VS Code 扩展：零配置、带校验和的服务器自动安装，首次使用引导（walkthrough），以及实时任务树预览（贴图节点、缩放、源码跳转、PNG/JSON 导出）。
-- 只读语言模型工具（`vscode.lm`）：让 VS Code 的 agent 模式用完整规则库验证草稿文件、检索已索引的符号与本地化条目、查询内嵌规则数据库、查阅悬停语义——全部由已在运行的语言服务器提供。
-- `@paradox` 聊天参与者：在同一套工具上运行自带 EU4 模组写作领域提示词的 agent 循环（模型取当前聊天选中的模型），并提供 `/validate`、`/symbols`、`/rules`、`/loc`、`/hover` 确定性命令，无聊天模型时依然可用。
-- stdio MCP 服务器（`editors/vscode/scripts/mcp.mjs`）：把同样的五个只读工具暴露给任意 Model Context Protocol 客户端——手写换行分隔 JSON-RPC，零 SDK 依赖，工具清单与扩展贡献点同源。
+- 只读语言模型工具（`vscode.lm`）：让 VS Code 的 agent 模式查询工作区摘要、检索脚本区符号、查阅悬停语义、拉取诊断、按位置或按名称查找引用、检索内嵌规则库并在内存中验证草稿——全部由已在运行的语言服务器提供。本地化查询独立成区（`loc_get` 精确寻址、`loc_search` 模糊反查、`loc_list` 前缀列举），两区严格不交叉。
+- `@paradox` 聊天参与者：在同一套工具上运行自带 EU4 模组写作领域提示词的 agent 循环（模型取当前聊天选中的模型），并提供 `/validate`、`/symbols`、`/rules`、`/loc`、`/hover` 确定性命令，无聊天模型时依然可用。工具轮次预算耗尽时，循环会强制基于已收集的结果给出无工具的收尾回答，而不是中断。
+- stdio MCP 服务器（`editors/vscode/scripts/mcp.mjs`）：把同样的十一个只读工具暴露给任意 Model Context Protocol 客户端——手写换行分隔 JSON-RPC，零 SDK 依赖，工具清单与扩展贡献点同源。
 - 精确版本服务器下载：SHA-256 校验、受限解压、有界流式传输与自校验可执行缓存。
 
 ## 快速开始
@@ -56,7 +56,7 @@ Linux（x86_64、aarch64）、macOS（x86_64、aarch64）与 Windows（x86_64）
 
 ### MCP 服务器
 
-同样的五个只读 agent 工具还以 stdio [Model Context Protocol](https://modelcontextprotocol.io) 服务器形式提供，MCP 客户端可以在 VS Code 之外验证草稿、查询规则库。需要本仓库的 checkout 与一份已构建（或从 Release 下载）的 `paradoxcode` 二进制：
+同样的十一个只读 agent 工具还以 stdio [Model Context Protocol](https://modelcontextprotocol.io) 服务器形式提供，MCP 客户端可以在 VS Code 之外验证草稿、查询规则库。脚本区工具（`workspace`、`search`、`context`、`diagnostics`、`references`、`symbol_references`、`rules`、`validate_text`）与本地化区工具（`loc_get` 精确寻址、`loc_search` 模糊反查、`loc_list` 前缀列举）严格分离；各工具的结果上限（如符号检索 100 条、本地化默认 20 条）都写进了各自的工具描述。需要本仓库的 checkout 与一份已构建（或从 Release 下载）的 `paradoxcode` 二进制：
 
 ```json
 {
