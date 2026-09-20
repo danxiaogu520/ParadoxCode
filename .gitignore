@@ -55,3 +55,13 @@ Desktop.ini
 
 # Local performance benchmark results
 /performance-results/*
+
+# Performance lab: run outputs, machine-local overrides, control binaries
+/lab/perf/runs/
+/lab/perf/baselines/
+/lab/perf/profiles/
+/lab/perf/bin/
+/lab/perf/config.local.sh
+
+# Local game-data corpus copies (licensed, local-only, never uploaded)
+/data/
