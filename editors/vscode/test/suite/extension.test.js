@@ -196,4 +196,56 @@ suite('ParadoxCode VS Code extension host', () => {
       assert.equal(disposables.length, 0);
     }
   });
+
+  test('participant tool specs stay in sync with the manifest contributions', async () => {
+    const extension = vscode.extensions.getExtension('paradoxcode.paradoxcode-vscode');
+    const { AGENT_TOOL_SPECS } = require('../../out/agent/prompt.js');
+    const contributed = (extension.packageJSON.contributes?.languageModelTools ?? [])
+      .map((tool) => tool.name)
+      .sort();
+    const specs = AGENT_TOOL_SPECS.map((tool) => tool.name).sort();
+    assert.deepEqual(specs, contributed, 'participant specs and manifest tools must not drift');
+  });
+
+  test('system prompt encodes the tool discipline', () => {
+    const { buildSystemPrompt } = require('../../out/agent/prompt.js');
+    const prompt = buildSystemPrompt();
+    for (const marker of [
+      'validate-text',
+      'search-rules',
+      'search-symbols',
+      'UnknownLocalisationKey',
+      'WrongScope',
+      'localisation',
+    ]) {
+      assert.ok(prompt.includes(marker), `system prompt must mention ${marker}`);
+    }
+  });
+
+  test('slash command query parsers split filters and bare terms', () => {
+    const { parseRuleFilters, parseLocalisationQuery } = require('../../out/agent/participant.js');
+    assert.deepEqual(parseRuleFilters('context=trigger key=army scope=country'), {
+      context: 'trigger', key: 'army', scope: 'country',
+    });
+    assert.deepEqual(parseRuleFilters('add_core'), { key: 'add_core' });
+    assert.deepEqual(parseRuleFilters('scope=estate add_core'), { scope: 'estate', key: 'add_core' });
+    assert.deepEqual(parseLocalisationQuery('key=greeting'), { key: 'greeting' });
+    assert.deepEqual(parseLocalisationQuery('text=Hello traveler'), { text: 'Hello traveler' });
+    assert.deepEqual(parseLocalisationQuery('greeting'), { key: 'greeting' });
+    assert.deepEqual(parseLocalisationQuery('Hello traveler'), { text: 'Hello traveler' });
+    assert.deepEqual(parseLocalisationQuery(''), {});
+  });
+
+  test('paradox participant registers on hosts with the Chat API', () => {
+    const { registerParadoxParticipant } = require('../../out/agent/participant.js');
+    const disposables = registerParadoxParticipant();
+    if ('chat' in vscode && typeof vscode.chat?.createChatParticipant === 'function') {
+      assert.equal(disposables.length, 1, 'the @paradox participant must register');
+      for (const disposable of disposables) {
+        disposable.dispose();
+      }
+    } else {
+      assert.equal(disposables.length, 0);
+    }
+  });
 });

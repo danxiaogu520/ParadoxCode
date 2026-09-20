@@ -188,6 +188,36 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "chatParticipants": [
+      {
+        "id": "paradoxcode.modding",
+        "name": "paradox",
+        "description": "%chatParticipant.paradox.description%",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "validate",
+            "description": "%chatParticipant.paradox.command.validate%"
+          },
+          {
+            "name": "symbols",
+            "description": "%chatParticipant.paradox.command.symbols%"
+          },
+          {
+            "name": "rules",
+            "description": "%chatParticipant.paradox.command.rules%"
+          },
+          {
+            "name": "loc",
+            "description": "%chatParticipant.paradox.command.loc%"
+          },
+          {
+            "name": "hover",
+            "description": "%chatParticipant.paradox.command.hover%"
+          }
+        ]
+      }
+    ],
     "languageModelTools": [
       {
         "name": "paradoxcode-validate-text",
