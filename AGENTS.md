@@ -36,7 +36,7 @@
 
 ## 4. 平台与工具链事实
 
-- 命令行一律使用 PowerShell 语法，不写 bash 专有语法。
+- 命令行语法按所在平台选择：Windows 侧一律使用 PowerShell 语法，WSL 侧一律使用 bash 语法；两侧都不写对方的专有语法。
 - 有现代 CLI 工具可用时优先使用，避免冗长的 PowerShell 等价写法：
   - 文本或代码搜索用 `rg`，不用 `Select-String`。
   - 文件查找用 `fd`，不用递归 `Get-ChildItem`。
@@ -50,7 +50,7 @@
 - 生命周期职责固定：本地分组负责快速反馈；PR 与 `main` 的 `Conclusion` 负责合并；Security 与 Performance 工作流负责定时审计；标签工作流负责可再分发资产；干净 profile 与 Marketplace 是人工验收。不要用一个阶段的结果替代另一个阶段的授权。
 - Vanilla sweep 只比较和解释本地诊断 / 性能变化，不维护仓库指纹基线，也不作为 PASS/FAIL 发布契约。`--previous` 只生成辅助差异；工具错误、服务器失败和用户显式 `--fail-on` 仍会让本地命令失败。服务器真实规则哈希取自 `server_messages`，checkout 哈希取自 `rules/manifest.json`，两者不一致时拒绝继续。
 - scripts 布局（`editors/vscode/scripts/`）：单词命名入口（diagnose / probe / compare / transcode / extension / package / host / smoke / sweep）+ lib 分工（options / workspace / overlay / diagnosis / report / client / sampler / paths）；入口全是薄壳，sweep 直接 import 相位函数。改诊断或性能链路时先动 lib 再动入口。transcode.mjs 含 Rust↔TS 差分向量对拍（74,549 条，`PDC_SKIP_VECTORS=1` 可跳过）。
-- 服务端 config 位于 **%APPDATA%（Roaming）**，不是 LOCALAPPDATA；缓存根位于 LOCALAPPDATA。
+- 服务端用户目录按平台解析（权威在 `crates/game` 的 `UserPaths::platform`）：Windows 的 config 位于 **%APPDATA%\ParadoxCode（Roaming，不是 LOCALAPPDATA）**，缓存根位于 %LOCALAPPDATA%\ParadoxCode\cache；WSL/Linux 的 config 位于 `~/.config/paradoxcode/`，缓存根位于 `~/.cache/paradoxcode/`。
 - npm 的 `--prefix … run` 传相对 `--server` 路径会以 editors/vscode 为工作目录解析而失败（用直接 node 调用或绝对路径）。
 - sweep 冷启动协议：客户端对缺失的 vanilla 缓存放行（服务器端支持在显式缓存缺失时自动发现并原位重建）。
 - GitHub 托管的 CI 不应依赖本机、游戏安装或持久缓存；可执行的远端证据必须来自仓库自有 source 与 fixture。远端工作流中出现 Vanilla 路径或 `sweep.mjs` 调用属于策略违规。
@@ -60,5 +60,6 @@
 本地安装、mod 和资料快照只用于调研与人工验证；路径从用户配置、工具发现结果或当次任务的显式参数取得。不要把维护者用户名、绝对路径、硬件规格或安装位置写进仓库、CI、Release、公开报告或可移植性假设。
 
 - EU4 原版真值以维护者合法安装为本地输入。优先读取 ParadoxCode 用户配置或运行 `cargo tools setup vanilla --game eu4` 完成发现，不假定 Steam / GOG / Epic 的固定目录。
+- WSL 侧开发时，EU4 原版、EDG 与 wiki 快照仍在 Windows 盘，经 `/mnt/c/…` 只读访问；用户配置里的 `/mnt/c` 路径属于本地配置，不算入库。经 9p 挂载做全量扫描明显慢于原生路径，sweep 耗时按需权衡。
 - EDG（EU4 中文模组“归墟之门”，`Entrance to the Desolate Ground`，创意工坊模组 ID：3047072888）可作为本地人工验证语料。
 - **查询 EU4 wiki 资料优先使用维护者已有的 `eu4-wiki-encyclopedia` 本地快照**，位置由当次环境提供，不访问受 `_fs-ch-` JS 挑战保护的在线站。入口 `MODDING.md`、`INDEX.md|json`；正文位于 `md/<分类>/`，原始表格查 `raw/`，页面新旧看 frontmatter 的 revid / revision_ts。需要更新走快照仓库 `tools/` 的再生流程。API 坑：allpages 续传用 `apcontinue`（generator 用 `gapcontinue`）；新版分类字段是 `title:"Category:X"`；turndown-plugin-gfm 遇 `<caption>` 放弃转表格，须先剥掉。内容许可 CC BY-SA 3.0，仅本地参考。
