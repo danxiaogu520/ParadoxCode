@@ -220,9 +220,167 @@
     ],
     "languageModelTools": [
       {
-        "name": "paradoxcode-validate-text",
+        "name": "paradoxcode_workspace",
+        "displayName": "ParadoxCode: Workspace Summary",
+        "modelDescription": "Summarise the EU4 workspace: game identity, embedded rule hash, source roots (Vanilla, dependency mods, project mod), file counts by zone, and the last scan outcome. Call it first when orienting in a workspace to learn what is indexed and where the project mod sits.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "paradoxcode_search",
+        "displayName": "ParadoxCode: Search Symbols",
+        "modelDescription": "Search script-zone symbols (events, decisions, tags, missions, scripted triggers/effects) by name substring across the project mod, dependency mods, and Vanilla. Localisation keys are excluded (use the loc tools for those). Results are limited to 100 symbols. Use it before drafting to discover what the game or existing mods already define.",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "query"
+          ],
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Symbol name substring (at least 2 characters)"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum entries to return (1-100, default 20)"
+            }
+          }
+        }
+      },
+      {
+        "name": "paradoxcode_context",
+        "displayName": "ParadoxCode: Context",
+        "modelDescription": "Explain the rule-driven semantics at one position of an indexed EU4 script file (project, dependency, or Vanilla): what the key accepts, which scopes allow it, and the localisation preview when it resolves one. Input uses a 1-based line and 0-based UTF-16 character column. Script files only; for localisation keys use the loc tools.",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "path",
+            "line"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Absolute path, file: URI, or workspace-relative path of an indexed script file"
+            },
+            "line": {
+              "type": "number",
+              "description": "1-based line number"
+            },
+            "character": {
+              "type": "number",
+              "description": "0-based UTF-16 character column (default 0)"
+            }
+          }
+        }
+      },
+      {
+        "name": "paradoxcode_diagnostics",
+        "displayName": "ParadoxCode: Workspace Diagnostics",
+        "modelDescription": "Diagnostics for the project script files on disk (Vanilla and dependency mods excluded), with stable codes, 1-based line numbers, and messages. Pass files (logical paths) to focus on specific files, or omit to page through the whole workspace (16 files per page, up to 128). Localisation files are excluded. Use it to ask what is currently broken in the mod.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Logical paths to focus on, such as events/my_event.txt"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum files per page (1-128, default 16)"
+            },
+            "offset": {
+              "type": "number",
+              "description": "Zero-based page offset from the full sorted file list"
+            }
+          }
+        }
+      },
+      {
+        "name": "paradoxcode_references",
+        "displayName": "ParadoxCode: References",
+        "modelDescription": "Find references to the symbol at one position of a script file (position-based; the position must point at a symbol the workspace has indexed). Input uses a 1-based line and 0-based UTF-16 character column. For lookup by name alone use paradoxcode_symbol_references.",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "path",
+            "line"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Absolute path, file: URI, or workspace-relative path of a script file"
+            },
+            "line": {
+              "type": "number",
+              "description": "1-based line number"
+            },
+            "character": {
+              "type": "number",
+              "description": "0-based UTF-16 character column (default 0)"
+            }
+          }
+        }
+      },
+      {
+        "name": "paradoxcode_symbol_references",
+        "displayName": "ParadoxCode: Symbol References",
+        "modelDescription": "Find the definition and references of a script-zone symbol addressed by name, without a cursor position (event ids, decisions, scripted effects/triggers, tags). Optional kind (for example event or scripted_effect) disambiguates names defined under several kinds; an ambiguous answer lists the candidate kinds to retry with. Results are limited to 100 references. Use it to measure the impact of editing or renaming a definition.",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Symbol name, for example flavor_kni.1 or my_scripted_effect"
+            },
+            "kind": {
+              "type": "string",
+              "description": "Optional symbol kind used to disambiguate, for example event"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum references to return (1-100, default 20)"
+            }
+          }
+        }
+      },
+      {
+        "name": "paradoxcode_rules",
+        "displayName": "ParadoxCode: Search Rules",
+        "modelDescription": "Search the embedded first-party EU4 semantic rule database. Filters (case-insensitive, at least one required): context (exact or prefix, for example trigger, effect, type:event), key (substring of the rule key, for example add_army_tradition), scope (substring of an allowed scope; rules valid in any scope match every scope query). Entries document the expected shape, allowed scopes, and documentation text, and results are limited to 50 rules. Use it to learn which keys are valid, what they accept, and in which scopes they work before writing them.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "context": {
+              "type": "string",
+              "description": "Semantic root such as trigger, effect, or type:event"
+            },
+            "key": {
+              "type": "string",
+              "description": "Substring of the rule key"
+            },
+            "scope": {
+              "type": "string",
+              "description": "Substring of an allowed scope, for example country"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum entries to return (1-50, default 20)"
+            }
+          }
+        }
+      },
+      {
+        "name": "paradoxcode_validate_text",
         "displayName": "ParadoxCode: Validate Script Text",
-        "modelDescription": "Validate Paradox EU4 script text (1-16 files) against the embedded EU4 rules and the indexed workspace/Vanilla data without writing anything to disk. Pass each file as {path, text} where path is the mod-relative logical path (for example \"events/my_event.txt\" or \"localisation/mod_l_english.yml\"). Returns per-file diagnostics with stable codes (UnknownKey, InvalidValue, WrongScope, UnknownLocalisationKey, ...), 1-based line numbers, and messages. Use it to verify drafted mod files before or after writing them.",
+        "modelDescription": "Validate Paradox EU4 script text (1-16 files) against the embedded EU4 rules and the indexed workspace/Vanilla data without writing anything to disk. Pass each file as {path, text} where path is the mod-relative logical path (for example \"events/my_event.txt\"). Returns per-file diagnostics with stable codes (UnknownKey, InvalidValue, WrongScope, UnknownLocalisationKey, ...), 1-based line numbers, and messages. Use it to verify drafted mod files before or after writing them.",
         "inputSchema": {
           "type": "object",
           "required": [
@@ -255,63 +413,32 @@
         }
       },
       {
-        "name": "paradoxcode-search-symbols",
-        "displayName": "ParadoxCode: Search Symbols",
-        "modelDescription": "Search the indexed EU4 symbol table (project mod, dependency mods, and Vanilla) for definitions such as events, decisions, tags, missions, or scripted triggers/effects by name substring. Returns matching symbol names with their kind and file location. Use it before drafting to discover what the game or existing mods already define.",
+        "name": "paradoxcode_loc_get",
+        "displayName": "ParadoxCode: Localisation Lookup",
+        "modelDescription": "Address one EU4 localisation key exactly (case-insensitive): returns the winning definition with its value, language, and file, or nothing. Never truncated. Use it whenever the key is known, for example an event title key from a script file.",
         "inputSchema": {
           "type": "object",
           "required": [
-            "query"
+            "key"
           ],
           "properties": {
-            "query": {
+            "key": {
               "type": "string",
-              "description": "Symbol name substring (at least 2 characters)"
-            },
-            "limit": {
-              "type": "number",
-              "description": "Maximum entries to return (1-50, default 20)"
+              "description": "Exact localisation key, for example my_mod.1.t"
             }
           }
         }
       },
       {
-        "name": "paradoxcode-search-rules",
-        "displayName": "ParadoxCode: Search Rules",
-        "modelDescription": "Search the embedded first-party EU4 semantic rule database. Filters (case-insensitive, at least one required): context (exact or prefix, for example trigger, effect, type:event), key (substring of the rule key, for example add_army_tradition), scope (substring of an allowed scope; rules valid in any scope match every scope query). Entries document the expected shape, allowed scopes, and documentation text. Use it to learn which keys are valid, what they accept, and in which scopes they work before writing them.",
+        "name": "paradoxcode_loc_search",
+        "displayName": "ParadoxCode: Search Localisation Text",
+        "modelDescription": "Discover EU4 localisation entries by displayed-value substring, case-insensitive, across the project mod, dependencies, and Vanilla. Returns the winning definition per key with its value, language, and file, limited to 50 entries. Use it to reverse-search visible text to its key before referencing it from events or decisions.",
         "inputSchema": {
           "type": "object",
+          "required": [
+            "text"
+          ],
           "properties": {
-            "context": {
-              "type": "string",
-              "description": "Semantic root such as trigger, effect, or type:event"
-            },
-            "key": {
-              "type": "string",
-              "description": "Substring of the rule key"
-            },
-            "scope": {
-              "type": "string",
-              "description": "Substring of an allowed scope, for example country"
-            },
-            "limit": {
-              "type": "number",
-              "description": "Maximum entries to return (1-50, default 20)"
-            }
-          }
-        }
-      },
-      {
-        "name": "paradoxcode-search-localisation",
-        "displayName": "ParadoxCode: Search Localisation",
-        "modelDescription": "Search indexed EU4 localisation entries (project mod, dependencies, and Vanilla) by key substring and/or displayed-value substring, both case-insensitive. Returns the winning definition per key with its value, language, and file. Use it to find usable localisation keys, check what a key displays, or reverse-search text to its key before referencing it from events or decisions.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "key": {
-              "type": "string",
-              "description": "Substring of the localisation key"
-            },
             "text": {
               "type": "string",
               "description": "Substring of the displayed value"
@@ -324,27 +451,22 @@
         }
       },
       {
-        "name": "paradoxcode-hover-info",
-        "displayName": "ParadoxCode: Hover Info",
-        "modelDescription": "Look up the rule-driven hover explanation at one position of an indexed EU4 script or localisation file (project, dependency, or Vanilla). Input uses a 1-based line and 0-based UTF-16 character column. Returns the semantic documentation for the key or value at that position. Use it to ask what a specific key means or accepts in context.",
+        "name": "paradoxcode_loc_list",
+        "displayName": "ParadoxCode: List Localisation Family",
+        "modelDescription": "Enumerate the EU4 localisation key family under an anchored key prefix (for example \"flavor_kni.1.\" lists the .t, .d, and option keys of that event). Returns the winning definition per key with value, language, and file, limited to 50 entries. Use it to see which keys a definition site already provides or which are missing.",
         "inputSchema": {
           "type": "object",
           "required": [
-            "path",
-            "line"
+            "keyPrefix"
           ],
           "properties": {
-            "path": {
+            "keyPrefix": {
               "type": "string",
-              "description": "Absolute path, file: URI, or workspace-relative path of an indexed file"
+              "description": "Anchored key prefix, for example my_event.1."
             },
-            "line": {
+            "limit": {
               "type": "number",
-              "description": "1-based line number"
-            },
-            "character": {
-              "type": "number",
-              "description": "0-based UTF-16 character column (default 0)"
+              "description": "Maximum entries to return (1-50, default 20)"
             }
           }
         }

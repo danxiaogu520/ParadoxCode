@@ -87,6 +87,6 @@
   "chatParticipant.paradox.command.validate": "用 EU4 规则库验证当前编辑器文件",
   "chatParticipant.paradox.command.symbols": "检索已索引符号（参数为查询词）",
   "chatParticipant.paradox.command.rules": "查询规则数据库（支持 context= key= scope= 过滤）",
-  "chatParticipant.paradox.command.loc": "检索本地化条目（key= 或 text= 过滤）",
+  "chatParticipant.paradox.command.loc": "查址本地化条目（key= 精确、text= 反查、prefix= 家族列举）",
   "chatParticipant.paradox.command.hover": "查询光标处的悬停语义"
 }

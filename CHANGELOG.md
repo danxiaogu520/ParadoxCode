@@ -9,6 +9,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Four new agent tools over the running language server, bringing the read-only surface to
+  eleven `paradoxcode_` tools split into two zones that never cross. Script zone:
+  `paradoxcode_workspace` (game id, rule hash, workspace roots, and per-zone file counts via
+  the new parameterless `pdc/workspaceSummary` request), `paradoxcode_diagnostics` (workspace
+  diagnostics through `pdc/workspaceDiagnostics`, now filterable by `parser: "script"` /
+  `"localisation"` and by logical `files` paths), `paradoxcode_symbol_references` (name-driven
+  reference lookup without a position via the new `pdc/symbolReferences`; ambiguous or unknown
+  names return the candidate kinds instead of a guess), and `paradoxcode_search` (script symbol
+  discovery via the new `pdc/symbolSearch`, prefix > substring > fuzzy scoring, capped at 100
+  entries, localisation definitions excluded server-side). Localisation zone:
+  `paradoxcode_loc_get` (exact key lookup, 0 or 1 results, never truncated),
+  `paradoxcode_loc_search` (fuzzy reverse search by displayed text, default 20 / max 50 hits),
+  and `paradoxcode_loc_list` (bounded prefix-family listing), all three riding
+  `pdc/localisationSearch` with a new `keyMatch` parameter (`exact` / `prefix` / `substring`).
+- `paradoxcode_context` and `paradoxcode_references`: script-zone hover semantics and
+  position-based references that reject `localisation/` paths with a pointer to the matching
+  localisation tool instead of silently crossing zones.
+
 - Momentary raw peek for the decoded localisation view. The editor-title eye on a `pdcloc://` tab
   flips it in place to the on-disk escaped form; Esc (bound to
   `paradoxcode.localisation.endPeek` while peeking), the eye on the raw view, or moving focus to
@@ -18,6 +36,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   palette — remains the pinned variant.
 
 ### Changed
+
+- The five 0.4.0 `vscode.lm` tools were renamed to the vendor-prefixed `paradoxcode_` scheme
+  and reorganised: `paradoxcode-validate-text` → `paradoxcode_validate_text`,
+  `-search-symbols` → `paradoxcode_search`, `-search-rules` → `paradoxcode_rules`,
+  `-search-localisation` → split into `paradoxcode_loc_get` / `paradoxcode_loc_search` /
+  `paradoxcode_loc_list`, `-hover-info` → `paradoxcode_context`. The same renames apply to the
+  stdio MCP server, whose manifest stays mirrored from `languageModelTools`. The `@paradox`
+  system prompt and the MCP instructions were restructured into gopls-style read/edit
+  workflows with an explicit zone-discipline section, and `/loc` now routes `key=` / bare
+  single words to exact lookup, `text=` / bare multi-word queries to reverse search, and the
+  new `prefix=` token to prefix listing.
+- Symbol search result caps are now declared per zone in each tool description (100 script
+  symbols, 20 default / 50 max localisation entries).
+- When the participant's 12-round tool budget is exhausted, the loop now forces a final
+  no-tools request that answers from the results already gathered (and states what could not
+  be verified) instead of ending with a static "ask me to continue" line that discarded the
+  whole investigation.
 
 - Opening an eligible transcoded file now takes over its tab instead of adding a second one: the
   decoded `pdcloc://` view is shown in the raw tab's own group and preview state and the raw tab

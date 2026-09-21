@@ -87,6 +87,6 @@
   "chatParticipant.paradox.command.validate": "Validate the active editor file against the EU4 rules",
   "chatParticipant.paradox.command.symbols": "Search indexed symbols (query as argument)",
   "chatParticipant.paradox.command.rules": "Search the rule database (context= key= scope= filters)",
-  "chatParticipant.paradox.command.loc": "Search localisation (key= or text= filters)",
+  "chatParticipant.paradox.command.loc": "Address localisation (key=, text=, or prefix= family listing)",
   "chatParticipant.paradox.command.hover": "Look up hover semantics at the cursor"
 }
