@@ -61,6 +61,67 @@
     const searchResults = document.getElementById('search-results');
     const ctx = canvas.getContext('2d');
 
+    // --- localisation ---------------------------------------------------------
+    //
+    // English fallback table; the extension host sends the real dictionary
+    // (matching the current UI language) as the first message, before any
+    // data message can paint visible text. Keys must mirror the table in
+    // src/webviewI18n.ts (the contract test enforces the pairing).
+
+    const DEFAULT_STRINGS = {
+        panelTitle: 'Mission Tree Preview',
+        toolbarAria: 'Mission preview controls',
+        canvasAria: 'Mission tree preview',
+        fit: 'Fit',
+        fitTitle: 'Fit mission tree (F)',
+        zoomOutTitle: 'Zoom out (-)',
+        zoomInTitle: 'Zoom in (+)',
+        searchPlaceholder: 'Search missions…',
+        searchAria: 'Search missions by title or id',
+        resultsAria: 'Matching missions',
+        series: 'Series',
+        seriesCount: 'Series ({0}/{1})',
+        seriesAria: 'Mission series visibility',
+        all: 'All',
+        none: 'None',
+        seriesHiddenSuffix: ' · series hidden',
+        slot: 'Slot {0}',
+        missionAria: 'Mission {0}',
+        noPreview: 'No preview available.',
+        statusMissions: '{0} missions',
+        errorSingular: '{0} error',
+        errorPlural: '{0} errors',
+        warningSingular: '{0} warning',
+        warningPlural: '{0} warnings',
+        flagError: 'error',
+        flagWarning: 'warning',
+    };
+
+    const strings = { ...DEFAULT_STRINGS };
+
+    function t(key, ...args) {
+        const template = strings[key] ?? DEFAULT_STRINGS[key] ?? key;
+        return template.replace(/\{(\d+)\}/g, (match, index) => (
+            index < args.length ? String(args[index]) : match
+        ));
+    }
+
+    function applyStaticStrings() {
+        document.title = t('panelTitle');
+        for (const element of document.querySelectorAll('[data-i18n]')) {
+            element.textContent = t(element.dataset.i18n);
+        }
+        for (const element of document.querySelectorAll('[data-i18n-title]')) {
+            element.title = t(element.dataset.i18nTitle);
+        }
+        for (const element of document.querySelectorAll('[data-i18n-placeholder]')) {
+            element.placeholder = t(element.dataset.i18nPlaceholder);
+        }
+        for (const element of document.querySelectorAll('[data-i18n-aria-label]')) {
+            element.setAttribute('aria-label', t(element.dataset.i18nAriaLabel));
+        }
+    }
+
     let preview = null;
     let hovered = null; // { kind: 'node'|'group', index, rect }
     let pan = { x: 0, y: 0 };
@@ -1021,9 +1082,11 @@
         const errors = visible.filter((node) => node.hasError).length;
         const warnings = visible.filter((node) => node.hasWarning).length;
         if (errors + warnings > 0) {
-            showStatus(
-                `${visible.length} missions · ${errors} error${errors === 1 ? '' : 's'} · ${warnings} warning${warnings === 1 ? '' : 's'}`,
-            );
+            showStatus([
+                t('statusMissions', visible.length),
+                errors === 1 ? t('errorSingular', errors) : t('errorPlural', errors),
+                warnings === 1 ? t('warningSingular', warnings) : t('warningPlural', warnings),
+            ].join(' · '));
         } else {
             hideStatus();
         }
@@ -1113,7 +1176,7 @@
             primary.textContent = plainTitle(node) || node.id;
             const secondary = document.createElement('span');
             secondary.className = 'search-result-series';
-            secondary.textContent = `${treeIds[node.tree]}${isTreeVisible(node.tree) ? '' : ' · series hidden'}`;
+            secondary.textContent = `${treeIds[node.tree]}${isTreeVisible(node.tree) ? '' : t('seriesHiddenSuffix')}`;
             row.append(primary, secondary);
             fragment.appendChild(row);
         });
@@ -1196,8 +1259,8 @@
         }
         const total = treeIds.filter(Boolean).length;
         seriesSummary.textContent = total > 0
-            ? `Series (${total - hiddenTreeIds.size}/${total})`
-            : 'Series';
+            ? t('seriesCount', total - hiddenTreeIds.size, total)
+            : t('series');
     }
 
     // World-space x of the grid origin (geometry::ORIGIN.0), used to derive a
@@ -1242,10 +1305,10 @@
             const block = document.createElement('div');
             block.className = 'series-column';
             block.setAttribute('role', 'group');
-            block.setAttribute('aria-label', `Slot ${column.slot}`);
+            block.setAttribute('aria-label', t('slot', column.slot));
             const header = document.createElement('div');
             header.className = 'series-column-slot';
-            header.textContent = `Slot ${column.slot}`;
+            header.textContent = t('slot', column.slot);
             block.append(header);
             for (const group of column.groups) {
                 const row = document.createElement('label');
@@ -1320,8 +1383,8 @@
                 titleLine.appendChild(span);
             }
             const flags = [];
-            if (options.showDiagnostics && node.hasError) flags.push('error');
-            if (options.showDiagnostics && node.hasWarning) flags.push('warning');
+            if (options.showDiagnostics && node.hasError) flags.push(t('flagError'));
+            if (options.showDiagnostics && node.hasWarning) flags.push(t('flagWarning'));
             const keyLine = document.createElement('div');
             keyLine.className = 'tooltip-dim';
             keyLine.textContent = flags.length
@@ -1354,13 +1417,20 @@
         }
         const node = preview.nodes[keyboardIndex];
         hovered = { kind: 'node', index: keyboardIndex, node, rect: null };
-        canvas.setAttribute('aria-label', `Mission ${nodeLabel(node)}`);
+        canvas.setAttribute('aria-label', t('missionAria', nodeLabel(node)));
         scheduleDraw();
     }
 
     window.addEventListener('message', (event) => {
         const message = event.data;
-        if (message.type === 'preview') {
+        if (message.type === 'i18n') {
+            Object.assign(strings, message.strings);
+            document.documentElement.lang = message.language;
+            applyStaticStrings();
+            runSearch();
+            renderSeriesList();
+            renderSummary();
+        } else if (message.type === 'preview') {
             setPreview(message.payload);
             switchDocument(message.payload.documentUri);
             syncSeriesState();
@@ -1375,7 +1445,7 @@
             runSearch();
             renderSeriesList();
             hideTooltip();
-            showStatus(message.message || 'No preview available.');
+            showStatus(message.message || t('noPreview'));
         } else if (message.type === 'assets') {
             setAssets(message);
         } else if (message.type === 'options') {

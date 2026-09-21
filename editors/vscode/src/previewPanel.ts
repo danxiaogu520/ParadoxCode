@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
 import { FRAME_SPRITE, FontAssets, GameAssetStore, findChineseFontMod, findGameDirectory } from './gameAssets';
+import { missionPreviewStrings, webviewI18nMessage } from './webviewI18n';
 
 const PREVIEW_VIEW_TYPE = 'paradoxcode.missionPreview';
 
@@ -77,6 +78,8 @@ type OutboundMessage =
     | { type: 'preview'; payload: MissionPreview }
     | { type: 'empty'; message: string }
     | { type: 'error'; message: string }
+    /** Localised UI strings; always the first message so no data paint beats it. */
+    | ReturnType<typeof webviewI18nMessage>
     /** Sprite pixels and game fonts the renderer asked for, decoded client-side. */
     | { type: 'assets'; textures: Record<string, string>; fonts?: FontAssets }
     | {
@@ -151,7 +154,7 @@ export class MissionPreviewPanel {
 
         const panel = vscode.window.createWebviewPanel(
             PREVIEW_VIEW_TYPE,
-            'Mission Tree Preview',
+            vscode.l10n.t('Mission Tree Preview'),
             vscode.ViewColumn.Beside,
             {
                 enableScripts: true,
@@ -166,6 +169,10 @@ export class MissionPreviewPanel {
         panel.reveal(vscode.ViewColumn.Beside, true);
         MissionPreviewPanel.panel = panel;
         panel.webview.html = MissionPreviewPanel.html(panel.webview, extensionUri);
+        MissionPreviewPanel.post(
+            panel,
+            webviewI18nMessage(missionPreviewStrings()),
+        );
         MissionPreviewPanel.postOptions(panel);
         panel.onDidDispose(() => {
             MissionPreviewPanel.panel = undefined;
@@ -207,9 +214,12 @@ export class MissionPreviewPanel {
             MissionPreviewPanel.post(panel, {
                 type: 'empty',
                 message: editor
-                    ? 'Mission tree preview only renders .txt files inside a missions folder.\n\n' +
-                      `active: ${editor.uri.fsPath}`
-                    : 'Open a .txt file inside a missions folder and focus it to preview its mission tree.',
+                    ? vscode.l10n.t(
+                        'Mission tree preview only renders .txt files inside a missions folder.\n\n'
+                        + 'active: {0}',
+                        editor.uri.fsPath,
+                    )
+                    : vscode.l10n.t('Open a .txt file inside a missions folder and focus it to preview its mission tree.'),
             });
             return;
         }
@@ -219,14 +229,14 @@ export class MissionPreviewPanel {
         if (!logical) {
             MissionPreviewPanel.post(panel, {
                 type: 'error',
-                message: 'The mission file must live inside the workspace root.',
+                message: vscode.l10n.t('The mission file must live inside the workspace root.'),
             });
             return;
         }
         if (!client) {
             MissionPreviewPanel.post(panel, {
                 type: 'error',
-                message: 'The ParadoxCode language server is not running.',
+                message: vscode.l10n.t('The ParadoxCode language server is not running.'),
             });
             return;
         }
@@ -396,19 +406,21 @@ export class MissionPreviewPanel {
                 editor = await vscode.window.showTextDocument(document, vscode.ViewColumn.One, false);
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
-                void vscode.window.showWarningMessage(`ParadoxCode: could not open mission source: ${message}`);
+                void vscode.window.showWarningMessage(
+                    vscode.l10n.t('ParadoxCode: could not open mission source: {0}', message),
+                );
                 return;
             }
         }
         if (MissionPreviewPanel.previewVersion !== undefined && editor.document.version !== MissionPreviewPanel.previewVersion) {
             void vscode.window.showInformationMessage(
-                'ParadoxCode: the mission preview is out of date; edit refresh is still pending.',
+                vscode.l10n.t('ParadoxCode: the mission preview is out of date; edit refresh is still pending.'),
             );
             return;
         }
         if (!sourceRange) {
             void vscode.window.showWarningMessage(
-                'ParadoxCode: the language server did not return a UTF-16 source range for this item.',
+                vscode.l10n.t('ParadoxCode: the language server did not return a UTF-16 source range for this item.'),
             );
             return;
         }

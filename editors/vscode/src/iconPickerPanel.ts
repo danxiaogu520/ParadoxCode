@@ -12,6 +12,7 @@ import * as vscode from 'vscode';
 import { CataloguedSprite, isMissionIconSprite } from './gameAssets';
 import { MissionPreviewPanel } from './previewPanel';
 import { iconValueSpanAt } from './iconPickerInsert';
+import { missionIconPickerStrings, webviewI18nMessage } from './webviewI18n';
 
 const PICKER_VIEW_TYPE = 'paradoxcode.missionIconPicker';
 
@@ -29,7 +30,9 @@ interface SpriteWire {
 type OutboundMessage =
     | { type: 'catalog'; sprites: SpriteWire[] }
     | { type: 'images'; textures: Record<string, string> }
-    | { type: 'error'; message: string };
+    | { type: 'error'; message: string }
+    /** Localised UI strings; always the first message so no data paint beats it. */
+    | ReturnType<typeof webviewI18nMessage>;
 
 /** Webview messages received from the picker. */
 type InboundMessage =
@@ -54,7 +57,7 @@ export class MissionIconPickerPanel {
         }
         const panel = vscode.window.createWebviewPanel(
             PICKER_VIEW_TYPE,
-            'Mission Icons',
+            vscode.l10n.t('Mission Icons'),
             vscode.ViewColumn.Beside,
             {
                 enableScripts: true,
@@ -69,6 +72,10 @@ export class MissionIconPickerPanel {
         panel.reveal(vscode.ViewColumn.Beside, true);
         MissionIconPickerPanel.panel = panel;
         panel.webview.html = MissionIconPickerPanel.html(panel.webview, extensionUri);
+        MissionIconPickerPanel.post(
+            panel,
+            webviewI18nMessage(missionIconPickerStrings()),
+        );
         panel.onDidDispose(() => {
             MissionIconPickerPanel.panel = undefined;
         });
@@ -104,8 +111,10 @@ export class MissionIconPickerPanel {
         if (catalog.length === 0) {
             MissionIconPickerPanel.post(panel, {
                 type: 'error',
-                message: 'No sprites were found. Point ParadoxCode at the EU4 installation '
+                message: vscode.l10n.t(
+                    'No sprites were found. Point ParadoxCode at the EU4 installation '
                     + '(paradoxcode.gameDirectory) or open a mod workspace, then reopen the picker.',
+                ),
             });
             return;
         }
@@ -151,7 +160,7 @@ export class MissionIconPickerPanel {
         if (!editor || editor.document.languageId !== 'eu4') {
             await vscode.env.clipboard.writeText(name);
             void vscode.window.showInformationMessage(
-                `ParadoxCode: no EU4 editor focused; copied "${name}" to the clipboard.`,
+                vscode.l10n.t('ParadoxCode: no EU4 editor focused; copied "{0}" to the clipboard.', name),
             );
             MissionIconPickerPanel.dispose();
             return;
@@ -173,7 +182,11 @@ export class MissionIconPickerPanel {
         }
         if (!applied) {
             void vscode.window.showWarningMessage(
-                `ParadoxCode: could not write "${name}" into ${path.basename(editor.document.uri.fsPath)}.`,
+                vscode.l10n.t(
+                    'ParadoxCode: could not write "{0}" into {1}.',
+                    name,
+                    path.basename(editor.document.uri.fsPath),
+                ),
             );
             return;
         }

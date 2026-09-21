@@ -8,6 +8,14 @@
 import type { IconPreview } from './gameAssets';
 import { toHoverImageUrl } from './hoverCards';
 
+/** The follow-up command title is user-visible (status bar). `vscode` is
+ * required lazily because this module is also imported by Node-side contract
+ * tests, where the module does not exist and this function never runs. */
+function followupCommandTitle(): string {
+    const vscode = require('vscode') as typeof import('vscode');
+    return vscode.l10n.t('Trigger follow-up completion');
+}
+
 export const FOLLOWUP_COMPLETION_TRIGGER_COMMAND = 'paradoxcode.triggerCompletion';
 
 /** Widest image a completion documentation panel renders; wider sprites scale down. */
@@ -49,7 +57,7 @@ export function attachFollowupCompletionTrigger(item: CompletionLike, documentUr
         return;
     }
     item.command = {
-        title: 'Trigger follow-up completion',
+        title: followupCommandTitle(),
         command: FOLLOWUP_COMPLETION_TRIGGER_COMMAND,
         ...(documentUri ? { arguments: [{ uri: documentUri }] } : {}),
     };

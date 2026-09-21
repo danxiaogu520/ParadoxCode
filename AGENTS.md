@@ -18,7 +18,8 @@
 ## 2. 常用命令与门禁
 
 - 本地检查聚合器：`cargo tools gates [core|core-fast|vscode|policy|artifact|fuzz|perf|all]`（无参数 = `all`）。`all` 只表示默认的确定性本地检查（不含需显式启用的 `perf`），不代表可合并或可发布；完整职责表见 `docs/validation.md`。`.cargo/config.toml` 的 `tools`/`tq` 别名自带结尾 `--`，命令里不要再带。
-- VS Code 扩展：`npm run check` + `npm run test:contract`（compile / smoke / extension / package / transcode 五项契约）。
+- VS Code 扩展：`npm run check` + `npm run test:contract`（compile / smoke / extension / package / transcode / i18n 六项契约）。
+- 扩展 UI 双语（en + zh-cn）与术语：用户可见字符串一律走 `vscode.l10n.t()`（webview 走 `src/webviewI18n.ts` 字典，media 内置英文默认表），`scripts/i18n-test.mjs` 契约检查覆盖率与 bundle key 同步；术语译名以 `docs/glossary.md` 为准（Vanilla→原版、Mod→模组、sprite→图像）。服务端诊断消息暂保持英文；LLM-facing 字符串（`src/agent/`、languageModelTools 描述）不本地化。
 - 全量 Vanilla sweep 是按风险运行的本地开发工具，不是提交、PR 或发布的门禁。必须显式传入要验证的 `--server`；脚本会核对服务器实际内嵌的规则哈希与当前 checkout，避免过期二进制产生假结论。报告只留在被忽略的 `performance-results/`，不得上传或提交。
 - 黄金对拍：`PDC_UPDATE_GOLDEN=1 cargo test -p ide golden_gfx_sprite_semantics`。
 - 规则改动后必须重烤并同步计数断言：`cargo run -p rules --bin bake -- build --source rules/eu4 --manifest rules/manifest.json` + rulec.rs 计数。

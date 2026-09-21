@@ -39,11 +39,11 @@ interface FileNode {
 function rootLabel(root: WorkspaceFileRoot): string {
     switch (root.kind) {
         case 'project':
-            return 'Project';
+            return vscode.l10n.t('Project');
         case 'dependency':
-            return `Dependency · ${root.path}`;
+            return vscode.l10n.t('Dependency · {0}', root.path);
         case 'vanilla':
-            return 'Vanilla';
+            return vscode.l10n.t('Vanilla');
         default:
             return root.kind;
     }
@@ -77,7 +77,9 @@ export class LoadedFilesProvider implements vscode.TreeDataProvider<ExplorerNode
     public getTreeItem(node: ExplorerNode): vscode.TreeItem {
         if (node.kind === 'root') {
             const item = new vscode.TreeItem(rootLabel(node.root), vscode.TreeItemCollapsibleState.Expanded);
-            item.description = node.root.writable ? 'editable' : 'read-only';
+            item.description = node.root.writable
+                ? vscode.l10n.t('editable')
+                : vscode.l10n.t('read-only');
             item.contextValue = `paradoxcode.root.${node.root.kind}`;
             item.iconPath = new vscode.ThemeIcon(
                 node.root.kind === 'project' ? 'folder-opened' : 'library',
@@ -85,13 +87,15 @@ export class LoadedFilesProvider implements vscode.TreeDataProvider<ExplorerNode
             return item;
         }
         const item = new vscode.TreeItem(node.file.logicalPath, vscode.TreeItemCollapsibleState.None);
-        item.description = node.file.active ? 'active definition' : node.file.category ?? '';
+        item.description = node.file.active
+            ? vscode.l10n.t('active definition')
+            : node.file.category ?? '';
         item.tooltip = `${node.file.logicalPath}\n${node.file.uri}`;
         item.contextValue = node.file.active ? 'paradoxcode.activeFile' : 'paradoxcode.loadedFile';
         item.iconPath = new vscode.ThemeIcon(node.file.active ? 'file-code' : 'file');
         item.command = {
             command: 'vscode.open',
-            title: 'Open Loaded File',
+            title: vscode.l10n.t('Open Loaded File'),
             arguments: [vscode.Uri.parse(node.file.uri)],
         };
         return item;

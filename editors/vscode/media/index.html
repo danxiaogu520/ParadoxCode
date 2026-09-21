@@ -6,30 +6,31 @@
           content="default-src 'none'; style-src {{cspSource}}; script-src {{cspSource}}; img-src data:; connect-src 'none';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{styleUri}}">
-    <title>Mission Tree Preview</title>
+    <title data-i18n="panelTitle">Mission Tree Preview</title>
 </head>
 <body>
-    <header class="toolbar" aria-label="Mission preview controls">
-        <button id="fit" type="button" title="Fit mission tree (F)">Fit</button>
-        <button id="zoom-out" type="button" title="Zoom out (-)">−</button>
-        <button id="zoom-in" type="button" title="Zoom in (+)">+</button>
+    <header class="toolbar" data-i18n-aria-label="toolbarAria" aria-label="Mission preview controls">
+        <button id="fit" type="button" data-i18n="fit" data-i18n-title="fitTitle" title="Fit mission tree (F)">Fit</button>
+        <button id="zoom-out" type="button" data-i18n-title="zoomOutTitle" title="Zoom out (-)">−</button>
+        <button id="zoom-in" type="button" data-i18n-title="zoomInTitle" title="Zoom in (+)">+</button>
         <div class="search">
-            <input id="search" type="text" placeholder="Search missions…"
+            <input id="search" type="text" data-i18n-placeholder="searchPlaceholder" data-i18n-aria-label="searchAria"
+                   placeholder="Search missions…"
                    aria-label="Search missions by title or id" autocomplete="off" spellcheck="false">
-            <div id="search-results" role="list" aria-label="Matching missions"></div>
+            <div id="search-results" role="list" data-i18n-aria-label="resultsAria" aria-label="Matching missions"></div>
         </div>
         <details id="series-list" class="series-list">
-            <summary id="series-summary">Series</summary>
+            <summary id="series-summary" data-i18n="series">Series</summary>
             <div class="series-content">
-                <div id="series-entries" role="list" aria-label="Mission series visibility"></div>
+                <div id="series-entries" role="list" data-i18n-aria-label="seriesAria" aria-label="Mission series visibility"></div>
                 <div class="series-actions">
-                    <button id="series-all" type="button">All</button>
-                    <button id="series-none" type="button">None</button>
+                    <button id="series-all" type="button" data-i18n="all">All</button>
+                    <button id="series-none" type="button" data-i18n="none">None</button>
                 </div>
             </div>
         </details>
     </header>
-    <canvas id="tree" tabindex="0" role="img" aria-label="Mission tree preview"></canvas>
+    <canvas id="tree" tabindex="0" role="img" data-i18n-aria-label="canvasAria" aria-label="Mission tree preview"></canvas>
     <div id="tooltip" class="tooltip" role="tooltip" aria-hidden="true"></div>
     <div id="status" class="status" role="status" aria-live="polite"></div>
     <script src="{{locFormatUri}}"></script>
