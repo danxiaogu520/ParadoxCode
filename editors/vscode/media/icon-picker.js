@@ -17,6 +17,57 @@
     /** Tiles appended per animation frame while building a large grid. */
     const RENDER_CHUNK = 400;
 
+    // English fallback table; the extension host sends the real dictionary
+    // (matching the current UI language) as the first message, before the
+    // catalog can paint visible text. Keys must mirror the table in
+    // src/webviewI18n.ts (the contract test enforces the pairing).
+
+    const DEFAULT_STRINGS = {
+        panelTitle: 'Mission Icons',
+        toolbarAria: 'Mission icon picker controls',
+        searchPlaceholder: 'Search icons…',
+        searchAria: 'Search icons by sprite name',
+        tabsAria: 'Sprite scope',
+        tabMission: 'Mission icons',
+        tabAll: 'All sprites',
+        gridAria: 'Sprite tiles',
+        hint: 'Click a tile to write it into the focused editor and close this panel.',
+        copy: 'copy',
+        copyTitle: 'Copy "{0}"',
+        frames: '{0} frames',
+        countAll: '{0} sprites',
+        countFiltered: '{0} / {1} sprites',
+        waiting: 'Waiting for the sprite catalog…',
+        noMatch: 'No sprites match the current search and tab.',
+        originVanilla: 'vanilla',
+        originMod: 'mod',
+    };
+
+    const strings = { ...DEFAULT_STRINGS };
+
+    function t(key, ...args) {
+        const template = strings[key] ?? DEFAULT_STRINGS[key] ?? key;
+        return template.replace(/\{(\d+)\}/g, (match, index) => (
+            index < args.length ? String(args[index]) : match
+        ));
+    }
+
+    function applyStaticStrings() {
+        document.title = t('panelTitle');
+        for (const element of document.querySelectorAll('[data-i18n]')) {
+            element.textContent = t(element.dataset.i18n);
+        }
+        for (const element of document.querySelectorAll('[data-i18n-title]')) {
+            element.title = t(element.dataset.i18nTitle);
+        }
+        for (const element of document.querySelectorAll('[data-i18n-placeholder]')) {
+            element.placeholder = t(element.dataset.i18nPlaceholder);
+        }
+        for (const element of document.querySelectorAll('[data-i18n-aria-label]')) {
+            element.setAttribute('aria-label', t(element.dataset.i18nAriaLabel));
+        }
+    }
+
     const sprites = [];
     /** Sprite names with an image request in flight -> the awaiting <img>. */
     const pendingImages = new Map();
@@ -83,18 +134,18 @@
         badges.className = 'badges';
         const origin = document.createElement('span');
         origin.className = 'badge';
-        origin.textContent = sprite.origin;
+        origin.textContent = sprite.origin === 'vanilla' ? t('originVanilla') : t('originMod');
         badges.appendChild(origin);
         if (sprite.frames !== undefined && sprite.frames > 1) {
             const frames = document.createElement('span');
             frames.className = 'badge';
-            frames.textContent = `${sprite.frames} frames`;
+            frames.textContent = t('frames', sprite.frames);
             badges.appendChild(frames);
         }
         const copy = document.createElement('span');
         copy.className = 'copy';
-        copy.textContent = 'copy';
-        copy.title = `Copy "${sprite.name}"`;
+        copy.textContent = t('copy');
+        copy.title = t('copyTitle', sprite.name);
         copy.addEventListener('click', (event) => {
             event.stopPropagation();
             vscode.postMessage({ type: 'copy', name: sprite.name });
@@ -124,12 +175,12 @@
         observer.disconnect();
         const filtered = sprites.filter(matches);
         count.textContent = filtered.length === sprites.length
-            ? `${filtered.length} sprites`
-            : `${filtered.length} / ${sprites.length} sprites`;
+            ? t('countAll', filtered.length)
+            : t('countFiltered', filtered.length, sprites.length);
         if (filtered.length === 0) {
             showMessage(sprites.length === 0
-                ? 'Waiting for the sprite catalog…'
-                : 'No sprites match the current search and tab.');
+                ? t('waiting')
+                : t('noMatch'));
             return;
         }
         messageBox.hidden = true;
@@ -201,6 +252,15 @@
     window.addEventListener('message', (event) => {
         const data = event.data;
         if (!data || typeof data !== 'object') {
+            return;
+        }
+        if (data.type === 'i18n') {
+            Object.assign(strings, data.strings);
+            document.documentElement.lang = data.language;
+            applyStaticStrings();
+            if (sprites.length > 0) {
+                render();
+            }
             return;
         }
         if (data.type === 'catalog') {
