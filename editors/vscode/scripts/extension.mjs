@@ -245,6 +245,7 @@ for (const command of [
   'paradoxcode.reloadServer',
   'paradoxcode.openOutput',
   'paradoxcode.exportDiagnostics',
+  'paradoxcode.openMissionIconPicker',
 ]) {
   if (!manifest.contributes.commands.some((entry) => entry.command === command)) {
     fail(`missing command ${command}`);
@@ -297,6 +298,17 @@ if (localisationGrammar.scopeName !== 'source.localisation'
 }
 if (localisationConfiguration.comments?.lineComment !== '#') {
   fail('Localisation language configuration must recognize # comments');
+}
+
+// Completion sprite previews are on unless opted out, like the hover previews.
+if (manifest.contributes.configuration?.properties?.['paradoxcode.completion.iconPreview']?.default !== true) {
+  fail('paradoxcode.completion.iconPreview must default to true');
+}
+// The mission-icon picker must be reachable from mission files directly.
+if (!manifest.contributes.menus?.['editor/title']?.some(
+  (entry) => entry.command === 'paradoxcode.openMissionIconPicker' && entry.when === 'paradoxcodeMissionFile',
+)) {
+  fail('the mission-icon picker needs an editor title button gated on mission files');
 }
 
 const previewSource = readFileSync(join(root, 'src', 'previewPanel.ts'), 'utf8');
@@ -356,6 +368,7 @@ const requiredSettings = [
   'paradoxcode.localisation.preferredLanguages',
   'paradoxcode.localisation.transparentEncoding',
   'paradoxcode.completion.sourceLayers',
+  'paradoxcode.completion.iconPreview',
   'paradoxcode.performance.profile',
 ];
 for (const setting of requiredSettings) {
@@ -454,6 +467,31 @@ for (const marker of [
 ]) {
   if (!rendererSource.includes(marker)) {
     fail(`Preview UX marker missing: ${marker}`);
+  }
+}
+
+// Icon-picker reliability markers: insertion goes through the tested pure
+// span helper, a click writes and closes, and the webview streams pixels
+// lazily instead of decoding the whole catalog up front.
+const pickerSource = readFileSync(join(root, 'src', 'iconPickerPanel.ts'), 'utf8');
+for (const marker of [
+  'iconValueSpanAt',
+  'editor.document.languageId !== \'eu4\'',
+  'MissionIconPickerPanel.dispose();',
+  'spriteIconUrls',
+]) {
+  if (!pickerSource.includes(marker)) {
+    fail(`Icon picker marker missing: ${marker}`);
+  }
+}
+const pickerWebviewSource = readFileSync(join(root, 'media', 'icon-picker.js'), 'utf8');
+for (const marker of [
+  'IntersectionObserver',
+  'requestImages',
+  '{ type: \'insert\', name',
+]) {
+  if (!pickerWebviewSource.includes(marker)) {
+    fail(`Icon picker webview marker missing: ${marker}`);
   }
 }
 for (const relative of ['README.md', 'package.nls.json', 'package.nls.zh-cn.json', 'media/getting-started.md', 'LICENSE']) {

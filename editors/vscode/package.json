@@ -869,6 +869,12 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "paradoxcode.openMissionIconPicker",
+        "title": "%commands.openMissionIconPicker.title%",
+        "category": "ParadoxCode",
+        "icon": "$(symbol-icon)"
+      },
+      {
         "command": "paradoxcode.installServer",
         "title": "%commands.installServer.title%",
         "category": "ParadoxCode"
@@ -983,6 +989,11 @@
           "group": "navigation@2"
         },
         {
+          "command": "paradoxcode.openMissionIconPicker",
+          "when": "paradoxcodeMissionFile",
+          "group": "navigation@3"
+        },
+        {
           "command": "paradoxcode.localisation.openDecoded",
           "when": "resourceScheme == file && resourceFilename =~ /\\.(yml|txt)$/ && paradoxcode.transcodeEligible",
           "group": "navigation@3"
@@ -1030,6 +1041,11 @@
           "command": "paradoxcode.localisation.openDecoded",
           "when": "resourceScheme == file && resourceFilename =~ /\\.(yml|txt)$/ && paradoxcode.transcodeEligible",
           "group": "paradoxcode@1"
+        },
+        {
+          "command": "paradoxcode.openMissionIconPicker",
+          "when": "paradoxcodeMissionFile",
+          "group": "paradoxcode@2"
         }
       ],
       "explorer/context": [
@@ -1238,6 +1254,11 @@
             "vanilla"
           ],
           "markdownDescription": "%configuration.completion.sourceLayers.description%"
+        },
+        "paradoxcode.completion.iconPreview": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%configuration.completion.iconPreview.description%"
         },
         "paradoxcode.performance.profile": {
           "type": "string",

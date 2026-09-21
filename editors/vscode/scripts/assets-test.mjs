@@ -1,5 +1,7 @@
-// Contract test for the extension-host game asset pipeline (src/gameAssets.ts)
-// and the hover texture preview assembly (src/hoverTextures.ts).
+// Contract test for the extension-host game asset pipeline (src/gameAssets.ts),
+// the hover texture preview assembly (src/hoverTextures.ts), the mission-icon
+// picker insertion helpers (src/iconPickerInsert.ts), and the completion
+// sprite-preview documentation (src/completionMiddleware.ts).
 //
 // The DDS decoder cases are ports of the former Rust suite
 // (crates/game/src/eu4/mission/texture/dds.rs); TGA, BMFont, and the sprite
@@ -945,6 +947,177 @@ function tgaHeader(width, height, bpp, descriptor) {
     } finally {
         rmSync(gameRoot, { recursive: true, force: true });
     }
+}
+
+// --- mission icon filter + first-frame crop ----------------------------------------
+
+{
+    // Both arms of the union: name prefix alone, texture directory alone
+    // (base-game icons live outside missionicons_*.gfx), both, neither.
+    assert.equal(assets.isMissionIconSprite({ name: 'mission_conquer_sindh', textureFile: 'gfx/interface/x.dds' }), true);
+    assert.equal(assets.isMissionIconSprite({ name: 'gain_mana', textureFile: 'gfx/interface/missions/base.dds' }), true);
+    assert.equal(assets.isMissionIconSprite({ name: 'Mission_Gain_Mana', textureFile: 'GFX/Interface/Missions/base.dds' }), true);
+    assert.equal(assets.isMissionIconSprite({ name: 'GFX_mission_settings_button', textureFile: 'gfx/interface/mission_settings_button.dds' }), false);
+    assert.equal(assets.isMissionIconSprite({ name: 'gain_mana', textureFile: 'gfx/interface/other.dds' }), false);
+
+    const strip = { width: 4, height: 1, pixels: Uint8Array.from([1, 1, 1, 255, 2, 2, 2, 255, 3, 3, 3, 255, 4, 4, 4, 255]) };
+    const first = assets.cropFirstFrame(strip, 2);
+    assert.equal(first.width, 2);
+    assert.deepEqual([...first.pixels], [1, 1, 1, 255, 2, 2, 2, 255]);
+    // Degenerate declarations keep the image unchanged.
+    assert.equal(assets.cropFirstFrame(strip, 1), strip);
+    assert.equal(assets.cropFirstFrame(strip), strip);
+    assert.equal(assets.cropFirstFrame(strip, 99), strip);
+}
+
+// --- GameAssetStore catalog + icon previews (picker grid) ---------------------------
+
+{
+    const gameRoot = mkdtempSync(join(tmpdir(), 'pdc-icon-game-'));
+    const modRoot = mkdtempSync(join(tmpdir(), 'pdc-icon-mod-'));
+    try {
+        mkdirSync(join(gameRoot, 'interface'), { recursive: true });
+        mkdirSync(join(gameRoot, 'gfx', 'interface', 'missions'), { recursive: true });
+        mkdirSync(join(gameRoot, 'gfx', 'interface'), { recursive: true });
+        writeFileSync(
+            join(gameRoot, 'interface', 'missionicons_test.gfx'),
+            'spriteTypes = {'
+                + ' spriteType = { name = "mission_base" texturefile = "gfx//interface//missions//base.dds" }'
+                + ' spriteType = { name = "gain_mana" texturefile = "gfx/interface/missions/mana.dds" }'
+                + ' spriteType = { name = "ui_button" texturefile = "gfx/interface/button.dds" }'
+                + ' }',
+        );
+        const red = withData(ddsHeader(2, 1, 0x40 | DDPF_ALPHAPIXELS, null), [0, 0, 255, 255, 0, 255, 0, 255]);
+        writeFileSync(join(gameRoot, 'gfx', 'interface', 'missions', 'base.dds'), red);
+        writeFileSync(join(gameRoot, 'gfx', 'interface', 'missions', 'mana.dds'), red);
+        writeFileSync(join(gameRoot, 'gfx', 'interface', 'button.dds'), red);
+
+        // The mod overrides one vanilla icon (declared with a frame strip) and
+        // adds a mission icon of its own with a custom texture directory.
+        mkdirSync(join(modRoot, 'interface'), { recursive: true });
+        mkdirSync(join(modRoot, 'gfx', 'interface', 'missions'), { recursive: true });
+        writeFileSync(
+            join(modRoot, 'interface', 'mod.gfx'),
+            'spriteTypes = {'
+                + ' spriteType = { name = "mission_base" texturefile = "gfx/interface/missions/base.dds" noOfFrames = 2 }'
+                + ' spriteType = { name = "mission_custom" texturefile = "gfx/interface/custom_icon.dds" }'
+                + ' }',
+        );
+        const green = withData(
+            ddsHeader(4, 1, 0x40 | DDPF_ALPHAPIXELS, null),
+            [0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255],
+        );
+        writeFileSync(join(modRoot, 'gfx', 'interface', 'missions', 'base.dds'), green);
+
+        const store = new assets.GameAssetStore(gameRoot, undefined, [modRoot]);
+        const catalog = store.spriteCatalog();
+        // Origins: mod definitions replace vanilla ones by name; untouched
+        // vanilla sprites keep the vanilla badge.
+        assert.equal(catalog.get('mission_base')?.origin, 'mod');
+        assert.equal(catalog.get('mission_base')?.frames, 2);
+        assert.equal(catalog.get('gain_mana')?.origin, 'vanilla');
+        assert.equal(catalog.get('ui_button')?.origin, 'vanilla');
+        assert.equal(catalog.get('mission_custom')?.origin, 'mod');
+        // The mission filter selects the union: name prefix or missions
+        // texture directory, vanilla or mod alike.
+        const missions = [...catalog.values()].filter(assets.isMissionIconSprite).map((entry) => entry.name).sort();
+        assert.deepEqual(missions, ['gain_mana', 'mission_base', 'mission_custom']);
+
+        // Icon previews are first frames: the mod override is a 4x1 strip with
+        // noOfFrames = 2, so its preview is the left 2x1 half.
+        const previews = await store.spriteIconUrls(['mission_base', 'ui_button', 'absent']);
+        assert.ok(previews.mission_base?.url.startsWith('data:image/png;base64,'));
+        assert.equal(previews.mission_base?.width, 2);
+        assert.equal(previews.mission_base?.height, 1);
+        assert.equal(previews.ui_button?.width, 2);
+        assert.equal(previews.absent, undefined);
+        // Same caching contract as spriteUrls: warm fetches ship nothing new
+        // unless forced (a rebuilt picker webview).
+        assert.deepEqual(await store.spriteIconUrls(['mission_base']), {});
+        const forced = await store.spriteIconUrls(['mission_base'], new Set(['mission_base']));
+        assert.ok(forced.mission_base?.url.startsWith('data:image/png;base64,'));
+        assert.deepEqual(await new assets.GameAssetStore(undefined, undefined).spriteIconUrls(['mission_base']), {});
+    } finally {
+        rmSync(gameRoot, { recursive: true, force: true });
+        rmSync(modRoot, { recursive: true, force: true });
+    }
+}
+
+// --- icon value location (picker insertion) -----------------------------------------
+
+{
+    const insert = require(join(scriptDir, '..', 'out', 'iconPickerInsert.js'));
+    // Bare value, cursor inside: the span covers exactly the token.
+    assert.deepEqual(insert.iconValueSpanAt('\ticon = mission_x', 15, 3), { line: 3, start: 8, end: 17 });
+    assert.deepEqual(insert.iconValueSpanAt('icon=mission_x', 8, 0), { line: 0, start: 5, end: 14 });
+    // Quoted value: the span excludes the quotes, matching texturefileValueAt.
+    assert.deepEqual(insert.iconValueSpanAt('icon = "mission_x"', 12, 1), { line: 1, start: 8, end: 17 });
+    // Trailing comments are not part of a bare value.
+    assert.deepEqual(insert.iconValueSpanAt('icon = mission_x # conquest', 12, 2), { line: 2, start: 7, end: 16 });
+    // Cursor one past the end still binds (the caret sits after the token).
+    assert.deepEqual(insert.iconValueSpanAt('\ticon = mission_x', 17, 0), { line: 0, start: 8, end: 17 });
+    // Cursor before the value, on another key, or on an empty assignment: no span.
+    assert.equal(insert.iconValueSpanAt('icon = mission_x', 6, 0), undefined);
+    assert.equal(insert.iconValueSpanAt('picture = mission_x', 12, 0), undefined);
+    assert.equal(insert.iconValueSpanAt('icon =', 6, 0), undefined);
+    assert.equal(insert.iconValueSpanAt('icons = mission_x', 12, 0), undefined);
+    // Unclosed quote: no span (the value is not a well-formed token).
+    assert.equal(insert.iconValueSpanAt('icon = "mission_x', 12, 0), undefined);
+}
+
+// --- completion documentation sprite previews ---------------------------------------
+
+{
+    const middleware = require(join(scriptDir, '..', 'out', 'completionMiddleware.js'));
+    const preview = { url: 'data:image/png;base64,AAA', width: 64, height: 64 };
+    const wide = { url: 'data:image/png;base64,AAA', width: 512, height: 512 };
+    // Server documentation is a plain string: the image is appended as markdown.
+    assert.deepEqual(middleware.mergeSpritePreviewDocumentation('symbol type `sprite`', 'mission_x', preview), {
+        kind: 'markdown',
+        value: 'symbol type `sprite`\n\n![mission_x](data:image/png;base64,AAA)',
+    });
+    // Existing markdown documentation is preserved and extended.
+    assert.equal(
+        middleware.mergeSpritePreviewDocumentation({ kind: 'markdown', value: 'doc' }, 'mission_x', preview).value,
+        'doc\n\n![mission_x](data:image/png;base64,AAA)',
+    );
+    // Plaintext is fenced so the switch to markdown cannot reformat it.
+    assert.equal(
+        middleware.mergeSpritePreviewDocumentation({ kind: 'plaintext', value: 'a *b* c' }, 'mission_x', preview).value,
+        '```\na *b* c\n```\n\n![mission_x](data:image/png;base64,AAA)',
+    );
+    // Missing documentation yields the image alone; wide sprites scale down.
+    assert.equal(
+        middleware.mergeSpritePreviewDocumentation(undefined, 'mission_x', preview).value,
+        '![mission_x](data:image/png;base64,AAA)',
+    );
+    assert.equal(
+        middleware.mergeSpritePreviewDocumentation(undefined, 'mission_x', wide).value,
+        '![mission_x](data:image/png;base64,AAA|width=128)',
+    );
+
+    // attachSpritePreviewDocumentation mutates only items whose label is a
+    // sprite with a decodable texture; everything else is left untouched.
+    const source = {
+        spriteTexture: (name) => (name === 'mission_x' ? { name, textureFile: 'gfx/interface/missions/x.dds' } : undefined),
+        spriteIconUrls: async (names) => (names.includes('mission_x') ? { mission_x: preview } : {}),
+    };
+    const hit = { label: 'mission_x', documentation: 'doc' };
+    await middleware.attachSpritePreviewDocumentation(hit, source);
+    assert.equal(hit.documentation.kind, 'markdown');
+    const miss = { label: 'not_a_sprite', documentation: 'doc' };
+    await middleware.attachSpritePreviewDocumentation(miss, source);
+    assert.equal(miss.documentation, 'doc');
+    const objectLabel = { label: { label: 'mission_x', description: 'x' } };
+    await middleware.attachSpritePreviewDocumentation(objectLabel, source);
+    assert.equal(objectLabel.documentation, undefined);
+    const undecodable = { label: 'mission_x', documentation: 'doc' };
+    const broken = {
+        spriteTexture: () => ({ name: 'mission_x', textureFile: 'gfx/interface/x.dds' }),
+        spriteIconUrls: async () => ({}),
+    };
+    await middleware.attachSpritePreviewDocumentation(undecodable, broken);
+    assert.equal(undecodable.documentation, 'doc');
 }
 
 console.log('assets contract OK');
