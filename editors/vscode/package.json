@@ -958,10 +958,16 @@
         "category": "ParadoxCode"
       },
       {
-        "command": "paradoxcode.localisation.transcodeFile",
-        "title": "%commands.localisation.transcodeFile.title%",
+        "command": "paradoxcode.localisation.encodeFile",
+        "title": "%commands.localisation.encodeFile.title%",
         "category": "ParadoxCode",
         "icon": "$(encode)"
+      },
+      {
+        "command": "paradoxcode.localisation.decodeFile",
+        "title": "%commands.localisation.decodeFile.title%",
+        "category": "ParadoxCode",
+        "icon": "$(eye)"
       }
     ],
     "menus": {
@@ -995,6 +1001,14 @@
         {
           "command": "paradoxcode.localisation.endPeek",
           "when": "paradoxcode.peekingRaw"
+        },
+        {
+          "command": "paradoxcode.localisation.encodeFile",
+          "when": "config.paradoxcode.localisation.transparentEncoding == false"
+        },
+        {
+          "command": "paradoxcode.localisation.decodeFile",
+          "when": "config.paradoxcode.localisation.transparentEncoding == false"
         }
       ],
       "keybindings": [
@@ -1025,9 +1039,14 @@
           "group": "paradoxcode@1"
         },
         {
-          "command": "paradoxcode.localisation.transcodeFile",
-          "when": "explorerResourceIsFolder == false",
+          "command": "paradoxcode.localisation.encodeFile",
+          "when": "config.paradoxcode.localisation.transparentEncoding == false && explorerResourceIsFolder == false",
           "group": "paradoxcode@2"
+        },
+        {
+          "command": "paradoxcode.localisation.decodeFile",
+          "when": "config.paradoxcode.localisation.transparentEncoding == false && explorerResourceIsFolder == false",
+          "group": "paradoxcode@3"
         }
       ]
     },
@@ -1301,11 +1320,6 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "%configuration.localisation.transparentEncoding.description%"
-        },
-        "paradoxcode.localisation.autoOpenDecoded": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "%configuration.localisation.autoOpenDecoded.description%"
         },
         "paradoxcode.localisation.transparentScriptGlobs": {
           "type": "array",
