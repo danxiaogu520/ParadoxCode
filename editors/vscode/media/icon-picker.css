@@ -1,0 +1,158 @@
+/* Mission-icon picker webview styles: VS Code theme variables only. */
+
+body {
+    margin: 0;
+    padding: 0 12px 12px;
+    color: var(--vscode-editor-foreground);
+    background: var(--vscode-editor-background);
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size, 13px);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    box-sizing: border-box;
+}
+
+.picker-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    flex-wrap: wrap;
+}
+
+#search {
+    flex: 1 1 220px;
+    min-width: 160px;
+    padding: 4px 8px;
+    color: var(--vscode-input-foreground);
+    background: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border, transparent);
+    border-radius: 2px;
+    outline: none;
+}
+
+#search:focus {
+    border-color: var(--vscode-focusBorder);
+}
+
+.tabs {
+    display: flex;
+    gap: 4px;
+}
+
+.tab {
+    padding: 4px 10px;
+    color: var(--vscode-button-foreground);
+    background: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.tab[aria-selected="true"] {
+    background: var(--vscode-button-background);
+}
+
+.count {
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+}
+
+.grid {
+    flex: 1;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 8px;
+    align-content: start;
+    padding: 4px 2px;
+}
+
+.tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 6px;
+    border: 1px solid var(--vscode-panel-border, transparent);
+    border-radius: 4px;
+    background: var(--vscode-editorWidget-background, transparent);
+    cursor: pointer;
+    text-align: center;
+    /* Keep thousands of offscreen tiles cheap to keep in the DOM. */
+    content-visibility: auto;
+    contain-intrinsic-size: 128px;
+}
+
+.tile:hover,
+.tile:focus-visible {
+    border-color: var(--vscode-focusBorder);
+    outline: none;
+}
+
+.tile .art {
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tile img {
+    max-width: 56px;
+    max-height: 56px;
+    image-rendering: auto;
+}
+
+.tile .name {
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 11px;
+    line-height: 1.2;
+    word-break: break-all;
+    max-height: 2.4em;
+    overflow: hidden;
+}
+
+.tile .badges {
+    display: flex;
+    gap: 4px;
+    font-size: 10px;
+}
+
+.badge {
+    padding: 0 4px;
+    border-radius: 2px;
+    color: var(--vscode-badge-foreground);
+    background: var(--vscode-badge-background);
+}
+
+.badge.missing {
+    background: var(--vscode-inputValidation-errorBorder, var(--vscode-badge-background));
+}
+
+.copy {
+    border: none;
+    background: none;
+    color: var(--vscode-descriptionForeground);
+    font-size: 10px;
+    cursor: pointer;
+    padding: 0;
+}
+
+.copy:hover {
+    color: var(--vscode-foreground);
+    text-decoration: underline;
+}
+
+.message {
+    padding: 24px;
+    color: var(--vscode-descriptionForeground);
+    text-align: center;
+}
+
+.hint {
+    margin: 4px 0 0;
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+}
