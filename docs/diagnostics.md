@@ -140,9 +140,10 @@ on a country, for example). The `expected:` line lists the valid scopes.
 The server no longer publishes this code: raw localisation documents carry
 no LSP diagnostics at all (see the note at the top), which retired the old
 release-path check for readable CJK under `localisation/…/replace/…`.
-Transcode release-tree files deliberately (`ParadoxCode: Transcode Localisation
-File`) or keep readable sources in the master tree outside `replace/`. The
-decoded-view provider no longer attaches it either: a `pdcloc://` view over
+Transcode release-tree files deliberately (**ParadoxCode: Encode File (EU4dll
+Escape Form)**, available with `transparentEncoding` turned off) or keep
+readable sources in the master tree outside `replace/`. The decoded-view
+provider no longer attaches it either: a `pdcloc://` view over
 readable bytes now carries the informational `LocalisationWillTranscodeOnSave`
 hint instead, because quoted CJK is escape-encoded on the next save.
 

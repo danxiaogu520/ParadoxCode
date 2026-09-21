@@ -79,14 +79,14 @@
   "commands.localisation.revealOriginal.title": "Open the Raw Transcoded File",
   "commands.localisation.peekOriginal.title": "Peek at the Raw Transcoded Form",
   "commands.localisation.endPeek.title": "Back to the Decoded View",
-  "commands.localisation.transcodeFile.title": "Transcode Localisation File",
-  "configuration.localisation.transparentEncoding.description": "Enable the `pdcloc://` transparent read/write view over EU4dll-transcoded files. Eligible localisation yml and script files can open as readable Chinese, and saving the decoded view re-encodes the on-disk escaped form.",
-  "configuration.localisation.autoOpenDecoded.description": "Automatically open every eligible file (localisation yml or the configured script globs) in the decoded view, taking over the raw tab. Plain readable files pass through unchanged; quoted CJK is escape-encoded on save.",
+  "configuration.localisation.transparentEncoding.description": "Master switch for the transparent EU4dll pipeline. On: eligible files open in the decoded view and saves escape-encode quoted strings automatically (scoped form). Off: nothing automatic — the manual Encode File / Decode File commands become available.",
   "configuration.localisation.transparentScriptGlobs.description": "Workspace-relative glob patterns of script files eligible for the transparent decoded view (paratranz `latin1eu4` profile). Eligible files open in the decoded view whatever their current bytes look like — readable text passes through, escaped strings decode. Default: `**/*.txt`.",
   "chatParticipant.paradox.description": "EU4 modding assistant backed by the ParadoxCode language server: validates drafted files, searches symbols, rules, and localisation.",
   "chatParticipant.paradox.command.validate": "Validate the active editor file against the EU4 rules",
   "chatParticipant.paradox.command.symbols": "Search indexed symbols (query as argument)",
   "chatParticipant.paradox.command.rules": "Search the rule database (context= key= scope= filters)",
   "chatParticipant.paradox.command.loc": "Address localisation (key=, text=, or prefix= family listing)",
-  "chatParticipant.paradox.command.hover": "Look up hover semantics at the cursor"
+  "chatParticipant.paradox.command.hover": "Look up hover semantics at the cursor",
+  "commands.localisation.encodeFile.title": "Encode File (EU4dll Escape Form)",
+  "commands.localisation.decodeFile.title": "Decode File (Readable Text)"
 }
