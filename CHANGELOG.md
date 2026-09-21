@@ -42,6 +42,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   readable and escaped strings alike); the TypeScript twin mirrors all of it, pinned by 9,760
   new differential vectors (84,309 total) and a golden-corpus property — a master whose CJK
   lives entirely inside strings scope-encodes byte-identical to the whole-file release.
+- Manual one-shot transcoding commands for when the transparent pipeline is off:
+  **Encode File (EU4dll Escape Form)** rewrites a readable eligible file in the scoped escaped
+  form and **Decode File (Readable Text)** rewrites an escaped one (legacy whole-file or scoped)
+  as readable UTF-8. Both write a `.pre-transcode.bak` backup next to the file first, refuse
+  when an editor holds unsaved changes for it, and appear in the palette and Explorer context
+  menu only while `paradoxcode.localisation.transparentEncoding` is `false`.
 
 ### Changed
 
@@ -67,6 +73,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   is closed. Raw views opened deliberately (revealOriginal, an active peek) are immune to the
   automatic redirect until their tab closes, and invisible programmatic document opens no longer
   trigger a redirect at all — only the editor the user is actually looking at is taken over.
+
+- `paradoxcode.localisation.transparentEncoding` is now the single master switch: on, the full
+  transparent pipeline runs (decoded views, path-based takeover, save-time scoped encoding); off,
+  nothing automatic happens and only the manual Encode/Decode commands remain. The separate
+  `paradoxcode.localisation.autoOpenDecoded` setting is gone — its behaviour is exactly the
+  master switch being on. The one-shot `Transcode Localisation File` command was absorbed into
+  **Encode File (EU4dll Escape Form)**, now writing the scoped form with the same
+  `.pre-transcode.bak` backup.
 
 - Entry to the decoded view is now path-based rather than content-based: every eligible file
   (localisation yml or `transparentScriptGlobs`) opens through its `pdcloc://` twin and takes

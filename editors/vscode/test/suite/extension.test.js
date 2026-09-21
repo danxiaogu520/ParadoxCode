@@ -111,7 +111,7 @@ suite('ParadoxCode VS Code extension host', () => {
       assert.equal(config.get('hover.eventCard'), true);
       assert.deepEqual(config.get('diagnostics.severityOverrides'), {});
       assert.deepEqual(config.get('localisation.preferredLanguages'), []);
-      assert.equal(config.get('localisation.autoOpenDecoded'), true);
+      assert.equal(config.get('localisation.transparentEncoding'), true);
       assert.deepEqual(config.get('completion.sourceLayers'), [
         'project',
         'dependencies',

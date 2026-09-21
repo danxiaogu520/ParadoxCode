@@ -564,69 +564,188 @@ async function endPeek(foreground = true): Promise<void> {
     restoreLine(editor, line);
 }
 
+/** Whether the transparent pipeline (pdcloc:// views, automatic redirection) is enabled. */
+function transparentEncodingEnabled(): boolean {
+    return vscode.workspace
+        .getConfiguration('paradoxcode.localisation')
+        .get<boolean>('transparentEncoding', true);
+}
+
+/** Whether an open editor — raw or decoded view — holds unsaved changes for `real`. */
+function hasDirtyDocument(real: vscode.Uri): boolean {
+    const raw = real.toString();
+    const twin = decodedUriOf(real).toString();
+    return vscode.workspace.textDocuments.some(
+        (document) =>
+            document.isDirty && (document.uri.toString() === raw || document.uri.toString() === twin),
+    );
+}
+
+/** Shared guards for the manual one-shot commands: they need a target, a disabled
+ * transparent pipeline (the master switch), an in-scope path, and no unsaved
+ * editor for that file — both commands rewrite the file on disk. */
+async function manualCommandTarget(
+    verb: string,
+    uri: vscode.Uri | undefined,
+): Promise<vscode.Uri | undefined> {
+    const real = commandResource(uri);
+    if (!real || real.scheme !== 'file') {
+        void vscode.window.showErrorMessage(`ParadoxCode: select a file to ${verb} first.`);
+        return undefined;
+    }
+    if (transparentEncodingEnabled()) {
+        void vscode.window.showInformationMessage(
+            'ParadoxCode: transparent encoding is on — saves already encode automatically. ' +
+                'Turn paradoxcode.localisation.transparentEncoding off to transcode by hand.',
+        );
+        return undefined;
+    }
+    if (profileForRealPath(real.fsPath, transparentScriptGlobs()) === undefined) {
+        void vscode.window.showErrorMessage(
+            'ParadoxCode: this file is not in the transcoding scope ' +
+                '(localisation/**/*.yml or paradoxcode.localisation.transparentScriptGlobs).',
+        );
+        return undefined;
+    }
+    if (hasDirtyDocument(real)) {
+        void vscode.window.showErrorMessage(
+            `ParadoxCode: save or close the editor for this file first — ${verb}ing rewrites it on disk.`,
+        );
+        return undefined;
+    }
+    return real;
+}
+
 /**
- * Explicitly encodes a readable (master-copy) file into the on-disk escaped
- * form — the one-shot converter for files that live on the game read path but
- * were authored or pasted as readable CJK. The original is backed up next to
- * the file first.
+ * Manual one-shot encode, the counterpart of the automatic pipeline: a
+ * readable eligible file is rewritten in the scoped escaped form — triples
+ * inside quoted strings only, comments and code as readable UTF-8. The
+ * original is backed up next to the file first.
  */
-async function transcodeFile(
+async function encodeFileManually(
     transcoder: Transcoder,
     uri: vscode.Uri | undefined,
     log: vscode.OutputChannel,
 ): Promise<void> {
-    const real = commandResource(uri);
-    if (!real || real.scheme !== 'file') {
-        void vscode.window.showErrorMessage('ParadoxCode: select a file to transcode first.');
+    const real = await manualCommandTarget('encode', uri);
+    if (!real) {
         return;
     }
     const profile = profileForRealPath(real.fsPath, transparentScriptGlobs());
     if (profile === undefined) {
-        void vscode.window.showErrorMessage(
-            'ParadoxCode: this file is not in the transparent-encoding scope ' +
-                '(localisation/**/*.yml or paradoxcode.localisation.transparentScriptGlobs).',
-        );
         return;
     }
     const bytes = new Uint8Array(await fs.readFile(real.fsPath));
-    const classification = transcoder.classify(bytes, profile);
-    if (classification === 'escaped') {
-        void vscode.window.showInformationMessage(
-            'ParadoxCode: file is already transcoded.',
-        );
+    const form = transcoder.scopedClassify(bytes, profile);
+    if (form === 'whole' || form === 'scoped') {
+        void vscode.window.showInformationMessage('ParadoxCode: file is already encoded.');
         return;
     }
-    if (classification !== 'readable' && classification !== 'ascii') {
+    if (form === 'damaged') {
         void vscode.window.showErrorMessage(
-            'ParadoxCode: file mixes readable and escaped content; fix it manually before transcoding.',
+            'ParadoxCode: stray escape marker(s) outside every quoted string — fix the file manually first.',
         );
         return;
     }
-    const encoded = transcoder.encode(bytes, profile);
+    let encoded: ScopedEncodeResult;
+    try {
+        encoded = transcoder.scopedEncode(bytes, profile);
+    } catch {
+        void vscode.window.showErrorMessage(
+            'ParadoxCode: refused to encode — the file is not valid UTF-8 (convert it first).',
+        );
+        return;
+    }
+    if ('alreadyEscaped' in encoded) {
+        void vscode.window.showErrorMessage(
+            `ParadoxCode: refused to encode — ${encoded.alreadyEscaped.length} escape marker(s) already sit inside quoted strings.`,
+        );
+        return;
+    }
     if ('unencodable' in encoded) {
         const points = encoded.unencodable
             .map((point) => formatCodePoint(point.codePoint))
             .slice(0, 8)
             .join(', ');
         void vscode.window.showErrorMessage(
-            `ParadoxCode: refused to transcode — ${encoded.unencodable.length} unencodable code point(s) (${points}).`,
+            `ParadoxCode: refused to encode — ${encoded.unencodable.length} unencodable code point(s) inside strings (${points}).`,
         );
         return;
     }
     const backup = `${real.fsPath}.pre-transcode.bak`;
     await fs.copyFile(real.fsPath, backup);
     await fs.writeFile(real.fsPath, encoded.bytes);
-    log.appendLine(`transparentLoc: transcoded ${real.fsPath} (backup: ${backup})`);
+    log.appendLine(`transparentLoc: encoded ${real.fsPath} (backup: ${backup})`);
     void vscode.window.showInformationMessage(
-        `ParadoxCode: transcoded ${nodePath.basename(real.fsPath)} (backup: ${nodePath.basename(backup)}).`,
+        `ParadoxCode: encoded ${nodePath.basename(real.fsPath)} in the scoped escape form (backup: ${nodePath.basename(backup)}).`,
     );
 }
 
-/** Whether opening an eligible raw file should automatically use its decoded twin. */
-function autoOpenDecoded(): boolean {
-    return vscode.workspace
-        .getConfiguration('paradoxcode.localisation')
-        .get<boolean>('autoOpenDecoded', true);
+/**
+ * Manual one-shot decode: an escaped eligible file — legacy whole-file or
+ * scoped form — is rewritten as readable UTF-8, with the same side-of-file
+ * backup. Plain and damaged files are refused with the reason instead of
+ * rewritten.
+ */
+async function decodeFileManually(
+    transcoder: Transcoder,
+    uri: vscode.Uri | undefined,
+    log: vscode.OutputChannel,
+): Promise<void> {
+    const real = await manualCommandTarget('decode', uri);
+    if (!real) {
+        return;
+    }
+    const profile = profileForRealPath(real.fsPath, transparentScriptGlobs());
+    if (profile === undefined) {
+        return;
+    }
+    const bytes = new Uint8Array(await fs.readFile(real.fsPath));
+    const form = transcoder.scopedClassify(bytes, profile);
+    if (form === 'plain') {
+        void vscode.window.showInformationMessage('ParadoxCode: file is already readable.');
+        return;
+    }
+    if (form === 'damaged') {
+        void vscode.window.showErrorMessage(
+            'ParadoxCode: stray escape marker(s) outside every quoted string — fix the file manually first.',
+        );
+        return;
+    }
+    let text: Uint8Array;
+    let orphans: number;
+    if (form === 'whole') {
+        const decoded = transcoder.decode(bytes, profile);
+        if (decoded === 'invalid-utf8') {
+            void vscode.window.showErrorMessage(
+                'ParadoxCode: an escaped localisation file must be valid UTF-8 — the bytes are damaged.',
+            );
+            return;
+        }
+        text = decoded.text;
+        orphans = decoded.broken;
+    } else {
+        const decoded = transcoder.scopedDecode(bytes, profile);
+        if (decoded === 'invalid-utf8') {
+            void vscode.window.showErrorMessage(
+                'ParadoxCode: an escaped localisation file must be valid UTF-8 — the bytes are damaged.',
+            );
+            return;
+        }
+        text = decoded.text;
+        orphans = decoded.inSpanBroken.length;
+    }
+    const backup = `${real.fsPath}.pre-transcode.bak`;
+    await fs.copyFile(real.fsPath, backup);
+    await fs.writeFile(real.fsPath, text);
+    log.appendLine(`transparentLoc: decoded ${real.fsPath} (backup: ${backup})`);
+    const note =
+        orphans > 0
+            ? ` — ${orphans} orphan marker(s) passed through undecoded, check damaged triples`
+            : '';
+    void vscode.window.showInformationMessage(
+        `ParadoxCode: decoded ${nodePath.basename(real.fsPath)} to readable text (backup: ${nodePath.basename(backup)})${note}.`,
+    );
 }
 
 const TRANSCODE_ELIGIBLE_CONTEXT = 'paradoxcode.transcodeEligible';
@@ -667,7 +786,7 @@ async function maybeAutoOpenDecodedView(
     document: vscode.TextDocument,
     opening: Set<string>,
 ): Promise<void> {
-    if (!autoOpenDecoded() || document.uri.scheme !== 'file') {
+    if (document.uri.scheme !== 'file') {
         return;
     }
     const key = document.uri.toString();
@@ -691,12 +810,13 @@ async function maybeAutoOpenDecodedView(
 }
 
 /**
- * Registers the whole transparent-localisation feature: the FileSystemProvider,
- * commands, status-bar indicator, and client-side classification diagnostics.
- * Controlled by `paradoxcode.localisation.transparentEncoding`; automatic
- * raw-to-decoded redirection is controlled separately by
- * `paradoxcode.localisation.autoOpenDecoded`. When the artifact is missing
- * the feature degrades to a log line, never an error.
+ * Registers the transparent-localisation feature. `transparentEncoding` is
+ * the master switch: on, the `pdcloc://` FileSystemProvider, decoded-view
+ * commands, automatic path-based redirection, the status-bar indicator, and
+ * save-time scoped encoding are all active; off, only the manual one-shot
+ * encode/decode commands remain (their menus hide through the same config
+ * check). When the artifact is missing the feature degrades to a log line,
+ * never an error.
  */
 export async function activateTransparentLocalisation(
     context: vscode.ExtensionContext,
@@ -731,8 +851,17 @@ export async function activateTransparentLocalisation(
 
     const openingDecodedViews = new Set<string>();
     const disposables: vscode.Disposable[] = [provider, statusItem, diagnostics];
-    const configuration = vscode.workspace.getConfiguration('paradoxcode.localisation');
-    if (configuration.get<boolean>('transparentEncoding', true)) {
+    // Manual one-shot transcoding works with the transparent pipeline off;
+    // with it on, the handlers answer with a pointer to the setting instead.
+    disposables.push(
+        vscode.commands.registerCommand('paradoxcode.localisation.encodeFile', (uri) =>
+            void encodeFileManually(transcoder, uri, log),
+        ),
+        vscode.commands.registerCommand('paradoxcode.localisation.decodeFile', (uri) =>
+            void decodeFileManually(transcoder, uri, log),
+        ),
+    );
+    if (transparentEncodingEnabled()) {
         const autoOpenDocument = (document: vscode.TextDocument | undefined): void => {
             if (!document) {
                 return;
@@ -770,9 +899,6 @@ export async function activateTransparentLocalisation(
             ),
             vscode.commands.registerCommand('paradoxcode.localisation.endPeek', () =>
                 void endPeek(),
-            ),
-            vscode.commands.registerCommand('paradoxcode.localisation.transcodeFile', (uri) =>
-                void transcodeFile(transcoder, uri, log),
             ),
             vscode.window.onDidChangeActiveTextEditor((editor) => {
                 updateStatus();
@@ -813,7 +939,9 @@ export async function activateTransparentLocalisation(
         updateEntryContext(vscode.window.activeTextEditor?.document);
         log.appendLine('transparent localisation enabled (pdcloc:// provider active)');
     } else {
-        log.appendLine('transparent localisation disabled by configuration');
+        log.appendLine(
+            'transparent localisation disabled by configuration (manual encode/decode commands only)',
+        );
     }
 
     const controller = vscode.Disposable.from(...disposables);

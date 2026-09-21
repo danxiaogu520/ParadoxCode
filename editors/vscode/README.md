@@ -62,8 +62,7 @@ ships the transcoder and edits those files as readable Chinese through the `pdcl
   `paradoxcode.localisation.transparentScriptGlobs` (`**/*.txt` by default) — opens in the decoded
   view and takes over the raw tab, whatever its bytes look like. Plain readable files pass through
   unchanged; their quoted CJK is escape-encoded on the next save (announced by an informational
-  `LocalisationWillTranscodeOnSave` hint). Automatic redirection is controlled by
-  `paradoxcode.localisation.autoOpenDecoded` and is enabled by default.
+  `LocalisationWillTranscodeOnSave` hint).
 - Saving writes the scoped form: escape triples only inside quoted strings, comments and code as
   readable UTF-8 — the game-side transcoder reads the strings exactly as with whole-file encoding.
   Partially escaped files self-heal on save. Saving is refused (never double-encoded) when a
@@ -72,6 +71,10 @@ ships the transcoder and edits those files as readable Chinese through the `pdcl
   `LocalisationMixedEncoding` error anchored at the marker; fix it by hand.
 - While a decoded view is active, the status bar shows **EU4 decoded view**; click it to open the
   raw transcoded file, and use the editor-title eye to peek at the raw bytes momentarily.
+- Turn `paradoxcode.localisation.transparentEncoding` off to disable everything automatic (no
+  `pdcloc://` provider, no redirection, no save-time encoding): the manual **Encode File (EU4dll
+  Escape Form)** and **Decode File (Readable Text)** commands become available instead, each a
+  one-shot disk rewrite with a `.pre-transcode.bak` backup written next to the file.
 
 ## Configuration
 
@@ -109,9 +112,8 @@ on the next server restart; preview settings take effect immediately.
 | `paradoxcode.diagnosticLogging` | `false` | Log client-side diagnostic filtering counts. |
 | `paradoxcode.diagnostics.severityOverrides` | `{}` | Remap diagnostic codes to `error`, `warning`, `info`, `hint`, or `off`. |
 | `paradoxcode.localisation.preferredLanguages` | `[]` | Localisation language preference order. |
-| `paradoxcode.localisation.transparentEncoding` | `true` | Enable the `pdcloc://` decoded read/write view over EU4dll-transcoded files. |
-| `paradoxcode.localisation.autoOpenDecoded` | `true` | Automatically open eligible transcoded files in the decoded view. |
-| `paradoxcode.localisation.transparentScriptGlobs` | `["**/*.txt"]` | Workspace-relative globs of script files eligible for the decoded view (`latin1eu4`). Readable UTF-8 (BOM) files never enter the decoded view. |
+| `paradoxcode.localisation.transparentEncoding` | `true` | Master switch for the transparent EU4dll pipeline: on, eligible files open decoded and saves encode automatically; off, manual Encode/Decode commands. |
+| `paradoxcode.localisation.transparentScriptGlobs` | `["**/*.txt"]` | Workspace-relative globs of script files eligible for transcoding (`latin1eu4`). Eligible files open in the decoded view whatever their bytes look like. |
 | `paradoxcode.completion.sourceLayers` | `[project, dependencies, vanilla]` | Completion layers to include; resolution priority is unchanged. |
 | `paradoxcode.performance.profile` | `"balanced"` | Bounded scan concurrency: `conservative`, `balanced`, or `fast`. |
 | `paradoxcode.preview.refreshMode` | `"always"` | Preview refresh timing: `always`, `onSave`, or `manual`. |

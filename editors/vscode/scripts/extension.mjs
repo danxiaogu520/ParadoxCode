@@ -354,7 +354,7 @@ const requiredSettings = [
   'paradoxcode.hover.eventCard',
   'paradoxcode.diagnostics.severityOverrides',
   'paradoxcode.localisation.preferredLanguages',
-  'paradoxcode.localisation.autoOpenDecoded',
+  'paradoxcode.localisation.transparentEncoding',
   'paradoxcode.completion.sourceLayers',
   'paradoxcode.performance.profile',
 ];
@@ -368,8 +368,8 @@ for (const setting of requiredSettings) {
     fail(`English and Chinese NLS entries are required for ${setting}`);
     }
 }
-if (manifest.contributes.configuration?.properties?.['paradoxcode.localisation.autoOpenDecoded']?.default !== true) {
-  fail('paradoxcode.localisation.autoOpenDecoded must default to true');
+if (manifest.contributes.configuration?.properties?.['paradoxcode.localisation.transparentEncoding']?.default !== true) {
+  fail('paradoxcode.localisation.transparentEncoding must default to true');
 }
 // Game-font rendering is on unless opted out, and font-mod auto-discovery is
 // the default path (empty override).
