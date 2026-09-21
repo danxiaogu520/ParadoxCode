@@ -825,6 +825,17 @@
         "icon": "$(file)"
       },
       {
+        "command": "paradoxcode.localisation.peekOriginal",
+        "title": "%commands.localisation.peekOriginal.title%",
+        "category": "ParadoxCode",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "paradoxcode.localisation.endPeek",
+        "title": "%commands.localisation.endPeek.title%",
+        "category": "ParadoxCode"
+      },
+      {
         "command": "paradoxcode.localisation.transcodeFile",
         "title": "%commands.localisation.transcodeFile.title%",
         "category": "ParadoxCode",
@@ -849,9 +860,26 @@
           "group": "navigation@3"
         },
         {
-          "command": "paradoxcode.localisation.revealOriginal",
+          "command": "paradoxcode.localisation.peekOriginal",
           "when": "resourceScheme == pdcloc",
           "group": "navigation@3"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "paradoxcode.localisation.peekOriginal",
+          "when": "resourceScheme == pdcloc"
+        },
+        {
+          "command": "paradoxcode.localisation.endPeek",
+          "when": "paradoxcode.peekingRaw"
+        }
+      ],
+      "keybindings": [
+        {
+          "command": "paradoxcode.localisation.endPeek",
+          "key": "escape",
+          "when": "paradoxcode.peekingRaw && editorTextFocus"
         }
       ],
       "view/title": [

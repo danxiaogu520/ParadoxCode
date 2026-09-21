@@ -7,6 +7,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Momentary raw peek for the decoded localisation view. The editor-title eye on a `pdcloc://` tab
+  flips it in place to the on-disk escaped form; Esc (bound to
+  `paradoxcode.localisation.endPeek` while peeking), the eye on the raw view, or moving focus to
+  another editor group flips it back. The cursor line survives every flip because escape triples
+  never contain newline bytes. Unsaved raw edits keep the peek open (it degrades to the pinned
+  mode), and `paradoxcode.localisation.revealOriginal` — now on the status bar and command
+  palette — remains the pinned variant.
+
+### Changed
+
+- Opening an eligible transcoded file now takes over its tab instead of adding a second one: the
+  decoded `pdcloc://` view is shown in the raw tab's own group and preview state and the raw tab
+  is closed. Raw views opened deliberately (revealOriginal, an active peek) are immune to the
+  automatic redirect until their tab closes, and invisible programmatic document opens no longer
+  trigger a redirect at all — only the editor the user is actually looking at is taken over.
+
 ## [0.4.0] - 2026-09-21
 
 ### Added
