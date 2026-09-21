@@ -2,7 +2,7 @@
 //
 // The algorithm is fixed and shared with the Rust crate by *equivalence*, not
 // by shared source: scripts/transcode.mjs pins this implementation to the
-// Rust one with (a) the EDG-KTP golden corpus byte for byte and (b) an
+// Rust one with (a) the golden corpus byte for byte and (b) an
 // exhaustive code-point sweep plus deterministic random-sequence vectors
 // emitted by `cargo run -p transcode --bin transcode-vectors`. Any change to
 // either implementation turns that test red.
