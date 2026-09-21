@@ -170,7 +170,7 @@ const statusBar = vscode.window.createStatusBarItem(
 statusBar.name = 'ParadoxCode Language Server';
 statusBar.command = 'paradoxcode.openOutput';
 statusBar.text = 'ParadoxCode $(debug-disconnect)';
-statusBar.tooltip = 'ParadoxCode: server not running';
+statusBar.tooltip = vscode.l10n.t('ParadoxCode: server not running');
 
 let client: LanguageClient | undefined;
 let missingServerWarningShown = false;
@@ -326,7 +326,7 @@ function dependencySettings(): DependencySetting[] {
         .getConfiguration('paradoxcode')
         .get<unknown>('dependencies', []);
     if (!Array.isArray(raw)) {
-        throw new Error('paradoxcode.dependencies must be an array');
+        throw new Error(vscode.l10n.t('paradoxcode.dependencies must be an array'));
     }
     const dependencies: DependencySetting[] = [];
     for (const [index, value] of raw.entries()) {
@@ -336,19 +336,19 @@ function dependencySettings(): DependencySetting[] {
             || typeof (value as { id?: unknown }).id !== 'string'
             || typeof (value as { path?: unknown }).path !== 'string'
         ) {
-            throw new Error(`paradoxcode.dependencies[${index}] must contain string id and path`);
+            throw new Error(vscode.l10n.t('paradoxcode.dependencies[{0}] must contain string id and path', index));
         }
         const id = (value as { id: string }).id.trim();
         const dependencyPath = (value as { path: string }).path.trim();
         const configuredIndex = (value as { index?: unknown }).index;
         if (!id || !dependencyPath) {
-            throw new Error(`paradoxcode.dependencies[${index}] must contain non-empty id and path`);
+            throw new Error(vscode.l10n.t('paradoxcode.dependencies[{0}] must contain non-empty id and path', index));
         }
         if (!DEPENDENCY_ID_PATTERN.test(id)) {
-            throw new Error(`paradoxcode.dependencies[${index}] has invalid id "${id}"`);
+            throw new Error(vscode.l10n.t('paradoxcode.dependencies[{0}] has invalid id "{1}"', index, id));
         }
         if (configuredIndex !== undefined && typeof configuredIndex !== 'string') {
-            throw new Error(`paradoxcode.dependencies[${index}].index must be a string`);
+            throw new Error(vscode.l10n.t('paradoxcode.dependencies[{0}].index must be a string', index));
         }
         const entry: DependencySetting = { id, path: dependencyPath };
         if (typeof configuredIndex === 'string' && configuredIndex.trim()) {
@@ -391,7 +391,7 @@ async function addDependency(): Promise<void> {
     const workspaceFolder = workspaceConfigurationTarget();
     if (!workspaceFolder) {
         void vscode.window.showWarningMessage(
-            'ParadoxCode: open a workspace before adding a dependency.',
+            vscode.l10n.t('ParadoxCode: open a workspace before adding a dependency.'),
         );
         return;
     }
@@ -399,8 +399,8 @@ async function addDependency(): Promise<void> {
         canSelectFiles: false,
         canSelectFolders: true,
         canSelectMany: false,
-        openLabel: 'Use Dependency Mod',
-        title: 'Choose a dependency Mod directory',
+        openLabel: vscode.l10n.t('Use Dependency Mod'),
+        title: vscode.l10n.t('Choose a dependency Mod directory'),
     });
     if (!selected?.[0]) {
         return;
@@ -408,12 +408,12 @@ async function addDependency(): Promise<void> {
     try {
         const stat = await vscode.workspace.fs.stat(selected[0]);
         if ((stat.type & vscode.FileType.Directory) === 0) {
-            void vscode.window.showErrorMessage('ParadoxCode: the dependency path must be a directory.');
+            void vscode.window.showErrorMessage(vscode.l10n.t('ParadoxCode: the dependency path must be a directory.'));
             return;
         }
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        void vscode.window.showErrorMessage(`ParadoxCode: could not read dependency directory: ${message}`);
+        void vscode.window.showErrorMessage(vscode.l10n.t('ParadoxCode: could not read dependency directory: {0}', message));
         return;
     }
 
@@ -422,23 +422,23 @@ async function addDependency(): Promise<void> {
         dependencies = dependencySettings();
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        void vscode.window.showErrorMessage(`ParadoxCode: ${message}`);
+        void vscode.window.showErrorMessage(vscode.l10n.t('ParadoxCode: {0}', message));
         return;
     }
     const id = await vscode.window.showInputBox({
-        title: 'Name the dependency',
-        prompt: 'Use a stable id; dependencies are ordered from lowest to highest priority.',
+        title: vscode.l10n.t('Name the dependency'),
+        prompt: vscode.l10n.t('Use a stable id; dependencies are ordered from lowest to highest priority.'),
         value: suggestedDependencyId(selected[0].fsPath),
         validateInput: (value) => {
             const normalized = value.trim();
             if (!normalized) {
-                return 'Dependency id must not be empty.';
+                return vscode.l10n.t('Dependency id must not be empty.');
             }
             if (!DEPENDENCY_ID_PATTERN.test(normalized)) {
-                return 'Use letters, numbers, dots, hyphens, or underscores.';
+                return vscode.l10n.t('Use letters, numbers, dots, hyphens, or underscores.');
             }
             if (dependencies.some((dependency) => dependency.id.toLowerCase() === normalized.toLowerCase())) {
-                return `A dependency named ${normalized} already exists.`;
+                return vscode.l10n.t('A dependency named {0} already exists.', normalized);
             }
             return undefined;
         },
@@ -449,18 +449,18 @@ async function addDependency(): Promise<void> {
 
     const cacheChoice = await vscode.window.showQuickPick([
         {
-            label: 'Live scan',
-            description: 'Scan this dependency when the language server starts.',
+            label: vscode.l10n.t('Live scan'),
+            description: vscode.l10n.t('Scan this dependency when the language server starts.'),
             value: 'live',
         },
         {
-            label: 'Persistent index cache',
-            description: 'Load/build a .pdcindex instead of scanning on every launch.',
+            label: vscode.l10n.t('Persistent index cache'),
+            description: vscode.l10n.t('Load/build a .pdcindex instead of scanning on every launch.'),
             value: 'index',
         },
     ], {
-        title: 'How should ParadoxCode load this dependency?',
-        placeHolder: 'Choose a loading strategy',
+        title: vscode.l10n.t('How should ParadoxCode load this dependency?'),
+        placeHolder: vscode.l10n.t('Choose a loading strategy'),
     });
     if (!cacheChoice) {
         return;
@@ -477,9 +477,9 @@ async function addDependency(): Promise<void> {
         );
         const index = await vscode.window.showSaveDialog({
             defaultUri: defaultIndex,
-            filters: { 'ParadoxCode index': ['pdcindex'] },
-            saveLabel: 'Use Index Path',
-            title: 'Choose the dependency index cache path',
+            filters: { [vscode.l10n.t('ParadoxCode index')]: ['pdcindex'] },
+            saveLabel: vscode.l10n.t('Use Index Path'),
+            title: vscode.l10n.t('Choose the dependency index cache path'),
         });
         if (!index) {
             return;
@@ -496,12 +496,12 @@ async function addDependency(): Promise<void> {
         );
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        void vscode.window.showErrorMessage(`ParadoxCode: could not save dependency: ${message}`);
+        void vscode.window.showErrorMessage(vscode.l10n.t('ParadoxCode: could not save dependency: {0}', message));
         return;
     }
     const action = await vscode.window.showInformationMessage(
-        `ParadoxCode: added dependency ${entry.id} at the end of the priority list.`,
-        'Open Dependencies Settings',
+        vscode.l10n.t('ParadoxCode: added dependency {0} at the end of the priority list.', entry.id),
+        vscode.l10n.t('Open Dependencies Settings'),
     );
     if (action) {
         await openDependencySettings();
@@ -511,7 +511,7 @@ async function addDependency(): Promise<void> {
 async function removeDependency(): Promise<void> {
     if (!workspaceConfigurationTarget()) {
         void vscode.window.showWarningMessage(
-            'ParadoxCode: open a workspace before removing a dependency.',
+            vscode.l10n.t('ParadoxCode: open a workspace before removing a dependency.'),
         );
         return;
     }
@@ -520,34 +520,37 @@ async function removeDependency(): Promise<void> {
         dependencies = dependencySettings();
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        void vscode.window.showErrorMessage(`ParadoxCode: ${message}`);
+        void vscode.window.showErrorMessage(vscode.l10n.t('ParadoxCode: {0}', message));
         return;
     }
     if (dependencies.length === 0) {
-        void vscode.window.showInformationMessage('ParadoxCode: no workspace dependencies are configured.');
+        void vscode.window.showInformationMessage(vscode.l10n.t('ParadoxCode: no workspace dependencies are configured.'));
         return;
     }
     const selected = await vscode.window.showQuickPick(
         dependencies.map((dependency, index) => ({
             label: dependency.id,
             description: dependency.path,
-            detail: dependency.index ? `index: ${dependency.index}` : 'live scan',
+            detail: dependency.index
+                ? vscode.l10n.t('index: {0}', dependency.index)
+                : vscode.l10n.t('live scan'),
             index,
         })),
         {
-            title: 'Remove a ParadoxCode dependency',
-            placeHolder: 'Choose a dependency',
+            title: vscode.l10n.t('Remove a ParadoxCode dependency'),
+            placeHolder: vscode.l10n.t('Choose a dependency'),
         },
     );
     if (!selected) {
         return;
     }
+    const removeButton = vscode.l10n.t('Remove');
     const confirmation = await vscode.window.showWarningMessage(
-        `Remove dependency ${selected.label}?`,
+        vscode.l10n.t('Remove dependency {0}?', selected.label),
         { modal: true },
-        'Remove',
+        removeButton,
     );
-    if (confirmation !== 'Remove') {
+    if (confirmation !== removeButton) {
         return;
     }
     dependencies.splice(selected.index, 1);
@@ -559,10 +562,10 @@ async function removeDependency(): Promise<void> {
         );
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        void vscode.window.showErrorMessage(`ParadoxCode: could not save dependency: ${message}`);
+        void vscode.window.showErrorMessage(vscode.l10n.t('ParadoxCode: could not save dependency: {0}', message));
         return;
     }
-    void vscode.window.showInformationMessage(`ParadoxCode: removed dependency ${selected.label}.`);
+    void vscode.window.showInformationMessage(vscode.l10n.t('ParadoxCode: removed dependency {0}.', selected.label));
 }
 
 interface ServerResolution {
@@ -575,7 +578,7 @@ function installOptions(context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration('paradoxcode');
     const packageVersion = context.extension.packageJSON.version;
     if (typeof packageVersion !== 'string' || !/^[0-9A-Za-z][0-9A-Za-z.+-]*$/.test(packageVersion)) {
-        throw new Error('The ParadoxCode extension manifest has an invalid version.');
+        throw new Error(vscode.l10n.t('The ParadoxCode extension manifest has an invalid version.'));
     }
     return {
         version: packageVersion,
@@ -1033,21 +1036,26 @@ function showMissingServerActions(automaticInstallError?: string): void {
     }
     missingServerWarningShown = true;
     const message = automaticInstallError
-        ? `The automatic ParadoxCode server installation failed: ${automaticInstallError}`
-        : 'The ParadoxCode server was not found. Install it from the release cache, select a ' +
-          'binary, set paradoxcode.serverPath, or add paradoxcode to PATH.';
+        ? vscode.l10n.t('The automatic ParadoxCode server installation failed: {0}', automaticInstallError)
+        : vscode.l10n.t(
+            'The ParadoxCode server was not found. Install it from the release cache, select a '
+            + 'binary, set paradoxcode.serverPath, or add paradoxcode to PATH.',
+        );
     log.appendLine(`WARNING: ${message}`);
+    const installButton = vscode.l10n.t('Install server');
+    const selectBinaryButton = vscode.l10n.t('Select binary');
+    const openOutputButton = vscode.l10n.t('Open Output');
     void vscode.window.showWarningMessage(
-        `ParadoxCode: ${message}`,
-        'Install server',
-        'Select binary',
-        'Open Output',
+        vscode.l10n.t('ParadoxCode: {0}', message),
+        installButton,
+        selectBinaryButton,
+        openOutputButton,
     ).then((choice) => {
-        if (choice === 'Install server') {
+        if (choice === installButton) {
             void vscode.commands.executeCommand('paradoxcode.installServer');
-        } else if (choice === 'Select binary') {
+        } else if (choice === selectBinaryButton) {
             void vscode.commands.executeCommand('paradoxcode.selectServer');
-        } else if (choice === 'Open Output') {
+        } else if (choice === openOutputButton) {
             log.show(true);
         }
     });
@@ -1246,18 +1254,18 @@ function updateStatus(state: State): void {
                 ? 'ParadoxCode $(check)'
                 : 'ParadoxCode $(sync~spin)';
             statusBar.tooltip = serverReady
-                ? 'ParadoxCode: pdc ready (click to open output)'
-                : 'ParadoxCode: pdc running; indexes are loading…';
+                ? vscode.l10n.t('ParadoxCode: pdc ready (click to open output)')
+                : vscode.l10n.t('ParadoxCode: pdc running; indexes are loading…');
             void vscode.commands.executeCommand('setContext', 'paradoxcodeServerRunning', true);
             break;
         case State.Starting:
             statusBar.text = 'ParadoxCode $(sync~spin)';
-            statusBar.tooltip = 'ParadoxCode: pdc starting…';
+            statusBar.tooltip = vscode.l10n.t('ParadoxCode: pdc starting…');
             void vscode.commands.executeCommand('setContext', 'paradoxcodeServerRunning', false);
             break;
         default:
             statusBar.text = 'ParadoxCode $(debug-disconnect)';
-            statusBar.tooltip = 'ParadoxCode: pdc not running (click to open output)';
+            statusBar.tooltip = vscode.l10n.t('ParadoxCode: pdc not running (click to open output)');
             void vscode.commands.executeCommand('setContext', 'paradoxcodeServerRunning', false);
     }
 }
@@ -1287,12 +1295,12 @@ async function resolveOrInstallServer(context: vscode.ExtensionContext): Promise
     const options = installOptions(context);
     log.appendLine(`pdc was not found; installing the matching ${options.version} release automatically`);
     statusBar.text = 'ParadoxCode $(cloud-download~spin)';
-    statusBar.tooltip = 'ParadoxCode: installing the language server…';
+    statusBar.tooltip = vscode.l10n.t('ParadoxCode: installing the language server…');
     try {
         const binary = await vscode.window.withProgress(
             {
                 location: vscode.ProgressLocation.Window,
-                title: 'ParadoxCode: preparing language support',
+                title: vscode.l10n.t('ParadoxCode: preparing language support'),
                 cancellable: false,
             },
             (progress) => installServerRelease(context, options, progress),
@@ -1375,7 +1383,7 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
                 // timestamp, aligning with the timestamped protocol trace.
                 debugLog.info(`[pdc] ${params.message}`);
             }
-            statusBar.tooltip = `ParadoxCode: ${params.message}`;
+            statusBar.tooltip = vscode.l10n.t('ParadoxCode: {0}', params.message);
             updateVanillaContext(params.message);
         });
         currentClient.onNotification('pdc/trace', (params: unknown) => {
@@ -1400,7 +1408,7 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         log.appendLine(`ERROR: ${message}`);
-        void vscode.window.showErrorMessage(`ParadoxCode: ${message}`);
+        void vscode.window.showErrorMessage(vscode.l10n.t('ParadoxCode: {0}', message));
     }
 }
 
@@ -1435,11 +1443,14 @@ async function toggleDebugMode(): Promise<void> {
         : vscode.ConfigurationTarget.Global;
     await config.update('debug.enable', !enabled, target);
     if (!enabled) {
+        const openDebugButton = vscode.l10n.t('Open Debug Output');
         void vscode.window.showInformationMessage(
-            'ParadoxCode: debug mode enabled. Reproduce the issue, then share the "ParadoxCode Debug" output.',
-            'Open Debug Output',
+            vscode.l10n.t(
+                'ParadoxCode: debug mode enabled. Reproduce the issue, then share the "ParadoxCode Debug" output.',
+            ),
+            openDebugButton,
         ).then((choice) => {
-            if (choice === 'Open Debug Output') {
+            if (choice === openDebugButton) {
                 debugLog.show(true);
             }
         });
@@ -1451,8 +1462,10 @@ async function chooseServerPath(): Promise<void> {
         canSelectFiles: true,
         canSelectFolders: false,
         canSelectMany: false,
-        openLabel: 'Use pdc',
-        filters: process.platform === 'win32' ? { Executable: ['exe', 'com', 'cmd', 'bat'] } : undefined,
+        openLabel: vscode.l10n.t('Use pdc'),
+        filters: process.platform === 'win32'
+            ? { [vscode.l10n.t('Executable')]: ['exe', 'com', 'cmd', 'bat'] }
+            : undefined,
     });
     if (!selected?.[0]) {
         return;
@@ -1465,7 +1478,7 @@ async function chooseServerPath(): Promise<void> {
         selected[0].fsPath,
         target,
     );
-    void vscode.window.showInformationMessage(`ParadoxCode: using ${selected[0].fsPath}`);
+    void vscode.window.showInformationMessage(vscode.l10n.t('ParadoxCode: using {0}', selected[0].fsPath));
 }
 
 async function chooseGameDirectory(): Promise<void> {
@@ -1473,7 +1486,7 @@ async function chooseGameDirectory(): Promise<void> {
         canSelectFiles: false,
         canSelectFolders: true,
         canSelectMany: false,
-        openLabel: 'Use EU4 installation for Vanilla data',
+        openLabel: vscode.l10n.t('Use EU4 installation for Vanilla data'),
     });
     if (!selected?.[0]) {
         return;
@@ -1488,13 +1501,15 @@ async function chooseGameDirectory(): Promise<void> {
     );
     setVanillaContext(false);
     void vscode.window.showInformationMessage(
-        'ParadoxCode: EU4 installation selected. The language server will validate it and build Vanilla data in the background.',
+        vscode.l10n.t(
+            'ParadoxCode: EU4 installation selected. The language server will validate it and build Vanilla data in the background.',
+        ),
     );
 }
 
 async function exportDiagnostics(): Promise<void> {
     if (!client) {
-        void vscode.window.showWarningMessage('ParadoxCode: the language server is not running.');
+        void vscode.window.showWarningMessage(vscode.l10n.t('ParadoxCode: the language server is not running.'));
         return;
     }
     try {
@@ -1503,7 +1518,7 @@ async function exportDiagnostics(): Promise<void> {
             limit: 128,
         });
         const target = await vscode.window.showSaveDialog({
-            saveLabel: 'Export Diagnostics',
+            saveLabel: vscode.l10n.t('Export Diagnostics'),
             filters: { JSON: ['json'] },
             defaultUri: vscode.Uri.file('paradoxcode-diagnostics.json'),
         });
@@ -1512,7 +1527,7 @@ async function exportDiagnostics(): Promise<void> {
         }
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        void vscode.window.showErrorMessage(`ParadoxCode: could not export diagnostics: ${message}`);
+        void vscode.window.showErrorMessage(vscode.l10n.t('ParadoxCode: could not export diagnostics: {0}', message));
     }
 }
 
@@ -1527,7 +1542,7 @@ interface WorkspaceFormatSummary {
 
 async function formatWorkspace(): Promise<void> {
     if (!client) {
-        void vscode.window.showWarningMessage('ParadoxCode: the language server is not running.');
+        void vscode.window.showWarningMessage(vscode.l10n.t('ParadoxCode: the language server is not running.'));
         return;
     }
     // Saving first closes the gap between dirty editor buffers and disk: the
@@ -1541,21 +1556,25 @@ async function formatWorkspace(): Promise<void> {
         });
         const skipped = summary.skippedUnsafeFiles + summary.skippedLegacyEncodingFiles;
         const parts = [
-            `${summary.formattedFiles} formatted`,
-            `${summary.unchangedFiles} already canonical`,
+            vscode.l10n.t('{0} formatted', summary.formattedFiles),
+            vscode.l10n.t('{0} already canonical', summary.unchangedFiles),
         ];
         if (skipped > 0) {
-            parts.push(`${skipped} skipped`);
+            parts.push(vscode.l10n.t('{0} skipped', skipped));
         }
         if (summary.failedFiles > 0) {
-            parts.push(`${summary.failedFiles} failed`);
+            parts.push(vscode.l10n.t('{0} failed', summary.failedFiles));
         }
         void vscode.window.showInformationMessage(
-            `ParadoxCode: workspace formatting finished (${summary.totalFiles} script files): ${parts.join(', ')}.`,
+            vscode.l10n.t(
+                'ParadoxCode: workspace formatting finished ({0} script files): {1}.',
+                summary.totalFiles,
+                parts.join(', '),
+            ),
         );
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        void vscode.window.showErrorMessage(`ParadoxCode: workspace formatting failed: ${message}`);
+        void vscode.window.showErrorMessage(vscode.l10n.t('ParadoxCode: workspace formatting failed: {0}', message));
     }
 }
 
@@ -1565,25 +1584,27 @@ async function installServer(context: vscode.ExtensionContext): Promise<boolean>
         const binary = await vscode.window.withProgress(
             {
                 location: vscode.ProgressLocation.Notification,
-                title: 'ParadoxCode: installing pdc',
+                title: vscode.l10n.t('ParadoxCode: installing pdc'),
                 cancellable: false,
             },
             (progress) => installServerRelease(context, options, progress),
         );
         log.appendLine(`pdc ${options.version} installed and verified: ${binary}`);
-        void vscode.window.showInformationMessage(`ParadoxCode: pdc ${options.version} is ready.`);
+        void vscode.window.showInformationMessage(vscode.l10n.t('ParadoxCode: pdc {0} is ready.', options.version));
         return true;
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         log.appendLine(`ERROR installing pdc: ${message}`);
+        const releasesButton = vscode.l10n.t('Open Releases');
+        const openOutputButton = vscode.l10n.t('Open Output');
         const choice = await vscode.window.showErrorMessage(
-            `ParadoxCode could not install pdc: ${message}`,
-            'Open Releases',
-            'Open Output',
+            vscode.l10n.t('ParadoxCode could not install pdc: {0}', message),
+            releasesButton,
+            openOutputButton,
         );
-        if (choice === 'Open Releases') {
+        if (choice === releasesButton) {
             await vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${options.repository}/releases`));
-        } else if (choice === 'Open Output') {
+        } else if (choice === openOutputButton) {
             log.show(true);
         }
         return false;

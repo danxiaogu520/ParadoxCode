@@ -52,7 +52,7 @@ function platformArtifact(): ServerArtifact {
         return { target: 'aarch64-apple-darwin', binary: 'paradoxcode', extension: 'tar.gz' };
     }
     throw new Error(
-        `ParadoxCode does not publish a server for ${process.platform}/${process.arch}.`,
+        vscode.l10n.t('ParadoxCode does not publish a server for {0}/{1}.', process.platform, process.arch),
     );
 }
 
@@ -62,10 +62,10 @@ export function archiveName(version: string, artifact: ServerArtifact): string {
 
 export function releaseAssetUrl(repository: string, version: string, archive: string): string {
     if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) {
-        throw new Error('The server repository must be in owner/name form.');
+        throw new Error(vscode.l10n.t('The server repository must be in owner/name form.'));
     }
     if (!/^[0-9A-Za-z][0-9A-Za-z.+-]*$/.test(version)) {
-        throw new Error('The server version contains unsupported characters.');
+        throw new Error(vscode.l10n.t('The server version contains unsupported characters.'));
     }
     return `https://github.com/${repository}/releases/download/v${version}/${archive}`;
 }
@@ -79,11 +79,11 @@ export function parseExpectedChecksum(sidecar: string, archive: string): string 
             return fields.length >= 2 && fields[1].replace(/^\*/, '') === archive;
         });
     if (!line) {
-        throw new Error(`The checksum sidecar does not mention ${archive}.`);
+        throw new Error(vscode.l10n.t('The checksum sidecar does not mention {0}.', archive));
     }
     const digest = line.split(/\s+/)[0].toLowerCase();
     if (!/^[0-9a-f]{64}$/.test(digest)) {
-        throw new Error('The checksum sidecar contains an invalid SHA-256 digest.');
+        throw new Error(vscode.l10n.t('The checksum sidecar contains an invalid SHA-256 digest.'));
     }
     return digest;
 }
@@ -94,13 +94,15 @@ function sha256(bytes: Buffer): string {
 
 interface DownloadError extends Error {
     statusCode?: number;
+    /** Marks the request-destroy timeout error so retry detection survives localisation. */
+    timedOut?: boolean;
 }
 
 function isRetryableDownloadError(error: unknown): boolean {
     if (!error || typeof error !== 'object') {
         return false;
     }
-    const candidate = error as { code?: unknown; statusCode?: unknown; message?: unknown };
+    const candidate = error as { code?: unknown; statusCode?: unknown; message?: unknown; timedOut?: unknown };
     if (
         typeof candidate.statusCode === 'number'
         && (candidate.statusCode === 408
@@ -121,17 +123,16 @@ function isRetryableDownloadError(error: unknown): boolean {
     ) {
         return true;
     }
-    return typeof candidate.message === 'string'
-        && candidate.message.startsWith('Timed out downloading ');
+    return candidate.timedOut === true;
 }
 
 async function fetchBytesOnce(url: string, maximum: number, label: string, redirects: number): Promise<Buffer> {
     if (redirects > MAX_REDIRECTS) {
-        throw new Error(`Too many redirects while downloading ${label}.`);
+        throw new Error(vscode.l10n.t('Too many redirects while downloading {0}.', label));
     }
     const parsed = new URL(url);
     if (parsed.protocol !== 'https:') {
-        throw new Error(`Unsupported download protocol for ${label}.`);
+        throw new Error(vscode.l10n.t('Unsupported download protocol for {0}.', label));
     }
     const get = https.get;
     return new Promise<Buffer>((resolve, reject) => {
@@ -145,7 +146,7 @@ async function fetchBytesOnce(url: string, maximum: number, label: string, redir
             }
             if (status < 200 || status >= 300) {
                 response.resume();
-                const error: DownloadError = new Error(`Downloading ${label} failed with HTTP ${status}.`);
+                const error: DownloadError = new Error(vscode.l10n.t('Downloading {0} failed with HTTP {1}.', label, status));
                 error.statusCode = status;
                 reject(error);
                 return;
@@ -155,7 +156,10 @@ async function fetchBytesOnce(url: string, maximum: number, label: string, redir
             response.on('data', (chunk: Buffer) => {
                 size += chunk.length;
                 if (size > maximum) {
-                    request.destroy(new Error(`Downloaded ${label} exceeds the ${maximum}-byte safety limit.`));
+                    const error: DownloadError = new Error(
+                        vscode.l10n.t('Downloaded {0} exceeds the {1}-byte safety limit.', label, maximum),
+                    );
+                    request.destroy(error);
                     return;
                 }
                 chunks.push(chunk);
@@ -165,7 +169,11 @@ async function fetchBytesOnce(url: string, maximum: number, label: string, redir
         });
         request.setTimeout(
             DOWNLOAD_TIMEOUT_MS,
-            () => request.destroy(new Error(`Timed out downloading ${label}.`)),
+            () => {
+                const error: DownloadError = new Error(vscode.l10n.t('Timed out downloading {0}.', label));
+                error.timedOut = true;
+                request.destroy(error);
+            },
         );
         request.on('error', reject);
     });
@@ -200,7 +208,7 @@ async function extractArchive(archive: string, destination: string, artifact: Se
         );
         const entries = listing.stdout.split(/\r?\n/).map((entry) => entry.trim()).filter(Boolean);
         if (entries.length !== 1 || entries[0].replace(/\/$/, '') !== artifact.binary) {
-            throw new Error(`The server archive must contain only ${artifact.binary}.`);
+            throw new Error(vscode.l10n.t('The server archive must contain only {0}.', artifact.binary));
         }
         for (const entry of entries) {
             const normalized = entry.replace(/\\/g, '/');
@@ -210,7 +218,7 @@ async function extractArchive(archive: string, destination: string, artifact: Se
                 || normalized.split('/').some((part) => part === '..')
                 || normalized.length > 4_096
             ) {
-                throw new Error(`The server archive contains an unsafe path: ${entry}`);
+                throw new Error(vscode.l10n.t('The server archive contains an unsafe path: {0}', entry));
             }
         }
         const details = await execFileAsync(
@@ -219,7 +227,7 @@ async function extractArchive(archive: string, destination: string, artifact: Se
             { windowsHide: true, maxBuffer: 2 * 1024 * 1024 },
         );
         if (details.stdout.split(/\r?\n/).some((line) => /^[lh]/.test(line))) {
-            throw new Error('The server archive must not contain symbolic or hard links.');
+            throw new Error(vscode.l10n.t('The server archive must not contain symbolic or hard links.'));
         }
         if (artifact.extension === 'tar.gz') {
             await execFileAsync('tar', ['-xzf', archive, '-C', destination], { windowsHide: true });
@@ -231,7 +239,7 @@ async function extractArchive(archive: string, destination: string, artifact: Se
             && String((error as { code?: unknown }).code) === 'ENOENT';
         if (artifact.extension !== 'zip' || process.platform !== 'win32' || !commandMissing) {
             const message = error instanceof Error ? error.message : String(error);
-            throw new Error(`Could not extract the server archive: ${message}`);
+            throw new Error(vscode.l10n.t('Could not extract the server archive: {0}', message));
         }
         // Windows installations without bsdtar still have PowerShell's archive support. The
         // paths are encoded as single-quoted literals, so a downloaded filename cannot become
@@ -255,7 +263,7 @@ async function findBinary(root: string, binary: string): Promise<string> {
         for (const entry of entries) {
             visited += 1;
             if (visited > 512) {
-                throw new Error('The server archive contains too many entries.');
+                throw new Error(vscode.l10n.t('The server archive contains too many entries.'));
             }
             const candidate = path.join(current.directory, entry.name);
             if (entry.isFile() && entry.name === binary) {
@@ -266,7 +274,7 @@ async function findBinary(root: string, binary: string): Promise<string> {
             }
         }
     }
-    throw new Error(`The server archive did not contain ${binary}.`);
+    throw new Error(vscode.l10n.t('The server archive did not contain {0}.', binary));
 }
 
 async function replaceFile(source: string, target: string): Promise<void> {
@@ -349,21 +357,24 @@ export async function installServerRelease(
     const archivePath = path.join(temporaryRoot, archive);
     const extractedPath = path.join(temporaryRoot, 'extracted');
     try {
-        progress?.report({ message: `Downloading ${archive}`, increment: 5 });
-        const sidecar = await fetchBytes(checksumUrl, MAX_CHECKSUM_BYTES, 'checksum sidecar');
+        progress?.report({ message: vscode.l10n.t('Downloading {0}', archive), increment: 5 });
+        const sidecar = await fetchBytes(checksumUrl, MAX_CHECKSUM_BYTES, vscode.l10n.t('checksum sidecar'));
         const expectedArchiveDigest = parseExpectedChecksum(sidecar.toString('utf8'), archive);
-        progress?.report({ message: 'Downloading and verifying the ParadoxCode server', increment: 30 });
-        const archiveBytes = await fetchBytes(archiveUrl, MAX_ARCHIVE_BYTES, 'server archive');
+        progress?.report({
+            message: vscode.l10n.t('Downloading and verifying the ParadoxCode server'),
+            increment: 30,
+        });
+        const archiveBytes = await fetchBytes(archiveUrl, MAX_ARCHIVE_BYTES, vscode.l10n.t('server archive'));
         if (sha256(archiveBytes) !== expectedArchiveDigest) {
-            throw new Error(`The downloaded server archive failed SHA-256 verification: ${archive}.`);
+            throw new Error(vscode.l10n.t('The downloaded server archive failed SHA-256 verification: {0}.', archive));
         }
         await fs.writeFile(archivePath, archiveBytes);
-        progress?.report({ message: 'Extracting the ParadoxCode server', increment: 35 });
+        progress?.report({ message: vscode.l10n.t('Extracting the ParadoxCode server'), increment: 35 });
         await extractArchive(archivePath, extractedPath, artifact);
         const extractedBinary = await findBinary(extractedPath, artifact.binary);
         const executable = await fs.readFile(extractedBinary);
         if (executable.length === 0 || executable.length > MAX_EXECUTABLE_BYTES) {
-            throw new Error('The extracted server executable exceeds the safety limit.');
+            throw new Error(vscode.l10n.t('The extracted server executable exceeds the safety limit.'));
         }
         const executableDigest = sha256(executable);
         const temporaryBinary = path.join(temporaryRoot, artifact.binary);
@@ -375,7 +386,7 @@ export async function installServerRelease(
         }
         await replaceFile(temporaryBinary, binaryPath);
         await replaceFile(temporaryChecksum, checksumPath);
-        progress?.report({ message: 'ParadoxCode server installed', increment: 30 });
+        progress?.report({ message: vscode.l10n.t('ParadoxCode server installed'), increment: 30 });
         return binaryPath;
     } finally {
         await fs.rm(temporaryRoot, { recursive: true, force: true });

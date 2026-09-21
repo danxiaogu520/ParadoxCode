@@ -216,7 +216,7 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
             const decoded = this.transcoder.decode(bytes, profile);
             if (decoded === 'invalid-utf8') {
                 throw vscode.FileSystemError.Unavailable(
-                    'an escaped localisation file must be valid UTF-8 — the bytes are damaged',
+                    vscode.l10n.t('an escaped localisation file must be valid UTF-8 — the bytes are damaged'),
                 );
             }
             this.publishReadDiagnostics(uri, real, bytes, { form, broken: decoded.broken, damagedAt: undefined });
@@ -225,7 +225,7 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
         const decoded = this.transcoder.scopedDecode(bytes, profile);
         if (decoded === 'invalid-utf8') {
             throw vscode.FileSystemError.Unavailable(
-                'an escaped localisation file must be valid UTF-8 — the bytes are damaged',
+                vscode.l10n.t('an escaped localisation file must be valid UTF-8 — the bytes are damaged'),
             );
         }
         this.publishReadDiagnostics(uri, real, bytes, {
@@ -247,22 +247,23 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
         try {
             encoded = this.transcoder.scopedEncode(content, profile);
         } catch (error) {
-            const message = 'Refused to save: the editor buffer is not valid UTF-8.';
+            const message = vscode.l10n.t('Refused to save: the editor buffer is not valid UTF-8.');
             this.log.appendLine(
                 `transparentLoc: refused save of ${real.fsPath} (${error instanceof Error ? error.message : String(error)})`,
             );
-            void vscode.window.showErrorMessage(`ParadoxCode: ${message}`);
+            void vscode.window.showErrorMessage(vscode.l10n.t('ParadoxCode: {0}', message));
             throw vscode.FileSystemError.NoPermissions(message);
         }
         if ('alreadyEscaped' in encoded) {
-            const message =
-                `Refused to save: ${encoded.alreadyEscaped.length} escape marker(s) already sit inside ` +
-                'quoted strings — encoding them again would double-encode. Undo the paste ' +
-                '(or decode the text) first.';
+            const message = vscode.l10n.t(
+                'Refused to save: {0} escape marker(s) already sit inside quoted strings — '
+                + 'encoding them again would double-encode. Undo the paste (or decode the text) first.',
+                encoded.alreadyEscaped.length,
+            );
             this.log.appendLine(
                 `transparentLoc: refused save of ${real.fsPath} (in-span escape markers)`,
             );
-            void vscode.window.showErrorMessage(`ParadoxCode: ${message}`);
+            void vscode.window.showErrorMessage(vscode.l10n.t('ParadoxCode: {0}', message));
             throw vscode.FileSystemError.NoPermissions(message);
         }
         if ('unencodable' in encoded) {
@@ -270,11 +271,14 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
                 .map((point) => formatCodePoint(point.codePoint))
                 .slice(0, 8)
                 .join(', ');
-            const message =
-                `Refused to save: ${encoded.unencodable.length} code point(s) cannot be round-tripped ` +
-                `by the EU4 transcoder (${points}). Replace or remove them first.`;
+            const message = vscode.l10n.t(
+                'Refused to save: {0} code point(s) cannot be round-tripped by the EU4 transcoder ({1}). '
+                + 'Replace or remove them first.',
+                encoded.unencodable.length,
+                points,
+            );
             this.log.appendLine(`transparentLoc: refused save of ${real.fsPath} (${message})`);
-            void vscode.window.showErrorMessage(`ParadoxCode: ${message}`);
+            void vscode.window.showErrorMessage(vscode.l10n.t('ParadoxCode: {0}', message));
             throw vscode.FileSystemError.NoPermissions(message);
         }
         await fs.writeFile(real.fsPath, encoded.bytes);
@@ -283,32 +287,35 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
     }
 
     async readDirectory(): Promise<[string, vscode.FileType][]> {
-        throw vscode.FileSystemError.NoPermissions('pdcloc:// exposes individual files only');
+        throw vscode.FileSystemError.NoPermissions(vscode.l10n.t('pdcloc:// exposes individual files only'));
     }
 
     async createDirectory(): Promise<void> {
-        throw vscode.FileSystemError.NoPermissions('pdcloc:// exposes individual files only');
+        throw vscode.FileSystemError.NoPermissions(vscode.l10n.t('pdcloc:// exposes individual files only'));
     }
 
     async delete(uri: vscode.Uri): Promise<void> {
         throw vscode.FileSystemError.NoPermissions(
-            `delete is not supported for pdcloc:// views (${realUriOf(uri)?.fsPath ?? uri.toString()})`,
+            vscode.l10n.t(
+                'delete is not supported for pdcloc:// views ({0})',
+                realUriOf(uri)?.fsPath ?? uri.toString(),
+            ),
         );
     }
 
     async rename(): Promise<void> {
-        throw vscode.FileSystemError.NoPermissions('rename is not supported for pdcloc:// views');
+        throw vscode.FileSystemError.NoPermissions(vscode.l10n.t('rename is not supported for pdcloc:// views'));
     }
 
     async copy(): Promise<void> {
-        throw vscode.FileSystemError.NoPermissions('copy is not supported for pdcloc:// views');
+        throw vscode.FileSystemError.NoPermissions(vscode.l10n.t('copy is not supported for pdcloc:// views'));
     }
 
     private requireReal(uri: vscode.Uri): vscode.Uri {
         const real = realUriOf(uri);
         if (!real) {
             throw vscode.FileSystemError.FileNotFound(
-                `${PDCLOC_SCHEME}:// requires a real backing path`,
+                vscode.l10n.t('{0}:// requires a real backing path', PDCLOC_SCHEME),
             );
         }
         return real;
@@ -318,8 +325,10 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
         const profile = profileForRealPath(real.fsPath, transparentScriptGlobs());
         if (profile === undefined) {
             throw vscode.FileSystemError.Unavailable(
-                'this file is not eligible for the transparent localisation view ' +
-                    '(localisation yml or the configured script globs)',
+                vscode.l10n.t(
+                    'this file is not eligible for the transparent localisation view '
+                    + '(localisation yml or the configured script globs)',
+                ),
             );
         }
         return profile;
@@ -336,23 +345,30 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
             const line = outcome.damagedAt === undefined ? 0 : lineAt(bytes, outcome.damagedAt);
             diagnostic = new vscode.Diagnostic(
                 new vscode.Range(line, 0, line, 0),
-                'Stray EU4dll escape marker(s) outside every quoted string — the file is damaged ' +
-                    'and shown as-is. Move them inside a string or remove them.',
+                vscode.l10n.t(
+                    'Stray EU4dll escape marker(s) outside every quoted string — the file is damaged '
+                    + 'and shown as-is. Move them inside a string or remove them.',
+                ),
                 vscode.DiagnosticSeverity.Error,
             );
             diagnostic.code = 'LocalisationMixedEncoding';
         } else if (outcome.form === 'plain' && hasQuotedCjk(bytes)) {
             diagnostic = new vscode.Diagnostic(
                 new vscode.Range(0, 0, 0, 0),
-                'Quoted CJK text stays readable here; saving encodes it into EU4dll escape ' +
-                    'triples inside the strings (comments and code stay readable on disk).',
+                vscode.l10n.t(
+                    'Quoted CJK text stays readable here; saving encodes it into EU4dll escape '
+                    + 'triples inside the strings (comments and code stay readable on disk).',
+                ),
                 vscode.DiagnosticSeverity.Information,
             );
             diagnostic.code = 'LocalisationWillTranscodeOnSave';
         } else if (outcome.broken > 0) {
             diagnostic = new vscode.Diagnostic(
                 new vscode.Range(0, 0, 0, 0),
-                `${outcome.broken} orphan escape marker(s) were passed through undecoded — check for damaged triples.`,
+                vscode.l10n.t(
+                    '{0} orphan escape marker(s) were passed through undecoded — check for damaged triples.',
+                    outcome.broken,
+                ),
                 vscode.DiagnosticSeverity.Warning,
             );
             diagnostic.code = 'LocalisationBrokenEscapeSequence';
@@ -452,14 +468,16 @@ async function openDecodedView(uri: vscode.Uri | undefined): Promise<void> {
     const real = commandResource(uri);
     if (!real || real.scheme !== 'file') {
         void vscode.window.showErrorMessage(
-            'ParadoxCode: open a localisation yml (or a configured script file) first.',
+            vscode.l10n.t('ParadoxCode: open a localisation yml (or a configured script file) first.'),
         );
         return;
     }
     if (profileForRealPath(real.fsPath, transparentScriptGlobs()) === undefined) {
         void vscode.window.showErrorMessage(
-            'ParadoxCode: this file is not eligible for the decoded view ' +
-                '(localisation/**/*.yml or paradoxcode.localisation.transparentScriptGlobs).',
+            vscode.l10n.t(
+                'ParadoxCode: this file is not eligible for the decoded view '
+                + '(localisation/**/*.yml or paradoxcode.localisation.transparentScriptGlobs).',
+            ),
         );
         return;
     }
@@ -541,7 +559,9 @@ async function endPeek(foreground = true): Promise<void> {
     );
     if (rawEditor?.document.isDirty) {
         void vscode.window.setStatusBarMessage(
-            'ParadoxCode: raw view kept open — it has unsaved edits (Esc again after saving or discarding them).',
+            vscode.l10n.t(
+                'ParadoxCode: raw view kept open — it has unsaved edits (Esc again after saving or discarding them).',
+            ),
             6000,
         );
         return;
@@ -583,33 +603,38 @@ function hasDirtyDocument(real: vscode.Uri): boolean {
 
 /** Shared guards for the manual one-shot commands: they need a target, a disabled
  * transparent pipeline (the master switch), an in-scope path, and no unsaved
- * editor for that file — both commands rewrite the file on disk. */
+ * editor for that file — both commands rewrite the file on disk. The verb is
+ * passed already localised because it lands directly in user-visible messages. */
 async function manualCommandTarget(
     verb: string,
     uri: vscode.Uri | undefined,
 ): Promise<vscode.Uri | undefined> {
     const real = commandResource(uri);
     if (!real || real.scheme !== 'file') {
-        void vscode.window.showErrorMessage(`ParadoxCode: select a file to ${verb} first.`);
+        void vscode.window.showErrorMessage(vscode.l10n.t('ParadoxCode: select a file to {0} first.', verb));
         return undefined;
     }
     if (transparentEncodingEnabled()) {
         void vscode.window.showInformationMessage(
-            'ParadoxCode: transparent encoding is on — saves already encode automatically. ' +
-                'Turn paradoxcode.localisation.transparentEncoding off to transcode by hand.',
+            vscode.l10n.t(
+                'ParadoxCode: transparent encoding is on — saves already encode automatically. '
+                + 'Turn paradoxcode.localisation.transparentEncoding off to transcode by hand.',
+            ),
         );
         return undefined;
     }
     if (profileForRealPath(real.fsPath, transparentScriptGlobs()) === undefined) {
         void vscode.window.showErrorMessage(
-            'ParadoxCode: this file is not in the transcoding scope ' +
-                '(localisation/**/*.yml or paradoxcode.localisation.transparentScriptGlobs).',
+            vscode.l10n.t(
+                'ParadoxCode: this file is not in the transcoding scope '
+                + '(localisation/**/*.yml or paradoxcode.localisation.transparentScriptGlobs).',
+            ),
         );
         return undefined;
     }
     if (hasDirtyDocument(real)) {
         void vscode.window.showErrorMessage(
-            `ParadoxCode: save or close the editor for this file first — ${verb}ing rewrites it on disk.`,
+            vscode.l10n.t('ParadoxCode: save or close the editor for this file first — {0} rewrites it on disk.', verb),
         );
         return undefined;
     }
@@ -627,7 +652,7 @@ async function encodeFileManually(
     uri: vscode.Uri | undefined,
     log: vscode.OutputChannel,
 ): Promise<void> {
-    const real = await manualCommandTarget('encode', uri);
+    const real = await manualCommandTarget(vscode.l10n.t('encode'), uri);
     if (!real) {
         return;
     }
@@ -638,12 +663,12 @@ async function encodeFileManually(
     const bytes = new Uint8Array(await fs.readFile(real.fsPath));
     const form = transcoder.scopedClassify(bytes, profile);
     if (form === 'whole' || form === 'scoped') {
-        void vscode.window.showInformationMessage('ParadoxCode: file is already encoded.');
+        void vscode.window.showInformationMessage(vscode.l10n.t('ParadoxCode: file is already encoded.'));
         return;
     }
     if (form === 'damaged') {
         void vscode.window.showErrorMessage(
-            'ParadoxCode: stray escape marker(s) outside every quoted string — fix the file manually first.',
+            vscode.l10n.t('ParadoxCode: stray escape marker(s) outside every quoted string — fix the file manually first.'),
         );
         return;
     }
@@ -652,13 +677,16 @@ async function encodeFileManually(
         encoded = transcoder.scopedEncode(bytes, profile);
     } catch {
         void vscode.window.showErrorMessage(
-            'ParadoxCode: refused to encode — the file is not valid UTF-8 (convert it first).',
+            vscode.l10n.t('ParadoxCode: refused to encode — the file is not valid UTF-8 (convert it first).'),
         );
         return;
     }
     if ('alreadyEscaped' in encoded) {
         void vscode.window.showErrorMessage(
-            `ParadoxCode: refused to encode — ${encoded.alreadyEscaped.length} escape marker(s) already sit inside quoted strings.`,
+            vscode.l10n.t(
+                'ParadoxCode: refused to encode — {0} escape marker(s) already sit inside quoted strings.',
+                encoded.alreadyEscaped.length,
+            ),
         );
         return;
     }
@@ -668,7 +696,11 @@ async function encodeFileManually(
             .slice(0, 8)
             .join(', ');
         void vscode.window.showErrorMessage(
-            `ParadoxCode: refused to encode — ${encoded.unencodable.length} unencodable code point(s) inside strings (${points}).`,
+            vscode.l10n.t(
+                'ParadoxCode: refused to encode — {0} unencodable code point(s) inside strings ({1}).',
+                encoded.unencodable.length,
+                points,
+            ),
         );
         return;
     }
@@ -677,7 +709,11 @@ async function encodeFileManually(
     await fs.writeFile(real.fsPath, encoded.bytes);
     log.appendLine(`transparentLoc: encoded ${real.fsPath} (backup: ${backup})`);
     void vscode.window.showInformationMessage(
-        `ParadoxCode: encoded ${nodePath.basename(real.fsPath)} in the scoped escape form (backup: ${nodePath.basename(backup)}).`,
+        vscode.l10n.t(
+            'ParadoxCode: encoded {0} in the scoped escape form (backup: {1}).',
+            nodePath.basename(real.fsPath),
+            nodePath.basename(backup),
+        ),
     );
 }
 
@@ -692,7 +728,7 @@ async function decodeFileManually(
     uri: vscode.Uri | undefined,
     log: vscode.OutputChannel,
 ): Promise<void> {
-    const real = await manualCommandTarget('decode', uri);
+    const real = await manualCommandTarget(vscode.l10n.t('decode'), uri);
     if (!real) {
         return;
     }
@@ -703,12 +739,12 @@ async function decodeFileManually(
     const bytes = new Uint8Array(await fs.readFile(real.fsPath));
     const form = transcoder.scopedClassify(bytes, profile);
     if (form === 'plain') {
-        void vscode.window.showInformationMessage('ParadoxCode: file is already readable.');
+        void vscode.window.showInformationMessage(vscode.l10n.t('ParadoxCode: file is already readable.'));
         return;
     }
     if (form === 'damaged') {
         void vscode.window.showErrorMessage(
-            'ParadoxCode: stray escape marker(s) outside every quoted string — fix the file manually first.',
+            vscode.l10n.t('ParadoxCode: stray escape marker(s) outside every quoted string — fix the file manually first.'),
         );
         return;
     }
@@ -718,7 +754,7 @@ async function decodeFileManually(
         const decoded = transcoder.decode(bytes, profile);
         if (decoded === 'invalid-utf8') {
             void vscode.window.showErrorMessage(
-                'ParadoxCode: an escaped localisation file must be valid UTF-8 — the bytes are damaged.',
+                vscode.l10n.t('ParadoxCode: an escaped localisation file must be valid UTF-8 — the bytes are damaged.'),
             );
             return;
         }
@@ -728,7 +764,7 @@ async function decodeFileManually(
         const decoded = transcoder.scopedDecode(bytes, profile);
         if (decoded === 'invalid-utf8') {
             void vscode.window.showErrorMessage(
-                'ParadoxCode: an escaped localisation file must be valid UTF-8 — the bytes are damaged.',
+                vscode.l10n.t('ParadoxCode: an escaped localisation file must be valid UTF-8 — the bytes are damaged.'),
             );
             return;
         }
@@ -741,10 +777,15 @@ async function decodeFileManually(
     log.appendLine(`transparentLoc: decoded ${real.fsPath} (backup: ${backup})`);
     const note =
         orphans > 0
-            ? ` — ${orphans} orphan marker(s) passed through undecoded, check damaged triples`
+            ? vscode.l10n.t(' — {0} orphan marker(s) passed through undecoded, check damaged triples', orphans)
             : '';
     void vscode.window.showInformationMessage(
-        `ParadoxCode: decoded ${nodePath.basename(real.fsPath)} to readable text (backup: ${nodePath.basename(backup)})${note}.`,
+        vscode.l10n.t(
+            'ParadoxCode: decoded {0} to readable text (backup: {1}){2}.',
+            nodePath.basename(real.fsPath),
+            nodePath.basename(backup),
+            note,
+        ),
     );
 }
 
@@ -833,7 +874,7 @@ export async function activateTransparentLocalisation(
         99,
     );
     statusItem.name = 'ParadoxCode Decoded View';
-    statusItem.text = '$(eye) EU4 decoded view';
+    statusItem.text = `$(eye) ${vscode.l10n.t('EU4 decoded view')}`;
     statusItem.command = 'paradoxcode.localisation.revealOriginal';
 
     const updateStatus = (): void => {
@@ -841,7 +882,10 @@ export async function activateTransparentLocalisation(
         if (active?.scheme === PDCLOC_SCHEME) {
             const real = realUriOf(active);
             statusItem.tooltip = new vscode.MarkdownString(
-                `Decoded EU4 view over \`${real?.fsPath ?? 'unknown'}\` — click to open the raw file.`,
+                vscode.l10n.t(
+                    'Decoded EU4 view over `{0}` — click to open the raw file.',
+                    real?.fsPath ?? 'unknown',
+                ),
             );
             statusItem.show();
         } else {
