@@ -34,6 +34,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   never contain newline bytes. Unsaved raw edits keep the peek open (it degrades to the pinned
   mode), and `paradoxcode.localisation.revealOriginal` — now on the status bar and command
   palette — remains the pinned variant.
+- Scoped transcoding: escape triples now land only inside quoted strings, so comments and code
+  stay readable UTF-8 on disk while the game-side transcoder reads the strings exactly as with
+  whole-file encoding. The Rust crate gained a byte-level quote/comment scanner plus
+  scoped form dispatch (`plain` / `whole` / `scoped` / `damaged`), scoped encode/decode with
+  in-span iron-rule ② refusals, and self-healing for partially escaped files (a save converges
+  readable and escaped strings alike); the TypeScript twin mirrors all of it, pinned by 9,760
+  new differential vectors (84,309 total) and a golden-corpus property — a master whose CJK
+  lives entirely inside strings scope-encodes byte-identical to the whole-file release.
 
 ### Changed
 
@@ -59,6 +67,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   is closed. Raw views opened deliberately (revealOriginal, an active peek) are immune to the
   automatic redirect until their tab closes, and invisible programmatic document opens no longer
   trigger a redirect at all — only the editor the user is actually looking at is taken over.
+
+- Entry to the decoded view is now path-based rather than content-based: every eligible file
+  (localisation yml or `transparentScriptGlobs`) opens through its `pdcloc://` twin and takes
+  over the raw tab. readFile dispatches on the actual form — plain readable files pass through
+  unchanged (quoted CJK is escape-encoded on the next save, announced by an info diagnostic),
+  legacy whole-escaped files decode wholesale, scoped files decode their strings while comments
+  stay readable, and damaged files show as-is with an error anchored at the first stray marker.
+  Three consequences worth knowing: (1) a legacy whole-escaped file saved through the decoded
+  view migrates to the scoped form — strings stay byte-identical, previously escaped comments
+  become readable UTF-8; (2) with the default `**/*.txt` glob, every workspace `.txt` now opens
+  through the decoded view, not only already-escaped ones; (3) files that land on an eligible
+  path mid-session (Save As from an untitled buffer, a file moved into scope) are adopted on
+  open, so typed CJK is encoded by the next save. Known limitation: a brand-new file that has
+  never been saved has no path yet and keeps its plain editor until it does.
+- The save gate is span-aware: pasted escape markers inside quoted strings refuse the save with
+  their positions (iron rule ②), while markers in comments or code no longer block saving —
+  those regions are written verbatim. Saves from the decoded view always write the scoped form.
+- `LocalisationMixedEncoding` diagnostics are narrowed to actual damage: a stray escape marker
+  outside every quoted string is the error (anchored at the marker itself); markers inside
+  strings are repairable `LocalisationBrokenEscapeSequence` warnings; readable CJK sharing a
+  string with escapes self-heals on save and is no longer flagged. Unencodable-code-point
+  warnings now apply only inside strings — comment/code positions stay verbatim on save.
+- The eye-icon context key `paradoxcode.transcodeEscaped` was renamed to
+  `paradoxcode.transcodeEligible` and now reflects pure path eligibility (no disk read) instead
+  of the classifier verdict.
 
 ## [0.4.0] - 2026-09-21
 
