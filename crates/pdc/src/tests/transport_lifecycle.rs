@@ -78,31 +78,31 @@ fn pdcloc_uris_resolve_to_the_backing_file_path() {
     #[cfg(windows)]
     {
         assert_eq!(
-            FileUri::parse("pdcloc:///C:/mods/edg/localisation/replace/edg_l_english.yml")
+            FileUri::parse("pdcloc:///C:/mods/demo/localisation/replace/demo_l_english.yml")
                 .expect("pdcloc URI should parse")
                 .to_path()
                 .expect("pdcloc URI should decode"),
-            std::path::PathBuf::from("C:/mods/edg/localisation/replace/edg_l_english.yml")
+            std::path::PathBuf::from("C:/mods/demo/localisation/replace/demo_l_english.yml")
         );
         assert_eq!(
-            FileUri::parse("pdcloc://localhost/C:/mods/edg/history/countries/CHI%20-%20Ming.txt")
+            FileUri::parse("pdcloc://localhost/C:/mods/demo/history/countries/CHI%20-%20Ming.txt")
                 .expect("pdcloc URI with localhost authority should parse")
                 .to_path()
                 .expect("localhost authority should decode"),
-            std::path::PathBuf::from("C:/mods/edg/history/countries/CHI - Ming.txt")
+            std::path::PathBuf::from("C:/mods/demo/history/countries/CHI - Ming.txt")
         );
     }
     assert_eq!(
-        FileUri::parse("pdcloc:///tmp/edg/localisation/x.yml")
+        FileUri::parse("pdcloc:///tmp/demo/localisation/x.yml")
             .expect("scheme-swapped file URI should parse")
             .to_path()
             .expect("scheme-swapped file URI should decode"),
         // The Windows branch of `to_path` drops the leading `/` of a
         // POSIX-style path just like it does for `file://` URIs.
         std::path::PathBuf::from(if cfg!(windows) {
-            "tmp/edg/localisation/x.yml"
+            "tmp/demo/localisation/x.yml"
         } else {
-            "/tmp/edg/localisation/x.yml"
+            "/tmp/demo/localisation/x.yml"
         })
     );
     // A non-local authority names a remote host: a UNC path on Windows, an

@@ -67,7 +67,8 @@ pub enum Profile {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum EscapeSet {
     /// Canonical paratranz / EU4SpecialEscape set (23 values, includes `0x2F`).
-    /// Verified byte-exact against EDG-KTP release files and 310 workshop scripts.
+    /// Verified byte-exact against a real CJK mod's release files and 310
+    /// workshop scripts.
     #[default]
     Paratranz,
     /// EU4dll in-game encoder superset (29 values). Rarely needed for encoding —
@@ -96,7 +97,7 @@ impl EscapeSet {
 }
 
 /// Canonical 23-value escape set (paratranz / EU4SpecialEscape, EU4 profile with
-/// `0x2F`). Empirically confirmed by the EDG-KTP file pair and the 310-file
+/// `0x2F`). Empirically confirmed by the golden corpus file pair and the 310-file
 /// workshop script corpus.
 pub const PARATRANZ_ESCAPE_BYTES: [u8; 23] = [
     0x00, 0x0A, 0x0D, 0x20, 0x22, 0x23, 0x24, 0x2F, 0x3B, 0x3D, 0x40, 0x5B, 0x5C, 0x5D, 0x5F, 0x7B,

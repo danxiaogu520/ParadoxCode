@@ -15,7 +15,7 @@
  *   node editors/vscode/scripts/compare.mjs --workspace <mod> --cache <vanilla.pdcindex> \
  *       --label baseline --out performance-results/baseline.json
  *   node editors/vscode/scripts/compare.mjs --workspace <mod> --cache <vanilla.pdcindex> \
- *       --dependency EDG=/path/to/reference-mod --label with-reference-mod
+ *       --dependency DEMO=/path/to/reference-mod --label with-reference-mod
  *   node editors/vscode/scripts/compare.mjs --compare performance-results/baseline.json \
  *       performance-results/candidate.json
  */

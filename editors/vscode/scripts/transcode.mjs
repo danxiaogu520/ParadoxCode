@@ -4,8 +4,8 @@
 // Three layers of protection, in increasing strength:
 //   1. Behavioural cases ported from the native suite (round trips, iron
 //      rule ② refusals, orphan markers, CP1252 single bytes).
-//   2. The EDG-KTP golden corpus, byte for byte in both directions — the
-//      same ground truth paratranz certified for the Rust crate.
+//   2. The golden corpus, byte for byte in both directions — the same
+//      ground truth paratranz certified for the Rust crate.
 //   3. Differential vectors: `cargo run -p transcode --bin transcode-vectors`
 //      emits an exhaustive per-code-point encode sweep plus deterministic
 //      random byte/text sequences; every vector is replayed through the TS
@@ -60,7 +60,7 @@ assert.equal(transcode.TRANSCODE_VERSION, 1, 'transcode version must match the n
 const facade = new transcode.Transcoder();
 
 // --- Localisation profile round trip (BOM + CRLF kept structural) -------------
-const ymlText = '﻿l_english:\r\n edg_key:0 "发行本"\r\n other: "Straße Ära"\r\n';
+const ymlText = '﻿l_english:\r\n demo_key:0 "发行本"\r\n other: "Straße Ära"\r\n';
 const encoded = facade.encode(encoder.encode(ymlText), PROFILE_LOCALISATION);
 assert.ok(!('unencodable' in encoded), 'yml encode must succeed');
 assert.equal(facade.classify(encoded.bytes, PROFILE_LOCALISATION), 'escaped');
@@ -95,9 +95,9 @@ const cp1252 = facade.encode(encoder.encode('ä'), PROFILE_SCRIPT);
 assert.ok(!('unencodable' in cp1252));
 assert.deepEqual([...cp1252.bytes], [0xe4], 'CP1252-mapped letters stay single bytes');
 
-// --- Golden corpus: EDG-KTP release file ⇄ master file ------------------------
-const master = readFileSync(join(corpusRoot, 'edg_ktp_master.yml'));
-const release = readFileSync(join(corpusRoot, 'edg_ktp_release.yml'));
+// --- Golden corpus: release file ⇄ master file ---------------------------------
+const master = readFileSync(join(corpusRoot, 'cjk_pair_master.yml'));
+const release = readFileSync(join(corpusRoot, 'cjk_pair_release.yml'));
 assert.equal(facade.classify(new Uint8Array(release), PROFILE_LOCALISATION), 'escaped');
 const corpusDecoded = facade.decode(new Uint8Array(release), PROFILE_LOCALISATION);
 assert.notEqual(corpusDecoded, 'invalid-utf8');

@@ -188,7 +188,7 @@ fn area_scope_transition_keeps_province_trigger_valid() {
             .as_nanos()
     ));
     let area_path = root.join("map/area.txt");
-    let event_path = root.join("events/EDG_KTPEvents.txt");
+    let event_path = root.join("events/demo_events.txt");
     fs::create_dir_all(area_path.parent().expect("area parent")).expect("area directory");
     fs::create_dir_all(event_path.parent().expect("event parent")).expect("event directory");
     fs::write(&area_path, "tripolitania_area = { 1 2 }\n").expect("area source");
@@ -198,7 +198,7 @@ fn area_scope_transition_keeps_province_trigger_valid() {
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("index area definitions");
-    let id = DocumentId::new("file:///tmp/events/EDG_KTPEvents.txt");
+    let id = DocumentId::new("file:///tmp/events/demo_events.txt");
     let text = concat!(
         "country_event = {\n",
         "  immediate = {\n",
@@ -255,11 +255,11 @@ fn eu4_normal_type_selector_applies_mission_rules_to_custom_root_names() {
         SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
-    let path = root.join("missions/EDG_Bavarian_Missions.txt");
-    let source = "EDG_Bavarian_Missions = { slot = 1 generic = no ai = yes has_country_shield = yes potential = { } EDG_bav_claim = { required_missions = { potential } } }\n";
+    let path = root.join("missions/DEMO_Bavarian_Missions.txt");
+    let source = "DEMO_Bavarian_Missions = { slot = 1 generic = no ai = yes has_country_shield = yes potential = { } demo_bav_claim = { required_missions = { potential } } }\n";
     fs::write(&path, source).expect("write mission document");
     host.refresh_source_roots().expect("index mission document");
-    let id = DocumentId::new("file:///tmp/EDG_Bavarian_Missions.txt");
+    let id = DocumentId::new("file:///tmp/DEMO_Bavarian_Missions.txt");
     host.open_document(
         id.clone(),
         1,
@@ -276,7 +276,7 @@ fn eu4_normal_type_selector_applies_mission_rules_to_custom_root_names() {
                     "generic",
                     "ai",
                     "has_country_shield",
-                    "EDG_bav_claim",
+                    "demo_bav_claim",
                 ]
                 .iter()
                 .any(|key| item.message.contains(&format!("`{key}`")))

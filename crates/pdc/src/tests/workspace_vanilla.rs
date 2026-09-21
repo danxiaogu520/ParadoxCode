@@ -124,7 +124,7 @@ fn workspace_root_is_scanned_as_project_without_editor_override() {
     fs::create_dir_all(root.join("missions")).expect("missions directory");
     fs::write(
         root.join("common/country_tags/00_tags.txt"),
-        "KTP = \"countries/KTP.txt\"\n",
+        "D00 = \"countries/D00.txt\"\n",
     )
     .expect("country tag source");
     let mission = root.join("missions/test_missions.txt");
@@ -146,7 +146,7 @@ fn workspace_root_is_scanned_as_project_without_editor_override() {
         server
             .snapshot()
             .index()
-            .active_definition("country_tag", "KTP")
+            .active_definition("country_tag", "D00")
             .is_some()
     );
     fs::remove_dir_all(root).expect("cleanup");
