@@ -77,6 +77,8 @@
   "configuration.hover.eventCard.description": "在 `events/` 目录的事件文件内悬停事件时渲染游戏同款事件窗口（背景骨架、图片横幅、标题、描述、选项按钮）。贴图路径解析来自服务器索引；卡片使用与任务树预览相同的字体合成。",
   "commands.localisation.openDecoded.title": "以中文（解码）视图打开",
   "commands.localisation.revealOriginal.title": "打开原始转码文件",
+  "commands.localisation.peekOriginal.title": "窥视原始转码形态",
+  "commands.localisation.endPeek.title": "返回解码视图",
   "commands.localisation.transcodeFile.title": "转码本地化文件",
   "configuration.localisation.transparentEncoding.description": "启用 `pdcloc://` 透明读写视图。符合范围的本地化 yml 和脚本文件可按可读中文打开，在解码视图中保存时会重新编码为磁盘上的 EU4dll 转义形态。",
   "configuration.localisation.autoOpenDecoded.description": "打开已确认经过 EU4dll 转码的文件时，自动切换到中文解码视图；可读、混合编码和纯 ASCII 文件仍使用原始文件 URI。",
