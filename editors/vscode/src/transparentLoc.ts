@@ -11,6 +11,13 @@
 // directions: decoding only happens for whole files the classifier marks
 // `escaped`, and a save is refused outright when the buffer itself already
 // contains escape sequences — with the reason surfaced to the user.
+//
+// Opening an eligible escaped file takes over its tab instead of adding a
+// second one: the decoded view is shown in the raw tab's own slot (preview
+// state included) and the raw tab is closed. `revealOriginal` pins the raw
+// form the same way, and `peekOriginal` flips the slot momentarily — Esc or
+// an editor-group switch flips it back (escape triples never contain newline
+// bytes, so the cursor line survives every flip).
 
 import * as fs from 'node:fs/promises';
 import * as nodePath from 'node:path';
@@ -294,6 +301,74 @@ function commandResource(uri: vscode.Uri | undefined): vscode.Uri | undefined {
     return realUriOf(active) ?? active;
 }
 
+/**
+ * Raw URIs intentionally kept on their `file://` view — pinned by
+ * revealOriginal or an active peek. The automatic redirect skips them until
+ * their tab closes (pruned from the tab-change listener below).
+ */
+const manualRawViews = new Set<string>();
+
+interface TextTabSlot {
+    tab: vscode.Tab;
+    group: vscode.TabGroup;
+}
+
+/** Plain text tabs showing `uri` — diff, custom, and notebook inputs are excluded on purpose. */
+function textTabsFor(uri: vscode.Uri): TextTabSlot[] {
+    const slots: TextTabSlot[] = [];
+    for (const group of vscode.window.tabGroups.all) {
+        for (const tab of group.tabs) {
+            if (tab.input instanceof vscode.TabInputText && tab.input.uri.toString() === uri.toString()) {
+                slots.push({ tab, group });
+            }
+        }
+    }
+    return slots;
+}
+
+async function closeTextTabs(uri: vscode.Uri): Promise<void> {
+    const tabs = textTabsFor(uri).map((slot) => slot.tab);
+    if (tabs.length > 0) {
+        await vscode.window.tabGroups.close(tabs);
+    }
+}
+
+/**
+ * Shows `target` in `source`'s tab slot — same group, same preview state —
+ * then closes whatever plain text tabs still show `source`. A preview slot is
+ * reused in place; a pinned tab is replaced beside itself, so the swap never
+ * leaves a second tab behind. When `source` has no tab yet the target simply
+ * opens in the active group as a persistent tab.
+ */
+async function takeoverShow(source: vscode.Uri, target: vscode.Uri): Promise<vscode.TextEditor> {
+    const slot = textTabsFor(source)[0];
+    const editor = await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(target), {
+        viewColumn: slot?.group.viewColumn,
+        preview: slot?.tab.isPreview ?? false,
+    });
+    await closeTextTabs(source);
+    return editor;
+}
+
+function currentLine(editor: vscode.TextEditor | undefined): number | undefined {
+    return editor?.selection.active.line;
+}
+
+/**
+ * Restores the cursor to `line` (column 0) after a flip: escape triples never
+ * contain newline bytes, so line numbers map one-to-one between the raw and
+ * decoded forms — only the column has to reset.
+ */
+function restoreLine(editor: vscode.TextEditor | undefined, line: number | undefined): void {
+    if (!editor || line === undefined) {
+        return;
+    }
+    const clamped = Math.min(Math.max(line, 0), editor.document.lineCount - 1);
+    const position = new vscode.Position(clamped, 0);
+    editor.selection = new vscode.Selection(position, position);
+    editor.revealRange(editor.document.lineAt(clamped).range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+}
+
 async function openDecodedView(transcoder: Transcoder, uri: vscode.Uri | undefined): Promise<void> {
     const real = commandResource(uri);
     if (!real || real.scheme !== 'file') {
@@ -326,17 +401,102 @@ async function openDecodedView(transcoder: Transcoder, uri: vscode.Uri | undefin
         );
         return;
     }
-    const document = await vscode.workspace.openTextDocument(decodedUriOf(real));
-    await vscode.window.showTextDocument(document);
+    await takeoverShow(real, decodedUriOf(real));
+    supersedePeek(real);
 }
 
+/** Pins the raw on-disk form: flips the decoded tab in place and keeps the raw view immune to the auto-redirect. */
 async function revealOriginal(): Promise<void> {
-    const active = vscode.window.activeTextEditor?.document.uri;
-    const real = active ? realUriOf(active) : undefined;
-    if (!real) {
+    const active = vscode.window.activeTextEditor;
+    const real = active ? realUriOf(active.document.uri) : undefined;
+    if (!active || !real) {
         return;
     }
-    await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(real));
+    const line = currentLine(active);
+    manualRawViews.add(real.toString());
+    const editor = await takeoverShow(active.document.uri, real);
+    restoreLine(editor, line);
+}
+
+/** The active momentary raw view, if any. */
+interface PeekState {
+    real: vscode.Uri;
+    decoded: vscode.Uri;
+    column: vscode.ViewColumn | undefined;
+}
+
+const PEEKING_RAW_CONTEXT = 'paradoxcode.peekingRaw';
+
+let peek: PeekState | undefined;
+
+/** Drops the peek bookkeeping after its file got the decoded view back another way (e.g. the eye command). */
+function supersedePeek(real: vscode.Uri): void {
+    if (!peek || peek.real.toString() !== real.toString()) {
+        return;
+    }
+    peek = undefined;
+    manualRawViews.delete(real.toString());
+    void vscode.commands.executeCommand('setContext', PEEKING_RAW_CONTEXT, false);
+}
+
+/**
+ * Momentary look at the on-disk escaped form: the decoded tab flips in place
+ * and Esc (or the eye command on the raw view) flips it back. Moving focus to
+ * another editor group ends the peek in the background; a tab switch inside
+ * the peek's own group cannot (VS Code has no API to rewrite a background
+ * tab), so the peek simply survives there until Esc. Unsaved raw edits also
+ * keep it open — refusing to yank the view is safer than losing the user's
+ * place, and it degrades to the pinned revealOriginal mode.
+ */
+async function peekOriginal(): Promise<void> {
+    const active = vscode.window.activeTextEditor;
+    const decoded = active?.document.uri;
+    const real = decoded ? realUriOf(decoded) : undefined;
+    if (!active || !decoded || !real) {
+        return;
+    }
+    if (peek) {
+        await endPeek();
+    }
+    const line = currentLine(active);
+    manualRawViews.add(real.toString());
+    const editor = await takeoverShow(decoded, real);
+    restoreLine(editor, line);
+    peek = { real, decoded, column: editor.viewColumn };
+    await vscode.commands.executeCommand('setContext', PEEKING_RAW_CONTEXT, true);
+}
+
+async function endPeek(foreground = true): Promise<void> {
+    const state = peek;
+    if (!state) {
+        return;
+    }
+    const rawEditor = vscode.window.visibleTextEditors.find(
+        (editor) => editor.document.uri.toString() === state.real.toString(),
+    );
+    if (rawEditor?.document.isDirty) {
+        void vscode.window.setStatusBarMessage(
+            'ParadoxCode: raw view kept open — it has unsaved edits (Esc again after saving or discarding them).',
+            6000,
+        );
+        return;
+    }
+    peek = undefined;
+    manualRawViews.delete(state.real.toString());
+    void vscode.commands.executeCommand('setContext', PEEKING_RAW_CONTEXT, false);
+    if (!rawEditor) {
+        // The raw tab was closed outright (middle-click): nothing to flip back.
+        return;
+    }
+    const slot = textTabsFor(state.real)[0];
+    const line = currentLine(rawEditor);
+    const editor = await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(state.decoded), {
+        viewColumn: slot?.group.viewColumn,
+        preview: slot?.tab.isPreview ?? false,
+        preserveFocus: !foreground,
+    });
+    await closeTextTabs(state.real);
+    restoreLine(editor, line);
 }
 
 /**
@@ -421,6 +581,31 @@ const classificationStamps = new Map<string, ClassificationStamp>();
 let contextUpdateSequence = 0;
 
 /**
+ * Whether the file behind `real` is currently classifier-escaped, served from
+ * (and refreshing) the mtime/size stamp cache — one disk read per file
+ * version across every consumer (eye-icon context, auto-redirect).
+ */
+async function escapedOnDisk(transcoder: Transcoder, real: vscode.Uri): Promise<boolean> {
+    const profile = profileForRealPath(real.fsPath, transparentScriptGlobs());
+    if (profile === undefined) {
+        return false;
+    }
+    try {
+        const stats = await fs.stat(real.fsPath);
+        const stamp = classificationStamps.get(real.fsPath);
+        if (stamp && stamp.mtime === stats.mtimeMs && stamp.size === stats.size && stamp.profile === profile) {
+            return stamp.escaped;
+        }
+        const bytes = new Uint8Array(await fs.readFile(real.fsPath));
+        const escaped = transcoder.classify(bytes, profile) === 'escaped';
+        classificationStamps.set(real.fsPath, { mtime: stats.mtimeMs, size: stats.size, profile, escaped });
+        return escaped;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Publishes `paradoxcode.transcodeEscaped` for a document: true only when the
  * file is both eligible and classifier-escaped. Normal readable UTF-8 (BOM
  * included) and ASCII files never offer the decoded view, yml and txt alike —
@@ -434,32 +619,7 @@ async function updateDecodedEntryContext(
     const sequence = ++contextUpdateSequence;
     let escaped = false;
     if (document && document.uri.scheme === 'file') {
-        const profile = profileForRealPath(document.uri.fsPath, transparentScriptGlobs());
-        if (profile !== undefined) {
-            try {
-                const stats = await fs.stat(document.uri.fsPath);
-                const stamp = classificationStamps.get(document.uri.fsPath);
-                if (
-                    stamp &&
-                    stamp.mtime === stats.mtimeMs &&
-                    stamp.size === stats.size &&
-                    stamp.profile === profile
-                ) {
-                    escaped = stamp.escaped;
-                } else {
-                    const bytes = new Uint8Array(await fs.readFile(document.uri.fsPath));
-                    escaped = transcoder.classify(bytes, profile) === 'escaped';
-                    classificationStamps.set(document.uri.fsPath, {
-                        mtime: stats.mtimeMs,
-                        size: stats.size,
-                        profile,
-                        escaped,
-                    });
-                }
-            } catch {
-                escaped = false;
-            }
-        }
+        escaped = await escapedOnDisk(transcoder, document.uri);
     }
     if (sequence !== contextUpdateSequence) {
         return;
@@ -469,11 +629,14 @@ async function updateDecodedEntryContext(
 
 /**
  * Opens the decoded view when an eligible, transcoded file is opened through
- * its raw path. Readable, mixed, and ASCII files stay on the normal `file://`
+ * its raw path, taking over the raw tab instead of adding a second one.
+ * Readable, mixed, and ASCII files stay on the normal `file://`
  * URI so the classifier remains the single guard against double decoding.
  *
- * The set is only an in-flight guard. A raw document can be intentionally
- * revealed later, and closing/reopening it should apply the setting again.
+ * The `opening` set is only an in-flight guard. URIs deliberately pinned on
+ * their raw view (revealOriginal, an active peek) are skipped until their tab
+ * closes; a raw document can still be intentionally revealed later, and
+ * closing/reopening it should apply the setting again.
  */
 async function maybeAutoOpenDecodedView(
     transcoder: Transcoder,
@@ -483,23 +646,18 @@ async function maybeAutoOpenDecodedView(
     if (!autoOpenDecoded() || document.uri.scheme !== 'file') {
         return;
     }
-    const profile = profileForRealPath(document.uri.fsPath, transparentScriptGlobs());
-    if (profile === undefined) {
-        return;
-    }
     const key = document.uri.toString();
-    if (opening.has(key)) {
+    if (opening.has(key) || manualRawViews.has(key)) {
         return;
     }
     opening.add(key);
     try {
-        let bytes: Uint8Array;
-        try {
-            bytes = new Uint8Array(await fs.readFile(document.uri.fsPath));
-        } catch {
+        if (!(await escapedOnDisk(transcoder, document.uri))) {
             return;
         }
-        if (transcoder.classify(bytes, profile) !== 'escaped') {
+        // Only take over the editor the user is actually looking at: invisible
+        // programmatic opens and quick tab switches must not pop a decoded tab.
+        if (vscode.window.activeTextEditor?.document.uri.toString() !== key) {
             return;
         }
         await openDecodedView(transcoder, document.uri);
@@ -583,12 +741,42 @@ export async function activateTransparentLocalisation(
             vscode.commands.registerCommand('paradoxcode.localisation.revealOriginal', () =>
                 void revealOriginal(),
             ),
+            vscode.commands.registerCommand('paradoxcode.localisation.peekOriginal', () =>
+                void peekOriginal(),
+            ),
+            vscode.commands.registerCommand('paradoxcode.localisation.endPeek', () =>
+                void endPeek(),
+            ),
             vscode.commands.registerCommand('paradoxcode.localisation.transcodeFile', (uri) =>
                 void transcodeFile(transcoder, uri, log),
             ),
             vscode.window.onDidChangeActiveTextEditor((editor) => {
                 updateStatus();
                 updateEntryContext(editor?.document);
+                if (peek) {
+                    const peekStillActive =
+                        editor !== undefined && editor.document.uri.toString() === peek.real.toString();
+                    if (!peekStillActive && editor?.viewColumn !== peek.column) {
+                        // Focus moved to another group or out of the editors:
+                        // flip back without stealing focus. A switch inside the
+                        // peek's own group cannot rewrite a background tab, so
+                        // the peek survives there until Esc.
+                        void endPeek(false);
+                    }
+                }
+                autoOpenDocument(editor?.document);
+            }),
+            vscode.window.tabGroups.onDidChangeTabs(() => {
+                for (const key of manualRawViews) {
+                    if (textTabsFor(vscode.Uri.parse(key)).length === 0) {
+                        manualRawViews.delete(key);
+                    }
+                }
+                if (peek && textTabsFor(peek.real).length === 0) {
+                    // The peeked tab was closed outright — nothing to flip back to.
+                    peek = undefined;
+                    void vscode.commands.executeCommand('setContext', PEEKING_RAW_CONTEXT, false);
+                }
             }),
             vscode.workspace.onDidOpenTextDocument(autoOpenDocument),
             vscode.workspace.onDidOpenTextDocument(updateEntryContext),
