@@ -56,21 +56,22 @@ remembers its hidden set for the session.
 ## Transparent Localisation (Chinese)
 
 Mods running the EU4dll double-byte patch store localisation as escape-tripled bytes. ParadoxCode
-ships the transcoder and opens those files as readable Chinese through the `pdcloc://` view:
+ships the transcoder and edits those files as readable Chinese through the `pdcloc://` view:
 
-- Eligible transcoded files automatically open in the decoded view. You can still choose
-  **ParadoxCode: Open in Decoded (Chinese) View** on any `localisation/**/*.yml` (or a script file
-  matching `paradoxcode.localisation.transparentScriptGlobs`, `**/*.txt` by default) when needed.
-  Files that are normal readable UTF-8 (BOM included) never enter the decoded view. Automatic
-  redirection is controlled by `paradoxcode.localisation.autoOpenDecoded` and is enabled by default.
-- Edits are re-encoded on save; the raw bytes on disk always stay game-ready. Saving is refused
-  (never double-encoded) if the buffer itself already contains escape sequences or code points
-  the ecosystem cannot round-trip.
-- Files on the game read path that are still readable Chinese get a
-  `LocalisationNotTranscoded` warning; use **ParadoxCode: Transcode Localisation File** to encode
-  them in place (a `.pre-transcode.bak` backup is written next to the file).
+- Entry is path-based: every eligible file — any `localisation/**/*.yml` or a script file matching
+  `paradoxcode.localisation.transparentScriptGlobs` (`**/*.txt` by default) — opens in the decoded
+  view and takes over the raw tab, whatever its bytes look like. Plain readable files pass through
+  unchanged; their quoted CJK is escape-encoded on the next save (announced by an informational
+  `LocalisationWillTranscodeOnSave` hint). Automatic redirection is controlled by
+  `paradoxcode.localisation.autoOpenDecoded` and is enabled by default.
+- Saving writes the scoped form: escape triples only inside quoted strings, comments and code as
+  readable UTF-8 — the game-side transcoder reads the strings exactly as with whole-file encoding.
+  Partially escaped files self-heal on save. Saving is refused (never double-encoded) when a
+  string already contains escape markers, or holds code points the ecosystem cannot round-trip.
+- Stray escape markers outside every quoted string are damage: the file is shown as-is with a
+  `LocalisationMixedEncoding` error anchored at the marker; fix it by hand.
 - While a decoded view is active, the status bar shows **EU4 decoded view**; click it to open the
-  raw transcoded file.
+  raw transcoded file, and use the editor-title eye to peek at the raw bytes momentarily.
 
 ## Configuration
 
