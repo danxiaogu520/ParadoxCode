@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'none'; style-src {{cspSource}}; script-src {{cspSource}}; img-src data:; connect-src 'none';">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{styleUri}}">
+    <title>Mission Icons</title>
+</head>
+<body>
+    <header class="picker-toolbar" aria-label="Mission icon picker controls">
+        <input id="search" type="text" placeholder="Search icons…" autocomplete="off" spellcheck="false"
+               aria-label="Search icons by sprite name">
+        <div class="tabs" role="tablist" aria-label="Sprite scope">
+            <button id="tab-mission" class="tab" role="tab" aria-selected="true" type="button">Mission icons</button>
+            <button id="tab-all" class="tab" role="tab" aria-selected="false" type="button">All sprites</button>
+        </div>
+        <span id="count" class="count" role="status" aria-live="polite"></span>
+    </header>
+    <div id="grid" class="grid" role="list" aria-label="Sprite tiles"></div>
+    <div id="message" class="message" role="status" aria-live="polite" hidden></div>
+    <p id="hint" class="hint">Click a tile to write it into the focused editor and close this panel.</p>
+    <script src="{{scriptUri}}"></script>
+</body>
+</html>

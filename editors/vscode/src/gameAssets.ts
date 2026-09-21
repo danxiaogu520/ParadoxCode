@@ -515,6 +515,55 @@ export interface SpriteEntry {
     frames?: number;
 }
 
+/** One sprite of the merged index plus the root kind that provided it. */
+export interface CataloguedSprite extends SpriteEntry {
+    /** `vanilla` = the game installation, `mod` = a mod root (workspace or
+     * explicit `paradoxcode.modDirectory`), which overrides vanilla by name. */
+    origin: 'vanilla' | 'mod';
+}
+
+/** One decoded sprite ready for icon-sized display (first frame only). */
+export interface IconPreview {
+    url: string;
+    width: number;
+    height: number;
+}
+
+/** Directory vanilla mission-icon textures live under (normalized form of
+ * the `gfx//interface//missions//…` spellings the game's .gfx files use). */
+const MISSION_TEXTURE_PREFIX = 'gfx/interface/missions/';
+
+/**
+ * Union filter for sprites usable as mission `icon` values. The vanilla set
+ * proves both arms are needed: name-only would miss the 545 sprites that
+ * only the texture directory identifies (base-game icons live in
+ * `countrymissionsview.gfx`), directory-only would miss sprites named
+ * `mission_*` with textures elsewhere; together they cover every icon value
+ * vanilla missions use. Deliberately over-inclusive: a few unreferenced
+ * mission-view UI sprites ride along.
+ */
+export function isMissionIconSprite(entry: { name: string; textureFile: string }): boolean {
+    if (entry.name.toLowerCase().startsWith('mission')) {
+        return true;
+    }
+    return entry.textureFile.toLowerCase().startsWith(MISSION_TEXTURE_PREFIX);
+}
+
+/** Crops a horizontal frame strip to its leftmost frame; anything without a
+ * multi-frame declaration returns the image unchanged. */
+export function cropFirstFrame(image: DecodedImage, frames?: number): DecodedImage {
+    if (frames === undefined || frames <= 1 || frames > image.width) {
+        return image;
+    }
+    const width = Math.floor(image.width / frames);
+    const pixels = new Uint8Array(width * image.height * 4);
+    for (let y = 0; y < image.height; y += 1) {
+        const source = y * image.width * 4;
+        pixels.set(image.pixels.subarray(source, source + width * 4), y * width * 4);
+    }
+    return { width, height: image.height, pixels };
+}
+
 /** One decoded texture file ready for markdown embedding. */
 export interface TextureImageData {
     url: string;
@@ -830,8 +879,9 @@ export class GameAssetStore {
     private readonly chineseFontDirectory: string | undefined;
     /** Mod roots (explicit mod directory, then workspace folders). */
     private readonly modRoots: readonly string[];
-    private spriteIndex: Map<string, SpriteEntry> | undefined;
+    private spriteIndex: Map<string, CataloguedSprite> | undefined;
     private readonly spriteCache = new Map<string, { modified: number; url: string }>();
+    private readonly iconUrlCache = new Map<string, { modified: number; preview: IconPreview }>();
     private readonly textureFileCache = new Map<string, { modified: number; image: TextureImageData }>();
     private readonly textureRasterCache = new Map<string, { modified: number; image: DecodedImage }>();
     private fontCache: { modified: string; fonts: FontAssets } | undefined;
@@ -897,6 +947,67 @@ export class GameAssetStore {
         const index = this.spriteIndex ?? this.loadSpriteIndex();
         this.spriteIndex = index;
         return index.get(name);
+    }
+
+    /** The whole merged sprite index with the providing root kind attached.
+     * The catalog the mission-icon picker browses; loaded on first use. */
+    public spriteCatalog(): Map<string, CataloguedSprite> {
+        const index = this.spriteIndex ?? this.loadSpriteIndex();
+        this.spriteIndex = index;
+        return index;
+    }
+
+    /**
+     * Resolves sprite names to first-frame PNG previews (the icon-sized
+     * images the picker grid and completion documentation render). Same
+     * contract as `spriteUrls`: unknown names and decode failures are absent
+     * from the result, and only newly loaded or mtime-changed sprites are
+     * returned unless `force` names them.
+     */
+    public async spriteIconUrls(
+        names: readonly string[],
+        force?: ReadonlySet<string>,
+    ): Promise<Record<string, IconPreview>> {
+        const previews: Record<string, IconPreview> = {};
+        if (!this.gameDirectory && this.modRoots.length === 0) {
+            return previews;
+        }
+        const index = this.spriteIndex ?? this.loadSpriteIndex();
+        this.spriteIndex = index;
+        for (const name of names) {
+            const entry = index.get(name);
+            if (!entry) {
+                continue;
+            }
+            const file = this.resolveTexture(entry.textureFile);
+            if (!file) {
+                continue;
+            }
+            const modified = this.fileModified(file);
+            if (modified === undefined) {
+                continue;
+            }
+            const cached = this.iconUrlCache.get(name);
+            if (cached && cached.modified === modified) {
+                if (force?.has(name)) {
+                    previews[name] = cached.preview;
+                }
+                continue;
+            }
+            const raster = await this.textureRaster(file);
+            if (!raster) {
+                continue;
+            }
+            const image = cropFirstFrame(raster, entry.frames);
+            const preview: IconPreview = {
+                url: pngDataUrl(image),
+                width: image.width,
+                height: image.height,
+            };
+            this.iconUrlCache.set(name, { modified, preview });
+            previews[name] = preview;
+        }
+        return previews;
     }
 
     /**
@@ -1112,7 +1223,7 @@ export class GameAssetStore {
         }
     }
 
-    private loadSpriteIndex(): Map<string, SpriteEntry> {
+    private loadSpriteIndex(): Map<string, CataloguedSprite> {
         const gameFiles = this.gameDirectory
             ? this.readGfxFiles(path.join(this.gameDirectory, 'interface'))
             : [];
@@ -1120,10 +1231,13 @@ export class GameAssetStore {
         for (const root of this.modRoots) {
             modFiles.push(...this.readGfxFiles(path.join(root, 'interface')));
         }
-        const index = buildSpriteIndex(gameFiles);
+        const index = new Map<string, CataloguedSprite>();
+        for (const [name, entry] of buildSpriteIndex(gameFiles)) {
+            index.set(name, { ...entry, origin: 'vanilla' });
+        }
         // Mod definitions replace vanilla ones for the same sprite name.
         for (const [name, entry] of buildSpriteIndex(modFiles)) {
-            index.set(name, entry);
+            index.set(name, { ...entry, origin: 'mod' });
         }
         return index;
     }

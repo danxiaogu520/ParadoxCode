@@ -16,12 +16,14 @@ import { registerAgentTools } from './agent/register';
 import { setAgentClient } from './agent/server';
 import { LoadedFilesProvider } from './fileExplorer';
 import { MissionPreviewPanel } from './previewPanel';
+import { MissionIconPickerPanel } from './iconPickerPanel';
 import {
     PDCLOC_SCHEME,
     activateTransparentLocalisation,
 } from './transparentLoc';
 import {
     attachFollowupCompletionTrigger,
+    attachSpritePreviewDocumentation,
     FOLLOWUP_COMPLETION_TRIGGER_COMMAND,
 } from './completionMiddleware';
 import { normalizeTexturePath, pngDataUrl } from './gameAssets';
@@ -632,6 +634,13 @@ function previewRefreshMode(): 'always' | 'onSave' | 'manual' {
     return value === 'onSave' || value === 'manual' ? value : 'always';
 }
 
+/** Reads the completion sprite-preview switch (on unless opted out). */
+function completionSpritePreview(): boolean {
+    return vscode.workspace
+        .getConfiguration('paradoxcode.completion')
+        .get<boolean>('iconPreview', true);
+}
+
 function clientMiddleware(): NonNullable<LanguageClientOptions['middleware']> {
     return {
         provideCompletionItem(document, position, context, token, next) {
@@ -647,11 +656,20 @@ function clientMiddleware(): NonNullable<LanguageClientOptions['middleware']> {
             });
         },
         resolveCompletionItem(item, token, next) {
-            return Promise.resolve(next(item, token)).then((resolved) => {
+            return Promise.resolve(next(item, token)).then(async (resolved) => {
                 if (resolved) {
                     // VS Code may resolve an item before applying it. Re-attach the command to
                     // the resolved object because the server's resolve response is authoritative.
                     attachFollowupCompletionTrigger(resolved);
+                    if (completionSpritePreview()) {
+                        // A resolved label naming a sprite gains the decoded
+                        // first-frame image in its documentation; resolve fires
+                        // per displayed item, so nothing is decoded up front.
+                        // Awaited, because VS Code snapshots the item when this
+                        // promise settles — a later mutation would be lost.
+                        await attachSpritePreviewDocumentation(resolved, MissionPreviewPanel.store())
+                            .catch(() => undefined);
+                    }
                 }
                 return resolved;
             });
@@ -1645,7 +1663,11 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('paradoxcode.formatWorkspace', () => formatWorkspace()),
         vscode.commands.registerCommand('paradoxcode.refreshLoadedFiles', () => loadedFilesProvider.refresh(client)),
         vscode.commands.registerCommand('paradoxcode.refreshMissionPreview', () => MissionPreviewPanel.refresh(client)),
+        vscode.commands.registerCommand('paradoxcode.openMissionIconPicker', () => {
+            void MissionIconPickerPanel.show(context.extensionUri);
+        }),
         { dispose: () => MissionPreviewPanel.dispose() },
+        { dispose: () => MissionIconPickerPanel.dispose() },
     );
 
     updateMissionContext(vscode.window.activeTextEditor?.document);
@@ -1686,6 +1708,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): Promise<void> {
     MissionPreviewPanel.dispose();
+    MissionIconPickerPanel.dispose();
     statusBar.hide();
     return stopClient(loadedFilesProvider);
 }
