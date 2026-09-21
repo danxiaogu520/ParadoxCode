@@ -114,6 +114,24 @@ assertBytesEqual(
     'encode(master) must equal the committed release file byte for byte',
 );
 
+// Scoped encoding of the same corpus: the master keeps all CJK inside strings,
+// so the scoped form must reproduce the release exactly, and the release (no
+// readable CJK between strings) must dispatch to the legacy whole-file path.
+const masterText = decoder.decode(master);
+const scopedFromMaster = transcode.scopedEncodeFile(masterText, PROFILE_LOCALISATION, PARATRANZ);
+assert.ok('bytes' in scopedFromMaster, 'master scoped encode must succeed');
+assertBytesEqual(
+    scopedFromMaster.bytes,
+    release,
+    'scopedEncode(master) must equal the whole-file release when no CJK sits outside strings',
+);
+assert.equal(transcode.scopedForm(new Uint8Array(release), PROFILE_LOCALISATION), 'whole');
+const scopedCorpusBack = transcode.scopedDecodeFile(new Uint8Array(release), PROFILE_LOCALISATION);
+assert.ok(typeof scopedCorpusBack === 'object');
+assert.equal(scopedCorpusBack.text, masterText, 'scoped decode of the release equals the master');
+assert.deepEqual(scopedCorpusBack.inSpanBroken, []);
+assert.deepEqual(scopedCorpusBack.outOfSpanMarkers, []);
+
 // --- Iron rule ② gates --------------------------------------------------------
 const refused = facade.encode(encoded.bytes, PROFILE_LOCALISATION);
 assert.ok('unencodable' in refused, 'encoding escaped text must be refused');
@@ -232,6 +250,70 @@ if (process.env.PDC_SKIP_VECTORS !== '1') {
                     'mixed',
                     `seq ${vector.b} must classify as mixed (invalid UTF-8)`,
                 );
+            }
+            compared += 1;
+            return;
+        }
+        if (vector.v === 'sct') {
+            const profile = vector.p === 's' ? PROFILE_SCRIPT : PROFILE_LOCALISATION;
+            const text = cpsToText(parseCps(vector.t));
+            const scopedEncoded = transcode.scopedEncodeFile(text, profile, PARATRANZ);
+            if (vector.e.startsWith('E[')) {
+                if (!('alreadyEscaped' in scopedEncoded)) {
+                    record(`sct ${vector.t}: expected iron-rule refusal`);
+                    return;
+                }
+                const actual = scopedEncoded.alreadyEscaped.join(',');
+                if (actual !== vector.e.slice(2, -1)) {
+                    record(`sct ${vector.t}: refusal positions ${actual} != ${vector.e}`);
+                    return;
+                }
+            } else if (vector.e.startsWith('R')) {
+                if (!('unencodable' in scopedEncoded)) {
+                    record(`sct ${vector.t}: expected unencodable refusal`);
+                    return;
+                }
+                const actual = scopedEncoded.unencodable
+                    .map((point) => `${point.kind}@${point.byteIndex}`)
+                    .join(',');
+                if (actual !== vector.e.slice(1)) {
+                    record(`sct ${vector.t}: refusal ${actual} != ${vector.e}`);
+                    return;
+                }
+            } else {
+                if (!('bytes' in scopedEncoded)) {
+                    record(`sct ${vector.t}: unexpected refusal`);
+                    return;
+                }
+                if (hex(scopedEncoded.bytes) !== vector.e) {
+                    record(`sct ${vector.t}: encode mismatch`);
+                    return;
+                }
+            }
+            compared += 1;
+            return;
+        }
+        if (vector.v === 'scd') {
+            const profile = vector.p === 's' ? PROFILE_SCRIPT : PROFILE_LOCALISATION;
+            const bytes = new Uint8Array(Buffer.from(vector.b, 'hex'));
+            if (transcode.scopedForm(bytes, profile) !== vector.f) {
+                record(`scd ${vector.b}: form mismatch`);
+                return;
+            }
+            const scopedDecoded = transcode.scopedDecodeFile(bytes, profile);
+            if (vector.d === 'ERR') {
+                if (scopedDecoded !== 'invalid-utf8') {
+                    record(`scd ${vector.b}: expected invalid-utf8`);
+                    return;
+                }
+            } else if (
+                typeof scopedDecoded !== 'object' ||
+                hexTextCps(scopedDecoded.text) !== vector.d ||
+                brokenList(scopedDecoded.inSpanBroken) !== vector.ib ||
+                brokenList(scopedDecoded.outOfSpanMarkers) !== vector.ob
+            ) {
+                record(`scd ${vector.b}: decode mismatch`);
+                return;
             }
             compared += 1;
             return;

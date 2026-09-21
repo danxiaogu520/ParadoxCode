@@ -668,12 +668,6 @@ function clientMiddleware(): NonNullable<LanguageClientOptions['middleware']> {
                     .get<string[]>('diagnosticIgnoreCodes', [])
                     .filter((value): value is string => typeof value === 'string'),
             );
-            // A decoded pdcloc view intentionally shows readable CJK; the backing
-            // shard is re-encoded on save, so the server's NotTranscoded warning
-            // for release paths would always be a false alarm in that view.
-            if (uri.scheme === PDCLOC_SCHEME) {
-                ignoredCodes.add('LocalisationNotTranscoded');
-            }
             const patterns = diagnosticIgnorePatterns().map(globToRegExp);
             const relative = relativeDiagnosticPath(uri);
             const filtered = diagnostics.filter((diagnostic) => {

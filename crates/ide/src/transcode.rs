@@ -3,12 +3,16 @@
 //! The server sees documents as text (disk bytes were already read through the
 //! UTF-8/CP1252 layer), so these checks classify the document text and report:
 //!
-//! * files mixing readable CJK with escape triples or carrying stray markers
-//!   (`LocalisationMixedEncoding`);
-//! * orphan escape markers that decoding passed through
+//! * escape markers outside every quoted string — code or comment position —
+//!   (`LocalisationMixedEncoding`); inside strings a marker is either part of
+//!   a scoped escape (readable CJK sharing the span self-heals on save
+//!   through the decoded view) or a repairable orphan;
+//! * orphan escape markers inside strings that decoding passed through
 //!   (`LocalisationBrokenEscapeSequence`);
-//! * code points the transcoder refuses (`LocalisationUnencodableCodePoint`),
-//!   while the script profile accepts the 27 CP1252 letters;
+//! * code points inside strings that the transcoder refuses
+//!   (`LocalisationUnencodableCodePoint`), while the script profile accepts
+//!   the 27 CP1252 letters — outside strings scoped saving keeps bytes
+//!   verbatim, so no refusal applies there;
 //! * script files that decode correctly but re-encode differently
 //!   (`ScriptLegacyEscapeVariant`, Hint).
 //!
@@ -33,62 +37,49 @@ pub(crate) fn transcode_diagnostics(
         return Ok(Vec::new());
     }
     let source: &str = input.source.as_ref();
-    let counts = transcode::classify_text_counts(source);
     let mut diagnostics = Vec::new();
-    // A file that is escaped overall (at least three triples, no raw CJK) but
-    // carries orphan markers is a *damaged transcoded file*: report each
-    // orphan precisely instead of the harsher mixed-encoding error. Everything
-    // else that is not clean gets the mixed-encoding diagnosis.
-    let escaped_with_damage =
-        counts.escaped_triples >= 3 && counts.raw_cjk == 0 && counts.broken_markers > 0;
     match transcode::classify_text(source) {
-        transcode::Classification::Escaped | transcode::Classification::Mixed
-            if escaped_with_damage =>
-        {
-            let decoded = transcode::decode_text(source);
-            for offset in decoded
-                .broken_sequences
-                .iter()
-                .take(MAX_TRANSCODE_DIAGNOSTICS)
-            {
-                cancellation.checkpoint()?;
-                if let Some(range) = char_range(source, *offset) {
-                    diagnostics.push(Diagnostic::new(
-                        DiagnosticCode::LocalisationBrokenEscapeSequence,
-                        Severity::Warning,
-                        range,
-                        "orphan EU4dll escape marker: the surrounding triple is damaged and \
-                             was passed through undecoded"
-                            .to_owned(),
-                    ));
-                }
-            }
-            if input.format == FileFormat::Script
-                && diagnostics.len() < MAX_TRANSCODE_DIAGNOSTICS
-                && !transcode::script_roundtrip_is_canonical(source)
-            {
-                diagnostics.push(Diagnostic::new(
-                    DiagnosticCode::ScriptLegacyEscapeVariant,
-                    Severity::Hint,
-                    TextRange::empty(TextSize::from(
-                        u32::try_from(source.len()).unwrap_or(u32::MAX),
-                    )),
-                    "this file was written with a historical EU4dll escape-set variant: it \
-                     decodes correctly, but saving normalizes the triples to the canonical set"
-                        .to_owned(),
-                ));
-            }
-        }
         transcode::Classification::Mixed => {
-            if let Some(range) = first_mixed_evidence(source) {
-                diagnostics.push(Diagnostic::new(
-                    DiagnosticCode::LocalisationMixedEncoding,
-                    Severity::Error,
-                    range,
-                    "this file mixes readable CJK with EU4dll escape triples (or stray escape \
-                     markers); no transformation is applied — fix the file manually"
-                        .to_owned(),
-                ));
+            let bytes = source.as_bytes();
+            match transcode::marker_outside_spans(bytes).first() {
+                Some(&offset) => {
+                    if let Some(range) = char_range(source, offset) {
+                        diagnostics.push(Diagnostic::new(
+                            DiagnosticCode::LocalisationMixedEncoding,
+                            Severity::Error,
+                            range,
+                            "escape marker outside every quoted string: damaged transcoded \
+                             content — no transformation is applied, fix the file manually"
+                                .to_owned(),
+                        ));
+                    }
+                }
+                None => {
+                    // Scoped shape: orphan markers survive only inside strings.
+                    // Span boundaries fall on ASCII structural bytes, so text
+                    // slices at them are char-safe.
+                    for (start, end) in transcode::scan_string_spans(bytes) {
+                        cancellation.checkpoint()?;
+                        let Some(span) = source.get(start..end) else {
+                            continue;
+                        };
+                        for offset in transcode::decode_text(span).broken_sequences {
+                            if diagnostics.len() >= MAX_TRANSCODE_DIAGNOSTICS {
+                                break;
+                            }
+                            if let Some(range) = char_range(source, start + offset) {
+                                diagnostics.push(Diagnostic::new(
+                                    DiagnosticCode::LocalisationBrokenEscapeSequence,
+                                    Severity::Warning,
+                                    range,
+                                    "orphan EU4dll escape marker: the surrounding triple is \
+                                     damaged and was passed through undecoded"
+                                        .to_owned(),
+                                ));
+                            }
+                        }
+                    }
+                }
             }
         }
         transcode::Classification::Escaped => {
@@ -116,38 +107,43 @@ pub(crate) fn transcode_diagnostics(
     Ok(diagnostics)
 }
 
-/// Per-character warnings for code points the script transcoder refuses. The 27
-/// CP1252-mapped letters remain valid single bytes.
+/// Per-character warnings for code points inside strings that the script
+/// transcoder refuses. The 27 CP1252-mapped letters remain valid single bytes.
 fn unencodable_diagnostics(
     source: &str,
     cancellation: &CancellationToken,
 ) -> Result<Vec<Diagnostic>, Cancelled> {
     let mut diagnostics = Vec::new();
-    for (offset, character) in source.char_indices() {
+    for (start, end) in transcode::scan_string_spans(source.as_bytes()) {
         cancellation.checkpoint()?;
-        if let Some(kind) =
-            transcode::file_unencodable_kind(u32::from(character), transcode::Profile::Script)
-        {
+        let Some(span) = source.get(start..end) else {
+            continue;
+        };
+        for (offset, character) in span.char_indices() {
             if diagnostics.len() >= MAX_TRANSCODE_DIAGNOSTICS {
-                break;
+                return Ok(diagnostics);
             }
-            let reason = match kind {
-                transcode::UnencodableKind::MangledLowPlane => {
-                    "U+0100..U+0FFF characters are silently mangled by the EU4 transcoder"
-                }
-                transcode::UnencodableKind::BeyondBmp => {
-                    "characters beyond the BMP are destroyed by the EU4 transcoder"
-                }
-            };
-            diagnostics.push(Diagnostic::new(
-                DiagnosticCode::LocalisationUnencodableCodePoint,
-                Severity::Warning,
-                char_range(source, offset).unwrap_or_else(|| TextRange::empty(0)),
-                format!(
-                    "{character} (U+{:04X}) cannot be round-tripped: {reason}",
-                    u32::from(character)
-                ),
-            ));
+            if let Some(kind) =
+                transcode::file_unencodable_kind(u32::from(character), transcode::Profile::Script)
+            {
+                let reason = match kind {
+                    transcode::UnencodableKind::MangledLowPlane => {
+                        "U+0100..U+0FFF characters are silently mangled by the EU4 transcoder"
+                    }
+                    transcode::UnencodableKind::BeyondBmp => {
+                        "characters beyond the BMP are destroyed by the EU4 transcoder"
+                    }
+                };
+                diagnostics.push(Diagnostic::new(
+                    DiagnosticCode::LocalisationUnencodableCodePoint,
+                    Severity::Warning,
+                    char_range(source, start + offset).unwrap_or_else(|| TextRange::empty(0)),
+                    format!(
+                        "{character} (U+{:04X}) cannot be round-tripped: {reason}",
+                        u32::from(character)
+                    ),
+                ));
+            }
         }
     }
     Ok(diagnostics)
@@ -158,16 +154,4 @@ fn char_range(source: &str, offset: usize) -> Option<TextRange> {
     let character = source[offset..].chars().next()?;
     let end = start + (character.len_utf8() as u32);
     TextRange::new(start, end)
-}
-
-/// Anchors the mixed-encoding error at the first marker or CJK character,
-/// whichever comes first, so the reported position is actual evidence.
-fn first_mixed_evidence(source: &str) -> Option<TextRange> {
-    source
-        .char_indices()
-        .find(|(_, character)| {
-            let code_point = u32::from(*character);
-            (0x10..=0x13).contains(&code_point) || transcode::is_raw_cjk(code_point)
-        })
-        .and_then(|(offset, _)| char_range(source, offset))
 }

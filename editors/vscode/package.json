@@ -978,7 +978,7 @@
         },
         {
           "command": "paradoxcode.localisation.openDecoded",
-          "when": "resourceScheme == file && resourceFilename =~ /\\.(yml|txt)$/ && paradoxcode.transcodeEscaped",
+          "when": "resourceScheme == file && resourceFilename =~ /\\.(yml|txt)$/ && paradoxcode.transcodeEligible",
           "group": "navigation@3"
         },
         {
@@ -1014,7 +1014,7 @@
       "editor/context": [
         {
           "command": "paradoxcode.localisation.openDecoded",
-          "when": "resourceScheme == file && resourceFilename =~ /\\.(yml|txt)$/ && paradoxcode.transcodeEscaped",
+          "when": "resourceScheme == file && resourceFilename =~ /\\.(yml|txt)$/ && paradoxcode.transcodeEligible",
           "group": "paradoxcode@1"
         }
       ],

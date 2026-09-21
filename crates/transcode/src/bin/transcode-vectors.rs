@@ -244,4 +244,135 @@ fn main() {
             }
         }
     }
+
+    // --- scoped layer: quote/comment-aware encode and decode -----------------
+    // Text vectors exercise the scoped encoder (including iron-rule refusals
+    // from pooled markers); their successful bytes double as decode+form
+    // vectors, and byte-salad vectors stress the scanner and dispatch.
+    const SCOPED_POOL: [u32; 15] = [
+        0x22, 0x23, 0x5C, 0x0A, 0x61, 0x4E2D, 0x6587, 0x0160, 0x0100, 0x1F600, 0x10, 0x13, 0x20AC,
+        0x00E9, 0x30,
+    ];
+    let scoped_profile = |roll: u64| {
+        if roll.is_multiple_of(2) {
+            Profile::Script
+        } else {
+            Profile::Localisation
+        }
+    };
+    let scoped_form_name = |form: transcode::ScopedForm| match form {
+        transcode::ScopedForm::Plain => "plain",
+        transcode::ScopedForm::WholeEscaped => "whole",
+        transcode::ScopedForm::Scoped => "scoped",
+        transcode::ScopedForm::Damaged => "damaged",
+    };
+    let emit_scoped_bytes = |bytes: &[u8], profile: Profile| {
+        let form_name = scoped_form_name(transcode::scoped_form(bytes, profile));
+        match transcode::scoped_decode_file(bytes, profile) {
+            Ok(decoded) => {
+                emit(format!(
+                    "{{\"v\":\"scd\",\"p\":\"{}\",\"b\":\"{}\",\"d\":\"{}\",\"ib\":\"[{}]\",\"ob\":\"[{}]\",\"f\":\"{form_name}\"}}",
+                    profile_name(profile),
+                    hex(bytes),
+                    cps(&decoded.text),
+                    offsets(&decoded.in_span_broken),
+                    offsets(&decoded.out_of_span_markers),
+                ));
+            }
+            Err(_) => {
+                emit(format!(
+                    "{{\"v\":\"scd\",\"p\":\"{}\",\"b\":\"{}\",\"d\":\"ERR\",\"ib\":\"[]\",\"ob\":\"[]\",\"f\":\"{form_name}\"}}",
+                    profile_name(profile),
+                    hex(bytes),
+                ));
+            }
+        }
+    };
+    for _ in 0..4000 {
+        let length = (rng.next() % 33) as usize;
+        let text: String = (0..length)
+            .map(|_| {
+                char::from_u32(SCOPED_POOL[(rng.next() as usize) % SCOPED_POOL.len()])
+                    .expect("pool scalar")
+            })
+            .collect();
+        let profile = scoped_profile(rng.next());
+        match transcode::scoped_encode_file(&text, profile, EscapeSet::Paratranz) {
+            Ok(bytes) => {
+                emit(format!(
+                    "{{\"v\":\"sct\",\"p\":\"{}\",\"t\":\"{}\",\"e\":\"{}\"}}",
+                    profile_name(profile),
+                    cps(&text),
+                    hex(&bytes),
+                ));
+                emit_scoped_bytes(&bytes, profile);
+            }
+            Err(transcode::ScopedEncodeError::AlreadyEscaped { positions }) => {
+                let joined = offsets(&positions);
+                emit(format!(
+                    "{{\"v\":\"sct\",\"p\":\"{}\",\"t\":\"{}\",\"e\":\"E[{}]\"}}",
+                    profile_name(profile),
+                    cps(&text),
+                    joined,
+                ));
+            }
+            Err(transcode::ScopedEncodeError::Unencodable { error }) => {
+                let refusals = error
+                    .unencodable
+                    .iter()
+                    .map(|point| {
+                        let discriminant = match point.kind {
+                            transcode::UnencodableKind::MangledLowPlane => 0,
+                            transcode::UnencodableKind::BeyondBmp => 1,
+                        };
+                        format!("{discriminant}@{}", point.byte_index)
+                    })
+                    .collect::<Vec<_>>()
+                    .join(",");
+                emit(format!(
+                    "{{\"v\":\"sct\",\"p\":\"{}\",\"t\":\"{}\",\"e\":\"R{refusals}\"}}",
+                    profile_name(profile),
+                    cps(&text),
+                ));
+            }
+        }
+    }
+    // Byte salad: structural bytes, markers, high bytes, and spliced UTF-8
+    // CJK runs so the scanner, gap detection, and dispatch all diverge on
+    // realistic-looking damage.
+    let chunks: [&[u8]; 12] = [
+        &[0x22],
+        &[0x23],
+        &[0x5C],
+        &[0x0A],
+        b"a",
+        &[0x10],
+        &[0x11],
+        &[0x80, 0x81],
+        "中".as_bytes(),
+        "文".as_bytes(),
+        "é".as_bytes(),
+        "€".as_bytes(),
+    ];
+    for _ in 0..3000 {
+        let count = (rng.next() % 25) as usize;
+        let mut bytes = Vec::new();
+        for _ in 0..count {
+            let roll = rng.next();
+            if roll.is_multiple_of(5) {
+                bytes.push((roll >> 8) as u8);
+            } else {
+                bytes.extend_from_slice(chunks[(roll as usize) % chunks.len()]);
+            }
+        }
+        let profile = scoped_profile(rng.next());
+        emit_scoped_bytes(&bytes, profile);
+    }
+}
+
+fn profile_name(profile: Profile) -> &'static str {
+    match profile {
+        Profile::Script => "s",
+        Profile::Localisation => "l",
+    }
 }

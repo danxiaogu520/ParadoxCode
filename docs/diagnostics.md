@@ -142,41 +142,50 @@ no LSP diagnostics at all (see the note at the top), which retired the old
 release-path check for readable CJK under `localisation/…/replace/…`.
 Transcode release-tree files deliberately (`ParadoxCode: Transcode Localisation
 File`) or keep readable sources in the master tree outside `replace/`. The
-VS Code decoded-view provider still attaches this code when a `pdcloc://`
-view is opened over a file whose bytes are readable CJK — through that route
-readable text means the file was never transcoded.
+decoded-view provider no longer attaches it either: a `pdcloc://` view over
+readable bytes now carries the informational `LocalisationWillTranscodeOnSave`
+hint instead, because quoted CJK is escape-encoded on the next save.
+
+## LocalisationWillTranscodeOnSave
+
+Emitted by the VS Code decoded-view provider, never by the server: the file
+is plain readable text whose quoted strings contain CJK. Editing continues in
+readable form, and the next save writes the scoped escaped form (comments and
+code stay readable UTF-8 on disk).
 
 ## LocalisationMixedEncoding
 
-The file mixes readable CJK with EU4dll escape triples, or carries stray
-escape markers too sparse to be a transcoded file. Neither encode nor decode
-is a safe transformation, so none is applied — resolve the file by hand (or
-restore it from paratranz, the single source of truth for correct content).
-The error anchors on the first marker or CJK character, whichever comes first.
+An EU4dll escape marker sits outside every quoted string — in code or comment
+position. Scoped transcoding only ever escapes inside strings, so such a
+marker is damage: no transformation is applied and the file is shown as-is.
+The error anchors on the marker itself. Move it into a string, repair it into
+a triple, or delete it (or restore the file from paratranz, the single source
+of truth for correct content).
 
 ## LocalisationBrokenEscapeSequence
 
-The file is a transcoded file overall (three or more intact escape triples, no
-readable CJK) but contains orphan escape markers: a `0x10`–`0x13` marker whose
+An orphan escape marker inside a quoted string: a `0x10`–`0x13` marker whose
 two payload bytes are missing or damaged. Decoding passes orphans through
 untouched, so the character after the marker in a decoded view is wrong. Each
 orphan is flagged individually; fix the triple or delete the stray marker.
 
 ## LocalisationUnencodableCodePoint
 
-A character in a configured script file cannot survive the EU4 transcoder: code points in
-U+0100–U+0FFF are silently mangled into triples (and back incorrectly), and
-code points beyond the BMP are destroyed. Re-transcoding the file would
-corrupt these characters, so they are flagged per character. The 27
-CP1252-mapped Latin letters (ä, é, ß, …) stay single bytes and are allowed.
+A character inside a quoted string of a configured script file cannot survive
+the EU4 transcoder: code points in U+0100–U+0FFF are silently mangled into
+triples (and back incorrectly), and code points beyond the BMP are destroyed.
+Encoding the string would corrupt these characters, so they are flagged per
+character. The 27 CP1252-mapped Latin letters (ä, é, ß, …) stay single bytes
+and are allowed. Characters outside strings — comments and code — stay
+verbatim UTF-8 under scoped saving and are never flagged.
 
 ## LocalisationEscapeRefused
 
-Emitted by the VS Code extension's save gate, never by the server: you edited
-a file that classifies as escaped (or mixed) in a context where the save would
-double-encode or corrupt it, and the write was refused. The document on disk
-is untouched. Decode the file first (open the decoded view) or fix the mixed
-content by hand.
+Emitted by the VS Code extension's save gate, never by the server: the editor
+buffer holds escape markers inside its quoted strings (encoding them again
+would double-encode), or in-span characters the ecosystem cannot round-trip,
+and the write was refused. The document on disk is untouched. Undo the paste
+or decode the text first.
 
 ## ScriptLegacyEscapeVariant
 
@@ -213,5 +222,7 @@ The EU4dll transcode pipeline later added `LocalisationNotTranscoded`,
 `LocalisationUnencodableCodePoint`, `LocalisationEscapeRefused` (extension
 save gate only), and `ScriptLegacyEscapeVariant`. The removal of LSP
 diagnostics from localisation documents then retired the server-side
-`LocalisationNotTranscoded` release-path check; that code now surfaces only
-through the decoded-view provider described above.
+`LocalisationNotTranscoded` release-path check, and scoped transcoding later
+retired the decoded-view variant too — readable quoted CJK now carries the
+informational `LocalisationWillTranscodeOnSave` hint instead, since the next
+save escape-encodes it.
