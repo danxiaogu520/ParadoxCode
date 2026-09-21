@@ -372,23 +372,276 @@ export function decodeFile(bytes: Uint8Array, profile: LocalisationProfile): Fil
 
 export function classifyFile(bytes: Uint8Array, profile: LocalisationProfile): Classification {
     if (profile === PROFILE_LOCALISATION) {
-        try {
-            return classifyText(utf8Decoder.decode(bytes));
-        } catch {
-            return 'mixed';
-        }
+        const text = tryUtf8(bytes);
+        return text === undefined ? 'mixed' : classifyText(text);
     }
-    const asUtf8 = (() => {
-        try {
-            return utf8Decoder.decode(bytes);
-        } catch {
-            return undefined;
-        }
-    })();
+    const asUtf8 = tryUtf8(bytes);
     if (asUtf8 !== undefined) {
         return classifyText(asUtf8);
     }
     return classifyCounts(countCodePoints(Array.from(bytes, byteToChar)));
+}
+
+function tryUtf8(bytes: Uint8Array): string | undefined {
+    try {
+        return utf8Decoder.decode(bytes);
+    } catch {
+        return undefined;
+    }
+}
+
+// --- scoped layer (quote/comment-aware transcoding) ---------------------------
+//
+// Mirrors crates/transcode/src/scoped.rs: escape triples live only inside
+// quoted strings; comments and code stay readable UTF-8 on disk. The scanner
+// runs on raw bytes — structural bytes are escape-set members, so payloads
+// never contain them and spans are stable across encode/decode.
+
+export type ScopedForm = 'plain' | 'whole' | 'scoped' | 'damaged';
+
+/** Maximal quoted spans outside comments: byte ranges including the quotes. */
+export function scanStringSpans(bytes: Uint8Array): Array<[number, number]> {
+    const spans: Array<[number, number]> = [];
+    let inString = false;
+    let start = 0;
+    let index = 0;
+    while (index < bytes.length) {
+        const byte = bytes[index];
+        if (inString) {
+            if (byte === 0x5c && index + 1 < bytes.length) {
+                index += 2;
+                continue;
+            }
+            if (byte === 0x22) {
+                spans.push([start, index + 1]);
+                inString = false;
+            } else if (byte === 0x0a) {
+                spans.push([start, index]);
+                inString = false;
+            }
+        } else if (byte === 0x23) {
+            while (index < bytes.length && bytes[index] !== 0x0a) {
+                index += 1;
+            }
+            continue;
+        } else if (byte === 0x22) {
+            inString = true;
+            start = index;
+        }
+        index += 1;
+    }
+    if (inString) {
+        spans.push([start, bytes.length]);
+    }
+    return spans;
+}
+
+export function scopedForm(bytes: Uint8Array, profile: LocalisationProfile): ScopedForm {
+    const classification = classifyFile(bytes, profile);
+    if (classification === 'ascii' || classification === 'readable') {
+        return 'plain';
+    }
+    if (classification === 'escaped') {
+        return readableCjkGap(bytes) ? 'scoped' : 'whole';
+    }
+    if (readableCjkGap(bytes)) {
+        return 'scoped';
+    }
+    // Localisation input that is not valid UTF-8 can never decode; report it
+    // as damaged instead of a form the decoder refuses.
+    if (profile === PROFILE_LOCALISATION && tryUtf8(bytes) === undefined) {
+        return 'damaged';
+    }
+    return markerOutsideSpans(bytes).length === 0 ? 'scoped' : 'damaged';
+}
+
+/** Whether any between-spans run is unescaped, valid UTF-8 with raw CJK — the
+ * fingerprint of readable scoped comments, which a legacy escaped file's
+ * CP1252 byte layer can never produce. */
+function readableCjkGap(bytes: Uint8Array): boolean {
+    const spans = scanStringSpans(bytes);
+    let cursor = 0;
+    for (const [start, end] of spans) {
+        if (gapIsReadableCjk(bytes.subarray(cursor, start))) {
+            return true;
+        }
+        cursor = end;
+    }
+    return gapIsReadableCjk(bytes.subarray(cursor));
+}
+
+function gapIsReadableCjk(gap: Uint8Array): boolean {
+    if (gap.length === 0) {
+        return false;
+    }
+    for (const byte of gap) {
+        if (isMarker(byte)) {
+            return false;
+        }
+    }
+    const text = tryUtf8(gap);
+    if (text === undefined) {
+        return false;
+    }
+    for (let index = 0; index < text.length; ) {
+        const cp = text.codePointAt(index) as number;
+        if (isRawCjk(cp)) {
+            return true;
+        }
+        index += cp > 0xffff ? 2 : 1;
+    }
+    return false;
+}
+
+/** Input byte offsets of escape markers that sit outside every quoted span. */
+export function markerOutsideSpans(bytes: Uint8Array): number[] {
+    const spans = scanStringSpans(bytes);
+    const markers: number[] = [];
+    let cursor = 0;
+    const scanGap = (gap: Uint8Array, base: number): void => {
+        for (let offset = 0; offset < gap.length; offset += 1) {
+            if (isMarker(gap[offset])) {
+                markers.push(base + offset);
+            }
+        }
+    };
+    for (const [start, end] of spans) {
+        scanGap(bytes.subarray(cursor, start), cursor);
+        cursor = end;
+    }
+    scanGap(bytes.subarray(cursor), cursor);
+    return markers;
+}
+
+export type ScopedFileDecodeResult =
+    | { text: string; inSpanBroken: number[]; outOfSpanMarkers: number[] }
+    | 'invalid-utf8';
+
+export function scopedDecodeFile(
+    bytes: Uint8Array,
+    profile: LocalisationProfile,
+): ScopedFileDecodeResult {
+    if (profile === PROFILE_LOCALISATION && tryUtf8(bytes) === undefined) {
+        return 'invalid-utf8';
+    }
+    const spans = scanStringSpans(bytes);
+    let text = '';
+    const inSpanBroken: number[] = [];
+    const outOfSpanMarkers: number[] = [];
+    const appendGap = (gap: Uint8Array, base: number): void => {
+        if (gap.length === 0) {
+            return;
+        }
+        for (let offset = 0; offset < gap.length; offset += 1) {
+            if (isMarker(gap[offset])) {
+                outOfSpanMarkers.push(base + offset);
+            }
+        }
+        text += decodeRunSegment(gap, profile, base).text;
+    };
+    let cursor = 0;
+    for (const [start, end] of spans) {
+        appendGap(bytes.subarray(cursor, start), cursor);
+        const run = decodeRunSegment(bytes.subarray(start, end), profile, start);
+        inSpanBroken.push(...run.broken);
+        text += run.text;
+        cursor = end;
+    }
+    appendGap(bytes.subarray(cursor), cursor);
+    return { text, inSpanBroken, outOfSpanMarkers };
+}
+
+/** Decodes one run (span or gap): with markers it takes the profile's triple
+ * decode (orphan markers come back as whole-input offsets); without markers it
+ * is readable content — verbatim UTF-8 when valid, CP1252-mapped otherwise. */
+function decodeRunSegment(
+    segment: Uint8Array,
+    profile: LocalisationProfile,
+    base: number,
+): { text: string; broken: number[] } {
+    let hasMarker = false;
+    for (const byte of segment) {
+        if (isMarker(byte)) {
+            hasMarker = true;
+            break;
+        }
+    }
+    if (hasMarker) {
+        const decoded = decodeFile(segment, profile);
+        if (decoded === 'invalid-utf8') {
+            // Localisation runs were validated as UTF-8 above and script decode
+            // never fails — mirrors the Rust .expect().
+            throw new Error('scoped segment decode cannot fail');
+        }
+        return { text: decoded.text, broken: decoded.broken.map((offset) => offset + base) };
+    }
+    const run = tryUtf8(segment);
+    if (run !== undefined) {
+        return { text: run, broken: [] };
+    }
+    let text = '';
+    for (const byte of segment) {
+        text += safeFromCodePoint(byteToChar(byte));
+    }
+    return { text, broken: [] };
+}
+
+export type ScopedEncodeResult =
+    | { bytes: Uint8Array }
+    | { alreadyEscaped: number[] }
+    | { unencodable: UnencodablePoint[] };
+
+/** Encodes readable text into scoped-escaped bytes: triples only inside quoted
+ * spans, verbatim UTF-8 outside them. Iron rule ②: refuses when any span
+ * already carries a marker; refused in-span code points come back with offsets
+ * rebased to the whole input. */
+export function scopedEncodeFile(
+    input: string,
+    profile: LocalisationProfile,
+    set: ReadonlySet<number>,
+): ScopedEncodeResult {
+    const bytes = utf8Encoder.encode(input);
+    const spans = scanStringSpans(bytes);
+    const positions: number[] = [];
+    for (const [start, end] of spans) {
+        for (let offset = start; offset < end; offset += 1) {
+            if (isMarker(bytes[offset])) {
+                positions.push(offset);
+            }
+        }
+    }
+    if (positions.length > 0) {
+        return { alreadyEscaped: positions };
+    }
+    const output: number[] = [];
+    const appendRange = (source: Uint8Array, from: number, to: number): void => {
+        for (let index = from; index < to; index += 1) {
+            output.push(source[index]);
+        }
+    };
+    let cursor = 0;
+    for (const [start, end] of spans) {
+        appendRange(bytes, cursor, start);
+        const spanText = tryUtf8(bytes.subarray(start, end));
+        if (spanText === undefined) {
+            // Span boundaries fall on ASCII structural bytes, so every span of
+            // a UTF-8-encoded string decodes — mirrors the Rust byte slice.
+            throw new Error('scoped encode span is not valid UTF-8');
+        }
+        const encoded = encodeFile(spanText, profile, set);
+        if ('unencodable' in encoded) {
+            return {
+                unencodable: encoded.unencodable.map((point) => ({
+                    ...point,
+                    byteIndex: point.byteIndex + start,
+                })),
+            };
+        }
+        appendRange(encoded.bytes, 0, encoded.bytes.length);
+        cursor = end;
+    }
+    appendRange(bytes, cursor, bytes.length);
+    return { bytes: Uint8Array.from(output) };
 }
 
 // --- facade used by the pdcloc:// provider -----------------------------------
@@ -420,5 +673,31 @@ export class Transcoder {
             throw new Error('transcode encode input is not valid UTF-8');
         }
         return encodeFile(input, profile, PARATRANZ_SET);
+    }
+
+    /** Scoped counterparts for the pdcloc:// provider's quote-aware path. */
+    scopedClassify(bytes: Uint8Array, profile: LocalisationProfile): ScopedForm {
+        return scopedForm(bytes, profile);
+    }
+
+    scopedDecode(
+        bytes: Uint8Array,
+        profile: LocalisationProfile,
+    ): { text: Uint8Array; inSpanBroken: number[]; outOfSpanMarkers: number[] } | 'invalid-utf8' {
+        const decoded = scopedDecodeFile(bytes, profile);
+        if (decoded === 'invalid-utf8') {
+            return decoded;
+        }
+        return { ...decoded, text: utf8Encoder.encode(decoded.text) };
+    }
+
+    scopedEncode(bytes: Uint8Array, profile: LocalisationProfile): ScopedEncodeResult {
+        let input: string;
+        try {
+            input = utf8Decoder.decode(bytes);
+        } catch {
+            throw new Error('transcode scoped encode input is not valid UTF-8');
+        }
+        return scopedEncodeFile(input, profile, PARATRANZ_SET);
     }
 }
