@@ -338,7 +338,7 @@ async function sampleQueryLatencies(client, options, files, sampleCount) {
       const changeStarted = performance.now();
       client.notify('textDocument/didChange', {
         textDocument: { uri, version: 2 },
-        contentChanges: [{ text: `${text}\nedg_sweep_probe_unknown_key = yes` }],
+        contentChanges: [{ text: `${text}\ndemo_sweep_probe_unknown_key = yes` }],
       });
       const published = await client
         .waitFor(

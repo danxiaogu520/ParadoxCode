@@ -25,13 +25,13 @@ fn transcoded_localisation_previews_decode_to_readable_values() {
     fs::create_dir_all(root.join("localisation/l_english")).expect("master dir");
     fs::create_dir_all(root.join("localisation/replace")).expect("release dir");
     fs::write(
-        root.join("localisation/l_english/edg_l_english.yml"),
-        "\u{feff}l_english:\r\n EDG_KEY:0 \"\u{6BCD}\u{672C}\"\r\n",
+        root.join("localisation/l_english/demo_l_english.yml"),
+        "\u{feff}l_english:\r\n DEMO_KEY:0 \"\u{6BCD}\u{672C}\"\r\n",
     )
     .expect("master fixture");
     fs::write(
-        root.join("localisation/replace/edg_l_english.yml"),
-        escaped_yml("\u{feff}l_english:\r\n EDG_KEY:0 \"\u{53D1}\u{884C}\u{672C}\"\r\n"),
+        root.join("localisation/replace/demo_l_english.yml"),
+        escaped_yml("\u{feff}l_english:\r\n DEMO_KEY:0 \"\u{53D1}\u{884C}\u{672C}\"\r\n"),
     )
     .expect("release fixture");
 
@@ -44,7 +44,7 @@ fn transcoded_localisation_previews_decode_to_readable_values() {
     host.refresh_source_roots().expect("scan roots");
     let snapshot = host.snapshot();
 
-    let definitions = snapshot.index().definitions("localisation", "edg_key");
+    let definitions = snapshot.index().definitions("localisation", "demo_key");
     assert_eq!(definitions.len(), 2, "master and release both indexed");
     for definition in definitions {
         let file = snapshot

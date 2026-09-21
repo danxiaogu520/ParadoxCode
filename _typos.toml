@@ -1,6 +1,6 @@
 # typos configuration (https://github.com/crate-ci/typos), pinned in CI.
 #
-# The EU4 rules data, golden fixtures, and the EDG-KTP transcode corpus quote
+# The EU4 rules data, golden fixtures, and the transcode corpus quote
 # Paradox's own spellings verbatim (`manuever`, `historial_lucky.txt`, ...);
 # correcting them would break matching against the game, so those trees are
 # excluded and the handful of game strings referenced from real code are

@@ -730,14 +730,14 @@ fn custom_tooltip_hover_shows_localisation_preview_inside_mission_effects() {
     host.open_document(
         localisation.clone(),
         1,
-        "l_english:\nEDG_TEST_TT:0 \"My tooltip text\"\n".to_owned(),
+        "l_english:\nDEMO_TEST_TT:0 \"My tooltip text\"\n".to_owned(),
         Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/localisation/test.yml",
         ))),
     )
     .expect("open localisation");
     let mission = DocumentId::new("file:///tmp/missions/test.txt");
-    let source = "series = { mission_one = { effect = { custom_tooltip = EDG_TEST_TT } } }\n";
+    let source = "series = { mission_one = { effect = { custom_tooltip = DEMO_TEST_TT } } }\n";
     host.open_document(
         mission.clone(),
         1,
@@ -749,7 +749,7 @@ fn custom_tooltip_hover_shows_localisation_preview_inside_mission_effects() {
     .expect("open mission");
 
     let position =
-        u32::try_from(source.find("EDG_TEST_TT").expect("tooltip key") + 4).expect("position");
+        u32::try_from(source.find("DEMO_TEST_TT").expect("tooltip key") + 4).expect("position");
     let hover = hover(&host.snapshot(), &mission, position).expect("tooltip hover");
     assert!(
         hover
@@ -1609,27 +1609,27 @@ fn semantic_hover_infers_modifier_kind_from_workspace_membership() {
     std::fs::create_dir_all(root.join("events")).expect("events directory");
     std::fs::create_dir_all(root.join("localisation/english")).expect("localisation directory");
     std::fs::write(
-        root.join("common/event_modifiers/00_edg.txt"),
-        "EDG_test_modifier = { awareness = 1 }\n",
+        root.join("common/event_modifiers/00_demo.txt"),
+        "demo_test_modifier = { awareness = 1 }\n",
     )
     .expect("write event modifier");
     std::fs::write(
-        root.join("common/static_modifiers/00_edg.txt"),
-        "EDG_static_mod = { discipline = 0.05 }\n",
+        root.join("common/static_modifiers/00_demo.txt"),
+        "demo_static_mod = { discipline = 0.05 }\n",
     )
     .expect("write static modifier");
     std::fs::write(
-        root.join("localisation/english/edg_l_english.yml"),
-        "l_english:\n EDG_test_modifier:0 \"Tear of Iset\"\n EDG_static_mod:0 \"Static Tear\"\n",
+        root.join("localisation/english/demo_l_english.yml"),
+        "l_english:\n demo_test_modifier:0 \"Tear of Iset\"\n demo_static_mod:0 \"Static Tear\"\n",
     )
     .expect("write localisation");
     let text = concat!(
         "country_event = {\n",
-        "  id = edg.1\n",
+        "  id = demo.1\n",
         "  immediate = {\n",
-        "    add_country_modifier = { name = EDG_test_modifier duration = 365 }\n",
-        "    remove_country_modifier = EDG_static_mod\n",
-        "    add_country_modifier = { name = EDG_unknown_modifier duration = 1 }\n",
+        "    add_country_modifier = { name = demo_test_modifier duration = 365 }\n",
+        "    remove_country_modifier = demo_static_mod\n",
+        "    add_country_modifier = { name = demo_unknown_modifier duration = 1 }\n",
         "  }\n",
         "}\n",
     );
@@ -1640,18 +1640,18 @@ fn semantic_hover_infers_modifier_kind_from_workspace_membership() {
         AbsPath::normalize(&root),
     )]));
     host.refresh_source_roots().expect("scan modifier root");
-    let id = DocumentId::new("file:///tmp/events/edg_events.txt");
+    let id = DocumentId::new("file:///tmp/events/demo_events.txt");
     host.open_document(
         id.clone(),
         1,
         text.to_owned(),
-        Some(AbsPath::normalize(&PathBuf::from("events/edg_events.txt"))),
+        Some(AbsPath::normalize(&PathBuf::from("events/demo_events.txt"))),
     )
     .expect("open event document");
     let snapshot = host.snapshot();
 
     let position = u32::try_from(
-        text.find("EDG_test_modifier")
+        text.find("demo_test_modifier")
             .expect("event modifier value")
             + 3,
     )
@@ -1660,7 +1660,7 @@ fn semantic_hover_infers_modifier_kind_from_workspace_membership() {
     assert!(
         result
             .contents
-            .contains("### event_modifier `EDG_test_modifier`"),
+            .contains("### event_modifier `demo_test_modifier`"),
         "{}",
         result.contents
     );
@@ -1670,13 +1670,13 @@ fn semantic_hover_infers_modifier_kind_from_workspace_membership() {
         result.contents
     );
 
-    let position = u32::try_from(text.find("EDG_static_mod").expect("static modifier value") + 3)
+    let position = u32::try_from(text.find("demo_static_mod").expect("static modifier value") + 3)
         .expect("position");
     let result = hover(&snapshot, &id, position).expect("static modifier hover");
     assert!(
         result
             .contents
-            .contains("### static_modifier `EDG_static_mod`"),
+            .contains("### static_modifier `demo_static_mod`"),
         "{}",
         result.contents
     );
@@ -1689,7 +1689,7 @@ fn semantic_hover_infers_modifier_kind_from_workspace_membership() {
     // Membership cannot resolve an unknown modifier, so the value keeps the
     // multi-alternative rule hover and the mismatch validation instead of a
     // guessed symbol interpretation.
-    let position = u32::try_from(text.find("EDG_unknown_modifier").expect("unknown value") + 3)
+    let position = u32::try_from(text.find("demo_unknown_modifier").expect("unknown value") + 3)
         .expect("position");
     let result = hover(&snapshot, &id, position).expect("unknown modifier hover");
     assert!(

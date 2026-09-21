@@ -383,7 +383,7 @@ mod tests {
     #[test]
     fn known_triple_from_release_file() {
         // U+5E8A (low 0x8A not in set, high 0x5E not in set) -> [0x10, U+0160, '^']
-        // observed verbatim in the EDG-KTP release file.
+        // observed verbatim in a real mod's release file.
         let encoded = encode_text("\u{5E8A}", P).unwrap();
         assert_eq!(encoded, "\u{0010}\u{0160}^");
         assert_eq!(decoded_text(&encoded), "\u{5E8A}");
@@ -430,7 +430,7 @@ mod tests {
     #[test]
     fn escape_sets_diverge_but_decode_agrees() {
         // 为 U+4E3A (low 0x3A) and 个 U+4E2A (low 0x2A): paratranz leaves them raw,
-        // dll-full escapes them — the calibration lesson from EDG-KTP.
+        // dll-full escapes them — a calibration lesson from the real mod corpus.
         for code_point in [0x4E3A, 0x4E2A] {
             let character = char::from_u32(code_point).unwrap().to_string();
             let canonical = encode_file(&character, Profile::Script, P).unwrap();

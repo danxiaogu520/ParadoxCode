@@ -1,18 +1,18 @@
-//! Golden corpus tests: the EDG-KTP localisation file pair (the user's own mod,
-//! verified against the deployed paratranz converter on 2026-09-11) plus synthetic
-//! script fixtures reproducing the phenomena found in the 310-file workshop corpus
-//! (history/countries of workshop mod 3047072888).
+//! Golden corpus tests: a real CJK mod's localisation file pair (verified
+//! against the deployed paratranz converter on 2026-09-11) plus synthetic
+//! script fixtures reproducing the phenomena found in a 310-file workshop
+//! history/countries corpus.
 
 use transcode::{
     Classification, EscapeSet, Profile, classify_file, decode_file, decode_text, encode_file,
     encode_text,
 };
 
-const MASTER: &[u8] = include_bytes!("corpus/edg_ktp_master.yml");
-const RELEASE: &[u8] = include_bytes!("corpus/edg_ktp_release.yml");
+const MASTER: &[u8] = include_bytes!("corpus/cjk_pair_master.yml");
+const RELEASE: &[u8] = include_bytes!("corpus/cjk_pair_release.yml");
 
 #[test]
-fn edg_ktp_release_decodes_to_the_master() {
+fn release_decodes_to_the_master() {
     let decoded =
         decode_file(RELEASE, Profile::Localisation).expect("release file must be valid UTF-8");
     let master = std::str::from_utf8(MASTER).expect("master must be valid UTF-8");
@@ -21,7 +21,7 @@ fn edg_ktp_release_decodes_to_the_master() {
 }
 
 #[test]
-fn edg_ktp_master_encodes_to_the_release_byte_for_byte() {
+fn master_encodes_to_the_release_byte_for_byte() {
     let master = std::str::from_utf8(MASTER).expect("master must be valid UTF-8");
     let encoded = encode_file(master, Profile::Localisation, EscapeSet::Paratranz)
         .expect("master must contain only encodable code points");
@@ -29,7 +29,7 @@ fn edg_ktp_master_encodes_to_the_release_byte_for_byte() {
 }
 
 #[test]
-fn edg_ktp_classification() {
+fn pair_classification() {
     assert_eq!(
         classify_file(MASTER, Profile::Localisation),
         Classification::Readable
@@ -41,7 +41,7 @@ fn edg_ktp_classification() {
 }
 
 #[test]
-fn edg_ktp_text_layer_matches_the_file_layer() {
+fn text_layer_matches_the_file_layer() {
     let master = std::str::from_utf8(MASTER).unwrap();
     let text_encoded = encode_text(master, EscapeSet::Paratranz).unwrap();
     assert_eq!(text_encoded.as_bytes(), RELEASE);

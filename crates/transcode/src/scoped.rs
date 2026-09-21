@@ -393,7 +393,7 @@ mod tests {
 
     #[test]
     fn scoped_localisation_round_trip() {
-        let readable = "l_english:\r\n edg_key:0 \"发行本\" # 注释\r\n";
+        let readable = "l_english:\r\n demo_key:0 \"发行本\" # 注释\r\n";
         let scoped = scoped_encode_file(readable, Profile::Localisation, P).unwrap();
         assert!(scoped.starts_with("l_english:".as_bytes()));
         assert_eq!(
