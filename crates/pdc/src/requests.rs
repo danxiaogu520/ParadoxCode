@@ -1338,6 +1338,7 @@ impl SnapshotRequestContext {
                 "path": asset.path,
                 "rootKind": asset.root_kind,
                 "extensionFallback": asset.extension_fallback,
+                "archiveMember": asset.archive_member,
                 "frames": asset.frames,
             })
         };

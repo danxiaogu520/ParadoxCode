@@ -16,20 +16,40 @@ use vfs::{SourceRoot, SourceRootKind};
 const CATALOG_DIRECTORIES: &[&str] = &["gfx", "tutorial"];
 /// DLC pack container directory; its packs re-base catalog keys pack-relative.
 const CATALOG_PACK_DIRECTORY: &str = "builtin_dlc";
+/// DLC archive container directory; its `*.zip` central directories are
+/// harvested name-only, without extraction.
+const CATALOG_DLC_DIRECTORY: &str = "dlc";
 /// File extensions harvested into the catalog.
 const CATALOG_EXTENSIONS: &[&str] = &["dds", "tga", "png", "jpg", "jpeg", "ddr", "lua", "mesh"];
 /// Hard cap on walked entries so a pathological tree cannot stall a snapshot build.
 const MAX_CATALOG_ENTRIES: usize = 200_000;
 /// Maximum completion labels served for one prefix query.
 pub(crate) const MAX_PREFIX_RESULTS: usize = 200;
+/// End-of-central-directory signature (`PK\x05\x06`).
+const ZIP_EOCD_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x05, 0x06];
+/// Central-directory file-header signature (`PK\x01\x02`).
+const ZIP_CENTRAL_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x01, 0x02];
+/// Fixed byte length of one central-directory file header (before the name).
+const ZIP_CENTRAL_HEADER: usize = 46;
+/// Fixed byte length of the end-of-central-directory record.
+const ZIP_EOCD_HEADER: usize = 22;
+/// Zip64 sentinel spellings in the classic end-of-central-directory record.
+const ZIP64_SENTINEL16: u16 = 0xffff;
+const ZIP64_SENTINEL32: u32 = 0xffff_ffff;
+/// Upper bound on a central directory read into memory (roughly 100k entries).
+const MAX_ZIP_CENTRAL_DIRECTORY: u32 = 16 * 1024 * 1024;
 
 /// One source-root hit for a normalized asset path.
 #[derive(Clone, Debug)]
 pub struct TextureCatalogHit {
     /// Kind of the source root providing the file.
     pub root_kind: SourceRootKind,
-    /// Physical path of the file, absolute.
+    /// Physical path of the file, absolute. For a DLC archive member this is
+    /// the `.zip` itself; `archive_member` names the entry inside it.
     pub path: AbsPath,
+    /// In-archive spelling of the serving entry when the hit is a DLC zip
+    /// member rather than a file on disk.
+    pub archive_member: Option<String>,
 }
 
 /// A successful asset-path resolution.
@@ -71,6 +91,9 @@ impl TextureCatalog {
     /// `builtin_dlc` pack files are keyed pack-relative (the spelling the pack's own
     /// `.gfx` files reference), so a pack-provided `gfx/x.dds` is found by the plain
     /// `gfx/x.dds` alongside the game-root entry of the same name when both exist.
+    /// `dlc` archives contribute their members the same way, keyed by the in-archive
+    /// spelling the main interface `.gfx` files reference DLC assets by; member names
+    /// are read from each zip's central directory and nothing is ever extracted.
     #[must_use]
     pub fn build(roots: &[SourceRoot]) -> Self {
         let mut catalog = Self::default();
@@ -87,6 +110,22 @@ impl TextureCatalog {
             if let Ok(entries) = std::fs::read_dir(&packs) {
                 for pack in entries.flatten() {
                     collect_directory(&mut catalog, root, &pack.path(), "");
+                }
+            }
+            let archives = root.path.as_path().join(CATALOG_DLC_DIRECTORY);
+            if let Ok(entries) = std::fs::read_dir(&archives) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        // The shipped layout nests one zip per dlc directory.
+                        if let Ok(zips) = std::fs::read_dir(&path) {
+                            for zip in zips.flatten() {
+                                collect_zip_archive(&mut catalog, root, &zip.path());
+                            }
+                        }
+                    } else {
+                        collect_zip_archive(&mut catalog, root, &path);
+                    }
                 }
             }
         }
@@ -144,6 +183,7 @@ impl TextureCatalog {
                 .map(|root| TextureCatalogHit {
                     root_kind: root.kind,
                     path: AbsPath::normalize(&root.path.as_path().join(&probe)),
+                    archive_member: None,
                 });
             if let Some(hit) = hit {
                 return Some(TextureResolution {
@@ -325,8 +365,169 @@ fn collect_directory(
                 TextureCatalogHit {
                     root_kind: root.kind,
                     path: AbsPath::normalize(&entry.path()),
+                    archive_member: None,
                 },
             );
         }
     }
+}
+
+/// Harvests the catalog-extension members of one DLC zip archive.
+///
+/// Keys keep the in-archive spelling (game-relative — the spelling the main
+/// interface `.gfx` files reference DLC assets by, lowercased like every other
+/// catalog key) and the hit points at the archive through `archive_member`,
+/// so hover provenance can show both the pack and the entry inside it. Files
+/// shipped on disk always win because archives are harvested last per root.
+fn collect_zip_archive(catalog: &mut TextureCatalog, root: &SourceRoot, path: &std::path::Path) {
+    if !path
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("zip"))
+    {
+        return;
+    }
+    if catalog.len() >= MAX_CATALOG_ENTRIES {
+        return;
+    }
+    for name in zip_member_names(path) {
+        if catalog.len() >= MAX_CATALOG_ENTRIES {
+            return;
+        }
+        let Some((_, extension)) = name.rsplit_once('.') else {
+            continue;
+        };
+        if !CATALOG_EXTENSIONS
+            .iter()
+            .any(|accepted| accepted.eq_ignore_ascii_case(extension))
+        {
+            continue;
+        }
+        let normalized = name.replace('\\', "/").to_ascii_lowercase();
+        let normalized = normalized.trim_start_matches('/');
+        if normalized.is_empty() {
+            continue;
+        }
+        catalog.insert(
+            normalized.to_owned(),
+            TextureCatalogHit {
+                root_kind: root.kind,
+                path: AbsPath::normalize(path),
+                archive_member: Some(name),
+            },
+        );
+    }
+}
+
+/// Reads one zip's member names from its central directory, nothing more.
+///
+/// The last 64 KiB plus the 22-byte record locate the end-of-central-directory
+/// entry; the directory table itself is then read with one bounded seek. Every
+/// failure mode — a truncated tail, a comment that swallows the record, a
+/// zip64 sentinel, an implausible table size, a malformed entry — yields an
+/// empty list, so an unreadable archive simply contributes nothing.
+fn zip_member_names(path: &std::path::Path) -> Vec<String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return Vec::new();
+    };
+    let Ok(size) = file.metadata().map(|metadata| metadata.len()) else {
+        return Vec::new();
+    };
+    if size < ZIP_EOCD_HEADER as u64 {
+        return Vec::new();
+    }
+    let window_start = size.saturating_sub(65_536 + ZIP_EOCD_HEADER as u64);
+    let window_len = usize::try_from(size - window_start).unwrap_or(0);
+    let mut window = vec![0_u8; window_len];
+    if file.seek(SeekFrom::Start(window_start)).is_err() || file.read_exact(&mut window).is_err() {
+        return Vec::new();
+    }
+    // Scan backwards for the record; a candidate only counts when its comment
+    // length exactly spans the remaining bytes, which rejects a signature that
+    // merely appears inside a comment.
+    let mut eocd = None;
+    if window_len >= ZIP_EOCD_HEADER {
+        let mut index = window_len - ZIP_EOCD_HEADER;
+        loop {
+            if window[index..].starts_with(&ZIP_EOCD_SIGNATURE) {
+                let comment_len = usize::from(le16(&window, index + 20));
+                if index + ZIP_EOCD_HEADER + comment_len == window_len {
+                    eocd = Some(index);
+                    break;
+                }
+            }
+            if index == 0 {
+                break;
+            }
+            index -= 1;
+        }
+    }
+    let Some(eocd) = eocd else {
+        return Vec::new();
+    };
+    let entries = le16(&window, eocd + 10);
+    let table_size = le32(&window, eocd + 12);
+    let table_offset = le32(&window, eocd + 16);
+    if entries == ZIP64_SENTINEL16
+        || table_size == ZIP64_SENTINEL32
+        || table_offset == ZIP64_SENTINEL32
+    {
+        return Vec::new();
+    }
+    if table_size > MAX_ZIP_CENTRAL_DIRECTORY
+        || u64::from(table_offset.saturating_add(table_size)) > size
+    {
+        return Vec::new();
+    }
+    let mut directory = vec![0_u8; table_size as usize];
+    if file.seek(SeekFrom::Start(u64::from(table_offset))).is_err()
+        || file.read_exact(&mut directory).is_err()
+    {
+        return Vec::new();
+    }
+    let mut names = Vec::new();
+    let mut offset = 0_usize;
+    while offset + ZIP_CENTRAL_HEADER <= directory.len() {
+        if !directory[offset..].starts_with(&ZIP_CENTRAL_SIGNATURE) {
+            break;
+        }
+        let name_len = usize::from(le16(&directory, offset + 28));
+        let extra_len = usize::from(le16(&directory, offset + 30));
+        let comment_len = usize::from(le16(&directory, offset + 32));
+        let Some(name_end) = (offset + ZIP_CENTRAL_HEADER)
+            .checked_add(name_len)
+            .filter(|end| *end <= directory.len())
+        else {
+            break;
+        };
+        if let Ok(name) = std::str::from_utf8(&directory[offset + ZIP_CENTRAL_HEADER..name_end])
+            && !name.ends_with('/')
+        {
+            names.push(name.to_owned());
+        }
+        let Some(next) = name_end
+            .checked_add(extra_len)
+            .and_then(|end| end.checked_add(comment_len))
+            .filter(|end| *end <= directory.len())
+        else {
+            break;
+        };
+        offset = next;
+    }
+    names
+}
+
+/// Reads one little-endian `u16` at `offset`.
+fn le16(bytes: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes([bytes[offset], bytes[offset + 1]])
+}
+
+/// Reads one little-endian `u32` at `offset`.
+fn le32(bytes: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes([
+        bytes[offset],
+        bytes[offset + 1],
+        bytes[offset + 2],
+        bytes[offset + 3],
+    ])
 }
