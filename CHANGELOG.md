@@ -46,6 +46,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   DLC-packed texture reference (King of Kings, Winds of Change) and grows the catalog by
   ~2,200 entries.
 
+### Changed
+
+- The eleven `paradoxcode_` language-model tools now declare `"when": "paradoxcodeServerRunning"`,
+  so VS Code agent mode only lists them in windows where the ParadoxCode extension has actually
+  activated and its language server is running. Previously they appeared in the tool picker of
+  every window (including non-EU4 workspaces), where calling them could only fail. The MCP mirror
+  is unaffected: it reads names, descriptions, and schemas from the same manifest and ignores the
+  `when` clause.
+
 ### Fixed
 
 - Saving a `paradoxcode.*` setting no longer surfaces a spurious "Sending notification

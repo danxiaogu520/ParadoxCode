@@ -541,6 +541,9 @@ for (const name of expectedAgentTools) {
   if (tool.canBeReferencedInPrompt === true) {
     fail(`agent tool ${name} must not opt into manual prompt references`);
   }
+  if (tool.when !== 'paradoxcodeServerRunning') {
+    fail(`agent tool ${name} must gate availability on paradoxcodeServerRunning, found ${JSON.stringify(tool.when)}`);
+  }
 }
 
 const chatParticipant = manifest.contributes?.chatParticipants?.find(
