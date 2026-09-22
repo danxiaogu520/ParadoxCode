@@ -198,60 +198,18 @@ suite('ParadoxCode VS Code extension host', () => {
     }
   });
 
-  test('participant tool specs stay in sync with the manifest contributions', async () => {
+  test('agent tools are prompt-referenceable and carry unique reference names', async () => {
     const extension = vscode.extensions.getExtension('paradoxcode.paradoxcode-vscode');
-    const { AGENT_TOOL_SPECS } = require('../../out/agent/prompt.js');
-    const contributed = (extension.packageJSON.contributes?.languageModelTools ?? [])
-      .map((tool) => tool.name)
-      .sort();
-    const specs = AGENT_TOOL_SPECS.map((tool) => tool.name).sort();
-    assert.deepEqual(specs, contributed, 'participant specs and manifest tools must not drift');
-  });
-
-  test('system prompt encodes the tool discipline', () => {
-    const { buildSystemPrompt } = require('../../out/agent/prompt.js');
-    const prompt = buildSystemPrompt();
-    for (const marker of [
-      'paradoxcode_validate_text',
-      'paradoxcode_rules',
-      'paradoxcode_search',
-      'paradoxcode_loc_get',
-      'paradoxcode_loc_list',
-      'Zone discipline',
-      'UnknownLocalisationKey',
-      'WrongScope',
-      'localisation',
-    ]) {
-      assert.ok(prompt.includes(marker), `system prompt must mention ${marker}`);
+    const contributed = extension.packageJSON.contributes?.languageModelTools ?? [];
+    assert.equal(contributed.length, 11, 'all eleven agent tools must be contributed');
+    const referenceNames = contributed.map((tool) => tool.toolReferenceName);
+    for (const tool of contributed) {
+      assert.equal(tool.canBeReferencedInPrompt, true, `${tool.name} must be prompt-referenceable`);
+      assert.match(tool.toolReferenceName, /^paradox[A-Z]/, `${tool.name} needs a paradox-prefixed reference name`);
     }
-  });
-
-  test('slash command query parsers split filters and bare terms', () => {
-    const { parseRuleFilters, parseLocalisationQuery } = require('../../out/agent/participant.js');
-    assert.deepEqual(parseRuleFilters('context=trigger key=army scope=country'), {
-      context: 'trigger', key: 'army', scope: 'country',
-    });
-    assert.deepEqual(parseRuleFilters('add_core'), { key: 'add_core' });
-    assert.deepEqual(parseRuleFilters('scope=estate add_core'), { scope: 'estate', key: 'add_core' });
-    assert.deepEqual(parseLocalisationQuery('key=greeting'), { mode: 'get', key: 'greeting' });
-    assert.deepEqual(parseLocalisationQuery('text=Hello traveler'), { mode: 'search', text: 'Hello traveler' });
-    assert.deepEqual(parseLocalisationQuery('prefix=my_event.1.'), { mode: 'list', keyPrefix: 'my_event.1.' });
-    assert.deepEqual(parseLocalisationQuery('greeting'), { mode: 'get', key: 'greeting' });
-    assert.deepEqual(parseLocalisationQuery('Hello traveler'), { mode: 'search', text: 'Hello traveler' });
-    assert.deepEqual(parseLocalisationQuery(''), { mode: 'get' });
-  });
-
-  test('paradox participant registers on hosts with the Chat API', () => {
-    const { registerParadoxParticipant } = require('../../out/agent/participant.js');
-    const disposables = registerParadoxParticipant();
-    if ('chat' in vscode && typeof vscode.chat?.createChatParticipant === 'function') {
-      assert.equal(disposables.length, 1, 'the @paradox participant must register');
-      for (const disposable of disposables) {
-        disposable.dispose();
-      }
-    } else {
-      assert.equal(disposables.length, 0);
-    }
+    assert.equal(new Set(referenceNames).size, referenceNames.length, 'reference names must be unique');
+    const chatParticipants = extension.packageJSON.contributes?.chatParticipants ?? [];
+    assert.equal(chatParticipants.length, 0, 'the @paradox chat participant must stay removed');
   });
 
   test('mission preview and diagnostic paths resolve pdcloc decoded views', async () => {

@@ -6,12 +6,12 @@ import {
 
 /**
  * Registers the read-only analysis tools with VS Code's Language Model Tools API so
- * chat participants and agent mode can call them autonomously. Users never reference
- * these tools manually. Registration is skipped silently on hosts without `vscode.lm`.
+ * agent mode can call them autonomously and users can reference them explicitly with
+ * #paradoxSearch-style references. Registration is skipped silently on hosts without
+ * `vscode.lm`.
  *
  * The names follow the `paradoxcode_` convention and are mirrored one-to-one by the
- * stdio MCP server's manifest (read from package.json at runtime) and by the @paradox
- * participant's TOOL_RUNNERS table.
+ * stdio MCP server's manifest (read from package.json at runtime).
  */
 
 type ToolRun<Input> = (input: Input, token: vscode.CancellationToken) => Promise<string>;

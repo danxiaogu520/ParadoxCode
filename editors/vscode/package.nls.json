@@ -84,12 +84,6 @@
   "commands.localisation.endPeek.title": "Back to the Decoded View",
   "configuration.localisation.transparentEncoding.description": "Master switch for the transparent EU4dll pipeline. On: eligible files open in the decoded view and saves escape-encode quoted strings automatically (scoped form). Off: nothing automatic — the manual Encode File / Decode File commands become available.",
   "configuration.localisation.transparentScriptGlobs.description": "Workspace-relative glob patterns of script files eligible for the transparent decoded view (paratranz `latin1eu4` profile). Eligible files open in the decoded view whatever their current bytes look like — readable text passes through, escaped strings decode. Default: `**/*.txt`.",
-  "chatParticipant.paradox.description": "EU4 modding assistant backed by the ParadoxCode language server: validates drafted files, searches symbols, rules, and localisation.",
-  "chatParticipant.paradox.command.validate": "Validate the active editor file against the EU4 rules",
-  "chatParticipant.paradox.command.symbols": "Search indexed symbols (query as argument)",
-  "chatParticipant.paradox.command.rules": "Search the rule database (context= key= scope= filters)",
-  "chatParticipant.paradox.command.loc": "Address localisation (key=, text=, or prefix= family listing)",
-  "chatParticipant.paradox.command.hover": "Look up hover semantics at the cursor",
   "commands.localisation.encodeFile.title": "Encode File (EU4dll Escape Form)",
   "commands.localisation.decodeFile.title": "Decode File (Readable Text)"
 }

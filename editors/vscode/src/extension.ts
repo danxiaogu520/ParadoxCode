@@ -11,7 +11,6 @@ import {
 } from 'vscode-languageclient/node';
 
 import { FileTeeDebugChannel } from './debugChannel';
-import { registerParadoxParticipant } from './agent/participant';
 import { registerAgentTools } from './agent/register';
 import { setAgentClient } from './agent/server';
 import { LoadedFilesProvider } from './fileExplorer';
@@ -1651,10 +1650,9 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.registerTreeDataProvider('paradoxcode.loadedFiles', loadedFilesProvider),
         // Agent tools are read-only queries over the shared language-server client; they
         // register whenever the host exposes the Language Model Tools API and stay inert
-        // (never invoked) on hosts without a chat provider. The @paradox participant adds
-        // the conversational loop and deterministic slash commands on top of the same layer.
+        // (never invoked) on hosts without a chat provider. The tools are prompt-referenceable
+        // (#paradoxSearch, #paradoxValidate, …) so agent sessions can list and enable them.
         ...registerAgentTools(),
-        ...registerParadoxParticipant(),
     );
 
     // Transparent localisation (pdcloc:// decoded views) is independent of the

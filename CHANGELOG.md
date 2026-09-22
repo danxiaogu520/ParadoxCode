@@ -54,6 +54,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   every window (including non-EU4 workspaces), where calling them could only fail. The MCP mirror
   is unaffected: it reads names, descriptions, and schemas from the same manifest and ignores the
   `when` clause.
+- Every tool now opts into prompt references (`canBeReferencedInPrompt: true` with unique
+  `toolReferenceName`s such as `paradoxSearch` or `paradoxValidate`). Current VS Code tool
+  pickers only list prompt-referenceable extension tools, so without the flag the tools could
+  never be enabled by the user: agent sessions rejected every call with "Tool … is currently
+  disabled by the user" while the Configure Tools dialog showed no way to turn them on.
+
+### Removed
+
+- The `@paradox` chat participant (`paradoxcode.modding`) and its `/validate`, `/symbols`,
+  `/rules`, `/loc`, `/hover` commands. Its private agent loop masked the agent-mode tool
+  enablement gap above; with the tools directly listed, referenceable, and enableable in agent
+  sessions, the participant duplicated that surface. Conversational modding now goes through the
+  normal agent chat (plus `#paradox…` references), and deterministic checks remain available via
+  the editor commands, diagnostics, and the MCP server.
 
 ### Fixed
 
