@@ -22,8 +22,11 @@ fuzz_target!(|data: &[u8]| {
             };
             SyntaxEdit::ranged(TextRange::empty(offset), text.into_owned())
         };
-        let Ok(next) = current.apply_edit(&edit) else {
-            return;
+        let next = match current.apply_edit(&edit) {
+            Ok(next) => next,
+            // A byte offset derived from chunk data can land inside a multi-byte
+            // code point; the only legal failure is that rejected range.
+            Err(parser::EditError::InvalidRange(_)) => continue,
         };
         let full = parse(FileFormat::Script, next.source());
         assert_eq!(next.root(), full.root());
