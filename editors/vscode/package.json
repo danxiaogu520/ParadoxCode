@@ -221,6 +221,7 @@
     "languageModelTools": [
       {
         "name": "paradoxcode_workspace",
+        "when": "paradoxcodeServerRunning",
         "displayName": "ParadoxCode: Workspace Summary",
         "modelDescription": "Summarise the EU4 workspace: game identity, embedded rule hash, source roots (Vanilla, dependency mods, project mod), file counts by zone, and the last scan outcome. Call it first when orienting in a workspace to learn what is indexed and where the project mod sits.",
         "inputSchema": {
@@ -230,6 +231,7 @@
       },
       {
         "name": "paradoxcode_search",
+        "when": "paradoxcodeServerRunning",
         "displayName": "ParadoxCode: Search Symbols",
         "modelDescription": "Search script-zone symbols (events, decisions, tags, missions, scripted triggers/effects) by name substring across the project mod, dependency mods, and Vanilla. Localisation keys are excluded (use the loc tools for those). Results are limited to 100 symbols. Use it before drafting to discover what the game or existing mods already define.",
         "inputSchema": {
@@ -251,6 +253,7 @@
       },
       {
         "name": "paradoxcode_context",
+        "when": "paradoxcodeServerRunning",
         "displayName": "ParadoxCode: Context",
         "modelDescription": "Explain the rule-driven semantics at one position of an indexed EU4 script file (project, dependency, or Vanilla): what the key accepts, which scopes allow it, and the localisation preview when it resolves one. Input uses a 1-based line and 0-based UTF-16 character column. Script files only; for localisation keys use the loc tools.",
         "inputSchema": {
@@ -277,6 +280,7 @@
       },
       {
         "name": "paradoxcode_diagnostics",
+        "when": "paradoxcodeServerRunning",
         "displayName": "ParadoxCode: Workspace Diagnostics",
         "modelDescription": "Diagnostics for the project script files on disk (Vanilla and dependency mods excluded), with stable codes, 1-based line numbers, and messages. Pass files (logical paths) to focus on specific files, or omit to page through the whole workspace (16 files per page, up to 128). Localisation files are excluded. Use it to ask what is currently broken in the mod.",
         "inputSchema": {
@@ -302,6 +306,7 @@
       },
       {
         "name": "paradoxcode_references",
+        "when": "paradoxcodeServerRunning",
         "displayName": "ParadoxCode: References",
         "modelDescription": "Find references to the symbol at one position of a script file (position-based; the position must point at a symbol the workspace has indexed). Input uses a 1-based line and 0-based UTF-16 character column. For lookup by name alone use paradoxcode_symbol_references.",
         "inputSchema": {
@@ -328,6 +333,7 @@
       },
       {
         "name": "paradoxcode_symbol_references",
+        "when": "paradoxcodeServerRunning",
         "displayName": "ParadoxCode: Symbol References",
         "modelDescription": "Find the definition and references of a script-zone symbol addressed by name, without a cursor position (event ids, decisions, scripted effects/triggers, tags). Optional kind (for example event or scripted_effect) disambiguates names defined under several kinds; an ambiguous answer lists the candidate kinds to retry with. Results are limited to 100 references. Use it to measure the impact of editing or renaming a definition.",
         "inputSchema": {
@@ -353,6 +359,7 @@
       },
       {
         "name": "paradoxcode_rules",
+        "when": "paradoxcodeServerRunning",
         "displayName": "ParadoxCode: Search Rules",
         "modelDescription": "Search the embedded first-party EU4 semantic rule database. Filters (case-insensitive, at least one required): context (exact or prefix, for example trigger, effect, type:event), key (substring of the rule key, for example add_army_tradition), scope (substring of an allowed scope; rules valid in any scope match every scope query). Entries document the expected shape, allowed scopes, and documentation text, and results are limited to 50 rules. Use it to learn which keys are valid, what they accept, and in which scopes they work before writing them.",
         "inputSchema": {
@@ -379,6 +386,7 @@
       },
       {
         "name": "paradoxcode_validate_text",
+        "when": "paradoxcodeServerRunning",
         "displayName": "ParadoxCode: Validate Script Text",
         "modelDescription": "Validate Paradox EU4 script text (1-16 files) against the embedded EU4 rules and the indexed workspace/Vanilla data without writing anything to disk. Pass each file as {path, text} where path is the mod-relative logical path (for example \"events/my_event.txt\"). Returns per-file diagnostics with stable codes (UnknownKey, InvalidValue, WrongScope, UnknownLocalisationKey, ...), 1-based line numbers, and messages. Use it to verify drafted mod files before or after writing them.",
         "inputSchema": {
@@ -414,6 +422,7 @@
       },
       {
         "name": "paradoxcode_loc_get",
+        "when": "paradoxcodeServerRunning",
         "displayName": "ParadoxCode: Localisation Lookup",
         "modelDescription": "Address one EU4 localisation key exactly (case-insensitive): returns the winning definition with its value, language, and file, or nothing. Never truncated. Use it whenever the key is known, for example an event title key from a script file.",
         "inputSchema": {
@@ -431,6 +440,7 @@
       },
       {
         "name": "paradoxcode_loc_search",
+        "when": "paradoxcodeServerRunning",
         "displayName": "ParadoxCode: Search Localisation Text",
         "modelDescription": "Discover EU4 localisation entries by displayed-value substring, case-insensitive, across the project mod, dependencies, and Vanilla. Returns the winning definition per key with its value, language, and file, limited to 50 entries. Use it to reverse-search visible text to its key before referencing it from events or decisions.",
         "inputSchema": {
@@ -452,6 +462,7 @@
       },
       {
         "name": "paradoxcode_loc_list",
+        "when": "paradoxcodeServerRunning",
         "displayName": "ParadoxCode: List Localisation Family",
         "modelDescription": "Enumerate the EU4 localisation key family under an anchored key prefix (for example \"flavor_kni.1.\" lists the .t, .d, and option keys of that event). Returns the winning definition per key with value, language, and file, limited to 50 entries. Use it to see which keys a definition site already provides or which are missing.",
         "inputSchema": {
