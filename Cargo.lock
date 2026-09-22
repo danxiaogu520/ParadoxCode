@@ -189,7 +189,7 @@ dependencies = [
 
 [[package]]
 name = "engine"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "dunce",
  "game",
@@ -295,7 +295,7 @@ dependencies = [
 
 [[package]]
 name = "game"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "dunce",
  "parser",
@@ -347,7 +347,7 @@ dependencies = [
 
 [[package]]
 name = "hir"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "game",
  "parser",
@@ -451,7 +451,7 @@ dependencies = [
 
 [[package]]
 name = "ide"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "engine",
  "game",
@@ -486,7 +486,7 @@ dependencies = [
 
 [[package]]
 name = "index"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "hir",
  "parser",
@@ -630,7 +630,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
 name = "parser"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "serde",
  "text",
@@ -639,7 +639,7 @@ dependencies = [
 
 [[package]]
 name = "pdc"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "dunce",
  "engine",
@@ -745,7 +745,7 @@ dependencies = [
 
 [[package]]
 name = "rules"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "parser",
  "rayon",
@@ -983,7 +983,7 @@ dependencies = [
 
 [[package]]
 name = "text"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "dunce",
  "serde",
@@ -1060,7 +1060,7 @@ checksum = "7d56353a2a665ad0f41a421187180aab746c8c325620617ad883a99a1cbe66d2"
 
 [[package]]
 name = "tools"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "dunce",
  "engine",
@@ -1081,7 +1081,7 @@ dependencies = [
 
 [[package]]
 name = "transcode"
-version = "0.4.0"
+version = "0.4.1"
 
 [[package]]
 name = "typed-path"
@@ -1133,7 +1133,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "vfs"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "encoding_rs",
  "parser",
