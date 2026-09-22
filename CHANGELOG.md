@@ -7,6 +7,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- The eleven `paradoxcode_` language-model tools now declare `"when": "paradoxcodeServerRunning"`,
+  so VS Code agent mode only lists them in windows where the ParadoxCode extension has actually
+  activated and its language server is running. Previously they appeared in the tool picker of
+  every window (including non-EU4 workspaces), where calling them could only fail. The MCP mirror
+  is unaffected: it reads names, descriptions, and schemas from the same manifest and ignores the
+  `when` clause.
+
 ### Fixed
 
 - Mission Tree Preview failed with "The mission file must live inside the workspace root." for any
