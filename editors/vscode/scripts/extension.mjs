@@ -538,41 +538,27 @@ for (const name of expectedAgentTools) {
   if (tool.inputSchema?.type !== 'object') {
     fail(`agent tool ${name} needs an object inputSchema`);
   }
-  if (tool.canBeReferencedInPrompt === true) {
-    fail(`agent tool ${name} must not opt into manual prompt references`);
+  if (tool.canBeReferencedInPrompt !== true) {
+    fail(`agent tool ${name} must be prompt-referenceable so agent tool pickers can list and enable it`);
+  }
+  if (typeof tool.toolReferenceName !== 'string' || tool.toolReferenceName.length === 0) {
+    fail(`agent tool ${name} needs a toolReferenceName when canBeReferencedInPrompt is true`);
   }
   if (tool.when !== 'paradoxcodeServerRunning') {
     fail(`agent tool ${name} must gate availability on paradoxcodeServerRunning, found ${JSON.stringify(tool.when)}`);
   }
 }
-
-const chatParticipant = manifest.contributes?.chatParticipants?.find(
-  (entry) => entry.id === 'paradoxcode.modding',
-);
-if (!chatParticipant || chatParticipant.name !== 'paradox' || chatParticipant.isSticky !== true) {
-  fail('the @paradox chat participant must be contributed with name "paradox" and isSticky');
+const referenceNames = agentTools.map((tool) => tool.toolReferenceName);
+if (new Set(referenceNames).size !== referenceNames.length) {
+  fail(`agent toolReferenceNames must be unique: ${JSON.stringify(referenceNames)}`);
 }
-const expectedParticipantCommands = ['validate', 'symbols', 'rules', 'loc', 'hover'];
-const participantCommands = (chatParticipant.commands ?? []).map((entry) => entry.name);
-for (const name of expectedParticipantCommands) {
-  if (!participantCommands.includes(name)) {
-    fail(`chat participant command missing: ${name}`);
-  }
-}
-for (const key of [chatParticipant.description, ...(chatParticipant.commands ?? []).map((entry) => entry.description)]) {
-  if (typeof key !== 'string' || !key.startsWith('%')) {
-    fail(`chat participant strings must use NLS references, found ${key}`);
-  }
-  const resolved = key.slice(1, -1);
-  if (!(resolved in nls) || !(resolved in zh)) {
-    fail(`chat participant NLS key missing from a locale: ${resolved}`);
-  }
+if (manifest.contributes?.chatParticipants?.some((entry) => entry.id === 'paradoxcode.modding')) {
+  fail('the @paradox chat participant was removed; agent tools are the only chat surface');
 }
 
 // The stdio MCP server must ship the same tool surface: its manifest is read
 // at runtime from contributes.languageModelTools (single source of truth), so
-// the MCP face cannot drift from the VS Code face, and its instructions must
-// carry the same hard tool discipline as the participant prompt.
+// the MCP face cannot drift from the VS Code face.
 for (const relative of [
   'scripts/mcp.mjs',
   'scripts/lib/mcpServer.mjs',
