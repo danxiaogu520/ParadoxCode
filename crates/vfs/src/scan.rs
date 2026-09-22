@@ -843,8 +843,10 @@ mod tests {
 
         let mut output = Vec::new();
         let mut report = WorkspaceScanReport::default();
-        let mut limits = WorkspaceScanLimits::default();
-        limits.max_depth = 2;
+        let limits = WorkspaceScanLimits {
+            max_depth: 2,
+            ..Default::default()
+        };
         collect_whitelisted_files(
             &root,
             &profile,
@@ -899,8 +901,10 @@ mod tests {
 
         let mut output = Vec::new();
         let mut report = WorkspaceScanReport::default();
-        let mut limits = WorkspaceScanLimits::default();
-        limits.max_files = 1;
+        let limits = WorkspaceScanLimits {
+            max_files: 1,
+            ..Default::default()
+        };
         let error = collect_whitelisted_files(
             &root,
             &profile,
