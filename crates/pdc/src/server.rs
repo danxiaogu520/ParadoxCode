@@ -8,8 +8,8 @@ use std::time::{Duration, Instant};
 
 use engine::{
     AnalysisHost, AnalysisSnapshot, DiskFileChange, DiskFileChangeKind, DocumentId, DocumentSource,
-    IndexCache, PreparedDocument, SourceRootKind, WorkspaceError, WorkspaceScanFilters,
-    WorkspaceScanReport, WorkspaceScanToken,
+    GlobIncludePatterns, IndexCache, PreparedDocument, SourceRootKind, WorkspaceError,
+    WorkspaceScanFilters, WorkspaceScanReport, WorkspaceScanToken,
 };
 use game::DiscoveryToken;
 use ide::{
@@ -381,6 +381,8 @@ pub(crate) struct PreparedInitialize {
     pub(crate) ignored_diagnostic_codes: Vec<String>,
     /// Per-category severity remapping applied before publication and workspace aggregation.
     pub(crate) diagnostic_severity_overrides: BTreeMap<String, Option<Severity>>,
+    /// Include globs deciding transparent-localisation script eligibility.
+    pub(crate) transparent_script_globs: GlobIncludePatterns,
     /// Whether automatic and explicit workspace refreshes publish diagnostics for closed Current
     /// Mod files.
     pub(crate) workspace_wide_diagnostics: bool,
@@ -727,6 +729,9 @@ pub struct LspServer {
     pub(crate) ignored_diagnostic_codes: Arc<HashSet<String>>,
     /// Per-category severity remapping applied to all analysis diagnostics at the protocol edge.
     pub(crate) diagnostic_severity_overrides: Arc<BTreeMap<String, Option<Severity>>>,
+    /// Include globs deciding which workspace-relative script files are eligible for the
+    /// transparent-localisation view; shared with snapshot request contexts.
+    pub(crate) transparent_script_globs: Arc<GlobIncludePatterns>,
     /// Whether automatic and explicit workspace refreshes also publish diagnostics for closed
     /// Project files. The bounded publication path is enabled by default and can be disabled
     /// by clients that only want diagnostics for open documents.
@@ -808,6 +813,7 @@ impl LspServer {
             background_reindex_due: None,
             ignored_diagnostic_codes: Arc::new(HashSet::new()),
             diagnostic_severity_overrides: Arc::new(BTreeMap::new()),
+            transparent_script_globs: Arc::new(GlobIncludePatterns::default()),
             workspace_wide_diagnostics: crate::workspace::DEFAULT_WORKSPACE_WIDE_DIAGNOSTICS,
             workspace_diagnostics_pending: false,
             client_trace: "off".to_owned(),

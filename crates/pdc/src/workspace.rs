@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use engine::{
-    SourceRoot, SourceRootId, SourceRootKind, WorkspaceScanFilters, WorkspaceScanLimits,
-    WorkspaceScanToken,
+    GlobIncludePatterns, SourceRoot, SourceRootId, SourceRootKind, WorkspaceScanFilters,
+    WorkspaceScanLimits, WorkspaceScanToken,
 };
 use ide::{DiagnosticCode, Severity};
 use serde::Deserialize;
@@ -75,6 +75,10 @@ struct WorkspaceInitializationOptions {
     vanilla_mode: Option<String>,
     /// Preferred localisation language order used by hover and mission titles.
     preferred_localisation_languages: Option<Vec<String>>,
+    /// Workspace-relative glob patterns of the script files the transparent-localisation
+    /// view is offered for. Absent means the editor default (`**/*.txt`); an explicitly
+    /// empty list keeps the transparent view localisation-only.
+    transparent_script_globs: Option<Vec<String>>,
     /// Source-root layers eligible to contribute completion members.
     completion_source_layers: Option<Vec<String>>,
     /// Coarse bounded parsing-concurrency profile.
@@ -120,6 +124,9 @@ pub(crate) struct ResolvedSourceRoots {
     pub(crate) vanilla_mode: VanillaMode,
     /// Preferred localisation language order used by analysis queries.
     pub(crate) preferred_localisation_languages: Vec<String>,
+    /// Include globs deciding which workspace-relative script files are eligible for the
+    /// transparent-localisation view.
+    pub(crate) transparent_script_globs: GlobIncludePatterns,
     /// Source-root layers eligible to contribute completion members.
     pub(crate) completion_source_layers: Vec<SourceRootKind>,
     /// Coarse bounded parsing-concurrency profile.
@@ -200,6 +207,17 @@ pub(crate) fn resolve_source_roots(
     let preferred_localisation_languages = normalize_preferred_localisation_languages(
         project.preferred_localisation_languages.unwrap_or_default(),
     )?;
+    let transparent_script_globs = GlobIncludePatterns::new(
+        project
+            .transparent_script_globs
+            .unwrap_or_else(|| vec!["**/*.txt".to_owned()]),
+    )
+    .map_err(|error| {
+        RpcError::new(
+            INVALID_PARAMS,
+            format!("invalid transparentScriptGlobs: {error}"),
+        )
+    })?;
     let completion_source_layers =
         normalize_completion_source_layers(project.completion_source_layers.unwrap_or_default())?;
     let performance_profile =
@@ -381,6 +399,7 @@ pub(crate) fn resolve_source_roots(
         workspace_wide_diagnostics,
         vanilla_mode,
         preferred_localisation_languages,
+        transparent_script_globs,
         completion_source_layers,
         performance_profile,
         scan_limits,

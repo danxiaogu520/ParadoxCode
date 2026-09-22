@@ -130,6 +130,8 @@ pub(crate) fn is_snapshot_request(method: &str) -> bool {
             | "pdc/workspaceFiles"
             | "pdc/classifyPaths"
             | "pdc/textDiagnostics"
+            | "pdc/transcodeDecode"
+            | "pdc/transcodeEncode"
             | "pdc/missionPreview"
             | "pdc/hoverCard"
             | "pdc/ruleSearch"
