@@ -855,3 +855,51 @@ fn declaring_document_edits_move_the_definitions_cache_domain() {
     );
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn overlay_document_errors_report_their_specific_variant() {
+    let mut host = AnalysisHost::new(RuleSet::empty());
+    let id = DocumentId::new("file:///tmp/overlay-errors.txt");
+
+    // Changes and closes before an open target no overlay.
+    let error = host
+        .apply_document_changes(&id, 2, &[TextChange::full("x")])
+        .expect_err("change on an unopened document must fail");
+    assert_eq!(error, super::DocumentError::NotOpen(id.clone()));
+    let error = host
+        .close_document(&id)
+        .expect_err("close on an unopened document must fail");
+    assert_eq!(error, super::DocumentError::NotOpen(id.clone()));
+
+    host.open_document(id.clone(), 1, "a\u{1F600}z".to_owned(), None)
+        .expect("open document");
+    let error = host
+        .open_document(id.clone(), 2, "again".to_owned(), None)
+        .expect_err("reopening a live overlay must fail");
+    assert_eq!(error, super::DocumentError::AlreadyOpen(id.clone()));
+
+    // A newer version still cannot edit inside the four-byte emoji.
+    let range = TextRange::new(1, 3).expect("emoji interior");
+    let error = host
+        .apply_document_changes(&id, 2, &[TextChange::ranged(range, "x")])
+        .expect_err("code point splitting range must fail");
+    assert_eq!(
+        error,
+        super::DocumentError::InvalidRange {
+            document: id.clone(),
+            range,
+        }
+    );
+
+    // The rejected operations leave the overlay text untouched.
+    assert_eq!(
+        host.snapshot().document(&id).expect("document").text(),
+        "a\u{1F600}z"
+    );
+
+    host.close_document(&id).expect("close document");
+    let error = host
+        .close_document(&id)
+        .expect_err("closing twice must fail");
+    assert_eq!(error, super::DocumentError::NotOpen(id));
+}
