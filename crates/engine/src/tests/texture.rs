@@ -4,16 +4,6 @@
 use super::*;
 use text::AbsPath;
 
-fn temp_root(label: &str) -> std::path::PathBuf {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-texture-{label}-{nonce}"));
-    fs::create_dir_all(&root).expect("fixture root");
-    root
-}
-
 fn source_root(id: u32, kind: SourceRootKind, path: &std::path::Path) -> SourceRoot {
     SourceRoot::new(SourceRootId::new(id), kind, AbsPath::normalize(path))
 }

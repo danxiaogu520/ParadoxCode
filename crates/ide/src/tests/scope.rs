@@ -279,49 +279,17 @@ fn dynamic_scope_mismatch_surfaces_at_the_call_site() {
         .clone();
     model.semantic.rules.push(SemanticRule {
         id: "fixture:effect:enter-province".to_owned(),
-        context: "effect".to_owned(),
-        parent_path: Vec::new(),
-        key: KeyMatcher::Exact("fixture_enter_province".to_owned()),
-        operator: None,
-        value: ValueMatcher::AnyScalar,
         shape: RuleShape::Node,
         child_context: Some("effect".to_owned()),
-        alternative_id: None,
-        severity: None,
-        required: false,
-        deprecated: false,
-        documentation: Vec::new(),
-        allowed_scopes: Vec::new(),
         push_scope: Some("province".to_owned()),
-        replace_scope: Vec::new(),
-        min_occurs: None,
-        strict_min: true,
-        max_occurs: None,
-        source_file: "fixture.semantic".to_owned(),
-        line: 1,
+        ..semantic_rule("effect", "fixture_enter_province")
     });
     model.semantic.rules.push(SemanticRule {
         id: "fixture:effect:country-only".to_owned(),
-        context: "effect".to_owned(),
-        parent_path: Vec::new(),
-        key: KeyMatcher::Exact("fixture_country_only".to_owned()),
-        operator: None,
         value: ValueMatcher::Bool,
-        shape: RuleShape::Leaf,
-        child_context: None,
-        alternative_id: None,
-        severity: None,
-        required: false,
-        deprecated: false,
-        documentation: Vec::new(),
         allowed_scopes: vec!["country".to_owned()],
-        push_scope: None,
-        replace_scope: Vec::new(),
-        min_occurs: None,
-        strict_min: true,
-        max_occurs: None,
-        source_file: "fixture.semantic".to_owned(),
         line: 2,
+        ..semantic_rule("effect", "fixture_country_only")
     });
 
     let nonce = std::time::SystemTime::now()

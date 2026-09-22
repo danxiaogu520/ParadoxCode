@@ -113,11 +113,7 @@ fn bulk_index_build_retains_every_shard_and_definition() {
 
 #[test]
 fn parallel_file_state_materialization_is_deterministic() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-parallel-{nonce}"));
+    let root = temp_root("parallel");
     let events = root.join("events");
     fs::create_dir_all(&events).expect("event directory");
     for index in 0..64 {
@@ -149,11 +145,7 @@ fn parallel_file_state_materialization_is_deterministic() {
 
 #[test]
 fn type_per_file_definition_is_emitted_once_without_generic_pseudo_members() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-type-per-file-{nonce}"));
+    let root = temp_root("type-per-file");
     let countries = root.join("common/countries");
     fs::create_dir_all(&countries).expect("country directory");
     fs::write(
@@ -163,7 +155,7 @@ fn type_per_file_definition_is_emitted_once_without_generic_pseudo_members() {
     .expect("country fixture");
 
     let rules = game::eu4::first_party_rules().expect("first-party rules");
-    let mut host = AnalysisHost::with_profile(rules, game::eu4::profile());
+    let mut host = eu4_host_with(rules);
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),
@@ -262,11 +254,7 @@ fn symbol_case_policy_controls_definition_lookup_identity() {
 
 #[test]
 fn identity_only_host_does_not_leak_eu4_dynamic_symbols() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-generic-profile-{nonce}"));
+    let root = temp_root("generic-profile");
     let cultures = root.join("common/cultures");
     let scripted_effects = root.join("common/scripted_effects");
     for directory in [&cultures, &scripted_effects] {

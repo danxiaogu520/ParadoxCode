@@ -2,7 +2,7 @@ use std::fs;
 use std::io::Cursor;
 use text::AbsPath;
 
-use engine::{AnalysisHost, IndexCache, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+use engine::{IndexCache, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
 use game::{DiscoveryOptions, DiscoveryOutcome, UserConfiguration, UserPaths};
 use lsp_types::SymbolInformation;
 
@@ -298,10 +298,7 @@ fn editor_options_load_ordered_dependencies_and_keep_them_read_only() {
         "country_event = { id = vanilla.1 }\n",
     )
     .expect("Vanilla definition");
-    let mut vanilla_host = AnalysisHost::with_profile(
-        game::eu4::first_party_rules().expect("rules for Vanilla cache"),
-        game::eu4::profile(),
-    );
+    let mut vanilla_host = first_party_host();
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
@@ -492,10 +489,7 @@ fn initialize_defers_an_existing_vanilla_cache() {
     let vanilla = dunce::canonicalize(&vanilla).expect("canonical Vanilla directory");
     let cache_path = container.join("vanilla.pdcindex");
 
-    let mut vanilla_host = AnalysisHost::with_profile(
-        game::eu4::first_party_rules().expect("embedded rules"),
-        game::eu4::profile(),
-    );
+    let mut vanilla_host = first_party_host();
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
@@ -511,10 +505,7 @@ fn initialize_defers_an_existing_vanilla_cache() {
     }))
     .expect("initialize params");
     let candidate = prepare_initialize_candidate(
-        AnalysisHost::with_profile(
-            game::eu4::first_party_rules().expect("embedded rules"),
-            game::eu4::profile(),
-        ),
+        first_party_host(),
         params,
         true,
         None,
@@ -1493,10 +1484,7 @@ fn existing_dependency_index_cache_is_installed_in_the_background() {
         SourceRootKind::Dependency,
         AbsPath::normalize(&dependency),
     );
-    let mut builder = AnalysisHost::with_profile(
-        game::eu4::first_party_rules().expect("embedded rules"),
-        game::eu4::profile(),
-    );
+    let mut builder = first_party_host();
     builder.apply_change(WorkspaceChange::SetSourceRoots(vec![
         dependency_root.clone(),
     ]));

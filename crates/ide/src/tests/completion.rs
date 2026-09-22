@@ -544,49 +544,14 @@ fn leaf_value_exact_literals_and_date_keys_avoid_arbitrary_samples() {
     for rule in [
         SemanticRule {
             id: "fixture:container".to_owned(),
-            context: "trigger".to_owned(),
-            parent_path: Vec::new(),
-            key: KeyMatcher::Exact("container".to_owned()),
-            operator: None,
-            value: ValueMatcher::AnyScalar,
             shape: RuleShape::Node,
-            child_context: None,
-            alternative_id: None,
-            severity: None,
-            required: false,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            strict_min: true,
-            max_occurs: None,
-            source_file: "fixture.semantic".to_owned(),
-            line: 1,
+            ..semantic_rule("trigger", "container")
         },
         SemanticRule {
             id: "fixture:exact-block".to_owned(),
-            context: "trigger".to_owned(),
             parent_path: vec!["container".to_owned()],
-            key: KeyMatcher::Exact("exact_block".to_owned()),
-            operator: None,
-            value: ValueMatcher::AnyScalar,
             shape: RuleShape::ValueClause,
-            child_context: None,
-            alternative_id: None,
-            severity: None,
-            required: false,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            strict_min: true,
-            max_occurs: None,
-            source_file: "fixture.semantic".to_owned(),
-            line: 1,
+            ..semantic_rule("trigger", "exact_block")
         },
         SemanticRule {
             id: "fixture:exact-leaf".to_owned(),
@@ -764,26 +729,9 @@ fn open_ended_value_types_do_not_offer_arbitrary_samples() {
         },
         SemanticRule {
             id: "fixture:completion:date".to_owned(),
-            context: "trigger".to_owned(),
-            parent_path: Vec::new(),
-            key: KeyMatcher::Exact("fixture_date_value".to_owned()),
-            operator: None,
             value: ValueMatcher::Date,
-            shape: RuleShape::Leaf,
-            child_context: None,
-            alternative_id: None,
-            severity: None,
-            required: false,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            strict_min: true,
-            max_occurs: None,
-            source_file: "fixture.semantic".to_owned(),
             line: 3,
+            ..semantic_rule("trigger", "fixture_date_value")
         },
     ]);
     let mut host = eu4_host(RuleSet::from_model(model));
@@ -2584,29 +2532,10 @@ fn completion_detail_uses_bare_categories() {
     assert_eq!(foo.kind, CompletionKind::Command);
 
     let mut effect_model = game::eu4::bootstrap_model();
-    effect_model.semantic.rules.push(SemanticRule {
-        id: "fixture:effect:bar".to_owned(),
-        context: "effect".to_owned(),
-        parent_path: Vec::new(),
-        key: KeyMatcher::Exact("bar".to_owned()),
-        operator: None,
-        value: ValueMatcher::AnyScalar,
-        shape: RuleShape::Leaf,
-        child_context: None,
-        alternative_id: None,
-        severity: None,
-        required: false,
-        deprecated: false,
-        documentation: Vec::new(),
-        allowed_scopes: Vec::new(),
-        push_scope: None,
-        replace_scope: Vec::new(),
-        min_occurs: None,
-        strict_min: true,
-        max_occurs: None,
-        source_file: "fixture.semantic".to_owned(),
-        line: 1,
-    });
+    effect_model
+        .semantic
+        .rules
+        .push(semantic_rule("effect", "bar"));
     let effect_text = "effect = { ba";
     let mut host = eu4_host(RuleSet::from_model(effect_model));
     let id = DocumentId::new("file:///tmp/common/events/test.txt");
@@ -2628,26 +2557,7 @@ fn completion_detail_uses_bare_categories() {
     let mut root_model = game::eu4::bootstrap_model();
     root_model.semantic.rules.push(SemanticRule {
         id: "fixture:root:baz".to_owned(),
-        context: "root:government_reform".to_owned(),
-        parent_path: Vec::new(),
-        key: KeyMatcher::Exact("baz".to_owned()),
-        operator: None,
-        value: ValueMatcher::AnyScalar,
-        shape: RuleShape::Leaf,
-        child_context: None,
-        alternative_id: None,
-        severity: None,
-        required: false,
-        deprecated: false,
-        documentation: Vec::new(),
-        allowed_scopes: Vec::new(),
-        push_scope: None,
-        replace_scope: Vec::new(),
-        min_occurs: None,
-        strict_min: true,
-        max_occurs: None,
-        source_file: "fixture.semantic".to_owned(),
-        line: 1,
+        ..semantic_rule("root:government_reform", "baz")
     });
     let root_text = "government_reform = { ba";
     let mut host = eu4_host(RuleSet::from_model(root_model));
@@ -2834,26 +2744,8 @@ fn dynamic_value_completion_covers_scope_expressions_and_same_named_enums() {
     // the end of the line (the half-open property range boundary).
     model.semantic.rules.push(SemanticRule {
         id: "fixture:bool-value".to_owned(),
-        context: "trigger".to_owned(),
-        parent_path: Vec::new(),
-        key: KeyMatcher::Exact("bool_value".to_owned()),
-        operator: None,
         value: ValueMatcher::Bool,
-        shape: RuleShape::Leaf,
-        child_context: None,
-        alternative_id: None,
-        severity: None,
-        required: false,
-        deprecated: false,
-        documentation: Vec::new(),
-        allowed_scopes: Vec::new(),
-        push_scope: None,
-        replace_scope: Vec::new(),
-        min_occurs: None,
-        strict_min: true,
-        max_occurs: None,
-        source_file: "fixture.semantic".to_owned(),
-        line: 1,
+        ..semantic_rule("trigger", "bool_value")
     });
     let mut host = eu4_host(RuleSet::from_model(model));
     let bool_text = "trigger = { bool_value = ";

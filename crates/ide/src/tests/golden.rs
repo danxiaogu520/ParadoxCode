@@ -160,17 +160,6 @@ fn leaf_rule(id: &str, context: &str, key: KeyMatcher, value: ValueMatcher) -> S
     }
 }
 
-/// Creates an isolated Project source root under the system temp directory.
-fn temp_root(tag: &str) -> PathBuf {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdc-golden-{tag}-{nonce}"));
-    std::fs::create_dir_all(&root).expect("golden temp root");
-    root
-}
-
 fn first_party_host(root: &std::path::Path) -> AnalysisHost {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(

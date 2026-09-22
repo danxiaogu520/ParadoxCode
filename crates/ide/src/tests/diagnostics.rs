@@ -106,50 +106,15 @@ fn scope_target_failures_use_distinct_categories() {
     let mut model = game::eu4::bootstrap_model();
     model.semantic.rules.extend([
         SemanticRule {
-            id: "fixture:trigger:target".to_owned(),
-            context: "trigger".to_owned(),
-            parent_path: Vec::new(),
-            key: KeyMatcher::Exact("target".to_owned()),
-            operator: None,
             value: ValueMatcher::Scope(Some("country".to_owned())),
-            shape: RuleShape::Leaf,
-            child_context: None,
-            alternative_id: None,
-            severity: None,
-            required: false,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            strict_min: true,
-            max_occurs: None,
-            source_file: "fixture.semantic".to_owned(),
             line: 10,
+            ..semantic_rule("trigger", "target")
         },
         SemanticRule {
             id: "fixture:trigger:scope-command".to_owned(),
-            context: "trigger".to_owned(),
-            parent_path: Vec::new(),
-            key: KeyMatcher::Exact("scope".to_owned()),
-            operator: None,
             value: ValueMatcher::Scope(Some("country".to_owned())),
-            shape: RuleShape::Leaf,
-            child_context: None,
-            alternative_id: None,
-            severity: None,
-            required: false,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            strict_min: true,
-            max_occurs: None,
-            source_file: "fixture.semantic".to_owned(),
             line: 11,
+            ..semantic_rule("trigger", "scope")
         },
     ]);
     let mut host = eu4_host(RuleSet::from_model(model));
@@ -879,27 +844,9 @@ fn invalid_enum_value_carries_one_unique_did_you_mean_fix() {
         vec!["historic".to_owned(), "dynamic".to_owned()],
     );
     model.semantic.rules.push(SemanticRule {
-        id: "fixture:trigger:mode".to_owned(),
-        context: "trigger".to_owned(),
-        parent_path: Vec::new(),
-        key: KeyMatcher::Exact("mode".to_owned()),
         operator: Some("=".to_owned()),
         value: ValueMatcher::Enum("fixture_modes".to_owned()),
-        shape: RuleShape::Leaf,
-        child_context: None,
-        alternative_id: None,
-        severity: None,
-        required: false,
-        deprecated: false,
-        documentation: Vec::new(),
-        allowed_scopes: Vec::new(),
-        push_scope: None,
-        replace_scope: Vec::new(),
-        min_occurs: None,
-        strict_min: true,
-        max_occurs: None,
-        source_file: "fixture.semantic".to_owned(),
-        line: 1,
+        ..semantic_rule("trigger", "mode")
     });
     let mut host = eu4_host(RuleSet::from_model(model));
     let id = DocumentId::new("file:///tmp/common/events/enum-fix.txt");
@@ -944,27 +891,9 @@ fn ambiguous_enum_suggestions_do_not_produce_a_fix() {
         vec!["cat".to_owned(), "bat".to_owned()],
     );
     model.semantic.rules.push(SemanticRule {
-        id: "fixture:trigger:mode".to_owned(),
-        context: "trigger".to_owned(),
-        parent_path: Vec::new(),
-        key: KeyMatcher::Exact("mode".to_owned()),
         operator: Some("=".to_owned()),
         value: ValueMatcher::Enum("fixture_modes".to_owned()),
-        shape: RuleShape::Leaf,
-        child_context: None,
-        alternative_id: None,
-        severity: None,
-        required: false,
-        deprecated: false,
-        documentation: Vec::new(),
-        allowed_scopes: Vec::new(),
-        push_scope: None,
-        replace_scope: Vec::new(),
-        min_occurs: None,
-        strict_min: true,
-        max_occurs: None,
-        source_file: "fixture.semantic".to_owned(),
-        line: 1,
+        ..semantic_rule("trigger", "mode")
     });
     let mut host = eu4_host(RuleSet::from_model(model));
     let id = DocumentId::new("file:///tmp/common/events/enum-tie.txt");
@@ -1028,27 +957,11 @@ fn semantic_matcher_enforces_min_cardinality() {
 fn semantic_value_clause_validates_bare_values_and_cardinality() {
     let mut model = game::eu4::bootstrap_model();
     model.semantic.rules.push(SemanticRule {
-        id: "fixture:terrain:color".to_owned(),
-        context: "terrain".to_owned(),
-        parent_path: Vec::new(),
-        key: KeyMatcher::Exact("color".to_owned()),
         operator: Some("=".to_owned()),
-        value: ValueMatcher::AnyScalar,
         shape: RuleShape::ValueClause,
-        child_context: None,
-        alternative_id: None,
-        severity: None,
-        required: false,
-        deprecated: false,
         documentation: vec!["RGB color clause".to_owned()],
-        allowed_scopes: Vec::new(),
-        push_scope: None,
-        replace_scope: Vec::new(),
-        min_occurs: None,
-        strict_min: true,
         max_occurs: Some(1),
-        source_file: "fixture.semantic".to_owned(),
-        line: 1,
+        ..semantic_rule("terrain", "color")
     });
     model.semantic.rules.push(SemanticRule {
         id: "fixture:terrain:color:int".to_owned(),
@@ -1987,26 +1900,10 @@ fn empty_dynamic_calls_map_required_cardinality_to_the_call() {
         .clone();
     model.semantic.rules.push(SemanticRule {
         id: "fixture:effect:required-in-empty-definition".to_owned(),
-        context: "effect".to_owned(),
-        parent_path: Vec::new(),
-        key: KeyMatcher::Exact("fixture_required".to_owned()),
-        operator: None,
         value: ValueMatcher::Bool,
-        shape: RuleShape::Leaf,
-        child_context: None,
-        alternative_id: None,
-        severity: None,
         required: true,
-        deprecated: false,
-        documentation: Vec::new(),
-        allowed_scopes: Vec::new(),
-        push_scope: None,
-        replace_scope: Vec::new(),
         min_occurs: Some(1),
-        strict_min: true,
-        max_occurs: None,
-        source_file: "fixture.semantic".to_owned(),
-        line: 1,
+        ..semantic_rule("effect", "fixture_required")
     });
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

@@ -3,11 +3,7 @@ use text::AbsPath;
 
 #[test]
 fn previous_cache_schema_is_rejected_before_table_loading() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-old-schema-cache-{nonce}"));
+    let root = temp_root("old-schema-cache");
     let vanilla = root.join("vanilla");
     fs::create_dir_all(vanilla.join("events")).expect("event directory");
     fs::write(
@@ -16,10 +12,7 @@ fn previous_cache_schema_is_rejected_before_table_loading() {
     )
     .expect("schema fixture");
 
-    let mut host = AnalysisHost::with_profile(
-        game::eu4::first_party_rules().expect("first-party rules"),
-        game::eu4::profile(),
-    );
+    let mut host = eu4_host_with(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
@@ -47,11 +40,7 @@ fn previous_cache_schema_is_rejected_before_table_loading() {
 
 #[test]
 fn vanilla_cache_preserves_dynamic_definition_references_without_hir() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-vanilla-scripted-cache-{nonce}"));
+    let root = temp_root("vanilla-scripted-cache");
     let vanilla = root.join("vanilla");
     fs::create_dir_all(vanilla.join("common/scripted_effects"))
         .expect("scripted effects directory");
@@ -68,7 +57,7 @@ fn vanilla_cache_preserves_dynamic_definition_references_without_hir() {
     .expect("dynamic call");
 
     let rules = game::eu4::first_party_rules().expect("first-party rules");
-    let mut host = AnalysisHost::with_profile(rules, game::eu4::profile());
+    let mut host = eu4_host_with(rules);
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(0),
@@ -139,11 +128,7 @@ fn vanilla_cache_preserves_dynamic_definition_references_without_hir() {
 
 #[test]
 fn definition_attribute_summaries_survive_live_and_cached_indexing() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-attr-cache-{nonce}"));
+    let root = temp_root("attr-cache");
     let vanilla = root.join("vanilla");
     fs::create_dir_all(vanilla.join("common/event_modifiers")).expect("modifier directory");
     fs::write(
@@ -154,7 +139,7 @@ fn definition_attribute_summaries_survive_live_and_cached_indexing() {
     .expect("event modifier");
 
     let rules = game::eu4::first_party_rules().expect("first-party rules");
-    let mut host = AnalysisHost::with_profile(rules, game::eu4::profile());
+    let mut host = eu4_host_with(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
@@ -191,11 +176,7 @@ fn definition_attribute_summaries_survive_live_and_cached_indexing() {
 
 #[test]
 fn corrupted_navigation_position_is_rejected_without_symbol_table_scans() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-vanilla-position-cache-{nonce}"));
+    let root = temp_root("vanilla-position-cache");
     let vanilla = root.join("vanilla");
     fs::create_dir_all(vanilla.join("events")).expect("event directory");
     fs::write(
@@ -205,7 +186,7 @@ fn corrupted_navigation_position_is_rejected_without_symbol_table_scans() {
     .expect("vanilla event");
 
     let rules = game::eu4::first_party_rules().expect("first-party rules");
-    let mut host = AnalysisHost::with_profile(rules, game::eu4::profile());
+    let mut host = eu4_host_with(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
@@ -231,11 +212,7 @@ fn corrupted_navigation_position_is_rejected_without_symbol_table_scans() {
 
 #[test]
 fn refreshed_cache_reindexes_changed_files_and_drops_deleted_ones() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-refresh-cache-{nonce}"));
+    let root = temp_root("refresh-cache");
     let vanilla = root.join("vanilla");
     fs::create_dir_all(vanilla.join("events")).expect("event directory");
     fs::create_dir_all(vanilla.join("common/scripted_effects"))
@@ -257,7 +234,7 @@ fn refreshed_cache_reindexes_changed_files_and_drops_deleted_ones() {
     .expect("definition fixture");
 
     let rules = game::eu4::first_party_rules().expect("first-party rules");
-    let mut host = AnalysisHost::with_profile(rules.clone(), game::eu4::profile());
+    let mut host = eu4_host_with(rules.clone());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
@@ -369,11 +346,7 @@ fn refreshed_cache_reindexes_changed_files_and_drops_deleted_ones() {
 
 #[test]
 fn refresh_rejects_stale_rules_and_mismatched_games() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-refresh-reject-{nonce}"));
+    let root = temp_root("refresh-reject");
     let vanilla = root.join("vanilla");
     fs::create_dir_all(vanilla.join("events")).expect("event directory");
     fs::write(
@@ -383,7 +356,7 @@ fn refresh_rejects_stale_rules_and_mismatched_games() {
     .expect("fixture");
 
     let bootstrap = game::eu4::bootstrap_rules();
-    let mut host = AnalysisHost::with_profile(bootstrap.clone(), game::eu4::profile());
+    let mut host = eu4_host_with(bootstrap.clone());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
@@ -414,11 +387,7 @@ fn refresh_rejects_stale_rules_and_mismatched_games() {
 
 #[test]
 fn save_reclaims_free_pages_when_rebuilding_a_smaller_cache() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-shrink-cache-{nonce}"));
+    let root = temp_root("shrink-cache");
     let cache_path = root.join("cache/vanilla.pdcindex");
 
     let rules = game::eu4::bootstrap_rules();
@@ -432,7 +401,7 @@ fn save_reclaims_free_pages_when_rebuilding_a_smaller_cache() {
             ));
         }
         fs::write(vanilla.join("events/a.txt"), body).expect("fixture");
-        let mut host = AnalysisHost::with_profile(rules.clone(), game::eu4::profile());
+        let mut host = eu4_host_with(rules.clone());
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(0),
             SourceRootKind::Vanilla,
@@ -478,11 +447,7 @@ fn save_reclaims_free_pages_when_rebuilding_a_smaller_cache() {
 
 #[test]
 fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-vanilla-cache-{nonce}"));
+    let root = temp_root("vanilla-cache");
     let vanilla = root.join("vanilla");
     let current = root.join("current");
     fs::create_dir_all(vanilla.join("events")).expect("Vanilla fixture directory");
@@ -679,11 +644,7 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
 
 #[test]
 fn vanilla_cache_previews_retain_only_preferred_languages() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-preview-retention-{nonce}"));
+    let root = temp_root("preview-retention");
     let vanilla = root.join("vanilla");
     fs::create_dir_all(vanilla.join("localisation")).expect("fixture directory");
     fs::write(
@@ -767,11 +728,7 @@ fn vanilla_cache_previews_retain_only_preferred_languages() {
 
 #[test]
 fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-dependency-cache-{nonce}"));
+    let root = temp_root("dependency-cache");
     let dependency = root.join("dependency");
     fs::create_dir_all(dependency.join("common/scripted_effects"))
         .expect("scripted effects directory");
@@ -795,7 +752,7 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
 
     // Build the cache from a dedicated dependency-only workspace.
     let rules = game::eu4::first_party_rules().expect("first-party rules");
-    let mut builder = AnalysisHost::with_profile(rules, game::eu4::profile());
+    let mut builder = eu4_host_with(rules);
     builder.apply_change(WorkspaceChange::SetSourceRoots(vec![
         dependency_root.clone(),
     ]));
@@ -810,10 +767,7 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
     assert_eq!(loaded.source_root().kind, SourceRootKind::Dependency);
 
     // Install into a workspace where the dependency root is configured but not scanned.
-    let mut host = AnalysisHost::with_profile(
-        game::eu4::first_party_rules().unwrap(),
-        game::eu4::profile(),
-    );
+    let mut host = eu4_host_with(game::eu4::first_party_rules().unwrap());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![
         dependency_root.clone(),
     ]));
@@ -867,11 +821,7 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
 
 #[test]
 fn batch_dependency_cache_install_rebuilds_the_workspace_index_once() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-batch-dependency-cache-{nonce}"));
+    let root = temp_root("batch-dependency-cache");
     let rules = game::eu4::first_party_rules().expect("first-party rules");
     let mut caches = Vec::new();
     for (id, name) in [(1_u32, "first"), (2_u32, "second")] {
@@ -888,7 +838,7 @@ fn batch_dependency_cache_install_rebuilds_the_workspace_index_once() {
             SourceRootKind::Dependency,
             AbsPath::normalize(&dependency_path),
         );
-        let mut builder = AnalysisHost::with_profile(rules.clone(), game::eu4::profile());
+        let mut builder = eu4_host_with(rules.clone());
         builder.apply_change(WorkspaceChange::SetSourceRoots(vec![dependency_root]));
         builder.refresh_source_roots().expect("scan dependency");
         caches.push(IndexCache::from_snapshot(&builder.snapshot()).expect("build cache"));
@@ -906,7 +856,7 @@ fn batch_dependency_cache_install_rebuilds_the_workspace_index_once() {
         SourceRootKind::Project,
         AbsPath::normalize(&fs::canonicalize(&current).expect("canonical project root")),
     );
-    let mut host = AnalysisHost::with_profile(rules, game::eu4::profile());
+    let mut host = eu4_host_with(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![current_root]));
     host.refresh_source_roots().expect("scan project");
     let before_install = host.snapshot().revision();
@@ -940,11 +890,7 @@ fn batch_dependency_cache_install_rebuilds_the_workspace_index_once() {
 
 #[test]
 fn dependency_index_cache_rejects_an_unrelated_configured_root() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-dependency-mismatch-{nonce}"));
+    let root = temp_root("dependency-mismatch");
     let dependency = root.join("dependency");
     fs::create_dir_all(dependency.join("events")).expect("event directory");
     fs::write(
@@ -955,7 +901,7 @@ fn dependency_index_cache_rejects_an_unrelated_configured_root() {
     let dependency_path = fs::canonicalize(&dependency).expect("canonical dependency root");
 
     let rules = game::eu4::first_party_rules().expect("first-party rules");
-    let mut builder = AnalysisHost::with_profile(rules, game::eu4::profile());
+    let mut builder = eu4_host_with(rules);
     builder.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(7),
         SourceRootKind::Dependency,
@@ -970,10 +916,7 @@ fn dependency_index_cache_rejects_an_unrelated_configured_root() {
     // The configured root claims the same id but a different directory.
     let other = root.join("other");
     fs::create_dir_all(&other).expect("other directory");
-    let mut host = AnalysisHost::with_profile(
-        game::eu4::first_party_rules().unwrap(),
-        game::eu4::profile(),
-    );
+    let mut host = eu4_host_with(game::eu4::first_party_rules().unwrap());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(7),
         SourceRootKind::Dependency,
@@ -988,11 +931,7 @@ fn dependency_index_cache_rejects_an_unrelated_configured_root() {
 
 #[test]
 fn lazy_reference_load_serves_skipped_kinds_from_disk() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-lazy-refs-{nonce}"));
+    let root = temp_root("lazy-refs");
     let vanilla = root.join("vanilla");
     fs::create_dir_all(vanilla.join("events")).expect("events directory");
     fs::create_dir_all(vanilla.join("common/scripted_effects"))
@@ -1089,11 +1028,7 @@ fn lazy_reference_load_serves_skipped_kinds_from_disk() {
 
 #[test]
 fn lazy_preferred_language_load_skips_other_languages() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-lazy-previews-{nonce}"));
+    let root = temp_root("lazy-previews");
     let vanilla = root.join("vanilla");
     fs::create_dir_all(vanilla.join("localisation")).expect("localisation directory");
     fs::write(
