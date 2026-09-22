@@ -7,7 +7,7 @@
 //! resolve pack-relative, and a `.tga`/`.dds` extension drift is accepted because the
 //! engine falls back between the two.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use text::AbsPath;
 use vfs::{SourceRoot, SourceRootKind};
@@ -21,7 +21,7 @@ const CATALOG_EXTENSIONS: &[&str] = &["dds", "tga", "png", "jpg", "jpeg", "ddr",
 /// Hard cap on walked entries so a pathological tree cannot stall a snapshot build.
 const MAX_CATALOG_ENTRIES: usize = 200_000;
 /// Maximum completion labels served for one prefix query.
-const MAX_PREFIX_RESULTS: usize = 200;
+pub(crate) const MAX_PREFIX_RESULTS: usize = 200;
 
 /// One source-root hit for a normalized asset path.
 #[derive(Clone, Debug)]
@@ -51,6 +51,18 @@ pub type TextureCatalogCache = std::sync::Mutex<Option<(usize, std::sync::Arc<Te
 pub struct TextureCatalog {
     /// Normalized (lowercased, forward-slash, collapsed) asset path -> hits.
     entries: BTreeMap<String, Vec<TextureCatalogHit>>,
+    /// Every ancestor directory of an entry key, spelled with a trailing slash.
+    directories: BTreeSet<String>,
+}
+
+/// Drill-down completion children of one catalog directory.
+#[derive(Clone, Debug, Default)]
+pub struct TextureCatalogChildren<'a> {
+    /// Subdirectory keys, each spelled with a trailing slash so selecting one
+    /// continues the browse.
+    pub directories: Vec<&'a str>,
+    /// File keys sitting directly in the browsed directory.
+    pub files: Vec<&'a str>,
 }
 
 impl TextureCatalog {
@@ -170,6 +182,48 @@ impl TextureCatalog {
             .collect()
     }
 
+    /// Returns the immediate children of the directory a completion prefix points into.
+    ///
+    /// The prefix's directory portion (everything up to and including its last `/`)
+    /// selects the browsed directory; the remainder filters child names. Subdirectory
+    /// labels keep their trailing slash so a selected directory continues the browse,
+    /// while files stay capped at 200 per directory. This keeps a
+    /// shallow prefix (even the empty one after an opening quote) useful on catalogs
+    /// with thousands of entries, where the flat prefix scan would show only its
+    /// alphabetical head.
+    #[must_use]
+    pub fn children_with_prefix(&self, prefix: &str) -> TextureCatalogChildren<'_> {
+        let normalized = normalize_asset_path(prefix);
+        let (directory, fragment) = match normalized.rfind('/') {
+            Some(index) => normalized.split_at(index + 1),
+            None => ("", normalized.as_str()),
+        };
+        let mut directories = Vec::new();
+        for dir in self.directories.range(directory.to_owned()..) {
+            if !dir.starts_with(directory) {
+                break;
+            }
+            let remainder = &dir[directory.len()..];
+            if let Some(name) = remainder.strip_suffix('/')
+                && !name.contains('/')
+                && name.starts_with(fragment)
+            {
+                directories.push(dir.as_str());
+            }
+        }
+        let mut files = Vec::new();
+        for (path, _) in self.entries.range(directory.to_owned()..) {
+            if !path.starts_with(directory) || files.len() >= MAX_PREFIX_RESULTS {
+                break;
+            }
+            let name = &path[directory.len()..];
+            if !name.contains('/') && name.starts_with(fragment) {
+                files.push(path.as_str());
+            }
+        }
+        TextureCatalogChildren { directories, files }
+    }
+
     /// Returns catalog paths sharing the directory prefix of `raw`, used for
     /// did-you-mean suggestions on a missing texture.
     #[must_use]
@@ -188,6 +242,11 @@ impl TextureCatalog {
     }
 
     fn insert(&mut self, key: String, hit: TextureCatalogHit) {
+        let mut boundary = 0;
+        while let Some(slash) = key[boundary..].find('/') {
+            boundary += slash + 1;
+            self.directories.insert(key[..boundary].to_owned());
+        }
         self.entries.entry(key).or_default().push(hit);
     }
 }

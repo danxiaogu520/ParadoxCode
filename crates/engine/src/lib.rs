@@ -15,7 +15,10 @@ pub use fingerprint::workspace_context_fingerprint;
 pub use host::AnalysisHost;
 pub use query_cache::{CacheDomain, SnapshotQueryCache};
 pub use snapshot::AnalysisSnapshot;
-pub use texture::{TextureCatalog, TextureCatalogHit, TextureResolution, normalize_asset_path};
+pub use texture::{
+    TextureCatalog, TextureCatalogChildren, TextureCatalogHit, TextureResolution,
+    normalize_asset_path,
+};
 
 // Facade re-exports: downstream crates keep consuming these names through `engine::`.
 pub use index::{
