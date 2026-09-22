@@ -4853,7 +4853,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Each level of skill is worth 50."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -5886,7 +5888,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "THIS = Province, FROM = Builder(not nessecairly owner, can be overlord)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -5925,7 +5929,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "THIS = Province, FROM = Destroyer, Will not be called on buildings made obsolete!"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -5964,7 +5970,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "THIS = Province, FROM = Destroyer, Will not be called on buildings destroyed!"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -6031,7 +6039,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "if yes, only one of these can exist in a country"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -6500,7 +6510,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Fires when you start the construction, ROOT - Province FROM - Country that started"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -6535,7 +6547,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Fires when you cancel the construction, ROOT - Province FROM - Country that canceled"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -6575,7 +6589,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "cost in $ to build (subject to other modifiers)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -6754,7 +6770,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Always allow annexation (even if other rules disallow)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -6784,7 +6802,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Always deny annexation (even if other rules allows it)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -6858,7 +6878,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Multiplied with the cost for transfering trade power."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -7673,7 +7695,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Always allow annexation (even if other rules disallow)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -7703,7 +7727,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Always deny annexation (even if other rules allows it)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -8194,7 +8220,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Multiplied with the cost for transfering trade power."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -8358,7 +8386,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "If yes you get no negative opinion from this"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -8571,7 +8601,7 @@
     "severity": null,
     "required": false,
     "documentation": [
-      "A condition that automatically activates a CB. May or may not work for triggered CBs, needs verification."
+      "A condition that automatically activates a CB. Does not work for triggered CBs."
     ],
     "allowed_scopes": [
       "any"
@@ -8737,7 +8767,7 @@
     "severity": null,
     "required": false,
     "documentation": [
-      "The CB will be triggered via code e.g. in event effects."
+      "Triggered from within the code or by event effects. DO NOT REMOVE THE STOCK ONES."
     ],
     "allowed_scopes": [
       "any"
@@ -9127,7 +9157,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "FROM = center of revolution"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -9761,7 +9793,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "60% of character"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -9821,7 +9855,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "30% of character"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -9881,7 +9917,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Up to 10% -> try map color here"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -11079,7 +11117,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "WHEN ADDING NEW, ALWAYS ADD AT THE END"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -11135,7 +11175,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "muslimgfx (fallback if the first does not exist)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -12158,7 +12200,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "do this before the peace is enforced, or there is no war enemy country"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -14829,7 +14873,7 @@
     "severity": null,
     "required": false,
     "documentation": [
-      "Effect executed when the progress towards the disaster ticks upwards or downwards."
+      "triggered monthly when it is ticking up to 100. The progress is saved in a variable that is <disaster key>_progress"
     ],
     "allowed_scopes": [
       "any"
@@ -15317,7 +15361,7 @@
     "severity": null,
     "required": false,
     "documentation": [
-      "Modifier that is applied if specified conditions are true, with its effect scaling on the influence of the estate"
+      "Modifier that are applied if the specified conditions are true. At 100% Influence you gain 100% of the modifier."
     ],
     "allowed_scopes": [
       "any"
@@ -15920,7 +15964,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "You can put static modifier names here as well as normal localisation keys"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -16816,7 +16862,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Used for when declaring independence"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -17434,7 +17482,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Alternative naming of estates"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -17588,7 +17638,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "For each province bordering another country, the neighboring provinces with the highest weights are added, until (share of land ownership * total development) is reached. From all these tries (It will do 32 of the highest weight border provinces at most), the result with the highest total sum of weights is then selected and these provinces then become the new country."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -21219,7 +21271,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Used By Revolutionary Client State"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -21721,7 +21775,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "invisible/does not take up a slot"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -22858,7 +22914,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Used By Revolutionary Client State"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -26446,7 +26504,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Each group of exclusive reforms are mutually exclusive to each other"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -28993,7 +29053,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "province it starts in"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29049,7 +29111,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "tier data"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29111,7 +29175,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "time to upgrade to this level (0 for tier 0)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29175,7 +29241,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "cost to upgrade to this level (0 for tier 0)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29203,7 +29271,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "what modifiers are added to the province when we have this project here on this tier"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29240,7 +29310,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "what modifiers are added to the provinces in the map area when we have this project here on this tier"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29275,7 +29347,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "date built in real life (so anything built during game time will be there if you start a game after that date)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29340,7 +29414,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "what modifiers are added to the country when we have this project here on this tier"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29632,7 +29708,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "tier data"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29658,7 +29736,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "time to build"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29689,7 +29769,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "how much to build one"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29715,7 +29797,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "can we move it?"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29746,7 +29830,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "time to move the project one unit of distance, in days"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29777,7 +29863,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "tier that the project starts at when first placed in the game (be that at game start or when built by a country as the game progresses)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29805,7 +29893,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "project type"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29833,7 +29923,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "project type"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29859,7 +29951,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "can we build it?"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29988,7 +30082,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "what to do when it's built"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30117,7 +30213,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "what to do when it's destroyed"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30156,7 +30254,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "can our country use it?"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30195,7 +30295,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "can our country upgrade it?"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30234,7 +30336,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "can our country keep it or is it destroyed when we get hold of it?"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30309,7 +30413,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "time to upgrade to this level (0 for tier 0)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30373,7 +30479,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "cost to upgrade to this level (0 for tier 0)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30401,7 +30509,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "what modifiers are added to the province when we have this project here on this tier"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30438,7 +30548,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "what modifiers are added to the provinces in the map area when we have this project here on this tier"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30540,7 +30652,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "what modifiers are added to the country when we have this project here on this tier"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30799,7 +30913,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "tier data"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30861,7 +30977,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "time to upgrade to this level (0 for tier 0)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30925,7 +31043,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "cost to upgrade to this level (0 for tier 0)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30953,7 +31073,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "what modifiers are added to the province when we have this project here on this tier"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -31018,7 +31140,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "what modifiers are added to the provinces in the map area when we have this project here on this tier"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -31092,7 +31216,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "what modifiers are added to the country when we have this project here on this tier"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -31351,7 +31477,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "tier data"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -31413,7 +31541,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "time to upgrade to this level (0 for tier 0)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -31477,7 +31607,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "cost to upgrade to this level (0 for tier 0)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -31505,7 +31637,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "what modifiers are added to the province when we have this project here on this tier"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -31542,7 +31676,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "what modifiers are added to the provinces in the map area when we have this project here on this tier"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -31616,7 +31752,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "what modifiers are added to the country when we have this project here on this tier"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -40082,7 +40220,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Province scope"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -42103,7 +42243,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Mandatory to have entry called \"ai_value\". Its value at the end of the ai_weight scope is what will be used"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -43120,7 +43262,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Held provinces will auto-defect after 18 months, regardless of accept/enforce demands."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -43228,7 +43372,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Units will relocate if they have sieged all provinces nearby and has to move over sea."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -43358,7 +43504,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Will reinforce (double rate in rebel controlled provinces)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -43410,7 +43558,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Do assault forts, tactically withdraw from battle, etc."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -44070,7 +44220,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "THIS = Nation wanting to invite the scholar, FROM = Nation that follows that school"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -44112,7 +44264,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "THIS = Nation wanting to invite the scholar, FORM = Nation that sends scholar"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -44960,7 +45114,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Uses piety mechanics"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -44990,7 +45146,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Other christians hate them less"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45134,7 +45292,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Uses patriarch authority"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45420,7 +45580,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Uses church power/aspect mechanics"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45450,7 +45612,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Uses church power/aspect mechanics"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45480,7 +45644,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Uses church power/aspect mechanics"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45623,7 +45789,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Refered to even for initial CoR Spawn"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -51203,7 +51371,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Flag emblem values - Used for Dynamic Setup of Random Nations. Emblem texture: game/gfx/interface/client_state_symbols_large.dds Can be overridden per religion."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -52382,7 +52552,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Subject Interactions: (continuous)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -52408,7 +52580,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Subject Interactions:"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -52460,7 +52634,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Subject Interactions:"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -52488,7 +52664,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Graphics:"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -52566,7 +52744,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "(immediate)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -52618,7 +52798,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Subject Interactions: (immediate)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -52644,7 +52826,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Subject Interactions:"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -52670,7 +52854,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Subject Interactions:"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -53172,7 +53358,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "(enable)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -53224,7 +53412,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "(enable)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -53354,7 +53544,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Subject Interactions: (immediate)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -53569,7 +53761,7 @@
     "severity": null,
     "required": false,
     "documentation": [
-      "Use this to disable inheritance on Subject types that use inheriting (Personal Union) mechanics"
+      "Use this for Personal Union types of subjects to disallow the inheriting mechanic"
     ],
     "allowed_scopes": [
       "any"
@@ -53596,7 +53788,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "(special)"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -53932,7 +54126,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Properties:"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -54239,7 +54435,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Properties:"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -54561,7 +54759,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Properties:"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -54587,7 +54787,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Properties:"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -54829,7 +55031,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Properties:"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -54907,7 +55111,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Properties:"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -54959,7 +55165,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Properties:"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -55037,7 +55245,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Properties:"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -55764,7 +55974,7 @@
     "severity": null,
     "required": false,
     "documentation": [
-      "Enemies can force this subject to join defensive wars against the overlord"
+      "Enemies can force this subject to join its overlord into the defense war. Only used when the subject has the \"joins_overlords_wars = no\". By default it's \"no\"."
     ],
     "allowed_scopes": [
       "any"
@@ -55792,7 +56002,7 @@
     "severity": null,
     "required": false,
     "documentation": [
-      "Overlord can use favors to ask subject to join wars, only effective if joins_overlords_wars = no"
+      "Overlord can ask subject to join wars like it could ask allies to join. You would require favors to call them to wars. Only used when the subject has the \"joins_overlords_wars = no\". By default it's \"no\""
     ],
     "allowed_scopes": [
       "any"
@@ -55824,7 +56034,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Defines how much favors the overlord need to invest to call the subject into an offensive war"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -55855,7 +56067,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Defines how much favors the overlord need to invest to call the subject into a defensive war"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -55887,7 +56101,7 @@
     "severity": null,
     "required": false,
     "documentation": [
-      "Opinion necessary to join the war, only applies if Leviathan DLC is not enabled"
+      "Defines how much opinion the subject loses of the overlord to call the subject into an offensive war. Applied if you do not have Leviathan"
     ],
     "allowed_scopes": [
       "any"
@@ -55920,7 +56134,7 @@
     "severity": null,
     "required": false,
     "documentation": [
-      "Opinion necessary to join the war, only applies if Leviathan DLC is not enabled"
+      "Defines how much opinion the subject loses of the overlord to call the subject into a defensive war. Applied if you do not have Leviathan"
     ],
     "allowed_scopes": [
       "any"
@@ -56202,7 +56416,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Liberty desire at 100% revolution spread in country"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -56326,7 +56542,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Liberty desire at 100% revolution spread in country"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -56423,7 +56641,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Percent of subject FL to use as base for modifiers"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -56454,7 +56674,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Percent of subject FL to use as base for modifiers"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -56485,7 +56707,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Percent of subject FL to use as base for modifiers"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -59118,7 +59342,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "base price in $. (default is 1.0 if not specified"
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -59148,7 +59374,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "This resource works like 'gold' if yes, using prices from mine-value in province instead of supply/demand and baseprice. Also creates gold-inflation"
+    ],
     "allowed_scopes": [
       "any"
     ],
