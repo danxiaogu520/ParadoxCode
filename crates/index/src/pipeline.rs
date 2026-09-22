@@ -904,9 +904,12 @@ fn find_property(node: CstNode<'_>, wanted: &str, parsed: &ParsedFile) -> Option
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rules::{FileCategory, FileMatcher, FileResolutionPolicy, RulesModel};
+    use rules::{
+        FileCategory, FileMatcher, FileResolutionPolicy, ProfileDefinitionRule, ProfileMatchMode,
+        ProfileTextMatcher, RulesModel,
+    };
     use std::path::PathBuf;
-    use vfs::{SourceRootId, SourceRootKind};
+    use vfs::{SourceRootId, SourceRootKind, WorkspaceScanIssueKind};
 
     fn strict_common_profile() -> GameProfile {
         let mut profile = GameProfile::empty("test");
@@ -978,5 +981,237 @@ mod tests {
         let prepared = prepare_document_snapshot(&rules, &profile, &[root], known);
         assert!(prepared.parsed.is_some());
         assert!(prepared.hir.is_some());
+    }
+
+    fn fixture_source_file(id: SourceFileId, logical: &str) -> SourceFile {
+        SourceFile {
+            id,
+            root_id: SourceRootId::new(3),
+            physical_path: AbsPath::normalize(&PathBuf::from("C:/fixture").join(logical)),
+            logical_path: LogicalPath::parse(logical).expect("logical path"),
+            category_id: Some("script".to_owned()),
+            resolution: FileResolutionPolicy::ReplaceByRelativePath,
+        }
+    }
+
+    fn event_profile() -> GameProfile {
+        let mut profile = GameProfile::empty("test");
+        profile.definitions = vec![ProfileDefinitionRule {
+            path: ProfileTextMatcher::insensitive(ProfileMatchMode::Prefix, "events/"),
+            key: ProfileTextMatcher::insensitive(ProfileMatchMode::Exact, "country_event"),
+            kind: "event".to_owned(),
+            name_field: Some("id".to_owned()),
+            requires_value: true,
+            retain_attributes: false,
+        }];
+        profile
+    }
+
+    static NO_FILES: std::sync::LazyLock<BTreeMap<SourceFileId, SourceFile>> =
+        std::sync::LazyLock::new(BTreeMap::new);
+    static NO_STATES: std::sync::LazyLock<BTreeMap<SourceFileId, Arc<FileState>>> =
+        std::sync::LazyLock::new(BTreeMap::new);
+
+    fn load_context<'a>(
+        rules: &'a RuleSet,
+        profile: &'a GameProfile,
+        cancellation: &'a WorkspaceScanToken,
+    ) -> SourceLoadContext<'a> {
+        SourceLoadContext {
+            limits: WorkspaceScanLimits::default(),
+            previous_files: &NO_FILES,
+            previous_states: &NO_STATES,
+            rules,
+            profile,
+            parse_cache: None,
+            cancellation,
+            progress: None,
+        }
+    }
+
+    #[test]
+    fn document_classification_falls_back_to_uri_names_and_rejects_unknown_extensions() {
+        let rules = generic_script_rules();
+        let profile = GameProfile::empty("test");
+
+        // Without a path, the URI-derived name still selects the script parser.
+        let document = unparsed_document(
+            DocumentId::new("file:///workspace/events/alpha.txt"),
+            None,
+            "key = yes\n".to_owned(),
+            DocumentSource::Disk,
+            None,
+        );
+        let prepared = prepare_document_snapshot(&rules, &profile, &[], document);
+        assert!(prepared.parsed.is_some());
+        assert!(prepared.hir.is_some());
+
+        // A yml name selects the localisation frontend.
+        let document = unparsed_document(
+            DocumentId::new("file:///workspace/localisation/l_english.yml"),
+            None,
+            "l_english:\nkey:0 \"text\"\n".to_owned(),
+            DocumentSource::Disk,
+            None,
+        );
+        let prepared = prepare_document_snapshot(&rules, &profile, &[], document);
+        let Some(ParsedSource::Text(parsed)) = &prepared.parsed else {
+            panic!("yml document must parse");
+        };
+        assert_eq!(parsed.format(), FileFormat::Localisation);
+
+        // Unknown extensions never reach a frontend.
+        let document = unparsed_document(
+            DocumentId::new("file:///workspace/assets/icon.png"),
+            None,
+            "binary".to_owned(),
+            DocumentSource::Disk,
+            None,
+        );
+        let prepared = prepare_document_snapshot(&rules, &profile, &[], document);
+        assert!(prepared.parsed.is_none());
+        assert!(prepared.hir.is_none());
+    }
+
+    #[test]
+    fn malformed_scripts_still_shard_partial_definitions_and_count_syntax_errors() {
+        let rules = generic_script_rules();
+        let profile = event_profile();
+        let file = fixture_source_file(SourceFileId::new(11), "events/broken.txt");
+        let state = build_file_state(
+            &file,
+            "country_event = { id = broken.1 }\ntrailing = {\n".to_owned(),
+            4,
+            &rules,
+            &profile,
+        );
+        assert!(state.parsed().is_some());
+        // The intact event definition survives next to the unterminated block.
+        assert_eq!(state.shard().syntax_error_count, 1);
+        let definitions = state
+            .shard()
+            .definitions
+            .iter()
+            .map(|definition| (&*definition.kind, &*definition.name))
+            .collect::<Vec<_>>();
+        assert_eq!(definitions, [("event", "broken.1")]);
+    }
+
+    #[test]
+    fn unclassified_paths_keep_an_empty_shard_and_the_raw_source() {
+        let rules = generic_script_rules();
+        let file = fixture_source_file(SourceFileId::new(12), "interface/unknown.gui");
+        let state = build_file_state(
+            &file,
+            "unknown = yes\n".to_owned(),
+            2,
+            &rules,
+            &GameProfile::empty("test"),
+        );
+        assert!(state.parsed().is_none());
+        assert!(state.hir().is_none());
+        assert_eq!(state.source(), "unknown = yes\n");
+        assert!(state.shard().definitions.is_empty());
+        assert!(state.shard().references.is_empty());
+        assert_eq!(state.shard().syntax_error_count, 0);
+    }
+
+    #[test]
+    fn load_source_files_reports_vanished_files_without_failing_the_scan() {
+        let rules = generic_script_rules();
+        let profile = GameProfile::empty("test");
+        let token = WorkspaceScanToken::new();
+        let context = load_context(&rules, &profile, &token);
+        let job = SourceReadJob {
+            file: fixture_source_file(SourceFileId::new(13), "events/vanished.txt"),
+            physical_path: AbsPath::normalize(&PathBuf::from(
+                "C:/fixture/does-not-exist/events/vanished.txt",
+            )),
+            retain_frontend: false,
+        };
+
+        let mut files = BTreeMap::new();
+        let mut states = BTreeMap::new();
+        let mut report = WorkspaceScanReport::default();
+        load_source_files(vec![job], &mut files, &mut states, &mut report, &context)
+            .expect("a vanished file is a reported issue, not a scan failure");
+        assert!(files.is_empty());
+        assert!(states.is_empty());
+        assert_eq!(report.issues.len(), 1);
+        assert_eq!(
+            report.issues[0].kind,
+            WorkspaceScanIssueKind::FileUnreadable
+        );
+    }
+
+    #[test]
+    fn load_source_files_rejects_colliding_file_identities_and_cancellation() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("index-pipeline-collision-{nonce}"));
+        std::fs::create_dir_all(root.join("events")).expect("events directory");
+        std::fs::write(root.join("events/first.txt"), "key = 1\n").expect("first source");
+        std::fs::write(root.join("events/second.txt"), "key = 2\n").expect("second source");
+
+        let rules = generic_script_rules();
+        let profile = GameProfile::empty("test");
+        let token = WorkspaceScanToken::new();
+        let context = load_context(&rules, &profile, &token);
+        let shared_id = SourceFileId::new(14);
+        let jobs = vec![
+            SourceReadJob {
+                file: fixture_source_file(shared_id, "events/first.txt"),
+                physical_path: AbsPath::normalize(&root.join("events/first.txt")),
+                retain_frontend: false,
+            },
+            SourceReadJob {
+                file: SourceFile {
+                    id: shared_id,
+                    root_id: SourceRootId::new(3),
+                    physical_path: AbsPath::normalize(&root.join("events/second.txt")),
+                    logical_path: LogicalPath::parse("events/second.txt").expect("logical path"),
+                    category_id: Some("script".to_owned()),
+                    resolution: FileResolutionPolicy::ReplaceByRelativePath,
+                },
+                physical_path: AbsPath::normalize(&root.join("events/second.txt")),
+                retain_frontend: false,
+            },
+        ];
+
+        let mut files = BTreeMap::new();
+        let mut states = BTreeMap::new();
+        let error = load_source_files(
+            jobs,
+            &mut files,
+            &mut states,
+            &mut WorkspaceScanReport::default(),
+            &context,
+        )
+        .expect_err("two physical files sharing one identity must fail");
+        assert!(matches!(
+            &error,
+            WorkspaceError::FileIdCollision { first, second }
+                if first.ends_with("events/first.txt") && second.ends_with("events/second.txt")
+        ));
+
+        let cancelled = WorkspaceScanToken::new();
+        cancelled.cancel();
+        let context = load_context(&rules, &profile, &cancelled);
+        let error = load_source_files(
+            vec![SourceReadJob {
+                file: fixture_source_file(SourceFileId::new(15), "events/first.txt"),
+                physical_path: AbsPath::normalize(&root.join("events/first.txt")),
+                retain_frontend: false,
+            }],
+            &mut files,
+            &mut states,
+            &mut WorkspaceScanReport::default(),
+            &context,
+        )
+        .expect_err("a cancelled token stops source loading");
+        assert_eq!(error.to_string(), "workspace scan was cancelled");
+        std::fs::remove_dir_all(root).expect("cleanup");
     }
 }

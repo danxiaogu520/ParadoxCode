@@ -1179,3 +1179,43 @@ fn profile_lowering_skips_substitutions_inside_condition_ranges() {
         Some(reference) if reference.kind == HirParameterReferenceKind::Conditional
     ));
 }
+
+#[test]
+fn empty_and_whitespace_sources_lower_to_construct_free_trees() {
+    for format in [FileFormat::Script, FileFormat::Localisation] {
+        let hir = lower(parse(format, " \n\t\n"), &RuleSet::empty());
+        assert!(
+            hir.syntax().errors().is_empty(),
+            "blank input must stay error-free"
+        );
+        assert!(hir.properties().is_empty());
+        assert!(hir.definitions().is_empty());
+        assert!(hir.unknown_constructs().is_empty());
+    }
+}
+
+#[test]
+fn unterminated_block_cascades_keep_nested_properties_and_bounded_errors() {
+    let source = "intact = yes\nouter = {\n inner = {\n deep = yes\n";
+    let hir = lower(parse(FileFormat::Script, source), &RuleSet::empty());
+
+    // Both unterminated blocks are reported exactly once each.
+    assert_eq!(hir.syntax().errors().len(), 2);
+    let keys = hir
+        .properties()
+        .iter()
+        .map(|property| property.key.as_str())
+        .collect::<Vec<_>>();
+    for key in ["intact", "outer", "inner", "deep"] {
+        assert!(
+            keys.contains(&key),
+            "property `{key}` must survive the cascade: {keys:?}"
+        );
+    }
+    assert!(
+        hir.unknown_constructs()
+            .iter()
+            .all(|unknown| unknown.range.end() <= u32::try_from(source.len()).unwrap_or(u32::MAX)),
+        "no recovery construct may point past the source"
+    );
+}
