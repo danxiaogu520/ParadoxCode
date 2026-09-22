@@ -11,7 +11,9 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+engine = { path = "../crates/engine" }
 game = { path = "../crates/game" }
+transcode = { path = "../crates/transcode" }
 hir = { path = "../crates/hir" }
 rules = { path = "../crates/rules" }
 parser = { path = "../crates/parser" }
@@ -55,6 +57,20 @@ bench = false
 [[bin]]
 name = "quoted-script"
 path = "fuzz_targets/quoted_script.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "transcode-decode"
+path = "fuzz_targets/transcode_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "index-cache-load"
+path = "fuzz_targets/index_cache_load.rs"
 test = false
 doc = false
 bench = false
