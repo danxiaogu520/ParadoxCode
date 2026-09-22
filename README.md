@@ -51,12 +51,8 @@ and Paradox Interactive are trademarks of their respective owners.
   position- and name-based reference lookup, the embedded rule database, and in-memory draft
   validation — all served by the already-running language server. Localisation queries live in
   their own zone (exact `loc_get`, fuzzy `loc_search`, prefix `loc_list`) and the two zones never
-  cross.
-- A `@paradox` chat participant that runs its own EU4-modding agent loop over the same tools
-  (domain system prompt, model from the active chat selection), with deterministic
-  `/validate`, `/symbols`, `/rules`, `/loc`, and `/hover` commands that keep working without
-  a chat model. When the tool-round budget runs out, the loop forces a final no-tools answer
-  from what it already gathered instead of stalling.
+  cross. Every tool is prompt-referenceable (`#paradoxSearch`, `#paradoxValidate`, …) and listed
+  only while the language server is running, so agent tool pickers can show and enable them.
 - A stdio MCP server (`editors/vscode/scripts/mcp.mjs`) that exposes the same eleven read-only
   tools to any Model Context Protocol client — hand-rolled newline-delimited JSON-RPC with no
   SDK dependency, its tool manifest mirrored from the extension's contributions.

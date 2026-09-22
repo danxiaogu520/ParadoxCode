@@ -224,6 +224,71 @@ fn selected_game_rejects_a_mismatched_rules_artifact() {
 }
 
 #[test]
+fn position_requests_serve_scanned_files_no_editor_opened() {
+    // Agent tooling (the extension's hover/references tools and the MCP
+    // server, whose pdc instance never receives didOpen) addresses workspace
+    // files by bare `file://` URIs. Position requests must lazily stage the
+    // scanned disk text instead of answering "document is not open".
+    let root = std::env::temp_dir().join(format!("pdc-agent-{}", std::process::id()));
+    let missions = root.join("missions");
+    fs::create_dir_all(&missions).expect("create missions fixture dir");
+    let path = missions.join("EDG_FDMMissions.txt");
+    fs::write(&path, "EDG_FDM_mission_1 = {\n\ticon = mission_1\n}\n")
+        .expect("write missions fixture");
+    let uri = file_uri_string(&path);
+    let root_uri = file_uri_string(&root);
+    let unknown_uri = file_uri_string(&root.join("missions").join("missing.txt"));
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"agent-fixture"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":4}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/references","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":4},"context":{"includeDeclaration":true}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"textDocument/hover","params":{"textDocument":{"uri":unknown_uri},"position":{"line":0,"character":0}}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("server should initialize");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport should finish");
+    let responses = decode_frames(&output);
+
+    let hover = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("hover response");
+    assert!(
+        hover.get("error").is_none(),
+        "closed workspace files must serve hover, got {hover}"
+    );
+    let references = responses
+        .iter()
+        .find(|value| value["id"] == 3)
+        .expect("references response");
+    assert!(
+        references.get("error").is_none(),
+        "closed workspace files must serve references, got {references}"
+    );
+    let unknown = responses
+        .iter()
+        .find(|value| value["id"] == 4)
+        .expect("unknown-file hover response");
+    assert_eq!(unknown["error"]["code"], -32602);
+
+    let snapshot = server.snapshot();
+    let document = snapshot
+        .document(&engine::DocumentId::new(uri.clone()))
+        .expect("lazy disk document stays staged");
+    assert_eq!(
+        document.text(),
+        "EDG_FDM_mission_1 = {\n\ticon = mission_1\n}\n"
+    );
+    assert_eq!(document.version(), None);
+    fs::remove_dir_all(&root).expect("remove fixture dir");
+}
+
+#[test]
 fn memory_transport_runs_real_json_rpc_lifecycle_and_sync() {
     let path = std::env::temp_dir().join(format!("pdc-{}.txt", std::process::id()));
     fs::write(&path, "disk").expect("write disk fixture");

@@ -1330,6 +1330,37 @@ impl AnalysisHost {
         Ok(())
     }
 
+    /// Opens a disk-backed document on demand for a request that addresses a
+    /// scanned file no editor ever opened (agent tooling passes bare paths,
+    /// and the editor's decoded views open the `pdcloc://` twin instead of the
+    /// `file://` URI). The entry mirrors what [`Self::close_document`] leaves
+    /// behind, so a later `didOpen` of the same URI still succeeds. Returns
+    /// `false` when the document is already open, the path was never scanned,
+    /// or the file no longer reads.
+    pub fn open_disk_document(&mut self, id: DocumentId, path: AbsPath) -> bool {
+        if self.documents.contains_key(&id) || !self.source_file_paths.contains_key(&path) {
+            return false;
+        }
+        let mut report = WorkspaceScanReport::default();
+        let Some(text) = read_source_file(
+            &path,
+            self.scan_limits,
+            &mut report,
+            self.profile.source_encoding,
+        ) else {
+            return false;
+        };
+        let document =
+            self.document_snapshot(id.clone(), None, text, DocumentSource::Disk, Some(path));
+        let declares_dynamic_definitions = self.document_declares_dynamic_definitions(&document);
+        Arc::make_mut(&mut self.documents).insert(id, document);
+        self.advance_document_revision();
+        if declares_dynamic_definitions {
+            self.query_cache.advance_definitions(self.revision);
+        }
+        true
+    }
+
     /// True when the document's HIR declares a definition of a
     /// dynamic-definition kind (scripted triggers, effects, ...).
     ///

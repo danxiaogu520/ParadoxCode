@@ -623,6 +623,7 @@ pub(crate) fn completion_kind(kind: CompletionKind) -> CompletionItemKind {
         CompletionKind::Symbol => CompletionItemKind::FUNCTION,
         CompletionKind::Localisation => CompletionItemKind::REFERENCE,
         CompletionKind::DynamicParameter => CompletionItemKind::VARIABLE,
+        CompletionKind::Folder => CompletionItemKind::FOLDER,
     }
 }
 

@@ -62,12 +62,16 @@ const MAX_DEFINITION_READ_BYTES: u64 = 8 * 1024 * 1024;
 pub struct HoverCardAsset {
     /// Sprite name the reference resolved through, when the asset backs one.
     pub sprite: Option<String>,
-    /// Absolute path of the serving file on this machine.
+    /// Absolute path of the serving file on this machine. For a DLC archive
+    /// member this is the `.zip` itself; `archive_member` names the entry.
     pub path: String,
     /// Kind of the source root serving the file (`project`/`dependency`/`vanilla`).
     pub root_kind: String,
     /// The `.tga`/`.dds` extension drift fallback saved this reference.
     pub extension_fallback: bool,
+    /// In-archive spelling when `path` is a DLC zip; the card cannot decode
+    /// packed members, so previews degrade to the plain hover text.
+    pub archive_member: Option<String>,
     /// Declared horizontal frame count (`noOfFrames`), when the block has one.
     pub frames: Option<u32>,
 }
@@ -768,6 +772,7 @@ fn asset_from(
         }
         .to_owned(),
         extension_fallback: resolution.extension_fallback,
+        archive_member: resolution.hit.archive_member.clone(),
         frames,
     }
 }

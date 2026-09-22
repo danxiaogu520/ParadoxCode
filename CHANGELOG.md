@@ -7,7 +7,90 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- The script formatter now canonicalizes asset-path separators: in scalar values whose
+  spelling ends with a known asset extension (`.dds`, `.tga`, `.mesh`, fonts, sounds, …),
+  every run of `\`, `\\`, or `//` separators collapses to single forward slashes, quoted or
+  bare alike. Vanilla ships the same texture with all four spellings and the engine accepts
+  every one of them, so this is a canonicalization on par with keyword casing, validated by
+  the formatter's existing re-parse, token-equivalence, and idempotence gates. Values without
+  a known extension, values containing whitespace, escaped quotes, or empty/numeric strings
+  keep their spelling untouched.
+
+- `.gfx` completion now mirrors the decisions scaffold end to end. An empty `interface/*.gfx`
+  file completes its three wrapper blocks (`spriteTypes`, `bitmapfonts`, `objectTypes`) with
+  block skeletons, and the gap inside a wrapper completes the fixed instance vocabulary
+  (`spriteType` and its five sibling kinds, `cursor_offset`, `bitmapfont`, and the `objectTypes`
+  kinds) through new `wrapper:{type}` rules — free-form wrappers such as `country_decisions`
+  keep their silence. The `object` type now recognises `arrowType`, `tradeRouteType`,
+  `pdxparticle`, `PieChartType`, `LineChartType`, and `animatedmaptext` as instances (their
+  bodies previously had no completion or validation), and `animatedmaptext`'s `textblock`
+  gained named rows for `text`, `color`, `font` (bitmap-font member completion), `position`,
+  and `format`.
+
+- `texturefile`-style values complete as a directory browse instead of a flat 200-entry
+  alphabetical head: an empty prefix lists the top-level asset directories, each level lists
+  its subdirectories (new `Folder` completion kind) plus the files directly inside it, and the
+  200-file cap now applies per directory rather than to the whole catalog (~10k entries on a
+  vanilla workspace).
+
+- The texture catalog now harvests DLC archives record-only: each `dlc/<pack>/<id>.zip`'s
+  central directory is read for member names (no extraction, no decompression — a hand-rolled
+  bounded parser that yields nothing on zip64, truncated, or corrupt archives), catalog-image
+  members join the same normalized namespace and the directory browse as if they were files,
+  and files shipped loose on disk keep priority. Hover provenance for a packed asset shows
+  both the archive path and the member inside it (`…/dlc128.zip :: gfx/event_pictures/….dds`);
+  hover previews of packed assets degrade to the no-preview state because only names are
+  recorded. On the maintainer's vanilla install this resolves every previously unreachable
+  DLC-packed texture reference (King of Kings, Winds of Change) and grows the catalog by
+  ~2,200 entries.
+
+### Changed
+
+- The eleven `paradoxcode_` language-model tools now declare `"when": "paradoxcodeServerRunning"`,
+  so VS Code agent mode only lists them in windows where the ParadoxCode extension has actually
+  activated and its language server is running. Previously they appeared in the tool picker of
+  every window (including non-EU4 workspaces), where calling them could only fail. The MCP mirror
+  is unaffected: it reads names, descriptions, and schemas from the same manifest and ignores the
+  `when` clause.
+- Every tool now opts into prompt references (`canBeReferencedInPrompt: true` with unique
+  `toolReferenceName`s such as `paradoxSearch` or `paradoxValidate`). Current VS Code tool
+  pickers only list prompt-referenceable extension tools, so without the flag the tools could
+  never be enabled by the user: agent sessions rejected every call with "Tool … is currently
+  disabled by the user" while the Configure Tools dialog showed no way to turn them on.
+
+### Removed
+
+- The `@paradox` chat participant (`paradoxcode.modding`) and its `/validate`, `/symbols`,
+  `/rules`, `/loc`, `/hover` commands. Its private agent loop masked the agent-mode tool
+  enablement gap above; with the tools directly listed, referenceable, and enableable in agent
+  sessions, the participant duplicated that surface. Conversational modding now goes through the
+  normal agent chat (plus `#paradox…` references), and deterministic checks remain available via
+  the editor commands, diagnostics, and the MCP server.
+
 ### Fixed
+
+- Saving a `paradoxcode.*` setting no longer surfaces a spurious "Sending notification
+  workspace/didChangeConfiguration failed / Starting server failed" error. The language
+  client's `synchronize.configurationSection` auto-push and the extension's
+  server-setting restart both reacted to the same settings save; the push passed the
+  client's running-state check, then watched the restart's `stop()` tear the connection
+  down mid-flight. The push was also dead weight on its own terms — it delivers the
+  settings wrapped in a `paradoxcode` namespace that the server's flat-key configuration
+  handler never reads, and every server-consumed setting triggers the restart that
+  re-sends fresh `initializationOptions` anyway. The synchronize block is removed; the
+  server keeps its `workspace/didChangeConfiguration` handler for raw LSP clients.
+
+- Position-bound agent tools answered "document is not open" for exactly the files they are meant
+  to describe. `paradoxcode_context` (hover) and `paradoxcode_references` resolve paths to
+  `file://` URIs, but the server only served documents an editor had opened under that exact URI:
+  the MCP server's own pdc instance never receives `didOpen` (both tools failed for every file),
+  and in the extension transparent encoding syncs the `pdcloc://` decoded twin instead of the
+  `file://` URI, so the tools failed for the very files being edited. The server now lazily stages
+  the scanned disk text for snapshot requests addressing known workspace files (unknown URIs keep
+  the error), and the extension's tools prefer an open document's URI — the decoded twin carries
+  the live, possibly unsaved text — before falling back to the on-disk URI.
 
 - Mission Tree Preview failed with "The mission file must live inside the workspace root." for any
   mission file opened through its `pdcloc://` decoded view (transparent encoding, on by default

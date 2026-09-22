@@ -1,0 +1,16 @@
+sprite = {
+	texturefile = "gfx\\interface\\alerticon_dismiss.dds"
+	second = "gfx//interface//hre_bg.tga"
+	mixed = "gfx\\interface\choose_language_bg.dds"
+	file = "gfx\\models\ships\barque.mesh"
+	bare = gfx\interface\plain.dds
+	spaces = "gfx//dlc//king of kings//x.dds"
+	no_extension = "gfx\interface"
+	plain_text = "notes\a.txt"
+	empty = ""
+	number = "999"
+	escaped_quote = "a\"b.dds"
+}
+effect = "
+	texturefile = \"gfx\\a.dds\"
+"

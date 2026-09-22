@@ -84,12 +84,6 @@
   "commands.localisation.endPeek.title": "返回解码视图",
   "configuration.localisation.transparentEncoding.description": "透明 EU4dll 转码管线的总开关。开启：有资格的文件以解码视图打开，保存时自动把引号内中文转为逃逸三元组（scoped 形态）。关闭：不做任何自动处理——手动“编码文件 / 解码文件”命令随之可用。",
   "configuration.localisation.transparentScriptGlobs.description": "有资格进入透明解码视图的脚本文件 glob（相对工作区，paratranz `latin1eu4` 档）。有资格的文件无论当前字节形态都以解码视图打开——可读文本原样透传，转码字符串正常解码。默认：`**/*.txt`。",
-  "chatParticipant.paradox.description": "由 ParadoxCode 语言服务器驱动的 EU4 模组写作助手：验证草稿文件，检索符号、规则与本地化条目。",
-  "chatParticipant.paradox.command.validate": "用 EU4 规则库验证当前编辑器文件",
-  "chatParticipant.paradox.command.symbols": "检索已索引符号（参数为查询词）",
-  "chatParticipant.paradox.command.rules": "查询规则数据库（支持 context= key= scope= 过滤）",
-  "chatParticipant.paradox.command.loc": "查址本地化条目（key= 精确、text= 反查、prefix= 家族列举）",
-  "chatParticipant.paradox.command.hover": "查询光标处的悬停语义",
   "commands.localisation.encodeFile.title": "编码文件（EU4dll 转码形态）",
   "commands.localisation.decodeFile.title": "解码文件（可读文本）"
 }
