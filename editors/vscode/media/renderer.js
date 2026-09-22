@@ -59,6 +59,7 @@
     const seriesSummary = document.getElementById('series-summary');
     const searchInput = document.getElementById('search');
     const searchResults = document.getElementById('search-results');
+    const fileBadge = document.getElementById('file');
     const ctx = canvas.getContext('2d');
 
     // --- localisation ---------------------------------------------------------
@@ -1069,6 +1070,23 @@
         scheduleDraw();
     }
 
+    // The preview pins to the most recently focused mission file, so the tree
+    // on screen can belong to a different document than the active editor; the
+    // badge names it. documentUri is the percent-encoded URI string from the
+    // payload.
+    function setFileBadge(documentUri) {
+        let decoded = documentUri;
+        try {
+            decoded = decodeURIComponent(documentUri);
+        } catch (error) {
+            // Malformed percent sequences: keep the raw URI text.
+        }
+        const slash = decoded.lastIndexOf('/');
+        fileBadge.textContent = slash === -1 ? decoded : decoded.slice(slash + 1);
+        fileBadge.title = decoded;
+        fileBadge.hidden = false;
+    }
+
     function hideStatus() {
         status.classList.remove('visible');
     }
@@ -1433,6 +1451,7 @@
         } else if (message.type === 'preview') {
             setPreview(message.payload);
             switchDocument(message.payload.documentUri);
+            setFileBadge(message.payload.documentUri);
             syncSeriesState();
             keyboardIndex = -1;
             hideStatus();
@@ -1442,6 +1461,7 @@
             renderSummary();
         } else if (message.type === 'empty' || message.type === 'error') {
             preview = null;
+            fileBadge.hidden = true;
             runSearch();
             renderSeriesList();
             hideTooltip();

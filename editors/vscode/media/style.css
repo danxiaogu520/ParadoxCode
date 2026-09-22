@@ -85,6 +85,26 @@ summary:focus-visible {
     outline-offset: 0;
 }
 
+/* Names the file the rendered tree was computed from; the preview stays
+   pinned when focus moves to other files, so this may differ from the
+   active editor. */
+.file {
+    max-width: 32vw;
+    padding: 3px 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border: 1px solid var(--vscode-widget-border, transparent);
+    border-radius: 3px;
+    background: var(--vscode-editorWidget-background);
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+}
+
+.file[hidden] {
+    display: none;
+}
+
 #search::placeholder {
     color: var(--vscode-input-placeholderForeground);
 }
