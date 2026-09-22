@@ -327,7 +327,7 @@ pub(crate) fn range(start: usize, end: usize) -> TextRange {
 mod tests {
     use text::TextRange;
 
-    use super::{CstKind, FileFormat, SyntaxEdit, SyntaxErrorKind, parse};
+    use super::{CstKind, EditError, FileFormat, SyntaxEdit, SyntaxErrorKind, parse};
 
     #[test]
     fn phase0_parse_preserves_source() {
@@ -494,5 +494,124 @@ mod tests {
             current = next;
         }
         assert_eq!(current.revision(), 3);
+    }
+
+    #[test]
+    fn edit_rejects_out_of_bounds_and_code_point_splitting_ranges() {
+        // The three-byte key makes mid-code-point boundaries representable in plain u32s.
+        let parsed = parse(FileFormat::Script, "名 = one");
+        for (start, end) in [(0, 2), (1, 4), (7, 99), (10, 10)] {
+            let range = TextRange::new(start, end).expect("constructible range");
+            let error = parsed
+                .apply_edit(&SyntaxEdit::ranged(range, "x"))
+                .expect_err("edit outside the source or inside a code point must fail");
+            assert_eq!(error, EditError::InvalidRange(range));
+            assert_eq!(
+                error.to_string(),
+                format!("invalid syntax edit range {start}..{end}")
+            );
+        }
+        // The boundaries around the rejections stay editable.
+        let edited = parsed
+            .apply_edit(&SyntaxEdit::ranged(
+                TextRange::new(6, 9).expect("range"),
+                "two",
+            ))
+            .expect("edit on code point boundaries applies");
+        assert_eq!(edited.source(), "名 = two");
+        assert_eq!(edited.revision(), 1);
+    }
+
+    #[test]
+    fn script_syntax_errors_report_missing_values_and_unterminated_delimiters() {
+        for (source, expected) in [
+            ("key =", SyntaxErrorKind::MissingValue),
+            ("block {\n", SyntaxErrorKind::UnterminatedBlock),
+            (
+                "[[!country] value = yes",
+                SyntaxErrorKind::UnterminatedParameterBlock,
+            ),
+        ] {
+            let parsed = parse(FileFormat::Script, source);
+            assert!(
+                parsed
+                    .errors()
+                    .iter()
+                    .any(|error| error.kind == expected && error.code() == expected.code()),
+                "`{source}` must report {} ({expected:?}): {:?}",
+                expected.code(),
+                parsed.errors()
+            );
+            assert!(
+                parsed
+                    .errors()
+                    .iter()
+                    .all(|error| parsed.text(error.range).is_some())
+            );
+        }
+    }
+
+    #[test]
+    fn localisation_syntax_errors_report_invalid_entries_and_unterminated_strings() {
+        for (source, expected) in [
+            (
+                "l_english:\n: orphan\n",
+                SyntaxErrorKind::InvalidLocalisationEntry,
+            ),
+            (
+                "l_english:\nkey:0\n",
+                SyntaxErrorKind::InvalidLocalisationEntry,
+            ),
+            (
+                "l_english:\nkey:0 \"unfinished\n",
+                SyntaxErrorKind::UnterminatedLocalisationString,
+            ),
+        ] {
+            let parsed = parse(FileFormat::Localisation, source);
+            assert!(
+                parsed
+                    .errors()
+                    .iter()
+                    .any(|error| error.kind == expected && error.code() == expected.code()),
+                "`{source}` must report {} ({expected:?}): {:?}",
+                expected.code(),
+                parsed.errors()
+            );
+            assert!(
+                parsed
+                    .errors()
+                    .iter()
+                    .all(|error| parsed.text(error.range).is_some())
+            );
+        }
+    }
+
+    #[test]
+    fn empty_and_truncated_inputs_keep_a_typed_root_and_safe_error_ranges() {
+        for (format, kind) in [
+            (FileFormat::Script, CstKind::Document),
+            (FileFormat::Localisation, CstKind::LocalisationDocument),
+        ] {
+            let parsed = parse(format, "");
+            assert_eq!(parsed.root().kind(), kind);
+            assert!(parsed.errors().is_empty(), "errors: {:?}", parsed.errors());
+        }
+
+        // Truncated tails of otherwise valid documents recover with in-range errors.
+        for (format, source) in [
+            (FileFormat::Script, "key = \"value"),
+            (FileFormat::Script, "block {"),
+            (FileFormat::Localisation, "l_english:\nkey:0 \"val"),
+        ] {
+            let parsed = parse(format, source);
+            assert!(
+                !parsed.errors().is_empty(),
+                "`{source}` must report recovery errors"
+            );
+            assert!(parsed.errors().iter().all(|error| {
+                parsed.text(error.range).is_some()
+                    && usize::try_from(error.range.end()).unwrap_or(usize::MAX) <= source.len()
+            }));
+        }
     }
 }
