@@ -48,6 +48,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Saving a `paradoxcode.*` setting no longer surfaces a spurious "Sending notification
+  workspace/didChangeConfiguration failed / Starting server failed" error. The language
+  client's `synchronize.configurationSection` auto-push and the extension's
+  server-setting restart both reacted to the same settings save; the push passed the
+  client's running-state check, then watched the restart's `stop()` tear the connection
+  down mid-flight. The push was also dead weight on its own terms — it delivers the
+  settings wrapped in a `paradoxcode` namespace that the server's flat-key configuration
+  handler never reads, and every server-consumed setting triggers the restart that
+  re-sends fresh `initializationOptions` anyway. The synchronize block is removed; the
+  server keeps its `workspace/didChangeConfiguration` handler for raw LSP clients.
+
 - Position-bound agent tools answered "document is not open" for exactly the files they are meant
   to describe. `paradoxcode_context` (hover) and `paradoxcode_references` resolve paths to
   `file://` URIs, but the server only served documents an editor had opened under that exact URI:
