@@ -4543,3 +4543,397 @@ fn texturefile_value_completes_from_the_workspace_catalog() {
 
     std::fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn gfx_file_root_offers_the_wrapper_entries() {
+    use std::path::PathBuf;
+
+    // An empty .gfx file offers its three wrapper blocks, mirroring the decisions
+    // file-root scaffold; no instance body keys may leak to the file root.
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/interface/root-entry.gfx");
+    host.open_document(
+        id.clone(),
+        1,
+        "\n".to_owned(),
+        Some(AbsPath::normalize(&PathBuf::from(
+            "interface/root-entry.gfx",
+        ))),
+    )
+    .expect("open gfx document");
+    let snapshot = host.snapshot();
+    let result = complete(&snapshot, &id, 0);
+    let mut labels = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    labels.sort_unstable();
+    assert_eq!(
+        labels,
+        vec!["bitmapfonts", "objectTypes", "spriteTypes"],
+        "{result:?}"
+    );
+    let entry = result
+        .items
+        .iter()
+        .find(|item| item.label == "spriteTypes")
+        .expect("spriteTypes entry");
+    assert_eq!(
+        entry.insert_text, "spriteTypes = {\n\t$0\n}",
+        "the wrapper entry must insert an empty block skeleton: {result:?}"
+    );
+    assert_eq!(entry.kind, CompletionKind::Key);
+
+    // Once a wrapper is declared, the file root stops re-offering it but keeps
+    // offering the undeclared siblings.
+    let text = "spriteTypes = {}\n";
+    let mut host2 = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let id2 = DocumentId::new("file:///tmp/interface/root-entry-2.gfx");
+    host2
+        .open_document(
+            id2.clone(),
+            1,
+            text.to_owned(),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "interface/root-entry-2.gfx",
+            ))),
+        )
+        .expect("open populated document");
+    let snapshot2 = host2.snapshot();
+    let populated = complete(
+        &snapshot2,
+        &id2,
+        u32::try_from(text.len()).expect("tail position"),
+    );
+    assert!(
+        populated
+            .items
+            .iter()
+            .all(|item| item.label != "spriteTypes"),
+        "an already-declared wrapper must not be re-offered: {populated:?}"
+    );
+    for label in ["bitmapfonts", "objectTypes"] {
+        assert!(
+            populated.items.iter().any(|item| item.label == label),
+            "undeclared wrapper `{label}` stays offered: {populated:?}"
+        );
+    }
+
+    // The scaffold is path- and extension-scoped: decisions files and .gui files
+    // must not offer the gfx wrappers.
+    for (path, uri) in [
+        (
+            "decisions/root-entry.txt",
+            "file:///tmp/decisions/root-entry.txt",
+        ),
+        ("interface/empty.gui", "file:///tmp/interface/empty.gui"),
+    ] {
+        let mut other = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+        let other_id = DocumentId::new(uri);
+        other
+            .open_document(
+                other_id.clone(),
+                1,
+                "\n".to_owned(),
+                Some(AbsPath::normalize(&PathBuf::from(path))),
+            )
+            .expect("open document");
+        let result = complete(&other.snapshot(), &other_id, 0);
+        assert!(
+            result.items.iter().all(|item| item.label != "spriteTypes"),
+            "the gfx wrapper must not leak into {path}: {result:?}"
+        );
+    }
+}
+
+#[test]
+fn gfx_wrapper_gap_completes_the_closed_instance_vocabulary() {
+    use std::path::PathBuf;
+
+    let cases = [
+        (
+            "spriteTypes",
+            concat!("spriteTypes = {\n", "  \n", "}\n"),
+            vec![
+                "cursor_offset",
+                "frameAnimatedSpriteType",
+                "maskedShieldType",
+                "progressbartype",
+                "corneredTileSpriteType",
+                "spriteType",
+                "textSpriteType",
+            ],
+        ),
+        (
+            "bitmapfonts",
+            concat!("bitmapfonts = {\n", "  \n", "}\n"),
+            vec!["bitmapfont"],
+        ),
+        (
+            "objectTypes",
+            concat!("objectTypes = {\n", "  \n", "}\n"),
+            vec![
+                "pdxmesh",
+                "arrowType",
+                "tradeRouteType",
+                "pdxparticle",
+                "PieChartType",
+                "LineChartType",
+                "animatedmaptext",
+            ],
+        ),
+    ];
+    for (wrapper, text, expected) in cases {
+        let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+        let id = DocumentId::new("file:///tmp/interface/wrapper-gap.gfx");
+        host.open_document(
+            id.clone(),
+            1,
+            text.to_owned(),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "interface/wrapper-gap.gfx",
+            ))),
+        )
+        .expect("open gfx document");
+        let snapshot = host.snapshot();
+        let position =
+            u32::try_from(text.find("  \n").expect("blank wrapper body")).expect("position") + 2;
+        let result = complete(&snapshot, &id, position);
+        let labels = result
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>();
+        for label in &expected {
+            assert!(
+                labels.contains(label),
+                "`{wrapper}` gap must offer `{label}`: {labels:?}"
+            );
+        }
+        for body_key in ["name", "texturefile", "texturefile1"] {
+            assert!(
+                !labels.contains(&body_key),
+                "`{wrapper}` gap must not offer instance body key `{body_key}`: {labels:?}"
+            );
+        }
+    }
+
+    // The skeleton insertion carries the instance block shape, and a gap after an
+    // existing instance still offers the vocabulary (sprites repeat).
+    let text = "spriteTypes = {\n  spriteType = {}\n  \n}\n";
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/interface/wrapper-gap-2.gfx");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&PathBuf::from(
+            "interface/wrapper-gap-2.gfx",
+        ))),
+    )
+    .expect("open gfx document");
+    let snapshot = host.snapshot();
+    let position =
+        u32::try_from(text.rfind("  \n").expect("blank wrapper body")).expect("position") + 2;
+    let result = complete(&snapshot, &id, position);
+    let entry = result
+        .items
+        .iter()
+        .find(|item| item.label == "textSpriteType")
+        .expect("textSpriteType after an existing instance");
+    assert_eq!(entry.insert_text, "textSpriteType = {\n\t$0\n}");
+
+    // The open-naming wrapper keeps its silence: decisions never complete keys
+    // in the wrapper gap.
+    let text = "country_decisions = {\n  \n}\n";
+    let mut host2 = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let id2 = DocumentId::new("file:///tmp/decisions/open-wrapper.txt");
+    host2
+        .open_document(
+            id2.clone(),
+            1,
+            text.to_owned(),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "decisions/open-wrapper.txt",
+            ))),
+        )
+        .expect("open decision document");
+    let snapshot2 = host2.snapshot();
+    let position2 =
+        u32::try_from(text.find("  \n").expect("blank wrapper body")).expect("position") + 2;
+    let result2 = complete(&snapshot2, &id2, position2);
+    assert!(
+        result2.items.is_empty(),
+        "the free-form wrapper must stay silent: {result2:?}"
+    );
+}
+
+#[test]
+fn gfx_object_instance_bodies_complete_their_fields() {
+    use std::path::PathBuf;
+
+    // arrowType bodies now resolve as object instances and complete their fields.
+    let text = "objectTypes = {\n  arrowType = {\n    \n  }\n}\n";
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/interface/arrow-body.gfx");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&PathBuf::from(
+            "interface/arrow-body.gfx",
+        ))),
+    )
+    .expect("open gfx document");
+    let snapshot = host.snapshot();
+    let position = u32::try_from(text.find("    \n").expect("blank body")).expect("position") + 4;
+    let result = complete(&snapshot, &id, position);
+    let labels = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    for label in ["name", "texture", "normal", "specular", "effect"] {
+        assert!(
+            labels.contains(&label),
+            "arrowType body must complete `{label}`: {labels:?}"
+        );
+    }
+
+    // animatedmaptext completes its label fields, including the textblock children.
+    let text = concat!(
+        "objectTypes = {\n",
+        "  animatedmaptext = {\n",
+        "    textblock = {\n",
+        "      \n",
+        "    }\n",
+        "  }\n",
+        "}\n"
+    );
+    let mut host2 = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let id2 = DocumentId::new("file:///tmp/interface/maptext-body.gfx");
+    host2
+        .open_document(
+            id2.clone(),
+            1,
+            text.to_owned(),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "interface/maptext-body.gfx",
+            ))),
+        )
+        .expect("open gfx document");
+    let snapshot2 = host2.snapshot();
+    let position2 =
+        u32::try_from(text.find("      \n").expect("blank textblock")).expect("position") + 6;
+    let result2 = complete(&snapshot2, &id2, position2);
+    let labels2 = result2
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    for label in ["text", "color", "font", "position", "format"] {
+        assert!(
+            labels2.contains(&label),
+            "textblock must complete `{label}`: {labels2:?}"
+        );
+    }
+}
+
+#[test]
+fn texturefile_value_browses_catalog_directories() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ide-texture-browse-{nonce}"));
+    std::fs::create_dir_all(root.join("interface")).expect("interface directory");
+    std::fs::create_dir_all(root.join("gfx/interface")).expect("gfx directory");
+    std::fs::create_dir_all(root.join("gfx/map")).expect("map directory");
+    std::fs::write(root.join("gfx/interface/health.dds"), b"").expect("texture");
+    std::fs::write(root.join("gfx/map/terrain.dds"), b"").expect("texture");
+
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::Project,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().expect("scan texture roots");
+
+    fn open(
+        host: &mut AnalysisHost,
+        root: &std::path::Path,
+        tag: &str,
+        text: String,
+    ) -> DocumentId {
+        let id = DocumentId::new(format!("file:///interface/{tag}.gfx"));
+        host.open_document(
+            id.clone(),
+            1,
+            text,
+            Some(AbsPath::normalize(
+                &root.join(format!("interface/{tag}.gfx")),
+            )),
+        )
+        .expect("open gfx document");
+        id
+    }
+
+    // An empty prefix lists the top-level directory instead of an alphabetical
+    // head of every catalog file.
+    let text = "spriteTypes = {\n\tspriteType = {\n\t\ttexturefile = \"\n\t}\n}\n".to_owned();
+    let id = open(&mut host, &root, "browse-root", text.clone());
+    let position = u32::try_from(text.find("\"\n").expect("empty value")).expect("offset") + 1;
+    let result = complete(&host.snapshot(), &id, position);
+    let folder = result
+        .items
+        .iter()
+        .find(|item| item.label == "gfx/")
+        .expect("top-level directory entry: {result:?}");
+    assert_eq!(folder.kind, CompletionKind::Folder);
+    assert_eq!(folder.detail, "directory");
+    assert_eq!(folder.insert_text, "gfx/");
+
+    // One level in: the subdirectories of gfx/.
+    let text = "spriteTypes = {\n\tspriteType = {\n\t\ttexturefile = \"gfx/\n\t}\n}\n".to_owned();
+    let id = open(&mut host, &root, "browse-gfx", text.clone());
+    let position = u32::try_from(text.find("gfx/\n").expect("gfx prefix")).expect("offset") + 4;
+    let result = complete(&host.snapshot(), &id, position);
+    let labels = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    for label in ["gfx/interface/", "gfx/map/"] {
+        assert!(
+            labels.contains(&label),
+            "gfx/ must offer `{label}` for drilling: {labels:?}"
+        );
+    }
+    assert!(
+        result
+            .items
+            .iter()
+            .all(|item| !item.label.ends_with(".dds")),
+        "files in subdirectories stay behind their directory entries: {labels:?}"
+    );
+
+    // The final level lists the files of the browsed directory.
+    let text = "spriteTypes = {\n\tspriteType = {\n\t\ttexturefile = \"gfx/interface/\n\t}\n}\n"
+        .to_owned();
+    let id = open(&mut host, &root, "browse-interface", text.clone());
+    let position = u32::try_from(text.find("gfx/interface/\n").expect("interface prefix"))
+        .expect("offset")
+        + 14;
+    let result = complete(&host.snapshot(), &id, position);
+    let file = result
+        .items
+        .iter()
+        .find(|item| item.label == "gfx/interface/health.dds")
+        .expect("file entry: {result:?}");
+    assert_eq!(file.kind, CompletionKind::Value);
+    assert_eq!(file.detail, "texture path");
+
+    std::fs::remove_dir_all(root).expect("cleanup");
+}

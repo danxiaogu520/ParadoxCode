@@ -299,6 +299,19 @@ suite('ParadoxCode VS Code extension host', () => {
         'missions/EDG_FDMMissions.txt',
         'diagnostic ignore patterns must match decoded views by logical path',
       );
+      const { openDocumentUriFor } = require('../../out/agent/tools.js');
+      assert.equal(
+        openDocumentUriFor(vscode.Uri.file(file)).toString(),
+        decoded.toString(),
+        'agent position tools must target the open decoded twin (it carries the live text)',
+      );
+      const closedFile = path.join(root, 'missions', 'ClosedMissions.txt');
+      fs.writeFileSync(closedFile, 'closed = {}\n', 'utf8');
+      assert.equal(
+        openDocumentUriFor(vscode.Uri.file(closedFile)).toString(),
+        vscode.Uri.file(closedFile).toString(),
+        'closed files must fall back to their on-disk file URI',
+      );
     } finally {
       fs.rmSync(path.join(root, 'missions'), { recursive: true, force: true });
     }

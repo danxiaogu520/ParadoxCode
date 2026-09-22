@@ -1097,7 +1097,7 @@ impl LspServer {
     }
 
     pub(super) fn spawn_snapshot_request<'scope, 'environment>(
-        &self,
+        &mut self,
         scope: &'scope std::thread::Scope<'scope, 'environment>,
         event_sender: &mpsc::Sender<TransportEvent>,
         in_flight: &mut HashMap<RequestId, InFlightRequest>,
@@ -1132,6 +1132,9 @@ impl LspServer {
         if self.cancelled.contains(&request_id) {
             cancellation.cancel();
         }
+        // Mirrors the event loop's inline dispatch: stage the disk text for
+        // scanned files no editor opened before snapshotting the host.
+        self.ensure_snapshot_request_document(object.get("params"));
         let context = SnapshotRequestContext::new(
             self.host.snapshot(),
             cancellation.clone(),

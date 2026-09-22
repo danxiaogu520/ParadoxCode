@@ -883,7 +883,7 @@
         "command": "paradoxcode.openMissionIconPicker",
         "title": "%commands.openMissionIconPicker.title%",
         "category": "ParadoxCode",
-        "icon": "$(symbol-icon)"
+        "icon": "$(symbol-misc)"
       },
       {
         "command": "paradoxcode.installServer",
@@ -983,7 +983,7 @@
         "command": "paradoxcode.localisation.encodeFile",
         "title": "%commands.localisation.encodeFile.title%",
         "category": "ParadoxCode",
-        "icon": "$(encode)"
+        "icon": "$(arrow-swap)"
       },
       {
         "command": "paradoxcode.localisation.decodeFile",

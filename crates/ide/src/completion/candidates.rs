@@ -929,13 +929,25 @@ fn add_leaf_value_member_items(
             }
         }
         ValueMatcher::TexturePath => {
-            for label in snapshot.texture_catalog().paths_with_prefix(prefix) {
+            let children = snapshot.texture_catalog().children_with_prefix(prefix);
+            for label in children
+                .directories
+                .into_iter()
+                .map(|label| (label, CompletionKind::Folder, "directory"))
+                .chain(
+                    children
+                        .files
+                        .into_iter()
+                        .map(|label| (label, CompletionKind::Value, "texture path")),
+                )
+            {
+                let (label, kind, detail) = label;
                 push_completion(
                     items,
                     CompletionItem {
                         label: label.to_owned(),
-                        kind: CompletionKind::Value,
-                        detail: "texture path".to_owned(),
+                        kind,
+                        detail: detail.to_owned(),
                         documentation: documentation.clone(),
                         replacement_range,
                         insert_text: label.to_owned(),
@@ -1803,7 +1815,30 @@ fn add_texture_path_items(
     deprecated: bool,
     schema_tier: CompletionSchemaTier,
 ) {
-    for label in snapshot.texture_catalog().paths_with_prefix(prefix) {
+    let children = snapshot.texture_catalog().children_with_prefix(prefix);
+    // Directories first so the drill-down affordance stays visible above the
+    // (possibly long) file list of the browsed directory.
+    for label in children.directories {
+        add_typed_value_completion(
+            items,
+            TypedValueCompletion {
+                label,
+                detail: "directory",
+                documentation: documentation.clone(),
+                replacement_range,
+                prefix,
+                deprecated,
+                kind: CompletionKind::Folder,
+                rank: CompletionRankContext::new(
+                    schema_tier,
+                    CompletionSpecificity::Value,
+                    false,
+                    deprecated,
+                ),
+            },
+        );
+    }
+    for label in children.files {
         add_value_completion_ranked(
             items,
             label,

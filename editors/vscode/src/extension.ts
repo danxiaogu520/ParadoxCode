@@ -1241,9 +1241,12 @@ function createClient({ command, source }: ServerResolution): LanguageClient {
             { pattern: '**/interface/state_view/*.txt' },
             { pattern: '**/localisation/**/*' },
         ],
-        synchronize: {
-            configurationSection: 'paradoxcode',
-        },
+        // Deliberately no `synchronize.configurationSection`: its auto-push wraps the
+        // settings in a `paradoxcode` namespace the server's flat-key configuration
+        // handler never reads, so the push never applied anything. Every setting the
+        // server consumes lives in SERVER_SETTING_KEYS, whose save path restarts the
+        // server with fresh initializationOptions; the push only raced that restart
+        // and surfaced as a spurious didChangeConfiguration send failure.
         initializationOptions: readInitializationOptions(),
         // The client writes server stderr and its own diagnostics into the main
         // channel so users have exactly one basic-output channel to watch.
