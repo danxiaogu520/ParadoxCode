@@ -775,29 +775,73 @@ mod tests {
         assert!(matches!(error, CliError::Usage(_)));
     }
 
-    #[test]
-    fn index_vanilla_builds_and_refreshes_a_persistent_cache() {
+    /// Creates an installation fixture (validation directories plus the
+    /// platform executable) and a user-path pair under one temp root. Keep the
+    /// returned guard alive for the whole test; the paths die with it.
+    fn installation_fixture(
+        label: &str,
+        with_validation_directories: bool,
+    ) -> (tempfile::TempDir, std::path::PathBuf, UserPaths) {
+        let temporary = tempfile::tempdir().expect("temporary directory");
+        let source = temporary.path().join(label);
+        if with_validation_directories {
+            for directory in game::eu4::INSTALL_DESCRIPTOR.validation_directories {
+                fs::create_dir_all(source.join(directory)).expect("validation directory");
+            }
+        }
+        #[cfg(target_os = "windows")]
+        let executable = source.join("eu4.exe");
+        #[cfg(target_os = "linux")]
+        let executable = source.join("eu4");
+        #[cfg(target_os = "macos")]
+        let executable = source.join("Europa Universalis IV.app/Contents/MacOS/eu4");
+        fs::create_dir_all(executable.parent().expect("executable parent"))
+            .expect("executable parent directory");
+        fs::write(executable, b"fixture executable").expect("executable marker");
+        let paths = UserPaths {
+            config_file: temporary.path().join("config/config.toml"),
+            cache_root: temporary.path().join("cache"),
+        };
+        (temporary, source, paths)
+    }
+
+    /// Creates a `pdcindex` build fixture: one indexed events file under a
+    /// nonce temp root plus the matching `index` CLI arguments.
+    fn index_fixture(
+        label: &str,
+        kind: &str,
+        event_id: &str,
+        dependency_id: Option<&str>,
+    ) -> (std::path::PathBuf, std::path::PathBuf, Vec<String>) {
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("pdc-cli-vanilla-cache-{nonce}"));
-        let source = root.join("vanilla");
+        let root = std::env::temp_dir().join(format!("pdc-cli-{label}-{nonce}"));
+        let source = root.join(kind);
         fs::create_dir_all(source.join("events")).expect("fixture directory");
         fs::write(
             source.join("events/definitions.txt"),
-            "country_event = { id = vanilla.1 }\n",
+            format!("country_event = {{ id = {event_id} }}\n"),
         )
         .expect("fixture source");
-        let output = root.join("cache/vanilla.pdcindex");
-        let args = vec![
-            "index".to_owned(),
-            "vanilla".to_owned(),
+        let output = root.join(format!("cache/{kind}.pdcindex"));
+        let mut args = vec!["index".to_owned(), kind.to_owned()];
+        if let Some(id) = dependency_id {
+            args.extend(["--id".to_owned(), id.to_owned()]);
+        }
+        args.extend([
             "--source".to_owned(),
             source.display().to_string(),
             "--output".to_owned(),
             output.display().to_string(),
-        ];
+        ]);
+        (root, output, args)
+    }
+
+    #[test]
+    fn index_vanilla_builds_and_refreshes_a_persistent_cache() {
+        let (root, output, args) = index_fixture("vanilla-cache", "vanilla", "vanilla.1", None);
 
         let first = execute(&args).expect("build cache");
         assert!(first.contains("indexed files: 1"));
@@ -815,29 +859,8 @@ mod tests {
 
     #[test]
     fn index_dependency_builds_a_cache_with_the_stable_root_identity() {
-        let nonce = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos();
-        let root = std::env::temp_dir().join(format!("pdc-cli-dependency-cache-{nonce}"));
-        let source = root.join("dependency");
-        fs::create_dir_all(source.join("events")).expect("fixture directory");
-        fs::write(
-            source.join("events/definitions.txt"),
-            "country_event = { id = dep.1 }\n",
-        )
-        .expect("fixture source");
-        let output = root.join("cache/dependency.pdcindex");
-        let args = vec![
-            "index".to_owned(),
-            "dependency".to_owned(),
-            "--id".to_owned(),
-            "dep-a".to_owned(),
-            "--source".to_owned(),
-            source.display().to_string(),
-            "--output".to_owned(),
-            output.display().to_string(),
-        ];
+        let (root, output, args) =
+            index_fixture("dependency-cache", "dependency", "dep.1", Some("dep-a"));
 
         let summary = execute(&args).expect("build dependency cache");
         assert!(summary.contains("Dependency dep-a cache written to"));
@@ -854,30 +877,13 @@ mod tests {
 
     #[test]
     fn setup_vanilla_validates_indexes_and_persists_user_configuration() {
-        let temporary = tempfile::tempdir().expect("temporary directory");
-        let source = temporary.path().join("Europa Universalis IV");
-        for directory in game::eu4::INSTALL_DESCRIPTOR.validation_directories {
-            fs::create_dir_all(source.join(directory)).expect("validation directory");
-        }
-        #[cfg(target_os = "windows")]
-        let executable = source.join("eu4.exe");
-        #[cfg(target_os = "linux")]
-        let executable = source.join("eu4");
-        #[cfg(target_os = "macos")]
-        let executable = source.join("Europa Universalis IV.app/Contents/MacOS/eu4");
-        fs::create_dir_all(executable.parent().expect("executable parent"))
-            .expect("executable parent directory");
-        fs::write(executable, b"fixture executable").expect("executable marker");
+        let (_guard, source, paths) = installation_fixture("Europa Universalis IV", true);
         fs::create_dir_all(source.join("events")).expect("indexed directory");
         fs::write(
             source.join("events/definitions.txt"),
             "country_event = { id = vanilla.1 }\n",
         )
         .expect("fixture source");
-        let paths = UserPaths {
-            config_file: temporary.path().join("config/config.toml"),
-            cache_root: temporary.path().join("cache"),
-        };
         let output = setup_vanilla(
             &["--source".to_owned(), source.display().to_string()],
             &paths,
@@ -906,22 +912,7 @@ mod tests {
 
     #[test]
     fn setup_vanilla_rejects_incomplete_installations() {
-        let temporary = tempfile::tempdir().expect("temporary directory");
-        let source = temporary.path().join("incomplete");
-        fs::create_dir_all(&source).expect("source directory");
-        #[cfg(target_os = "windows")]
-        let executable = source.join("eu4.exe");
-        #[cfg(target_os = "linux")]
-        let executable = source.join("eu4");
-        #[cfg(target_os = "macos")]
-        let executable = source.join("Europa Universalis IV.app/Contents/MacOS/eu4");
-        fs::create_dir_all(executable.parent().expect("executable parent"))
-            .expect("executable parent directory");
-        fs::write(executable, b"fixture executable").expect("executable marker");
-        let paths = UserPaths {
-            config_file: temporary.path().join("config/config.toml"),
-            cache_root: temporary.path().join("cache"),
-        };
+        let (_guard, source, paths) = installation_fixture("incomplete", false);
         let error = setup_vanilla(
             &["--source".to_owned(), source.display().to_string()],
             &paths,
@@ -933,24 +924,7 @@ mod tests {
 
     #[test]
     fn setup_vanilla_retains_a_discovered_source_when_indexing_fails() {
-        let temporary = tempfile::tempdir().expect("temporary directory");
-        let source = temporary.path().join("Europa Universalis IV");
-        for directory in game::eu4::INSTALL_DESCRIPTOR.validation_directories {
-            fs::create_dir_all(source.join(directory)).expect("validation directory");
-        }
-        #[cfg(target_os = "windows")]
-        let executable = source.join("eu4.exe");
-        #[cfg(target_os = "linux")]
-        let executable = source.join("eu4");
-        #[cfg(target_os = "macos")]
-        let executable = source.join("Europa Universalis IV.app/Contents/MacOS/eu4");
-        fs::create_dir_all(executable.parent().expect("executable parent"))
-            .expect("executable parent directory");
-        fs::write(executable, b"fixture executable").expect("executable marker");
-        let paths = UserPaths {
-            config_file: temporary.path().join("config/config.toml"),
-            cache_root: temporary.path().join("cache"),
-        };
+        let (_guard, source, paths) = installation_fixture("Europa Universalis IV", true);
         let cache_path = paths.vanilla_cache("eu4");
         fs::create_dir_all(cache_path.parent().expect("cache parent")).expect("cache directory");
         fs::write(&cache_path, b"not a ParadoxCode cache").expect("unrelated cache file");

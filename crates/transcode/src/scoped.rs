@@ -381,11 +381,11 @@ mod tests {
     fn scoped_script_round_trip_with_readable_comments() {
         let readable =
             "# 注释保持可读\r\ndynasty = \"大明王朝\"\r\n# 另一条注释\r\ntitle = \"帝国\"\r\n";
-        let scoped = scoped_encode_file(readable, Profile::Script, P).unwrap();
+        let scoped = scoped_encode_file(readable, Profile::Script, P).expect("scoped encode");
         // Comments stay readable UTF-8 on disk; strings hold byte triples.
         assert!(scoped.starts_with("# 注释保持可读\r\n".as_bytes()));
         assert_eq!(scoped_form(&scoped, Profile::Script), ScopedForm::Scoped);
-        let decoded = scoped_decode_file(&scoped, Profile::Script).unwrap();
+        let decoded = scoped_decode_file(&scoped, Profile::Script).expect("scoped decode");
         assert_eq!(decoded.text, readable);
         assert!(decoded.in_span_broken.is_empty());
         assert!(decoded.out_of_span_markers.is_empty());
@@ -394,13 +394,13 @@ mod tests {
     #[test]
     fn scoped_localisation_round_trip() {
         let readable = "l_english:\r\n demo_key:0 \"发行本\" # 注释\r\n";
-        let scoped = scoped_encode_file(readable, Profile::Localisation, P).unwrap();
+        let scoped = scoped_encode_file(readable, Profile::Localisation, P).expect("scoped encode");
         assert!(scoped.starts_with("l_english:".as_bytes()));
         assert_eq!(
             scoped_form(&scoped, Profile::Localisation),
             ScopedForm::Scoped
         );
-        let decoded = scoped_decode_file(&scoped, Profile::Localisation).unwrap();
+        let decoded = scoped_decode_file(&scoped, Profile::Localisation).expect("scoped decode");
         assert_eq!(decoded.text, readable);
     }
 
@@ -410,8 +410,8 @@ mod tests {
         // encode to exactly the whole-file form (comments are ASCII here).
         let readable = "dynasty = \"大明王朝\"\r\n";
         assert_eq!(
-            scoped_encode_file(readable, Profile::Script, P).unwrap(),
-            encode_file(readable, Profile::Script, P).unwrap()
+            scoped_encode_file(readable, Profile::Script, P).expect("scoped encode"),
+            encode_file(readable, Profile::Script, P).expect("encode file")
         );
     }
 
@@ -419,7 +419,8 @@ mod tests {
     fn partial_files_self_heal() {
         // One string escaped on disk, one readable, comment readable: scoped
         // decode shows all readable, scoped encode converges both strings.
-        let escaped_part = encode_file("title = \"帝国\"\r\n", Profile::Script, P).unwrap();
+        let escaped_part =
+            encode_file("title = \"帝国\"\r\n", Profile::Script, P).expect("encode file");
         let mixed: Vec<u8> = [
             "# 注释\r\n".as_bytes(),
             &escaped_part,
@@ -427,31 +428,34 @@ mod tests {
         ]
         .concat();
         assert_eq!(scoped_form(&mixed, Profile::Script), ScopedForm::Scoped);
-        let decoded = scoped_decode_file(&mixed, Profile::Script).unwrap();
+        let decoded = scoped_decode_file(&mixed, Profile::Script).expect("scoped decode");
         assert_eq!(
             decoded.text,
             "# 注释\r\ntitle = \"帝国\"\r\ndynasty = \"大明王朝\"\r\n"
         );
-        let healed = scoped_encode_file(&decoded.text, Profile::Script, P).unwrap();
-        let redecoded = scoped_decode_file(&healed, Profile::Script).unwrap();
+        let healed = scoped_encode_file(&decoded.text, Profile::Script, P).expect("scoped encode");
+        let redecoded = scoped_decode_file(&healed, Profile::Script).expect("scoped decode");
         assert_eq!(redecoded.text, decoded.text);
         // And the healed file re-encodes to itself (fixed point).
         assert_eq!(
-            scoped_encode_file(&redecoded.text, Profile::Script, P).unwrap(),
+            scoped_encode_file(&redecoded.text, Profile::Script, P).expect("scoped encode"),
             healed
         );
     }
 
     #[test]
     fn whole_escaped_files_take_the_legacy_path() {
-        let legacy = encode_file("# 注释\r\nkey = \"大明\"\r\n", Profile::Script, P).unwrap();
+        let legacy =
+            encode_file("# 注释\r\nkey = \"大明\"\r\n", Profile::Script, P).expect("encode file");
         assert_eq!(
             scoped_form(&legacy, Profile::Script),
             ScopedForm::WholeEscaped
         );
         // The legacy decoder still applies to it.
         assert_eq!(
-            decode_file(&legacy, Profile::Script).unwrap().text,
+            decode_file(&legacy, Profile::Script)
+                .expect("decode file")
+                .text,
             "# 注释\r\nkey = \"大明\"\r\n"
         );
     }
@@ -477,7 +481,7 @@ mod tests {
     fn iron_rule_refuses_in_span_markers() {
         // A buffer carrying escaped triples inside its strings (as the editor
         // char layer would show pasted transcoded script content) is refused.
-        let pasted = encode_file("key = \"大明\"\r\n", Profile::Script, P).unwrap();
+        let pasted = encode_file("key = \"大明\"\r\n", Profile::Script, P).expect("encode file");
         let buffer: String = "# 注释\r\n"
             .chars()
             .chain(
@@ -499,7 +503,8 @@ mod tests {
         let readable = "# 注释\r\nkey = \"前😀后\"\r\n";
         match scoped_encode_file(readable, Profile::Script, P) {
             Err(ScopedEncodeError::Unencodable { error }) => {
-                let expected = "# 注释\r\nkey = \"".len() + "前".chars().next().unwrap().len_utf8();
+                let expected = "# 注释\r\nkey = \"".len()
+                    + "前".chars().next().expect("next element").len_utf8();
                 assert_eq!(error.unencodable[0].byte_index, expected);
                 assert_eq!(error.unencodable[0].code_point, 0x1F600);
             }
@@ -511,7 +516,7 @@ mod tests {
     fn in_span_orphans_report_and_pass_through() {
         // Marker inside a string with fewer than two payload bytes left.
         let bytes: Vec<u8> = [b'"', 0x10, b'"', b'\n'].to_vec();
-        let decoded = scoped_decode_file(&bytes, Profile::Script).unwrap();
+        let decoded = scoped_decode_file(&bytes, Profile::Script).expect("scoped decode");
         assert_eq!(decoded.in_span_broken, vec![1]);
         assert_eq!(decoded.text, "\"\u{0010}\"\n");
     }

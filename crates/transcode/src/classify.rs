@@ -137,7 +137,7 @@ mod tests {
     use crate::escape::{decode_text, encode_text};
 
     fn escaped(text: &str) -> String {
-        encode_text(text, EscapeSet::Paratranz).unwrap()
+        encode_text(text, EscapeSet::Paratranz).expect("fixture must be encodable")
     }
 
     #[test]

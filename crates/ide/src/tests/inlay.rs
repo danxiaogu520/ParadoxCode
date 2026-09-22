@@ -24,74 +24,43 @@ fn scope_hints_use_rule_proven_transitions_and_skip_ambient_blocks() {
 }
 
 #[test]
-fn country_history_nested_blocks_get_scope_hints_from_inherited_context() {
-    let path = "/tmp/history/countries/ZZZ - Inlay.txt";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
-    let id = DocumentId::new(format!("file://{path}"));
-    host.open_document(
-        id.clone(),
-        1,
-        "if = {\n\tlimit = { always = yes }\n\trandom_owned_province = {\n\t\tadd_core = ZZZ\n\t}\n}\n".to_owned(),
-        Some(AbsPath::normalize(&AbsPath::normalize(&AbsPath::normalize(&AbsPath::normalize(&AbsPath::normalize(&AbsPath::normalize(&std::path::PathBuf::from(path)))))))),
-    )
-    .expect("open country history");
-    let hints =
-        scope_inlay_hints_with_cancellation(&host.snapshot(), &id, None, &CancellationToken::new())
-            .expect("scope hints");
-    assert!(
-        hints.iter().any(|hint| hint.scope == "province"),
-        "country history inherits effect, so nested scope transitions must yield hints: {hints:?}"
-    );
-}
-
-#[test]
-fn province_history_nested_blocks_get_scope_hints_from_inherited_context() {
-    let path = "/tmp/history/provinces/-1 - Inlay.txt";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
-    let id = DocumentId::new(format!("file://{path}"));
-    host.open_document(
-        id.clone(),
-        1,
-        "if = {\n\tlimit = { always = yes }\n\towner = {\n\t\tadd_treasury = 10\n\t}\n}\n"
-            .to_owned(),
-        Some(AbsPath::normalize(&AbsPath::normalize(
-            &AbsPath::normalize(&AbsPath::normalize(&AbsPath::normalize(
-                &AbsPath::normalize(&std::path::PathBuf::from(path)),
-            ))),
-        ))),
-    )
-    .expect("open province history");
-    let hints =
-        scope_inlay_hints_with_cancellation(&host.snapshot(), &id, None, &CancellationToken::new())
-            .expect("scope hints");
-    assert!(
-        hints.iter().any(|hint| hint.scope == "country"),
-        "province history inherits effect and starts in province scope, so owner must yield a country hint: {hints:?}"
-    );
-}
-
-#[test]
-fn on_action_effect_bodies_get_scope_hints_from_inherited_context() {
-    let path = "/tmp/common/on_actions/00_inlay.txt";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
-    let id = DocumentId::new(format!("file://{path}"));
-    host.open_document(
-        id.clone(),
-        1,
-        "consort_on_shipwreck = {\n\trandom_owned_province = {\n\t\tadd_core = ZZZ\n\t}\n}\n"
-            .to_owned(),
-        Some(AbsPath::normalize(&AbsPath::normalize(
-            &AbsPath::normalize(&AbsPath::normalize(&AbsPath::normalize(
-                &AbsPath::normalize(&std::path::PathBuf::from(path)),
-            ))),
-        ))),
-    )
-    .expect("open on_action");
-    let hints =
-        scope_inlay_hints_with_cancellation(&host.snapshot(), &id, None, &CancellationToken::new())
-            .expect("scope hints");
-    assert!(
-        hints.iter().any(|hint| hint.scope == "province"),
-        "on_action bodies inherit effect context, so scope transitions must yield hints: {hints:?}"
-    );
+fn nested_history_and_on_action_blocks_get_scope_hints_from_inherited_context() {
+    for (path, script, expected) in [
+        (
+            "/tmp/history/countries/ZZZ - Inlay.txt",
+            "if = {\n\tlimit = { always = yes }\n\trandom_owned_province = {\n\t\tadd_core = ZZZ\n\t}\n}\n",
+            "province",
+        ),
+        (
+            "/tmp/history/provinces/-1 - Inlay.txt",
+            "if = {\n\tlimit = { always = yes }\n\towner = {\n\t\tadd_treasury = 10\n\t}\n}\n",
+            "country",
+        ),
+        (
+            "/tmp/common/on_actions/00_inlay.txt",
+            "consort_on_shipwreck = {\n\trandom_owned_province = {\n\t\tadd_core = ZZZ\n\t}\n}\n",
+            "province",
+        ),
+    ] {
+        let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+        let id = DocumentId::new(format!("file://{path}"));
+        host.open_document(
+            id.clone(),
+            1,
+            script.to_owned(),
+            Some(AbsPath::normalize(&std::path::PathBuf::from(path))),
+        )
+        .expect("open inherited-context fixture");
+        let hints = scope_inlay_hints_with_cancellation(
+            &host.snapshot(),
+            &id,
+            None,
+            &CancellationToken::new(),
+        )
+        .expect("scope hints");
+        assert!(
+            hints.iter().any(|hint| hint.scope == expected),
+            "{path} inherits effect context, so scope transitions must yield hints: {hints:?}"
+        );
+    }
 }
