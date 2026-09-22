@@ -65,10 +65,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   is unaffected: it reads names, descriptions, and schemas from the same manifest and ignores the
   `when` clause.
 - Every tool now opts into prompt references (`canBeReferencedInPrompt: true` with unique
-  `toolReferenceName`s such as `paradoxSearch` or `paradoxValidate`). Current VS Code tool
-  pickers only list prompt-referenceable extension tools, so without the flag the tools could
-  never be enabled by the user: agent sessions rejected every call with "Tool … is currently
-  disabled by the user" while the Configure Tools dialog showed no way to turn them on.
+  `toolReferenceName`s such as `paradoxSearch` or `paradoxValidate`), so users can force a
+  specific tool with `#paradox…` references. Note on the underlying enablement saga, verified on
+  the maintainer's machine (0.4.1, no flag): tools registered dynamically at activation are not
+  picked up by the chat tool picker until the window is reloaded — until then, agent calls are
+  rejected with a misleading "Tool … is currently disabled by the user" (same error family as
+  microsoft/vscode#328189) even though Configure Tools never listed them. A Reload Window makes
+  the tools appear and work; the flags above are for explicit references, not a prerequisite for
+  agent use.
 
 ### Removed
 

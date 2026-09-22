@@ -52,7 +52,10 @@ and Paradox Interactive are trademarks of their respective owners.
   validation — all served by the already-running language server. Localisation queries live in
   their own zone (exact `loc_get`, fuzzy `loc_search`, prefix `loc_list`) and the two zones never
   cross. Every tool is prompt-referenceable (`#paradoxSearch`, `#paradoxValidate`, …) and listed
-  only while the language server is running, so agent tool pickers can show and enable them.
+  only while the language server is running. VS Code quirk: tools registered by extensions at
+  activation only reach the chat tool picker after a window reload — if Configure Tools does not
+  list the ParadoxCode tools (or agent calls report "currently disabled by the user"), run
+  **Developer: Reload Window** once.
 - A stdio MCP server (`editors/vscode/scripts/mcp.mjs`) that exposes the same eleven read-only
   tools to any Model Context Protocol client — hand-rolled newline-delimited JSON-RPC with no
   SDK dependency, its tool manifest mirrored from the extension's contributions.
