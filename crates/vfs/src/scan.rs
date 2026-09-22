@@ -668,3 +668,338 @@ pub fn source_priorities(
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::WorkspaceScanFilterError;
+    use rules::GameProfile;
+
+    fn test_directory(label: &str) -> PathBuf {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!("vfs-scan-{label}-{nonce}"));
+        fs::create_dir_all(&directory).expect("test directory");
+        directory
+    }
+
+    fn profile_with_roots(scan_roots: &[&str], extensions: &[&str]) -> GameProfile {
+        let mut profile = GameProfile::empty("scan-test");
+        profile.scan_roots = scan_roots.iter().map(|root| (*root).to_owned()).collect();
+        profile.scan_extensions = extensions
+            .iter()
+            .map(|extension| (*extension).to_owned())
+            .collect();
+        profile
+    }
+
+    fn scan_root_directory(
+        root: &std::path::Path,
+        profile: &GameProfile,
+        filters: &WorkspaceScanFilters,
+    ) -> Vec<String> {
+        let mut output = Vec::new();
+        let mut report = WorkspaceScanReport::default();
+        collect_whitelisted_files(
+            root,
+            profile,
+            filters,
+            WorkspaceScanLimits::default(),
+            &mut report,
+            &mut output,
+            &WorkspaceScanToken::new(),
+        )
+        .expect("scan fixture root");
+        output
+            .into_iter()
+            .map(|(logical, _)| logical.as_str().to_owned())
+            .collect()
+    }
+
+    #[test]
+    fn scan_filter_validation_reports_each_rejection_with_its_limit() {
+        let too_many = (0..=WorkspaceScanFilters::MAX_PATTERNS)
+            .map(|index| format!("generated-{index}"))
+            .collect::<Vec<_>>();
+        for (kind, patterns) in [("file", too_many.clone()), ("directory", too_many)] {
+            let error = WorkspaceScanFilters::new(
+                if kind == "file" {
+                    patterns.clone()
+                } else {
+                    Vec::new()
+                },
+                if kind == "file" {
+                    Vec::new()
+                } else {
+                    patterns.clone()
+                },
+            )
+            .expect_err("pattern count above the bound must fail");
+            assert_eq!(
+                error,
+                WorkspaceScanFilterError::TooMany {
+                    kind,
+                    limit: WorkspaceScanFilters::MAX_PATTERNS,
+                }
+            );
+            assert_eq!(
+                error.to_string(),
+                format!(
+                    "too many {kind} ignore patterns (maximum {})",
+                    WorkspaceScanFilters::MAX_PATTERNS
+                )
+            );
+        }
+
+        let too_long = vec!["x".repeat(WorkspaceScanFilters::MAX_PATTERN_LENGTH + 1)];
+        let error = WorkspaceScanFilters::new(too_long, Vec::new())
+            .expect_err("pattern length above the bound must fail");
+        assert_eq!(
+            error,
+            WorkspaceScanFilterError::TooLong {
+                kind: "file",
+                limit: WorkspaceScanFilters::MAX_PATTERN_LENGTH,
+            }
+        );
+
+        let error = WorkspaceScanFilters::new(Vec::new(), vec!["bad\0pattern".to_owned()])
+            .expect_err("NUL inside a pattern must fail");
+        assert_eq!(error, WorkspaceScanFilterError::Nul { kind: "directory" });
+
+        // The exact bounds stay accepted.
+        WorkspaceScanFilters::new(
+            vec!["x".repeat(WorkspaceScanFilters::MAX_PATTERN_LENGTH)],
+            Vec::new(),
+        )
+        .expect("pattern at the bounds is accepted");
+    }
+
+    #[test]
+    fn scan_filter_patterns_are_normalized_and_deduplicated() {
+        let filters = WorkspaceScanFilters::new(
+            vec![
+                "./events\\legacy.txt".to_owned(),
+                "/events/legacy.txt".to_owned(),
+                "events/legacy.txt".to_owned(),
+                String::new(),
+                "/".to_owned(),
+            ],
+            vec!["events\\generated\\".to_owned()],
+        )
+        .expect("valid patterns");
+        assert_eq!(
+            filters.ignore_file_patterns(),
+            ["events/legacy.txt".to_owned()]
+        );
+        assert_eq!(
+            filters.ignore_directory_patterns(),
+            ["events/generated/".to_owned()]
+        );
+    }
+
+    #[test]
+    fn scan_filters_match_basenames_wildcards_and_ignored_parents() {
+        let filters = WorkspaceScanFilters::new(
+            vec!["generated.txt".to_owned(), "skip_?.tmp".to_owned()],
+            vec!["vendor".to_owned()],
+        )
+        .expect("valid patterns");
+        for (path, ignored) in [
+            ("generated.txt", true),
+            ("deep/nested/generated.txt", true),
+            ("deep/nested/keep.txt", false),
+            ("skip_a.tmp", true),
+            ("deep/skip_1.tmp", true),
+            ("skip_ab.tmp", false),
+            ("vendor/anything.txt", true),
+            ("deep/vendor/anything.txt", true),
+        ] {
+            assert_eq!(filters.ignores_file(path), ignored, "file path `{path}`");
+        }
+        // A separator-free directory pattern matches the directory's own basename;
+        // deeper segments are only reachable through the parent walk in
+        // `ignores_file`, which is how `deep/vendor/anything.txt` above is ignored.
+        assert!(filters.ignores_directory("app/vendor"));
+        assert!(!filters.ignores_directory("app/vendorkeep"));
+        assert!(!filters.ignores_directory("app/vendor/cache"));
+    }
+
+    #[test]
+    fn collect_whitelisted_files_selects_profile_roots_and_reports_depth_issues() {
+        let root = test_directory("whitelist");
+        fs::create_dir_all(root.join("events/deep/deeper")).expect("events tree");
+        fs::create_dir_all(root.join("common/nested")).expect("common tree");
+        fs::create_dir_all(root.join("outside")).expect("unlisted tree");
+        fs::write(root.join("events/alpha.txt"), "key = 1\n").expect("alpha");
+        fs::write(root.join("events/beta.md"), "# not indexed").expect("beta");
+        fs::write(root.join("events/deep/deeper/delta.txt"), "key = 4\n").expect("delta");
+        fs::write(root.join("common/nested/gamma.txt"), "key = 3\n").expect("gamma");
+        fs::write(root.join("outside/omega.txt"), "key = 5\n").expect("omega");
+
+        let mut profile = profile_with_roots(&["events", "common"], &["txt"]);
+        profile.scan_root_max_depths.insert("common".to_owned(), 0);
+
+        let mut output = Vec::new();
+        let mut report = WorkspaceScanReport::default();
+        let limits = WorkspaceScanLimits {
+            max_depth: 2,
+            ..Default::default()
+        };
+        collect_whitelisted_files(
+            &root,
+            &profile,
+            &WorkspaceScanFilters::default(),
+            limits,
+            &mut report,
+            &mut output,
+            &WorkspaceScanToken::new(),
+        )
+        .expect("scan fixture root");
+
+        let collected = output
+            .into_iter()
+            .map(|(logical, _)| logical.as_str().to_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(collected, ["events/alpha.txt".to_owned()]);
+        // The outside root is never walked and beta.md fails the extension
+        // whitelist; a subtree nested past the global depth limit is reported,
+        // and a scan root with an explicit depth of zero prunes silently.
+        assert_eq!(report.discovered_files, 2);
+        assert_eq!(report.skipped_entries, 1);
+        assert_eq!(
+            report
+                .issues
+                .iter()
+                .map(|issue| (
+                    issue.kind,
+                    issue.path.file_name().and_then(|name| name.to_str())
+                ))
+                .collect::<Vec<_>>(),
+            [(WorkspaceScanIssueKind::DepthLimitExceeded, Some("deeper"))]
+        );
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn collect_whitelisted_files_prunes_ignored_names_and_respects_the_file_budget() {
+        let root = test_directory("prune");
+        fs::create_dir_all(root.join(".git")).expect("git directory");
+        fs::create_dir_all(root.join("vendor/pkg")).expect("vendor tree");
+        fs::create_dir_all(root.join("events")).expect("events directory");
+        fs::write(root.join(".git/tracked.txt"), "key = 1\n").expect("git file");
+        fs::write(root.join("vendor/pkg/lib.txt"), "key = 2\n").expect("vendor file");
+        fs::write(root.join("generated.txt"), "key = 3\n").expect("generated file");
+        fs::write(root.join("events/alpha.txt"), "key = 4\n").expect("alpha");
+        fs::write(root.join("events/beta.txt"), "key = 5\n").expect("beta");
+
+        let profile = profile_with_roots(&[""], &["txt"]);
+        let filters =
+            WorkspaceScanFilters::new(vec!["generated.txt".to_owned()], vec!["vendor".to_owned()])
+                .expect("valid patterns");
+
+        let mut output = Vec::new();
+        let mut report = WorkspaceScanReport::default();
+        let limits = WorkspaceScanLimits {
+            max_files: 1,
+            ..Default::default()
+        };
+        let error = collect_whitelisted_files(
+            &root,
+            &profile,
+            &filters,
+            limits,
+            &mut report,
+            &mut output,
+            &WorkspaceScanToken::new(),
+        )
+        .expect_err("second discovered file must exceed the budget");
+        assert!(matches!(
+            error,
+            WorkspaceError::FileLimitExceeded { limit: 1 }
+        ));
+        assert_eq!(report.discovered_files, 1);
+
+        // Without the artificial budget the same tree collects only the event
+        // files: `.git`, the ignored directory, and the ignored file are pruned.
+        let collected = scan_root_directory(&root, &profile, &filters);
+        assert_eq!(
+            collected,
+            ["events/alpha.txt".to_owned(), "events/beta.txt".to_owned()]
+        );
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn collect_whitelisted_files_skips_symbolic_links_with_an_issue() {
+        let root = test_directory("symlink");
+        fs::create_dir_all(root.join("events")).expect("events directory");
+        let outside = root.join("outside.txt");
+        fs::write(&outside, "key = 1\n").expect("outside target");
+        fs::write(root.join("events/alpha.txt"), "key = 2\n").expect("alpha");
+        std::os::unix::fs::symlink(&outside, root.join("events/link.txt")).expect("symlink");
+
+        let profile = profile_with_roots(&["events"], &["txt"]);
+        let mut output = Vec::new();
+        let mut report = WorkspaceScanReport::default();
+        collect_whitelisted_files(
+            &root,
+            &profile,
+            &WorkspaceScanFilters::default(),
+            WorkspaceScanLimits::default(),
+            &mut report,
+            &mut output,
+            &WorkspaceScanToken::new(),
+        )
+        .expect("scan fixture root");
+
+        let collected = output
+            .into_iter()
+            .map(|(logical, _)| logical.as_str().to_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(collected, ["events/alpha.txt".to_owned()]);
+        assert!(report.issues.iter().any(|issue| {
+            issue.kind == WorkspaceScanIssueKind::SymlinkSkipped
+                && issue.path.file_name().and_then(|name| name.to_str()) == Some("link.txt")
+        }));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn collect_whitelisted_files_rejects_missing_roots_and_cancellation() {
+        let root = test_directory("rejections");
+        fs::write(root.join("file.txt"), "key = 1\n").expect("regular file");
+        let profile = profile_with_roots(&["events"], &["txt"]);
+
+        let error = collect_whitelisted_files(
+            &root.join("file.txt"),
+            &profile,
+            &WorkspaceScanFilters::default(),
+            WorkspaceScanLimits::default(),
+            &mut WorkspaceScanReport::default(),
+            &mut Vec::new(),
+            &WorkspaceScanToken::new(),
+        )
+        .expect_err("a regular file is not a source root");
+        assert!(
+            matches!(error, WorkspaceError::Io(error) if error.kind() == std::io::ErrorKind::NotADirectory)
+        );
+
+        let cancelled = WorkspaceScanToken::new();
+        cancelled.cancel();
+        let error = collect_whitelisted_files(
+            &root,
+            &profile,
+            &WorkspaceScanFilters::default(),
+            WorkspaceScanLimits::default(),
+            &mut WorkspaceScanReport::default(),
+            &mut Vec::new(),
+            &cancelled,
+        )
+        .expect_err("a cancelled token stops the scan");
+        assert_eq!(error.to_string(), "workspace scan was cancelled");
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+}
