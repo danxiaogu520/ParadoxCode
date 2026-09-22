@@ -286,6 +286,45 @@ fn semantic_root_entry_context(
         .next()
 }
 
+/// Rewrites a type-instance wrapper gap to its wrapper-key completion context.
+///
+/// A wrapper such as `country_decisions = { … }` accepts free-form instance
+/// names, so its gap completes nothing. A wrapper whose `type_key_filter` is a
+/// closed list (`spriteTypes` accepting only `spriteType` and its siblings)
+/// instead completes that fixed vocabulary, served from the dedicated
+/// `wrapper:{type}` rules so instance bodies never see these rows.
+pub(crate) fn closed_wrapper_key_completion_context(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+) -> Option<SemanticCompletionContext> {
+    if !context.wrapper_container {
+        return None;
+    }
+    let type_name = context.context.strip_prefix("type:")?;
+    let descriptor = snapshot
+        .rules()
+        .model()
+        .semantic
+        .type_descriptors
+        .get(type_name)?;
+    if !matches!(&descriptor.type_key_filter, Some((_, false))) {
+        return None;
+    }
+    let wrapper_context = format!("wrapper:{type_name}");
+    let has_rows = snapshot
+        .rules()
+        .semantic_rules_for_context(&wrapper_context)
+        .next()
+        .is_some();
+    if !has_rows {
+        return None;
+    }
+    let mut rewritten = context.clone();
+    rewritten.context = wrapper_context;
+    rewritten.wrapper_container = false;
+    Some(rewritten)
+}
+
 /// Returns whether a file-root entry container accepts bare scalar entries.
 ///
 /// Bare root values (for example `westerngfx` in `graphicalculturetype.txt`) must stay on the

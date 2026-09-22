@@ -7,6 +7,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `.gfx` completion now mirrors the decisions scaffold end to end. An empty `interface/*.gfx`
+  file completes its three wrapper blocks (`spriteTypes`, `bitmapfonts`, `objectTypes`) with
+  block skeletons, and the gap inside a wrapper completes the fixed instance vocabulary
+  (`spriteType` and its five sibling kinds, `cursor_offset`, `bitmapfont`, and the `objectTypes`
+  kinds) through new `wrapper:{type}` rules — free-form wrappers such as `country_decisions`
+  keep their silence. The `object` type now recognises `arrowType`, `tradeRouteType`,
+  `pdxparticle`, `PieChartType`, `LineChartType`, and `animatedmaptext` as instances (their
+  bodies previously had no completion or validation), and `animatedmaptext`'s `textblock`
+  gained named rows for `text`, `color`, `font` (bitmap-font member completion), `position`,
+  and `format`.
+
+- `texturefile`-style values complete as a directory browse instead of a flat 200-entry
+  alphabetical head: an empty prefix lists the top-level asset directories, each level lists
+  its subdirectories (new `Folder` completion kind) plus the files directly inside it, and the
+  200-file cap now applies per directory rather than to the whole catalog (~10k entries on a
+  vanilla workspace).
+
 ### Fixed
 
 - Position-bound agent tools answered "document is not open" for exactly the files they are meant

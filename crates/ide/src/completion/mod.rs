@@ -135,10 +135,25 @@ pub fn complete_with_cancellation(
                 .is_none_or(|property| property.operator.is_none());
             // A type-instance wrapper such as `country_decisions = { … }` accepts only
             // free-form instance names; the wrapped type's keys must not be offered there.
+            // A wrapper with a closed instance-key vocabulary (spriteTypes accepting
+            // spriteType and siblings) completes that vocabulary instead.
             if !context.wrapper_container {
                 add_semantic_key_items_ranked(
                     snapshot,
                     context,
+                    &mut member_cache,
+                    &mut items,
+                    replacement_range,
+                    &prefix,
+                    insert_assignment,
+                    cancellation,
+                )?;
+            } else if let Some(wrapper_keys) =
+                closed_wrapper_key_completion_context(snapshot, context)
+            {
+                add_semantic_key_items_ranked(
+                    snapshot,
+                    &wrapper_keys,
                     &mut member_cache,
                     &mut items,
                     replacement_range,

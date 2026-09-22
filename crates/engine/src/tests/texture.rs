@@ -123,6 +123,72 @@ fn catalog_serves_completion_prefixes_and_missing_suggestions() {
 }
 
 #[test]
+fn catalog_browses_children_by_directory_level() {
+    let game_root = temp_root("browse");
+    fs::create_dir_all(game_root.join("gfx/interface/assets")).expect("assets dir");
+    fs::create_dir_all(game_root.join("gfx/map")).expect("map dir");
+    fs::create_dir_all(game_root.join("tutorial")).expect("tutorial dir");
+    fs::write(game_root.join("tutorial/first.dds"), b"").expect("tutorial");
+    fs::write(game_root.join("gfx/top.dds"), b"").expect("top file");
+    fs::write(game_root.join("gfx/interface/a.dds"), b"").expect("a");
+    fs::write(game_root.join("gfx/interface/assets/deep.dds"), b"").expect("deep");
+    fs::write(game_root.join("gfx/map/c.png"), b"").expect("c");
+
+    let roots = [source_root(1, SourceRootKind::Vanilla, &game_root)];
+    let catalog = TextureCatalog::build(&roots);
+
+    // An empty prefix lists the top-level directories, not an alphabetical
+    // head of every file in the catalog.
+    let top = catalog.children_with_prefix("");
+    assert_eq!(top.directories, vec!["gfx/", "tutorial/"]);
+    assert!(top.files.is_empty(), "no top-level files: {:?}", top.files);
+
+    // One level down: subdirectories and the files sitting directly in gfx/.
+    let gfx = catalog.children_with_prefix("gfx/");
+    assert_eq!(gfx.directories, vec!["gfx/interface/", "gfx/map/"]);
+    assert_eq!(gfx.files, vec!["gfx/top.dds"]);
+
+    // Deeper files only appear once their own directory is browsed; the
+    // fragment after the last slash filters both children kinds.
+    let interface = catalog.children_with_prefix("gfx/interface/");
+    assert_eq!(interface.directories, vec!["gfx/interface/assets/"]);
+    assert_eq!(interface.files, vec!["gfx/interface/a.dds"]);
+    let filtered = catalog.children_with_prefix("gfx/interface/a");
+    assert_eq!(filtered.directories, vec!["gfx/interface/assets/"]);
+    assert_eq!(filtered.files, vec!["gfx/interface/a.dds"]);
+    let exact = catalog.children_with_prefix("gfx/interface/as");
+    assert_eq!(exact.directories, vec!["gfx/interface/assets/"]);
+    assert!(exact.files.is_empty());
+
+    // Spelling normalization (case, backslashes, doubled separators) applies
+    // to the browse prefix exactly as it does to resolution.
+    let spelled = catalog.children_with_prefix("\\\\GFX//Interface\\");
+    assert_eq!(spelled.files, vec!["gfx/interface/a.dds"]);
+}
+
+#[test]
+fn catalog_browse_files_respect_the_prefix_cap() {
+    let game_root = temp_root("cap");
+    fs::create_dir_all(game_root.join("gfx/interface")).expect("dir");
+    for index in 0..260 {
+        fs::write(
+            game_root.join(format!("gfx/interface/f{index:03}.dds")),
+            b"",
+        )
+        .expect("texture");
+    }
+
+    let roots = [source_root(1, SourceRootKind::Vanilla, &game_root)];
+    let catalog = TextureCatalog::build(&roots);
+    let children = catalog.children_with_prefix("gfx/interface/");
+    assert_eq!(children.files.len(), crate::texture::MAX_PREFIX_RESULTS);
+    assert_eq!(
+        children.files.first().copied(),
+        Some("gfx/interface/f000.dds")
+    );
+}
+
+#[test]
 fn snapshot_rebuilds_the_texture_catalog_when_watched_assets_change() {
     let mod_root = temp_root("watch");
     fs::create_dir_all(mod_root.join("gfx/interface")).expect("dir");

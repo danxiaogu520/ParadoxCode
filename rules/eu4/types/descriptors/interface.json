@@ -3,7 +3,7 @@
     "name": "sprite",
     "path": "game/interface",
     "path_file": null,
-    "path_extension": null,
+    "path_extension": "gfx",
     "path_strict": false,
     "type_per_file": false,
     "skip_root_paths": [
@@ -24,13 +24,14 @@
         "frameAnimatedSpriteType"
       ],
       false
-    ]
+    ],
+    "root_entries": "sprite_entries"
   },
   "bitmap_font": {
     "name": "bitmap_font",
     "path": "game/interface",
     "path_file": null,
-    "path_extension": null,
+    "path_extension": "gfx",
     "path_strict": false,
     "type_per_file": false,
     "skip_root_paths": [
@@ -55,7 +56,7 @@
     "name": "object",
     "path": "game/interface",
     "path_file": null,
-    "path_extension": null,
+    "path_extension": "gfx",
     "path_strict": false,
     "type_per_file": false,
     "skip_root_paths": [
@@ -68,7 +69,13 @@
     "starts_with": null,
     "type_key_filter": [
       [
-        "pdxmesh"
+        "pdxmesh",
+        "arrowType",
+        "tradeRouteType",
+        "pdxparticle",
+        "PieChartType",
+        "LineChartType",
+        "animatedmaptext"
       ],
       false
     ]

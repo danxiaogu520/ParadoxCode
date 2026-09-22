@@ -4189,5 +4189,793 @@
     "max_occurs": null,
     "source_file": "common/units_display/*.txt",
     "line": 1
+  },
+  {
+    "id": "interface/gfx:90:rule:root:sprite_entries:spriteTypes",
+    "context": "root:sprite_entries",
+    "parent_path": [],
+    "key": {
+      "exact": "spriteTypes"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Wrapper block containing all sprite definitions (spriteType, textSpriteType, progress bars, shields, animated sprites)."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:91:rule:root:sprite_entries:bitmapfonts",
+    "context": "root:sprite_entries",
+    "parent_path": [],
+    "key": {
+      "exact": "bitmapfonts"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Wrapper block containing bitmap font definitions."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:92:rule:root:sprite_entries:objectTypes",
+    "context": "root:sprite_entries",
+    "parent_path": [],
+    "key": {
+      "exact": "objectTypes"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Wrapper block containing engine object definitions (pdxmesh, arrows, particles, map text, charts)."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:93:rule:wrapper:sprite:spriteType",
+    "context": "wrapper:sprite",
+    "parent_path": [],
+    "key": {
+      "exact": "spriteType"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Plain sprite: one texture file with optional frame slicing and load behaviour."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:94:rule:wrapper:sprite:textSpriteType",
+    "context": "wrapper:sprite",
+    "parent_path": [],
+    "key": {
+      "exact": "textSpriteType"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Sprite whose texture is rendered behind dynamic text (names, numbers)."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:95:rule:wrapper:sprite:progressbartype",
+    "context": "wrapper:sprite",
+    "parent_path": [],
+    "key": {
+      "exact": "progressbartype"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Progress bar sprite: texturefile1 fill over texturefile2 background, coloured through color and colortwo."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:96:rule:wrapper:sprite:corneredTileSpriteType",
+    "context": "wrapper:sprite",
+    "parent_path": [],
+    "key": {
+      "exact": "corneredTileSpriteType"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Tiled sprite whose corners stay fixed while edges and centre stretch (size and bordersize)."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:97:rule:wrapper:sprite:maskedShieldType",
+    "context": "wrapper:sprite",
+    "parent_path": [],
+    "key": {
+      "exact": "maskedShieldType"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Shield sprite masking texturefile with an overlay grid (texturefile3, overlay_frames_per_row, overlay_rows)."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:98:rule:wrapper:sprite:frameAnimatedSpriteType",
+    "context": "wrapper:sprite",
+    "parent_path": [],
+    "key": {
+      "exact": "frameAnimatedSpriteType"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Frame-by-frame animated sprite (animation_rate_fps, looping, play_on_show, pause_on_loop)."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:99:rule:wrapper:sprite:cursor_offset",
+    "context": "wrapper:sprite",
+    "parent_path": [],
+    "key": {
+      "exact": "cursor_offset"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Global cursor hotspot offset for every edit box: cursor_offset = { -5 -4 }."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:100:rule:wrapper:bitmap_font:bitmapfont",
+    "context": "wrapper:bitmap_font",
+    "parent_path": [],
+    "key": {
+      "exact": "bitmapfont"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Bitmap font definition: name plus texture atlas path and colour tables."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:101:rule:wrapper:object:pdxmesh",
+    "context": "wrapper:object",
+    "parent_path": [],
+    "key": {
+      "exact": "pdxmesh"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Mesh object referencing a .mesh file with optional animations and texture overrides."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:102:rule:wrapper:object:arrowType",
+    "context": "wrapper:object",
+    "parent_path": [],
+    "key": {
+      "exact": "arrowType"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Map arrow object: texture, normal, and specular maps plus the arrow shader effect."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:103:rule:wrapper:object:tradeRouteType",
+    "context": "wrapper:object",
+    "parent_path": [],
+    "key": {
+      "exact": "tradeRouteType"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Trade route object: arrow texture set and a cull distance."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:104:rule:wrapper:object:pdxparticle",
+    "context": "wrapper:object",
+    "parent_path": [],
+    "key": {
+      "exact": "pdxparticle"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Particle system object driven by a named particle type."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:105:rule:wrapper:object:PieChartType",
+    "context": "wrapper:object",
+    "parent_path": [],
+    "key": {
+      "exact": "PieChartType"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Pie chart object sized in pixels."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:106:rule:wrapper:object:LineChartType",
+    "context": "wrapper:object",
+    "parent_path": [],
+    "key": {
+      "exact": "LineChartType"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Line chart object sized in pixels with a line width."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:107:rule:wrapper:object:animatedmaptext",
+    "context": "wrapper:object",
+    "parent_path": [],
+    "key": {
+      "exact": "animatedmaptext"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Floating map text label with a scroll speed and one or more textblock style blocks."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:108:rule:root:object:textblock:text",
+    "context": "root:object",
+    "parent_path": [
+      "textblock"
+    ],
+    "key": {
+      "exact": "text"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Localisation-rendered text of the label."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:109:rule:root:object:textblock:color",
+    "context": "root:object",
+    "parent_path": [
+      "textblock"
+    ],
+    "key": {
+      "exact": "color"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Text colour as an RGB float block: color = { 1.0 1.0 0.0 }."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:110:rule:leaf-value:root:object:textblock:color:float",
+    "context": "root:object",
+    "parent_path": [
+      "textblock",
+      "color"
+    ],
+    "key": "any_scalar",
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "RGB channel value between 0.0 and 1.0."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:111:rule:root:object:textblock:font",
+    "context": "root:object",
+    "parent_path": [
+      "textblock"
+    ],
+    "key": {
+      "exact": "font"
+    },
+    "operator": "=",
+    "value": {
+      "type": "bitmap_font"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Bitmap font name, declared by a bitmapfont block in an interface .gfx file."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:112:rule:root:object:textblock:position",
+    "context": "root:object",
+    "parent_path": [
+      "textblock"
+    ],
+    "key": {
+      "exact": "position"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Pixel position of the text block: position = { x = 0 y = 0 }."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:113:rule:root:object:textblock:position:x",
+    "context": "root:object",
+    "parent_path": [
+      "textblock",
+      "position"
+    ],
+    "key": {
+      "exact": "x"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Horizontal pixel offset."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:114:rule:root:object:textblock:position:y",
+    "context": "root:object",
+    "parent_path": [
+      "textblock",
+      "position"
+    ],
+    "key": {
+      "exact": "y"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Vertical pixel offset."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
+  },
+  {
+    "id": "interface/gfx:115:rule:root:object:textblock:format",
+    "context": "root:object",
+    "parent_path": [
+      "textblock"
+    ],
+    "key": {
+      "exact": "format"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Text alignment within the block; vanilla uses centre."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "interface/*.gfx",
+    "line": 1
   }
 ]
