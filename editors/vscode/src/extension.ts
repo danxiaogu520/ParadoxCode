@@ -74,6 +74,7 @@ const SERVER_SETTING_KEYS = [
     'vanilla.mode',
     'diagnostics.severityOverrides',
     'localisation.preferredLanguages',
+    'localisation.transparentScriptGlobs',
     'completion.sourceLayers',
     'performance.profile',
     'server.installPolicy',
@@ -285,6 +286,7 @@ function readInitializationOptions(): Record<string, unknown> {
         ['vanilla.mode', 'vanillaMode'],
         ['diagnostics.severityOverrides', 'diagnosticSeverityOverrides'],
         ['localisation.preferredLanguages', 'preferredLocalisationLanguages'],
+        ['localisation.transparentScriptGlobs', 'transparentScriptGlobs'],
         ['completion.sourceLayers', 'completionSourceLayers'],
         ['performance.profile', 'performanceProfile'],
     ];
