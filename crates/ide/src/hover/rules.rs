@@ -250,15 +250,20 @@ fn texture_resolution_section(snapshot: &AnalysisSnapshot, value: &str) -> Strin
                 SourceRootKind::Dependency => "a dependency mod",
                 SourceRootKind::Vanilla => "the game or a DLC pack",
             };
+            // A DLC zip member shows the archive plus the entry inside it;
+            // the archive alone would not say which asset serves the reference.
+            let resolved = match resolution.hit.archive_member.as_deref() {
+                Some(member) => {
+                    format!("{} :: {member}", resolution.hit.path.as_path().display())
+                }
+                None => resolution.hit.path.as_path().display().to_string(),
+            };
             let fallback = if resolution.extension_fallback {
                 "\n- note: resolved through the engine's `.tga`/`.dds` extension fallback"
             } else {
                 ""
             };
-            format!(
-                "- resolved: `{}`\n- found in: {origin}{fallback}",
-                resolution.hit.path
-            )
+            format!("- resolved: `{resolved}`\n- found in: {origin}{fallback}")
         }
         None => "- resolved: not found in any mod, game, or DLC pack root".to_owned(),
     }
