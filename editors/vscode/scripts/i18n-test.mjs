@@ -145,8 +145,6 @@ const SINKS = [
   {
     name: 'thrown Error',
     pattern: /throw new Error\(\s*([\s\S]{0,200}?)[,)]/g,
-    // Internal invariant guards that never surface as notifications.
-    skipFiles: [join('src', 'transcode.ts')],
   },
   {
     name: 'FileSystemError',

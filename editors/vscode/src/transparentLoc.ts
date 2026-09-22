@@ -12,16 +12,24 @@
 // on-disk shard and every position is a decoded-view position — no offset
 // mapping).
 //
+// The codec itself lives in the language server: classification, decode, and
+// encode travel over the `pdc/transcodeDecode` / `pdc/transcodeEncode`
+// requests (byte payloads as hex), so this file owns only the provider
+// plumbing, the client-side eligibility gates (pure path checks needed by
+// menus and auto-open decisions), the save gate's error presentation, and
+// file persistence. A missing server fails closed — eligible files are never
+// written without the encode guard.
+//
 // Entry is path-based: every eligible file (localisation yml or the
 // configured script globs) opens through its pdcloc:// twin, whatever its
 // bytes look like. Plain readable files pass through unchanged (a save
 // encodes their quoted CJK), damaged files pass through with an error, and
-// only the classifier decides which decode applies — never the caller.
+// only the server-side classifier decides which decode applies — never the
+// caller.
 //
-// Iron rule ② (never encode twice / decode twice) is enforced in both
-// directions: the scoped decoder resolves triples only inside strings, and a
-// save is refused outright when a string already contains escape markers —
-// with the reason surfaced to the user.
+// Iron rule ② (never encode twice / decode twice) is enforced by the
+// server-side encoder — a save is refused outright when a string already
+// contains escape markers, with the reason surfaced to the user.
 //
 // Opening an eligible file takes over its tab instead of adding a second
 // one: the decoded view is shown in the raw tab's own slot (preview
@@ -33,20 +41,16 @@
 import * as fs from 'node:fs/promises';
 import * as nodePath from 'node:path';
 import * as vscode from 'vscode';
+import { acquireAgentClient, withTimeout } from './agent/server';
 import { globToRegExp } from './paths';
-import {
-    Transcoder,
-    PROFILE_LOCALISATION,
-    PROFILE_SCRIPT,
-    isRawCjk,
-    markerOutsideSpans,
-    scanStringSpans,
-    type LocalisationProfile,
-    type ScopedEncodeResult,
-    type ScopedForm,
-} from './transcode';
 
 export const PDCLOC_SCHEME = 'pdcloc';
+
+/** Wire-facing transcoder profile names, mirroring the server's response. */
+export type LocalisationProfile = 'localisation' | 'script';
+
+const PROFILE_LOCALISATION: LocalisationProfile = 'localisation';
+const PROFILE_SCRIPT: LocalisationProfile = 'script';
 
 /** The `pdcloc://` twin of a real `file://` URI. */
 export function decodedUriOf(real: vscode.Uri): vscode.Uri {
@@ -103,8 +107,6 @@ function formatCodePoint(codePoint: number): string {
     return `U+${codePoint.toString(16).toUpperCase().padStart(4, '0')}`;
 }
 
-const fatalUtf8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
-
 /** Zero-based line number of a byte offset, from the passthrough bytes. */
 function lineAt(bytes: Uint8Array, offset: number): number {
     let lines = 0;
@@ -116,33 +118,139 @@ function lineAt(bytes: Uint8Array, offset: number): number {
     return lines;
 }
 
-/** Whether any quoted string holds raw CJK — the content a plain-form save encodes. */
-function hasQuotedCjk(bytes: Uint8Array): boolean {
-    try {
-        fatalUtf8.decode(bytes);
-    } catch {
-        return false; // CP1252-only bytes cannot hold CJK
-    }
-    for (const [start, end] of scanStringSpans(bytes)) {
-        const span = fatalUtf8.decode(bytes.subarray(start, end));
-        for (let index = 0; index < span.length; ) {
-            const codePoint = span.codePointAt(index) as number;
-            if (isRawCjk(codePoint)) {
-                return true;
-            }
-            index += codePoint > 0xffff ? 2 : 1;
-        }
-    }
-    return false;
+// ---------------------------------------------------------------------------
+// Server-backed codec
+// ---------------------------------------------------------------------------
+
+const TRANSCODE_AVAILABILITY_WAIT_MS = 30_000;
+const TRANSCODE_REQUEST_TIMEOUT_MS = 120_000;
+
+/** How a buffer relates to the scoped form, mirroring the server's classifier. */
+type ScopedForm = 'plain' | 'whole' | 'scoped' | 'damaged';
+
+interface TranscodeDecodeResponse {
+    eligible?: boolean;
+    profile?: 'localisation' | 'script';
+    form?: ScopedForm;
+    bytes?: string;
+    broken?: number;
+    damagedAt?: number;
+    quotedCjk?: boolean;
+    error?: 'invalid-utf8';
 }
 
-/** What readFile observed for a URI — consumed by the diagnostics publisher. */
-interface ReadOutcome {
+/** Server-controlled encode answer: either `bytes`, or `refused` with its payload. */
+interface TranscodeEncodeResponse {
+    bytes?: string;
+    refused?: 'alreadyEscaped' | 'unencodable' | 'invalidUtf8';
+    offsets?: number[];
+    points?: { codePoint?: number; byteIndex?: number }[];
+}
+
+/** What a successful decode produced — the bytes to show plus read metadata. */
+export interface DecodedView {
     form: ScopedForm;
+    bytes: Uint8Array;
     /** Orphan markers the decoder passed through (whole-file or in-span). */
     broken: number;
     /** First input byte offset of damage, for anchoring the damaged-form error. */
     damagedAt: number | undefined;
+    /** Plain form whose quoted CJK a save would encode. */
+    quotedCjk: boolean;
+}
+
+function hexToBytes(hex: string): Uint8Array {
+    return new Uint8Array(Buffer.from(hex, 'hex'));
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+    return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('hex');
+}
+
+/** The server is required for every codec operation; failures fail closed. */
+class TranscodeUnavailableError extends Error {}
+
+async function sendTranscodeRequest<T>(method: string, params: object): Promise<T> {
+    let client;
+    try {
+        client = await acquireAgentClient(TRANSCODE_AVAILABILITY_WAIT_MS);
+    } catch (error) {
+        throw new TranscodeUnavailableError(error instanceof Error ? error.message : String(error));
+    }
+    try {
+        return await withTimeout(
+            client.sendRequest<T>(method, params),
+            TRANSCODE_REQUEST_TIMEOUT_MS,
+            'Transcode',
+        );
+    } catch (error) {
+        if (error instanceof TranscodeUnavailableError) {
+            throw error;
+        }
+        throw new TranscodeUnavailableError(error instanceof Error ? error.message : String(error));
+    }
+}
+
+/** Classifies and decodes one file server-side. Never throws for content. */
+async function transcodeDecode(real: vscode.Uri): Promise<DecodedView | 'invalid-utf8'> {
+    const response = await sendTranscodeRequest<TranscodeDecodeResponse>(
+        'pdc/transcodeDecode',
+        { path: real.fsPath },
+    );
+    if (response?.error === 'invalid-utf8') {
+        return 'invalid-utf8';
+    }
+    if (response?.eligible !== true || typeof response.bytes !== 'string') {
+        throw new TranscodeUnavailableError(
+            `unexpected pdc/transcodeDecode response for ${real.fsPath}`,
+        );
+    }
+    return {
+        form: response.form ?? 'plain',
+        bytes: hexToBytes(response.bytes),
+        broken: typeof response.broken === 'number' ? response.broken : 0,
+        damagedAt: typeof response.damagedAt === 'number' ? response.damagedAt : undefined,
+        quotedCjk: response.quotedCjk === true,
+    };
+}
+
+type EncodeOutcome =
+    | { bytes: Uint8Array }
+    | { alreadyEscaped: number[] }
+    | { unencodable: { codePoint: number }[] }
+    | 'invalid-utf8';
+
+/** Encodes readable bytes server-side; refusals come back as data, not errors. */
+async function transcodeEncode(real: vscode.Uri, bytes: Uint8Array): Promise<EncodeOutcome> {
+    const response = await sendTranscodeRequest<TranscodeEncodeResponse>(
+        'pdc/transcodeEncode',
+        { path: real.fsPath, bytes: bytesToHex(bytes) },
+    );
+    if (typeof response !== 'object' || response === null) {
+        throw new TranscodeUnavailableError(
+            `unexpected pdc/transcodeEncode response for ${real.fsPath}`,
+        );
+    }
+    if (typeof response.bytes === 'string') {
+        return { bytes: hexToBytes(response.bytes) };
+    }
+    if (response.refused === 'alreadyEscaped') {
+        return { alreadyEscaped: Array.isArray(response.offsets) ? response.offsets : [] };
+    }
+    if (response.refused === 'invalidUtf8') {
+        return 'invalid-utf8';
+    }
+    if (response.refused === 'unencodable') {
+        const points = Array.isArray(response.points) ? response.points : [];
+        return {
+            unencodable: points.map((point) => ({
+                codePoint: typeof point?.codePoint === 'number' ? point.codePoint : 0,
+            })),
+        };
+    }
+    throw new TranscodeUnavailableError(
+        `unexpected pdc/transcodeEncode response for ${real.fsPath}`,
+    );
 }
 
 class PdclocFileSystemProvider implements vscode.FileSystemProvider {
@@ -150,7 +258,6 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
     private readonly watchers = new Set<vscode.FileSystemWatcher>();
 
     constructor(
-        private readonly transcoder: Transcoder,
         private readonly diagnostics: vscode.DiagnosticCollection,
         private readonly log: vscode.OutputChannel,
     ) {}
@@ -199,41 +306,23 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
 
     async readFile(uri: vscode.Uri): Promise<Uint8Array> {
         const real = this.requireReal(uri);
-        const profile = this.requireProfile(real);
-        const bytes = new Uint8Array(await fs.readFile(real.fsPath));
-        const form = this.transcoder.scopedClassify(bytes, profile);
-        if (form === 'plain' || form === 'damaged') {
-            // Plain bytes pass through unchanged — a save encodes their quoted
-            // CJK. Damaged content is never transformed, only reported.
-            this.publishReadDiagnostics(uri, real, bytes, {
-                form,
-                broken: 0,
-                damagedAt: form === 'damaged' ? markerOutsideSpans(bytes)[0] : undefined,
-            });
-            return bytes;
+        this.requireProfile(real);
+        let view: DecodedView | 'invalid-utf8';
+        try {
+            view = await transcodeDecode(real);
+        } catch (error) {
+            this.logTranscodeFailure('read', real, error);
+            throw vscode.FileSystemError.Unavailable(
+                vscode.l10n.t('the decoded view needs the ParadoxCode language server; it is starting or not running — retry shortly.'),
+            );
         }
-        if (form === 'whole') {
-            const decoded = this.transcoder.decode(bytes, profile);
-            if (decoded === 'invalid-utf8') {
-                throw vscode.FileSystemError.Unavailable(
-                    vscode.l10n.t('an escaped localisation file must be valid UTF-8 — the bytes are damaged'),
-                );
-            }
-            this.publishReadDiagnostics(uri, real, bytes, { form, broken: decoded.broken, damagedAt: undefined });
-            return decoded.text;
-        }
-        const decoded = this.transcoder.scopedDecode(bytes, profile);
-        if (decoded === 'invalid-utf8') {
+        if (view === 'invalid-utf8') {
             throw vscode.FileSystemError.Unavailable(
                 vscode.l10n.t('an escaped localisation file must be valid UTF-8 — the bytes are damaged'),
             );
         }
-        this.publishReadDiagnostics(uri, real, bytes, {
-            form,
-            broken: decoded.inSpanBroken.length,
-            damagedAt: undefined,
-        });
-        return decoded.text;
+        this.publishReadDiagnostics(uri, real, view);
+        return view.bytes;
     }
 
     async writeFile(
@@ -242,14 +331,20 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
         _options?: { create: boolean; overwrite: boolean },
     ): Promise<void> {
         const real = this.requireReal(uri);
-        const profile = this.requireProfile(real);
-        let encoded: ScopedEncodeResult;
+        this.requireProfile(real);
+        let encoded: EncodeOutcome;
         try {
-            encoded = this.transcoder.scopedEncode(content, profile);
+            encoded = await transcodeEncode(real, content);
         } catch (error) {
+            this.logTranscodeFailure('save', real, error);
+            throw vscode.FileSystemError.Unavailable(
+                vscode.l10n.t('saving the decoded view needs the ParadoxCode language server; it is starting or not running — retry shortly.'),
+            );
+        }
+        if (encoded === 'invalid-utf8') {
             const message = vscode.l10n.t('Refused to save: the editor buffer is not valid UTF-8.');
             this.log.appendLine(
-                `transparentLoc: refused save of ${real.fsPath} (${error instanceof Error ? error.message : String(error)})`,
+                `transparentLoc: refused save of ${real.fsPath} (buffer is not valid UTF-8)`,
             );
             void vscode.window.showErrorMessage(vscode.l10n.t('ParadoxCode: {0}', message));
             throw vscode.FileSystemError.NoPermissions(message);
@@ -284,6 +379,11 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
         await fs.writeFile(real.fsPath, encoded.bytes);
         this.diagnostics.delete(uri);
         this.diagnostics.delete(real);
+    }
+
+    private logTranscodeFailure(operation: string, real: vscode.Uri, error: unknown): void {
+        const message = error instanceof Error ? error.message : String(error);
+        this.log.appendLine(`transparentLoc: ${operation} of ${real.fsPath} failed: ${message}`);
     }
 
     async readDirectory(): Promise<[string, vscode.FileType][]> {
@@ -337,12 +437,11 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
     private publishReadDiagnostics(
         uri: vscode.Uri,
         real: vscode.Uri,
-        bytes: Uint8Array,
-        outcome: ReadOutcome,
+        view: DecodedView,
     ): void {
         let diagnostic: vscode.Diagnostic | undefined;
-        if (outcome.form === 'damaged') {
-            const line = outcome.damagedAt === undefined ? 0 : lineAt(bytes, outcome.damagedAt);
+        if (view.form === 'damaged') {
+            const line = view.damagedAt === undefined ? 0 : lineAt(view.bytes, view.damagedAt);
             diagnostic = new vscode.Diagnostic(
                 new vscode.Range(line, 0, line, 0),
                 vscode.l10n.t(
@@ -352,7 +451,7 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
                 vscode.DiagnosticSeverity.Error,
             );
             diagnostic.code = 'LocalisationMixedEncoding';
-        } else if (outcome.form === 'plain' && hasQuotedCjk(bytes)) {
+        } else if (view.form === 'plain' && view.quotedCjk) {
             diagnostic = new vscode.Diagnostic(
                 new vscode.Range(0, 0, 0, 0),
                 vscode.l10n.t(
@@ -362,12 +461,12 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
                 vscode.DiagnosticSeverity.Information,
             );
             diagnostic.code = 'LocalisationWillTranscodeOnSave';
-        } else if (outcome.broken > 0) {
+        } else if (view.broken > 0) {
             diagnostic = new vscode.Diagnostic(
                 new vscode.Range(0, 0, 0, 0),
                 vscode.l10n.t(
                     '{0} orphan escape marker(s) were passed through undecoded — check for damaged triples.',
-                    outcome.broken,
+                    view.broken,
                 ),
                 vscode.DiagnosticSeverity.Warning,
             );
@@ -648,7 +747,6 @@ async function manualCommandTarget(
  * original is backed up next to the file first.
  */
 async function encodeFileManually(
-    transcoder: Transcoder,
     uri: vscode.Uri | undefined,
     log: vscode.OutputChannel,
 ): Promise<void> {
@@ -656,26 +754,37 @@ async function encodeFileManually(
     if (!real) {
         return;
     }
-    const profile = profileForRealPath(real.fsPath, transparentScriptGlobs());
-    if (profile === undefined) {
+    let view: DecodedView | 'invalid-utf8';
+    try {
+        view = await transcodeDecode(real);
+    } catch (error) {
+        reportManualTranscodeFailure('encode', real, log, error);
         return;
     }
-    const bytes = new Uint8Array(await fs.readFile(real.fsPath));
-    const form = transcoder.scopedClassify(bytes, profile);
-    if (form === 'whole' || form === 'scoped') {
+    if (view === 'invalid-utf8') {
+        void vscode.window.showErrorMessage(
+            vscode.l10n.t('ParadoxCode: refused to encode — the file is not valid UTF-8 (convert it first).'),
+        );
+        return;
+    }
+    if (view.form === 'whole' || view.form === 'scoped') {
         void vscode.window.showInformationMessage(vscode.l10n.t('ParadoxCode: file is already encoded.'));
         return;
     }
-    if (form === 'damaged') {
+    if (view.form === 'damaged') {
         void vscode.window.showErrorMessage(
             vscode.l10n.t('ParadoxCode: stray escape marker(s) outside every quoted string — fix the file manually first.'),
         );
         return;
     }
-    let encoded: ScopedEncodeResult;
+    let encoded: EncodeOutcome;
     try {
-        encoded = transcoder.scopedEncode(bytes, profile);
-    } catch {
+        encoded = await transcodeEncode(real, view.bytes);
+    } catch (error) {
+        reportManualTranscodeFailure('encode', real, log, error);
+        return;
+    }
+    if (encoded === 'invalid-utf8') {
         void vscode.window.showErrorMessage(
             vscode.l10n.t('ParadoxCode: refused to encode — the file is not valid UTF-8 (convert it first).'),
         );
@@ -724,7 +833,6 @@ async function encodeFileManually(
  * rewritten.
  */
 async function decodeFileManually(
-    transcoder: Transcoder,
     uri: vscode.Uri | undefined,
     log: vscode.OutputChannel,
 ): Promise<void> {
@@ -732,52 +840,37 @@ async function decodeFileManually(
     if (!real) {
         return;
     }
-    const profile = profileForRealPath(real.fsPath, transparentScriptGlobs());
-    if (profile === undefined) {
+    let view: DecodedView | 'invalid-utf8';
+    try {
+        view = await transcodeDecode(real);
+    } catch (error) {
+        reportManualTranscodeFailure('decode', real, log, error);
         return;
     }
-    const bytes = new Uint8Array(await fs.readFile(real.fsPath));
-    const form = transcoder.scopedClassify(bytes, profile);
-    if (form === 'plain') {
+    if (view === 'invalid-utf8') {
+        void vscode.window.showErrorMessage(
+            vscode.l10n.t('ParadoxCode: an escaped localisation file must be valid UTF-8 — the bytes are damaged.'),
+        );
+        return;
+    }
+    if (view.form === 'plain') {
         void vscode.window.showInformationMessage(vscode.l10n.t('ParadoxCode: file is already readable.'));
         return;
     }
-    if (form === 'damaged') {
+    if (view.form === 'damaged') {
         void vscode.window.showErrorMessage(
             vscode.l10n.t('ParadoxCode: stray escape marker(s) outside every quoted string — fix the file manually first.'),
         );
         return;
     }
-    let text: Uint8Array;
-    let orphans: number;
-    if (form === 'whole') {
-        const decoded = transcoder.decode(bytes, profile);
-        if (decoded === 'invalid-utf8') {
-            void vscode.window.showErrorMessage(
-                vscode.l10n.t('ParadoxCode: an escaped localisation file must be valid UTF-8 — the bytes are damaged.'),
-            );
-            return;
-        }
-        text = decoded.text;
-        orphans = decoded.broken;
-    } else {
-        const decoded = transcoder.scopedDecode(bytes, profile);
-        if (decoded === 'invalid-utf8') {
-            void vscode.window.showErrorMessage(
-                vscode.l10n.t('ParadoxCode: an escaped localisation file must be valid UTF-8 — the bytes are damaged.'),
-            );
-            return;
-        }
-        text = decoded.text;
-        orphans = decoded.inSpanBroken.length;
-    }
+    // Whole and scoped forms both arrive as decoded bytes with the orphan count.
     const backup = `${real.fsPath}.pre-transcode.bak`;
     await fs.copyFile(real.fsPath, backup);
-    await fs.writeFile(real.fsPath, text);
+    await fs.writeFile(real.fsPath, view.bytes);
     log.appendLine(`transparentLoc: decoded ${real.fsPath} (backup: ${backup})`);
     const note =
-        orphans > 0
-            ? vscode.l10n.t(' — {0} orphan marker(s) passed through undecoded, check damaged triples', orphans)
+        view.broken > 0
+            ? vscode.l10n.t(' — {0} orphan marker(s) passed through undecoded, check damaged triples', view.broken)
             : '';
     void vscode.window.showInformationMessage(
         vscode.l10n.t(
@@ -785,6 +878,22 @@ async function decodeFileManually(
             nodePath.basename(real.fsPath),
             nodePath.basename(backup),
             note,
+        ),
+    );
+}
+
+/** One shared failure surface for the manual commands when the server is unreachable. */
+function reportManualTranscodeFailure(
+    verb: string,
+    real: vscode.Uri,
+    log: vscode.OutputChannel,
+    error: unknown,
+): void {
+    const message = error instanceof Error ? error.message : String(error);
+    log.appendLine(`transparentLoc: manual ${verb} of ${real.fsPath} failed: ${message}`);
+    void vscode.window.showErrorMessage(
+        vscode.l10n.t(
+            'ParadoxCode: manual transcoding needs the ParadoxCode language server; it is starting or not running — retry shortly.',
         ),
     );
 }
@@ -863,10 +972,8 @@ export async function activateTransparentLocalisation(
     context: vscode.ExtensionContext,
     log: vscode.OutputChannel,
 ): Promise<vscode.Disposable> {
-    const transcoder = new Transcoder();
-
     const diagnostics = vscode.languages.createDiagnosticCollection('paradoxcode.transparent');
-    const provider = new PdclocFileSystemProvider(transcoder, diagnostics, log);
+    const provider = new PdclocFileSystemProvider(diagnostics, log);
 
     const statusItem = vscode.window.createStatusBarItem(
         'paradoxcode.transparentLoc',
@@ -899,10 +1006,10 @@ export async function activateTransparentLocalisation(
     // with it on, the handlers answer with a pointer to the setting instead.
     disposables.push(
         vscode.commands.registerCommand('paradoxcode.localisation.encodeFile', (uri) =>
-            void encodeFileManually(transcoder, uri, log),
+            void encodeFileManually(uri, log),
         ),
         vscode.commands.registerCommand('paradoxcode.localisation.decodeFile', (uri) =>
-            void decodeFileManually(transcoder, uri, log),
+            void decodeFileManually(uri, log),
         ),
     );
     if (transparentEncodingEnabled()) {

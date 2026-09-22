@@ -191,5 +191,8 @@
   "Waiting for the sprite catalog…": "Waiting for the sprite catalog…",
   "warning": "warning",
   "Zoom in (+)": "Zoom in (+)",
-  "Zoom out (-)": "Zoom out (-)"
+  "Zoom out (-)": "Zoom out (-)",
+  "the decoded view needs the ParadoxCode language server; it is starting or not running — retry shortly.": "the decoded view needs the ParadoxCode language server; it is starting or not running — retry shortly.",
+  "saving the decoded view needs the ParadoxCode language server; it is starting or not running — retry shortly.": "saving the decoded view needs the ParadoxCode language server; it is starting or not running — retry shortly.",
+  "ParadoxCode: manual transcoding needs the ParadoxCode language server; it is starting or not running — retry shortly.": "ParadoxCode: manual transcoding needs the ParadoxCode language server; it is starting or not running — retry shortly."
 }

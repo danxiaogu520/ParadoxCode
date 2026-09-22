@@ -26,6 +26,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   same bounded, normalized pattern machinery now also serves include globs
   (`vfs::GlobIncludePatterns`), matched case-insensitively against whole workspace-relative
   paths.
+- The extension's transparent-localisation provider now delegates every codec operation
+  to the server through `pdc/transcodeDecode` / `pdc/transcodeEncode`: opening a
+  `pdcloc://` view, saving through the scoped-encoding gate, and the manual one-shot
+  encode/decode commands all wait for the language server (with the same bounded
+  availability wait as the agent tools) and fail closed with a localized, retryable
+  message when it is unavailable. The save gate's three refusal messages, the read
+  diagnostics, and the `.pre-transcode.bak` backups are unchanged. Eligibility gates
+  (menus, auto-open) stay client-side path checks, kept in sync with the server through
+  the `localisation.transparentScriptGlobs` setting, which now restarts the server on
+  change.
+- The TypeScript transcoder twin (`src/transcode.ts`), the Rust↔TS differential vector
+  harness (`scripts/transcode.mjs`, 74,549 vectors), and the `transcode-vectors`
+  generator binary are retired; `crates/transcode` is the single codec implementation,
+  still pinned by its corpus, matrix, and fuzz suites.
+
+### Removed
+
+- The `transcode` contract from `npm run test:contract` / `test:ci` (the remaining
+  assets / extension / package / i18n contracts are unchanged).
 
 ## [0.4.2] - 2026-09-23
 

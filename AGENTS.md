@@ -18,7 +18,7 @@
 ## 2. 常用命令与门禁
 
 - 本地检查聚合器：`cargo tools gates [core|core-fast|vscode|policy|artifact|fuzz|perf|all]`（无参数 = `all`）。`all` 只表示默认的确定性本地检查（不含需显式启用的 `perf`），不代表可合并或可发布；完整职责表见 `docs/validation.md`。`.cargo/config.toml` 的 `tools`/`tq` 别名自带结尾 `--`，命令里不要再带。
-- VS Code 扩展：`npm run check` + `npm run test:contract`（compile / smoke / extension / package / transcode / i18n 六项契约）。
+- VS Code 扩展：`npm run check` + `npm run test:contract`（assets / extension / package / i18n 契约）。
 - 扩展 UI 双语（en + zh-cn）与术语：用户可见字符串一律走 `vscode.l10n.t()`（webview 走 `src/webviewI18n.ts` 字典，media 内置英文默认表），`scripts/i18n-test.mjs` 契约检查覆盖率与 bundle key 同步；术语译名以 `docs/glossary.md` 为准（Vanilla→原版、Mod→模组、sprite→图像）。服务端诊断消息暂保持英文；LLM-facing 字符串（`src/agent/`、languageModelTools 描述）不本地化。
 - 全量 Vanilla sweep 是按风险运行的本地开发工具，不是提交、PR 或发布的门禁。必须显式传入要验证的 `--server`；脚本会核对服务器实际内嵌的规则哈希与当前 checkout，避免过期二进制产生假结论。报告只留在被忽略的 `performance-results/`，不得上传或提交。
 - 黄金对拍：`PDC_UPDATE_GOLDEN=1 cargo test -p ide golden_gfx_sprite_semantics`。
@@ -51,7 +51,7 @@
 - 生命周期职责固定：本地分组负责快速反馈；PR 与 `main` 的 `Conclusion` 负责合并；Security 与 Performance 工作流负责定时审计；标签工作流负责可再分发资产；干净 profile 与 Marketplace 是人工验收。不要用一个阶段的结果替代另一个阶段的授权。
 - PR 自动驾驶：`.github/workflows/pr-autosync.yml` 对维护者本人名下的开放 PR 自动启用 squash auto-merge，并在 main 每次推进后用 `update-branch` 刷新全部分支、使 CI 针对最新 main 重跑；合入仍由必需检查 `Conclusion` 把关，冲突只记日志等人工解决。所有调用走 `AUTOMERGE_TOKEN` 仓库 secret（fine-grained PAT，Contents 与 Pull requests 读写、仅本仓库）——`GITHUB_TOKEN` 的推送刻意不触发其他 workflow，用它刷新分支会让 auto-merge 永远等不到 CI。
 - Vanilla sweep 只比较和解释本地诊断 / 性能变化，不维护仓库指纹基线，也不作为 PASS/FAIL 发布契约。`--previous` 只生成辅助差异；工具错误、服务器失败和用户显式 `--fail-on` 仍会让本地命令失败。服务器真实规则哈希取自 `server_messages`，checkout 哈希取自 `rules/manifest.json`，两者不一致时拒绝继续。
-- scripts 布局（`editors/vscode/scripts/`）：单词命名入口（diagnose / probe / compare / transcode / extension / package / host / smoke / sweep / mcp）+ lib 分工（options / workspace / overlay / diagnosis / report / client / sampler / paths / mcpServer / mcpTools / mcpBoot）；入口全是薄壳，sweep 直接 import 相位函数。改诊断或性能链路时先动 lib 再动入口。transcode.mjs 含 Rust↔TS 差分向量对拍（74,549 条，`PDC_SKIP_VECTORS=1` 可跳过）。mcp.mjs 是 stdio MCP 服务器（手写 ndjson JSON-RPC，零 npm 依赖；工具清单运行时读 package.json 的 `languageModelTools`，工具整形与 `src/agent/tools.ts` 是行为孪生，改其一必须同步另一个）。
+- scripts 布局（`editors/vscode/scripts/`）：单词命名入口（diagnose / probe / compare / extension / package / host / smoke / sweep / mcp）+ lib 分工（options / workspace / overlay / diagnosis / report / client / sampler / paths / mcpServer / mcpTools / mcpBoot）；入口全是薄壳，sweep 直接 import 相位函数。改诊断或性能链路时先动 lib 再动入口。透明本地化的编解码已协议化：`crates/transcode` 是唯一实现，扩展经 `pdc/transcodeDecode`/`pdc/transcodeEncode` 请求委托（字节以 hex 传输），TS 孪生实现与 Rust↔TS 差分向量 harness 已退役（Rust 侧 corpus/matrix/fuzz 测试保留）。mcp.mjs 是 stdio MCP 服务器（手写 ndjson JSON-RPC，零 npm 依赖；工具清单运行时读 package.json 的 `languageModelTools`，工具整形与 `src/agent/tools.ts` 是行为孪生，改其一必须同步另一个）。
 - 服务端用户目录按平台解析（权威在 `crates/game` 的 `UserPaths::platform`）：Windows 的 config 位于 **%APPDATA%\ParadoxCode（Roaming，不是 LOCALAPPDATA）**，缓存根位于 %LOCALAPPDATA%\ParadoxCode\cache；WSL/Linux 的 config 位于 `~/.config/paradoxcode/`，缓存根位于 `~/.cache/paradoxcode/`。
 - npm 的 `--prefix … run` 传相对 `--server` 路径会以 editors/vscode 为工作目录解析而失败（用直接 node 调用或绝对路径）。
 - sweep 冷启动协议：客户端对缺失的 vanilla 缓存放行（服务器端支持在显式缓存缺失时自动发现并原位重建）。
