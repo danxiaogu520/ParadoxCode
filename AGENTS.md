@@ -9,7 +9,7 @@
 3. 综合选择出完整方案，用户确认后才实施。
 4. **Git 工作流（固定）**：
    - **超小改动直接提交**：不改变运行行为的内容（typo、注释、纯文档、格式化、测试断言、跟随主改动的契约脚本同步），确认无误后直接在 `main` 上提交并推送。
-   - **行为变更一律走 PR**：凡改变服务端 / 扩展 / 规则 / 脚本的可观察行为，或改动协议、接口、配置默认值，一律开分支提交并发 PR，随即启用自动合并（`gh pr merge --auto --squash`）。main 的分支保护已把远端 `Conclusion` 设为必需检查（不对管理员强制，超小改动的直推不受影响），通过后 GitHub 自动合入。
+   - **行为变更一律走 PR**：凡改变服务端 / 扩展 / 规则 / 脚本的可观察行为，或改动协议、接口、配置默认值，一律开分支提交并发 PR，无需手动启用自动合并——`pr-autosync` 工作流会对维护者名下的 PR 自动开 squash auto-merge，并在 main 推进时自动刷新分支重跑 CI。main 的分支保护已把远端 `Conclusion` 设为必需检查（不对管理员强制，超小改动的直推不受影响），通过后 GitHub 自动合入。
    - 归类拿不准时按行为变更处理（走 PR）。
    - 提交默认按逻辑单元切分（服务端、客户端、文档分开），用户可当场指定其他切分方式。
    - 永不改写已推送的历史、不强推、不移动或删除受保护标签（见第 3 节）。
@@ -49,6 +49,7 @@
 ## 5. CI 与本地诊断基础设施
 
 - 生命周期职责固定：本地分组负责快速反馈；PR 与 `main` 的 `Conclusion` 负责合并；Security 与 Performance 工作流负责定时审计；标签工作流负责可再分发资产；干净 profile 与 Marketplace 是人工验收。不要用一个阶段的结果替代另一个阶段的授权。
+- PR 自动驾驶：`.github/workflows/pr-autosync.yml` 对维护者本人名下的开放 PR 自动启用 squash auto-merge，并在 main 每次推进后用 `update-branch` 刷新全部分支、使 CI 针对最新 main 重跑；合入仍由必需检查 `Conclusion` 把关，冲突只记日志等人工解决。所有调用走 `AUTOMERGE_TOKEN` 仓库 secret（fine-grained PAT，Contents 与 Pull requests 读写、仅本仓库）——`GITHUB_TOKEN` 的推送刻意不触发其他 workflow，用它刷新分支会让 auto-merge 永远等不到 CI。
 - Vanilla sweep 只比较和解释本地诊断 / 性能变化，不维护仓库指纹基线，也不作为 PASS/FAIL 发布契约。`--previous` 只生成辅助差异；工具错误、服务器失败和用户显式 `--fail-on` 仍会让本地命令失败。服务器真实规则哈希取自 `server_messages`，checkout 哈希取自 `rules/manifest.json`，两者不一致时拒绝继续。
 - scripts 布局（`editors/vscode/scripts/`）：单词命名入口（diagnose / probe / compare / transcode / extension / package / host / smoke / sweep / mcp）+ lib 分工（options / workspace / overlay / diagnosis / report / client / sampler / paths / mcpServer / mcpTools / mcpBoot）；入口全是薄壳，sweep 直接 import 相位函数。改诊断或性能链路时先动 lib 再动入口。transcode.mjs 含 Rust↔TS 差分向量对拍（74,549 条，`PDC_SKIP_VECTORS=1` 可跳过）。mcp.mjs 是 stdio MCP 服务器（手写 ndjson JSON-RPC，零 npm 依赖；工具清单运行时读 package.json 的 `languageModelTools`，工具整形与 `src/agent/tools.ts` 是行为孪生，改其一必须同步另一个）。
 - 服务端用户目录按平台解析（权威在 `crates/game` 的 `UserPaths::platform`）：Windows 的 config 位于 **%APPDATA%\ParadoxCode（Roaming，不是 LOCALAPPDATA）**，缓存根位于 %LOCALAPPDATA%\ParadoxCode\cache；WSL/Linux 的 config 位于 `~/.config/paradoxcode/`，缓存根位于 `~/.cache/paradoxcode/`。
