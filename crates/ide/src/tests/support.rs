@@ -18,6 +18,47 @@ pub(crate) fn eu4_host(rules: RuleSet) -> AnalysisHost {
     AnalysisHost::with_profile(rules, game::eu4::profile())
 }
 
+/// Creates an isolated fixture root under the system temp directory. Cleanup
+/// stays with the caller (`fs::remove_dir_all`), matching the existing tests.
+pub(crate) fn temp_root(tag: &str) -> std::path::PathBuf {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ide-{tag}-{nonce}"));
+    std::fs::create_dir_all(&root).expect("fixture root");
+    root
+}
+
+/// A fully-defaulted [`SemanticRule`] fixture: exact `key` match in `context`
+/// with a derived `fixture:<context>:<key>` id. Tests override the differing
+/// fields with struct-update syntax instead of repeating all 21 fields.
+pub(crate) fn semantic_rule(context: &str, key: &str) -> SemanticRule {
+    SemanticRule {
+        id: format!("fixture:{context}:{key}"),
+        context: context.to_owned(),
+        parent_path: Vec::new(),
+        key: KeyMatcher::Exact(key.to_owned()),
+        operator: None,
+        value: ValueMatcher::AnyScalar,
+        shape: RuleShape::Leaf,
+        child_context: None,
+        alternative_id: None,
+        severity: None,
+        required: false,
+        deprecated: false,
+        documentation: Vec::new(),
+        allowed_scopes: Vec::new(),
+        push_scope: None,
+        replace_scope: Vec::new(),
+        min_occurs: None,
+        strict_min: true,
+        max_occurs: None,
+        source_file: "fixture.semantic".to_owned(),
+        line: 1,
+    }
+}
+
 pub(crate) fn snapshot(text: &str) -> (AnalysisHost, DocumentId) {
     let mut host = eu4_host(game::eu4::bootstrap_rules());
     let id = DocumentId::new("file:///tmp/common/events/test.txt");
@@ -78,73 +119,26 @@ pub(crate) fn quoted_script_snapshot(text: &str) -> (AnalysisHost, DocumentId) {
     let mut model = game::eu4::bootstrap_model();
     model.semantic.rules.extend([
         SemanticRule {
-            id: "fixture:trigger:embedded".to_owned(),
-            context: "trigger".to_owned(),
-            parent_path: Vec::new(),
-            key: KeyMatcher::Exact("embedded".to_owned()),
             operator: Some("=".to_owned()),
-            value: ValueMatcher::AnyScalar,
             shape: RuleShape::QuotedScript,
             child_context: Some("trigger".to_owned()),
-            alternative_id: None,
-            severity: None,
-            required: false,
-            deprecated: false,
             documentation: vec!["Embedded trigger Script".to_owned()],
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            strict_min: true,
-            max_occurs: None,
-            source_file: "fixture.semantic".to_owned(),
             line: 2,
+            ..semantic_rule("trigger", "embedded")
         },
         SemanticRule {
-            id: "fixture:trigger:nested".to_owned(),
-            context: "trigger".to_owned(),
-            parent_path: Vec::new(),
-            key: KeyMatcher::Exact("nested".to_owned()),
             operator: Some("=".to_owned()),
-            value: ValueMatcher::AnyScalar,
             shape: RuleShape::QuotedScript,
             child_context: Some("trigger".to_owned()),
-            alternative_id: None,
-            severity: None,
-            required: false,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            strict_min: true,
-            max_occurs: None,
-            source_file: "fixture.semantic".to_owned(),
             line: 3,
+            ..semantic_rule("trigger", "nested")
         },
         SemanticRule {
             id: "fixture:trigger:foo-quoted-child".to_owned(),
-            context: "trigger".to_owned(),
-            parent_path: Vec::new(),
-            key: KeyMatcher::Exact("foo".to_owned()),
             operator: Some("=".to_owned()),
             value: ValueMatcher::Bool,
-            shape: RuleShape::Leaf,
-            child_context: None,
-            alternative_id: None,
-            severity: None,
-            required: false,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            strict_min: true,
-            max_occurs: None,
-            source_file: "fixture.semantic".to_owned(),
             line: 4,
+            ..semantic_rule("trigger", "foo")
         },
     ]);
     let mut host = eu4_host(RuleSet::from_model(model));

@@ -4,11 +4,7 @@ use super::*;
 
 #[test]
 fn targeted_disk_changes_replace_one_shard_without_overwriting_an_overlay() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-targeted-disk-{nonce}"));
+    let root = temp_root("targeted-disk");
     let events = root.join("events");
     fs::create_dir_all(&events).expect("fixture directory");
     let changed_path = events.join("changed.txt");
@@ -132,11 +128,7 @@ fn targeted_disk_changes_replace_one_shard_without_overwriting_an_overlay() {
 
 #[test]
 fn targeted_disk_changes_reindex_a_localisation_shard() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-targeted-localisation-{nonce}"));
+    let root = temp_root("targeted-localisation");
     let localisation = root.join("localisation/nested");
     fs::create_dir_all(&localisation).expect("localisation fixture directory");
     let changed_path = localisation.join("test_l_english.yml");
@@ -185,11 +177,7 @@ fn targeted_disk_changes_reindex_a_localisation_shard() {
 
 #[test]
 fn source_file_ids_do_not_shift_when_an_earlier_path_is_added() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-stable-ids-{nonce}"));
+    let root = temp_root("stable-ids");
     let events = root.join("events");
     fs::create_dir_all(&events).expect("event directory");
     fs::write(events.join("b.txt"), "country_event = { id = stable.b }\n").expect("b event");
@@ -241,11 +229,7 @@ fn source_file_ids_do_not_shift_when_an_earlier_path_is_added() {
 
 #[test]
 fn unchanged_file_states_are_reused_and_only_changed_files_advance() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-file-state-{nonce}"));
+    let root = temp_root("file-state");
     let events = root.join("events");
     fs::create_dir_all(&events).expect("event directory");
     fs::write(events.join("a.txt"), "country_event = { id = state.a }\n").expect("a event");
@@ -351,11 +335,7 @@ fn unchanged_file_states_are_reused_and_only_changed_files_advance() {
 
 #[test]
 fn one_overlay_edit_parses_and_lowers_exactly_once_in_a_populated_workspace() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-pipeline-count-{nonce}"));
+    let root = temp_root("pipeline-count");
     let events = root.join("events");
     fs::create_dir_all(&events).expect("event directory");
     for index in 0..64 {
@@ -600,11 +580,7 @@ fn close_restores_the_backing_disk_candidate() {
 
 #[test]
 fn roots_overlay_and_shards_preserve_shadowed_semantic_definitions() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-phase4-{nonce}"));
+    let root = temp_root("phase4");
     let vanilla = root.join("vanilla");
     let dependency = root.join("dependency");
     let current = root.join("current");
@@ -798,11 +774,7 @@ fn cloned_hosts_observe_live_revisions() {
 
 #[test]
 fn declaring_document_edits_move_the_definitions_cache_domain() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-definitions-domain-{nonce}"));
+    let root = temp_root("definitions-domain");
     let triggers = root.join("common/scripted_triggers");
     fs::create_dir_all(&triggers).expect("fixture directory");
     fs::write(triggers.join("base.txt"), "is_ready = { always = yes }\n").expect("trigger fixture");
@@ -821,8 +793,7 @@ fn declaring_document_edits_move_the_definitions_cache_domain() {
             ..rules::TypeDescriptor::default()
         },
     );
-    let mut host =
-        AnalysisHost::with_profile(rules::RuleSet::from_model(model), game::eu4::profile());
+    let mut host = eu4_host_with(rules::RuleSet::from_model(model));
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),

@@ -6,16 +6,6 @@ fn escaped_yml(readable: &str) -> String {
         .expect("fixture must be encodable")
 }
 
-fn temp_root(label: &str) -> std::path::PathBuf {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-localisation-{label}-{nonce}"));
-    fs::create_dir_all(&root).expect("fixture root");
-    root
-}
-
 /// Previews of EU4dll-transcoded localisation files store the decoded readable
 /// value (the text the game renders), not the raw escape triples. Readable
 /// files keep their values unchanged.

@@ -45,6 +45,15 @@ pub(crate) fn eu4_server(options: InitializeOptions) -> Result<LspServer, LspErr
     )
 }
 
+/// An analysis host with the embedded first-party rules — the standard base for
+/// Vanilla-cache fixtures that build or compare `IndexCache` snapshots.
+pub(crate) fn first_party_host() -> AnalysisHost {
+    AnalysisHost::with_profile(
+        game::eu4::first_party_rules().expect("embedded rules"),
+        game::eu4::profile(),
+    )
+}
+
 pub(crate) fn frame(value: Value) -> Vec<u8> {
     let body = serde_json::to_vec(&value).expect("test JSON should serialize");
     let mut framed = format!("Content-Length: {}\r\n\r\n", body.len()).into_bytes();

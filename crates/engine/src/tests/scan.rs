@@ -4,11 +4,7 @@ use super::*;
 
 #[test]
 fn persistent_parse_cache_skips_reparsing_matching_disk_source() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdc-parse-cache-{nonce}"));
+    let root = temp_root("parse-cache");
     let events = root.join("events");
     let cache = root.join("cache");
     fs::create_dir_all(&events).expect("event directory");
@@ -55,11 +51,7 @@ fn persistent_parse_cache_skips_reparsing_matching_disk_source() {
 
 #[test]
 fn physical_path_lookup_follows_scan_and_targeted_disk_changes() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-path-index-{nonce}"));
+    let root = temp_root("path-index");
     let events = root.join("events");
     fs::create_dir_all(&events).expect("event directory");
     fs::write(events.join("kept.txt"), "country_event = { id = kept.1 }\n").expect("kept file");
@@ -120,11 +112,7 @@ fn physical_path_lookup_follows_scan_and_targeted_disk_changes() {
 
 #[test]
 fn recoverable_file_failures_do_not_abort_the_workspace_scan() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-isolation-{nonce}"));
+    let root = temp_root("isolation");
     let events = root.join("events");
     fs::create_dir_all(&events).expect("event directory");
     fs::write(events.join("good.txt"), "country_event = { id = safe.1 }\n").expect("valid event");
@@ -179,11 +167,7 @@ fn recoverable_file_failures_do_not_abort_the_workspace_scan() {
 
 #[test]
 fn eu4_legacy_windows1252_text_is_decoded_before_indexing() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-windows1252-{nonce}"));
+    let root = temp_root("windows1252");
     let events = root.join("events");
     fs::create_dir_all(&events).expect("event directory");
     fs::write(
@@ -228,11 +212,7 @@ fn eu4_legacy_windows1252_text_is_decoded_before_indexing() {
 
 #[test]
 fn game_encoded_text_with_control_characters_keeps_surrounding_definitions() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-non-text-{nonce}"));
+    let root = temp_root("non-text");
     let events = root.join("events");
     fs::create_dir_all(&events).expect("event directory");
     fs::write(
@@ -275,11 +255,7 @@ fn game_encoded_text_with_control_characters_keeps_surrounding_definitions() {
 
 #[test]
 fn malformed_characters_in_comments_do_not_activate_commented_braces() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-encoded-comments-{nonce}"));
+    let root = temp_root("encoded-comments");
     let events = root.join("events");
     fs::create_dir_all(&events).expect("event directory");
     fs::write(
@@ -329,11 +305,7 @@ country_event = { id = after_close.1 }\n",
 
 #[test]
 fn malformed_quoted_value_does_not_discard_the_parent_or_sibling() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-encoded-block-{nonce}"));
+    let root = temp_root("encoded-block");
     let events = root.join("events");
     fs::create_dir_all(&events).expect("event directory");
     fs::write(
@@ -371,11 +343,7 @@ fn malformed_quoted_value_does_not_discard_the_parent_or_sibling() {
 
 #[test]
 fn depth_limit_skips_nested_subtrees_with_a_reported_issue() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-depth-{nonce}"));
+    let root = temp_root("depth");
     let events = root.join("events");
     fs::create_dir_all(&events).expect("event directory");
     fs::write(events.join("deep.txt"), "country_event = { id = deep.1 }\n").expect("deep event");
@@ -407,11 +375,7 @@ fn depth_limit_skips_nested_subtrees_with_a_reported_issue() {
 
 #[test]
 fn file_limit_failure_preserves_the_previous_snapshot() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-file-limit-{nonce}"));
+    let root = temp_root("file-limit");
     let events = root.join("events");
     fs::create_dir_all(&events).expect("event directory");
     fs::write(events.join("a.txt"), "country_event = { id = limit.a }\n").expect("a event");
@@ -447,11 +411,7 @@ fn file_limit_failure_preserves_the_previous_snapshot() {
 
 #[test]
 fn cancelled_scan_preserves_the_previous_snapshot_atomically() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-cancel-scan-{nonce}"));
+    let root = temp_root("cancel-scan");
     let events = root.join("events");
     fs::create_dir_all(&events).expect("event directory");
     fs::write(
@@ -497,11 +457,7 @@ fn cancelled_scan_preserves_the_previous_snapshot_atomically() {
 
 #[test]
 fn opaque_binary_assets_are_indexed_without_reading_them_as_utf8() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-opaque-asset-{nonce}"));
+    let root = temp_root("opaque-asset");
     fs::create_dir_all(root.join("gfx")).expect("asset directory");
     fs::write(root.join("gfx/icon.png"), [0_u8, 159, 146, 150]).expect("binary asset");
 
@@ -544,11 +500,7 @@ fn opaque_binary_assets_are_indexed_without_reading_them_as_utf8() {
 
 #[test]
 fn eu4_scan_uses_the_explicit_script_folder_whitelist() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-whitelist-{nonce}"));
+    let root = temp_root("whitelist");
     fs::create_dir_all(root.join("events")).expect("events directory");
     fs::create_dir_all(root.join("events/nested")).expect("nested events directory");
     fs::create_dir_all(root.join("common/countries")).expect("common directory");
@@ -770,12 +722,8 @@ fn eu4_scan_uses_the_explicit_script_folder_whitelist() {
 fn directory_symlinks_are_reported_and_never_followed() {
     use std::os::unix::fs::symlink;
 
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-symlink-root-{nonce}"));
-    let outside = std::env::temp_dir().join(format!("engine-symlink-outside-{nonce}"));
+    let root = temp_root("symlink-root");
+    let outside = temp_root("symlink-outside");
     fs::create_dir_all(&root).expect("source root");
     fs::create_dir_all(&outside).expect("outside directory");
     fs::write(
@@ -809,11 +757,7 @@ fn directory_symlinks_are_reported_and_never_followed() {
 
 #[test]
 fn workspace_scan_skips_tool_generated_directories() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-ignored-tools-{nonce}"));
+    let root = temp_root("ignored-tools");
     let events = root.join("events");
     let generated_events = root.join("target/debug/events");
     fs::create_dir_all(&events).expect("events directory");
@@ -859,11 +803,7 @@ fn workspace_scan_skips_tool_generated_directories() {
 
 #[test]
 fn workspace_scan_filters_prune_files_before_budget_and_targeted_updates() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("engine-scan-filters-{nonce}"));
+    let root = temp_root("scan-filters");
     let events = root.join("events");
     let generated = root.join("generated/nested");
     let ignored_tree = root.join("common/ignored");
