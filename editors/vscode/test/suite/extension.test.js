@@ -86,6 +86,7 @@ suite('ParadoxCode VS Code extension host', () => {
         'paradoxcode.addDependency',
         'paradoxcode.removeDependency',
         'paradoxcode.openDependencySettings',
+        'paradoxcode.updateIndexCaches',
         'paradoxcode.reloadServer',
         'paradoxcode.openOutput',
       ]) {
