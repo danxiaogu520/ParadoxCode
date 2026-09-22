@@ -19,6 +19,7 @@ rules = { path = "../rules" }
 ide = { path = "../ide" }
 text = { path = "../text" }
 engine = { path = "../engine" }
+transcode = { path = "../transcode" }
 lsp-types = "0.97.0"
 percent-encoding = "2"
 url = "2"

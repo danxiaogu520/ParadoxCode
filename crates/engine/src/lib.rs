@@ -32,11 +32,11 @@ pub use index_cache::{
 };
 pub use vfs::{
     CURRENT_PARSE_CACHE_SCHEMA_VERSION, DiskFileChange, DiskFileChangeKind, DocumentError,
-    DocumentId, DocumentSource, LocalisationPreview, ParseCache, ParseCacheError,
-    ResolvedCandidate, SourceFile, SourceFileId, SourceRoot, SourceRootId, SourceRootKind,
-    StringPool, TextChange, WorkspaceChange, WorkspaceError, WorkspaceScanFilterError,
-    WorkspaceScanFilters, WorkspaceScanIssue, WorkspaceScanIssueKind, WorkspaceScanLimits,
-    WorkspaceScanReport, WorkspaceScanToken, intern_shard_string,
+    DocumentId, DocumentSource, GlobIncludePatterns, LocalisationPreview, ParseCache,
+    ParseCacheError, ResolvedCandidate, SourceFile, SourceFileId, SourceRoot, SourceRootId,
+    SourceRootKind, StringPool, TextChange, WorkspaceChange, WorkspaceError,
+    WorkspaceScanFilterError, WorkspaceScanFilters, WorkspaceScanIssue, WorkspaceScanIssueKind,
+    WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken, intern_shard_string,
 };
 
 #[cfg(test)]

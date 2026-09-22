@@ -7,6 +7,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- New `pdc/transcodeDecode` and `pdc/transcodeEncode` requests expose the transparent-
+  localisation codec over the protocol: the server reads a file from disk, decides
+  eligibility (localisation yml under `localisation/`, or a workspace-relative script file
+  matching the new `transparentScriptGlobs` initialization option, default `["**/*.txt"]`),
+  classifies its scoped form, and returns the decoded view bytes plus read metadata
+  (`broken`, `damagedAt`, `quotedCjk`); encoding takes readable bytes and answers with the
+  scoped-escaped bytes or one of the three structured refusals (`invalidUtf8`,
+  `alreadyEscaped`, `unencodable`). Nothing is written by the server — the client owns the
+  file bytes, the write gate, and the presentation. Byte payloads travel as hex strings.
+  This is the server-side groundwork for retiring the extension's TypeScript codec twin.
+
+### Changed
+
+- Workspace scan filter validation messages no longer hard-code the word "ignore"; the
+  same bounded, normalized pattern machinery now also serves include globs
+  (`vfs::GlobIncludePatterns`), matched case-insensitively against whole workspace-relative
+  paths.
+
 ## [0.4.2] - 2026-09-23
 
 ### Added

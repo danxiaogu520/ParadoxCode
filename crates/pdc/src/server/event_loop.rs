@@ -485,6 +485,8 @@ impl LspServer {
                                     );
                                     self.diagnostic_severity_overrides =
                                         Arc::new(prepared.diagnostic_severity_overrides.clone());
+                                    self.transparent_script_globs =
+                                        Arc::new(prepared.transparent_script_globs.clone());
                                     self.workspace_wide_diagnostics =
                                         prepared.workspace_wide_diagnostics;
                                     self.scan_pending = prepared.scan_pending;

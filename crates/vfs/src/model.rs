@@ -167,18 +167,12 @@ impl fmt::Display for WorkspaceScanFilterError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::TooMany { kind, limit } => {
-                write!(
-                    formatter,
-                    "too many {kind} ignore patterns (maximum {limit})"
-                )
+                write!(formatter, "too many {kind} patterns (maximum {limit})")
             }
             Self::TooLong { kind, limit } => {
-                write!(
-                    formatter,
-                    "{kind} ignore pattern exceeds {limit} characters"
-                )
+                write!(formatter, "{kind} pattern exceeds {limit} characters")
             }
-            Self::Nul { kind } => write!(formatter, "{kind} ignore pattern contains NUL"),
+            Self::Nul { kind } => write!(formatter, "{kind} pattern contains NUL"),
         }
     }
 }
@@ -243,6 +237,58 @@ impl WorkspaceScanFilters {
         }
         false
     }
+}
+
+/// A bounded, normalized set of include glob patterns matched against workspace-relative
+/// paths. The transparent-localisation script globs are the first consumer: unlike the
+/// ignore filters above, matching is case-insensitive (paths and patterns routinely differ
+/// in case on Windows and in EU4 trees) and a separator-less pattern still addresses the
+/// whole relative path rather than a basename at any depth.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct GlobIncludePatterns {
+    patterns: Arc<[String]>,
+}
+
+impl GlobIncludePatterns {
+    /// Validates and normalizes include patterns with the same bounds and normalization
+    /// rules as workspace scan filters. An empty input matches nothing.
+    pub fn new(patterns: Vec<String>) -> Result<Self, WorkspaceScanFilterError> {
+        Ok(Self {
+            patterns: normalize_patterns(patterns, "include")?.into(),
+        })
+    }
+
+    /// Returns the normalized patterns.
+    #[must_use]
+    pub fn patterns(&self) -> &[String] {
+        &self.patterns
+    }
+
+    /// Whether a workspace-relative file path (`/`-separated) matches any pattern.
+    #[must_use]
+    pub fn matches(&self, relative_path: &str) -> bool {
+        self.patterns
+            .iter()
+            .any(|pattern| include_pattern_matches(pattern, relative_path))
+    }
+}
+
+/// Full-path, case-insensitive variant of the scan-filter matcher: `*` and `?` stay inside
+/// one component and `**` spans components on both sides.
+fn include_pattern_matches(pattern: &str, path: &str) -> bool {
+    let pattern = pattern.trim_end_matches('/');
+    if pattern.is_empty() {
+        return false;
+    }
+    let path = path.trim_matches('/');
+    let pattern_parts = pattern
+        .split('/')
+        .map(str::to_lowercase)
+        .collect::<Vec<_>>();
+    let path_parts = path.split('/').map(str::to_lowercase).collect::<Vec<_>>();
+    let pattern_refs = pattern_parts.iter().map(String::as_str).collect::<Vec<_>>();
+    let path_refs = path_parts.iter().map(String::as_str).collect::<Vec<_>>();
+    glob_path_matches(&pattern_refs, &path_refs)
 }
 
 const fn pattern_kind_limit() -> usize {
@@ -786,3 +832,62 @@ impl fmt::Display for WorkspaceError {
 }
 
 impl std::error::Error for WorkspaceError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn patterns(values: &[&str]) -> GlobIncludePatterns {
+        GlobIncludePatterns::new(values.iter().map(|value| (*value).to_owned()).collect())
+            .expect("valid patterns")
+    }
+
+    #[test]
+    fn include_patterns_match_whole_relative_paths_case_insensitively() {
+        let globs = patterns(&["**/*.txt", "events/*.gui"]);
+        assert!(globs.matches("events/flavor_kni.txt"));
+        assert!(globs.matches("EVENTS/Flavor_Kni.TXT"));
+        assert!(globs.matches("common/decisions/some.txt"));
+        assert!(globs.matches("events/panel.gui"));
+        assert!(!globs.matches("interface/panel.gui"));
+        assert!(!globs.matches("events/deeply/nested/panel.gui"));
+        assert!(!globs.matches("events/flavor_kni.yml"));
+    }
+
+    #[test]
+    fn include_patterns_without_separator_address_only_the_top_level() {
+        let globs = patterns(&["*.txt"]);
+        assert!(globs.matches("readme.txt"));
+        assert!(!globs.matches("events/readme.txt"));
+    }
+
+    #[test]
+    fn include_patterns_normalize_input_and_match_nothing_when_empty() {
+        let globs = patterns(&["./Events/**", "Events/**"]);
+        assert_eq!(globs.patterns(), &["Events/**".to_owned()]);
+        assert!(globs.matches("EVENTS/a/b.txt"));
+        let none = patterns(&[]);
+        assert!(none.patterns().is_empty());
+        assert!(!none.matches("events/a.txt"));
+    }
+
+    #[test]
+    fn include_patterns_reject_unbounded_input() {
+        let too_many = vec!["*.txt".to_owned(); WorkspaceScanFilters::MAX_PATTERNS + 1];
+        assert_eq!(
+            GlobIncludePatterns::new(too_many),
+            Err(WorkspaceScanFilterError::TooMany {
+                kind: "include",
+                limit: WorkspaceScanFilters::MAX_PATTERNS,
+            })
+        );
+        let too_long = vec!["a".repeat(WorkspaceScanFilters::MAX_PATTERN_LENGTH + 1)];
+        assert_eq!(
+            GlobIncludePatterns::new(too_long),
+            Err(WorkspaceScanFilterError::TooLong {
+                kind: "include",
+                limit: WorkspaceScanFilters::MAX_PATTERN_LENGTH,
+            })
+        );
+    }
+}
