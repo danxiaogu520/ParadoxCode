@@ -20,6 +20,7 @@ import { MissionIconPickerPanel } from './iconPickerPanel';
 import {
     PDCLOC_SCHEME,
     activateTransparentLocalisation,
+    realUriOf,
 } from './transparentLoc';
 import {
     attachFollowupCompletionTrigger,
@@ -635,12 +636,18 @@ function diagnosticIgnorePatterns(): string[] {
         .filter((value): value is string => typeof value === 'string' && value.length > 0);
 }
 
-function relativeDiagnosticPath(uri: vscode.Uri): string {
-    const folder = vscode.workspace.getWorkspaceFolder(uri);
+/** Workspace-relative diagnostic path (forward slashes; full path when
+ * outside every folder). `pdcloc://` decoded views mirror their backing
+ * `file://` path but `getWorkspaceFolder` only matches `file` URIs, so the
+ * twin is unwrapped first and ignore patterns keep matching the logical
+ * path. Exported for the extension-host contract test. */
+export function relativeDiagnosticPath(uri: vscode.Uri): string {
+    const real = realUriOf(uri) ?? uri;
+    const folder = vscode.workspace.getWorkspaceFolder(real);
     if (!folder) {
-        return uri.fsPath.replace(/\\/g, '/');
+        return real.fsPath.replace(/\\/g, '/');
     }
-    return pathRelative(folder.uri.fsPath, uri.fsPath);
+    return pathRelative(folder.uri.fsPath, real.fsPath);
 }
 
 function previewRefreshMode(): 'always' | 'onSave' | 'manual' {

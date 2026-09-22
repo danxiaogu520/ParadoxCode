@@ -7,6 +7,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Mission Tree Preview failed with "The mission file must live inside the workspace root." for any
+  mission file opened through its `pdcloc://` decoded view (transparent encoding, on by default
+  since 0.4.1, takes over every `*.txt` tab): the preview located the workspace folder with a
+  scheme-blind URI containment check that never matches the `pdcloc` twin. The logical path is now
+  computed against the backing `file://` URI. The same unwrapping now also keeps
+  `diagnosticIgnoreFiles` patterns matching diagnostics published on decoded views (they previously
+  fell back to the full path and silently never matched).
+
 ## [0.4.1] - 2026-09-22
 
 ### Added

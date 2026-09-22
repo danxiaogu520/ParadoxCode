@@ -253,4 +253,38 @@ suite('ParadoxCode VS Code extension host', () => {
       assert.equal(disposables.length, 0);
     }
   });
+
+  test('mission preview and diagnostic paths resolve pdcloc decoded views', async () => {
+    const root = process.env.PDCLOC_HOST_WORKSPACE;
+    assert.ok(root, 'the host runner must open the fixture workspace (npm run test:host)');
+    const file = path.join(root, 'missions', 'EDG_FDMMissions.txt');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, 'missions = {}\n', 'utf8');
+    try {
+      const extension = vscode.extensions.getExtension('paradoxcode.paradoxcode-vscode');
+      assert.ok(extension, 'development extension must be discoverable');
+      await extension.activate();
+      const decoded = vscode.Uri.file(file).with({ scheme: 'pdcloc' });
+      const document = await vscode.workspace.openTextDocument(decoded);
+      assert.equal(
+        document.uri.scheme,
+        'pdcloc',
+        'the missions file must open through its decoded twin',
+      );
+      const { logicalPath } = require('../../out/previewPanel.js');
+      assert.equal(
+        logicalPath(document),
+        'missions/EDG_FDMMissions.txt',
+        'decoded mission views must resolve to the workspace-relative logical path',
+      );
+      const { relativeDiagnosticPath } = require('../../out/extension.js');
+      assert.equal(
+        relativeDiagnosticPath(decoded),
+        'missions/EDG_FDMMissions.txt',
+        'diagnostic ignore patterns must match decoded views by logical path',
+      );
+    } finally {
+      fs.rmSync(path.join(root, 'missions'), { recursive: true, force: true });
+    }
+  });
 });
