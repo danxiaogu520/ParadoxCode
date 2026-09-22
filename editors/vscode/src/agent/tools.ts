@@ -3,6 +3,7 @@ import { sep } from 'node:path';
 import * as vscode from 'vscode';
 import { acquireAgentClient, withTimeout } from './server';
 import { capList, capText, collapseWhitespace } from './budget';
+import { realUriOf } from '../transparentLoc';
 
 /**
  * The eleven read-only agent tools, split into a script zone (workspace, search, context,
@@ -140,6 +141,31 @@ function resolveFileUri(path: string): vscode.Uri | undefined {
     return undefined;
 }
 
+/** Prefers a document that is actually open, falling back to the on-disk
+ * `file://` URI. With transparent encoding the file the user edits is its
+ * `pdcloc://` decoded twin — that URI carries the live (possibly unsaved)
+ * text the server knows, while the `file://` twin was never synced. */
+export function openDocumentUriFor(fileUri: vscode.Uri): vscode.Uri {
+    const fold = (value: string): string =>
+        process.platform === 'win32' ? value.toLowerCase() : value;
+    const wanted = fold(fileUri.fsPath);
+    let twin: vscode.Uri | undefined;
+    let raw: vscode.Uri | undefined;
+    for (const document of vscode.workspace.textDocuments) {
+        const decoded = realUriOf(document.uri);
+        const real = decoded ?? document.uri;
+        if (fold(real.fsPath) !== wanted) {
+            continue;
+        }
+        if (decoded) {
+            twin = document.uri;
+        } else {
+            raw = document.uri;
+        }
+    }
+    return twin ?? raw ?? fileUri;
+}
+
 /** True when a path addresses a localisation-zone file (the `localisation/` tree). */
 function isLocalisationPath(path: string): boolean {
     const normalised = path.replace(/\\/g, '/').toLowerCase();
@@ -269,7 +295,7 @@ export async function runContext(
         client.sendRequest<{ contents?: { value?: unknown } } | null>(
             'textDocument/hover',
             {
-                textDocument: { uri: uri.toString() },
+                textDocument: { uri: openDocumentUriFor(uri).toString() },
                 position: { line: line - 1, character },
             },
             token,
@@ -378,7 +404,7 @@ export async function runReferences(
         client.sendRequest<{ uri?: unknown; range?: { start?: { line?: unknown } } }[]>(
             'textDocument/references',
             {
-                textDocument: { uri: uri.toString() },
+                textDocument: { uri: openDocumentUriFor(uri).toString() },
                 position: { line: line - 1, character },
                 context: { includeDeclaration: true },
             },

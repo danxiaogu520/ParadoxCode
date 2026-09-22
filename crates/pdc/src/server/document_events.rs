@@ -152,17 +152,49 @@ impl LspServer {
                 "only the pdc/reindexWorkspace, validateWorkspace, and pdc/formatWorkspace \
                  commands are supported",
             )),
-            method if is_snapshot_request(method) => SnapshotRequestContext::new(
-                self.host.snapshot(),
-                CancellationToken::new(),
-                self.client_snippet_support,
-                Arc::clone(&self.ignored_diagnostic_codes),
-                Arc::clone(&self.diagnostic_severity_overrides),
-                Arc::clone(&self.semantic_tokens_cache),
-            )
-            .dispatch(method, params),
+            method if is_snapshot_request(method) => {
+                // Position-bound requests resolve through open documents; this
+                // lazily stages the disk text for scanned files no editor ever
+                // opened (agent tooling passes bare paths, and decoded views
+                // sync the `pdcloc://` twin rather than the `file://` URI).
+                self.ensure_snapshot_request_document(params);
+                SnapshotRequestContext::new(
+                    self.host.snapshot(),
+                    CancellationToken::new(),
+                    self.client_snippet_support,
+                    Arc::clone(&self.ignored_diagnostic_codes),
+                    Arc::clone(&self.diagnostic_severity_overrides),
+                    Arc::clone(&self.semantic_tokens_cache),
+                )
+                .dispatch(method, params)
+            }
             _ => Err(RpcError::new(METHOD_NOT_FOUND, "method is not implemented")),
         }
+    }
+
+    /// Stages a disk-backed document for a snapshot request that addresses a
+    /// scanned file by a URI no open document carries. No-ops for requests
+    /// without a `textDocument.uri`, already-open documents, and unknown or
+    /// unreadable paths — those keep today's `document is not open` answer.
+    pub(super) fn ensure_snapshot_request_document(&mut self, params: Option<&Value>) {
+        let Some(uri) = params
+            .and_then(|params| params.get("textDocument"))
+            .and_then(|document| document.get("uri"))
+            .and_then(Value::as_str)
+        else {
+            return;
+        };
+        let id = DocumentId::new(uri.to_owned());
+        if self.host.snapshot().document(&id).is_some() {
+            return;
+        }
+        let Some(path) = parse_file_uri_str(uri)
+            .ok()
+            .and_then(|path| AbsPath::canonicalize(&path).ok())
+        else {
+            return;
+        };
+        self.host.open_disk_document(id, path);
     }
 
     fn handle_cancel(&mut self, params: Option<&Value>) {
