@@ -16,17 +16,13 @@
 //
 // Usage: node scripts/i18n-test.mjs   (wired into npm run check / test:contract)
 
+import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const extRoot = join(here, '..');
-
-function fail(message) {
-  console.error(`FAIL: ${message}`);
-  process.exitCode = 1;
-}
 
 function listFiles(directory, extension, skip, accumulator = []) {
   for (const name of readdirSync(directory)) {
@@ -87,25 +83,20 @@ const enBundle = JSON.parse(readFileSync(join(extRoot, 'l10n', 'bundle.l10n.json
 const zhBundle = JSON.parse(readFileSync(join(extRoot, 'l10n', 'bundle.l10n.zh-cn.json'), 'utf8'));
 
 for (const key of tStrings.keys()) {
-  if (!Object.hasOwn(enBundle, key)) {
-    fail(`l10n/bundle.l10n.json is missing the source string: ${JSON.stringify(key)}`);
-  }
+  assert.ok(Object.hasOwn(enBundle, key),
+    `l10n/bundle.l10n.json is missing the source string: ${JSON.stringify(key)}`);
 }
 for (const [key, value] of Object.entries(enBundle)) {
-  if (value !== key) {
-    fail(`l10n/bundle.l10n.json must map every key to itself (identity), got: ${JSON.stringify(key)}`);
-  }
-  if (!tStrings.has(key)) {
-    fail(`l10n/bundle.l10n.json has a stale entry no longer present in src/: ${JSON.stringify(key)}`);
-  }
-  if (!Object.hasOwn(zhBundle, key)) {
-    fail(`l10n/bundle.l10n.zh-cn.json is missing a translation for: ${JSON.stringify(key)}`);
-  }
+  assert.equal(value, key,
+    `l10n/bundle.l10n.json must map every key to itself (identity), got: ${JSON.stringify(key)}`);
+  assert.ok(tStrings.has(key),
+    `l10n/bundle.l10n.json has a stale entry no longer present in src/: ${JSON.stringify(key)}`);
+  assert.ok(Object.hasOwn(zhBundle, key),
+    `l10n/bundle.l10n.zh-cn.json is missing a translation for: ${JSON.stringify(key)}`);
 }
 for (const key of Object.keys(zhBundle)) {
-  if (!Object.hasOwn(enBundle, key)) {
-    fail(`l10n/bundle.l10n.zh-cn.json has an entry without an English source: ${JSON.stringify(key)}`);
-  }
+  assert.ok(Object.hasOwn(enBundle, key),
+    `l10n/bundle.l10n.zh-cn.json has an entry without an English source: ${JSON.stringify(key)}`);
 }
 
 // --- 2. user-visible call sites ----------------------------------------------
@@ -178,29 +169,25 @@ for (const file of sourceFiles) {
     }
     for (const match of text.matchAll(sink.pattern)) {
       const value = match[1].trim();
-      if (isRawLiteral(value) && !(sink.allowTemplates && value.startsWith('`'))) {
-        fail(`${relative}: ${sink.name} renders a raw string; wrap it in vscode.l10n.t() (near "${value.slice(0, 60)}")`);
-      }
+      assert.ok(!(isRawLiteral(value) && !(sink.allowTemplates && value.startsWith('`'))),
+        `${relative}: ${sink.name} renders a raw string; wrap it in vscode.l10n.t() (near "${value.slice(0, 60)}")`);
     }
   }
   // Status text: quoted literals must be brand+codicon only; templates must
   // carry a translation call or join pure data.
   for (const match of text.matchAll(/\.text\s*=\s*([\s\S]{0,120}?)[;\n]/g)) {
     const value = match[1].trim();
-    if (isQuotedLiteral(value) && !BRAND_AND_CODICON.test(value.replaceAll("'", ''))) {
-      fail(`${relative}: status item .text literal is not brand/codicon-only: ${value.slice(0, 60)}`);
-    }
-    if (value.startsWith('`')
+    assert.ok(!(isQuotedLiteral(value) && !BRAND_AND_CODICON.test(value.replaceAll("'", ''))),
+      `${relative}: status item .text literal is not brand/codicon-only: ${value.slice(0, 60)}`);
+    assert.ok(!(value.startsWith('`')
       && !value.includes('vscode.l10n.t(')
-      && !templateIsDataOnly(value)) {
-      fail(`${relative}: status item .text template has no vscode.l10n.t() call: ${value.slice(0, 60)}`);
-    }
+      && !templateIsDataOnly(value)),
+      `${relative}: status item .text template has no vscode.l10n.t() call: ${value.slice(0, 60)}`);
   }
   // Tooltips assembled as templates: translated call or pure data join.
   for (const match of text.matchAll(/\.tooltip\s*=\s*`([\s\S]{0,120}?)[;]/g)) {
-    if (!match[0].includes('vscode.l10n.t(') && !templateIsDataOnly(match[0].slice('.tooltip = '.length + 1))) {
-      fail(`${relative}: status item .tooltip template has no vscode.l10n.t() call: ${match[0].slice(0, 60)}`);
-    }
+    assert.ok(match[0].includes('vscode.l10n.t(') || templateIsDataOnly(match[0].slice('.tooltip = '.length + 1)),
+      `${relative}: status item .tooltip template has no vscode.l10n.t() call: ${match[0].slice(0, 60)}`);
   }
 }
 
@@ -236,9 +223,8 @@ function extractMediaDefaults(mediaPath) {
 const tables = extractWebviewTables(join(extRoot, 'src', 'webviewI18n.ts'));
 const previewTable = tables.get('missionPreviewStrings');
 const pickerTable = tables.get('missionIconPickerStrings');
-if (!previewTable || previewTable.size === 0 || !pickerTable || pickerTable.size === 0) {
-  fail('src/webviewI18n.ts must define non-empty missionPreviewStrings and missionIconPickerStrings tables');
-}
+assert.ok(previewTable?.size > 0 && pickerTable?.size > 0,
+  'src/webviewI18n.ts must define non-empty missionPreviewStrings and missionIconPickerStrings tables');
 
 const webviewPairs = [
   ['missionPreviewStrings', previewTable, 'renderer.js'],
@@ -246,23 +232,18 @@ const webviewPairs = [
 ];
 for (const [tableName, srcTable, mediaFile] of webviewPairs) {
   const mediaTable = extractMediaDefaults(join(extRoot, 'media', mediaFile));
-  if (mediaTable.size === 0) {
-    fail(`media/${mediaFile} is missing its DEFAULT_STRINGS fallback table`);
-  }
+  assert.ok(mediaTable.size > 0,
+    `media/${mediaFile} is missing its DEFAULT_STRINGS fallback table`);
   for (const [key, value] of srcTable) {
-    if (!mediaTable.has(key)) {
-      fail(`media/${mediaFile} DEFAULT_STRINGS is missing key "${key}" from ${tableName}`);
-    } else if (mediaTable.get(key) !== value) {
-      fail(
-        `media/${mediaFile} DEFAULT_STRINGS["${key}"] (${JSON.stringify(mediaTable.get(key))}) `
-        + `does not match the English source in ${tableName} (${JSON.stringify(value)})`,
-      );
-    }
+    assert.ok(mediaTable.has(key),
+      `media/${mediaFile} DEFAULT_STRINGS is missing key "${key}" from ${tableName}`);
+    assert.equal(mediaTable.get(key), value,
+      `media/${mediaFile} DEFAULT_STRINGS["${key}"] (${JSON.stringify(mediaTable.get(key))}) `
+      + `does not match the English source in ${tableName} (${JSON.stringify(value)})`);
   }
   for (const key of mediaTable.keys()) {
-    if (!srcTable.has(key)) {
-      fail(`src/webviewI18n.ts ${tableName} is missing key "${key}" present in media/${mediaFile}`);
-    }
+    assert.ok(srcTable.has(key),
+      `src/webviewI18n.ts ${tableName} is missing key "${key}" present in media/${mediaFile}`);
   }
 }
 
@@ -272,15 +253,13 @@ for (const [tableName, table, htmlFile] of [
 ]) {
   const html = readFileSync(join(extRoot, 'media', htmlFile), 'utf8');
   for (const match of html.matchAll(/data-i18n(?:-title|-placeholder|-aria-label)?="([^"]+)"/g)) {
-    if (!table.has(match[1])) {
-      fail(`media/${htmlFile} references i18n key "${match[1]}" missing from ${tableName}`);
-    }
+    assert.ok(table.has(match[1]),
+      `media/${htmlFile} references i18n key "${match[1]}" missing from ${tableName}`);
   }
 }
 
 // --- summary -------------------------------------------------------------------
 
-const total = process.exitCode === 1 ? 'FAILED' : 'OK';
-console.log(`i18n contract ${total} (${tStrings.size} source strings, `
+console.log(`i18n contract OK (${tStrings.size} source strings, `
   + `${Object.keys(zhBundle).length} zh-cn translations, `
   + `${previewTable.size + pickerTable.size} webview keys)`);

@@ -1,10 +1,11 @@
+import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const root = new URL('..', import.meta.url).pathname.replace(/^\/(\w):/, '$1:');
 const readJson = (relative) => JSON.parse(readFileSync(join(root, relative), 'utf8'));
 const fail = (message) => {
-  throw new Error(`extension contract: ${message}`);
+  throw new assert.AssertionError({ message: `extension contract: ${message}` });
 };
 
 const manifest = readJson('package.json');
