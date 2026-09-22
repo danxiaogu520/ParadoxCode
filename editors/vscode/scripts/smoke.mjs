@@ -324,6 +324,44 @@ const pathFailures = process.exitCode === 1;
 console.log(pathFailures ? 'serverPath FAILED' : 'serverPath OK');
 
 // ---------------------------------------------------------------------------
+// Server startup contract: --version must answer before rules load, and an
+// unknown argument must fail fast with a non-zero exit instead of starting a
+// session that would hang waiting on stdio.
+// ---------------------------------------------------------------------------
+
+function captureServer(extraArgs) {
+  const forwarded = serverArgs[0] === 'cargo'
+    ? [...serverArgs.slice(1), '--', ...extraArgs]
+    : [...serverArgs.slice(1), ...extraArgs];
+  return new Promise((resolve, reject) => {
+    const child = spawn(serverArgs[0], forwarded, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.on('error', reject);
+    child.on('exit', (code) => resolve({ code, stdout, stderr }));
+  });
+}
+
+const versionRun = await captureServer(['--version']);
+if (versionRun.code !== 0) {
+  fail(`server --version must exit 0, got ${versionRun.code}: ${versionRun.stderr.slice(0, 200)}`);
+} else if (!/^paradoxcode \d+\.\d+\.\d+/.test(versionRun.stdout.trim())) {
+  fail(`server --version must print "paradoxcode <semver>", got: ${JSON.stringify(versionRun.stdout.trim())}`);
+}
+
+const rejectedRun = await captureServer(['--definitely-not-a-flag']);
+if (rejectedRun.code === 0) {
+  fail('server must reject unknown arguments with a non-zero exit');
+} else if (!/unknown paradoxcode argument/.test(rejectedRun.stderr)) {
+  fail(`server must explain the rejected argument on stderr, got: ${JSON.stringify(rejectedRun.stderr.slice(0, 200))}`);
+}
+
+const startupFailures = process.exitCode === 1;
+console.log(startupFailures ? 'serverStartup FAILED' : 'serverStartup OK');
+
+// ---------------------------------------------------------------------------
 // MCP server contract: boot scripts/mcp.mjs over stdio, verify the handshake,
 // the tool manifest mirroring package.json, and one real tool round trip.
 // ---------------------------------------------------------------------------
