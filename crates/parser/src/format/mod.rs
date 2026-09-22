@@ -3,8 +3,10 @@
 //! The formatter is intentionally non-configurable. Script uses tabs, LF line endings,
 //! recursive block layout, and no layout blank lines. Ordinary scalar spelling is preserved;
 //! the fixed keyword spelling (`AND`/`OR`/`NOT`, `ROOT`/`FROM`/`PREV`/`THIS`) is
-//! canonicalized to capitals. Multiline quoted strings are formatted recursively only when
-//! their decoded payload is demonstrably valid, non-empty Script.
+//! canonicalized to capitals, and asset-path separators (`\`, `\\`, `//`) collapse to single
+//! forward slashes — the game accepts every separator spelling and vanilla ships all of
+//! them. Multiline quoted strings are formatted recursively only when their decoded payload
+//! is demonstrably valid, non-empty Script.
 
 use crate::{FileFormat, ParsedFile, parse};
 use common::skipped;
@@ -13,9 +15,12 @@ use equivalence::{equivalent, minimal_edits};
 mod common;
 mod equivalence;
 mod localisation;
+mod paths;
 mod script;
 
 pub use common::{FormatResult, FormatSkipReason, TextEdit};
+pub use paths::is_asset_path_normalization;
+pub use script::canonical_keyword;
 
 #[cfg(test)]
 mod tests;
