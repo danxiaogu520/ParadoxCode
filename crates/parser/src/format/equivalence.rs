@@ -36,7 +36,7 @@ pub(super) fn equivalent(original: &ParsedFile, formatted: &ParsedFile, depth: u
                     depth.saturating_add(1),
                 );
             }
-            // Keyword casing and asset-path separators are canonicalizations, not
+            // Keyword casing and asset-path separators are canonical rewrites, not
             // semantic changes: the game accepts every spelling, so the safety gate
             // must accept the fixed forms the formatter writes.
             super::script::canonical_keyword(before_text) == after_text

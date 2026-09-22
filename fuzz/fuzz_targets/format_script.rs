@@ -40,7 +40,7 @@ fuzz_target!(|data: &[u8]| {
             let before_text = parsed.text(before.range()).expect("before token text");
             let after_text = reparsed.text(after.range()).expect("after token text");
             // Beyond byte-identical text, the formatter may only apply its two
-            // canonicalizations: keyword casing and asset-path separators.
+            // canonical rewrites: keyword casing and asset-path separators.
             assert!(
                 before_text == after_text
                     || parser::format::canonical_keyword(before_text) == after_text
