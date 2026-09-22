@@ -264,8 +264,24 @@ suite('ParadoxCode VS Code extension host', () => {
       const extension = vscode.extensions.getExtension('paradoxcode.paradoxcode-vscode');
       assert.ok(extension, 'development extension must be discoverable');
       await extension.activate();
+      // The bare-path launch arg opens the folder asynchronously; wait for it
+      // so the eligibility check (getWorkspaceFolder) cannot race window startup.
+      const fixtureUri = vscode.Uri.file(file);
+      const deadline = Date.now() + 10_000;
+      while (Date.now() < deadline && !vscode.workspace.getWorkspaceFolder(fixtureUri)) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      assert.ok(
+        vscode.workspace.getWorkspaceFolder(fixtureUri),
+        'the fixture workspace folder must be open before the pdcloc eligibility check',
+      );
       const decoded = vscode.Uri.file(file).with({ scheme: 'pdcloc' });
       const document = await vscode.workspace.openTextDocument(decoded);
+      assert.equal(
+        document.languageId,
+        'eu4',
+        'decoded mission views must keep the EU4 language (gates the preview context and edit refresh)',
+      );
       assert.equal(
         document.uri.scheme,
         'pdcloc',
