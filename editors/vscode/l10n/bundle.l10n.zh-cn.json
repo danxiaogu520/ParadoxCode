@@ -191,5 +191,8 @@
   "paradoxcode.dependencies[{0}] must contain non-empty id and path": "paradoxcode.dependencies[{0}] 的 id 和 path 不能为空",
   "paradoxcode.dependencies[{0}] has invalid id \"{1}\"": "paradoxcode.dependencies[{0}] 的 id 无效：\"{1}\"",
   "paradoxcode.dependencies[{0}].index must be a string": "paradoxcode.dependencies[{0}].index 必须是字符串",
-  "The ParadoxCode extension manifest has an invalid version.": "ParadoxCode 扩展清单的版本号无效。"
+  "The ParadoxCode extension manifest has an invalid version.": "ParadoxCode 扩展清单的版本号无效。",
+  "the decoded view needs the ParadoxCode language server; it is starting or not running — retry shortly.": "解码视图需要 ParadoxCode 语言服务器；服务器正在启动或未运行——请稍后重试。",
+  "saving the decoded view needs the ParadoxCode language server; it is starting or not running — retry shortly.": "保存解码视图需要 ParadoxCode 语言服务器；服务器正在启动或未运行——请稍后重试。",
+  "ParadoxCode: manual transcoding needs the ParadoxCode language server; it is starting or not running — retry shortly.": "ParadoxCode：手动转码需要 ParadoxCode 语言服务器；服务器正在启动或未运行——请稍后重试。"
 }
