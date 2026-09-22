@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
 import { FRAME_SPRITE, FontAssets, GameAssetStore, findChineseFontMod, findGameDirectory } from './gameAssets';
+import { realUriOf } from './transparentLoc';
 import { missionPreviewStrings, webviewI18nMessage } from './webviewI18n';
 
 const PREVIEW_VIEW_TYPE = 'paradoxcode.missionPreview';
@@ -111,9 +112,13 @@ function isPreviewDocument(document: vscode.TextDocument): boolean {
 }
 
 /** The logical path expected by the server, relative to the workspace root
- * (the same convention `pdc/classifyPaths` uses). */
-function logicalPath(document: vscode.TextDocument): string | undefined {
-    const workspace = vscode.workspace.getWorkspaceFolder(document.uri);
+ * (the same convention `pdc/classifyPaths` uses). `pdcloc://` decoded views
+ * mirror their backing `file://` path but `getWorkspaceFolder` only matches
+ * `file` URIs, so unwrap the twin before locating the folder. Exported for
+ * the extension-host contract test. */
+export function logicalPath(document: vscode.TextDocument): string | undefined {
+    const uri = realUriOf(document.uri) ?? document.uri;
+    const workspace = vscode.workspace.getWorkspaceFolder(uri);
     if (!workspace) {
         return undefined;
     }
@@ -121,7 +126,7 @@ function logicalPath(document: vscode.TextDocument): string | undefined {
     // would deliver percent-encoded segments (`%20`, `%3A`) the server would
     // then see as literal directory names.
     const relative = path
-        .relative(workspace.uri.fsPath, document.uri.fsPath)
+        .relative(workspace.uri.fsPath, uri.fsPath)
         .split(path.sep)
         .join('/');
     if (relative.startsWith('..') || path.isAbsolute(relative)) {
