@@ -530,25 +530,30 @@ mod tests {
 
     fn sample_tree() -> MissionFile {
         let mut file = empty_file();
-        file.add_tree("t1").unwrap();
-        file.add_mission("t1", "a").unwrap();
-        file.add_mission("t1", "b").unwrap();
-        file.add_required("t1", "b", "a").unwrap();
+        file.add_tree("t1").expect("add tree");
+        file.add_mission("t1", "a").expect("add mission");
+        file.add_mission("t1", "b").expect("add mission");
+        file.add_required("t1", "b", "a")
+            .expect("add required mission");
         file
     }
 
     fn span_of(file: &MissionFile, tree_id: &str) -> TextRange {
-        file.trees.iter().find(|t| t.id == tree_id).unwrap().span
+        file.trees
+            .iter()
+            .find(|t| t.id == tree_id)
+            .expect("find tree")
+            .span
     }
 
     #[test]
     fn add_and_remove_tree() {
         let mut file = empty_file();
-        file.add_tree("x").unwrap();
+        file.add_tree("x").expect("add tree");
         assert_eq!(file.trees.len(), 1);
         assert_eq!(file.trees[0].slot, 1);
         assert!(file.add_tree("x").is_err());
-        file.remove_tree("x").unwrap();
+        file.remove_tree("x").expect("remove tree");
         assert!(file.trees.is_empty());
         assert!(file.remove_tree("x").is_err());
     }
@@ -556,7 +561,7 @@ mod tests {
     #[test]
     fn remove_mission_cleans_references() {
         let mut file = sample_tree();
-        file.remove_mission("t1", "a").unwrap();
+        file.remove_mission("t1", "a").expect("remove mission");
         assert!(file.trees[0].missions.iter().all(|m| m.required.is_empty()));
         assert!(file.remove_mission("t1", "ghost").is_err());
     }
@@ -564,12 +569,15 @@ mod tests {
     #[test]
     fn rename_mission_updates_references_file_wide() {
         let mut file = sample_tree();
-        file.add_tree("t2").unwrap();
-        file.add_mission("t2", "c").unwrap();
+        file.add_tree("t2").expect("add tree");
+        file.add_mission("t2", "c").expect("add mission");
         // c sits one row below a (same column) so the edge is legal.
-        file.set_mission_position("t2", "c", Some(2)).unwrap();
-        file.add_required("t2", "c", "a").unwrap();
-        file.rename_mission("t1", "a", "a2").unwrap();
+        file.set_mission_position("t2", "c", Some(2))
+            .expect("set mission position");
+        file.add_required("t2", "c", "a")
+            .expect("add required mission");
+        file.rename_mission("t1", "a", "a2")
+            .expect("rename mission");
         assert_eq!(file.trees[0].missions[1].required, vec!["a2"]);
         assert_eq!(file.trees[1].missions[0].required, vec!["a2"]);
         assert!(file.rename_mission("t1", "a", "b").is_err());
@@ -580,13 +588,16 @@ mod tests {
     fn dependencies_reject_self_and_duplicates() {
         let mut file = sample_tree();
         assert!(file.add_required("t1", "b", "b").is_err());
-        file.add_required("t1", "b", "a").unwrap();
-        file.add_required("t1", "b", "a").unwrap();
+        file.add_required("t1", "b", "a")
+            .expect("add required mission");
+        file.add_required("t1", "b", "a")
+            .expect("add required mission");
         assert_eq!(file.trees[0].missions[1].required, vec!["a"]);
-        file.remove_required("t1", "b", "a").unwrap();
+        file.remove_required("t1", "b", "a")
+            .expect("remove required mission");
         assert!(file.trees[0].missions[1].required.is_empty());
         file.set_required("t1", "b", vec!["a".into(), "a".into()])
-            .unwrap();
+            .expect("set required");
         assert_eq!(file.trees[0].missions[1].required, vec!["a"]);
         assert!(file.set_required("t1", "b", vec!["b".into()]).is_err());
     }
@@ -594,57 +605,69 @@ mod tests {
     #[test]
     fn dependencies_reject_spatially_illegal_edges() {
         let mut file = empty_file();
-        file.add_tree("t1").unwrap();
-        file.add_mission("t1", "a").unwrap();
-        file.add_mission("t1", "b").unwrap();
+        file.add_tree("t1").expect("add tree");
+        file.add_mission("t1", "a").expect("add mission");
+        file.add_mission("t1", "b").expect("add mission");
         // a below b -> illegal (prerequisite must sit above).
-        file.set_mission_position("t1", "a", Some(2)).unwrap();
-        file.set_mission_position("t1", "b", Some(1)).unwrap();
+        file.set_mission_position("t1", "a", Some(2))
+            .expect("set mission position");
+        file.set_mission_position("t1", "b", Some(1))
+            .expect("set mission position");
         assert!(matches!(
             file.add_required("t1", "b", "a"),
             Err(EditError::IllegalEdgePlacement { .. })
         ));
         assert!(file.trees[0].missions[1].required.is_empty());
         // a on the row directly above b -> legal.
-        file.set_mission_position("t1", "a", Some(1)).unwrap();
-        file.set_mission_position("t1", "b", Some(2)).unwrap();
-        file.add_required("t1", "b", "a").unwrap();
+        file.set_mission_position("t1", "a", Some(1))
+            .expect("set mission position");
+        file.set_mission_position("t1", "b", Some(2))
+            .expect("set mission position");
+        file.add_required("t1", "b", "a")
+            .expect("add required mission");
         // Cross-column edges need the row directly above.
-        file.add_tree("t2").unwrap();
-        file.set_tree_slot("t2", 2).unwrap();
-        file.add_mission("t2", "c").unwrap();
-        file.set_mission_position("t2", "c", Some(2)).unwrap();
-        file.add_required("t2", "c", "a").unwrap();
+        file.add_tree("t2").expect("add tree");
+        file.set_tree_slot("t2", 2).expect("set tree slot");
+        file.add_mission("t2", "c").expect("add mission");
+        file.set_mission_position("t2", "c", Some(2))
+            .expect("set mission position");
+        file.add_required("t2", "c", "a")
+            .expect("add required mission");
         // Same row, cross column: illegal.
-        file.set_mission_position("t2", "c", Some(1)).unwrap();
-        file.remove_required("t2", "c", "a").unwrap();
+        file.set_mission_position("t2", "c", Some(1))
+            .expect("set mission position");
+        file.remove_required("t2", "c", "a")
+            .expect("remove required mission");
         assert!(matches!(
             file.add_required("t2", "c", "a"),
             Err(EditError::IllegalEdgePlacement { .. })
         ));
         // Unknown ids are allowed (they may be cross-file refs).
-        file.add_required("t1", "b", "elsewhere").unwrap();
+        file.add_required("t1", "b", "elsewhere")
+            .expect("add required mission");
         assert_eq!(file.trees[0].missions[1].required, vec!["a", "elsewhere"]);
     }
 
     #[test]
     fn move_mission_moves_block_without_cleaning_references() {
         let mut file = sample_tree();
-        file.add_tree("t2").unwrap();
-        file.set_tree_slot("t2", 2).unwrap();
+        file.add_tree("t2").expect("add tree");
+        file.set_tree_slot("t2", 2).expect("set tree slot");
         // b requires a; x in t2 also requires a. Moving a must not touch any
         // reference to it (the id still exists in the file).
-        file.add_mission("t2", "x").unwrap();
-        file.set_mission_position("t2", "x", Some(2)).unwrap();
-        file.add_required("t2", "x", "a").unwrap();
-        file.move_mission("t1", "a", "t2").unwrap();
+        file.add_mission("t2", "x").expect("add mission");
+        file.set_mission_position("t2", "x", Some(2))
+            .expect("set mission position");
+        file.add_required("t2", "x", "a")
+            .expect("add required mission");
+        file.move_mission("t1", "a", "t2").expect("move mission");
         assert!(file.trees[0].mission("a").is_none());
         assert!(file.trees[1].mission("a").is_some());
         // b (t1) and x (t2) still reference a — the id still exists.
         assert_eq!(file.trees[0].missions[0].required, vec!["a"]);
         assert_eq!(file.trees[1].missions[0].required, vec!["a"]);
         // Moving to the same tree is a no-op; unknown ids error.
-        file.move_mission("t2", "a", "t2").unwrap();
+        file.move_mission("t2", "a", "t2").expect("move mission");
         assert!(file.move_mission("t2", "ghost", "t1").is_err());
         assert!(file.move_mission("t2", "a", "ghost").is_err());
     }
@@ -653,29 +676,30 @@ mod tests {
     fn scalar_and_block_fields() {
         let mut file = sample_tree();
         file.set_mission_icon("t1", "a", Some("mission_x".into()))
-            .unwrap();
-        file.set_mission_position("t1", "a", Some(3)).unwrap();
+            .expect("set mission icon");
+        file.set_mission_position("t1", "a", Some(3))
+            .expect("set mission position");
         file.set_mission_completed_by("t1", "a", Some("1500.1.1".into()))
-            .unwrap();
+            .expect("set mission completed by");
         file.set_mission_block(
             "t1",
             "a",
             BlockField::Trigger,
             Some("{\n\talways = yes\n}".into()),
         )
-        .unwrap();
-        file.set_tree_slot("t1", 4).unwrap();
-        file.set_tree_generic("t1", true).unwrap();
-        file.set_tree_ai("t1", Some(false)).unwrap();
+        .expect("set mission block");
+        file.set_tree_slot("t1", 4).expect("set tree slot");
+        file.set_tree_generic("t1", true).expect("set tree generic");
+        file.set_tree_ai("t1", Some(false)).expect("set tree ai");
         file.set_tree_block("t1", TreeBlockField::Potential, Some("{ tag = T1 }".into()))
-            .unwrap();
+            .expect("set tree block");
 
         let mission = &file.trees[0].missions[0];
         assert_eq!(mission.icon.as_deref(), Some("mission_x"));
         assert_eq!(mission.position, Some(3));
         assert_eq!(mission.completed_by.as_deref(), Some("1500.1.1"));
         assert_eq!(
-            mission.trigger.as_ref().unwrap().text,
+            mission.trigger.as_ref().expect("trigger set").text,
             "{\n\talways = yes\n}"
         );
         assert!(mission.effect.is_none());
@@ -683,11 +707,14 @@ mod tests {
         assert_eq!(tree.slot, 4);
         assert!(tree.generic);
         assert_eq!(tree.ai, Some(false));
-        assert_eq!(tree.potential.as_ref().unwrap().text, "{ tag = T1 }");
+        assert_eq!(
+            tree.potential.as_ref().expect("potential set").text,
+            "{ tag = T1 }"
+        );
 
         // Empty text clears the block.
         file.set_mission_block("t1", "a", BlockField::Trigger, None)
-            .unwrap();
+            .expect("clear mission block");
         assert!(file.trees[0].missions[0].trigger.is_none());
     }
 
@@ -699,15 +726,20 @@ mod tests {
         let mut file = loaded.file.clone();
         let style = crate::eu4::mission::write::detect_style(fixture);
 
-        file.add_mission("sam_main_tree", "sam_brand_new").unwrap();
+        file.add_mission("sam_main_tree", "sam_brand_new")
+            .expect("add mission");
         file.add_required("sam_main_tree", "sam_brand_new", "sam_first_mission")
-            .unwrap();
+            .expect("add required mission");
         file.remove_mission("sam_main_tree", "sam_second_mission")
-            .unwrap();
+            .expect("remove mission");
         file.rename_mission("sam_main_tree", "sam_first_mission", "sam_first_renamed")
-            .unwrap();
+            .expect("rename mission");
 
-        let tree = file.trees.iter().find(|t| t.id == "sam_main_tree").unwrap();
+        let tree = file
+            .trees
+            .iter()
+            .find(|t| t.id == "sam_main_tree")
+            .expect("find tree");
         let rendered = crate::eu4::mission::write::render_tree(tree, &style);
         let reparsed = parse_file(&rendered).file;
         assert_eq!(reparsed.trees.len(), 1);
@@ -715,7 +747,7 @@ mod tests {
         let edited = &reparsed.trees[0];
         let ids: Vec<&str> = edited.missions.iter().map(|m| m.id.as_str()).collect();
         assert_eq!(ids, vec!["sam_first_renamed", "sam_brand_new"]);
-        let brand_new = edited.mission("sam_brand_new").unwrap();
+        let brand_new = edited.mission("sam_brand_new").expect("load mission");
         assert_eq!(brand_new.required, vec!["sam_first_renamed"]);
         // The removed mission must be gone and un-referenced.
         assert!(edited.mission("sam_second_mission").is_none());

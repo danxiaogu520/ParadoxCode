@@ -48,25 +48,27 @@ fn workspace_member_index_tracks_overlay_open_and_close() {
     std::fs::remove_dir_all(root).expect("cleanup");
 }
 
-#[test]
-fn event_file_root_offers_all_entries_with_correct_shapes() {
-    use std::path::PathBuf;
-
-    // An empty event file offers the four real entry keys: two repeatable event blocks,
-    // the namespace header, and the normal-or-historical-nations switch.
-    let text = "\n";
+/// Opens `text` as the workspace-relative `path` in a first-party host and
+/// returns the host (keep it bound), the document id, and a fresh snapshot.
+fn first_party_document(path: &str, text: &str) -> (AnalysisHost, DocumentId, AnalysisSnapshot) {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
-    let id = DocumentId::new("file:///tmp/events/root-entries.txt");
+    let id = DocumentId::new(format!("file:///tmp/{path}"));
     host.open_document(
         id.clone(),
         1,
         text.to_owned(),
-        Some(AbsPath::normalize(&PathBuf::from(
-            "events/root-entries.txt",
-        ))),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(path))),
     )
-    .expect("open event document");
+    .expect("open document");
     let snapshot = host.snapshot();
+    (host, id, snapshot)
+}
+
+#[test]
+fn event_file_root_offers_all_entries_with_correct_shapes() {
+    // An empty event file offers the four real entry keys: two repeatable event blocks,
+    // the namespace header, and the normal-or-historical-nations switch.
+    let (_host, id, snapshot) = first_party_document("events/root-entries.txt", "\n");
     let result = complete(&snapshot, &id, 0);
     let by_label = |label: &str| result.items.iter().find(|item| item.label == label);
     for label in [
@@ -104,22 +106,9 @@ fn event_file_root_offers_all_entries_with_correct_shapes() {
 
 #[test]
 fn event_file_root_leaf_entry_completes_its_value_domain() {
-    use std::path::PathBuf;
-
     // `normal_or_historical_nations = ` picks yes/no from the entry's value domain.
     let text = "normal_or_historical_nations = \n";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
-    let id = DocumentId::new("file:///tmp/events/root-leaf-value.txt");
-    host.open_document(
-        id.clone(),
-        1,
-        text.to_owned(),
-        Some(AbsPath::normalize(&PathBuf::from(
-            "events/root-leaf-value.txt",
-        ))),
-    )
-    .expect("open event document");
-    let snapshot = host.snapshot();
+    let (_host, id, snapshot) = first_party_document("events/root-leaf-value.txt", text);
     let position = u32::try_from(text.find("= ").expect("assignment") + 2).expect("position");
     let result = complete(&snapshot, &id, position);
     let labels = result
@@ -130,21 +119,9 @@ fn event_file_root_leaf_entry_completes_its_value_domain() {
     assert_eq!(labels, vec!["no", "yes"], "{result:?}");
 
     // A namespace declaration has no value domain: its value is free text.
-    let mut host2 = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
-    let id2 = DocumentId::new("file:///tmp/events/root-leaf-value-2.txt");
-    host2
-        .open_document(
-            id2.clone(),
-            1,
-            "namespace = \n".to_owned(),
-            Some(AbsPath::normalize(&PathBuf::from(
-                "events/root-leaf-value-2.txt",
-            ))),
-        )
-        .expect("open event document");
-    let snapshot2 = host2.snapshot();
-    let position2 =
-        u32::try_from("namespace = \n".find("= ").expect("assignment") + 2).expect("position");
+    let text2 = "namespace = \n";
+    let (_host2, id2, snapshot2) = first_party_document("events/root-leaf-value-2.txt", text2);
+    let position2 = u32::try_from(text2.find("= ").expect("assignment") + 2).expect("position");
     let result2 = complete(&snapshot2, &id2, position2);
     assert!(
         result2.items.is_empty(),
@@ -154,21 +131,10 @@ fn event_file_root_leaf_entry_completes_its_value_domain() {
 
 #[test]
 fn event_file_root_repeats_blocks_but_not_single_declarations() {
-    use std::path::PathBuf;
-
     // After `namespace`, the cursor on the root gap must still scaffold another event
     // block (repeatable), while the already-declared single entries disappear.
     let text = "namespace = ns\ncountry_event = { id = ns.1 }\n\n";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
-    let id = DocumentId::new("file:///tmp/events/root-gap.txt");
-    host.open_document(
-        id.clone(),
-        1,
-        text.to_owned(),
-        Some(AbsPath::normalize(&PathBuf::from("events/root-gap.txt"))),
-    )
-    .expect("open event document");
-    let snapshot = host.snapshot();
+    let (_host, id, snapshot) = first_party_document("events/root-gap.txt", text);
     let position = u32::try_from(text.find("\n\n").expect("root gap") + 1).expect("position");
     let result = complete(&snapshot, &id, position);
     let labels = result
@@ -191,17 +157,7 @@ fn event_file_root_repeats_blocks_but_not_single_declarations() {
 
     // The same rule family keeps decisions wrappers non-repeatable.
     let text2 = "country_decisions = {}\n";
-    let mut host2 = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
-    let id2 = DocumentId::new("file:///tmp/decisions/root-gap.txt");
-    host2
-        .open_document(
-            id2.clone(),
-            1,
-            text2.to_owned(),
-            Some(AbsPath::normalize(&PathBuf::from("decisions/root-gap.txt"))),
-        )
-        .expect("open decision document");
-    let snapshot2 = host2.snapshot();
+    let (_host2, id2, snapshot2) = first_party_document("decisions/root-gap.txt", text2);
     let position2 = u32::try_from(text2.find("}\n").expect("tail") + 2).expect("position");
     let result2 = complete(&snapshot2, &id2, position2);
     assert!(
