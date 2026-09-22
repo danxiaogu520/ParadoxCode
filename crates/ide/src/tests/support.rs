@@ -6,7 +6,8 @@ pub(crate) use crate::{
     semantic_root_context, workspace_symbols, workspace_symbols_with_cancellation,
 };
 pub(crate) use engine::{
-    AnalysisHost, DocumentId, IndexCache, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
+    AnalysisHost, AnalysisSnapshot, DocumentId, IndexCache, SourceRoot, SourceRootId,
+    SourceRootKind, WorkspaceChange,
 };
 pub(crate) use rules::{
     KeyMatcher, ProfileDefinitionRule, ProfileMatchMode, ProfileTextMatcher, RuleSet, RuleShape,

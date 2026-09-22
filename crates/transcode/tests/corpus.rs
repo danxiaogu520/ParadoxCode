@@ -42,10 +42,10 @@ fn pair_classification() {
 
 #[test]
 fn text_layer_matches_the_file_layer() {
-    let master = std::str::from_utf8(MASTER).unwrap();
-    let text_encoded = encode_text(master, EscapeSet::Paratranz).unwrap();
+    let master = std::str::from_utf8(MASTER).expect("valid UTF-8");
+    let text_encoded = encode_text(master, EscapeSet::Paratranz).expect("encode text");
     assert_eq!(text_encoded.as_bytes(), RELEASE);
-    let release_text = std::str::from_utf8(RELEASE).unwrap();
+    let release_text = std::str::from_utf8(RELEASE).expect("valid UTF-8");
     assert_eq!(decode_text(release_text).text, master);
 }
 
@@ -54,7 +54,7 @@ fn text_layer_matches_the_file_layer() {
 #[test]
 fn script_fixture_round_trips() {
     let readable = "1500.1.1 = {\r\n\tmonarch = {\r\n\t\tname = \"\u{541B}\u{58EB}\u{5766}\u{4E01}\"\r\n\t\tdynasty = \"\u{5DF4}\u{5217}\u{5965}\u{7565}\"\r\n\t}\r\n}\r\n# K\u{f6}nigreich: caf\u{e9} r\u{e9}sum\u{e9}\r\n";
-    let bytes = encode_file(readable, Profile::Script, EscapeSet::Paratranz).unwrap();
+    let bytes = encode_file(readable, Profile::Script, EscapeSet::Paratranz).expect("encode file");
 
     assert!(
         !bytes.starts_with(&[0xEF, 0xBB, 0xBF]),
@@ -63,7 +63,7 @@ fn script_fixture_round_trips() {
     assert!(bytes.contains(&0xF6), "CP1252 ö stays a single byte");
     assert!(bytes.contains(&0xE9), "CP1252 é stays a single byte");
 
-    let decoded = decode_file(&bytes, Profile::Script).unwrap();
+    let decoded = decode_file(&bytes, Profile::Script).expect("decode file");
     assert_eq!(decoded.text, readable);
     assert!(decoded.broken_sequences.is_empty());
     assert_eq!(
@@ -71,7 +71,8 @@ fn script_fixture_round_trips() {
         Classification::Escaped
     );
 
-    let re_encoded = encode_file(&decoded.text, Profile::Script, EscapeSet::Paratranz).unwrap();
+    let re_encoded =
+        encode_file(&decoded.text, Profile::Script, EscapeSet::Paratranz).expect("encode file");
     assert_eq!(
         re_encoded, bytes,
         "byte-exact round trip within the canonical profile"
@@ -86,11 +87,12 @@ fn script_0x3a_variant_decodes_and_normalizes() {
     // 为 U+4E3A (low byte 0x3A): variant tool -> [0x11, 0x48, 0x4E]
     // (marker +1, low + 0x0E); canonical -> [0x10, 0x3A, 0x4E].
     let variant: [u8; 5] = [b'"', 0x11, 0x48, 0x4E, b'"'];
-    let decoded = decode_file(&variant, Profile::Script).unwrap();
+    let decoded = decode_file(&variant, Profile::Script).expect("decode file");
     assert_eq!(decoded.text, "\"\u{4E3A}\"");
     assert!(decoded.broken_sequences.is_empty());
 
-    let canonical = encode_file(&decoded.text, Profile::Script, EscapeSet::Paratranz).unwrap();
+    let canonical =
+        encode_file(&decoded.text, Profile::Script, EscapeSet::Paratranz).expect("encode file");
     assert_eq!(
         canonical,
         vec![b'"', 0x10, 0x3A, 0x4E, b'"'],
@@ -108,7 +110,7 @@ fn script_0x3a_variant_decodes_and_normalizes() {
         classify_file(&variant_stream, Profile::Script),
         Classification::Escaped
     );
-    let stream_decoded = decode_file(&variant_stream, Profile::Script).unwrap();
+    let stream_decoded = decode_file(&variant_stream, Profile::Script).expect("decode file");
     assert_eq!(stream_decoded.text, "\u{4E3A}\u{523A}\u{623A}");
 }
 
@@ -118,10 +120,10 @@ fn script_0x3a_variant_decodes_and_normalizes() {
 #[test]
 fn script_cp1252_triple_ambiguity_both_decode() {
     // U+2018 canonical script form: single byte 0x91.
-    let single = decode_file(&[0x91], Profile::Script).unwrap();
+    let single = decode_file(&[0x91], Profile::Script).expect("decode file");
     // Historical triple form: U+2018 encoded as a triple [0x10, 0x18, 0x20]
     // (low 0x18 = 0x2018 & 0xFF, high 0x20 = 0x2018 >> 8).
-    let triple = decode_file(&[0x10, 0x18, 0x20], Profile::Script).unwrap();
+    let triple = decode_file(&[0x10, 0x18, 0x20], Profile::Script).expect("decode file");
     assert_eq!(single.text, "\u{2018}");
     assert_eq!(triple.text, "\u{2018}");
 }
