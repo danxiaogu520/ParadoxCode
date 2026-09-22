@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-09-23
+
 ### Added
 
 - The script formatter now canonicalizes asset-path separators: in scalar values whose
@@ -45,6 +47,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   recorded. On the maintainer's vanilla install this resolves every previously unreachable
   DLC-packed texture reference (King of Kings, Winds of Change) and grows the catalog by
   ~2,200 entries.
+
+- Rule-data documentation backfill from vanilla `common/` file comments: 114 previously
+  undocumented definition fields (great projects, subject types, religions, buildings, wargoal
+  types, and the subject/estate families) now carry verbatim vanilla hover and completion
+  documentation, and 9 existing docs were replaced where the vanilla comment contradicts or is
+  strictly richer (e.g. cb_types `prerequisites` never works for triggered CBs; a disaster's
+  `on_progress_effect` fires monthly while progressing). Instance-level comments with no schema
+  slot are skipped on purpose.
 
 ### Changed
 
@@ -99,6 +109,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   computed against the backing `file://` URI. The same unwrapping now also keeps
   `diagnosticIgnoreFiles` patterns matching diagnostics published on decoded views (they previously
   fell back to the full path and silently never matched).
+
+- The mission icon picker's editor-title button rendered as a blank icon: its codicon
+  `symbol-icon` does not exist in VS Code's theme-icon library, and invalid codicons silently
+  render as empty space. It now uses `symbol-misc`; the encode-file command's equally
+  nonexistent `$(encode)` became `$(arrow-swap)`, and every other `$(…)` reference in the
+  extension manifest was verified against the icon library.
 
 ## [0.4.1] - 2026-09-22
 
@@ -1224,7 +1240,8 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.8...v0.4.0
 [0.3.8]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.7...v0.3.8
