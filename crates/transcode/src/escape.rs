@@ -331,17 +331,20 @@ mod tests {
     #[test]
     fn plain_passthrough() {
         assert_eq!(
-            encode_text("hello world\r\n", P).unwrap(),
+            encode_text("hello world\r\n", P).expect("encode text"),
             "hello world\r\n"
         );
         assert_eq!(decoded_text("hello world\r\n"), "hello world\r\n");
-        assert_eq!(encode_file("abc", Profile::Script, P).unwrap(), b"abc");
+        assert_eq!(
+            encode_file("abc", Profile::Script, P).expect("encode file"),
+            b"abc"
+        );
     }
 
     #[test]
     fn bom_passthrough() {
         let input = "\u{FEFF}中";
-        let encoded = encode_text(input, P).unwrap();
+        let encoded = encode_text(input, P).expect("encode text");
         assert!(encoded.starts_with('\u{FEFF}'));
         assert_eq!(decode_text(&encoded).text, input);
     }
@@ -350,7 +353,8 @@ mod tests {
     fn script_roundtrip_detects_legacy_escape_variants() {
         // A canonical script file re-encodes to itself through the char layer.
         let readable = "dynasty = \"大明王朝\"\r\n";
-        let canonical_bytes = encode_file(readable, Profile::Script, EscapeSet::Paratranz).unwrap();
+        let canonical_bytes =
+            encode_file(readable, Profile::Script, EscapeSet::Paratranz).expect("encode file");
         let canonical_text: String = canonical_bytes
             .iter()
             .map(|byte| char::from_u32(cp1252::byte_to_char(*byte)).expect("scalar"))
@@ -359,12 +363,14 @@ mod tests {
         // A file produced with the 29-value superset decodes fine but no longer
         // re-encodes to itself under the canonical set — the Hint case. 尺
         // (U+5C3A) has low byte 0x3A, escaped only by the legacy superset.
-        let legacy_bytes = encode_file("尺", Profile::Script, EscapeSet::DllFull).unwrap();
+        let legacy_bytes =
+            encode_file("尺", Profile::Script, EscapeSet::DllFull).expect("encode file");
         let legacy_text: String = legacy_bytes
             .iter()
             .map(|byte| char::from_u32(cp1252::byte_to_char(*byte)).expect("scalar"))
             .collect();
-        let canonical_bytes = encode_file("尺", Profile::Script, EscapeSet::Paratranz).unwrap();
+        let canonical_bytes =
+            encode_file("尺", Profile::Script, EscapeSet::Paratranz).expect("encode file");
         let canonical_text: String = canonical_bytes
             .iter()
             .map(|byte| char::from_u32(cp1252::byte_to_char(*byte)).expect("scalar"))
@@ -384,36 +390,28 @@ mod tests {
     fn known_triple_from_release_file() {
         // U+5E8A (low 0x8A not in set, high 0x5E not in set) -> [0x10, U+0160, '^']
         // observed verbatim in a real mod's release file.
-        let encoded = encode_text("\u{5E8A}", P).unwrap();
+        let encoded = encode_text("\u{5E8A}", P).expect("encode text");
         assert_eq!(encoded, "\u{0010}\u{0160}^");
         assert_eq!(decoded_text(&encoded), "\u{5E8A}");
     }
 
     #[test]
-    fn high_byte_compensation() {
-        // U+5F02: high 0x5F in set -> marker 0x12, high 0x5F-9 = 0x56.
-        let encoded = encode_text("\u{5F02}", P).unwrap();
-        let cps: Vec<u32> = encoded.chars().map(u32::from).collect();
-        assert_eq!(cps, [0x12, 0x02, 0x56]);
-        assert_eq!(decoded_text(&encoded), "\u{5F02}");
-    }
-
-    #[test]
-    fn low_byte_compensation() {
-        // U+4E3B (主): low 0x3B in set -> marker 0x11, low 0x3B+0x0E = 0x49.
-        let encoded = encode_text("\u{4E3B}", P).unwrap();
-        let cps: Vec<u32> = encoded.chars().map(u32::from).collect();
-        assert_eq!(cps, [0x11, 0x49, 0x4E]);
-        assert_eq!(decoded_text(&encoded), "\u{4E3B}");
-    }
-
-    #[test]
-    fn both_byte_compensation() {
-        // U+3B22: low 0x22 and high 0x3B in set -> marker 0x13.
-        let encoded = encode_text("\u{3B22}", P).unwrap();
-        let cps: Vec<u32> = encoded.chars().map(u32::from).collect();
-        assert_eq!(cps, [0x13, 0x30, 0x32]);
-        assert_eq!(decoded_text(&encoded), "\u{3B22}");
+    fn high_low_and_both_byte_compensation_matrix() {
+        // When a triple byte would collide with a set member, the encoder
+        // shifts that byte and marks the position in the marker itself.
+        for (code_point, expected) in [
+            (0x5F02u32, vec![0x12u32, 0x02, 0x56]), // high 0x5F in set -> marker 0x12, high 0x5F-9
+            (0x4E3B, vec![0x11, 0x49, 0x4E]), // 主: low 0x3B in set -> marker 0x11, low 0x3B+0x0E
+            (0x3B22, vec![0x13, 0x30, 0x32]), // low 0x22 and high 0x3B both in set -> marker 0x13
+        ] {
+            let character = char::from_u32(code_point)
+                .expect("valid code point")
+                .to_string();
+            let encoded = encode_text(&character, P).expect("encode text");
+            let cps: Vec<u32> = encoded.chars().map(u32::from).collect();
+            assert_eq!(cps, expected, "U+{code_point:04X}");
+            assert_eq!(decoded_text(&encoded), character, "U+{code_point:04X}");
+        }
     }
 
     #[test]
@@ -421,8 +419,10 @@ mod tests {
         // Triple members can themselves be marker bytes; decoding consumes
         // positionally, so the stream stays unambiguous.
         for code_point in [0x1061, 0x1010, 0x6110, 0x6113, 0x1361] {
-            let character = char::from_u32(code_point).unwrap().to_string();
-            let encoded = encode_text(&character, P).unwrap();
+            let character = char::from_u32(code_point)
+                .expect("valid code point")
+                .to_string();
+            let encoded = encode_text(&character, P).expect("encode text");
             assert_eq!(decoded_text(&encoded), character, "U+{code_point:04X}");
         }
     }
@@ -432,21 +432,31 @@ mod tests {
         // 为 U+4E3A (low 0x3A) and 个 U+4E2A (low 0x2A): paratranz leaves them raw,
         // dll-full escapes them — a calibration lesson from the real mod corpus.
         for code_point in [0x4E3A, 0x4E2A] {
-            let character = char::from_u32(code_point).unwrap().to_string();
-            let canonical = encode_file(&character, Profile::Script, P).unwrap();
-            let dll = encode_file(&character, Profile::Script, EscapeSet::DllFull).unwrap();
+            let character = char::from_u32(code_point)
+                .expect("valid code point")
+                .to_string();
+            let canonical = encode_file(&character, Profile::Script, P).expect("encode file");
+            let dll =
+                encode_file(&character, Profile::Script, EscapeSet::DllFull).expect("encode file");
             assert_ne!(canonical, dll, "U+{code_point:04X}");
             assert_eq!(
-                decode_file(&canonical, Profile::Script).unwrap().text,
+                decode_file(&canonical, Profile::Script)
+                    .expect("decode file")
+                    .text,
                 character
             );
-            assert_eq!(decode_file(&dll, Profile::Script).unwrap().text, character);
+            assert_eq!(
+                decode_file(&dll, Profile::Script)
+                    .expect("decode file")
+                    .text,
+                character
+            );
         }
     }
 
     #[test]
     fn script_profile_keeps_cp1252_single_bytes() {
-        let bytes = encode_file("\u{2018}x\u{20AC}", Profile::Script, P).unwrap();
+        let bytes = encode_file("\u{2018}x\u{20AC}", Profile::Script, P).expect("encode file");
         assert_eq!(bytes, vec![0x91, b'x', 0x80]);
     }
 
@@ -472,7 +482,7 @@ mod tests {
         // unmapped low-plane characters are rejected.
         assert!(encode_file("\u{0100}", Profile::Script, P).is_err());
         assert_eq!(
-            encode_file("\u{0160}", Profile::Script, P).unwrap(),
+            encode_file("\u{0160}", Profile::Script, P).expect("encode file"),
             vec![0x8A]
         );
     }
@@ -483,7 +493,7 @@ mod tests {
         assert_eq!(decoded.text, "a\u{0010}");
         assert_eq!(decoded.broken_sequences, vec![1]);
 
-        let decoded = decode_file(&[b'a', 0x10], Profile::Script).unwrap();
+        let decoded = decode_file(&[b'a', 0x10], Profile::Script).expect("decode file");
         assert_eq!(decoded.text, "a\u{0010}");
         assert_eq!(decoded.broken_sequences, vec![1]);
     }

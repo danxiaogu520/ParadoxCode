@@ -51,6 +51,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The mission tree preview now pins to the most recently focused mission file: moving focus to a
+  non-mission file keeps the rendered tree on screen instead of clearing to the empty-state hint,
+  and focusing another mission file retargets the preview as before. Closing the pinned file's tab
+  returns the panel to the empty state. A filename badge in the preview toolbar names the document
+  the tree was computed from (hover for the full path), since with pinning it can differ from the
+  active editor.
 - The five 0.4.0 `vscode.lm` tools were renamed to the vendor-prefixed `paradoxcode_` scheme
   and reorganised: `paradoxcode-validate-text` → `paradoxcode_validate_text`,
   `-search-symbols` → `paradoxcode_search`, `-search-rules` → `paradoxcode_rules`,

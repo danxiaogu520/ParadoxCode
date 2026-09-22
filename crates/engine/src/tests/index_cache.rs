@@ -726,6 +726,32 @@ fn vanilla_cache_previews_retain_only_preferred_languages() {
     fs::remove_dir_all(root).expect("cleanup");
 }
 
+/// Scans `dependency` (already populated) as a dependency root with the given
+/// id, then round-trips the snapshot through disk so the returned cache is the
+/// installed artifact, not the in-memory builder state.
+fn build_dependency_cache(
+    root: &std::path::Path,
+    dependency: &std::path::Path,
+    root_id: u32,
+) -> (SourceRoot, IndexCache) {
+    let dependency_path = fs::canonicalize(dependency).expect("canonical dependency root");
+    let dependency_root = SourceRoot::new(
+        SourceRootId::new(root_id),
+        SourceRootKind::Dependency,
+        AbsPath::normalize(&dependency_path),
+    );
+    let mut builder = eu4_host_with(game::eu4::first_party_rules().expect("first-party rules"));
+    builder.apply_change(WorkspaceChange::SetSourceRoots(vec![
+        dependency_root.clone(),
+    ]));
+    builder.refresh_source_roots().expect("scan dependency");
+    let cache = IndexCache::from_snapshot(&builder.snapshot()).expect("build cache");
+    let cache_path = root.join("cache/dependency.pdcindex");
+    cache.save(&cache_path).expect("save cache");
+    let loaded = IndexCache::load(&cache_path).expect("load cache");
+    (dependency_root, loaded)
+}
+
 #[test]
 fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
     let root = temp_root("dependency-cache");
@@ -743,26 +769,9 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
         "country_event = { id = dep.1 immediate = { dep_cached_effect = { amount = 1 } } }\n",
     )
     .expect("dependency events");
-    let dependency_path = fs::canonicalize(&dependency).expect("canonical dependency root");
-    let dependency_root = SourceRoot::new(
-        SourceRootId::new(42),
-        SourceRootKind::Dependency,
-        AbsPath::normalize(&dependency_path),
-    );
-
-    // Build the cache from a dedicated dependency-only workspace.
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
-    let mut builder = eu4_host_with(rules);
-    builder.apply_change(WorkspaceChange::SetSourceRoots(vec![
-        dependency_root.clone(),
-    ]));
-    builder.refresh_source_roots().expect("scan dependency");
-    let cache = IndexCache::from_snapshot(&builder.snapshot()).expect("build cache");
-    let cache_path = root.join("cache/dependency.pdcindex");
-    cache.save(&cache_path).expect("save cache");
+    let (dependency_root, loaded) = build_dependency_cache(&root, &dependency, 42);
 
     // The cache restores the non-Vanilla root identity.
-    let loaded = IndexCache::load(&cache_path).expect("load cache");
     assert_eq!(loaded.source_root().id, dependency_root.id);
     assert_eq!(loaded.source_root().kind, SourceRootKind::Dependency);
 
@@ -898,20 +907,7 @@ fn dependency_index_cache_rejects_an_unrelated_configured_root() {
         "country_event = { id = mismatch.1 }\n",
     )
     .expect("dependency events");
-    let dependency_path = fs::canonicalize(&dependency).expect("canonical dependency root");
-
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
-    let mut builder = eu4_host_with(rules);
-    builder.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-        SourceRootId::new(7),
-        SourceRootKind::Dependency,
-        AbsPath::normalize(&dependency_path),
-    )]));
-    builder.refresh_source_roots().expect("scan dependency");
-    let cache = IndexCache::from_snapshot(&builder.snapshot()).expect("build cache");
-    let cache_path = root.join("cache/dependency.pdcindex");
-    cache.save(&cache_path).expect("save cache");
-    let loaded = IndexCache::load(&cache_path).expect("load cache");
+    let (_, loaded) = build_dependency_cache(&root, &dependency, 7);
 
     // The configured root claims the same id but a different directory.
     let other = root.join("other");
