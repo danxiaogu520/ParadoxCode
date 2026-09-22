@@ -1,0 +1,111 @@
+name: PR autosync
+
+# Keeps the maintainer's pull requests self-driving. Every maintainer PR gets
+# squash auto-merge enabled as soon as it exists, and every push to main
+# refreshes all open maintainer PR branches (update-branch) so their CI re-runs
+# against the latest base. GitHub's native auto-merge then merges each PR once
+# the required `Conclusion` check is green and the branch has no conflicts —
+# no manual auto-merge enablement and no manual branch syncing left to do.
+#
+# Everything runs through the AUTOMERGE_TOKEN fine-grained PAT, never
+# GITHUB_TOKEN: pushes made with GITHUB_TOKEN intentionally trigger no other
+# workflows, which would leave refreshed branches without a CI run (auto-merge
+# then waits forever for a check that never comes) and main without its
+# post-merge Conclusion run.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  # One autosync pass at a time; a newer pass supersedes an older one and
+  # re-lists whatever PRs are still open.
+  group: pr-autosync
+  cancel-in-progress: true
+
+jobs:
+  autosync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable auto-merge and refresh branches
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo '::error::AUTOMERGE_TOKEN is missing. Create a fine-grained PAT' \
+              '(Contents: read+write, Pull requests: read+write, this repository' \
+              'only) and add it as the AUTOMERGE_TOKEN repository secret.' >&2
+            exit 1
+          fi
+          repo="${GITHUB_REPOSITORY}"
+          owner="${GITHUB_REPOSITORY_OWNER}"
+          tmp="$(mktemp)"
+
+          # Fail the whole pass on a bad token; otherwise every per-PR skip
+          # below would masquerade as success while nothing happens.
+          if ! gh api "repos/${repo}" --jq .full_name >/dev/null; then
+            echo '::error::AUTOMERGE_TOKEN cannot access this repository' \
+              '(invalid, expired, or wrong repository scope).' >&2
+            exit 1
+          fi
+
+          # Per-PR failures (conflicts, drafts, foreign authors) are logged and
+          # skipped; one blocked PR must not red-light the whole pass.
+          process_pr() {
+            local number="$1" meta
+            if ! meta="$(gh pr view "$number" --repo "$repo" \
+              --json author,isDraft,isCrossRepository,autoMergeRequest)"; then
+              echo "PR #${number}: cannot read (merged or gone), skipping"
+              return
+            fi
+            if [[ "$(jq -r '.author.login' <<<"$meta")" != "$owner" ]]; then
+              echo "PR #${number}: not authored by the maintainer, skipping"
+              return
+            fi
+            if [[ "$(jq -r '.isDraft' <<<"$meta")" == "true" ]]; then
+              echo "PR #${number}: draft, skipping"
+              return
+            fi
+            if [[ "$(jq -r '.isCrossRepository' <<<"$meta")" == "true" ]]; then
+              echo "PR #${number}: fork head, update-branch unavailable, skipping"
+              return
+            fi
+            if [[ -z "$(jq -r '.autoMergeRequest // empty' <<<"$meta")" ]]; then
+              if gh pr merge "$number" --repo "$repo" --auto --squash; then
+                echo "PR #${number}: squash auto-merge enabled"
+              else
+                echo "PR #${number}: enabling auto-merge failed, skipping"
+                return
+              fi
+            else
+              echo "PR #${number}: auto-merge already enabled"
+            fi
+            if gh api -X PUT "repos/${repo}/pulls/${number}/update-branch" \
+              >/dev/null 2>"$tmp"; then
+              echo "PR #${number}: branch refresh requested"
+            else
+              # 422 covers both real conflicts and an already-up-to-date
+              # branch; both are expected, neither is an error.
+              echo "PR #${number}: branch not refreshed — $(cat "$tmp")"
+            fi
+          }
+
+          if [[ -n "${PR_NUMBER:-}" ]]; then
+            process_pr "$PR_NUMBER"
+          else
+            numbers="$(gh pr list --repo "$repo" --state open --limit 100 \
+              --json number --jq '.[].number')"
+            if [[ -z "$numbers" ]]; then
+              echo 'no open pull requests'
+              exit 0
+            fi
+            for number in $numbers; do
+              process_pr "$number"
+            done
+          fi
