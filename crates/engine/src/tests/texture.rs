@@ -366,7 +366,7 @@ fn catalog_prefers_disk_files_over_packed_members() {
             .hit
             .path
             .as_path()
-            .ends_with(&std::path::Path::new("gfx").join("shared.dds"))
+            .ends_with(std::path::Path::new("gfx").join("shared.dds"))
     );
     assert_eq!(resolution.hit.archive_member, None);
 }
