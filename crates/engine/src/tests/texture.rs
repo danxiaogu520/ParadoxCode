@@ -360,13 +360,13 @@ fn catalog_prefers_disk_files_over_packed_members() {
     let roots = [source_root(1, SourceRootKind::Vanilla, &game_root)];
     let catalog = TextureCatalog::build(&roots);
     let resolution = catalog.resolve(&roots, "gfx/shared.dds").expect("resolves");
+    // Component-wise suffix: disk paths carry platform separators.
     assert!(
         resolution
             .hit
             .path
             .as_path()
-            .to_string_lossy()
-            .ends_with("gfx/shared.dds")
+            .ends_with(&std::path::Path::new("gfx").join("shared.dds"))
     );
     assert_eq!(resolution.hit.archive_member, None);
 }
