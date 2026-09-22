@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-22
+
 ### Added
 
 - Four new agent tools over the running language server, bringing the read-only surface to
@@ -48,6 +50,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   as readable UTF-8. Both write a `.pre-transcode.bak` backup next to the file first, refuse
   when an editor holds unsaved changes for it, and appear in the palette and Explorer context
   menu only while `paradoxcode.localisation.transparentEncoding` is `false`.
+- Mission icon picker: a webview panel (command palette, the editor-title button on mission
+  files, and the editor context menu) whose mission tab lists every sprite named `mission…` or
+  whose texture lives under `gfx/interface/missions/`, with a second tab browsing all sprites.
+  Each cell shows the first frame, the sprite name, a vanilla/mod source badge, and the frame
+  count; pixels load lazily in batches. Clicking writes the value into the `icon = …` span in
+  place (or inserts at the cursor) and closes the panel. Completion docs for sprite values
+  (mission `icon`, event `picture`) embed the decoded first frame via `completionItem/resolve`,
+  gated by `paradoxcode.completion.iconPreview` (default on).
+- Bilingual extension UI (English + 简体中文): all user-visible strings go through
+  `vscode.l10n.t`, and the webviews receive a localised dictionary with an English fallback
+  table baked into the media scripts. Terminology follows `docs/glossary.md` (Vanilla → 原版,
+  Mod → 模组, sprite → 图像), and a new i18n contract gate enforces bundle key parity and
+  webview table sync. LLM-facing strings and server diagnostics stay English.
 
 ### Changed
 
@@ -69,6 +84,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   new `prefix=` token to prefix listing.
 - Symbol search result caps are now declared per zone in each tool description (100 script
   symbols, 20 default / 50 max localisation entries).
+- The add-dependency loading-strategy quick pick now defaults to the **persistent index cache**
+  (listed first and marked recommended, with pros/cons in each option's detail line) instead of
+  live scanning. A new **ParadoxCode: Update Index Caches** command
+  (`paradoxcode.updateIndexCaches`) notifies and restarts the server so persistent dependency
+  caches and the Vanilla cache refresh incrementally at re-initialize — the manual pickup path,
+  since cached dependencies are not file-watched mid-session. The `paradoxcode.dependencies`
+  and `paradoxcode.vanillaIndexCache` setting descriptions now explain both loading modes.
 - When the participant's 12-round tool budget is exhausted, the loop now forces a final
   no-tools request that answers from the results already gathered (and states what could not
   be verified) instead of ending with a static "ask me to continue" line that discarded the
@@ -1109,7 +1131,8 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.8...v0.4.0
 [0.3.8]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.6...v0.3.7
