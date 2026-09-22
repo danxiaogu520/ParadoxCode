@@ -387,6 +387,17 @@ async function openDependencySettings(): Promise<void> {
     );
 }
 
+// Cache refresh rides the restart: at initialize the server loads every persistent
+// dependency/Vanilla cache and incrementally refreshes it against its source
+// directory (fingerprint diff; only changed files are re-parsed). Cached roots are
+// not file-watched mid-session, so this command is the manual pickup path.
+function updateIndexCaches(restart: () => void): void {
+    void vscode.window.showInformationMessage(
+        vscode.l10n.t('ParadoxCode: refreshing persistent index caches — the language server is restarting…'),
+    );
+    restart();
+}
+
 async function addDependency(): Promise<void> {
     const workspaceFolder = workspaceConfigurationTarget();
     if (!workspaceFolder) {
@@ -449,14 +460,16 @@ async function addDependency(): Promise<void> {
 
     const cacheChoice = await vscode.window.showQuickPick([
         {
-            label: vscode.l10n.t('Live scan'),
-            description: vscode.l10n.t('Scan this dependency when the language server starts.'),
-            value: 'live',
+            label: vscode.l10n.t('Persistent index cache (recommended)'),
+            description: vscode.l10n.t('Loads a .pdcindex and re-checks only the files that changed.'),
+            detail: vscode.l10n.t('Pros: fast startup even for large mods. Cons: changes made while the server runs are picked up only after Update Index Caches.'),
+            value: 'index',
         },
         {
-            label: vscode.l10n.t('Persistent index cache'),
-            description: vscode.l10n.t('Load/build a .pdcindex instead of scanning on every launch.'),
-            value: 'index',
+            label: vscode.l10n.t('Live scan'),
+            description: vscode.l10n.t('Scans the directory on every start and keeps watching it.'),
+            detail: vscode.l10n.t('Pros: dependency changes are picked up automatically. Cons: large mods slow down startup and can cause lag.'),
+            value: 'live',
         },
     ], {
         title: vscode.l10n.t('How should ParadoxCode load this dependency?'),
@@ -1680,6 +1693,7 @@ export function activate(context: vscode.ExtensionContext): void {
             () => openDependencySettings(),
         ),
         vscode.commands.registerCommand('paradoxcode.reloadServer', restart),
+        vscode.commands.registerCommand('paradoxcode.updateIndexCaches', () => updateIndexCaches(restart)),
         vscode.commands.registerCommand('paradoxcode.exportDiagnostics', () => exportDiagnostics()),
         vscode.commands.registerCommand('paradoxcode.formatWorkspace', () => formatWorkspace()),
         vscode.commands.registerCommand('paradoxcode.refreshLoadedFiles', () => loadedFilesProvider.refresh(client)),

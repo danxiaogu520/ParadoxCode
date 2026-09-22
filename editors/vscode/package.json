@@ -905,6 +905,11 @@
         "category": "ParadoxCode"
       },
       {
+        "command": "paradoxcode.updateIndexCaches",
+        "title": "%commands.updateIndexCaches.title%",
+        "category": "ParadoxCode"
+      },
+      {
         "command": "paradoxcode.reloadServer",
         "title": "%commands.reloadServer.title%",
         "category": "ParadoxCode"

@@ -418,6 +418,7 @@ for (const command of [
   'paradoxcode.addDependency',
   'paradoxcode.removeDependency',
   'paradoxcode.openDependencySettings',
+  'paradoxcode.updateIndexCaches',
 ]) {
   const contribution = manifest.contributes.commands?.find((entry) => entry.command === command);
   if (!contribution || typeof contribution.title !== 'string') {
