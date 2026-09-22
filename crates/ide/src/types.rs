@@ -646,6 +646,8 @@ pub enum CompletionKind {
     Localisation,
     /// A parameter declared by a dynamic definition.
     DynamicParameter,
+    /// A directory offered while drilling down a path-shaped value.
+    Folder,
 }
 
 /// Completion query output.
