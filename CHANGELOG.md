@@ -9,6 +9,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Position-bound agent tools answered "document is not open" for exactly the files they are meant
+  to describe. `paradoxcode_context` (hover) and `paradoxcode_references` resolve paths to
+  `file://` URIs, but the server only served documents an editor had opened under that exact URI:
+  the MCP server's own pdc instance never receives `didOpen` (both tools failed for every file),
+  and in the extension transparent encoding syncs the `pdcloc://` decoded twin instead of the
+  `file://` URI, so the tools failed for the very files being edited. The server now lazily stages
+  the scanned disk text for snapshot requests addressing known workspace files (unknown URIs keep
+  the error), and the extension's tools prefer an open document's URI — the decoded twin carries
+  the live, possibly unsaved text — before falling back to the on-disk URI.
+
 - Mission Tree Preview failed with "The mission file must live inside the workspace root." for any
   mission file opened through its `pdcloc://` decoded view (transparent encoding, on by default
   since 0.4.1, takes over every `*.txt` tab): the preview located the workspace folder with a
