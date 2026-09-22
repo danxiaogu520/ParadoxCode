@@ -1,8 +1,10 @@
 use super::common::{contains_line_break, fits_line, indent};
+use super::paths::{is_asset_path_spelling, normalize_asset_path_separators};
 use crate::{
     CstKind, CstNode, ParsedFile, encode_quoted_script_text,
     parse_quoted_script as parse_quoted_payload,
 };
+use std::borrow::Cow;
 use text::TextRange;
 const MAX_QUOTED_SCRIPT_DEPTH: usize = 64;
 pub(super) fn format_script(file: &ParsedFile) -> String {
@@ -209,7 +211,7 @@ impl<'file> PdcFormatter<'file> {
             node
         };
         match node.kind() {
-            CstKind::BareValue => ValueLayout::inline(canonical_keyword(self.text(node))),
+            CstKind::BareValue => ValueLayout::inline(canonical_scalar(self.text(node))),
             CstKind::QuotedString => self.quoted(node, depth, compact, force_expand),
             CstKind::Block => self.block(node, depth, compact, force_expand),
             CstKind::HeaderBlock => self.header_value(node, depth, compact, force_expand),
@@ -316,7 +318,7 @@ impl<'file> PdcFormatter<'file> {
 
     fn inline_item(&self, node: CstNode<'_>, depth: usize) -> Option<String> {
         match node.kind() {
-            CstKind::BareValue => Some(canonical_keyword(self.text(node)).to_owned()),
+            CstKind::BareValue => Some(canonical_scalar(self.text(node)).into_owned()),
             CstKind::QuotedString => match self.quoted(node, depth, false, false) {
                 ValueLayout::Inline { text, .. } if !contains_line_break(&text) => Some(text),
                 _ => None,
@@ -360,7 +362,7 @@ impl<'file> PdcFormatter<'file> {
     fn compact_item(&self, node: CstNode<'_>, depth: usize) -> Option<String> {
         match node.kind() {
             CstKind::Comment | CstKind::Bom => None,
-            CstKind::BareValue => Some(canonical_keyword(self.text(node)).to_owned()),
+            CstKind::BareValue => Some(canonical_scalar(self.text(node)).into_owned()),
             CstKind::QuotedString => match self.quoted(node, depth, true, false) {
                 ValueLayout::Inline { text, .. } => Some(text),
                 _ => None,
@@ -432,6 +434,9 @@ impl<'file> PdcFormatter<'file> {
     ) -> ValueLayout {
         let source = self.text(node);
         let Some(script) = quoted_script(source, self.quoted_script_depth) else {
+            if is_asset_path_spelling(source) {
+                return ValueLayout::inline(normalize_asset_path_separators(source));
+            }
             return ValueLayout::inline(source);
         };
         let inner = PdcFormatter::new(&script.parsed, self.quoted_script_depth + 1);
@@ -492,11 +497,22 @@ fn compose(prefix: String, layout: ValueLayout) -> Vec<String> {
     }
 }
 
+/// Canonical spelling of a bare scalar: the fixed keyword capitals, then
+/// asset-path separator normalization for path-shaped values.
+fn canonical_scalar(text: &str) -> Cow<'_, str> {
+    let keyword = canonical_keyword(text);
+    if is_asset_path_spelling(keyword) {
+        normalize_asset_path_separators(keyword)
+    } else {
+        Cow::Borrowed(keyword)
+    }
+}
+
 /// Canonical spelling of the fixed script keywords Paradox convention writes in capitals.
 /// Any other token is returned unchanged; matching is case-insensitive so mixed spellings
 /// normalize to the canonical form. A leading byte order mark (the lexer attaches it to the
 /// first key token of a BOM-prefixed file) is preserved and skipped for matching.
-pub(super) fn canonical_keyword(text: &str) -> &str {
+pub fn canonical_keyword(text: &str) -> &str {
     match text {
         _ if text.eq_ignore_ascii_case("and") => "AND",
         _ if text.eq_ignore_ascii_case("or") => "OR",

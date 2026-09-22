@@ -179,3 +179,57 @@ fn script_keyword_spelling_is_canonicalized_to_capitals() {
     // The canonical form is already uppercase: formatting is idempotent and emits no edits.
     assert!(format(&parse(FileFormat::Script, &output)).edits.is_empty());
 }
+
+#[test]
+fn asset_path_separators_canonicalize_to_single_forward_slashes() {
+    let source = r#"sprite = {
+	texturefile = "gfx\\interface\\alerticon_dismiss.dds"
+	second = "gfx//interface//hre_bg.tga"
+	mixed = "gfx\\interface\choose_language_bg.dds"
+	file = "gfx\\models\ships\barque.mesh"
+	bare = gfx\interface\plain.dds
+	upper = "gfx\\a.DDS"
+	clean = "gfx/interface/plain.dds"
+}
+"#;
+    let expected = r#"sprite = {
+	texturefile = "gfx/interface/alerticon_dismiss.dds"
+	second = "gfx/interface/hre_bg.tga"
+	mixed = "gfx/interface/choose_language_bg.dds"
+	file = "gfx/models/ships/barque.mesh"
+	bare = gfx/interface/plain.dds
+	upper = "gfx/a.DDS"
+	clean = "gfx/interface/plain.dds"
+}
+"#;
+    let output = formatted(FileFormat::Script, source);
+    assert_eq!(output, expected);
+    assert!(format(&parse(FileFormat::Script, &output)).edits.is_empty());
+}
+
+#[test]
+fn non_asset_path_scalars_keep_their_spelling() {
+    let source = r#"window = {
+	spaces = "gfx//dlc//king of kings//x.dds"
+	no_extension = "gfx\interface"
+	plain_text = "notes\a.txt"
+	empty = ""
+	number = "999"
+	escaped_quote = "a\"b.dds"
+	description = "readme\\notes"
+}
+"#;
+    assert_eq!(formatted(FileFormat::Script, source), source);
+}
+
+#[test]
+fn quoted_script_payloads_normalize_nested_asset_paths() {
+    let source = r#"effect = "
+	texturefile = \"gfx\\a.dds\"
+"
+"#;
+    let expected = concat!(r#"effect = "texturefile = \"gfx/a.dds\"""#, "\n",);
+    let output = formatted(FileFormat::Script, source);
+    assert_eq!(output, expected);
+    assert!(format(&parse(FileFormat::Script, &output)).edits.is_empty());
+}

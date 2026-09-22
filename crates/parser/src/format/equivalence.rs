@@ -36,9 +36,11 @@ pub(super) fn equivalent(original: &ParsedFile, formatted: &ParsedFile, depth: u
                     depth.saturating_add(1),
                 );
             }
-            // Keyword casing is a canonicalization, not a semantic change: the formatter
-            // writes the fixed uppercase spelling, so the safety gate must accept it.
+            // Keyword casing and asset-path separators are canonical rewrites, not
+            // semantic changes: the game accepts every spelling, so the safety gate
+            // must accept the fixed forms the formatter writes.
             super::script::canonical_keyword(before_text) == after_text
+                || super::paths::is_asset_path_normalization(before_text, after_text)
         })
 }
 
@@ -79,9 +81,14 @@ pub(super) fn minimal_edits(
         let after_text = formatted.text(after.range())?;
         if before_text != after_text {
             if before.kind() != TokenKind::Quoted || quoted_script(before_text, 0).is_none() {
-                // Only keyword-casing canonicalization may change a non-quoted token.
-                if before.kind() == TokenKind::Quoted
-                    || super::script::canonical_keyword(before_text) != after_text
+                // Outside quoted script payloads, only keyword-casing and asset-path
+                // separator canonicalization may change a token.
+                if before.kind() == TokenKind::Quoted {
+                    if !super::paths::is_asset_path_normalization(before_text, after_text) {
+                        return None;
+                    }
+                } else if super::script::canonical_keyword(before_text) != after_text
+                    && !super::paths::is_asset_path_normalization(before_text, after_text)
                 {
                     return None;
                 }

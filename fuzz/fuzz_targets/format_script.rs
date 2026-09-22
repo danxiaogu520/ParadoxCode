@@ -37,7 +37,16 @@ fuzz_target!(|data: &[u8]| {
                 .text(before.range())
                 .is_some_and(|text| text.contains('\n'))
         {
-            assert_eq!(parsed.text(before.range()), reparsed.text(after.range()));
+            let before_text = parsed.text(before.range()).expect("before token text");
+            let after_text = reparsed.text(after.range()).expect("after token text");
+            // Beyond byte-identical text, the formatter may only apply its two
+            // canonical rewrites: keyword casing and asset-path separators.
+            assert!(
+                before_text == after_text
+                    || parser::format::canonical_keyword(before_text) == after_text
+                    || parser::format::is_asset_path_normalization(before_text, after_text),
+                "unexpected rewrite: {before_text:?} -> {after_text:?}"
+            );
         }
     }
     assert!(format(&reparsed).edits.is_empty());
