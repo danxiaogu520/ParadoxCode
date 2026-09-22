@@ -26,6 +26,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   200-file cap now applies per directory rather than to the whole catalog (~10k entries on a
   vanilla workspace).
 
+- The texture catalog now harvests DLC archives record-only: each `dlc/<pack>/<id>.zip`'s
+  central directory is read for member names (no extraction, no decompression — a hand-rolled
+  bounded parser that yields nothing on zip64, truncated, or corrupt archives), catalog-image
+  members join the same normalized namespace and the directory browse as if they were files,
+  and files shipped loose on disk keep priority. Hover provenance for a packed asset shows
+  both the archive path and the member inside it (`…/dlc128.zip :: gfx/event_pictures/….dds`);
+  hover previews of packed assets degrade to the no-preview state because only names are
+  recorded. On the maintainer's vanilla install this resolves every previously unreachable
+  DLC-packed texture reference (King of Kings, Winds of Change) and grows the catalog by
+  ~2,200 entries.
+
 ### Fixed
 
 - Position-bound agent tools answered "document is not open" for exactly the files they are meant

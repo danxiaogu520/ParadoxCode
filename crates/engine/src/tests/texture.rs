@@ -229,3 +229,144 @@ fn snapshot_rebuilds_the_texture_catalog_when_watched_assets_change() {
         "catalog invalidated and rebuilt for a watched asset"
     );
 }
+
+/// Writes a real STORED-method zip with the given (name, payload) members so
+/// the central-directory harvest is exercised against authentic archive bytes.
+fn write_stored_zip(path: &std::path::Path, members: &[(&str, &[u8])]) {
+    fn le16(value: u16) -> [u8; 2] {
+        value.to_le_bytes()
+    }
+    fn le32(value: u32) -> [u8; 4] {
+        value.to_le_bytes()
+    }
+    let mut body = Vec::new();
+    let mut central = Vec::new();
+    for (name, payload) in members {
+        let local_offset = body.len() as u32;
+        body.extend_from_slice(&[0x50, 0x4b, 0x03, 0x04]); // local signature
+        body.extend_from_slice(&le16(20)); // version needed
+        body.extend_from_slice(&le16(0)); // flags
+        body.extend_from_slice(&le16(0)); // stored
+        body.extend_from_slice(&le16(0)); // time
+        body.extend_from_slice(&le16(0)); // date
+        body.extend_from_slice(&le32(0)); // crc
+        body.extend_from_slice(&le32(payload.len() as u32));
+        body.extend_from_slice(&le32(payload.len() as u32));
+        body.extend_from_slice(&le16(name.len() as u16));
+        body.extend_from_slice(&le16(0)); // extra
+        body.extend_from_slice(name.as_bytes());
+        body.extend_from_slice(payload);
+        central.extend_from_slice(&[0x50, 0x4b, 0x01, 0x02]);
+        central.extend_from_slice(&le16(20)); // version made by
+        central.extend_from_slice(&le16(20)); // version needed
+        central.extend_from_slice(&le16(0)); // flags
+        central.extend_from_slice(&le16(0)); // stored
+        central.extend_from_slice(&le16(0)); // time
+        central.extend_from_slice(&le16(0)); // date
+        central.extend_from_slice(&le32(0)); // crc
+        central.extend_from_slice(&le32(payload.len() as u32));
+        central.extend_from_slice(&le32(payload.len() as u32));
+        central.extend_from_slice(&le16(name.len() as u16));
+        central.extend_from_slice(&le16(0)); // extra
+        central.extend_from_slice(&le16(0)); // comment
+        central.extend_from_slice(&le16(0)); // disk start
+        central.extend_from_slice(&le16(0)); // internal attrs
+        central.extend_from_slice(&le32(0)); // external attrs
+        central.extend_from_slice(&le32(local_offset));
+        central.extend_from_slice(name.as_bytes());
+    }
+    let central_offset = body.len() as u32;
+    let central_size = central.len() as u32;
+    let mut zip = body;
+    zip.extend_from_slice(&central);
+    zip.extend_from_slice(&[0x50, 0x4b, 0x05, 0x06]);
+    zip.extend_from_slice(&le16(0)); // disk
+    zip.extend_from_slice(&le16(0)); // central directory disk
+    zip.extend_from_slice(&le16(members.len() as u16));
+    zip.extend_from_slice(&le16(members.len() as u16));
+    zip.extend_from_slice(&le32(central_size));
+    zip.extend_from_slice(&le32(central_offset));
+    zip.extend_from_slice(&le16(0)); // comment
+    fs::write(path, zip).expect("write zip");
+}
+
+#[test]
+fn catalog_harvests_dlc_zip_members_record_only() {
+    let game_root = temp_root("dlczip");
+    let pack_dir = game_root.join("dlc/dlc999_probe");
+    fs::create_dir_all(&pack_dir).expect("pack dir");
+    write_stored_zip(
+        &pack_dir.join("dlc999.zip"),
+        &[
+            ("gfx/event_pictures/pic.dds", b"pixels"),
+            ("music/track.mp3", b"audio"),
+            ("interface/readme.txt", b"text"),
+        ],
+    );
+    // No disk copy of the packed key exists here; the duplicate-priority case
+    // is covered by `catalog_prefers_disk_files_over_packed_members` below.
+    let roots = [source_root(1, SourceRootKind::Vanilla, &game_root)];
+    let catalog = TextureCatalog::build(&roots);
+
+    // The packed member resolves with archive provenance.
+    let resolution = catalog
+        .resolve(&roots, "gfx/event_pictures/pic.dds")
+        .expect("packed member resolves");
+    assert!(
+        resolution
+            .hit
+            .path
+            .as_path()
+            .to_string_lossy()
+            .ends_with("dlc999.zip")
+    );
+    assert_eq!(
+        resolution.hit.archive_member.as_deref(),
+        Some("gfx/event_pictures/pic.dds")
+    );
+    assert_eq!(resolution.hit.root_kind, SourceRootKind::Vanilla);
+
+    // Non-catalog extensions stay out, and so does a corrupt archive.
+    assert!(catalog.resolve(&roots, "music/track.mp3").is_none());
+    fs::write(pack_dir.join("broken.zip"), b"not a zip at all").expect("broken zip");
+    let rebuilt = TextureCatalog::build(&roots);
+    assert!(
+        rebuilt
+            .resolve(&roots, "gfx/event_pictures/pic.dds")
+            .is_some()
+    );
+
+    // The packed member's directories join the browse index.
+    let children = rebuilt.children_with_prefix("gfx/");
+    assert!(
+        children.directories.contains(&"gfx/event_pictures/"),
+        "packed directory must be browsable: {:?}",
+        children.directories
+    );
+}
+
+#[test]
+fn catalog_prefers_disk_files_over_packed_members() {
+    let game_root = temp_root("ziporder");
+    let pack_dir = game_root.join("dlc/dlc998_order");
+    fs::create_dir_all(&pack_dir).expect("pack dir");
+    write_stored_zip(
+        &pack_dir.join("dlc998.zip"),
+        &[("gfx/shared.dds", b"packed")],
+    );
+    fs::create_dir_all(game_root.join("gfx")).expect("dir");
+    fs::write(game_root.join("gfx/shared.dds"), b"disk").expect("disk copy");
+
+    let roots = [source_root(1, SourceRootKind::Vanilla, &game_root)];
+    let catalog = TextureCatalog::build(&roots);
+    let resolution = catalog.resolve(&roots, "gfx/shared.dds").expect("resolves");
+    // Component-wise suffix: disk paths carry platform separators.
+    assert!(
+        resolution
+            .hit
+            .path
+            .as_path()
+            .ends_with(std::path::Path::new("gfx").join("shared.dds"))
+    );
+    assert_eq!(resolution.hit.archive_member, None);
+}

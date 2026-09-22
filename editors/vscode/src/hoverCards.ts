@@ -32,6 +32,8 @@ export interface HoverCardAssetWire {
     path: string;
     rootKind: 'project' | 'dependency' | 'vanilla';
     extensionFallback: boolean;
+    /** Entry inside the DLC zip that `path` names; packed members cannot be decoded. */
+    archiveMember?: string;
     frames?: number;
 }
 
@@ -766,11 +768,13 @@ function parseAsset(value: unknown): HoverCardAssetWire | undefined {
     }
     const rootKind = record.rootKind;
     const frames = record.frames;
+    const archiveMember = record.archiveMember;
     return {
         sprite: typeof record.sprite === 'string' ? record.sprite : undefined,
         path: record.path,
         rootKind: rootKind === 'project' || rootKind === 'dependency' || rootKind === 'vanilla' ? rootKind : 'vanilla',
         extensionFallback: record.extensionFallback === true,
+        archiveMember: typeof archiveMember === 'string' && archiveMember !== '' ? archiveMember : undefined,
         frames: typeof frames === 'number' && frames >= 1 ? Math.floor(frames) : undefined,
     };
 }
