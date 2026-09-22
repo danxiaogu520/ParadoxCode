@@ -199,17 +199,23 @@ export class MissionPreviewPanel {
         }
         MissionPreviewPanel.postOptions(panel);
         const requestId = ++MissionPreviewPanel.requestSequence;
-        // The active editor document, falling back to the document behind the
-        // last pushed preview: the webview panel itself can steal focus (e.g.
-        // while the user pans the canvas), and picking any other open document
-        // would silently re-target the preview.
-        const active = vscode.window.activeTextEditor;
-        const editor = active
-            ? active.document
+        // The preview pins to the most recently focused mission document:
+        // focusing a non-mission file keeps the pinned tree on screen instead
+        // of clearing it, while focusing another mission document re-targets
+        // the preview. The pinned document stays eligible only while its tab
+        // is still open; once closed, the preview falls back to judging the
+        // active editor (usually landing on the empty-state hint). Picking any
+        // other open document would silently re-target the preview.
+        const active = vscode.window.activeTextEditor?.document;
+        const pinned = MissionPreviewPanel.previewUri === undefined
+            ? undefined
             : vscode.workspace.textDocuments.find(
                   (document) =>
                       document.uri.toString() === MissionPreviewPanel.previewUri,
               );
+        const editor = active !== undefined && isPreviewDocument(active)
+            ? active
+            : pinned ?? active;
         if (!editor || !isPreviewDocument(editor)) {
             MissionPreviewPanel.post(panel, {
                 type: 'empty',
