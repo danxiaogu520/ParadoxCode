@@ -6,8 +6,9 @@ use super::*;
 
 /// One whole `pdc/formatWorkspace` pass over a mixed Project workspace.
 ///
-/// The four script fixtures pin every summary bucket and the on-disk outcome:
-/// a messy file is rewritten to canonical text, an already-canonical file is
+/// The five script fixtures pin every summary bucket and the on-disk outcome:
+/// a messy file is rewritten to canonical text, an asset-path file has its
+/// separators normalized to forward slashes, an already-canonical file is
 /// left untouched (unchanged), a syntactically broken file is refused
 /// (unsafe skip, bytes preserved), and a legacy-encoded file is refused
 /// (legacy skip, bytes preserved). The localisation file is out of scope by
@@ -20,11 +21,17 @@ fn format_workspace_rewrites_scripts_and_reports_a_summary() {
     fs::create_dir_all(&events).expect("events directory");
     fs::create_dir_all(&localisation).expect("localisation directory");
     let messy = events.join("messy.txt");
+    let paths = events.join("paths.txt");
     let canonical = events.join("canonical.txt");
     let broken = events.join("broken.txt");
     let legacy = events.join("legacy.txt");
     let localised = localisation.join("test_l_english.yml");
     fs::write(&messy, "root = {\r\n  child = yes\r\n}\r\n").expect("messy source");
+    fs::write(
+        &paths,
+        "sprite = {\r\n\ttexturefile = \"gfx\\\\interface\\\\alert.dds\"\r\n}\r\n",
+    )
+    .expect("asset-path source");
     fs::write(&canonical, "ROOT = { child = yes }\n").expect("canonical source");
     fs::write(&broken, "broken = \"unfinished").expect("broken source");
     fs::write(&legacy, b"caf\xE9 = yes\n").expect("legacy-encoded source");
@@ -75,8 +82,8 @@ fn format_workspace_rewrites_scripts_and_reports_a_summary() {
         .find(|value| value["id"] == 2)
         .expect("format response");
     assert_eq!(format["error"], Value::Null);
-    assert_eq!(format["result"]["totalFiles"], 4);
-    assert_eq!(format["result"]["formattedFiles"], 1);
+    assert_eq!(format["result"]["totalFiles"], 5);
+    assert_eq!(format["result"]["formattedFiles"], 2);
     assert_eq!(format["result"]["unchangedFiles"], 1);
     assert_eq!(format["result"]["skippedUnsafeFiles"], 1);
     assert_eq!(format["result"]["skippedLegacyEncodingFiles"], 1);
@@ -85,6 +92,10 @@ fn format_workspace_rewrites_scripts_and_reports_a_summary() {
     assert_eq!(
         fs::read_to_string(&messy).expect("messy survives"),
         "ROOT = { child = yes }\n"
+    );
+    assert_eq!(
+        fs::read_to_string(&paths).expect("asset-path file survives"),
+        "sprite = { texturefile = \"gfx/interface/alert.dds\" }\n"
     );
     assert_eq!(
         fs::read_to_string(&canonical).expect("canonical survives"),

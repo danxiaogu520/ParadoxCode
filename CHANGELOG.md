@@ -9,6 +9,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The script formatter now canonicalizes asset-path separators: in scalar values whose
+  spelling ends with a known asset extension (`.dds`, `.tga`, `.mesh`, fonts, sounds, …),
+  every run of `\`, `\\`, or `//` separators collapses to single forward slashes, quoted or
+  bare alike. Vanilla ships the same texture with all four spellings and the engine accepts
+  every one of them, so this is a canonicalization on par with keyword casing, validated by
+  the formatter's existing re-parse, token-equivalence, and idempotence gates. Values without
+  a known extension, values containing whitespace, escaped quotes, or empty/numeric strings
+  keep their spelling untouched.
+
 - `.gfx` completion now mirrors the decisions scaffold end to end. An empty `interface/*.gfx`
   file completes its three wrapper blocks (`spriteTypes`, `bitmapfonts`, `objectTypes`) with
   block skeletons, and the gap inside a wrapper completes the fixed instance vocabulary
