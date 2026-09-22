@@ -333,10 +333,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let directory = std::env::temp_dir().join(format!(
-            "pdc-parse-cache-{label}-{}-{nonce}",
-            std::process::id()
-        ));
+        let directory = std::env::temp_dir().join(format!("vfs-parse-cache-{label}-{nonce}"));
         fs::create_dir_all(&directory).expect("test directory");
         directory
     }

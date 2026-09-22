@@ -201,26 +201,10 @@ fn semantic_hover_keeps_multiple_matching_rule_meanings() {
     ] {
         model.semantic.rules.push(SemanticRule {
             id: id.to_owned(),
-            context: "trigger".to_owned(),
-            parent_path: Vec::new(),
-            key: KeyMatcher::Exact("choice".to_owned()),
             operator: Some("=".to_owned()),
             value,
-            shape: RuleShape::Leaf,
-            child_context: None,
-            alternative_id: None,
-            severity: None,
-            required: false,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            strict_min: true,
             max_occurs: Some(1),
-            source_file: "fixture.semantic".to_owned(),
-            line: 1,
+            ..semantic_rule("trigger", "choice")
         });
     }
     let mut host = eu4_host(RuleSet::from_model(model));
@@ -352,27 +336,10 @@ fn semantic_hover_collapses_repeated_first_party_rule_rows() {
 fn semantic_hover_preserves_rule_detail_line_breaks() {
     let mut model = game::eu4::bootstrap_model();
     model.semantic.rules.push(SemanticRule {
-        id: "fixture:trigger:documented".to_owned(),
-        context: "trigger".to_owned(),
-        parent_path: Vec::new(),
-        key: KeyMatcher::Exact("documented".to_owned()),
-        operator: None,
         value: ValueMatcher::Bool,
-        shape: RuleShape::Leaf,
-        child_context: None,
-        alternative_id: None,
-        severity: None,
-        required: false,
-        deprecated: false,
         documentation: vec!["first line".to_owned(), "second line".to_owned()],
-        allowed_scopes: Vec::new(),
-        push_scope: None,
-        replace_scope: Vec::new(),
-        min_occurs: None,
-        strict_min: true,
         max_occurs: Some(1),
-        source_file: "fixture.semantic".to_owned(),
-        line: 1,
+        ..semantic_rule("trigger", "documented")
     });
     let mut host = eu4_host(RuleSet::from_model(model));
     let id = DocumentId::new("file:///tmp/documented.txt");
