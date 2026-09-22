@@ -1141,6 +1141,7 @@ impl LspServer {
             self.client_snippet_support,
             Arc::clone(&self.ignored_diagnostic_codes),
             Arc::clone(&self.diagnostic_severity_overrides),
+            Arc::clone(&self.transparent_script_globs),
             Arc::clone(&self.semantic_tokens_cache),
         );
         let method = method.to_owned();

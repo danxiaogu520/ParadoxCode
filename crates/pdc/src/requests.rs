@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
-use engine::{AnalysisSnapshot, DocumentId, ParsedSource, SourceRootKind};
+use engine::{AnalysisSnapshot, DocumentId, GlobIncludePatterns, ParsedSource, SourceRootKind};
 use game::eu4::mission::Severity;
 use game::eu4::mission::geometry::{self, ArrowGlyph};
 use ide::{
@@ -33,6 +33,7 @@ use rules::{KeyMatcher, ParserKind, RuleShape};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use text::{LineIndex, LogicalPath, Position, TextRange};
+use transcode::{Profile, ScopedEncodeError, ScopedForm};
 
 use crate::protocol::{
     RpcError, cancelled_error, completion_kind,
@@ -42,6 +43,7 @@ use crate::protocol::{
 };
 use crate::server::SemanticTokensCache;
 use crate::text::lsp_range_to_text_range;
+use crate::uri::FileUri;
 use crate::{
     INVALID_PARAMS, MAX_COMPLETION_RESULTS, MAX_WORKSPACE_DIAGNOSTIC_FILES,
     MAX_WORKSPACE_SYMBOL_RESULTS, METHOD_NOT_FOUND,
@@ -258,6 +260,23 @@ struct TextDiagnosticsParams {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct TranscodeDecodeParams {
+    /// Absolute path, `file:` URI, or `pdcloc:` URI of the file to classify and decode.
+    path: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct TranscodeEncodeParams {
+    /// Absolute path, `file:` URI, or `pdcloc:` URI of the file the text belongs to;
+    /// it only decides the transcoding profile.
+    path: String,
+    /// Readable editor-buffer bytes as a hex string.
+    bytes: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct RuleSearchParams {
     context: Option<String>,
     key: Option<String>,
@@ -333,6 +352,8 @@ pub(crate) struct SnapshotRequestContext {
     ignored_diagnostic_codes: Arc<HashSet<String>>,
     /// Per-category severity remapping applied before diagnostic publication.
     diagnostic_severity_overrides: Arc<BTreeMap<String, Option<ide::Severity>>>,
+    /// Include globs deciding transparent-localisation script eligibility.
+    transparent_script_globs: Arc<GlobIncludePatterns>,
     /// Shared bounded cache for semantic-token full/delta responses.
     semantic_tokens_cache: Arc<SemanticTokensCache>,
 }
@@ -344,6 +365,7 @@ impl SnapshotRequestContext {
         client_snippets: bool,
         ignored_diagnostic_codes: Arc<HashSet<String>>,
         diagnostic_severity_overrides: Arc<BTreeMap<String, Option<ide::Severity>>>,
+        transparent_script_globs: Arc<GlobIncludePatterns>,
         semantic_tokens_cache: Arc<SemanticTokensCache>,
     ) -> Self {
         Self {
@@ -352,6 +374,7 @@ impl SnapshotRequestContext {
             client_snippets,
             ignored_diagnostic_codes,
             diagnostic_severity_overrides,
+            transparent_script_globs,
             semantic_tokens_cache,
         }
     }
@@ -377,6 +400,8 @@ impl SnapshotRequestContext {
             "pdc/workspaceFiles" => self.workspace_files(params),
             "pdc/classifyPaths" => self.classify_paths(params),
             "pdc/textDiagnostics" => self.text_diagnostics(params),
+            "pdc/transcodeDecode" => self.transcode_decode(params),
+            "pdc/transcodeEncode" => self.transcode_encode(params),
             "pdc/missionPreview" => self.mission_preview(params),
             "pdc/hoverCard" => self.hover_card(params),
             "pdc/ruleSearch" => self.rule_search(params),
@@ -446,6 +471,146 @@ impl SnapshotRequestContext {
             }));
         }
         Ok(Value::Array(results))
+    }
+
+    /// Reads one file from disk and classifies/decodes it for the transparent-localisation
+    /// view: `plain`/`damaged` bytes pass through unchanged, `whole` takes the legacy
+    /// whole-file decoder, and `scoped` resolves escape triples inside quoted strings only.
+    /// Nothing is written; the client owns the file bytes, the write gate, and the
+    /// presentation of the refusal metadata (`broken`, `damagedAt`, `quotedCjk`).
+    fn transcode_decode(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let params = typed_params::<TranscodeDecodeParams>(params, "transcode decode")?;
+        self.ensure_active()?;
+        let path = transcode_target_path(&params.path)?;
+        let bytes = std::fs::read(&path).map_err(|error| {
+            RpcError::new(
+                INVALID_PARAMS,
+                format!("cannot read {}: {error}", params.path),
+            )
+        })?;
+        if bytes.len() > MAX_TEXT_DIAGNOSTIC_BYTES {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!("transcode is limited to {MAX_TEXT_DIAGNOSTIC_BYTES} bytes per file"),
+            ));
+        }
+        let Some(profile) = self.transcode_profile_for(&path) else {
+            return Ok(json!({ "eligible": false }));
+        };
+        let form = transcode::scoped_form(&bytes, profile);
+        let form_name = scoped_form_name(form);
+        let profile_name = transcode_profile_name(profile);
+        let (bytes, broken, damaged_at, quoted_cjk) = match form {
+            ScopedForm::Plain | ScopedForm::Damaged => {
+                let damaged_at = (form == ScopedForm::Damaged)
+                    .then(|| transcode::marker_outside_spans(&bytes).first().copied())
+                    .flatten();
+                let quoted_cjk = form == ScopedForm::Plain && has_quoted_cjk(&bytes);
+                (bytes, 0usize, damaged_at, quoted_cjk)
+            }
+            ScopedForm::WholeEscaped => match transcode::decode_file(&bytes, profile) {
+                Err(_) => {
+                    return Ok(transcode_decode_refusal(profile_name, form_name));
+                }
+                Ok(decoded) => (
+                    decoded.text.into_bytes(),
+                    decoded.broken_sequences.len(),
+                    None,
+                    false,
+                ),
+            },
+            ScopedForm::Scoped => match transcode::scoped_decode_file(&bytes, profile) {
+                Err(_) => {
+                    return Ok(transcode_decode_refusal(profile_name, form_name));
+                }
+                Ok(decoded) => (
+                    decoded.text.into_bytes(),
+                    decoded.in_span_broken.len(),
+                    None,
+                    false,
+                ),
+            },
+        };
+        let mut result = json!({
+            "eligible": true,
+            "profile": profile_name,
+            "form": form_name,
+            "bytes": encode_hex(&bytes),
+            "broken": broken,
+            "quotedCjk": quoted_cjk,
+        });
+        if let Some(damaged_at) = damaged_at {
+            result["damagedAt"] = Value::from(damaged_at);
+        }
+        Ok(result)
+    }
+
+    /// Encodes readable text into scoped-escaped bytes for one file. The three refusal
+    /// shapes mirror the extension's save gate: `invalidUtf8` (buffer is not UTF-8),
+    /// `alreadyEscaped` (iron rule ② — in-span escape markers would double-encode), and
+    /// `unencodable` (code points the EU4 ecosystem cannot round-trip). Nothing is
+    /// written; the client receives the encoded bytes and persists them itself.
+    fn transcode_encode(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let params = typed_params::<TranscodeEncodeParams>(params, "transcode encode")?;
+        self.ensure_active()?;
+        let path = transcode_target_path(&params.path)?;
+        let bytes = decode_hex(&params.bytes).ok_or_else(|| {
+            RpcError::new(INVALID_PARAMS, "bytes must be an even-length hex string")
+        })?;
+        if bytes.len() > MAX_TEXT_DIAGNOSTIC_BYTES {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!("transcode is limited to {MAX_TEXT_DIAGNOSTIC_BYTES} bytes per file"),
+            ));
+        }
+        let Some(profile) = self.transcode_profile_for(&path) else {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!(
+                    "path is not eligible for transparent localisation: {}",
+                    params.path
+                ),
+            ));
+        };
+        let text = match std::str::from_utf8(&bytes) {
+            Ok(text) => text,
+            Err(_) => return Ok(json!({ "refused": "invalidUtf8" })),
+        };
+        match transcode::scoped_encode_file(text, profile, transcode::EscapeSet::Paratranz) {
+            Ok(encoded) => Ok(json!({ "bytes": encode_hex(&encoded) })),
+            Err(ScopedEncodeError::AlreadyEscaped { positions }) => Ok(json!({
+                "refused": "alreadyEscaped",
+                "offsets": positions,
+            })),
+            Err(ScopedEncodeError::Unencodable { error }) => Ok(json!({
+                "refused": "unencodable",
+                "points": error
+                    .unencodable
+                    .iter()
+                    .map(|point| json!({
+                        "codePoint": point.code_point,
+                        "byteIndex": point.byte_index,
+                    }))
+                    .collect::<Vec<_>>(),
+            })),
+        }
+    }
+
+    /// Transparent-localisation eligibility of an absolute path: localisation yml under a
+    /// `localisation/` directory always qualifies; other files qualify when their
+    /// workspace-relative path matches the configured script globs. `None` means the file
+    /// is not offered the transparent view at all.
+    fn transcode_profile_for(&self, path: &std::path::Path) -> Option<Profile> {
+        let normalized_lower = path.to_string_lossy().replace('\\', "/").to_lowercase();
+        if normalized_lower.contains("/localisation/") && normalized_lower.ends_with(".yml") {
+            return Some(Profile::Localisation);
+        }
+        let root = self.snapshot.workspace_root()?.as_path();
+        let relative = path.strip_prefix(root).ok()?;
+        let relative = relative.to_string_lossy().replace('\\', "/");
+        self.transparent_script_globs
+            .matches(&relative)
+            .then_some(Profile::Script)
     }
 
     /// Bounded search over the embedded first-party semantic-rule database. Filters are
@@ -1970,4 +2135,99 @@ fn line_base_indent(source: &str, position: usize) -> String {
     } else {
         String::new()
     }
+}
+
+// ---------------------------------------------------------------------------
+// Transparent localisation
+// ---------------------------------------------------------------------------
+
+/// Resolves a transcode request path: an absolute path, or a `file:`/`pdcloc:` URI sharing
+/// `file:` path semantics (the extension addresses the decoded view by its real twin).
+fn transcode_target_path(raw: &str) -> Result<std::path::PathBuf, RpcError> {
+    let path = if raw.starts_with("file:") || raw.starts_with("pdcloc:") {
+        FileUri::parse(raw)
+            .and_then(|uri| uri.to_path())
+            .map_err(|error| {
+                RpcError::new(
+                    INVALID_PARAMS,
+                    format!("cannot parse transcode path URI {raw}: {error}"),
+                )
+            })?
+    } else {
+        std::path::PathBuf::from(raw)
+    };
+    if !path.is_absolute() {
+        return Err(RpcError::new(
+            INVALID_PARAMS,
+            format!("transcode path must be absolute: {raw}"),
+        ));
+    }
+    Ok(path)
+}
+
+fn scoped_form_name(form: ScopedForm) -> &'static str {
+    match form {
+        ScopedForm::Plain => "plain",
+        ScopedForm::WholeEscaped => "whole",
+        ScopedForm::Scoped => "scoped",
+        ScopedForm::Damaged => "damaged",
+    }
+}
+
+fn transcode_profile_name(profile: Profile) -> &'static str {
+    match profile {
+        Profile::Localisation => "localisation",
+        Profile::Script => "script",
+    }
+}
+
+fn transcode_decode_refusal(profile_name: &str, form_name: &str) -> Value {
+    json!({
+        "eligible": true,
+        "profile": profile_name,
+        "form": form_name,
+        "error": "invalid-utf8",
+    })
+}
+
+/// Lowercases hex, matching the differential-vector wire convention used across the
+/// transcode tooling.
+fn encode_hex(bytes: &[u8]) -> String {
+    const HEX_DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(HEX_DIGITS[usize::from(byte >> 4)] as char);
+        output.push(HEX_DIGITS[usize::from(byte & 0x0F)] as char);
+    }
+    output
+}
+
+/// Strict even-length lowercase-or-uppercase hex decoder.
+fn decode_hex(value: &str) -> Option<Vec<u8>> {
+    let (pairs, remainder) = value.as_bytes().as_chunks::<2>();
+    if !remainder.is_empty() {
+        return None;
+    }
+    let mut output = Vec::with_capacity(pairs.len());
+    for &[high, low] in pairs {
+        let high = (high as char).to_digit(16)?;
+        let low = (low as char).to_digit(16)?;
+        output.push(u8::try_from(high * 16 + low).ok()?);
+    }
+    Some(output)
+}
+
+/// Whether any quoted string holds raw CJK — the content a plain-form save encodes.
+/// Non-UTF-8 input cannot hold CJK on the CP1252 byte layer and reports `false`.
+fn has_quoted_cjk(bytes: &[u8]) -> bool {
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+    transcode::scan_string_spans(bytes)
+        .iter()
+        .any(|&(start, end)| {
+            // Span boundaries sit on ASCII quote bytes, so byte offsets are char-safe.
+            let span = &text[start..end.min(text.len())];
+            span.chars().any(|c| transcode::is_raw_cjk(u32::from(c)))
+        })
 }

@@ -12,10 +12,10 @@ mod string_pool;
 pub use model::localisation_previews_from_parsed;
 pub use model::{
     DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId, DocumentSource,
-    LocalisationPreview, ResolvedCandidate, SourceFile, SourceFileId, SourceRoot, SourceRootId,
-    SourceRootKind, TextChange, WorkspaceChange, WorkspaceError, WorkspaceScanFilterError,
-    WorkspaceScanFilters, WorkspaceScanIssue, WorkspaceScanIssueKind, WorkspaceScanLimits,
-    WorkspaceScanReport, WorkspaceScanToken,
+    GlobIncludePatterns, LocalisationPreview, ResolvedCandidate, SourceFile, SourceFileId,
+    SourceRoot, SourceRootId, SourceRootKind, TextChange, WorkspaceChange, WorkspaceError,
+    WorkspaceScanFilterError, WorkspaceScanFilters, WorkspaceScanIssue, WorkspaceScanIssueKind,
+    WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
 };
 pub use parse_cache::{CURRENT_PARSE_CACHE_SCHEMA_VERSION, ParseCache, ParseCacheError};
 pub use scan::{read_source_file_cancellable, root_priority};

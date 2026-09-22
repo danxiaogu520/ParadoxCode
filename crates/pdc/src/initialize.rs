@@ -359,6 +359,7 @@ pub(crate) fn prepare_initialize_candidate(
         background_reindex_idle_seconds: resolved.background_reindex_idle_seconds,
         ignored_diagnostic_codes: resolved.ignored_diagnostic_codes,
         diagnostic_severity_overrides: resolved.diagnostic_severity_overrides,
+        transparent_script_globs: resolved.transparent_script_globs,
         workspace_wide_diagnostics: resolved.workspace_wide_diagnostics,
     })
 }

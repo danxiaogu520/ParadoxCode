@@ -747,7 +747,7 @@ mod tests {
             assert_eq!(
                 error.to_string(),
                 format!(
-                    "too many {kind} ignore patterns (maximum {})",
+                    "too many {kind} patterns (maximum {})",
                     WorkspaceScanFilters::MAX_PATTERNS
                 )
             );
