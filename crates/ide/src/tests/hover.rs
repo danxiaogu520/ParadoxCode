@@ -1447,7 +1447,7 @@ fn localisation_hover_prefers_the_configured_language() {
 }
 
 #[test]
-fn event_hover_falls_back_to_the_generated_title_key() {
+fn event_hover_previews_only_explicit_title_keys() {
     use std::fs;
 
     let nonce = std::time::SystemTime::now()
@@ -1459,16 +1459,19 @@ fn event_hover_falls_back_to_the_generated_title_key() {
     let localisation = root.join("localisation");
     fs::create_dir_all(&events).expect("events directory");
     fs::create_dir_all(localisation.join("l_english")).expect("localisation directory");
-    fs::write(
-        events.join("hover_events.txt"),
+    let event_text = concat!(
         "country_event = { id = plain.1 immediate = { } }\n",
-    )
-    .expect("event without title");
+        "country_event = { id = plain.2 title = plain.2.t }\n",
+    );
+    fs::write(events.join("hover_events.txt"), event_text).expect("events");
+    // `plain.1.t` follows the widespread <id>.t naming convention, but the
+    // convention is not an engine rule: nothing binds that key to a
+    // title-less event, while `plain.2`'s explicit field binds its key.
     fs::write(
         localisation.join("l_english/plain_l_english.yml"),
-        "l_english:\n plain.1.t:0 \"Generated Title\"\n",
+        "l_english:\n plain.1.t:0 \"Convention Title\"\n plain.2.t:0 \"Explicit Title\"\n",
     )
-    .expect("generated title key");
+    .expect("localisation keys");
 
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -1482,17 +1485,32 @@ fn event_hover_falls_back_to_the_generated_title_key() {
     host.open_document(
         id.clone(),
         1,
-        "country_event = { id = plain.1 immediate = { } }\n".to_owned(),
+        event_text.to_owned(),
         Some(AbsPath::normalize(&events.join("hover_events.txt"))),
     )
     .expect("open event");
-    let text = "country_event = { id = plain.1 immediate = { } }\n";
-    let position = u32::try_from(text.find("plain.1").expect("event id") + 2).expect("position");
-    let hover = hover(&host.snapshot(), &id, position).expect("event hover");
+    let snapshot = host.snapshot();
+    let plain_contents = hover(
+        &snapshot,
+        &id,
+        u32::try_from(event_text.find("plain.1").expect("first event id") + 2).expect("position"),
+    )
+    .map(|hover| hover.contents)
+    .unwrap_or_default();
     assert!(
-        hover.contents.contains("Generated Title"),
-        "title-less event previews its generated <id>.t key: {}",
-        hover.contents
+        !plain_contents.contains("Convention Title"),
+        "a key merely matching the <id>.t convention is not bound to a title-less event: {plain_contents}",
+    );
+    let titled_hover = hover(
+        &snapshot,
+        &id,
+        u32::try_from(event_text.find("plain.2").expect("second event id") + 2).expect("position"),
+    )
+    .expect("titled event hover");
+    assert!(
+        titled_hover.contents.contains("Explicit Title"),
+        "the explicit title field previews its key: {}",
+        titled_hover.contents
     );
     fs::remove_dir_all(root).expect("cleanup");
 }

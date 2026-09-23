@@ -3073,6 +3073,20 @@ fn vanilla_powerprojection_file_and_static_modifier_blocks_validate() {
         ),
     ] {
         let mut host = eu4_host(rules.clone());
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::Project,
+            AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
+        )]));
+        host.open_document(
+            DocumentId::new("file:///tmp/localisation/test_l_english.yml"),
+            1,
+            "l_english:\n power_projection:0 \"Power Projection\"\n".to_owned(),
+            Some(AbsPath::normalize(&std::path::PathBuf::from(
+                "/tmp/localisation/test_l_english.yml",
+            ))),
+        )
+        .expect("open localisation");
         let id = DocumentId::new(format!("file://{path}"));
         host.open_document(
             id.clone(),

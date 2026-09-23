@@ -5,7 +5,7 @@ use super::{
 };
 use game::eu4::{bootstrap_rules, first_party_rules, profile};
 use parser::{FileFormat, parse};
-use rules::{GameProfile, KeyMatcher, RuleSet, RuleShape, ValueMatcher};
+use rules::{GameProfile, KeyMatcher, RuleSet, RuleShape, SemanticRule, ValueMatcher};
 use text::{LogicalPath, TextRange};
 
 #[test]
@@ -180,48 +180,6 @@ fn required_type_localisation_templates_expand_from_dynamic_members() {
 }
 
 #[test]
-fn explicit_type_localisation_fields_are_associated_with_instances() {
-    let path = LogicalPath::parse("events/test.txt").expect("logical path");
-    let mut model = first_party_rules()
-        .expect("first-party rules")
-        .model()
-        .clone();
-    model.semantic.rules.retain(|rule| {
-        !(rule.context.eq_ignore_ascii_case("root:event")
-            && matches!(&rule.key, KeyMatcher::Exact(key) if key.eq_ignore_ascii_case("title"))
-            && matches!(rule.value, ValueMatcher::Localisation))
-    });
-    let rules = RuleSet::from_model(model);
-    let hir = lower_with_profile(
-        parse(
-            FileFormat::Script,
-            "country_event = { id = event_one title = event_one_title }\n",
-        ),
-        &path,
-        &rules,
-        &GameProfile::empty(rules.game_id()),
-    );
-    let title_range = hir
-        .properties()
-        .iter()
-        .find(|property| property.key == "title")
-        .and_then(|property| property.scalar.as_ref())
-        .map(|scalar| scalar.range)
-        .expect("event title range");
-    let hover_references = super::derived_localisation_references_for_hover(&hir, &path, &rules);
-    assert!(hover_references.iter().any(|reference| {
-        reference.kind.as_ref() == "localisation"
-            && reference.name == "event_one_title"
-            && reference.range == title_range
-    }));
-    assert!(hover_references.iter().any(|reference| {
-        reference.origin == HirReferenceOrigin::DerivedLocalisation
-            && reference.name == "event_one_title"
-            && reference.range == title_range
-    }));
-}
-
-#[test]
 fn subtype_conditions_gate_type_localisation_templates() {
     let path = LogicalPath::parse("common/ideas/subtypes.txt").expect("logical path");
     let hir = lower_with_profile(
@@ -241,6 +199,168 @@ fn subtype_conditions_gate_type_localisation_templates() {
         .collect::<Vec<_>>();
     assert!(derived.contains(&"country_idea_start"));
     assert!(!derived.contains(&"other_idea_start"));
+}
+
+#[test]
+fn required_self_bindings_reach_the_diagnostics_set() {
+    // Cultures and their groups carry required self bindings: the instance
+    // name is the localisation key the game shows, so a missing key is a
+    // diagnostic, not just a silent hover miss.
+    let path = LogicalPath::parse("common/cultures/cultures.txt").expect("logical path");
+    let hir = lower_with_profile(
+        parse(
+            FileFormat::Script,
+            "nordic = { male_names = { } swedish = { } }\n",
+        ),
+        &path,
+        &first_party_rules().expect("first-party rules"),
+        &profile(),
+    );
+    let required = hir
+        .references()
+        .iter()
+        .filter(|reference| reference.origin == HirReferenceOrigin::DerivedLocalisation)
+        .map(|reference| reference.name.as_ref())
+        .collect::<Vec<_>>();
+    assert!(
+        required.contains(&"swedish") && required.contains(&"nordic"),
+        "culture and culture_group self bindings reach diagnostics: {required:?}"
+    );
+    assert!(!required.contains(&"male_names"));
+}
+
+#[test]
+fn unbound_types_carry_no_implicit_localisation() {
+    // The same-name convention exists only where a type declares it: an
+    // unbound type has neither hover previews nor diagnostics from its
+    // instance names.
+    let path = LogicalPath::parse("common/on_action/a.txt").expect("logical path");
+    let hir = lower_with_profile(
+        parse(FileFormat::Script, "on_startup = { effect = { } }\n"),
+        &path,
+        &first_party_rules().expect("first-party rules"),
+        &profile(),
+    );
+    let derived = hir
+        .references()
+        .iter()
+        .filter(|reference| reference.origin == HirReferenceOrigin::DerivedLocalisation)
+        .map(|reference| reference.name.as_ref())
+        .collect::<Vec<_>>();
+    assert!(
+        !derived.contains(&"on_startup"),
+        "no implicit same-name reference for the unbound on_action type: {derived:?}"
+    );
+}
+
+#[test]
+fn sprite_bindings_expand_template_and_semantic_fields() {
+    let rules = first_party_rules().expect("first-party rules");
+
+    // aspects_and_blessings: the GFX_$ template binding generates the sprite
+    // name from the aspect's own name (hover path; the binding is not
+    // required, so it stays out of the lowered reference set).
+    let path = LogicalPath::parse("common/church_aspects/test.txt").expect("logical path");
+    let hir = lower_with_profile(
+        parse(FileFormat::Script, "my_aspect = { enable = yes }\n"),
+        &path,
+        &rules,
+        &profile(),
+    );
+    let hover = super::derived_sprite_references_for_hover(&hir, &path, &rules);
+    assert!(
+        hover.iter().any(|reference| {
+            reference.kind.as_ref() == "sprite"
+                && reference.name == "GFX_my_aspect"
+                && reference.origin == HirReferenceOrigin::DerivedSprite
+        }),
+        "the GFX_$ template must expand to the aspect name"
+    );
+    assert!(
+        !hir.references()
+            .iter()
+            .any(|reference| reference.origin == HirReferenceOrigin::DerivedSprite),
+        "non-required icon bindings stay out of the diagnostics reference set"
+    );
+
+    // event_modifier: the required semantic picture binding associates the
+    // field value with the instance and enters the lowered set.
+    let path = LogicalPath::parse("common/event_modifiers/test.txt").expect("logical path");
+    let hir = lower_with_profile(
+        parse(FileFormat::Script, "my_mod = { picture = my_mod_icon }\n"),
+        &path,
+        &rules,
+        &profile(),
+    );
+    let derived = hir
+        .references()
+        .iter()
+        .filter(|reference| reference.origin == HirReferenceOrigin::DerivedSprite)
+        .map(|reference| reference.name.as_ref())
+        .collect::<Vec<_>>();
+    assert!(
+        derived.contains(&"my_mod_icon"),
+        "the required semantic icon binding must associate the field value"
+    );
+}
+
+#[test]
+fn typed_sprite_references_shadow_derived_sprite_duplicates() {
+    // The dedup backstop: if the schema ever grows a typed sprite rule for a
+    // field that also carries a semantic icon binding, the lowered set keeps
+    // the typed reference and drops the derived duplicate so one fault
+    // reports once.
+    let path = LogicalPath::parse("common/event_modifiers/test.txt").expect("logical path");
+    let mut model = first_party_rules()
+        .expect("first-party rules")
+        .model()
+        .clone();
+    model.semantic.rules.push(SemanticRule {
+        id: "test:event_modifier:picture".to_owned(),
+        context: "root:event_modifier".to_owned(),
+        parent_path: Vec::new(),
+        key: KeyMatcher::Exact("picture".to_owned()),
+        operator: None,
+        value: ValueMatcher::Type("sprite".to_owned()),
+        shape: RuleShape::Leaf,
+        child_context: None,
+        alternative_id: None,
+        severity: None,
+        required: false,
+        deprecated: false,
+        documentation: Vec::new(),
+        allowed_scopes: Vec::new(),
+        push_scope: None,
+        replace_scope: Vec::new(),
+        min_occurs: None,
+        strict_min: true,
+        max_occurs: None,
+        source_file: "semantic-rules.json".to_owned(),
+        line: 1,
+    });
+    let rules = RuleSet::from_model(model);
+    let hir = lower_with_profile(
+        parse(
+            FileFormat::Script,
+            "golden_mod = { picture = golden_icon }\n",
+        ),
+        &path,
+        &rules,
+        &GameProfile::empty(rules.game_id()),
+    );
+    let derived = hir
+        .references()
+        .iter()
+        .filter(|reference| reference.origin == HirReferenceOrigin::DerivedSprite)
+        .map(|reference| reference.name.as_ref())
+        .collect::<Vec<_>>();
+    assert!(!derived.contains(&"golden_icon"));
+    assert!(
+        hir.references().iter().any(|reference| {
+            reference.kind.as_ref() == "sprite" && reference.name == "golden_icon"
+        }),
+        "the typed sprite reference remains"
+    );
 }
 
 #[test]

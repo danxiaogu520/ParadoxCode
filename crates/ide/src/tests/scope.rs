@@ -237,7 +237,6 @@ fn eu4_replace_scope_links_populate_from_intrinsics() {
         SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
-
     let valid_id = DocumentId::new("file:///tmp/from-building.txt");
     host.open_document(
         valid_id.clone(),

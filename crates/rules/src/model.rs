@@ -296,43 +296,47 @@ pub fn entry_wrapper_reroutes(rule: &SemanticRule, context: &str) -> bool {
         .is_some_and(|child| !child.eq_ignore_ascii_case(context))
 }
 
-/// One type-instance to localisation-key mapping from the first-party rule source.
+/// One type-instance to symbol-name mapping from the first-party rule source.
 ///
-/// A template contains exactly one `$` placeholder, which is replaced by the concrete
-/// definition name. An explicit field mapping has no generated template; its value is
-/// validated by the ordinary semantic localisation rules instead.
+/// Bindings serve two families: localisation keys and icon sprites. A mapping
+/// is one of three kinds. A *self* binding keys the instance by its own
+/// name (`key == "$"`). A *template* binding generates the name from a
+/// template that contains exactly one `$` placeholder, replaced by the
+/// concrete definition name. A *semantic* binding takes the name from a
+/// source field of the instance (`field`); whether that field exists is the
+/// type schema's job, and the binding only associates the field's value with
+/// the instance.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct LocalisationBinding {
+pub struct SymbolBinding {
     /// Semantic type whose instances own this mapping.
     #[serde(rename = "type")]
     pub type_name: String,
-    /// Descriptive source field name, retained for diagnostics and stable identity.
-    pub field: String,
-    /// Generated key template, when this is not an explicit field mapping.
-    pub template: Option<String>,
-    /// Whether the generated key must exist.
+    /// Binding name: the hover row label and part of the stable identity.
+    pub name: String,
+    /// Generated name template (self or template binding); contains exactly
+    /// one `$`. `"$"` is the self binding.
+    pub key: Option<String>,
+    /// Whether the bound symbol must resolve. Required bindings drive
+    /// missing-symbol diagnostics; the rest are hover-only.
     #[serde(default)]
     pub required: bool,
-    /// Whether the generated key is an optional game convention.
-    #[serde(default)]
-    pub optional: bool,
     /// Subtype condition under which the mapping applies.
     #[serde(default)]
     pub subtype: Option<String>,
     /// Structural condition that selects the subtype, when it is not represented by a
     /// same-named child field.
     #[serde(default)]
-    pub condition: Option<LocalisationBindingCondition>,
-    /// Explicit source field whose value is the localisation key.
+    pub condition: Option<SymbolBindingCondition>,
+    /// Source field whose scalar value is the bound symbol (semantic binding).
     #[serde(default)]
-    pub explicit_field: Option<String>,
+    pub field: Option<String>,
 }
 
-/// Data-driven structural selector for one localisation binding subtype.
+/// Data-driven structural selector for one binding subtype.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct LocalisationBindingCondition {
+pub struct SymbolBindingCondition {
     /// Direct child field whose presence/value selects the subtype.
     #[serde(default)]
     pub field: Option<String>,
@@ -512,7 +516,10 @@ pub struct SemanticModel {
     /// File/root metadata declared by semantic type blocks.
     pub type_descriptors: BTreeMap<String, TypeDescriptor>,
     /// Type-instance to localisation-key mappings.
-    pub localisation_bindings: Vec<LocalisationBinding>,
+    pub localisation_bindings: Vec<SymbolBinding>,
+    /// Type-instance to sprite mappings.
+    #[serde(default)]
+    pub sprite_bindings: Vec<SymbolBinding>,
 }
 
 /// Normalized logical contents of one game rule database.

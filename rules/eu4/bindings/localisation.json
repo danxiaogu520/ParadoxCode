@@ -1,0 +1,1149 @@
+{
+  "advisor_type": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "description",
+      "key": "$_desc",
+      "required": true
+    }
+  ],
+  "ai_personality": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true,
+      "subtype": "ai",
+      "condition": {
+        "key_prefix": "ai_"
+      }
+    },
+    {
+      "name": "become",
+      "key": "an_$",
+      "required": true,
+      "subtype": "ai",
+      "condition": {
+        "key_prefix": "ai_"
+      }
+    }
+  ],
+  "ancestor_personalities": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "key": "desc_$",
+      "required": true,
+      "subtype": "ai",
+      "condition": {
+        "key_prefix": "ancestor_"
+      }
+    }
+  ],
+  "area": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "aspects_and_blessings": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "key": "desc_$",
+      "required": true,
+      "subtype": "church_aspect",
+      "condition": {
+        "field": "is_blessing",
+        "value": "no"
+      }
+    }
+  ],
+  "building": [
+    {
+      "name": "name",
+      "key": "building_$",
+      "required": true
+    }
+  ],
+  "casus_belli": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "description",
+      "key": "$_desc",
+      "required": true
+    }
+  ],
+  "climate": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "key": "desc_$",
+      "required": true
+    }
+  ],
+  "colonial_region": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true,
+      "subtype": "settled",
+      "condition": {
+        "field": "tax_income"
+      }
+    },
+    {
+      "name": "short",
+      "key": "short_$"
+    }
+  ],
+  "continent": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "cult": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    }
+  ],
+  "culture": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "culture_group": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "customideas": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    }
+  ],
+  "decision": [
+    {
+      "name": "name",
+      "key": "$_title",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    }
+  ],
+  "decree": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    },
+    {
+      "name": "title",
+      "required": true
+    }
+  ],
+  "defender_faith": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "key": "$_DESC",
+      "required": true
+    }
+  ],
+  "disaster": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "edict": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "estate": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "estate_agenda": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    }
+  ],
+  "estate_crown_land_bonus": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "estate_interaction": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "estate_modifier": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "estate_privilege": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    }
+  ],
+  "event_modifier": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "key": "desc_$",
+      "required": true
+    }
+  ],
+  "faction": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "key": "$_FACTION_DESC",
+      "required": true
+    },
+    {
+      "name": "influence_modifier",
+      "key": "$_influence",
+      "required": true
+    }
+  ],
+  "federation_advancements": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "fervor": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "short",
+      "required": true
+    }
+  ],
+  "game_age": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "short",
+      "required": true
+    },
+    {
+      "name": "description",
+      "key": "$_desc",
+      "required": true
+    }
+  ],
+  "game_age_ability": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "golden_bull": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "key": "$_DESC",
+      "required": true
+    }
+  ],
+  "government": [
+    {
+      "name": "name",
+      "required": true,
+      "subtype": "normal",
+      "condition": {
+        "field": "basic_reform"
+      }
+    }
+  ],
+  "government_mechanic": [
+    {
+      "name": "name",
+      "key": "ability_$",
+      "required": true
+    }
+  ],
+  "government_mechanic_interaction": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    }
+  ],
+  "government_mechanic_power": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "gain_modifier",
+      "required": true
+    },
+    {
+      "name": "modifier",
+      "key": "monthly_$",
+      "required": true,
+      "subtype": "base_monthly_growth",
+      "condition": {
+        "field": "base_monthly_growth"
+      }
+    },
+    {
+      "name": "modifier",
+      "key": "monthly_$",
+      "required": true,
+      "subtype": "development_scaled_monthly_growth",
+      "condition": {
+        "field": "development_scaled_monthly_growth"
+      }
+    }
+  ],
+  "government_reform": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "description",
+      "key": "$_desc"
+    }
+  ],
+  "graphical_terrain": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "great_project": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc"
+    }
+  ],
+  "guru": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "guru_teaching": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "hegemon": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "holy_order": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc"
+    }
+  ],
+  "idea": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    }
+  ],
+  "idea_group": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "bonus",
+      "required": true
+    },
+    {
+      "name": "start",
+      "required": true,
+      "subtype": "country_idea",
+      "condition": {
+        "field": "free",
+        "value": "yes"
+      }
+    }
+  ],
+  "imperial_incident": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "member_alert",
+      "required": true
+    },
+    {
+      "name": "emperor_alert",
+      "required": true
+    }
+  ],
+  "imperial_reform": [
+    {
+      "name": "name",
+      "key": "$_title",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    },
+    {
+      "name": "member",
+      "required": true,
+      "subtype": "member",
+      "condition": {
+        "field": "member"
+      }
+    },
+    {
+      "name": "member_desc",
+      "key": "desc_$_member",
+      "subtype": "member",
+      "condition": {
+        "field": "member"
+      }
+    },
+    {
+      "name": "emperor",
+      "required": true,
+      "subtype": "emperor",
+      "condition": {
+        "field": "emperor"
+      }
+    },
+    {
+      "name": "emperor_desc",
+      "key": "desc_$_emperor",
+      "subtype": "emperor",
+      "condition": {
+        "field": "emperor"
+      }
+    },
+    {
+      "name": "elector",
+      "required": true,
+      "subtype": "elector",
+      "condition": {
+        "field": "elector"
+      }
+    },
+    {
+      "name": "elector_desc",
+      "key": "desc_$_elector",
+      "subtype": "elector",
+      "condition": {
+        "field": "elector"
+      }
+    },
+    {
+      "name": "province",
+      "subtype": "province",
+      "condition": {
+        "field": "province"
+      }
+    },
+    {
+      "name": "emperor_per_prince",
+      "required": true,
+      "subtype": "emperor_per_prince",
+      "condition": {
+        "field": "emperor_per_prince"
+      }
+    },
+    {
+      "name": "elector_per_prince",
+      "required": true,
+      "subtype": "elector_per_prince",
+      "condition": {
+        "field": "elector_per_prince"
+      }
+    }
+  ],
+  "incident": [
+    {
+      "name": "name",
+      "key": "$_title",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    }
+  ],
+  "institution": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "key": "desc_$",
+      "required": true
+    },
+    {
+      "name": "date",
+      "required": true
+    }
+  ],
+  "insult": [
+    {
+      "name": "insult",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "isolationism": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    },
+    {
+      "name": "title",
+      "required": true
+    }
+  ],
+  "leader_personality": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "key": "desc_$",
+      "required": true
+    },
+    {
+      "name": "death_message",
+      "key": "$_die_desc",
+      "required": true
+    }
+  ],
+  "mercenary_company": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "mission": [
+    {
+      "name": "name",
+      "key": "$_title",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    }
+  ],
+  "natives": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "naval_doctrine": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    }
+  ],
+  "new_diplomatic_action": [
+    {
+      "name": "title",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    },
+    {
+      "name": "tooltip",
+      "required": true
+    },
+    {
+      "name": "dialog",
+      "required": true,
+      "subtype": "require_acceptance",
+      "condition": {
+        "field": "require_acceptance",
+        "value": "yes"
+      }
+    }
+  ],
+  "opinion_modifier": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "orthodox_icon": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "key": "desc_$"
+    }
+  ],
+  "papal_policy": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "parliament_bribe": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "parliament_issue": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "peace_treaty": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    },
+    {
+      "name": "CB_ALLOWED",
+      "key": "CB_ALLOWED_$",
+      "required": true
+    },
+    {
+      "name": "PEACE",
+      "key": "PEACE_$",
+      "required": true
+    }
+  ],
+  "personal_deity": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc"
+    }
+  ],
+  "policy": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "key": "desc_$",
+      "required": true
+    }
+  ],
+  "professionalism_modifier": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "province_group": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "province_id": [
+    {
+      "name": "name",
+      "key": "PROV$"
+    },
+    {
+      "name": "adj",
+      "key": "PROV_ADJ$"
+    }
+  ],
+  "province_triggered_modifier": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "key": "desc_$"
+    }
+  ],
+  "rebel_demand_loc": [
+    {
+      "name": "demand_desc",
+      "key": "$_desc",
+      "required": true
+    }
+  ],
+  "rebel_type": [
+    {
+      "name": "name",
+      "required": true
+    },
+    {
+      "name": "title",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    },
+    {
+      "name": "army",
+      "required": true
+    }
+  ],
+  "region": [
+    {
+      "name": "type",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "name"
+    },
+    {
+      "name": "adj"
+    }
+  ],
+  "religion": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "key": "$_religion_desc"
+    },
+    {
+      "name": "harmonized",
+      "key": "harmonized_$",
+      "subtype": "harmonized",
+      "condition": {
+        "field": "harmonized_modifier"
+      }
+    },
+    {
+      "name": "harmonized_desc",
+      "key": "desc_harmonized_$",
+      "subtype": "harmonized",
+      "condition": {
+        "field": "harmonized_modifier"
+      }
+    }
+  ],
+  "religion_group": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "harmonized",
+      "key": "harmonized_$",
+      "subtype": "harmonized",
+      "condition": {
+        "field": "harmonized_modifier"
+      }
+    },
+    {
+      "name": "harmonized_desc",
+      "key": "desc_harmonized_$",
+      "subtype": "harmonized",
+      "condition": {
+        "field": "harmonized_modifier"
+      }
+    }
+  ],
+  "religion_propagation": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "religious_reform": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    }
+  ],
+  "religious_reform_group": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "religious_school": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc"
+    }
+  ],
+  "ruler_personality": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "key": "desc_$",
+      "required": true
+    },
+    {
+      "name": "death_message",
+      "key": "$_die_desc",
+      "required": true
+    }
+  ],
+  "sprite_pack": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "static_modifier": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "states_general_faction": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "subject_type": [
+    {
+      "name": "name",
+      "key": "$_title",
+      "required": true
+    },
+    {
+      "name": "plural",
+      "key": "$_title_plural",
+      "required": true
+    },
+    {
+      "name": "longform",
+      "key": "$_long_desc",
+      "required": true
+    },
+    {
+      "name": "is_ours",
+      "key": "$_is_our",
+      "required": true
+    }
+  ],
+  "superregion": [
+    {
+      "name": "type",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "name"
+    },
+    {
+      "name": "adj"
+    }
+  ],
+  "technology_group": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "required": true
+    }
+  ],
+  "terrain": [
+    {
+      "name": "type",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "trade_center": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "description",
+      "key": "$_desc",
+      "required": true
+    }
+  ],
+  "trade_company": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "trade_company_investment": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "description",
+      "key": "$_desc",
+      "required": true
+    }
+  ],
+  "trade_good": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "description",
+      "key": "$DESC",
+      "required": true
+    }
+  ],
+  "trade_node_name": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    }
+  ],
+  "trading_policy": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "description",
+      "key": "$_desc",
+      "required": true
+    }
+  ],
+  "triggered_modifier": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "key": "desc_$",
+      "required": true
+    }
+  ],
+  "unit_type": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "description",
+      "key": "$DESCR",
+      "required": true
+    }
+  ],
+  "wargoal_type": [
+    {
+      "name": "name",
+      "key": "$",
+      "required": true
+    },
+    {
+      "name": "desc",
+      "key": "$_desc",
+      "required": true
+    }
+  ]
+}

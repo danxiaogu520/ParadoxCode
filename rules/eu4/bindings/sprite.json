@@ -1,0 +1,29 @@
+{
+  "aspects_and_blessings": [
+    {
+      "name": "icon",
+      "key": "GFX_$"
+    }
+  ],
+  "event_modifier": [
+    {
+      "name": "picture",
+      "field": "picture",
+      "required": true
+    }
+  ],
+  "province_triggered_modifier": [
+    {
+      "name": "picture",
+      "field": "picture",
+      "required": true
+    }
+  ],
+  "static_modifier": [
+    {
+      "name": "picture",
+      "field": "picture",
+      "required": true
+    }
+  ]
+}

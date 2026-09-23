@@ -173,16 +173,12 @@ const FIRST_PARTY_FILES: &[SourceFile<'static>] = &[
         bytes: include_bytes!("../../../../rules/eu4/values/enums/religion.json"),
     },
     SourceFile {
-        path: "localisation/bindings/common.json",
-        bytes: include_bytes!("../../../../rules/eu4/localisation/bindings/common.json"),
+        path: "bindings/localisation.json",
+        bytes: include_bytes!("../../../../rules/eu4/bindings/localisation.json"),
     },
     SourceFile {
-        path: "localisation/bindings/events.json",
-        bytes: include_bytes!("../../../../rules/eu4/localisation/bindings/events.json"),
-    },
-    SourceFile {
-        path: "localisation/bindings/other.json",
-        bytes: include_bytes!("../../../../rules/eu4/localisation/bindings/other.json"),
+        path: "bindings/sprite.json",
+        bytes: include_bytes!("../../../../rules/eu4/bindings/sprite.json"),
     },
     SourceFile {
         path: "profile/dynamic.json",
@@ -600,8 +596,43 @@ mod tests {
         assert!(!rules.model().semantic.rules.is_empty());
         assert_eq!(
             rules.model().semantic.localisation_bindings.len(),
-            189,
+            // Declared bindings only; nothing is injected at compile time.
+            187,
             "embedded source must carry the complete first-party type localisation map"
+        );
+        assert_eq!(
+            rules.model().semantic.sprite_bindings.len(),
+            4,
+            "embedded source must carry the complete first-party type sprite map"
+        );
+    }
+
+    #[test]
+    fn first_party_mission_bindings_stay_declared() {
+        // The mission card and mission preview resolve their title key through
+        // the `$_title` binding with no hardcoded fallback; this guard keeps
+        // the declaration from silently disappearing.
+        let rules = first_party_rules().expect("embedded EU4 source");
+        assert_eq!(
+            rules.localisation_template_key("mission", "name", "probe"),
+            Some("probe_title".to_owned())
+        );
+        let mission_bindings = rules
+            .model()
+            .semantic
+            .localisation_bindings
+            .iter()
+            .filter(|binding| binding.type_name.eq_ignore_ascii_case("mission"))
+            .collect::<Vec<_>>();
+        assert_eq!(mission_bindings.len(), 2);
+        assert!(
+            mission_bindings
+                .iter()
+                .any(|binding| binding.name == "name" && binding.required)
+                && mission_bindings
+                    .iter()
+                    .any(|binding| binding.name == "desc" && binding.required),
+            "mission title and description keys are required engine rules"
         );
     }
 

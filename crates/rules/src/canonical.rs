@@ -288,44 +288,49 @@ pub(crate) fn canonical_hash(model: &RulesModel) -> RuleHash {
             None => bytes.push(0),
         }
     }
-    let mut localisation_bindings = model.semantic.localisation_bindings.clone();
-    localisation_bindings.sort_by(|left, right| {
-        (
-            left.type_name.as_str(),
-            left.subtype.as_deref().unwrap_or_default(),
-            left.field.as_str(),
-            left.template.as_deref().unwrap_or_default(),
-        )
-            .cmp(&(
-                right.type_name.as_str(),
-                right.subtype.as_deref().unwrap_or_default(),
-                right.field.as_str(),
-                right.template.as_deref().unwrap_or_default(),
-            ))
-    });
-    put_len(&mut bytes, localisation_bindings.len());
-    for binding in localisation_bindings {
-        put_str(&mut bytes, &binding.type_name);
-        put_str(&mut bytes, &binding.field);
-        put_opt_str(&mut bytes, binding.template.as_deref());
-        bytes.push(u8::from(binding.required));
-        bytes.push(u8::from(binding.optional));
-        put_opt_str(&mut bytes, binding.subtype.as_deref());
-        if let Some(condition) = &binding.condition {
-            put_opt_str(&mut bytes, condition.field.as_deref());
-            put_opt_str(&mut bytes, condition.value.as_deref());
-            put_opt_str(&mut bytes, condition.key_prefix.as_deref());
-        } else {
-            put_opt_str(&mut bytes, None);
-            put_opt_str(&mut bytes, None);
-            put_opt_str(&mut bytes, None);
-        }
-        put_opt_str(&mut bytes, binding.explicit_field.as_deref());
-    }
+    hash_symbol_bindings(&mut bytes, &model.semantic.localisation_bindings);
+    hash_symbol_bindings(&mut bytes, &model.semantic.sprite_bindings);
     let digest = Sha256::digest(bytes);
     let mut result = [0_u8; 32];
     result.copy_from_slice(&digest);
     RuleHash(result)
+}
+
+/// Hashes one binding family in the shared deterministic order.
+fn hash_symbol_bindings(bytes: &mut Vec<u8>, bindings: &[crate::SymbolBinding]) {
+    let mut bindings = bindings.to_vec();
+    bindings.sort_by(|left, right| {
+        (
+            left.type_name.as_str(),
+            left.subtype.as_deref().unwrap_or_default(),
+            left.name.as_str(),
+            left.key.as_deref().unwrap_or_default(),
+        )
+            .cmp(&(
+                right.type_name.as_str(),
+                right.subtype.as_deref().unwrap_or_default(),
+                right.name.as_str(),
+                right.key.as_deref().unwrap_or_default(),
+            ))
+    });
+    put_len(bytes, bindings.len());
+    for binding in bindings {
+        put_str(bytes, &binding.type_name);
+        put_str(bytes, &binding.name);
+        put_opt_str(bytes, binding.key.as_deref());
+        bytes.push(u8::from(binding.required));
+        put_opt_str(bytes, binding.subtype.as_deref());
+        if let Some(condition) = &binding.condition {
+            put_opt_str(bytes, condition.field.as_deref());
+            put_opt_str(bytes, condition.value.as_deref());
+            put_opt_str(bytes, condition.key_prefix.as_deref());
+        } else {
+            put_opt_str(bytes, None);
+            put_opt_str(bytes, None);
+            put_opt_str(bytes, None);
+        }
+        put_opt_str(bytes, binding.field.as_deref());
+    }
 }
 
 fn put_len(bytes: &mut Vec<u8>, length: usize) {
