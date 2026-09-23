@@ -181,6 +181,10 @@ const FIRST_PARTY_FILES: &[SourceFile<'static>] = &[
         bytes: include_bytes!("../../../../rules/eu4/bindings/sprite.json"),
     },
     SourceFile {
+        path: "profile/cards.json",
+        bytes: include_bytes!("../../../../rules/eu4/profile/cards.json"),
+    },
+    SourceFile {
         path: "profile/dynamic.json",
         bytes: include_bytes!("../../../../rules/eu4/profile/dynamic.json"),
     },

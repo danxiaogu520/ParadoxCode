@@ -57,6 +57,7 @@
       "bindings/sprite.json"
     ],
     "profile": [
+      "profile/cards.json",
       "profile/dynamic.json",
       "profile/filesystem.json",
       "profile/install.json",

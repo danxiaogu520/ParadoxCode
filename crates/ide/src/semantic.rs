@@ -1712,6 +1712,69 @@ pub(crate) fn type_member_provably_valid(
         })
 }
 
+/// Field-level value semantics of one construct context, as declared by the
+/// semantic rules: which exact-named leaf fields hold localisation keys and
+/// which hold sprite names.
+///
+/// This is the query hover cards consume instead of hardcoding field names, so
+/// presentation and validation can never drift apart: a field resolves in a
+/// card exactly when the rule set types it there.
+pub(crate) struct ConstructFieldSemantics {
+    /// Exact-named leaf fields whose values are localisation keys.
+    pub localisation_fields: Vec<String>,
+    /// Exact-named leaf fields whose values are sprite names.
+    pub sprite_fields: Vec<String>,
+}
+
+/// Collects the field semantics of `context`'s direct leaf fields.
+///
+/// A field qualifies through any rule that types it; lenient sibling rules
+/// (vanilla's `any_scalar` catch-alls) never untype a field, matching the
+/// diagnostics side's strictest-voice ownership.
+pub(crate) fn construct_field_semantics(
+    snapshot: &AnalysisSnapshot,
+    context: &str,
+) -> ConstructFieldSemantics {
+    let mut localisation_fields = Vec::new();
+    let mut sprite_fields = Vec::new();
+    let rules = snapshot.rules();
+    let insert = |field: String, target: &mut Vec<String>| {
+        if !target
+            .iter()
+            .any(|seen: &String| seen.eq_ignore_ascii_case(&field))
+        {
+            target.push(field);
+        }
+    };
+    for index in rules.semantic_rule_indices_for_context(context) {
+        let Some(rule) = rules.semantic_rule_at(index) else {
+            continue;
+        };
+        if !rule.parent_path.is_empty()
+            || !matches!(
+                rule.shape,
+                rules::RuleShape::Leaf | rules::RuleShape::LeafValue
+            )
+        {
+            continue;
+        }
+        let rules::KeyMatcher::Exact(field) = &rule.key else {
+            continue;
+        };
+        match &rule.value {
+            rules::ValueMatcher::Localisation => insert(field.clone(), &mut localisation_fields),
+            rules::ValueMatcher::Type(kind) if kind.eq_ignore_ascii_case("sprite") => {
+                insert(field.clone(), &mut sprite_fields);
+            }
+            _ => {}
+        }
+    }
+    ConstructFieldSemantics {
+        localisation_fields,
+        sprite_fields,
+    }
+}
+
 pub(crate) fn semantic_property_matches(
     snapshot: &AnalysisSnapshot,
     rule: &rules::SemanticRule,
