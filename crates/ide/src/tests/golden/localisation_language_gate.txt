@@ -1,0 +1,16 @@
+// case: localisation_language_gate
+// input:
+//   golden_lang_tree = {
+//   	slot = 1
+//   	potential = { always = yes }
+//   	mission_lang = {
+//   		icon = mission_conquest
+//   		trigger = { always = yes }
+//   		effect = { add_prestige = 1 }
+//   		position = 1
+//   	}
+//   }
+//   
+diagnostics:
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=62..74
+  message: localisation key `mission_lang_desc` is missing in english (defined in french)

@@ -53,7 +53,8 @@ export interface HoverCardEventOptionWire {
 export interface HoverCardEventWire {
     id: string;
     picture?: string | null;
-    titleKey: string;
+    /** Present only when the event declares a scalar `title`; no key is fabricated. */
+    titleKey?: string | null;
     title?: { language?: string; value: string } | null;
     descKey?: string | null;
     desc?: { language?: string; value: string } | null;
@@ -855,7 +856,7 @@ export function parseHoverCardResponse(value: unknown): HoverCardResponseWire | 
         event = {
             id: record.id,
             picture: typeof record.picture === 'string' ? record.picture : undefined,
-            titleKey: typeof record.titleKey === 'string' ? record.titleKey : '',
+            titleKey: typeof record.titleKey === 'string' ? record.titleKey : undefined,
             title: parseLocText(record.title),
             descKey: typeof record.descKey === 'string' ? record.descKey : undefined,
             desc: parseLocText(record.desc),

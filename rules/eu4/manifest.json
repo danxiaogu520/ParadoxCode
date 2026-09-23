@@ -51,9 +51,10 @@
       "values/enums/religion.json"
     ],
     "localisation": [
-      "localisation/bindings/common.json",
-      "localisation/bindings/events.json",
-      "localisation/bindings/other.json"
+      "bindings/localisation.json"
+    ],
+    "sprite": [
+      "bindings/sprite.json"
     ],
     "profile": [
       "profile/dynamic.json",

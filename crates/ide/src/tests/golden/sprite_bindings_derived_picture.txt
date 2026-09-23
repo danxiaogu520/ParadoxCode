@@ -1,0 +1,9 @@
+// case: sprite_bindings_derived_picture
+// input:
+//   golden_missing_building = { cost = 100 }
+//   
+diagnostics:
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=0..23
+  message: unknown localisation key `building_golden_missing_building`
+- code=InvalidValue severity=Error certainty=certain range=0..23
+  message: unknown sprite `GFX_golden_missing_building`

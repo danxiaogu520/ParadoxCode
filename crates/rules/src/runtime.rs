@@ -1,7 +1,7 @@
 use crate::canonical::{RuleHash, canonical_hash};
 use crate::matcher::KeyMatcher;
 use crate::model::{
-    FileCategory, RuleShape, RulesModel, SemanticModel, SemanticRule, TypeRootScope,
+    FileCategory, RuleShape, RulesModel, SemanticModel, SemanticRule, SymbolBinding, TypeRootScope,
 };
 use text::LogicalPath;
 
@@ -66,7 +66,48 @@ pub struct RuleSet {
     pub(crate) dynamic_write_keys: FxHashMap<Box<str>, Box<str>>,
 }
 
+/// Deterministic ordering for one binding family, shared by the runtime sort
+/// and the canonical hash.
+fn sort_symbol_bindings(bindings: &mut [SymbolBinding]) {
+    bindings.sort_by(|left, right| {
+        (
+            left.type_name.as_str(),
+            left.subtype.as_deref().unwrap_or_default(),
+            left.name.as_str(),
+            left.key.as_deref().unwrap_or_default(),
+        )
+            .cmp(&(
+                right.type_name.as_str(),
+                right.subtype.as_deref().unwrap_or_default(),
+                right.name.as_str(),
+                right.key.as_deref().unwrap_or_default(),
+            ))
+    });
+}
+
 impl RuleSet {
+    /// The key one named template binding expands to for a given instance.
+    /// Specialized consumers (the mission card, the mission preview) resolve
+    /// their keys through this so the bindings JSON stays the single source.
+    #[must_use]
+    pub fn localisation_template_key(
+        &self,
+        type_name: &str,
+        binding_name: &str,
+        instance: &str,
+    ) -> Option<String> {
+        self.model
+            .semantic
+            .localisation_bindings
+            .iter()
+            .find(|binding| {
+                binding.type_name.eq_ignore_ascii_case(type_name)
+                    && binding.name.eq_ignore_ascii_case(binding_name)
+            })
+            .and_then(|binding| binding.key.as_deref())
+            .map(|template| template.replace('$', instance))
+    }
+
     /// Creates an empty rule set for bootstrapping the crate graph.
     #[must_use]
     pub fn empty() -> Self {
@@ -84,6 +125,7 @@ impl RuleSet {
                     type_root_scopes: BTreeMap::new(),
                     type_descriptors: BTreeMap::new(),
                     localisation_bindings: Vec::new(),
+                    sprite_bindings: Vec::new(),
                 },
                 profile: crate::GameProfile::default(),
             },
@@ -118,20 +160,8 @@ impl RuleSet {
             .semantic
             .rules
             .sort_by(|left, right| left.id.cmp(&right.id));
-        model.semantic.localisation_bindings.sort_by(|left, right| {
-            (
-                left.type_name.as_str(),
-                left.subtype.as_deref().unwrap_or_default(),
-                left.field.as_str(),
-                left.template.as_deref().unwrap_or_default(),
-            )
-                .cmp(&(
-                    right.type_name.as_str(),
-                    right.subtype.as_deref().unwrap_or_default(),
-                    right.field.as_str(),
-                    right.template.as_deref().unwrap_or_default(),
-                ))
-        });
+        sort_symbol_bindings(&mut model.semantic.localisation_bindings);
+        sort_symbol_bindings(&mut model.semantic.sprite_bindings);
         for values in model.semantic.enum_values.values_mut() {
             values.sort();
             values.dedup();

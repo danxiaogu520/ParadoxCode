@@ -2306,6 +2306,11 @@ country_event = {\n\
     let fallback = card(3);
     assert_eq!(fallback["card"]["kind"], "event");
     assert_eq!(fallback["card"]["asset"]["sprite"], "GFX_prefixed_picture");
+    // The event declares neither `title` nor `desc`: no keys are fabricated
+    // for it — the <id>.t/<id>.d spellings are modder convention, not
+    // engine defaults.
+    assert!(fallback["card"]["event"]["titleKey"].is_null());
+    assert!(fallback["card"]["event"]["descKey"].is_null());
     assert_eq!(
         fallback["card"]["event"]["options"]
             .as_array()
@@ -2324,9 +2329,74 @@ country_event = {\n\
         "GFX_prefixed_picture"
     );
 
-    // A position on the `id` value inside a block never cards.
-    assert_eq!(card(5), serde_json::Value::Null);
+    // A position on the `id` value is the event definition's name token:
+    // the generic icon card serves the bound picture texture there.
+    let id_icon = card(5);
+    assert_eq!(id_icon["card"]["kind"], "sprite");
+    assert_eq!(id_icon["card"]["asset"]["sprite"], "demo_picture");
     // A non-event position yields null, not an error.
     assert_eq!(card(6), serde_json::Value::Null);
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn hover_card_serves_icon_bound_definition() {
+    let (root, root_uri) = temp_workspace_dir();
+    // One holy-order sprite with its texture on disk; the holy order
+    // definition binds it through the icon binding family.
+    let textures = root.join("gfx").join("interface").join("holy_orders");
+    fs::create_dir_all(&textures).expect("create texture directory");
+    fs::write(textures.join("golden_order_icon.dds"), b"placeholder").expect("texture file");
+    let gfx_text = "spriteTypes = {\n\
+\t\tspriteType = {\n\
+\t\t\tname = \"golden_order_icon\"\n\
+\t\t\ttexturefile = \"gfx/interface/holy_orders/golden_order_icon.dds\"\n\
+\t\t}\n\
+}\n";
+    let holy_text = "golden_order = {\n\ticon = golden_order_icon\n}\n";
+    let gfx_uri = format!("{root_uri}/interface/test_icons.gfx");
+    let holy_uri = format!("{root_uri}/common/holy_orders/holy.txt");
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":gfx_uri,"languageId":"eu4","version":1,"text":gfx_text}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":holy_uri,"languageId":"eu4","version":1,"text":holy_text}}}),
+        // On the `golden_order` definition token: the generic icon card.
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/hoverCard","params":{"textDocument":{"uri":holy_uri},"position":{"line":0,"character":3}}}),
+        // On the `icon` value: the ordinary sprite card.
+        json!({"jsonrpc":"2.0","id":3,"method":"pdc/hoverCard","params":{"textDocument":{"uri":holy_uri},"position":{"line":1,"character":10}}}),
+        json!({"jsonrpc":"2.0","id":9,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    let card = |id: i64| {
+        responses
+            .iter()
+            .find(|value| value["id"] == id)
+            .unwrap_or_else(|| panic!("hover card response {id}"))["result"]
+            .clone()
+    };
+
+    let definition = card(2);
+    assert_eq!(definition["version"], 1);
+    assert_eq!(definition["card"]["kind"], "sprite");
+    assert_eq!(definition["card"]["asset"]["sprite"], "golden_order_icon");
+    assert!(
+        definition["card"]["asset"]["path"]
+            .as_str()
+            .is_some_and(|path| path
+                .replace('\\', "/")
+                .ends_with("gfx/interface/holy_orders/golden_order_icon.dds"))
+    );
+    assert_eq!(definition["card"]["asset"]["rootKind"], "project");
+
+    let value = card(3);
+    assert_eq!(value["card"]["kind"], "sprite");
+    assert_eq!(value["card"]["asset"]["sprite"], "golden_order_icon");
     fs::remove_dir_all(root).expect("cleanup");
 }

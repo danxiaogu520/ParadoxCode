@@ -439,10 +439,10 @@ const MAX_PREVIEW_FIELDS: usize = 6;
 /// Type-instance localisation mappings are indexed as ordinary localisation references at the
 /// instance's source range.  Looking those references up from the resolved definition lets a
 /// hover over `event = foo.1` (or another typed symbol use) show the same preview as hovering its
-/// generated localisation key. Type descriptors may also use the implicit same-name convention
-/// without a localisation-binding row. Finally, the per-family generated templates
-/// (`$_title`, `$.t`, `building_$`, …) are tried for every definition — the
-/// coverage matrix — and only shown when the generated key actually resolves.
+/// generated localisation key. Only declared bindings generate keys — a type carries the
+/// same-name convention exactly when its JSON declares a self binding — and the coverage
+/// matrix tries each binding (`$_title`, `building_$`, `harmonized_$`, …) for every
+/// definition, showing only the keys that actually resolve.
 ///
 /// Every strategy contributes its resolvable rows instead of the first match winning: a
 /// definition may carry an explicit `title` while its `desc` template also resolves, and the
@@ -526,7 +526,6 @@ pub(crate) fn symbol_localisation_preview(
         snapshot,
         kind,
         symbol_name,
-        is_type_definition(snapshot, kind),
         &mut rows,
         &mut seen,
         cancellation,
@@ -534,8 +533,8 @@ pub(crate) fn symbol_localisation_preview(
     Ok(rows)
 }
 
-/// Same-name and generated-template localisation previews for a typed token
-/// whose definition site is not at hand — the rule-layer hovers over
+/// Generated-template localisation previews for a typed token whose
+/// definition site is not at hand — the rule-layer hovers over
 /// `Type`-matched scope links (`tripolitania_area = { … }`) and typed scalar
 /// values. Localisation keys resolve on their own, so no definition lookup
 /// participates.
@@ -550,36 +549,14 @@ pub(crate) fn typed_name_localisation_previews(
     }
     let mut rows = Vec::new();
     let mut seen = BTreeSet::<String>::new();
-    collect_generated_preview_rows(
-        snapshot,
-        kind,
-        name,
-        is_type_definition(snapshot, kind),
-        &mut rows,
-        &mut seen,
-        cancellation,
-    )?;
+    collect_generated_preview_rows(snapshot, kind, name, &mut rows, &mut seen, cancellation)?;
     Ok(rows)
 }
 
-/// Whether hover localisation previews apply to a kind: it carries
-/// localisation bindings or is a type descriptor (the implicit same-name
-/// convention).
+/// Whether hover localisation previews apply to a kind: it names a semantic
+/// type. Types without declared bindings can still carry schema-typed
+/// localisation fields whose in-range references drive the preview.
 pub(crate) fn kind_is_localisation_displayable(snapshot: &AnalysisSnapshot, kind: &str) -> bool {
-    has_localisation_binding(snapshot, kind) || is_type_definition(snapshot, kind)
-}
-
-fn has_localisation_binding(snapshot: &AnalysisSnapshot, kind: &str) -> bool {
-    snapshot
-        .rules()
-        .model()
-        .semantic
-        .localisation_bindings
-        .iter()
-        .any(|binding| binding.type_name.eq_ignore_ascii_case(kind))
-}
-
-fn is_type_definition(snapshot: &AnalysisSnapshot, kind: &str) -> bool {
     snapshot
         .rules()
         .model()
@@ -589,23 +566,16 @@ fn is_type_definition(snapshot: &AnalysisSnapshot, kind: &str) -> bool {
         .any(|type_name| type_name.eq_ignore_ascii_case(kind))
 }
 
-/// Appends the implicit same-name row (for type descriptors) and every
-/// generated-template row whose key resolves, labelling each group with the
-/// binding field.
+/// Appends every generated-key row (self bindings and template bindings alike)
+/// whose key resolves, labelling each group with the binding name.
 fn collect_generated_preview_rows(
     snapshot: &AnalysisSnapshot,
     kind: &str,
     symbol_name: &str,
-    same_name: bool,
     rows: &mut Vec<LocalisationPreviewRow>,
     seen: &mut BTreeSet<String>,
     cancellation: &CancellationToken,
 ) -> Result<(), Cancelled> {
-    if same_name {
-        cancellation.checkpoint()?;
-        let previews = localisation_previews_for_name(snapshot, symbol_name, cancellation)?;
-        push_preview_rows(rows, seen, None, &previews);
-    }
     for binding in snapshot
         .rules()
         .model()
@@ -614,13 +584,13 @@ fn collect_generated_preview_rows(
         .iter()
         .filter(|binding| binding.type_name.eq_ignore_ascii_case(kind))
     {
-        let Some(template) = binding.template.as_deref() else {
+        let Some(key) = binding.key.as_deref() else {
             continue;
         };
-        let name = template.replace('$', symbol_name);
+        let name = key.replace('$', symbol_name);
         cancellation.checkpoint()?;
         let previews = localisation_previews_for_name(snapshot, &name, cancellation)?;
-        push_preview_rows(rows, seen, Some(binding.field.clone()), &previews);
+        push_preview_rows(rows, seen, Some(binding.name.clone()), &previews);
     }
     Ok(())
 }
@@ -657,9 +627,9 @@ pub(crate) fn unlabelled_preview_rows(
         .collect()
 }
 
-/// The binding field whose generated template expands to `key` for this
-/// instance, when one exists — labels derived-template references hovering a
-/// definition (`event_one.1.t` → `title_default`).
+/// The binding name whose generated key expands to `key` for this
+/// instance, when one exists — labels generated-key references hovering a
+/// definition (`mission_one_title` → `name`).
 fn generated_key_field<'a>(
     snapshot: &'a AnalysisSnapshot,
     kind: &str,
@@ -674,11 +644,11 @@ fn generated_key_field<'a>(
         .iter()
         .filter(|binding| binding.type_name.eq_ignore_ascii_case(kind))
         .find_map(|binding| {
-            let template = binding.template.as_deref()?;
+            let template = binding.key.as_deref()?;
             template
                 .replace('$', symbol_name)
                 .eq_ignore_ascii_case(key)
-                .then_some(binding.field.as_str())
+                .then_some(binding.name.as_str())
         })
 }
 

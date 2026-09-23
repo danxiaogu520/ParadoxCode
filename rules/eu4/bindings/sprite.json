@@ -1,0 +1,29 @@
+{
+  "aspects_and_blessings": [
+    {
+      "name": "icon",
+      "key": "GFX_$"
+    }
+  ],
+  "building": [
+    {
+      "name": "icon",
+      "key": "GFX_$",
+      "required": true
+    }
+  ],
+  "game_age": [
+    {
+      "name": "icon",
+      "key": "GFX_$",
+      "required": true
+    }
+  ],
+  "golden_bull": [
+    {
+      "name": "icon",
+      "key": "GFX_$",
+      "required": true
+    }
+  ]
+}

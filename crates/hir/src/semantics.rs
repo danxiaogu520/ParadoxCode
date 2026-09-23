@@ -1270,12 +1270,71 @@ fn semantic_localisation_key_matches(
     }
 }
 
+/// One binding family expansion request: the bindings to expand plus the
+/// reference kind and origin the derived entries carry.
+struct DerivedBindings<'a> {
+    bindings: &'a [rules::SymbolBinding],
+    reference_kind: &'static str,
+    origin: HirReferenceOrigin,
+}
+
 pub(super) fn derived_localisation_references(
     properties: &[HirProperty],
     root_range: TextRange,
     logical_path: Option<&LogicalPath>,
     rules: &RuleSet,
-    include_optional: bool,
+    required_only: bool,
+) -> Vec<HirReference> {
+    derived_symbol_references(
+        properties,
+        root_range,
+        logical_path,
+        rules,
+        required_only,
+        &DerivedBindings {
+            bindings: &rules.model().semantic.localisation_bindings,
+            reference_kind: "localisation",
+            origin: HirReferenceOrigin::DerivedLocalisation,
+        },
+    )
+}
+
+pub(super) fn derived_sprite_references(
+    properties: &[HirProperty],
+    root_range: TextRange,
+    logical_path: Option<&LogicalPath>,
+    rules: &RuleSet,
+    required_only: bool,
+) -> Vec<HirReference> {
+    derived_symbol_references(
+        properties,
+        root_range,
+        logical_path,
+        rules,
+        required_only,
+        &DerivedBindings {
+            bindings: &rules.model().semantic.sprite_bindings,
+            reference_kind: "sprite",
+            origin: HirReferenceOrigin::DerivedSprite,
+        },
+    )
+}
+
+/// Expands one binding family (localisation keys or icon sprites) for every
+/// type instance in the file.
+///
+/// Required bindings participate in diagnostics: a symbol that fails to
+/// resolve is reported against the instance. Non-required bindings stay out
+/// of that set — a missing hover-only symbol is valid game data. Hover asks
+/// for the complete binding set through `required_only = false` and resolves
+/// only names that actually exist in the workspace.
+fn derived_symbol_references(
+    properties: &[HirProperty],
+    root_range: TextRange,
+    logical_path: Option<&LogicalPath>,
+    rules: &RuleSet,
+    required_only: bool,
+    family: &DerivedBindings<'_>,
 ) -> Vec<HirReference> {
     if !logical_path.is_some_and(|path| path.as_str().contains('/')) {
         return Vec::new();
@@ -1291,17 +1350,11 @@ pub(super) fn derived_localisation_references(
             if name.contains('.') {
                 continue;
             }
-            for binding in rules
-                .model()
-                .semantic
-                .localisation_bindings
+            for binding in family
+                .bindings
                 .iter()
                 .filter(|binding| binding.type_name.eq_ignore_ascii_case(&descriptor.name))
-                // Required generated templates participate in diagnostics. Explicit fields are
-                // already present in source and validated by their normal localisation rule;
-                // hover asks for those associations (and optional generated templates) through
-                // the `include_optional` path, but they stay out of diagnostics.
-                .filter(|binding| include_optional || binding.required)
+                .filter(|binding| !required_only || binding.required)
                 .filter(|binding| {
                     localisation_subtype_applies(
                         properties,
@@ -1312,21 +1365,23 @@ pub(super) fn derived_localisation_references(
                     )
                 })
             {
-                if let Some(template) = binding.template.as_deref() {
+                if let Some(key) = binding.key.as_deref() {
                     references.push(HirReference {
-                        kind: "localisation".into(),
-                        name: template.replace('$', &name),
+                        kind: family.reference_kind.into(),
+                        name: key.replace('$', &name),
                         range,
-                        origin: HirReferenceOrigin::DerivedLocalisation,
+                        origin: family.origin,
                     });
                     continue;
                 }
-                // An explicit field mapping (for example an event's `title`) does not
-                // have a generated key.  It still belongs to the type instance, so retain
-                // the field value as a localisation reference at its own source range.  The
-                // ordinary semantic/profile lowering already validates this value; this
-                // derived entry only associates it with the instance for navigation and hover.
-                let Some(field) = binding.explicit_field.as_deref() else {
+                // A semantic binding (for example an event's `title` or a
+                // mission's `icon`) does not have a generated name.  It still
+                // belongs to the type instance, so retain the field value as a
+                // reference at its own source range.  The type schema owns
+                // whether the field exists; this derived entry only associates
+                // the value with the instance for navigation, hover, and (when
+                // required) missing-symbol diagnostics.
+                let Some(field) = binding.field.as_deref() else {
                     continue;
                 };
                 let Some(instance_index) = properties
@@ -1349,10 +1404,10 @@ pub(super) fn derived_localisation_references(
                     continue;
                 }
                 references.push(HirReference {
-                    kind: "localisation".into(),
+                    kind: family.reference_kind.into(),
                     name: field_value.value.clone(),
                     range: field_value.range,
-                    origin: HirReferenceOrigin::DerivedLocalisation,
+                    origin: family.origin,
                 });
             }
         }
@@ -1456,7 +1511,7 @@ fn localisation_subtype_applies(
     instance_range: TextRange,
     instance_name: &str,
     subtype: Option<&str>,
-    condition: Option<&rules::LocalisationBindingCondition>,
+    condition: Option<&rules::SymbolBindingCondition>,
 ) -> bool {
     if let Some(condition) = condition {
         if let Some(prefix) = condition.key_prefix.as_deref() {
