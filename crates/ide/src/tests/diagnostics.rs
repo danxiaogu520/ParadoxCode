@@ -4960,3 +4960,97 @@ fn government_ranks_entries_require_integer_keys() {
         "an integer rank entry with a modifier body must stay clean: {diags:?}"
     );
 }
+
+/// The extension's decoded view is a `pdcloc://` twin of the raw `file://`
+/// document over one backing path, and a tab takeover transiently opens both
+/// (a window reload can restore both persistently). Both twins staying open
+/// must not make the file's definitions shadow themselves.
+#[test]
+fn decoded_view_twin_overlays_do_not_shadow_their_own_definitions() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ide-twin-shadow-{nonce}"));
+    let events = root.join("events");
+    std::fs::create_dir_all(&events).expect("events directory");
+    let text = "country_event = { id = twin.1 }\n";
+    std::fs::write(events.join("one.txt"), text).expect("event file");
+
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::Project,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().expect("scan workspace");
+
+    let path = AbsPath::normalize(&events.join("one.txt"));
+    let raw_id = DocumentId::new(format!("file://{}", path.display()));
+    host.open_document(raw_id.clone(), 1, text.to_owned(), Some(path.clone()))
+        .expect("open raw overlay");
+    let decoded_id = DocumentId::new(format!("pdcloc://{}", path.display()));
+    host.open_document(decoded_id.clone(), 1, text.to_owned(), Some(path))
+        .expect("open decoded overlay");
+
+    for id in [&raw_id, &decoded_id] {
+        let snapshot = host.snapshot();
+        let shadows: Vec<_> = diagnostics(&snapshot, id)
+            .into_iter()
+            .filter(|item| item.code == DiagnosticCode::AmbiguousDefinition)
+            .collect();
+        assert!(
+            shadows.is_empty(),
+            "twin overlays over one path must not self-shadow: {shadows:?}"
+        );
+    }
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+/// Path-level twin deduplication must not swallow genuine in-file shadowing:
+/// a real duplicate pair still warns exactly once, at the later definition.
+#[test]
+fn genuine_in_file_duplicates_still_warn_with_twin_overlays_open() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ide-twin-genuine-{nonce}"));
+    let events = root.join("events");
+    std::fs::create_dir_all(&events).expect("events directory");
+    let text = concat!(
+        "country_event = { id = genuine.1 }\n",
+        "country_event = { id = genuine.1 }\n",
+        "event = genuine.1\n",
+    );
+    std::fs::write(events.join("one.txt"), text).expect("event file");
+
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::Project,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().expect("scan workspace");
+
+    let path = AbsPath::normalize(&events.join("one.txt"));
+    let raw_id = DocumentId::new(format!("file://{}", path.display()));
+    host.open_document(raw_id, 1, text.to_owned(), Some(path.clone()))
+        .expect("open raw overlay");
+    let decoded_id = DocumentId::new(format!("pdcloc://{}", path.display()));
+    host.open_document(decoded_id.clone(), 1, text.to_owned(), Some(path))
+        .expect("open decoded overlay");
+
+    let second_name =
+        u32::try_from("country_event = { id = genuine.1 }\ncountry_event = { id = ".len())
+            .expect("second name offset");
+    let snapshot = host.snapshot();
+    let shadows: Vec<_> = diagnostics(&snapshot, &decoded_id)
+        .into_iter()
+        .filter(|item| item.code == DiagnosticCode::AmbiguousDefinition)
+        .collect();
+    assert_eq!(shadows.len(), 1, "only the later definition warns");
+    assert_eq!(shadows[0].range.start(), second_name);
+    assert!(shadows[0].message.contains("shadows an earlier definition"));
+    std::fs::remove_dir_all(root).expect("cleanup");
+}

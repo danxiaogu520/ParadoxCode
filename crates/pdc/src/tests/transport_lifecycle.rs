@@ -457,3 +457,57 @@ fn initialize_rejects_root_uri_only_clients() {
     );
     assert_eq!(server.state(), ServerState::Exited);
 }
+
+/// The takeover between a raw `file://` tab and its decoded `pdcloc://` twin
+/// transiently holds both documents open over one backing path; diagnostics
+/// published inside that window must stay free of self-shadowing findings.
+#[test]
+fn twin_documents_over_one_path_publish_without_shadow_diagnostics() {
+    let (root, root_uri) = temp_workspace_dir();
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("events directory");
+    let text = "country_event = { id = twins.1 }\n";
+    fs::write(events.join("twin.txt"), text).expect("event file");
+    let raw_uri = format!("{root_uri}/events/twin.txt");
+    let decoded_uri = raw_uri.replacen("file:", "pdcloc:", 1);
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":raw_uri,"languageId":"eu4","version":1,"text":text}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":decoded_uri,"languageId":"eu4","version":1,"text":text}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("server");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    for uri in [raw_uri, decoded_uri] {
+        let published = responses
+            .iter()
+            .filter(|value| {
+                value["method"] == "textDocument/publishDiagnostics"
+                    && value["params"]["uri"] == *uri
+            })
+            .collect::<Vec<_>>();
+        assert!(
+            !published.is_empty(),
+            "diagnostics must be published for {uri}"
+        );
+        assert!(
+            published.iter().all(|value| {
+                value["params"]["diagnostics"]
+                    .as_array()
+                    .is_some_and(|items| {
+                        items
+                            .iter()
+                            .all(|item| item["code"] != "AmbiguousDefinition")
+                    })
+            }),
+            "twin documents must not self-shadow: {published:?}"
+        );
+    }
+    fs::remove_dir_all(root).expect("cleanup");
+}

@@ -1202,6 +1202,7 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
             overlay_files: BTreeSet::new(),
             overlay_definitions: BTreeMap::new(),
         };
+        let suppressed = twin_suppressed_overlays(snapshot);
         for document in snapshot
             .documents()
             .values()
@@ -1211,6 +1212,9 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
                 && let Some(file) = snapshot.source_file_id_for_path(path)
             {
                 context.overlay_files.insert(file);
+            }
+            if suppressed.contains(document.id()) {
+                continue;
             }
             let Some(input) = input_for_document(snapshot, document.id()) else {
                 continue;
@@ -1318,6 +1322,67 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
         }
         Some(retain_highest_and_order(candidates))
     }
+}
+
+/// Overlay documents suppressed by a twin over the same backing path.
+///
+/// The extension's decoded view is a `pdcloc://` twin of the raw `file://`
+/// document, and a tab takeover transiently opens both twins (a window reload
+/// can even restore both persistently). Storage keeps every open document —
+/// the client owns their lifetimes — but one file must contribute one
+/// effective text: counting both twins makes every definition in the file
+/// shadow itself. The winner is the decoded twin (the surface being edited);
+/// same-scheme spelling twins fall back to id order for determinism. The
+/// losers' disk shards stay hidden either way: `overlay_files` keys paths.
+fn twin_suppressed_overlays(snapshot: &AnalysisSnapshot) -> BTreeSet<DocumentId> {
+    let mut owner: HashMap<&std::path::Path, &DocumentId> = HashMap::new();
+    for document in snapshot
+        .documents()
+        .values()
+        .filter(|document| document.source() == DocumentSource::Overlay)
+    {
+        let Some(path) = document.path() else {
+            continue;
+        };
+        match owner.get(path) {
+            Some(current) if !overlay_twin_replaces(current, document.id()) => {}
+            _ => {
+                owner.insert(path, document.id());
+            }
+        }
+    }
+    snapshot
+        .documents()
+        .values()
+        .filter(|document| document.source() == DocumentSource::Overlay)
+        .filter_map(|document| {
+            let path = document.path()?;
+            owner
+                .get(path)
+                .is_some_and(|owner| *owner != document.id())
+                .then(|| document.id().clone())
+        })
+        .collect()
+}
+
+/// Whether `candidate` takes over the effective-text role of `current` for
+/// one backing path: a decoded `pdcloc://` twin outranks its raw `file://`
+/// twin; twins sharing a scheme resolve to id order so the winner never
+/// depends on map iteration order.
+fn overlay_twin_replaces(current: &DocumentId, candidate: &DocumentId) -> bool {
+    match (
+        is_decoded_view_uri(current.as_str()),
+        is_decoded_view_uri(candidate.as_str()),
+    ) {
+        (false, true) => true,
+        (true, false) => false,
+        _ => candidate > current,
+    }
+}
+
+fn is_decoded_view_uri(uri: &str) -> bool {
+    uri.split_once(':')
+        .is_some_and(|(scheme, _)| scheme.eq_ignore_ascii_case("pdcloc"))
 }
 
 /// Retains the highest-priority candidates and orders them oldest-first so the
