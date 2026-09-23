@@ -19,6 +19,7 @@ text = { path = "../text" }
 engine = { path = "../engine" }
 hir = { path = "../hir" }
 transcode = { path = "../transcode" }
+vfs = { path = "../vfs" }
 game = { path = "../game" }
 
 [lints]
@@ -40,3 +41,6 @@ harness = false
 [[bench]]
 name = "scripted_localisation"
 harness = false
+
+[dev-dependencies]
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
