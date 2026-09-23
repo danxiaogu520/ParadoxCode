@@ -9,6 +9,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Hover localisation previews keep up to 1000 characters (was 240), covering
+  the longest vanilla event and description texts.
 - New `pdc/transcodeDecode` and `pdc/transcodeEncode` requests expose the transparent-
   localisation codec over the protocol: the server reads a file from disk, decides
   eligibility (localisation yml under `localisation/`, or a workspace-relative script file
@@ -22,6 +24,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Localisation hover previews render as a markdown table instead of bullet
+  lines. Columns adapt — a Field column appears only when labelled binding
+  fields contribute rows — and cells escape pipes and newlines so values
+  cannot break the table.
+- Localisation surfaces now follow a single target language: the first entry
+  of `paradoxcode.localisation.preferredLanguages` (default english; later
+  entries are ignored). Cache-installed, scanned, and lazy-SQL preview
+  retention keeps only the target language (the persistent `.pdcindex` still
+  stores every language, so switching preferences only needs a restart, not a
+  rebuild). Hover previews and mission-preview titles show only the target
+  language; localisation search returns one row per key, sited at the target
+  language's effective definition with english as the navigation fallback,
+  keeping keys defined solely in other languages listed without a value;
+  symbol navigation prefers the target language with english as the fixed
+  fallback.
 - The extension's marketplace copy is retitled and rewritten: `displayName` is now just
   "ParadoxCode" (dropping the "- EU4 Language Tools" suffix) and the description reads
   "Complete support for EU4 modding, including diagnostics, completions, hover, go-to-
@@ -50,6 +67,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
+- `AGENTS.md` is deleted and the repository policy check no longer requires
+  it.
 - The `transcode` contract from `npm run test:contract` / `test:ci` (the remaining
   assets / extension / package / i18n contracts are unchanged).
 

@@ -17,6 +17,12 @@ use vfs::{
     SourceRoot, SourceRootKind, WorkspaceScanLimits, WorkspaceScanReport,
 };
 
+/// The single localisation language whose previews analysis retains and hover
+/// displays: the first configured preference, defaulting to English.
+pub fn localisation_preview_target_language(preferred: &[String]) -> &str {
+    preferred.first().map_or("english", String::as_str)
+}
+
 /// Immutable workspace view used by analysis queries.
 #[derive(Clone, Debug)]
 pub struct AnalysisSnapshot {
@@ -307,6 +313,14 @@ impl AnalysisSnapshot {
     #[must_use]
     pub fn preferred_localisation_languages(&self) -> &[String] {
         &self.preferred_localisation_languages
+    }
+
+    /// Returns the localisation language hover previews display and the
+    /// retained preview maps keep: the first configured preference, or
+    /// English when none is configured.
+    #[must_use]
+    pub fn localisation_preview_language(&self) -> &str {
+        localisation_preview_target_language(&self.preferred_localisation_languages)
     }
 
     /// Returns the source layers eligible to contribute workspace completion members.

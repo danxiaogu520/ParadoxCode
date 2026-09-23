@@ -477,29 +477,25 @@ impl AnalysisHost {
         Ok(())
     }
 
-    /// Bounds resident memory for cache-installed localisation previews to the languages
-    /// analysis can surface: the configured preference order plus the English fallback that
-    /// `prefer_localisation_language_for_snapshot` selects. Cached Vanilla locates every key
-    /// once per language, so unpreferred languages hold the bulk of preview bytes while no
-    /// query can reach them. Dropped previews stay in the persistent `.pdcindex` and return
-    /// on the next session that prefers them; diagnostics never read previews. Files without
-    /// a path language marker are always retained, as are files unknown to this cache's
-    /// source table (load-time validation guarantees the latter cannot occur).
+    /// Bounds resident memory for cache-installed localisation previews to the
+    /// single target language: the first configured preference, with English as
+    /// the default when none is configured. Cached Vanilla locates every key
+    /// once per language, so the other languages hold the bulk of preview bytes
+    /// while no query can reach them. Dropped previews stay in the persistent
+    /// `.pdcindex` and return on the next session that targets them;
+    /// diagnostics never read previews. Files without a path language marker
+    /// are always retained, as are files unknown to this cache's source table
+    /// (load-time validation guarantees the latter cannot occur).
     fn retain_preferred_localisation_previews(
         previews: &mut LocalisationPreviewMap,
         files: &BTreeMap<SourceFileId, SourceFile>,
         preferred: &[String],
     ) {
+        let target = crate::snapshot::localisation_preview_target_language(preferred);
         previews.retain_files(|file_id| {
             files.get(&file_id).is_none_or(|file| {
-                Self::localisation_path_language(file.logical_path.as_str()).is_none_or(
-                    |language| {
-                        language.eq_ignore_ascii_case("english")
-                            || preferred
-                                .iter()
-                                .any(|preferred| preferred.eq_ignore_ascii_case(language))
-                    },
-                )
+                Self::localisation_path_language(file.logical_path.as_str())
+                    .is_none_or(|language| language.eq_ignore_ascii_case(target))
             })
         });
     }
@@ -552,22 +548,19 @@ impl AnalysisHost {
         previews
     }
 
-    /// One file's preview entries under the preferred-language retention
-    /// policy, shared with the state's own vector when possible: cached
-    /// previews when the state carries them, otherwise a fresh extraction
-    /// from the retained frontend; `None` when filtered out.
+    /// One file's preview entries under the target-language retention policy,
+    /// shared with the state's own vector when possible: cached previews when
+    /// the state carries them, otherwise a fresh extraction from the retained
+    /// frontend; `None` when filtered out.
     fn scanned_entries_handle_for_state(
         state: &FileState,
         file: Option<&SourceFile>,
         preferred: &[String],
     ) -> Option<Arc<Vec<(TextRange, LocalisationPreview)>>> {
+        let target = crate::snapshot::localisation_preview_target_language(preferred);
         let retained = file.is_none_or(|file| {
-            Self::localisation_path_language(file.logical_path.as_str()).is_none_or(|language| {
-                language.eq_ignore_ascii_case("english")
-                    || preferred
-                        .iter()
-                        .any(|preferred| preferred.eq_ignore_ascii_case(language))
-            })
+            Self::localisation_path_language(file.logical_path.as_str())
+                .is_none_or(|language| language.eq_ignore_ascii_case(target))
         });
         if !retained {
             return None;

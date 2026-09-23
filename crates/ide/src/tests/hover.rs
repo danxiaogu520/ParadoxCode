@@ -370,9 +370,9 @@ fn localisation_hover_shows_the_resolved_short_text() {
     assert!(
         hover
             .contents
-            .contains("#### Localisation preview\n\n- Localisation")
+            .contains("#### Localisation preview\n\n| Text |")
     );
-    assert!(hover.contents.contains("Localisation (l_english): \"Foo\""));
+    assert!(hover.contents.contains("| Foo |"));
 }
 
 #[test]
@@ -410,9 +410,7 @@ fn hover_prefers_nonempty_localisation_preview_over_empty_sibling() {
         u32::try_from(source.find("mission_one").expect("mission name") + 4).expect("position");
     let hover = hover(&host.snapshot(), &mission, position).expect("mission hover");
     assert!(
-        hover
-            .contents
-            .contains("Localisation (l_english): \"Mission One Title\""),
+        hover.contents.contains("| Mission One Title |"),
         "hover should prefer the non-empty title preview: {}",
         hover.contents
     );
@@ -579,8 +577,8 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
 /// The localisation total order (design doc §7.2): layer order
 /// (project > dependency > vanilla) dominates, and within a layer all
 /// files — `l_*` directories and `replace/` alike — are equal, with the
-/// later-read definition winning. Resolution is per (key, language), so a
-/// key that only exists outside the preferred language still resolves.
+/// later-read definition winning. Values resolve only in the target
+/// language; a key that exists solely outside it has no value.
 #[test]
 fn localisation_values_by_key_apply_the_layer_then_read_order_total_order() {
     let nonce = std::time::SystemTime::now()
@@ -675,13 +673,12 @@ fn localisation_values_by_key_apply_the_layer_then_read_order_total_order() {
     let (language, value) = resolved.get("within_title").expect("within-layer title");
     assert_eq!(value, "Current Replace Override");
     assert_eq!(language.as_deref(), Some("l_english"));
-    // Later-read-wins applies per language, and a key with no English variant
-    // at all still resolves through its sole language.
-    let (language, value) = resolved
-        .get("french_only_title")
-        .expect("french-only title");
-    assert_eq!(value, "Dernier Seul");
-    assert_eq!(language.as_deref(), Some("l_french"));
+    // A key defined only outside the target language carries no value:
+    // strict target filtering drops it instead of showing another language.
+    assert!(
+        !resolved.contains_key("french_only_title"),
+        "french-only keys resolve to no value under the english target"
+    );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
 
@@ -719,9 +716,7 @@ fn custom_tooltip_hover_shows_localisation_preview_inside_mission_effects() {
         u32::try_from(source.find("DEMO_TEST_TT").expect("tooltip key") + 4).expect("position");
     let hover = hover(&host.snapshot(), &mission, position).expect("tooltip hover");
     assert!(
-        hover
-            .contents
-            .contains("Localisation (l_english): \"My tooltip text\""),
+        hover.contents.contains("| My tooltip text |"),
         "custom_tooltip inside a mission effect should resolve to the localisation preview: {}",
         hover.contents
     );
@@ -771,9 +766,7 @@ fn typed_symbol_hover_shows_definition_localisation_preview() {
         u32::try_from(use_text.find("test.1").expect("event reference") + 1).expect("position");
     let result = hover(&host.snapshot(), &use_id, position).expect("event hover");
     assert!(
-        result
-            .contents
-            .contains("title (l_english): \"Event Title\""),
+        result.contents.contains("| title | Event Title |"),
         "typed symbol hover should include its definition's localisation: {}",
         result.contents
     );
@@ -811,7 +804,7 @@ fn optional_type_localisation_hover_shows_existing_preview() {
         u32::try_from(source.find("region_one").expect("region name") + 1).expect("position");
     let result = hover(&host.snapshot(), &definition, position).expect("region hover");
     assert!(
-        result.contents.contains("name (l_english): \"Region One\""),
+        result.contents.contains("| name | Region One |"),
         "optional type mappings should contribute existing localisation previews: {}",
         result.contents
     );
@@ -849,9 +842,7 @@ fn same_name_type_localisation_hover_shows_existing_preview() {
         u32::try_from(source.find("europe").expect("continent name") + 1).expect("position");
     let result = hover(&host.snapshot(), &definition, position).expect("continent hover");
     assert!(
-        result
-            .contents
-            .contains("Localisation (l_english): \"Europe\""),
+        result.contents.contains("| Europe |"),
         "same-name type localisations should contribute existing previews: {}",
         result.contents
     );
@@ -898,9 +889,7 @@ fn scope_link_rule_hover_shows_typed_localisation_preview() {
         u32::try_from(source.find("test_area").expect("area scope link") + 1).expect("position");
     let result = hover(&host.snapshot(), &event, position).expect("area scope-link hover");
     assert!(
-        result
-            .contents
-            .contains("Localisation (l_english): \"Test Area\""),
+        result.contents.contains("| Test Area |"),
         "typed scope-link block keys should show their localisation preview: {}",
         result.contents
     );
@@ -938,12 +927,8 @@ fn bound_kind_hover_shows_every_template_preview() {
         u32::try_from(source.find("region_two").expect("region name") + 1).expect("position");
     let result = hover(&host.snapshot(), &definition, position).expect("region hover");
     assert!(
-        result
-            .contents
-            .contains("- name (l_english): \"Region Two\"")
-            && result
-                .contents
-                .contains("- short (l_english): \"Region 2\""),
+        result.contents.contains("| name | Region Two |")
+            && result.contents.contains("| short | Region 2 |"),
         "every resolvable binding template should contribute a labelled preview row: {}",
         result.contents
     );
@@ -1015,9 +1000,7 @@ fn cache_only_optional_type_hover_shows_existing_preview() {
         u32::try_from(text.find("region_one").expect("region reference") + 1).expect("position");
     let result = hover(&host.snapshot(), &document, position).expect("cached hover");
     assert!(
-        result
-            .contents
-            .contains("Localisation (l_english): \"Region One\""),
+        result.contents.contains("| Region One |"),
         "cache-only optional mappings should contribute existing previews: {}",
         result.contents
     );
@@ -1077,11 +1060,7 @@ fn vanilla_cache_localisation_hover_shows_derived_text_without_source_state() {
     let position =
         u32::try_from(text.find("cached_name").expect("localisation reference")).expect("position");
     let hover = hover(&host.snapshot(), &document, position).expect("cached localisation hover");
-    assert!(
-        hover
-            .contents
-            .contains("Localisation (l_english): \"Cached Vanilla text\"")
-    );
+    assert!(hover.contents.contains("| Cached Vanilla text |"));
     assert!(host.snapshot().file_state(localisation_file).is_none());
     std::fs::remove_dir_all(root).expect("cleanup");
 }
@@ -1419,7 +1398,7 @@ fn dynamic_parameter_hover_replays_bindings_aware_sites() {
 }
 
 #[test]
-fn localisation_hover_renders_every_language_in_parallel() {
+fn localisation_hover_shows_only_the_target_language() {
     let mut host = eu4_host(game::eu4::bootstrap_rules());
     let id = DocumentId::new("file:///tmp/localisation/parallel.yml");
     let text = concat!(
@@ -1436,16 +1415,33 @@ fn localisation_hover_renders_every_language_in_parallel() {
         u32::try_from(text.find("shared_name").expect("localisation key") + 2).expect("position");
     let hover = hover(&host.snapshot(), &id, position).expect("localisation hover");
     assert!(
-        hover
-            .contents
-            .contains("Localisation (l_english): \"English text\"")
-            && hover
-                .contents
-                .contains("Localisation (l_french): \"Texte français\"")
-            && hover
-                .contents
-                .contains("Localisation (l_german): \"Deutscher Text\""),
-        "every language renders in parallel: {}",
+        hover.contents.contains("| English text |")
+            && !hover.contents.contains("Texte français")
+            && !hover.contents.contains("Deutscher Text"),
+        "only the target language (english by default) renders: {}",
+        hover.contents
+    );
+}
+
+#[test]
+fn localisation_hover_prefers_the_configured_language() {
+    let mut host = eu4_host(game::eu4::bootstrap_rules());
+    host.set_preferred_localisation_languages(vec!["french".to_owned()]);
+    let id = DocumentId::new("file:///tmp/localisation/preferred.yml");
+    let text = concat!(
+        "l_english:\n",
+        "shared_name:0 \"English text\"\n",
+        "l_french:\n",
+        "shared_name:0 \"Texte français\"\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open localisation");
+    let position =
+        u32::try_from(text.find("shared_name").expect("localisation key") + 2).expect("position");
+    let hover = hover(&host.snapshot(), &id, position).expect("localisation hover");
+    assert!(
+        hover.contents.contains("| Texte français |") && !hover.contents.contains("English text"),
+        "the first configured preference is the preview language: {}",
         hover.contents
     );
 }
@@ -1521,9 +1517,7 @@ fn localisation_variable_fragment_hover_resolves_keys_and_names_placeholders() {
         nested_hover
             .contents
             .contains("### localisation `nested_key`")
-            && nested_hover
-                .contents
-                .contains("Localisation (l_english): \"Nested text\""),
+            && nested_hover.contents.contains("| Nested text |"),
         "resolvable fragment hovers as its key: {}",
         nested_hover.contents
     );

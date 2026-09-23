@@ -715,11 +715,11 @@ fn vanilla_cache_previews_retain_only_preferred_languages() {
     let french_preferences = install(vec!["french".to_owned()]);
     assert!(
         preview_is_present(&french_preferences, "french_key"),
-        "configured preference order is retained"
+        "the target language (first configured preference) is retained"
     );
     assert!(
-        preview_is_present(&french_preferences, "english_key"),
-        "English fallback remains retained alongside a preference"
+        !preview_is_present(&french_preferences, "english_key"),
+        "only the target language is retained; English is the default, not a fallback"
     );
     assert!(preview_is_present(&french_preferences, "plain_key"));
 
@@ -1090,11 +1090,9 @@ fn lazy_preferred_language_load_skips_other_languages() {
     let french_values = values(&preferred_french);
     assert!(french_values.iter().any(|value| value == "Texte francais"));
     assert!(
-        french_values
-            .iter()
-            .all(|value| value != "English text" || true)
+        french_values.iter().all(|value| value != "English text"),
+        "only the target language is read; English is the default, not a fallback"
     );
-    // english stays as the fallback alongside an explicit preference
-    assert_eq!(french_values.len(), 2);
+    assert_eq!(french_values.len(), 1);
     fs::remove_dir_all(root).expect("cleanup");
 }

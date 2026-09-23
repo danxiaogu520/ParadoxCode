@@ -58,7 +58,7 @@
   "configuration.vanilla.mode.cacheOnly.description": "Use an available cache but do not discover or build a new cache automatically.",
   "configuration.vanilla.mode.disabled.description": "Do not load or build Vanilla symbols for this workspace.",
   "configuration.diagnostics.severityOverrides.description": "Map diagnostic codes to effective severities. Use off to suppress a code.",
-  "configuration.localisation.preferredLanguages.description": "Language order for localisation hover and mission titles, for example english, french, german.",
+  "configuration.localisation.preferredLanguages.description": "Localisation language preference. The first entry is the target language: hover previews, mission titles, and localisation search show only its texts, and the Vanilla cache retains only it (english by default). English remains the navigation fallback; later entries are ignored.",
   "configuration.completion.sourceLayers.description": "Source layers allowed to contribute completion members. Resolution priority remains fixed.",
   "configuration.completion.iconPreview.description": "Append the decoded sprite image to completion documentation when a suggestion's label names a sprite (mission `icon`, event `picture`, `.gfx` references). Sprites are resolved from the workspace mod first, then the located game installation.",
   "configuration.performance.profile.description": "Bounded workspace scanning profile controlling parser concurrency.",

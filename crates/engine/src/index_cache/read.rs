@@ -803,21 +803,25 @@ fn load_localisation_previews(
     lazy_mode: bool,
     preferred_localisation_languages: &[String],
 ) -> Result<LocalisationPreviewMap, IndexCacheError> {
-    // In lazy mode the preferred-language filter the install would apply
-    // anyway moves into SQL, so three quarters of the rows (EU4 vanilla
-    // stores four languages) are never read. English always loads: the
-    // install-time retention keeps it as the fallback language. Row
-    // languages are the YAML headers verbatim (`l_english`); strip the
-    // prefix for comparison.
+    // In lazy mode the target-language filter the install would apply anyway
+    // moves into SQL, so every other language's rows (EU4 vanilla stores four
+    // languages) are never read — only the first configured preference loads,
+    // English by default. Row languages are the YAML headers verbatim
+    // (`l_english`); strip the prefix for comparison.
+    let kept_languages: Vec<String> = if lazy_mode {
+        vec![
+            crate::snapshot::localisation_preview_target_language(preferred_localisation_languages)
+                .to_ascii_lowercase(),
+        ]
+    } else {
+        Vec::new()
+    };
     let sql = if lazy_mode {
-        let mut kept: Vec<String> = preferred_localisation_languages
+        let placeholders = kept_languages
             .iter()
-            .map(|language| language.to_ascii_lowercase())
-            .collect();
-        kept.push("english".to_owned());
-        kept.sort();
-        kept.dedup();
-        let placeholders = kept.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(", ");
         format!(
             "SELECT file_id, range_start, range_end, language, value
              FROM localisation_previews
@@ -830,18 +834,6 @@ fn load_localisation_previews(
         "SELECT file_id, range_start, range_end, language, value
          FROM localisation_previews ORDER BY file_id, range_start, range_end"
             .to_owned()
-    };
-    let kept_languages: Vec<String> = if lazy_mode {
-        let mut kept: Vec<String> = preferred_localisation_languages
-            .iter()
-            .map(|language| language.to_ascii_lowercase())
-            .collect();
-        kept.push("english".to_owned());
-        kept.sort();
-        kept.dedup();
-        kept
-    } else {
-        Vec::new()
     };
     let mut statement = connection.prepare(&sql)?;
     let rows = statement.query_map(rusqlite::params_from_iter(kept_languages.iter()), |row| {

@@ -1092,32 +1092,20 @@ pub(crate) fn localisation_language(path: Option<&LogicalPath>) -> Option<String
     (!language.is_empty()).then(|| language.to_owned())
 }
 
-/// Vanilla localisation defines every key once per supported language. When a localisation symbol
-/// has candidates in several languages, prefer the English definition so the per-language variants
-/// do not look ambiguous; when no English definition exists, keep all candidates unchanged so
+/// Orders localisation candidates for navigation: the workspace target
+/// language (the first configured preference, English by default) first, with
+/// English as the fixed fallback so keys defined only in other languages stay
+/// navigable under any configured target. Candidates are reordered, never
+/// excluded — a set matching no listed language passes through unchanged so
 /// single-language mods still resolve.
-pub(crate) fn prefer_localisation_language(
-    candidates: Vec<ResolutionDefinition>,
-) -> Vec<ResolutionDefinition> {
-    prefer_localisation_language_ordered(candidates, &["english"])
-}
-
-/// Selects localisation candidates using the workspace-configured language preference order.
-/// The first configured language with a candidate wins; English remains the fallback for an
-/// empty or unavailable preference list, preserving the historical behaviour.
 pub(crate) fn prefer_localisation_language_for_snapshot(
     snapshot: &AnalysisSnapshot,
     candidates: Vec<ResolutionDefinition>,
 ) -> Vec<ResolutionDefinition> {
-    let configured = snapshot.preferred_localisation_languages();
-    if configured.is_empty() {
-        return prefer_localisation_language(candidates);
-    }
-    let mut ordered = configured.to_vec();
-    if !ordered.iter().any(|language| language == "english") {
-        ordered.push("english".to_owned());
-    }
-    prefer_localisation_language_ordered(candidates, &ordered)
+    prefer_localisation_language_ordered(
+        candidates,
+        &[snapshot.localisation_preview_language(), "english"],
+    )
 }
 
 fn prefer_localisation_language_ordered(
@@ -1160,10 +1148,10 @@ pub(crate) fn effective_localisation_candidate(
 }
 
 /// Resolves localisation keys to their effective displayed value — exactly one
-/// value per key: candidates are language-filtered, then the highest layer wins
-/// and within that layer the latest read order wins (the game's later-load
-/// override semantics). Keys whose
-/// effective definition has no preview are simply absent from the map.
+/// value per key, in the workspace target language: candidates are
+/// language-filtered, then the highest layer wins and within that layer the
+/// latest read order wins (the game's later-load override semantics). Keys
+/// with no target-language definition are simply absent from the map.
 ///
 /// Used by the LSP mission preview to resolve mission titles (`{id}_title`).
 /// Each key is resolved with a targeted overlay scan plus an exact index lookup
@@ -1175,6 +1163,7 @@ pub fn localisation_values_by_key<'a>(
     keys: &'a [&'a str],
     cancellation: &CancellationToken,
 ) -> Result<HashMap<String, (Option<String>, String)>, Cancelled> {
+    let target = snapshot.localisation_preview_language();
     let mut resolved = HashMap::new();
     for &key in keys {
         cancellation.checkpoint()?;
@@ -1182,8 +1171,13 @@ pub fn localisation_values_by_key<'a>(
         let Some(definition) = effective_localisation_candidate(&candidates) else {
             continue;
         };
-        if let Some(preview) = crate::localisation::localisation_preview(snapshot, definition) {
-            resolved.insert(key.to_owned(), preview);
+        let Some((language, value)) =
+            crate::localisation::localisation_preview(snapshot, definition)
+        else {
+            continue;
+        };
+        if crate::localisation::preview_language_is_target(language.as_deref(), target) {
+            resolved.insert(key.to_owned(), (language, value));
         }
     }
     Ok(resolved)
