@@ -7,7 +7,9 @@ use parser::{CstKind, FileFormat};
 use super::IndexCacheError;
 use crate::{AnalysisSnapshot, LocalisationPreview, LocalisationPreviewMap, ParsedSource};
 
-const MAX_LOCALISATION_PREVIEW_CHARS: usize = 240;
+/// Matches the vfs preview bound: covers the longest vanilla event and
+/// description texts while bounding the cache against pathological entries.
+const MAX_LOCALISATION_PREVIEW_CHARS: usize = 1000;
 
 pub(super) fn collect_localisation_previews(
     snapshot: &AnalysisSnapshot,

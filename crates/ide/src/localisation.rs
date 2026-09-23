@@ -18,7 +18,8 @@ use crate::resolution::{
     text_range_within,
 };
 use crate::support::{
-    ParsedContent, ParsedInput, input_for_document, input_for_source_file, truncate_hover_text,
+    ParsedContent, ParsedInput, input_for_document, input_for_source_file,
+    truncate_localisation_preview,
 };
 use crate::types::{CancellationToken, Cancelled};
 
@@ -317,7 +318,7 @@ pub(crate) fn localisation_preview(
         .unwrap_or(raw);
     // Mirror the engine preview derivation: transcoded (escaped) values decode to
     // the readable text the game renders; readable values pass through unchanged.
-    let value = truncate_hover_text(&transcode::decode_value(value));
+    let value = truncate_localisation_preview(&transcode::decode_value(value));
     if value.is_empty() {
         return None;
     }

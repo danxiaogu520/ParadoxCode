@@ -574,7 +574,9 @@ pub struct LocalisationPreview {
     pub value: String,
 }
 
-const MAX_LOCALISATION_PREVIEW_CHARS: usize = 240;
+/// Bounds previews against pathological entries while covering the longest
+/// vanilla event and description texts in full.
+const MAX_LOCALISATION_PREVIEW_CHARS: usize = 1000;
 
 pub fn localisation_previews_from_parsed(
     parsed: &ParsedFile,
