@@ -29,7 +29,9 @@ pub use references_store::ReferenceIndexStore;
 
 /// Current on-disk cache schema.
 ///
-/// Schema 14 decodes EU4dll-transcoded localisation values in persisted previews
+/// Schema 15 raises the localisation preview bound from 240 to 1000 characters;
+/// caches written before that hold the shorter previews. Schema 14 decodes
+/// EU4dll-transcoded localisation values in persisted previews
 /// (tied to `transcode::TRANSCODE_VERSION`); caches written before that hold the raw
 /// escaped form. Schema 12 adds the `flag_writes` table (`dynamic_set` write sites)
 /// to shards. Schema 11 persisted localisation previews; schema 10 persists the exact
@@ -37,7 +39,7 @@ pub use references_store::ReferenceIndexStore;
 /// by the old encoding-recovery sanitizer, which could expose braces from malformed comments as
 /// active syntax. Older caches are rebuilt once by the CLI or LSP, the same way a rules update
 /// triggers a rebuild; no legacy reader is retained.
-pub const CURRENT_CACHE_SCHEMA_VERSION: u32 = 14;
+pub const CURRENT_CACHE_SCHEMA_VERSION: u32 = 15;
 
 /// Oldest on-disk cache schema this executable can still load.
 pub const MIN_SUPPORTED_CACHE_SCHEMA_VERSION: u32 = CURRENT_CACHE_SCHEMA_VERSION;
