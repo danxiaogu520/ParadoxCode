@@ -291,5 +291,12 @@
     "gfx",
     "yml",
     "yaml"
+  ],
+  "scan_archive_roots": [
+    "builtin_dlc",
+    "dlc"
+  ],
+  "scan_archive_extensions": [
+    "gfx"
   ]
 }

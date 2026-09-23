@@ -22,6 +22,7 @@ transcode = { path = "../transcode" }
 parser = { path = "../parser" }
 rules = { path = "../rules" }
 text = { path = "../text" }
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 
 [lints]
 workspace = true

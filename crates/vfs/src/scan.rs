@@ -168,6 +168,18 @@ pub fn collect_whitelisted_files(
             &mut scan,
         )?;
     }
+    if !profile.scan_archive_roots.is_empty() {
+        collect_archive_files(
+            root,
+            profile,
+            filters,
+            limits,
+            report,
+            output,
+            &mut seen,
+            cancellation,
+        )?;
+    }
     Ok(())
 }
 
@@ -315,6 +327,280 @@ fn collect_disk_files(
     Ok(())
 }
 
+/// Supplements discovery with read-only archive tiers (see
+/// [`GameProfile::scan_archive_roots`]). Extracted archive directories are walked like any
+/// other directory, and every `*.zip` inside a tier is opened so its matching entries join
+/// discovery as virtual files addressed as `<zip path>!<entry path>`. Entries already
+/// discovered by the main pass keep precedence, so a tier can only add names the extracted
+/// game data does not carry.
+#[allow(clippy::too_many_arguments)]
+fn collect_archive_files(
+    root: &std::path::Path,
+    profile: &GameProfile,
+    filters: &WorkspaceScanFilters,
+    limits: WorkspaceScanLimits,
+    report: &mut WorkspaceScanReport,
+    output: &mut Vec<(LogicalPath, AbsPath)>,
+    seen: &mut BTreeSet<LogicalPath>,
+    cancellation: &WorkspaceScanToken,
+) -> Result<(), WorkspaceError> {
+    for archive_root in &profile.scan_archive_roots {
+        cancellation.checkpoint()?;
+        let current = root.join(archive_root);
+        if !current.is_dir() {
+            continue;
+        }
+        walk_archive_tier(
+            root,
+            &current,
+            0,
+            profile,
+            filters,
+            limits,
+            report,
+            output,
+            seen,
+            cancellation,
+        )?;
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn walk_archive_tier(
+    root: &std::path::Path,
+    current: &std::path::Path,
+    depth: usize,
+    profile: &GameProfile,
+    filters: &WorkspaceScanFilters,
+    limits: WorkspaceScanLimits,
+    report: &mut WorkspaceScanReport,
+    output: &mut Vec<(LogicalPath, AbsPath)>,
+    seen: &mut BTreeSet<LogicalPath>,
+    cancellation: &WorkspaceScanToken,
+) -> Result<(), WorkspaceError> {
+    cancellation.checkpoint()?;
+    let entries = match fs::read_dir(current) {
+        Ok(entries) => entries,
+        Err(error) => {
+            record_scan_issue(
+                report,
+                limits,
+                WorkspaceScanIssueKind::DirectoryUnreadable,
+                current.to_owned(),
+                error.to_string(),
+            );
+            return Ok(());
+        }
+    };
+    let mut entries = entries.filter_map(|entry| entry.ok()).collect::<Vec<_>>();
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        cancellation.checkpoint()?;
+        let path = entry.path();
+        let file_type = match entry.file_type() {
+            Ok(file_type) => file_type,
+            Err(error) => {
+                record_scan_issue(
+                    report,
+                    limits,
+                    WorkspaceScanIssueKind::DirectoryEntryUnreadable,
+                    path.clone(),
+                    error.to_string(),
+                );
+                continue;
+            }
+        };
+        if file_type.is_symlink() {
+            continue;
+        }
+        if file_type.is_dir() {
+            if depth >= limits.max_depth {
+                record_scan_issue(
+                    report,
+                    limits,
+                    WorkspaceScanIssueKind::DepthLimitExceeded,
+                    path,
+                    format!(
+                        "archive tier nesting exceeds the configured limit of {}",
+                        limits.max_depth
+                    ),
+                );
+                continue;
+            }
+            walk_archive_tier(
+                root,
+                &path,
+                depth + 1,
+                profile,
+                filters,
+                limits,
+                report,
+                output,
+                seen,
+                cancellation,
+            )?;
+            continue;
+        }
+        if !file_type.is_file() {
+            continue;
+        }
+        if path
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("zip"))
+        {
+            collect_zip_entries(
+                &path,
+                profile,
+                filters,
+                limits,
+                report,
+                output,
+                seen,
+                cancellation,
+            )?;
+            continue;
+        }
+        // Extracted tiers keep the game layout one pack directory below the tier, so
+        // `builtin_dlc/<pack>/interface/foo.gfx` surfaces as `interface/foo.gfx`.
+        let Some(relative) = path
+            .strip_prefix(root)
+            .ok()
+            .map(|relative| relative.to_string_lossy().replace('\\', "/"))
+        else {
+            continue;
+        };
+        if !archive_entry_has_allowed_extension(&relative, profile) {
+            continue;
+        }
+        let Some(logical) = archive_flattened_logical_path(&relative) else {
+            continue;
+        };
+        push_archive_entry(
+            logical,
+            AbsPath::normalize(&path),
+            filters,
+            limits,
+            report,
+            output,
+            seen,
+        );
+    }
+    Ok(())
+}
+
+/// Enumerates the matching entries of one zip archive and adds them as virtual files.
+#[allow(clippy::too_many_arguments)]
+fn collect_zip_entries(
+    zip_path: &std::path::Path,
+    profile: &GameProfile,
+    filters: &WorkspaceScanFilters,
+    limits: WorkspaceScanLimits,
+    report: &mut WorkspaceScanReport,
+    output: &mut Vec<(LogicalPath, AbsPath)>,
+    seen: &mut BTreeSet<LogicalPath>,
+    cancellation: &WorkspaceScanToken,
+) -> Result<(), WorkspaceError> {
+    let file = match fs::File::open(zip_path) {
+        Ok(file) => file,
+        Err(error) => {
+            record_scan_issue(
+                report,
+                limits,
+                WorkspaceScanIssueKind::FileUnreadable,
+                zip_path.to_owned(),
+                error.to_string(),
+            );
+            return Ok(());
+        }
+    };
+    let archive = match zip::ZipArchive::new(file) {
+        Ok(archive) => archive,
+        Err(error) => {
+            record_scan_issue(
+                report,
+                limits,
+                WorkspaceScanIssueKind::FileUnreadable,
+                zip_path.to_owned(),
+                format!("zip archive could not be opened: {error}"),
+            );
+            return Ok(());
+        }
+    };
+    // Zip payloads already use the game-data layout (`interface/foo.gfx`), so entry
+    // names map to logical paths verbatim.
+    let mut names: Vec<String> = archive.file_names().map(ToOwned::to_owned).collect();
+    names.sort();
+    for name in names {
+        cancellation.checkpoint()?;
+        if name.ends_with('/') || !archive_entry_has_allowed_extension(&name, profile) {
+            continue;
+        }
+        let Ok(logical) = LogicalPath::parse(&name) else {
+            continue;
+        };
+        let virtual_path = PathBuf::from(format!("{}!{}", zip_path.display(), name));
+        push_archive_entry(
+            logical,
+            AbsPath::normalize(&virtual_path),
+            filters,
+            limits,
+            report,
+            output,
+            seen,
+        );
+    }
+    Ok(())
+}
+
+/// Strips the tier directory plus one content-pack segment from an extracted tier path:
+/// `builtin_dlc/<pack>/interface/foo.gfx` -> `interface/foo.gfx`.
+fn archive_flattened_logical_path(relative: &str) -> Option<LogicalPath> {
+    let mut segments = relative.split('/');
+    segments.next()?;
+    segments.next()?;
+    let flattened = segments.collect::<Vec<_>>().join("/");
+    LogicalPath::parse(&flattened).ok()
+}
+
+fn archive_entry_has_allowed_extension(name: &str, profile: &GameProfile) -> bool {
+    let Some((_, extension)) = name
+        .rsplit('/')
+        .next()
+        .and_then(|file| file.rsplit_once('.'))
+    else {
+        return false;
+    };
+    profile
+        .scan_archive_extensions
+        .iter()
+        .any(|allowed| extension.eq_ignore_ascii_case(allowed.strip_prefix('.').unwrap_or(allowed)))
+}
+
+fn push_archive_entry(
+    logical: LogicalPath,
+    physical: AbsPath,
+    filters: &WorkspaceScanFilters,
+    limits: WorkspaceScanLimits,
+    report: &mut WorkspaceScanReport,
+    output: &mut Vec<(LogicalPath, AbsPath)>,
+    seen: &mut BTreeSet<LogicalPath>,
+) {
+    if filters.ignores_file(logical.as_str()) {
+        return;
+    }
+    // Tiers are supplementary: once the discovery budget is spent, stop adding instead
+    // of failing the whole scan.
+    if report.discovered_files >= limits.max_files {
+        return;
+    }
+    if !seen.insert(logical.clone()) {
+        return;
+    }
+    report.discovered_files = report.discovered_files.saturating_add(1);
+    output.push((logical, physical));
+}
+
 fn ignored_workspace_directory(name: &std::ffi::OsStr) -> bool {
     matches!(
         name.to_str(),
@@ -347,6 +633,16 @@ pub fn read_source_file_cancellable(
     source_encoding: SourceEncoding,
 ) -> Result<Option<String>, WorkspaceError> {
     cancellation.checkpoint()?;
+    if let Some((zip_path, entry)) = split_archive_path(path) {
+        return read_archive_entry(
+            &zip_path,
+            &entry,
+            limits,
+            report,
+            cancellation,
+            source_encoding,
+        );
+    }
     let file = match fs::File::open(path) {
         Ok(file) => file,
         Err(error) => {
@@ -425,9 +721,27 @@ pub fn read_source_file_cancellable(
         );
         return Ok(None);
     }
+    Ok(decode_source_bytes(
+        &bytes,
+        source_encoding,
+        path,
+        limits,
+        report,
+    ))
+}
+
+/// Decodes raw source bytes into scan text, recording the same recovery notices for
+/// archive entries as for disk files.
+fn decode_source_bytes(
+    bytes: &[u8],
+    source_encoding: SourceEncoding,
+    path: &std::path::Path,
+    limits: WorkspaceScanLimits,
+    report: &mut WorkspaceScanReport,
+) -> Option<String> {
     let mut legacy = false;
     let mut encoding_recovered = false;
-    let text = match String::from_utf8(bytes) {
+    let text = match String::from_utf8(bytes.to_vec()) {
         Ok(text) => text,
         Err(error) => {
             let detail = error.to_string();
@@ -448,7 +762,7 @@ pub fn read_source_file_cancellable(
                     path.to_owned(),
                     detail,
                 );
-                return Ok(None);
+                return None;
             }
         }
     };
@@ -469,7 +783,131 @@ pub fn read_source_file_cancellable(
     if legacy {
         report.legacy_encoded_files = report.legacy_encoded_files.saturating_add(1);
     }
-    Ok(Some(text))
+    Some(text)
+}
+
+/// Splits a virtual archive path (`<zip path>!<entry path>`) back into its parts.
+///
+/// The separator is matched from the right so a `!` inside a directory name of the
+/// archive location cannot be mistaken for the split point; archive entry names come
+/// from the game data and never contain it.
+pub fn split_archive_path(path: &std::path::Path) -> Option<(PathBuf, String)> {
+    let text = path.to_str()?;
+    let (zip_path, entry) = text.rsplit_once('!')?;
+    if zip_path.is_empty() || entry.is_empty() {
+        return None;
+    }
+    Some((PathBuf::from(zip_path), entry.to_owned()))
+}
+
+/// Reads the raw bytes of one zip entry addressed through a virtual scan path.
+///
+/// The read is bounded by `max_bytes`; a missing archive or entry, an unreadable
+/// entry, or one that exceeds the bound all yield `None` so callers can treat an
+/// archive member like any other unresolvable file reference.
+#[must_use]
+pub fn read_archive_entry_bytes(
+    zip_path: &std::path::Path,
+    entry: &str,
+    max_bytes: u64,
+) -> Option<Vec<u8>> {
+    let file = fs::File::open(zip_path).ok()?;
+    let mut archive = zip::ZipArchive::new(file).ok()?;
+    let mut entry_file = archive.by_name(entry).ok()?;
+    let mut bytes = Vec::new();
+    Read::take(&mut entry_file, max_bytes.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .ok()?;
+    if u64::try_from(bytes.len()).map_or(true, |size| size > max_bytes) {
+        return None;
+    }
+    Some(bytes)
+}
+
+/// Reads one entry out of a zip archive addressed through a virtual scan path.
+fn read_archive_entry(
+    zip_path: &std::path::Path,
+    entry: &str,
+    limits: WorkspaceScanLimits,
+    report: &mut WorkspaceScanReport,
+    cancellation: &WorkspaceScanToken,
+    source_encoding: SourceEncoding,
+) -> Result<Option<String>, WorkspaceError> {
+    let file = match fs::File::open(zip_path) {
+        Ok(file) => file,
+        Err(error) => {
+            record_scan_issue(
+                report,
+                limits,
+                WorkspaceScanIssueKind::FileUnreadable,
+                zip_path.to_owned(),
+                error.to_string(),
+            );
+            return Ok(None);
+        }
+    };
+    let mut archive = match zip::ZipArchive::new(file) {
+        Ok(archive) => archive,
+        Err(error) => {
+            record_scan_issue(
+                report,
+                limits,
+                WorkspaceScanIssueKind::FileUnreadable,
+                zip_path.to_owned(),
+                format!("zip archive could not be opened: {error}"),
+            );
+            return Ok(None);
+        }
+    };
+    let mut entry_file = match archive.by_name(entry) {
+        Ok(entry_file) => entry_file,
+        Err(error) => {
+            record_scan_issue(
+                report,
+                limits,
+                WorkspaceScanIssueKind::FileUnreadable,
+                PathBuf::from(format!("{}!{}", zip_path.display(), entry)),
+                format!("zip entry could not be read: {error}"),
+            );
+            return Ok(None);
+        }
+    };
+    let mut bytes = Vec::new();
+    if let Err(error) =
+        Read::take(&mut entry_file, limits.max_file_size.saturating_add(1)).read_to_end(&mut bytes)
+    {
+        record_scan_issue(
+            report,
+            limits,
+            WorkspaceScanIssueKind::FileUnreadable,
+            PathBuf::from(format!("{}!{}", zip_path.display(), entry)),
+            error.to_string(),
+        );
+        return Ok(None);
+    }
+    cancellation.checkpoint()?;
+    if u64::try_from(bytes.len()).map_or(true, |size| size > limits.max_file_size) {
+        record_scan_issue(
+            report,
+            limits,
+            WorkspaceScanIssueKind::FileTooLarge,
+            PathBuf::from(format!("{}!{}", zip_path.display(), entry)),
+            format!(
+                "zip entry size {} exceeds the configured limit of {} bytes",
+                bytes.len(),
+                limits.max_file_size
+            ),
+        );
+        return Ok(None);
+    }
+    let virtual_path = PathBuf::from(format!("{}!{}", zip_path.display(), entry));
+    Ok(decode_source_bytes(
+        &bytes,
+        source_encoding,
+        &virtual_path,
+        limits,
+        report,
+    ))
 }
 
 fn record_scan_notice(
@@ -1000,6 +1438,171 @@ mod tests {
         )
         .expect_err("a cancelled token stops the scan");
         assert_eq!(error.to_string(), "workspace scan was cancelled");
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    fn profile_with_archives(
+        scan_roots: &[&str],
+        archive_roots: &[&str],
+        extensions: &[&str],
+    ) -> GameProfile {
+        let mut profile = profile_with_roots(scan_roots, &["gfx"]);
+        profile.scan_archive_roots = archive_roots
+            .iter()
+            .map(|root| (*root).to_owned())
+            .collect();
+        profile.scan_archive_extensions = extensions.iter().map(|e| (*e).to_owned()).collect();
+        profile
+    }
+
+    fn write_zip(path: &std::path::Path, entries: &[(&str, &str)]) {
+        let file = fs::File::create(path).expect("create zip");
+        let mut zip = zip::ZipWriter::new(file);
+        for (name, contents) in entries {
+            zip.start_file::<_, ()>(*name, zip::write::SimpleFileOptions::default())
+                .expect("start entry");
+            std::io::Write::write_all(&mut zip, contents.as_bytes()).expect("write entry");
+        }
+        zip.finish().expect("finish zip");
+    }
+
+    fn scan_paths(root: &std::path::Path, profile: &GameProfile) -> Vec<(String, String)> {
+        let mut output = Vec::new();
+        let mut report = WorkspaceScanReport::default();
+        collect_whitelisted_files(
+            root,
+            profile,
+            &WorkspaceScanFilters::default(),
+            WorkspaceScanLimits::default(),
+            &mut report,
+            &mut output,
+            &WorkspaceScanToken::new(),
+        )
+        .expect("scan fixture root");
+        output
+            .into_iter()
+            .map(|(logical, physical)| {
+                (logical.as_str().to_owned(), physical.display().to_string())
+            })
+            .collect()
+    }
+
+    #[test]
+    fn archive_tiers_surface_zip_entries_and_extracted_files() {
+        let root = test_directory("archives");
+        fs::create_dir_all(root.join("interface")).expect("interface directory");
+        fs::write(root.join("interface/base.gfx"), "spriteTypes = { }").expect("base sprite file");
+        fs::create_dir_all(root.join("builtin_dlc/dlc100/interface")).expect("builtin pack");
+        fs::write(
+            root.join("builtin_dlc/dlc100/interface/extracted.gfx"),
+            "spriteTypes = { }",
+        )
+        .expect("extracted sprite file");
+        fs::create_dir_all(root.join("dlc/dlc200")).expect("dlc directory");
+        write_zip(
+            &root.join("dlc/dlc200/dlc200.zip"),
+            &[
+                ("interface/from_zip.gfx", "spriteTypes = { }"),
+                ("events/hidden.txt", "country_event = { }"),
+            ],
+        );
+
+        let profile = profile_with_archives(&["interface"], &["builtin_dlc", "dlc"], &["gfx"]);
+        let paths = scan_paths(&root, &profile);
+        let logicals = paths
+            .iter()
+            .map(|(logical, _)| logical.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            logicals,
+            vec![
+                "interface/base.gfx",
+                "interface/extracted.gfx",
+                "interface/from_zip.gfx"
+            ],
+            "archive tiers add their gfx payloads under the game-data layout"
+        );
+        let zip_entry = &paths[2].1;
+        assert!(
+            zip_entry.ends_with("interface/from_zip.gfx") && zip_entry.contains('!'),
+            "zip entries are addressed through the virtual separator path: {zip_entry}"
+        );
+
+        let mut report = WorkspaceScanReport::default();
+        let text = read_source_file(
+            std::path::Path::new(zip_entry),
+            WorkspaceScanLimits::default(),
+            &mut report,
+            SourceEncoding::Utf8,
+        )
+        .expect("read zip entry");
+        assert_eq!(text, "spriteTypes = { }");
+        assert!(
+            report.issues.is_empty(),
+            "reading a valid zip entry reports no issues: {:?}",
+            report.issues
+        );
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn archive_tiers_defer_to_discovered_disk_files_and_extension_filters() {
+        let root = test_directory("archive-dedup");
+        fs::create_dir_all(root.join("interface")).expect("interface directory");
+        fs::write(root.join("interface/shared.gfx"), "spriteTypes = { }")
+            .expect("disk sprite file");
+        fs::create_dir_all(root.join("dlc/pack")).expect("dlc directory");
+        write_zip(
+            &root.join("dlc/pack/pack.zip"),
+            &[
+                ("interface/shared.gfx", "spriteTypes = { overridden }"),
+                ("interface/extra.gfx", "spriteTypes = { }"),
+                ("localisation/hidden.yml", "l_english:"),
+            ],
+        );
+
+        let profile = profile_with_archives(&["interface"], &["dlc"], &["gfx"]);
+        let paths = scan_paths(&root, &profile);
+        let shared = paths
+            .iter()
+            .find(|(logical, _)| logical.as_str() == "interface/shared.gfx")
+            .expect("shared entry");
+        assert!(
+            !shared.1.contains('!'),
+            "the discovered disk file keeps precedence over the zip duplicate: {}",
+            shared.1
+        );
+        assert_eq!(
+            paths
+                .iter()
+                .filter(|(logical, _)| logical.as_str() == "interface/extra.gfx")
+                .count(),
+            1,
+            "names the disk data lacks still surface from the archive"
+        );
+        assert!(
+            !paths
+                .iter()
+                .any(|(logical, _)| logical.as_str().ends_with(".yml")),
+            "extensions outside the archive whitelist never surface"
+        );
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn archive_tiers_stay_off_without_profile_declaration() {
+        let root = test_directory("archive-off");
+        fs::create_dir_all(root.join("dlc/pack")).expect("dlc directory");
+        write_zip(
+            &root.join("dlc/pack/pack.zip"),
+            &[("interface/from_zip.gfx", "spriteTypes = { }")],
+        );
+        let profile = profile_with_roots(&["interface"], &["gfx"]);
+        let paths = scan_paths(&root, &profile);
+        assert!(
+            paths.is_empty(),
+            "no archive tier is walked unless the profile declares one: {paths:?}"
+        );
         fs::remove_dir_all(root).expect("cleanup");
     }
 }

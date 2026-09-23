@@ -461,6 +461,8 @@ dependencies = [
  "rustc-hash",
  "text",
  "transcode",
+ "vfs",
+ "zip",
 ]
 
 [[package]]
@@ -1145,6 +1147,7 @@ dependencies = [
  "sha2",
  "text",
  "transcode",
+ "zip",
  "zstd",
 ]
 

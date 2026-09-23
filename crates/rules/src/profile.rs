@@ -308,6 +308,23 @@ pub struct GameProfile {
     /// Entries omit the leading dot and are compared case-insensitively. An empty list keeps
     /// every extension, preserving the generic profile behavior.
     pub scan_extensions: Vec<String>,
+    /// Read-only archive tiers scanned after the whitelisted roots.
+    ///
+    /// Each entry names a directory (relative to a source root) that supplements the main
+    /// discovery pass: extracted archives (for example EU4's `builtin_dlc`) are walked
+    /// recursively, and every `*.zip` found inside is opened so its entries join discovery as
+    /// virtual read-only files. Only entries whose extension is listed in
+    /// [`Self::scan_archive_extensions`] surface, files already discovered by the main pass
+    /// keep precedence, and nothing in an archive tier is ever writable. This lets a game
+    /// profile expose shipped-as-archive assets (sprite sheets, event pictures) without
+    /// granting the archive's scripts or localisation load-order semantics.
+    pub scan_archive_roots: Vec<String>,
+    /// Optional file-extension whitelist for archive-tier entries.
+    ///
+    /// Entries omit the leading dot and are compared case-insensitively. An empty list keeps
+    /// every extension, so profiles that enable archive tiers without an extension filter
+    /// opt into the full archive contents.
+    pub scan_archive_extensions: Vec<String>,
     /// Directory names whose top-level `name` fields declare scripted-localisation commands.
     ///
     /// The match is path-segment based and case-insensitive so a game profile can support
@@ -567,6 +584,8 @@ impl GameProfile {
             scan_root_max_depths: BTreeMap::new(),
             scan_root_files: BTreeMap::new(),
             scan_extensions: Vec::new(),
+            scan_archive_roots: Vec::new(),
+            scan_archive_extensions: Vec::new(),
             scripted_localisation_directories: Vec::new(),
             definitions: Vec::new(),
             references: Vec::new(),

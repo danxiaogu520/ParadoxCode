@@ -18,5 +18,7 @@ pub use model::{
     WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
 };
 pub use parse_cache::{CURRENT_PARSE_CACHE_SCHEMA_VERSION, ParseCache, ParseCacheError};
-pub use scan::{read_source_file_cancellable, root_priority};
+pub use scan::{
+    read_archive_entry_bytes, read_source_file_cancellable, root_priority, split_archive_path,
+};
 pub use string_pool::{StringPool, intern_shard_string};
