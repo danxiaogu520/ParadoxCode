@@ -3054,6 +3054,149 @@ fn exported_modifier_keys_are_numeric_modifier_rules() {
 }
 
 #[test]
+fn dlc_archive_sprites_resolve_event_pictures() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ide-zip-sprites-{nonce}"));
+    std::fs::create_dir_all(root.join("dlc/pack")).expect("dlc directory");
+    std::fs::create_dir_all(root.join("events")).expect("events directory");
+    let zip_path = root.join("dlc/pack/pack.zip");
+    {
+        let file = std::fs::File::create(&zip_path).expect("create zip");
+        let mut zip = zip::ZipWriter::new(file);
+        zip.start_file::<_, ()>(
+            "interface/eventpictures_zip.gfx",
+            zip::write::SimpleFileOptions::default(),
+        )
+        .expect("start gfx entry");
+        // Vanilla `.gfx` puts every assignment on its own line; the hover-card
+        // texture scan relies on that shape. Event-picture sprites are named
+        // without the `GFX_` prefix, matching the shipped eventpictures.gfx.
+        std::io::Write::write_all(
+            &mut zip,
+            b"spriteTypes = {
+	spriteType = {
+		name = \"FROM_zip_eventPicture\"
+		texturefile = \"t.dds\"
+	}
+	spriteType = {
+		name = \"GFX_zip_alert_banner\"
+		texturefile = \"t.dds\"
+	}
+}",
+        )
+        .expect("write gfx entry");
+        zip.start_file::<_, ()>("t.dds", zip::write::SimpleFileOptions::default())
+            .expect("start texture entry");
+        zip.finish().expect("finish zip");
+    }
+    std::fs::write(
+        root.join("events/from_zip.txt"),
+        "country_event = { id = zip.1 title = t desc = d picture = FROM_zip_eventPicture }\n",
+    )
+    .expect("write event");
+
+    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let mut host = eu4_host(rules);
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::Vanilla,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().expect("scan archive root");
+
+    // The event hover card resolves the picture asset out of the DLC zip: the
+    // sprite definition and its texture both live only inside the archive.
+    let id = DocumentId::new("file:///tmp/events/from_zip.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        std::fs::read_to_string(root.join("events/from_zip.txt")).expect("event text"),
+        Some(AbsPath::normalize(&root.join("events/from_zip.txt"))),
+    )
+    .expect("open event");
+    let picture_offset = "count".len() as u32;
+    let card = crate::hover_card::hover_card_with_cancellation(
+        &host.snapshot(),
+        &id,
+        picture_offset,
+        &crate::types::CancellationToken::new(),
+    )
+    .expect("hover card")
+    .expect("a zip-only event picture renders a hover card");
+    assert!(
+        card.event
+            .as_ref()
+            .is_some_and(|event| event.picture.as_deref() == Some("FROM_zip_eventPicture")),
+        "the event card carries the authored picture: {card:?}"
+    );
+    assert!(
+        card.asset.as_ref().is_some_and(|asset| {
+            asset.sprite.as_deref() == Some("FROM_zip_eventPicture")
+                && asset.archive_member.as_deref() == Some("t.dds")
+        }),
+        "the picture asset resolves to the zip-defined sprite: {card:?}"
+    );
+
+    // With the picture field validating against the sprite universe, the
+    // zip-indexed definition keeps the authored reference clean…
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        !results
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("FROM_zip_eventPicture")),
+        "an event picture defined only inside a DLC zip must validate: {results:?}"
+    );
+    // …while a name absent from every tier is reported at the value.
+    let invalid_id = DocumentId::new("file:///tmp/events/from_zip2.txt");
+    host.open_document(
+        invalid_id.clone(),
+        1,
+        "country_event = { id = zip.2 title = t desc = d picture = missing_from_zip }\n".to_owned(),
+        Some(AbsPath::normalize(&root.join("events/from_zip2.txt"))),
+    )
+    .expect("open invalid event");
+    let results = diagnostics(&host.snapshot(), &invalid_id);
+    assert!(
+        results
+            .iter()
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue
+                && diagnostic.message.contains("missing_from_zip")),
+        "event pictures absent from every tier are reported: {results:?}"
+    );
+
+    // Sprite membership diagnostics see the same archive index on exact-match
+    // surfaces too: a `GFX_`-prefixed zip-only alert banner resolves while a
+    // name absent from every tier is reported.
+    let alerts_id = DocumentId::new("file:///tmp/common/alerts.txt");
+    host.open_document(
+        alerts_id.clone(),
+        1,
+        "icon = {\n\tHIGH = \"GFX_zip_alert_banner\"\n\tLOW = \"GFX_really_missing\"\n}\n"
+            .to_owned(),
+        Some(AbsPath::normalize(&root.join("common/alerts.txt"))),
+    )
+    .expect("open alerts");
+    let results = diagnostics(&host.snapshot(), &alerts_id);
+    assert!(
+        !results
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("GFX_zip_alert_banner")),
+        "a sprite defined only inside a DLC zip must resolve: {results:?}"
+    );
+    assert!(
+        results
+            .iter()
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue
+                && diagnostic.message.contains("GFX_really_missing")),
+        "sprites absent from every tier are still reported: {results:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn alert_icon_sprites_validate_and_trade_nodes_carry_their_name_key() {
     let rules = game::eu4::first_party_rules().expect("first-party rules");
     let mut host = eu4_host(rules);

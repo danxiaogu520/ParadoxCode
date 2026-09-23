@@ -869,6 +869,13 @@ fn definition_source(snapshot: &AnalysisSnapshot, location: &Location) -> Option
                 .map(|root| root.join(path.as_str()).to_path_buf())
         })
     }?;
+    // Archive tiers surface their members through `<zip>!<entry>` virtual paths,
+    // which plain metadata and read calls cannot serve; route them through the
+    // bounded archive reader instead of the disk fast path.
+    if let Some((zip_path, entry)) = vfs::split_archive_path(&path) {
+        let bytes = vfs::read_archive_entry_bytes(&zip_path, &entry, MAX_DEFINITION_READ_BYTES)?;
+        return Some(String::from_utf8_lossy(&bytes).into_owned());
+    }
     let metadata = std::fs::metadata(&path).ok()?;
     if metadata.len() > MAX_DEFINITION_READ_BYTES {
         return None;
