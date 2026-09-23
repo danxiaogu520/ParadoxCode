@@ -12,8 +12,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::{
-    FileCategory, GameProfile, RuleRecord, RuleSet, RulesModel, SemanticModel, SymbolDescriptor,
-    TypeRootScope,
+    FileCategory, GameProfile, KeyMatcher, RuleRecord, RuleSet, RulesModel, SemanticModel,
+    SymbolDescriptor, TypeRootScope, ValueMatcher,
 };
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -70,6 +70,9 @@ pub struct SourceFiles {
     pub values: Vec<String>,
     /// Type-to-localisation binding fragments.
     pub localisation: Vec<String>,
+    /// Type-to-sprite binding fragments.
+    #[serde(default)]
+    pub sprite: Vec<String>,
     /// Data-only game profile fragments.
     pub profile: Vec<String>,
 }
@@ -93,24 +96,23 @@ type ParsedTypeFragments = (
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct LocalisationBindingSource {
-    field: String,
-    template: Option<String>,
+struct SymbolBindingSource {
+    name: String,
+    #[serde(default)]
+    key: Option<String>,
+    #[serde(default)]
+    field: Option<String>,
     #[serde(default)]
     required: bool,
     #[serde(default)]
-    optional: bool,
-    #[serde(default)]
     subtype: Option<String>,
     #[serde(default)]
-    condition: Option<LocalisationBindingConditionSource>,
-    #[serde(default)]
-    explicit_field: Option<String>,
+    condition: Option<SymbolBindingConditionSource>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct LocalisationBindingConditionSource {
+struct SymbolBindingConditionSource {
     #[serde(default)]
     field: Option<String>,
     #[serde(default)]
@@ -216,7 +218,8 @@ fn parse_source_files(
     let (type_descriptors, type_root_keys, type_root_scopes) =
         parse_type_fragments(&manifest.files.types, &files)?;
     let enum_values = parse_value_fragments(&manifest.files.values, &files)?;
-    let localisation_bindings = parse_localisation_fragments(&manifest.files.localisation, &files)?;
+    let localisation_bindings = parse_binding_fragments(&manifest.files.localisation, &files)?;
+    let sprite_bindings = parse_binding_fragments(&manifest.files.sprite, &files)?;
     let profile = parse_profile_fragments(&manifest.files.profile, &files)?;
     let semantic = SemanticModel {
         rules: semantic_rules,
@@ -225,6 +228,7 @@ fn parse_source_files(
         type_root_scopes,
         type_descriptors,
         localisation_bindings,
+        sprite_bindings,
     };
     validate_source_model(manifest, catalog, semantic, profile)
 }
@@ -395,19 +399,21 @@ fn parse_value_fragments(
     Ok(values)
 }
 
-fn parse_localisation_fragments(
+/// Parses one binding family (localisation or icons): fragments group
+/// bindings by type name, and the merge order follows the manifest list.
+fn parse_binding_fragments(
     paths: &[String],
     files: &BTreeMap<String, Vec<u8>>,
-) -> Result<Vec<crate::LocalisationBinding>, CompileError> {
-    let mut source = BTreeMap::<String, Vec<LocalisationBindingSource>>::new();
+) -> Result<Vec<crate::SymbolBinding>, CompileError> {
+    let mut source = BTreeMap::<String, Vec<SymbolBindingSource>>::new();
     for fragment in
-        read_fragments_parallel::<BTreeMap<String, Vec<LocalisationBindingSource>>>(paths, files)?
+        read_fragments_parallel::<BTreeMap<String, Vec<SymbolBindingSource>>>(paths, files)?
     {
         for (type_name, bindings) in fragment {
             source.entry(type_name).or_default().extend(bindings);
         }
     }
-    Ok(decode_localisation_bindings(source))
+    Ok(decode_symbol_bindings(source))
 }
 
 fn parse_profile_fragments(
@@ -502,30 +508,37 @@ fn validate_source_model(
     Ok((manifest, model))
 }
 
-fn decode_localisation_bindings(
-    source: BTreeMap<String, Vec<LocalisationBindingSource>>,
-) -> Vec<crate::LocalisationBinding> {
+fn decode_symbol_bindings(
+    source: BTreeMap<String, Vec<SymbolBindingSource>>,
+) -> Vec<crate::SymbolBinding> {
     source
         .into_iter()
         .flat_map(|(type_name, bindings)| {
-            bindings
-                .into_iter()
-                .map(move |binding| crate::LocalisationBinding {
+            bindings.into_iter().map(move |binding| {
+                // A binding is semantic when it names a source field, generated
+                // otherwise; a generated binding with no key uses the `$_{name}`
+                // convention.
+                let key = if binding.field.is_some() {
+                    None
+                } else {
+                    Some(binding.key.unwrap_or_else(|| format!("$_{}", binding.name)))
+                };
+                crate::SymbolBinding {
                     type_name: type_name.clone(),
-                    field: binding.field,
-                    template: binding.template,
+                    name: binding.name,
+                    key,
                     required: binding.required,
-                    optional: binding.optional,
                     subtype: binding.subtype,
-                    condition: binding.condition.map(|condition| {
-                        crate::LocalisationBindingCondition {
+                    condition: binding
+                        .condition
+                        .map(|condition| crate::SymbolBindingCondition {
                             field: condition.field,
                             value: condition.value,
                             key_prefix: condition.key_prefix,
-                        }
-                    }),
-                    explicit_field: binding.explicit_field,
-                })
+                        }),
+                    field: binding.field,
+                }
+            })
         })
         .collect()
 }
@@ -775,11 +788,36 @@ fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
         }
     }
     let mut binding_ids = BTreeSet::new();
-    for binding in &model.semantic.localisation_bindings {
-        if binding.type_name.trim().is_empty() || binding.field.trim().is_empty() {
-            return Err(CompileError::Validation(
-                "localisation binding type and field must not be empty".to_owned(),
-            ));
+    validate_binding_family(
+        model,
+        &model.semantic.localisation_bindings,
+        "localisation",
+        &mut binding_ids,
+    )?;
+    let mut icon_binding_ids = BTreeSet::new();
+    validate_binding_family(
+        model,
+        &model.semantic.sprite_bindings,
+        "sprite",
+        &mut icon_binding_ids,
+    )?;
+    Ok(())
+}
+
+/// Validates one binding family: every binding names a known type, selects
+/// exactly one kind (key or field), and carries a unique
+/// `(type, subtype, name)` identity within its family.
+fn validate_binding_family(
+    model: &RulesModel,
+    bindings: &[crate::SymbolBinding],
+    family: &str,
+    binding_ids: &mut BTreeSet<String>,
+) -> Result<(), CompileError> {
+    for binding in bindings {
+        if binding.type_name.trim().is_empty() || binding.name.trim().is_empty() {
+            return Err(CompileError::Validation(format!(
+                "{family} binding type and name must not be empty"
+            )));
         }
         if !model
             .semantic
@@ -787,14 +825,24 @@ fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
             .contains_key(&binding.type_name)
         {
             return Err(CompileError::Validation(format!(
-                "localisation binding {}.{} refers to unknown type {}",
-                binding.type_name, binding.field, binding.type_name
+                "{family} binding {}.{} refers to unknown type {}",
+                binding.type_name, binding.name, binding.type_name
             )));
         }
-        if binding.required && binding.optional {
+        if binding.key.is_some() == binding.field.is_some() {
             return Err(CompileError::Validation(format!(
-                "localisation binding {}.{} cannot be both required and optional",
-                binding.type_name, binding.field
+                "{family} binding {}.{} must use either key or field",
+                binding.type_name, binding.name
+            )));
+        }
+        if binding
+            .field
+            .as_deref()
+            .is_some_and(|field| field.trim().is_empty())
+        {
+            return Err(CompileError::Validation(format!(
+                "{family} binding {}.{} has an empty field",
+                binding.type_name, binding.name
             )));
         }
         if binding
@@ -803,8 +851,8 @@ fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
             .is_some_and(|subtype| subtype.trim().is_empty())
         {
             return Err(CompileError::Validation(format!(
-                "localisation binding {}.{} has an empty subtype",
-                binding.type_name, binding.field
+                "{family} binding {}.{} has an empty subtype",
+                binding.type_name, binding.name
             )));
         }
         if let Some(condition) = &binding.condition {
@@ -818,8 +866,8 @@ fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
                     .is_some_and(|prefix| prefix.trim().is_empty())
             {
                 return Err(CompileError::Validation(format!(
-                    "localisation binding {}.{} condition contains an empty selector",
-                    binding.type_name, binding.field
+                    "{family} binding {}.{} condition contains an empty selector",
+                    binding.type_name, binding.name
                 )));
             }
             let has_field = condition
@@ -832,45 +880,89 @@ fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
                 .is_some_and(|prefix| !prefix.trim().is_empty());
             if has_field == has_key_prefix {
                 return Err(CompileError::Validation(format!(
-                    "localisation binding {}.{} condition must select one field or key_prefix",
-                    binding.type_name, binding.field
+                    "{family} binding {}.{} condition must select one field or key_prefix",
+                    binding.type_name, binding.name
                 )));
             }
             if condition.value.is_some() && !has_field {
                 return Err(CompileError::Validation(format!(
-                    "localisation binding {}.{} condition value requires field",
-                    binding.type_name, binding.field
+                    "{family} binding {}.{} condition value requires field",
+                    binding.type_name, binding.name
                 )));
             }
         }
-        if binding.explicit_field.is_some() != binding.template.is_none() {
-            return Err(CompileError::Validation(format!(
-                "localisation binding {}.{} must use either template or explicit_field",
-                binding.type_name, binding.field
-            )));
-        }
-        if let Some(template) = binding.template.as_deref()
-            && (template.matches('$').count() != 1 || template.trim().is_empty())
+        if let Some(key) = binding.key.as_deref()
+            && (key.matches('$').count() != 1 || key.trim().is_empty())
         {
             return Err(CompileError::Validation(format!(
-                "localisation binding {}.{} template must contain exactly one `$`",
-                binding.type_name, binding.field
+                "{family} binding {}.{} key must contain exactly one `$`",
+                binding.type_name, binding.name
             )));
+        }
+        if let Some(field) = binding.field.as_deref() {
+            // The schema boundary: a semantic binding may only name a field
+            // the schema knows, and only one it does not already type as the
+            // family's reference kind — a typed field's reference and
+            // existence diagnostics belong to the type rules alone.
+            let field_rules = type_instance_field_rules(model, &binding.type_name)
+                .filter(|rule| {
+                    matches!(&rule.key, KeyMatcher::Exact(key) if key.eq_ignore_ascii_case(field))
+                })
+                .collect::<Vec<_>>();
+            if field_rules.is_empty() {
+                return Err(CompileError::Validation(format!(
+                    "{family} binding {}.{} references field {field} which no schema rule covers",
+                    binding.type_name, binding.name
+                )));
+            }
+            let family_references_sprites = family == "icon";
+            let typed = field_rules.iter().any(|rule| {
+                if family_references_sprites {
+                    matches!(&rule.value, ValueMatcher::Type(kind) if kind.eq_ignore_ascii_case("sprite"))
+                } else {
+                    matches!(rule.value, ValueMatcher::Localisation)
+                }
+            });
+            if typed {
+                return Err(CompileError::Validation(format!(
+                    "{family} binding {}.{} duplicates the schema's typed check for field {field}",
+                    binding.type_name, binding.name
+                )));
+            }
         }
         let identity = format!(
             "{}\u{1f}{}\u{1f}{}",
             binding.type_name,
             binding.subtype.as_deref().unwrap_or_default(),
-            binding.field
+            binding.name
         );
         if !binding_ids.insert(identity) {
             return Err(CompileError::Validation(format!(
-                "duplicate localisation binding {}.{}",
-                binding.type_name, binding.field
+                "duplicate {family} binding {}.{}",
+                binding.type_name, binding.name
             )));
         }
     }
     Ok(())
+}
+
+/// The schema rules governing one type instance's fields: the type's root
+/// context plus rule paths marked with the type's `<name>` segment (missions
+/// live inside series, so their field rules hang off `root:mission_series`
+/// with a `<mission>` path marker).
+fn type_instance_field_rules<'a>(
+    model: &'a RulesModel,
+    type_name: &str,
+) -> impl Iterator<Item = &'a crate::model::SemanticRule> {
+    let root_context = format!("root:{type_name}");
+    let path_marker = format!("<{type_name}>");
+    model.semantic.rules.iter().filter(move |rule| {
+        rule.context.eq_ignore_ascii_case(&root_context)
+            || rule
+                .parent_path
+                .iter()
+                .any(|segment| segment.eq_ignore_ascii_case(&path_marker))
+    })
 }
 
 fn validate_source_layout(source: &Path, manifest: &SourceManifest) -> Result<(), CompileError> {
@@ -944,11 +1036,17 @@ fn validate_declared_paths(files: &SourceFiles) -> Result<BTreeSet<String>, Comp
         ("types", &files.types),
         ("values", &files.values),
         ("localisation", &files.localisation),
+        ("sprite", &files.sprite),
         ("profile", &files.profile),
     ] {
         for entry in entries {
             let path = normalize_source_path(entry)?;
-            let expected_prefix = format!("{family}/");
+            // Both binding families share the `bindings/` directory; every
+            // other family owns the directory named after it.
+            let expected_prefix = match family {
+                "localisation" | "sprite" => "bindings/".to_owned(),
+                family => format!("{family}/"),
+            };
             if !path.starts_with(&expected_prefix) {
                 return Err(CompileError::Validation(format!(
                     "{family} source file is outside its source directory: {path}"
@@ -1100,9 +1198,226 @@ fn temporary_path(output: &Path) -> PathBuf {
 mod tests {
     use super::*;
     use crate::{
-        DynamicDefinitionDescriptor, DynamicDefinitionUsage, KeyMatcher, RuleShape, SemanticRule,
-        TypeDescriptor, ValueMatcher,
+        DynamicDefinitionDescriptor, DynamicDefinitionUsage, KeyMatcher, RuleSet, RuleShape,
+        SemanticRule, TypeDescriptor, ValueMatcher,
     };
+
+    fn binding_model(bindings: Vec<crate::SymbolBinding>) -> RulesModel {
+        let mut model = RulesModel {
+            game_id: "eu4".to_owned(),
+            ..RulesModel::default()
+        };
+        for binding in &bindings {
+            model.semantic.type_descriptors.insert(
+                binding.type_name.clone(),
+                TypeDescriptor {
+                    name: binding.type_name.clone(),
+                    ..TypeDescriptor::default()
+                },
+            );
+        }
+        model.semantic.localisation_bindings = bindings;
+        model
+    }
+
+    #[test]
+    fn localisation_binding_source_defaults_fill_template_kind() {
+        let mut source = BTreeMap::new();
+        source.insert(
+            "cult".to_owned(),
+            vec![SymbolBindingSource {
+                name: "desc".to_owned(),
+                key: None,
+                field: None,
+                required: true,
+                subtype: None,
+                condition: None,
+            }],
+        );
+        let bindings = decode_symbol_bindings(source);
+        assert_eq!(bindings[0].key.as_deref(), Some("$_desc"));
+        assert_eq!(bindings[0].field, None);
+        assert!(bindings[0].required);
+    }
+
+    #[test]
+    fn localisation_binding_validation_separates_kinds() {
+        let mut model = binding_model(vec![
+            crate::SymbolBinding {
+                type_name: "cult".to_owned(),
+                name: "name".to_owned(),
+                key: Some("$".to_owned()),
+                required: true,
+                subtype: None,
+                condition: None,
+                field: None,
+            },
+            crate::SymbolBinding {
+                type_name: "cult".to_owned(),
+                name: "title".to_owned(),
+                key: None,
+                required: false,
+                subtype: None,
+                condition: None,
+                field: Some("title".to_owned()),
+            },
+        ]);
+        // A semantic binding names a field the schema covers but leaves
+        // untyped.
+        model.semantic.rules.push(SemanticRule {
+            id: "test:cult:title".to_owned(),
+            context: "root:cult".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("title".to_owned()),
+            operator: None,
+            value: ValueMatcher::AnyScalar,
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "semantic-rules.json".to_owned(),
+            line: 1,
+        });
+        assert!(validate_model(&model).is_ok());
+    }
+
+    #[test]
+    fn binding_validation_rejects_fields_the_schema_owns_or_does_not_know() {
+        let rule = |value: ValueMatcher| SemanticRule {
+            id: format!("test:cult:title:{:?}", value),
+            context: "root:cult".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("title".to_owned()),
+            operator: None,
+            value,
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "semantic-rules.json".to_owned(),
+            line: 1,
+        };
+        let semantic_binding = crate::SymbolBinding {
+            type_name: "cult".to_owned(),
+            name: "title".to_owned(),
+            key: None,
+            required: false,
+            subtype: None,
+            condition: None,
+            field: Some("title".to_owned()),
+        };
+        // A typed field belongs to the schema alone.
+        let mut typed = binding_model(vec![semantic_binding.clone()]);
+        typed.semantic.rules.push(rule(ValueMatcher::Localisation));
+        assert!(validate_model(&typed).is_err());
+        // An unknown field is a typo, not a binding.
+        let mut unknown = binding_model(vec![semantic_binding]);
+        unknown.semantic.rules.push(rule(ValueMatcher::AnyScalar));
+        unknown.semantic.rules[0].key = KeyMatcher::Exact("name".to_owned());
+        assert!(validate_model(&unknown).is_err());
+    }
+
+    #[test]
+    fn localisation_binding_validation_rejects_kind_conflicts() {
+        for (key, field) in [
+            (Some("$".to_owned()), Some("title".to_owned())),
+            (None, None),
+            (Some("a$$b".to_owned()), None),
+        ] {
+            let shape = format!("key={key:?} field={field:?}");
+            let model = binding_model(vec![crate::SymbolBinding {
+                type_name: "cult".to_owned(),
+                name: "title".to_owned(),
+                key,
+                required: false,
+                subtype: None,
+                condition: None,
+                field,
+            }]);
+            assert!(
+                validate_model(&model).is_err(),
+                "expected rejection for {shape}"
+            );
+        }
+    }
+
+    #[test]
+    fn sprite_bindings_validate_against_type_descriptors() {
+        let mut model = binding_model(Vec::new());
+        model.semantic.sprite_bindings = vec![crate::SymbolBinding {
+            type_name: "unknown_type".to_owned(),
+            name: "icon".to_owned(),
+            key: Some("$".to_owned()),
+            required: false,
+            subtype: None,
+            condition: None,
+            field: None,
+        }];
+        assert!(
+            validate_model(&model).is_err(),
+            "sprite bindings must name a known type descriptor"
+        );
+    }
+
+    #[test]
+    fn from_model_never_injects_bindings() {
+        let mut model = binding_model(vec![crate::SymbolBinding {
+            type_name: "cult".to_owned(),
+            name: "name".to_owned(),
+            key: Some("$".to_owned()),
+            required: true,
+            subtype: None,
+            condition: None,
+            field: None,
+        }]);
+        model
+            .semantic
+            .type_descriptors
+            .insert("building".to_owned(), TypeDescriptor::default());
+        let rules = RuleSet::from_model(model);
+        // The same-name probe is a derivation-time built-in: the model keeps
+        // exactly the declared bindings, so `building` gains nothing.
+        assert_eq!(
+            rules
+                .model()
+                .semantic
+                .localisation_bindings
+                .iter()
+                .filter(|binding| binding.type_name == "building")
+                .count(),
+            0,
+            "no default self binding is materialized for building"
+        );
+        assert_eq!(
+            rules
+                .model()
+                .semantic
+                .localisation_bindings
+                .iter()
+                .filter(|binding| binding.type_name == "cult")
+                .count(),
+            1,
+            "cult keeps its declared self binding"
+        );
+    }
 
     #[test]
     fn validation_rejects_duplicate_rule_ids_and_invalid_cardinality() {
@@ -1423,7 +1738,7 @@ mod tests {
         assert_eq!(source_model.file_categories.len(), 124);
         assert_eq!(source_model.symbol_descriptors.len(), 2657);
         assert_eq!(source_model.records.len(), 12_962);
-        assert_eq!(source_model.semantic.rules.len(), 8_461);
+        assert_eq!(source_model.semantic.rules.len(), 8_464);
         assert_eq!(source_model.semantic.enum_values.len(), 63);
         assert_eq!(source_model.semantic.type_root_keys.len(), 7);
         assert_eq!(source_model.semantic.type_root_scopes.len(), 4);
@@ -1469,7 +1784,9 @@ mod tests {
         assert_eq!(startup.from, "any");
         assert!(!startup.documentation.is_empty());
         assert_eq!(source_model.semantic.type_descriptors.len(), 156);
-        assert_eq!(source_model.semantic.localisation_bindings.len(), 189);
+        // Declared bindings only; nothing is injected at compile time.
+        assert_eq!(source_model.semantic.localisation_bindings.len(), 188);
+        assert_eq!(source_model.semantic.sprite_bindings.len(), 4);
         assert_eq!(source_model.profile.scan_roots.len(), 126);
         for (key, expected_scopes) in [
             ("is_janissary_modifier", &["country"][..]),

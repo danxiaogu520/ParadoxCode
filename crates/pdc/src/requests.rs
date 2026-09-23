@@ -959,19 +959,23 @@ impl SnapshotRequestContext {
         let diagnostics = game::eu4::mission::validate(file);
         let line_index = LineIndex::new(&params.text);
 
-        // Resolve all `{mission_id}_title` keys in one workspace pass with the
-        // same configured language preference as hover; missing keys
-        // simply fall back to the raw id in the renderer.
+        // Resolve every mission title key in one workspace pass with the same
+        // configured language preference as hover; the keys come from the
+        // mission `$_title` binding (the bindings JSON is the single source)
+        // and missing keys simply fall back to the raw id in the renderer.
         // Different nodes can produce the same localisation key (and malformed
         // files may repeat ids). Deduplicating here avoids resolving the same
         // definition repeatedly while preserving the response for every node.
         let mut title_keys = Vec::with_capacity(layout.len());
         let mut seen_title_keys = HashSet::with_capacity(layout.len());
         for pos in &layout {
-            let key = format!(
-                "{}_title",
-                file.trees[pos.tree_index].missions[pos.mission_index].id
-            );
+            let Some(key) = self.snapshot.rules().localisation_template_key(
+                "mission",
+                "name",
+                &file.trees[pos.tree_index].missions[pos.mission_index].id,
+            ) else {
+                continue;
+            };
             if seen_title_keys.insert(key.clone()) {
                 title_keys.push(key);
             }
@@ -1010,10 +1014,15 @@ impl SnapshotRequestContext {
                 let tree = &file.trees[pos.tree_index];
                 let mission = &tree.missions[pos.mission_index];
                 let (x, y) = geometry::world_position(pos);
-                // The game renders `{mission_id}_title`; resolve it through the
-                // active workspace localisation definition so mod overrides and
-                // Vanilla keys both work. The raw id remains as the fallback.
-                let title_key = format!("{}_title", mission.id);
+                // The game renders the mission's bound title key; resolve it
+                // through the active workspace localisation definition so mod
+                // overrides and Vanilla keys both work. The raw id remains as
+                // the fallback.
+                let title_key = self
+                    .snapshot
+                    .rules()
+                    .localisation_template_key("mission", "name", &mission.id)
+                    .unwrap_or_default();
                 let title = titles.get(&title_key).map(
                     |(language, value)| serde_json::json!({ "language": language, "value": value }),
                 );

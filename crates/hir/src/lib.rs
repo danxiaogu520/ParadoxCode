@@ -86,13 +86,48 @@ fn lower_shared_impl(
         profile,
         &scope_facts,
     );
-    references.extend(semantics::derived_localisation_references(
-        &properties,
-        syntax.root().range(),
-        logical_path,
-        rules,
-        false,
-    ));
+    {
+        // A derived entry whose name the semantic layer already types with the
+        // same kind (a schema-typed `icon = <sprite>` value, a `title = <key>`
+        // field) would duplicate that rule's diagnostic; the derived reference
+        // adds nothing there, so keep only names the semantic layer missed.
+        let semantically_typed = references
+            .iter()
+            .filter(|reference| {
+                matches!(
+                    reference.origin,
+                    HirReferenceOrigin::SemanticTyped | HirReferenceOrigin::Semantic
+                ) && (reference.kind.eq_ignore_ascii_case("sprite")
+                    || reference.kind.eq_ignore_ascii_case("localisation"))
+            })
+            .map(|reference| {
+                (
+                    reference.kind.to_ascii_lowercase(),
+                    reference.name.to_ascii_lowercase(),
+                )
+            })
+            .collect::<std::collections::BTreeSet<_>>();
+        let mut derived = semantics::derived_localisation_references(
+            &properties,
+            syntax.root().range(),
+            logical_path,
+            rules,
+            true,
+        );
+        derived.extend(semantics::derived_sprite_references(
+            &properties,
+            syntax.root().range(),
+            logical_path,
+            rules,
+            true,
+        ));
+        references.extend(derived.into_iter().filter(|reference| {
+            !semantically_typed.contains(&(
+                reference.kind.to_ascii_lowercase(),
+                reference.name.to_ascii_lowercase(),
+            ))
+        }));
+    }
     // Deduplicate (case-insensitive kind, name, range) without a BTreeSet:
     // sorting the moved tuples once avoids cloning every reference name and
     // lowercasing every kind on every insert.
@@ -149,9 +184,9 @@ fn lower_shared_impl(
 /// Returns all type-instance localisation mappings for hover/navigation queries.
 ///
 /// Required mappings are part of the normal HIR reference set because they also drive missing
-/// localisation diagnostics. Optional mappings are intentionally kept out of that set: a missing
-/// optional key is valid game data. Hover can still ask for the complete mapping set and resolve
-/// only keys that actually exist in the workspace.
+/// localisation diagnostics. Non-required mappings are intentionally kept out of that set.
+/// Hover asks for the complete mapping set and resolves only keys that actually exist in the
+/// workspace.
 #[must_use]
 pub fn derived_localisation_references_for_hover(
     hir: &HirFile,
@@ -163,7 +198,26 @@ pub fn derived_localisation_references_for_hover(
         hir.syntax.root().range(),
         Some(logical_path),
         rules,
-        true,
+        false,
+    )
+}
+
+/// Returns all type-instance sprite mappings for hover queries.
+///
+/// Icon bindings ride the same reference set as localisation mappings; hover
+/// resolves only names that exist as sprites in the workspace.
+#[must_use]
+pub fn derived_sprite_references_for_hover(
+    hir: &HirFile,
+    logical_path: &LogicalPath,
+    rules: &RuleSet,
+) -> Vec<HirReference> {
+    semantics::derived_sprite_references(
+        &hir.properties,
+        hir.syntax.root().range(),
+        Some(logical_path),
+        rules,
+        false,
     )
 }
 

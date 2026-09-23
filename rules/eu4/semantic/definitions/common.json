@@ -19036,7 +19036,9 @@
       "exact": "icon"
     },
     "operator": "=",
-    "value": "any_scalar",
+    "value": {
+      "type": "sprite"
+    },
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -27845,7 +27847,9 @@
       "exact": "alert_icon_gfx"
     },
     "operator": "=",
-    "value": "any_scalar",
+    "value": {
+      "type": "sprite"
+    },
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -66819,6 +66823,105 @@
     "max_occurs": 1,
     "source_file": "common/alerts.txt",
     "line": 2
+  },
+  {
+    "id": "common/alerts:4:rule:root:alerts:icon-HIGH",
+    "context": "root:alerts",
+    "parent_path": [
+      "icon"
+    ],
+    "key": {
+      "exact": "HIGH"
+    },
+    "operator": "=",
+    "value": {
+      "type": "sprite"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Sprite shown for high-severity alerts."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/alerts.txt",
+    "line": 4
+  },
+  {
+    "id": "common/alerts:5:rule:root:alerts:icon-MEDIUM",
+    "context": "root:alerts",
+    "parent_path": [
+      "icon"
+    ],
+    "key": {
+      "exact": "MEDIUM"
+    },
+    "operator": "=",
+    "value": {
+      "type": "sprite"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Sprite shown for medium-severity alerts."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/alerts.txt",
+    "line": 5
+  },
+  {
+    "id": "common/alerts:6:rule:root:alerts:icon-LOW",
+    "context": "root:alerts",
+    "parent_path": [
+      "icon"
+    ],
+    "key": {
+      "exact": "LOW"
+    },
+    "operator": "=",
+    "value": {
+      "type": "sprite"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Sprite shown for low-severity alerts."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/alerts.txt",
+    "line": 6
   },
   {
     "id": "common/alerts:3:rule:root:alerts:alerts",

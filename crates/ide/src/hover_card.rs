@@ -18,7 +18,8 @@ use engine::{AnalysisSnapshot, DocumentId, SourceRootKind};
 use text::{LogicalPath, TextRange, TextSize};
 
 use crate::resolution::{
-    localisation_values_by_key, semantic_data_with_cancellation, symbol_candidates_for_hover,
+    DefinitionInfo, localisation_values_by_key, semantic_data_with_cancellation,
+    symbol_candidates_for_hover,
 };
 use crate::support::{ParsedInput, contains, input_for_document, input_for_source_file};
 use crate::types::{CancellationToken, Cancelled, Location};
@@ -112,12 +113,14 @@ pub struct HoverCardEvent {
     pub id: String,
     /// `picture = <sprite>` spelling, when the event declares one.
     pub picture: Option<String>,
-    /// Localisation key of the event title (explicit `title`, else `<id>.t`).
-    pub title_key: String,
+    /// Localisation key of the event title, when a scalar `title` is declared.
+    /// The common `<id>.t` spelling is a modder convention inside the value,
+    /// not an engine default — no key is fabricated for a missing field.
+    pub title_key: Option<String>,
     /// Resolved title localisation, when any language defines the key.
     pub title: Option<(Option<String>, String)>,
-    /// Localisation key of the description (explicit scalar `desc`, else
-    /// `<id>.d`; a conditional `desc` block carries no single key).
+    /// Localisation key of the description (a scalar `desc`; a conditional
+    /// `desc` block carries no single key).
     pub desc_key: Option<String>,
     /// Resolved description localisation.
     pub desc: Option<(Option<String>, String)>,
@@ -172,6 +175,9 @@ pub fn hover_card_with_cancellation(
         return Ok(Some(card));
     }
     if let Some(card) = event_card(snapshot, &input, position, cancellation)? {
+        return Ok(Some(card));
+    }
+    if let Some(card) = icon_card(snapshot, &input, position, cancellation)? {
         return Ok(Some(card));
     }
     if let Some(card) = texture_card(snapshot, &input, position) {
@@ -353,7 +359,13 @@ fn mission_card_for_mission(
     mission: &game::eu4::mission::Mission,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
-    let title_key = format!("{}_title", mission.id);
+    // The title key comes from the mission's `$_title` binding — the JSON is
+    // the single source; an absent binding degrades to no title (the client
+    // falls back to the raw id).
+    let title_key = snapshot
+        .rules()
+        .localisation_template_key("mission", "name", &mission.id)
+        .unwrap_or_default();
     let titles = localisation_values_by_key(snapshot, &[title_key.as_str()], cancellation)?;
     let title = titles.get(&title_key).cloned();
     let icon = mission.icon.clone();
@@ -381,6 +393,144 @@ fn mission_card_for_mission(
         event: None,
         event_assets: None,
     }))
+}
+
+/// The generic icon card: hovering the definition token of a type that
+/// carries icon bindings (or a reference to such a definition) renders the
+/// bound sprite's texture. The specialized mission and event cards own their
+/// families; this card serves every remaining icon-bound type, from holy
+/// orders to subject types.
+fn icon_card(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: TextSize,
+    cancellation: &CancellationToken,
+) -> Result<Option<HoverCard>, Cancelled> {
+    if input.format != parser::FileFormat::Script
+        || !input
+            .profile
+            .game_id
+            .eq_ignore_ascii_case(game::eu4::GAME_ID)
+    {
+        return Ok(None);
+    }
+    let semantic = semantic_data_with_cancellation(snapshot, input, cancellation)?;
+    let current_document = input.document.as_ref();
+    // The card gate is reference-driven: any definition whose block carries a
+    // sprite reference (schema-typed or binding-derived) can render an icon.
+    let definition_has_sprite = |definition: &DefinitionInfo| {
+        semantic.references.iter().any(|reference| {
+            reference.kind.eq_ignore_ascii_case("sprite")
+                && within(definition.symbol.range, reference.range)
+        })
+    };
+    let hovered_definition = semantic.definitions.iter().find(|definition| {
+        definition.document.as_ref() == current_document
+            && contains(definition.symbol.selection_range, position)
+            && definition_has_sprite(definition)
+    });
+    if let Some(definition) = hovered_definition {
+        return icon_card_for_definition(snapshot, input, definition, cancellation);
+    }
+    // A hovered reference to an icon-bearing definition renders the target's
+    // icon; sprite and localisation references themselves have their own
+    // card paths further down the chain.
+    let Some(reference) = semantic.references.iter().find(|reference| {
+        contains(reference.range, position)
+            && !reference.kind.eq_ignore_ascii_case("sprite")
+            && !reference.kind.eq_ignore_ascii_case("localisation")
+    }) else {
+        return Ok(None);
+    };
+    let candidates =
+        symbol_candidates_for_hover(snapshot, &reference.kind, &reference.name, cancellation)?;
+    for candidate in &candidates {
+        cancellation.checkpoint()?;
+        let Some(target) = input_for_location(snapshot, &candidate.location) else {
+            continue;
+        };
+        let target_semantic = semantic_data_with_cancellation(snapshot, &target, cancellation)?;
+        let Some(definition) = target_semantic
+            .definitions
+            .iter()
+            .find(|definition| {
+                definition
+                    .document
+                    .as_ref()
+                    .is_some_and(|document| target.document.as_ref() == Some(document))
+                    && contains(
+                        definition.symbol.selection_range,
+                        candidate.selection_range.start(),
+                    )
+            })
+            .or_else(|| {
+                target_semantic.definitions.iter().find(|definition| {
+                    definition
+                        .document
+                        .as_ref()
+                        .is_some_and(|document| target.document.as_ref() == Some(document))
+                        && definition.name.eq_ignore_ascii_case(&reference.name)
+                })
+            })
+        else {
+            continue;
+        };
+        let card = icon_card_for_definition(snapshot, &target, definition, cancellation)?;
+        if card.is_some() {
+            return Ok(card);
+        }
+    }
+    Ok(None)
+}
+
+/// Resolves the icon sprites bound to one definition — derived icon
+/// references (templates, self bindings, semantic fields) plus any sprite
+/// references already lowered inside the block — and renders the first that
+/// resolves to a loadable texture.
+fn icon_card_for_definition(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    definition: &DefinitionInfo,
+    cancellation: &CancellationToken,
+) -> Result<Option<HoverCard>, Cancelled> {
+    let mut candidates = Vec::<(String, TextRange)>::new();
+    if let Some(hir) = input.hir.as_deref()
+        && let Some(path) = input.path.as_ref()
+    {
+        candidates.extend(
+            hir::derived_sprite_references_for_hover(hir, path, snapshot.rules())
+                .into_iter()
+                .map(|reference| (reference.name, reference.range)),
+        );
+    }
+    let semantic = semantic_data_with_cancellation(snapshot, input, cancellation)?;
+    candidates.extend(
+        semantic
+            .references
+            .iter()
+            .filter(|reference| {
+                reference.kind.eq_ignore_ascii_case("sprite")
+                    && within(definition.symbol.range, reference.range)
+            })
+            .map(|reference| (reference.name.clone(), reference.range)),
+    );
+    candidates.retain(|(_, range)| within(definition.symbol.range, *range));
+    candidates.sort_by_key(|(_, range)| (range.start(), range.end()));
+    candidates.dedup_by(|left, right| left.0.eq_ignore_ascii_case(&right.0));
+    for (name, _) in candidates {
+        cancellation.checkpoint()?;
+        if let Some(asset) = sprite_asset(snapshot, &name, cancellation)? {
+            return Ok(Some(HoverCard {
+                kind: "sprite",
+                asset: Some(asset),
+                mission: None,
+                card_assets: None,
+                event: None,
+                event_assets: None,
+            }));
+        }
+    }
+    Ok(None)
 }
 
 fn texture_card(
@@ -574,11 +724,13 @@ fn event_card_for_block(
     let Some(id) = child_scalar("id") else {
         return Ok(None);
     };
-    // EU4 defaults the title/description keys to `<id>.t`/`<id>.d` when the
-    // event omits them; a conditional `desc` block has no single key, but
-    // the default still applies to the base variant.
-    let title_key = child_scalar("title").unwrap_or_else(|| format!("{id}.t"));
-    let desc_key = Some(child_scalar("desc").unwrap_or_else(|| format!("{id}.d")));
+    // Title and description keys are read verbatim from the fields: the
+    // engine looks up whatever scalar the event declares. The near-universal
+    // `<id>.t`/`<id>.d` spellings live inside those values as modder
+    // convention, so an absent field (or a conditional `desc` block without
+    // a single scalar) yields no key rather than a fabricated one.
+    let title_key = child_scalar("title");
+    let desc_key = child_scalar("desc");
     let picture = child_scalar("picture");
     // Option blocks: `option`-keyed direct children of this block; each
     // one's `name` is the matching three-element-path property inside it.
@@ -604,7 +756,8 @@ fn event_card_for_block(
         .collect();
     options.sort_by_key(|(range, _)| range.start());
     cancellation.checkpoint()?;
-    let mut keys: Vec<String> = vec![title_key.clone()]
+    let mut keys: Vec<String> = title_key
+        .clone()
         .into_iter()
         .chain(desc_key.clone())
         .chain(options.iter().filter_map(|(_, name)| name.clone()))
@@ -618,7 +771,7 @@ fn event_card_for_block(
         id: id.clone(),
         picture: picture.clone(),
         title_key: title_key.clone(),
-        title: resolved(&title_key),
+        title: title_key.as_deref().and_then(resolved),
         desc: desc_key.as_deref().and_then(resolved),
         desc_key,
         options: options

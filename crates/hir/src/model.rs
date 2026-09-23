@@ -357,6 +357,8 @@ pub enum HirReferenceOrigin {
     DynamicDefinition,
     /// A required type-instance localisation mapping expanded from a first-party template.
     DerivedLocalisation,
+    /// A type-instance icon mapping expanded from a first-party icon binding.
+    DerivedSprite,
     /// A conservative bare value associated with the file category.
     Category,
 }

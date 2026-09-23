@@ -564,6 +564,91 @@ fn golden_localisation_derived_keys() {
 }
 
 #[test]
+fn golden_sprite_bindings_derived_picture() {
+    // The building `GFX_$` template derives the sprite name from the
+    // instance's own name, so an unresolvable sprite (and the equally
+    // required `building_$` localisation key) is reported against the
+    // instance. Modifier `picture` fields deliberately carry no sprite
+    // binding: their values are texture stems, not sprite names.
+    let text = "golden_missing_building = { cost = 100 }\n";
+    let root = temp_root("locicon");
+    std::fs::create_dir_all(root.join("common/buildings")).expect("buildings directory");
+    let mut host = first_party_host(&root);
+    let id = DocumentId::new("file:///tmp/common/buildings/golden.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(
+            &root.join("common/buildings/golden.txt"),
+        )),
+    )
+    .expect("open golden buildings");
+    assert_golden(
+        "sprite_bindings_derived_picture",
+        text,
+        &analyze_text(&host, &id),
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn golden_localisation_language_gate() {
+    // Required mission keys are judged in the target language (english by default):
+    // `mission_lang_title` exists in english and passes, `mission_lang_desc` exists
+    // only in french and is reported even though the key is defined workspace-wide.
+    let text = concat!(
+        "golden_lang_tree = {\n",
+        "\tslot = 1\n",
+        "\tpotential = { always = yes }\n",
+        "\tmission_lang = {\n",
+        "\t\ticon = mission_conquest\n",
+        "\t\ttrigger = { always = yes }\n",
+        "\t\teffect = { add_prestige = 1 }\n",
+        "\t\tposition = 1\n",
+        "\t}\n",
+        "}\n",
+    );
+    let root = temp_root("locgate");
+    let missions_dir = root.join("missions");
+    let loc_dir = root.join("localisation");
+    let interface_dir = root.join("interface");
+    std::fs::create_dir_all(&missions_dir).expect("missions directory");
+    std::fs::create_dir_all(&loc_dir).expect("localisation directory");
+    std::fs::create_dir_all(&interface_dir).expect("interface directory");
+    std::fs::write(
+        interface_dir.join("golden.gfx"),
+        "spriteTypes = { spriteType = { name = \"mission_conquest\" texturefile = \"gfx/none.dds\" } }\n",
+    )
+    .expect("write gfx sprite");
+    std::fs::write(
+        loc_dir.join("golden_lang_l_english.yml"),
+        "l_english:\n mission_lang_title:0 \"Title\"\n",
+    )
+    .expect("write english localisation");
+    std::fs::write(
+        loc_dir.join("golden_lang_l_french.yml"),
+        "l_french:\n mission_lang_desc:0 \"Description\"\n",
+    )
+    .expect("write french localisation");
+    let mut host = first_party_host(&root);
+    let id = DocumentId::new("file:///tmp/missions/golden_lang.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(AbsPath::normalize(&missions_dir.join("golden_lang.txt"))),
+    )
+    .expect("open golden mission file");
+    assert_golden(
+        "localisation_language_gate",
+        text,
+        &analyze_text(&host, &id),
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn golden_mission_trees() {
     let text = concat!(
         "golden_main_tree = {\n",

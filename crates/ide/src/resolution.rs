@@ -159,6 +159,7 @@ fn semantic_data_with_cancellation_uncached(
                     | HirReferenceOrigin::SemanticTyped
                     | HirReferenceOrigin::DynamicDefinition
                     | HirReferenceOrigin::DerivedLocalisation
+                    | HirReferenceOrigin::DerivedSprite
             )
         })
         .filter(|reference| semantic_reference_is_active(&inactive_semantic_references, reference))
