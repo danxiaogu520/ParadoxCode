@@ -528,34 +528,6 @@
     "line": 5011
   },
   {
-    "id": "events/events:33:rule:root:event:picture",
-    "context": "root:event",
-    "parent_path": [],
-    "key": {
-      "exact": "picture"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [
-      "Event picture name, defined in interface/eventpictures.gfx."
-    ],
-    "allowed_scopes": [
-      "any"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": null,
-    "strict_min": true,
-    "max_occurs": null,
-    "source_file": "semantic-rules.json",
-    "line": 5012
-  },
-  {
     "id": "events/events:35:rule:root:event:trigger",
     "context": "root:event",
     "parent_path": [

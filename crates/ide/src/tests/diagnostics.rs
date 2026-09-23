@@ -3072,12 +3072,13 @@ fn dlc_archive_sprites_resolve_event_pictures() {
         )
         .expect("start gfx entry");
         // Vanilla `.gfx` puts every assignment on its own line; the hover-card
-        // texture scan relies on that shape.
+        // texture scan relies on that shape. Event-picture sprites are named
+        // without the `GFX_` prefix, matching the shipped eventpictures.gfx.
         std::io::Write::write_all(
             &mut zip,
             b"spriteTypes = {
 	spriteType = {
-		name = \"GFX_FROM_zip_eventPicture\"
+		name = \"FROM_zip_eventPicture\"
 		texturefile = \"t.dds\"
 	}
 	spriteType = {
@@ -3133,14 +3134,42 @@ fn dlc_archive_sprites_resolve_event_pictures() {
     );
     assert!(
         card.asset.as_ref().is_some_and(|asset| {
-            asset.sprite.as_deref() == Some("GFX_FROM_zip_eventPicture")
+            asset.sprite.as_deref() == Some("FROM_zip_eventPicture")
                 && asset.archive_member.as_deref() == Some("t.dds")
         }),
         "the picture asset resolves to the zip-defined sprite: {card:?}"
     );
 
-    // Sprite membership diagnostics see the same archive index: a zip-only
-    // alert banner resolves while a name absent from every tier is reported.
+    // With the picture field validating against the sprite universe, the
+    // zip-indexed definition keeps the authored reference clean…
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        !results
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("FROM_zip_eventPicture")),
+        "an event picture defined only inside a DLC zip must validate: {results:?}"
+    );
+    // …while a name absent from every tier is reported at the value.
+    let invalid_id = DocumentId::new("file:///tmp/events/from_zip2.txt");
+    host.open_document(
+        invalid_id.clone(),
+        1,
+        "country_event = { id = zip.2 title = t desc = d picture = missing_from_zip }\n".to_owned(),
+        Some(AbsPath::normalize(&root.join("events/from_zip2.txt"))),
+    )
+    .expect("open invalid event");
+    let results = diagnostics(&host.snapshot(), &invalid_id);
+    assert!(
+        results
+            .iter()
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue
+                && diagnostic.message.contains("missing_from_zip")),
+        "event pictures absent from every tier are reported: {results:?}"
+    );
+
+    // Sprite membership diagnostics see the same archive index on exact-match
+    // surfaces too: a `GFX_`-prefixed zip-only alert banner resolves while a
+    // name absent from every tier is reported.
     let alerts_id = DocumentId::new("file:///tmp/common/alerts.txt");
     host.open_document(
         alerts_id.clone(),
