@@ -230,6 +230,12 @@ fn eu4_replace_scope_links_populate_from_intrinsics() {
     let root = std::env::temp_dir().join(format!("ide-scope-intrinsics-{nonce}"));
     let directory = root.join("common/buildings");
     fs::create_dir_all(&directory).expect("building directory");
+    fs::create_dir_all(root.join("interface")).expect("interface directory");
+    fs::write(
+        root.join("interface/test.gfx"),
+        "spriteTypes = { spriteType = { name = \"GFX_test_building\" texturefile = \"t.dds\" } }\n",
+    )
+    .expect("building sprite");
     let rules = game::eu4::first_party_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -237,6 +243,8 @@ fn eu4_replace_scope_links_populate_from_intrinsics() {
         SourceRootKind::Project,
         AbsPath::normalize(&root),
     )]));
+    host.refresh_source_roots().expect("scan building sprite");
+
     let valid_id = DocumentId::new("file:///tmp/from-building.txt");
     host.open_document(
         valid_id.clone(),

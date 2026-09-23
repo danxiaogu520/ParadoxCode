@@ -1,11 +1,9 @@
 // case: sprite_bindings_derived_picture
 // input:
-//   golden_icon_mod = { picture = golden_missing_icon }
+//   golden_missing_building = { cost = 100 }
 //   
 diagnostics:
-- code=UnknownLocalisationKey severity=Warning certainty=certain range=0..15
-  message: unknown localisation key `desc_golden_icon_mod`
-- code=UnknownLocalisationKey severity=Warning certainty=certain range=0..15
-  message: unknown localisation key `golden_icon_mod`
-- code=InvalidValue severity=Error certainty=certain range=30..49
-  message: unknown sprite `golden_missing_icon`
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=0..23
+  message: unknown localisation key `building_golden_missing_building`
+- code=InvalidValue severity=Error certainty=certain range=0..23
+  message: unknown sprite `GFX_golden_missing_building`

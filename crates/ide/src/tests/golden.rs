@@ -565,24 +565,25 @@ fn golden_localisation_derived_keys() {
 
 #[test]
 fn golden_sprite_bindings_derived_picture() {
-    // The event-modifier `picture` field is any_scalar in the semantic rules;
-    // the required semantic icon binding associates its value with the
-    // modifier instance, so an unresolvable sprite name is reported against
-    // the field value.
-    let text = "golden_icon_mod = { picture = golden_missing_icon }\n";
+    // The building `GFX_$` template derives the sprite name from the
+    // instance's own name, so an unresolvable sprite (and the equally
+    // required `building_$` localisation key) is reported against the
+    // instance. Modifier `picture` fields deliberately carry no sprite
+    // binding: their values are texture stems, not sprite names.
+    let text = "golden_missing_building = { cost = 100 }\n";
     let root = temp_root("locicon");
-    std::fs::create_dir_all(root.join("common/event_modifiers")).expect("modifiers directory");
+    std::fs::create_dir_all(root.join("common/buildings")).expect("buildings directory");
     let mut host = first_party_host(&root);
-    let id = DocumentId::new("file:///tmp/common/event_modifiers/golden.txt");
+    let id = DocumentId::new("file:///tmp/common/buildings/golden.txt");
     host.open_document(
         id.clone(),
         1,
         text.to_owned(),
         Some(AbsPath::normalize(
-            &root.join("common/event_modifiers/golden.txt"),
+            &root.join("common/buildings/golden.txt"),
         )),
     )
-    .expect("open golden modifiers");
+    .expect("open golden buildings");
     assert_golden(
         "sprite_bindings_derived_picture",
         text,

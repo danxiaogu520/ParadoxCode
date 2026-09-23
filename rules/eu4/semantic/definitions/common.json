@@ -19036,7 +19036,9 @@
       "exact": "icon"
     },
     "operator": "=",
-    "value": "any_scalar",
+    "value": {
+      "type": "sprite"
+    },
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -27845,7 +27847,9 @@
       "exact": "alert_icon_gfx"
     },
     "operator": "=",
-    "value": "any_scalar",
+    "value": {
+      "type": "sprite"
+    },
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,

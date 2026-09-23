@@ -283,9 +283,39 @@ fn sprite_bindings_expand_template_and_semantic_fields() {
         "non-required icon bindings stay out of the diagnostics reference set"
     );
 
-    // event_modifier: the required semantic picture binding associates the
-    // field value with the instance and enters the lowered set.
+    // building: the required GFX_$ template enters the lowered reference
+    // set, so a missing building sprite is a diagnostic.
+    let path = LogicalPath::parse("common/buildings/test.txt").expect("logical path");
+    let hir = lower_with_profile(
+        parse(FileFormat::Script, "my_building = { cost = 1 }\n"),
+        &path,
+        &rules,
+        &profile(),
+    );
+    assert!(
+        hir.references().iter().any(|reference| {
+            reference.origin == HirReferenceOrigin::DerivedSprite
+                && reference.kind.as_ref() == "sprite"
+                && reference.name == "GFX_my_building"
+        }),
+        "the required GFX_$ template must reach the diagnostics reference set"
+    );
+
+    // A semantic sprite binding (one that names a source field) associates
+    // the field value with the instance and enters the lowered set. Vanilla
+    // keeps no binding of this shape, so the model is built here.
     let path = LogicalPath::parse("common/event_modifiers/test.txt").expect("logical path");
+    let mut model = rules.model().clone();
+    model.semantic.sprite_bindings.push(rules::SymbolBinding {
+        type_name: "event_modifier".to_owned(),
+        name: "picture".to_owned(),
+        key: None,
+        required: true,
+        subtype: None,
+        condition: None,
+        field: Some("picture".to_owned()),
+    });
+    let rules = RuleSet::from_model(model);
     let hir = lower_with_profile(
         parse(FileFormat::Script, "my_mod = { picture = my_mod_icon }\n"),
         &path,
@@ -309,12 +339,22 @@ fn typed_sprite_references_shadow_derived_sprite_duplicates() {
     // The dedup backstop: if the schema ever grows a typed sprite rule for a
     // field that also carries a semantic icon binding, the lowered set keeps
     // the typed reference and drops the derived duplicate so one fault
-    // reports once.
+    // reports once. Vanilla keeps no binding of this shape, so both sides
+    // are synthesized here.
     let path = LogicalPath::parse("common/event_modifiers/test.txt").expect("logical path");
     let mut model = first_party_rules()
         .expect("first-party rules")
         .model()
         .clone();
+    model.semantic.sprite_bindings.push(rules::SymbolBinding {
+        type_name: "event_modifier".to_owned(),
+        name: "picture".to_owned(),
+        key: None,
+        required: true,
+        subtype: None,
+        condition: None,
+        field: Some("picture".to_owned()),
+    });
     model.semantic.rules.push(SemanticRule {
         id: "test:event_modifier:picture".to_owned(),
         context: "root:event_modifier".to_owned(),

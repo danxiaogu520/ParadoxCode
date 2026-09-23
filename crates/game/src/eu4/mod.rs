@@ -608,6 +608,40 @@ mod tests {
     }
 
     #[test]
+    fn first_party_sprite_references_stay_declared() {
+        // Every vanilla building, age, and golden bull names its icon
+        // `GFX_<instance>`; the mechanic fields carry explicit sprite values.
+        // This guard keeps those declarations from silently disappearing.
+        let rules = first_party_rules().expect("embedded EU4 source");
+        for type_name in ["building", "game_age", "golden_bull"] {
+            assert!(
+                rules
+                    .model()
+                    .semantic
+                    .sprite_bindings
+                    .iter()
+                    .any(|binding| binding.type_name.eq_ignore_ascii_case(type_name)
+                        && binding.key.as_deref() == Some("GFX_$")
+                        && binding.required),
+                "{type_name} must keep its required GFX_$ sprite binding"
+            );
+        }
+        for field in ["icon", "alert_icon_gfx"] {
+            assert!(
+                rules
+                    .model()
+                    .semantic
+                    .rules
+                    .iter()
+                    .any(|rule| rule.context.eq_ignore_ascii_case("root:government_mechanic")
+                        && matches!(&rule.key, rules::KeyMatcher::Exact(key) if key.eq_ignore_ascii_case(field))
+                        && matches!(&rule.value, rules::ValueMatcher::Type(kind) if kind == "sprite")),
+                "government_mechanic `{field}` must stay typed as a sprite reference"
+            );
+        }
+    }
+
+    #[test]
     fn first_party_mission_bindings_stay_declared() {
         // The mission card and mission preview resolve their title key through
         // the `$_title` binding with no hardcoded fallback; this guard keeps
