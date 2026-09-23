@@ -41,7 +41,7 @@ ParadoxCode **与 Paradox Interactive 无任何关联，也未获得其背书**�
 
 ### VS Code
 
-从 [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=paradoxcode.paradoxcode-vscode) 安装 **ParadoxCode - EU4 Language Tools**（或在命令面板执行 `ext install paradoxcode.paradoxcode-vscode`）。然后：
+从 [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=paradoxcode.paradoxcode-vscode) 安装 **ParadoxCode**（或在命令面板执行 `ext install paradoxcode.paradoxcode-vscode`）。然后：
 
 1. 打开（或新建）一个工作区并**信任**它。
 2. 打开 EU4 Mod 中的文件，例如 `common/`、`events/`、`decisions/`、`missions/`、`history/`、`interface/`。

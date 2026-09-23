@@ -66,7 +66,7 @@ and Paradox Interactive are trademarks of their respective owners.
 
 ### VS Code
 
-Install **ParadoxCode - EU4 Language Tools** from the
+Install **ParadoxCode** from the
 [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=paradoxcode.paradoxcode-vscode)
 (or run `ext install paradoxcode.paradoxcode-vscode` in the Command Palette). Then:
 
