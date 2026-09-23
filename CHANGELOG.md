@@ -46,6 +46,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The `transcode` contract from `npm run test:contract` / `test:ci` (the remaining
   assets / extension / package / i18n contracts are unchanged).
 
+### Fixed
+
+- `AmbiguousDefinition` false positives from the decoded view's shadow copy. A decoded-view
+  tab takeover transiently opens the raw `file://` document and its `pdcloc://` twin over the
+  same backing path (and a window reload can restore both persistently); direct resolution
+  counted both twins' definitions, so every resolution-sensitive definition in the file
+  reported itself as shadowing its own twin. Overlay documents are now deduplicated by
+  backing path — the decoded `pdcloc://` twin is the effective text (it is the surface being
+  edited), same-scheme spelling twins fall back to id order, and the losers contribute no
+  definitions while their disk shards stay hidden through the path either way.
+
 ## [0.4.2] - 2026-09-23
 
 ### Added
