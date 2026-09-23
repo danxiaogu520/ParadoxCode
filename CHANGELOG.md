@@ -22,6 +22,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The extension's marketplace copy is retitled and rewritten: `displayName` is now just
+  "ParadoxCode" (dropping the "- EU4 Language Tools" suffix) and the description reads
+  "Complete support for EU4 modding, including diagnostics, completions, hover, go-to-
+  definition, previews, and transcoding." (zh-cn: "为 EU4 模组编写提供完整支持，包括诊
+  断、补全、悬停、跳转、预览和转码。"). The extension README rendered on the Marketplace is
+  rewritten around the complete-support positioning and gains a Simplified Chinese intro-and-
+  setup section; the root READMEs' install sections reference the plain name.
 - Workspace scan filter validation messages no longer hard-code the word "ignore"; the
   same bounded, normalized pattern machinery now also serves include globs
   (`vfs::GlobIncludePatterns`), matched case-insensitively against whole workspace-relative

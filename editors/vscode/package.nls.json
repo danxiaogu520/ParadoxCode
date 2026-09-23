@@ -1,6 +1,6 @@
 {
-  "extension.displayName": "ParadoxCode - EU4 Language Tools",
-  "extension.description": "Independent, unofficial EU4 language tooling backed by pdc, with a live mission-tree preview.",
+  "extension.displayName": "ParadoxCode",
+  "extension.description": "Complete support for EU4 modding, including diagnostics, completions, hover, go-to-definition, previews, and transcoding.",
   "views.loadedFiles.name": "ParadoxCode Loaded Files",
   "walkthrough.gettingStarted.title": "Start using ParadoxCode",
   "walkthrough.gettingStarted.description": "A guided setup for your first EU4 Mod. Marketplace users normally need no manual server configuration.",

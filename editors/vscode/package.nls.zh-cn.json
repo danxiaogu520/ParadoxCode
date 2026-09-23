@@ -1,6 +1,6 @@
 {
-  "extension.displayName": "ParadoxCode - EU4 语言工具",
-  "extension.description": "由 pdc 驱动的独立、非官方 EU4 语言工具，并提供实时任务树预览。",
+  "extension.displayName": "ParadoxCode",
+  "extension.description": "为 EU4 模组编写提供完整支持，包括诊断、补全、悬停、跳转、预览和转码。",
   "views.loadedFiles.name": "ParadoxCode 已加载文件",
   "walkthrough.gettingStarted.title": "开始使用 ParadoxCode",
   "walkthrough.gettingStarted.description": "通过分步引导完成第一个 EU4 模组的准备。通常从扩展市场安装后无需手动配置服务器。",
