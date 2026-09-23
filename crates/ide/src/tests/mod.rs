@@ -5,6 +5,7 @@ mod golden;
 mod hover;
 mod hover_improvements;
 mod inlay;
+mod localisation;
 mod navigation;
 mod rename;
 mod scope;

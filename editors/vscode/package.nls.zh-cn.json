@@ -58,7 +58,7 @@
   "configuration.vanilla.mode.cacheOnly.description": "使用现有缓存，但不自动发现或构建新缓存。",
   "configuration.vanilla.mode.disabled.description": "不为此工作区加载或构建原版符号。",
   "configuration.diagnostics.severityOverrides.description": "将诊断代码映射到实际严重级别；使用 off 可隐藏代码。",
-  "configuration.localisation.preferredLanguages.description": "本地化悬停和任务标题的语言顺序，例如 english、french、german。",
+  "configuration.localisation.preferredLanguages.description": "本地化语言偏好。第一项即目标语言：悬停预览、任务标题与本地化搜索只显示它的文本，原版缓存也只保留它（默认 english）。English 仍作为导航兜底；其余项将被忽略。",
   "configuration.completion.sourceLayers.description": "允许贡献补全成员的来源层；解析优先级仍保持固定。",
   "configuration.completion.iconPreview.description": "当补全建议的标签是一个图像名（任务 `icon`、事件 `picture`、`.gfx` 引用）时，在其文档中追加解码后的图像。图像优先从工作区模组解析，其次为定位到的游戏安装目录。",
   "configuration.performance.profile.description": "控制解析并发度的有界工作区扫描档位。",

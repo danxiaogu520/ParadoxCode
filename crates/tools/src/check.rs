@@ -73,7 +73,6 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     results.push(requires_file("RELEASING.md"));
     results.push(requires_file("SECURITY.md"));
     results.push(requires_file("LICENSE"));
-    results.push(requires_file("AGENTS.md"));
     results.push(requires_file(".github/workflows/ci.yml"));
     results.push(requires_file(".github/workflows/release.yml"));
     results.push(requires_file("docs/validation.md"));

@@ -14,8 +14,8 @@ use parser::{CstKind, CstNode, FileFormat};
 use text::{TextRange, TextSize};
 
 use crate::resolution::{
-    ResolutionDefinition, semantic_data_with_cancellation, symbol_candidates_for_hover,
-    text_range_within,
+    ResolutionDefinition, effective_localisation_candidate, localisation_language,
+    semantic_data_with_cancellation, symbol_candidates_for_hover, text_range_within,
 };
 use crate::support::{
     ParsedContent, ParsedInput, input_for_document, input_for_source_file,
@@ -189,10 +189,14 @@ pub struct LocalisationSearchResult {
 ///
 /// The search walks the persisted workspace index (Vanilla, dependency, and project files on
 /// disk); open-but-unsaved editor overlays are outside this view, mirroring the on-disk
-/// lifetime of a mod under development. Only definitions that currently win symbol resolution
-/// are retained, so one key yields one hit at its effective definition site. Key matching
-/// follows `key_match` (substring by default); value matching runs against the bounded decoded
-/// preview, case-insensitively.
+/// lifetime of a mod under development. One key yields one hit — the index marks
+/// every definition in the highest layer active, so keys defined once per
+/// language must be deduplicated here — sited at the target language's
+/// effective definition (English as the navigation fallback): keys defined
+/// only in other languages stay listed so they remain findable, but carry no
+/// value. Key matching follows `key_match` (substring by default); value
+/// matching runs against the bounded decoded preview, case-insensitively, so
+/// it only ever sees the target language.
 pub fn localisation_search_with_cancellation(
     snapshot: &AnalysisSnapshot,
     key: Option<&str>,
@@ -203,6 +207,7 @@ pub fn localisation_search_with_cancellation(
 ) -> Result<LocalisationSearchResult, Cancelled> {
     let value_query = value.map(str::to_ascii_lowercase);
     let mut hits = Vec::new();
+    let mut seen_keys = BTreeSet::new();
     let mut truncated = false;
     cancellation.checkpoint()?;
     for (index, definition) in snapshot.index().definitions_iter().enumerate() {
@@ -217,7 +222,18 @@ pub fn localisation_search_with_cancellation(
         {
             continue;
         }
-        let preview = snapshot.localisation_preview(definition.file_id, definition.range);
+        if !seen_keys.insert(definition.name.to_string()) {
+            continue;
+        }
+        let candidates =
+            symbol_candidates_for_hover(snapshot, "localisation", &definition.name, cancellation)?;
+        let Some(winner) = effective_localisation_candidate(&candidates) else {
+            continue;
+        };
+        let Some(file_id) = winner.location.file else {
+            continue;
+        };
+        let preview = snapshot.localisation_preview(file_id, winner.location.range);
         if let Some(query) = value_query.as_deref() {
             let Some(preview) = preview else {
                 continue;
@@ -230,12 +246,18 @@ pub fn localisation_search_with_cancellation(
             truncated = true;
             break;
         }
+        let language = preview
+            .and_then(|preview| preview.language.clone())
+            .or_else(|| {
+                localisation_language(winner.location.path.as_ref())
+                    .map(|language| format!("l_{language}"))
+            });
         hits.push(LocalisationSearchHit {
             key: definition.name.to_string(),
-            language: preview.and_then(|preview| preview.language.clone()),
+            language,
             value: preview.map(|preview| preview.value.clone()),
-            file_id: definition.file_id,
-            range: definition.range,
+            file_id,
+            range: winner.location.range,
         });
     }
     Ok(LocalisationSearchResult { hits, truncated })
@@ -339,11 +361,13 @@ pub(crate) fn localisation_preview(
     Some((language, value))
 }
 
-/// Finds every language a localisation key resolves to, one preview per
-/// language. Candidates arrive sorted by priority descending then read order
-/// ascending, so per language the effective value is the *latest* definition
-/// of the highest layer — the game's later-load override semantics. The hover
-/// renders the languages in parallel instead of a single first-found value.
+/// Finds the target-language preview of a localisation key. Candidates arrive
+/// sorted by priority descending then read order ascending, so per language
+/// the effective value is the *latest* definition of the highest layer — the
+/// game's later-load override semantics. Only the workspace preview language
+/// (the first configured preference, English by default) survives the final
+/// filter; previews whose language is unknown (no language header) pass
+/// through unchanged.
 pub(crate) fn localisation_previews_for_name(
     snapshot: &AnalysisSnapshot,
     name: &str,
@@ -379,23 +403,31 @@ pub(crate) fn localisation_previews_for_name(
             }
         }
     }
+    let target = snapshot.localisation_preview_language();
+    previews.retain(|(language, _)| preview_language_is_target(language.as_deref(), target));
     Ok(previews)
 }
 
+/// Whether a preview language in YAML-header form (`l_english`) names the
+/// workspace target language; previews with an unknown (`None`) language
+/// pass through.
+pub(crate) fn preview_language_is_target(language: Option<&str>, target: &str) -> bool {
+    language.is_none_or(|language| {
+        language
+            .strip_prefix("l_")
+            .unwrap_or(language)
+            .eq_ignore_ascii_case(target)
+    })
+}
+
 /// One rendered localisation preview line: the resolved text for one key
-/// candidate in one language.  The label names the binding field (or the
-/// explicit source field) that produced the key, when known.
+/// candidate in the target language.  The label names the binding field (or
+/// the explicit source field) that produced the key, when known.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct LocalisationPreviewRow {
     pub label: Option<String>,
-    pub language: Option<String>,
     pub value: String,
 }
-
-/// Maximum languages rendered per labelled field; further languages collapse
-/// into a count line so a vanilla key defined in every shipped language
-/// cannot flood the tooltip.
-const MAX_PREVIEW_LANGUAGES: usize = 4;
 
 /// Maximum labelled fields rendered; further fields collapse into a count
 /// line.  Binding rows per kind are few (≤5), so this mostly bounds
@@ -474,7 +506,7 @@ pub(crate) fn symbol_localisation_preview(
     references.dedup();
 
     let mut rows = Vec::new();
-    let mut seen = BTreeSet::<(Option<String>, String)>::new();
+    let mut seen = BTreeSet::<String>::new();
     for (name, range) in references {
         cancellation.checkpoint()?;
         let previews = localisation_previews_for_name(snapshot, &name, cancellation)?;
@@ -517,7 +549,7 @@ pub(crate) fn typed_name_localisation_previews(
         return Ok(Vec::new());
     }
     let mut rows = Vec::new();
-    let mut seen = BTreeSet::<(Option<String>, String)>::new();
+    let mut seen = BTreeSet::<String>::new();
     collect_generated_preview_rows(
         snapshot,
         kind,
@@ -566,7 +598,7 @@ fn collect_generated_preview_rows(
     symbol_name: &str,
     same_name: bool,
     rows: &mut Vec<LocalisationPreviewRow>,
-    seen: &mut BTreeSet<(Option<String>, String)>,
+    seen: &mut BTreeSet<String>,
     cancellation: &CancellationToken,
 ) -> Result<(), Cancelled> {
     if same_name {
@@ -593,35 +625,33 @@ fn collect_generated_preview_rows(
     Ok(())
 }
 
-/// Appends one row per `(language, value)` not already shown; empty values
-/// and repeats of an identical `(language, value)` pair are dropped.
+/// Appends one row per value not already shown; empty values and repeats of
+/// an identical value are dropped.
 fn push_preview_rows(
     rows: &mut Vec<LocalisationPreviewRow>,
-    seen: &mut BTreeSet<(Option<String>, String)>,
+    seen: &mut BTreeSet<String>,
     label: Option<String>,
     previews: &[(Option<String>, String)],
 ) {
-    for (language, value) in previews {
-        if value.is_empty() || !seen.insert((language.clone(), value.clone())) {
+    for (_, value) in previews {
+        if value.is_empty() || !seen.insert(value.clone()) {
             continue;
         }
         rows.push(LocalisationPreviewRow {
             label: label.clone(),
-            language: language.clone(),
             value: value.clone(),
         });
     }
 }
 
-/// Wraps per-language previews of one key as unlabelled rows.
+/// Wraps the previews of one key as unlabelled rows.
 pub(crate) fn unlabelled_preview_rows(
     previews: &[(Option<String>, String)],
 ) -> Vec<LocalisationPreviewRow> {
     previews
         .iter()
-        .map(|(language, value)| LocalisationPreviewRow {
+        .map(|(_, value)| LocalisationPreviewRow {
             label: None,
-            language: language.clone(),
             value: value.clone(),
         })
         .collect()
@@ -667,11 +697,13 @@ fn enclosing_field_label(input: &ParsedInput, range: TextRange) -> Option<String
         .map(|property| property.key.to_string())
 }
 
-/// Formats the localisation-preview section over labelled row groups: one
-/// line per language in parallel, capped per field, with trailing count
-/// lines for further languages and fields.
+/// Formats the localisation-preview section over labelled row groups as a
+/// markdown table, capped per field with a trailing count line for further
+/// fields.  Rows carry no language — the preview language is the
+/// workspace-configured target, so the table needs only the Field column
+/// (when any shown row carries a label) and the text.
 pub(crate) fn localisation_preview_section(rows: &[LocalisationPreviewRow]) -> String {
-    let mut lines = Vec::new();
+    let mut shown_rows = Vec::<&LocalisationPreviewRow>::new();
     let mut fields_shown = 0;
     let mut fields_hidden = 0usize;
     let mut start = 0;
@@ -689,31 +721,41 @@ pub(crate) fn localisation_preview_section(rows: &[LocalisationPreviewRow]) -> S
             continue;
         }
         fields_shown += 1;
-        let title = label.as_deref().unwrap_or("Localisation");
-        let shown = group.len().min(MAX_PREVIEW_LANGUAGES);
-        lines.extend(
-            group[..shown]
-                .iter()
-                .map(|row| {
-                    format!(
-                        "- {}{}: \"{}\"",
-                        title,
-                        row.language
-                            .as_deref()
-                            .map_or_else(String::new, |language| format!(" ({language})")),
-                        row.value
-                    )
-                })
-                .collect::<Vec<_>>(),
-        );
-        if group.len() > shown {
-            lines.push(format!("- … and {} more languages", group.len() - shown));
+        shown_rows.extend(group.iter());
+    }
+
+    let show_label = shown_rows.iter().any(|row| row.label.is_some());
+    let mut headers = Vec::new();
+    if show_label {
+        headers.push("Field");
+    }
+    headers.push("Text");
+    let mut lines = vec![
+        format!("| {} |", headers.join(" | ")),
+        format!("| {} |", vec!["---"; headers.len()].join(" | ")),
+    ];
+    lines.extend(shown_rows.iter().map(|row| {
+        let mut cells = Vec::new();
+        if show_label {
+            cells.push(escape_table_cell(
+                row.label.as_deref().unwrap_or("Localisation"),
+            ));
         }
-    }
+        cells.push(escape_table_cell(&row.value));
+        format!("| {} |", cells.join(" | "))
+    }));
+
+    let mut section = format!("#### Localisation preview\n\n{}", lines.join("\n"));
     if fields_hidden > 0 {
-        lines.push(format!("- … and {fields_hidden} more fields"));
+        section.push_str(&format!("\n\n… and {fields_hidden} more fields"));
     }
-    format!("#### Localisation preview\n\n{}", lines.join("\n"))
+    section
+}
+
+/// Escapes text for a markdown table cell: a pipe would end the cell early
+/// and a newline would split the row.
+fn escape_table_cell(text: &str) -> String {
+    text.replace(['\n', '\r'], " ").replace('|', "\\|")
 }
 
 fn localisation_references_for_hover(
