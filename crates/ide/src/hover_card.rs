@@ -15,7 +15,8 @@
 //! body never card, so logic hovers keep the plain semantic pipeline.
 
 use engine::{AnalysisSnapshot, DocumentId, SourceRootKind};
-use text::{LogicalPath, TextRange, TextSize};
+use rules::GameProfile;
+use text::{TextRange, TextSize};
 
 use crate::resolution::{
     DefinitionInfo, localisation_values_by_key, semantic_data_with_cancellation,
@@ -23,18 +24,6 @@ use crate::resolution::{
 };
 use crate::support::{ParsedInput, contains, input_for_document, input_for_source_file};
 use crate::types::{CancellationToken, Cancelled, Location};
-
-/// Sprite of the mission-node frame (`countrymissionsview.gfx`).
-const MISSION_FRAME_SPRITE: &str = "GFX_mission_icons_frame";
-
-/// Event-window chrome (`interface/eventwindow.gfx`): stacked background
-/// pieces sized for 1–2 / 3–4 / 5+ options, plus the option button strip.
-const EVENT_BG_TOP_SPRITE: &str = "GFX_event_bg_top";
-const EVENT_BG_MIDDLE_SPRITE: &str = "GFX_event_bg_middle";
-const EVENT_BG_BOTTOM_S_SPRITE: &str = "GFX_event_bg_bottom_S";
-const EVENT_BG_BOTTOM_M_SPRITE: &str = "GFX_event_bg_bottom_M";
-const EVENT_BG_BOTTOM_L_SPRITE: &str = "GFX_event_bg_bottom_L";
-const EVENT_OPTION_BUTTON_SPRITE: &str = "GFX_event_button_547";
 
 /// Interface-definition keys whose scalar values the engine loads as texture
 /// paths — the `texture_path`-typed rule values of the baked interface rules.
@@ -373,7 +362,16 @@ fn mission_card_for_mission(
         Some(name) => sprite_asset(snapshot, name, cancellation)?,
         None => None,
     };
-    let frame = sprite_asset(snapshot, MISSION_FRAME_SPRITE, cancellation)?;
+    // The frame sprite is card chrome: it comes from the profile's mission
+    // card declaration, not from this renderer.
+    let frame = match snapshot
+        .game_profile()
+        .hover_card("mission")
+        .and_then(|spec| spec.chrome.get("frame"))
+    {
+        Some(name) => sprite_asset(snapshot, name, cancellation)?,
+        None => None,
+    };
     if icon_asset.is_none() && frame.is_none() {
         // Nothing renders without at least a frame; a text-only hover is
         // already served by the semantic pipeline.
@@ -618,18 +616,96 @@ fn within(outer: TextRange, inner: TextRange) -> bool {
     outer.start() <= inner.start() && inner.end() <= outer.end()
 }
 
-/// True when `path` sits inside an `events/` directory, the EU4 event root.
-fn is_event_path(path: Option<&LogicalPath>) -> bool {
-    path.and_then(|path| path.as_str().split('/').next())
-        .is_some_and(|first| first.eq_ignore_ascii_case("events"))
+/// One cardable definition block: the profile symbol declaration that anchored
+/// the card, plus the block's range.
+struct CardAnchor<'a> {
+    /// Symbol kind of the anchored definition (`event`, `mission`, …).
+    kind: &'a str,
+    /// Nested scalar field supplying the definition name, when the profile
+    /// declares one (events name themselves through `id`; missions are their
+    /// own key).
+    name_field: Option<&'a str>,
+    /// Full range of the anchored top-level block.
+    block_range: TextRange,
 }
 
-/// The event card: a hovered `country_event`/`province_event` block-name
-/// token in an `events/` file renders that block as the in-game event window.
-/// Fields are read from the flat property list — block structure comes from
-/// each property's full range, key paths give nesting depth, and containment
-/// picks the children of this specific block among sibling events in the
-/// same file.
+/// Returns whether `path`/`key` declare a symbol kind a hover card exists for.
+fn cardable_definition<'a>(
+    profile: &'a GameProfile,
+    path: &str,
+    key: &str,
+) -> Option<(&'a str, Option<&'a str>)> {
+    let rule = profile.definition(path, key)?;
+    profile
+        .hover_card(&rule.kind)
+        .map(|_| (rule.kind.as_str(), rule.name_field.as_deref()))
+}
+
+/// Finds the cardable top-level block whose key token contains `position`.
+fn card_anchor_at(input: &ParsedInput, position: TextSize) -> Option<CardAnchor<'_>> {
+    let hir = input.hir.as_deref()?;
+    let path = input.path.as_ref()?;
+    let profile = input.profile.as_ref();
+    for property in hir
+        .properties()
+        .iter()
+        .filter(|property| property.top_level)
+    {
+        if !contains(property.key_range, position) {
+            continue;
+        }
+        let (kind, name_field) = cardable_definition(profile, path.as_str(), &property.key)?;
+        return Some(CardAnchor {
+            kind,
+            name_field,
+            block_range: property.range,
+        });
+    }
+    None
+}
+
+/// Finds the cardable top-level block a `selection` points into: the block
+/// whose name-field value contains the selection wins (definition selection),
+/// else the first block whose range contains it.
+fn card_anchor_for_selection(input: &ParsedInput, selection: TextSize) -> Option<CardAnchor<'_>> {
+    let hir = input.hir.as_deref()?;
+    let path = input.path.as_ref()?;
+    let profile = input.profile.as_ref();
+    let properties = hir.properties();
+    let mut by_range = None;
+    for property in properties.iter().filter(|property| property.top_level) {
+        let Some((kind, name_field)) = cardable_definition(profile, path.as_str(), &property.key)
+        else {
+            continue;
+        };
+        let name_value_range = name_field.and_then(|field| {
+            properties
+                .iter()
+                .find(|nested| {
+                    nested.path.len() == 2
+                        && within(property.range, nested.range)
+                        && nested.key.eq_ignore_ascii_case(field)
+                })
+                .and_then(|nested| nested.scalar.as_ref())
+                .map(|scalar| scalar.range)
+        });
+        let anchor = || CardAnchor {
+            kind,
+            name_field,
+            block_range: property.range,
+        };
+        if name_value_range.is_some_and(|range| contains(range, selection)) {
+            return Some(anchor());
+        }
+        if by_range.is_none() && contains(property.range, selection) {
+            by_range = Some(anchor());
+        }
+    }
+    by_range
+}
+
+/// The event-window card: a hovered cardable definition's block-name token
+/// (see [`card_anchor_at`]) renders that block as the in-game event window.
 fn event_card(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
@@ -641,97 +717,108 @@ fn event_card(
             .profile
             .game_id
             .eq_ignore_ascii_case(game::eu4::GAME_ID)
-        || !is_event_path(input.path.as_ref())
     {
         return Ok(None);
     }
     cancellation.checkpoint()?;
-    let Some(hir) = input.hir.as_deref() else {
+    let Some(anchor) = card_anchor_at(input, position) else {
         return Ok(None);
     };
-    let properties = hir.properties();
-    let Some(block) = properties.iter().find(|property| {
-        property.top_level
-            && (property.key.eq_ignore_ascii_case("country_event")
-                || property.key.eq_ignore_ascii_case("province_event"))
-            && contains(property.key_range, position)
-    }) else {
-        return Ok(None);
-    };
-    event_card_for_block(snapshot, input, block.range, cancellation)
+    event_card_for_anchor(snapshot, input, anchor, cancellation)
 }
 
-/// Renders the event card for a reference's target: the top-level event
-/// block whose `id` token is the definition selection, else the one
-/// containing it.
+/// Renders the event card for a reference's target: the cardable block the
+/// selection points into (see [`card_anchor_for_selection`]).
 fn event_card_for_reference(
     snapshot: &AnalysisSnapshot,
     target: &ParsedInput,
     selection: TextRange,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
-    let Some(hir) = target.hir.as_deref() else {
+    if target.format != parser::FileFormat::Script
+        || !target
+            .profile
+            .game_id
+            .eq_ignore_ascii_case(game::eu4::GAME_ID)
+    {
+        return Ok(None);
+    }
+    let Some(anchor) = card_anchor_for_selection(target, selection.start()) else {
         return Ok(None);
     };
-    let properties = hir.properties();
-    let mut by_range = None;
-    for property in properties.iter().filter(|property| {
-        property.top_level
-            && (property.key.eq_ignore_ascii_case("country_event")
-                || property.key.eq_ignore_ascii_case("province_event"))
-    }) {
-        let id = properties
-            .iter()
-            .find(|nested| {
-                nested.path.len() == 2
-                    && nested.key.eq_ignore_ascii_case("id")
-                    && within(property.range, nested.range)
-            })
-            .and_then(|nested| nested.scalar.as_ref());
-        if id.is_some_and(|scalar| contains(scalar.range, selection.start())) {
-            return event_card_for_block(snapshot, target, property.range, cancellation);
-        }
-        if by_range.is_none() && contains(property.range, selection.start()) {
-            by_range = Some(property.range);
-        }
-    }
-    match by_range {
-        Some(block_range) => event_card_for_block(snapshot, target, block_range, cancellation),
-        None => Ok(None),
-    }
+    event_card_for_anchor(snapshot, target, anchor, cancellation)
 }
 
-fn event_card_for_block(
+/// Renders one anchored definition as the event window. Field semantics are
+/// not hardcoded here: which fields carry localisation keys or sprite names
+/// is queried from the semantic rules of the card's declared context, and the
+/// fixed chrome plus any sprite-name probes come from the profile's card
+/// declaration. The renderer serves the `event` kind; other cardable kinds
+/// route to their own renderers.
+fn event_card_for_anchor(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
-    block_range: TextRange,
+    anchor: CardAnchor<'_>,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
+    if !anchor.kind.eq_ignore_ascii_case("event") {
+        return Ok(None);
+    }
+    let profile = input.profile.as_ref();
+    let Some(spec) = profile.hover_card(anchor.kind) else {
+        return Ok(None);
+    };
     let Some(hir) = input.hir.as_deref() else {
         return Ok(None);
     };
     let properties = hir.properties();
-    // Direct children of the event block: paths include each property's
+    // Direct children of the anchored block: paths include each property's
     // own key, so a child of the block has a two-element path.
     let child_scalar = |key: &str| -> Option<String> {
         properties
             .iter()
-            .filter(|property| property.path.len() == 2 && within(block_range, property.range))
+            .filter(|property| {
+                property.path.len() == 2 && within(anchor.block_range, property.range)
+            })
             .find(|property| property.key.eq_ignore_ascii_case(key))
             .and_then(|property| property.scalar.as_ref())
             .map(|scalar| scalar.value.clone())
     };
-    let Some(id) = child_scalar("id") else {
+    let Some(id) = anchor.name_field.and_then(child_scalar) else {
         return Ok(None);
+    };
+    // Only fields the rule set types as localisation keys are read as such:
+    // a field whose typing disappears from the rules stops resolving here the
+    // same moment validation stops checking it.
+    let field_semantics = spec
+        .context
+        .as_deref()
+        .map(|context| crate::semantic::construct_field_semantics(snapshot, context));
+    let localisation_value = |field: &str| -> Option<String> {
+        field_semantics
+            .as_ref()
+            .is_some_and(|semantics| {
+                semantics
+                    .localisation_fields
+                    .iter()
+                    .any(|typed| typed.eq_ignore_ascii_case(field))
+            })
+            .then(|| child_scalar(field))
+            .flatten()
     };
     // Title and description keys are read verbatim from the fields: the
     // engine looks up whatever scalar the event declares. The near-universal
     // `<id>.t`/`<id>.d` spellings live inside those values as modder
     // convention, so an absent field (or a conditional `desc` block without
     // a single scalar) yields no key rather than a fabricated one.
-    let title_key = child_scalar("title");
-    let desc_key = child_scalar("desc");
-    let picture = child_scalar("picture");
+    let title_key = localisation_value("title");
+    let desc_key = localisation_value("desc");
+    // Sprite-valued fields resolve the same way; the first typed field backs
+    // the window's picture slot.
+    let sprite_field = field_semantics
+        .as_ref()
+        .and_then(|semantics| semantics.sprite_fields.first());
+    let picture = sprite_field.and_then(|field| child_scalar(field));
     // Option blocks: `option`-keyed direct children of this block; each
     // one's `name` is the matching three-element-path property inside it.
     let mut options: Vec<(TextRange, Option<String>)> = properties
@@ -739,7 +826,7 @@ fn event_card_for_block(
         .filter(|property| {
             property.path.len() == 2
                 && property.key.eq_ignore_ascii_case("option")
-                && within(block_range, property.range)
+                && within(anchor.block_range, property.range)
         })
         .map(|property| {
             let name = properties
@@ -785,32 +872,47 @@ fn event_card_for_block(
             })
             .collect(),
     };
-    // Event pictures reference `eventpictures.gfx` sprites verbatim (no
-    // `GFX_` prefix); mods sometimes define them prefixed, so probe both.
     let picture_asset = match picture.as_deref() {
         Some(name) => sprite_asset(snapshot, name, cancellation)?,
         None => None,
     };
+    // When the exact spelling misses, the field's declared probe prefix is
+    // tried once (vanilla event pictures name their sprites bare; mods
+    // sometimes define them prefixed). A value already carrying the prefix is
+    // not probed again — every acceptance path would double-count it.
     let picture_asset = match picture_asset {
         Some(asset) => Some(asset),
-        None => match picture.as_deref() {
-            Some(name) if !name.to_ascii_uppercase().starts_with("GFX_") => {
-                sprite_asset(snapshot, &format!("GFX_{name}"), cancellation)?
+        None => match (
+            picture.as_deref(),
+            sprite_field.and_then(|field| spec.sprite_probes.get(field)),
+        ) {
+            (Some(name), Some(prefix))
+                if !name
+                    .to_ascii_uppercase()
+                    .starts_with(&prefix.to_ascii_uppercase()) =>
+            {
+                sprite_asset(snapshot, &format!("{prefix}{name}"), cancellation)?
             }
             _ => None,
         },
     };
-    let background_top = sprite_asset(snapshot, EVENT_BG_TOP_SPRITE, cancellation)?;
+    let chrome = |slot: &str| -> Result<Option<HoverCardAsset>, Cancelled> {
+        match spec.chrome.get(slot) {
+            Some(name) => sprite_asset(snapshot, name, cancellation),
+            None => Ok(None),
+        }
+    };
+    let background_top = chrome("background_top")?;
     if picture_asset.is_none() && background_top.is_none() {
         return Ok(None);
     }
     let event_assets = EventCardAssets {
         background_top,
-        background_middle: sprite_asset(snapshot, EVENT_BG_MIDDLE_SPRITE, cancellation)?,
-        background_bottom_s: sprite_asset(snapshot, EVENT_BG_BOTTOM_S_SPRITE, cancellation)?,
-        background_bottom_m: sprite_asset(snapshot, EVENT_BG_BOTTOM_M_SPRITE, cancellation)?,
-        background_bottom_l: sprite_asset(snapshot, EVENT_BG_BOTTOM_L_SPRITE, cancellation)?,
-        option_button: sprite_asset(snapshot, EVENT_OPTION_BUTTON_SPRITE, cancellation)?,
+        background_middle: chrome("background_middle")?,
+        background_bottom_s: chrome("background_bottom_s")?,
+        background_bottom_m: chrome("background_bottom_m")?,
+        background_bottom_l: chrome("background_bottom_l")?,
+        option_button: chrome("option_button")?,
     };
     Ok(Some(HoverCard {
         kind: "event",
