@@ -1738,7 +1738,7 @@ mod tests {
         assert_eq!(source_model.file_categories.len(), 124);
         assert_eq!(source_model.symbol_descriptors.len(), 2657);
         assert_eq!(source_model.records.len(), 12_962);
-        assert_eq!(source_model.semantic.rules.len(), 8_461);
+        assert_eq!(source_model.semantic.rules.len(), 8_464);
         assert_eq!(source_model.semantic.enum_values.len(), 63);
         assert_eq!(source_model.semantic.type_root_keys.len(), 7);
         assert_eq!(source_model.semantic.type_root_scopes.len(), 4);
@@ -1785,7 +1785,7 @@ mod tests {
         assert!(!startup.documentation.is_empty());
         assert_eq!(source_model.semantic.type_descriptors.len(), 156);
         // Declared bindings only; nothing is injected at compile time.
-        assert_eq!(source_model.semantic.localisation_bindings.len(), 187);
+        assert_eq!(source_model.semantic.localisation_bindings.len(), 188);
         assert_eq!(source_model.semantic.sprite_bindings.len(), 4);
         assert_eq!(source_model.profile.scan_roots.len(), 126);
         for (key, expected_scopes) in [

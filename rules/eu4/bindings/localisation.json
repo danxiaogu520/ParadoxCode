@@ -981,14 +981,14 @@
       "required": true
     }
   ],
-  "static_modifier": [
+  "states_general_faction": [
     {
       "name": "name",
       "key": "$",
       "required": true
     }
   ],
-  "states_general_faction": [
+  "static_modifier": [
     {
       "name": "name",
       "key": "$",
@@ -1088,6 +1088,13 @@
     {
       "name": "description",
       "key": "$DESC",
+      "required": true
+    }
+  ],
+  "trade_node": [
+    {
+      "name": "name",
+      "key": "$",
       "required": true
     }
   ],

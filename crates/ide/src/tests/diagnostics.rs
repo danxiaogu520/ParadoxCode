@@ -3054,6 +3054,74 @@ fn exported_modifier_keys_are_numeric_modifier_rules() {
 }
 
 #[test]
+fn alert_icon_sprites_validate_and_trade_nodes_carry_their_name_key() {
+    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let mut host = eu4_host(rules);
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::Project,
+        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
+    )]));
+
+    host.open_document(
+        DocumentId::new("file:///tmp/interface/alerts.gfx"),
+        1,
+        "spriteTypes = { spriteType = { name = \"GFX_alerticon_banner\" texturefile = \"a.dds\" } }\n".to_owned(),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/interface/alerts.gfx",
+        ))),
+    )
+    .expect("open alert sprites");
+
+    let alerts_id = DocumentId::new("file:///tmp/common/alerts.txt");
+    host.open_document(
+        alerts_id.clone(),
+        1,
+        "icon = {\n\tHIGH = \"GFX_alerticon_banner\"\n\tLOW = \"GFX_missing_alert_icon\"\n}\n"
+            .to_owned(),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/common/alerts.txt",
+        ))),
+    )
+    .expect("open alerts");
+    let results = diagnostics(&host.snapshot(), &alerts_id);
+    assert!(
+        results
+            .iter()
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue
+                && diagnostic.message.contains("GFX_missing_alert_icon")),
+        "the severity sprites must be validated: {results:?}"
+    );
+    assert!(
+        !results
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("GFX_alerticon_banner")),
+        "the vanilla alert banner sprite must resolve: {results:?}"
+    );
+
+    let nodes_id = DocumentId::new("file:///tmp/common/tradenodes/test.txt");
+    host.open_document(
+        nodes_id.clone(),
+        1,
+        "my_trade_node = { location = 1 inland = no }\n".to_owned(),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/common/tradenodes/test.txt",
+        ))),
+    )
+    .expect("open trade node");
+    let results = diagnostics(&host.snapshot(), &nodes_id);
+    assert!(
+        results.iter().any(
+            |diagnostic| diagnostic.code == DiagnosticCode::UnknownLocalisationKey
+                && diagnostic
+                    .message
+                    .contains("unknown localisation key `my_trade_node`")
+        ),
+        "trade node names are localisation keys: {results:?}"
+    );
+}
+
+#[test]
 fn vanilla_powerprojection_file_and_static_modifier_blocks_validate() {
     let rules = game::eu4::first_party_rules().expect("first-party rules");
     for (path, text, forbidden) in [
@@ -3503,6 +3571,16 @@ fn vanilla_leader_names_and_custom_idea_metadata_are_not_false_symbols() {
 #[test]
 fn common_alerts_and_units_display_use_path_specific_semantics() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+
+    host.open_document(
+        DocumentId::new("file:///tmp/interface/alerts.gfx"),
+        1,
+        "spriteTypes = { spriteType = { name = \"GFX_alerticon_banner\" texturefile = \"a.dds\" } }\n".to_owned(),
+        Some(AbsPath::normalize(&std::path::PathBuf::from(
+            "/tmp/interface/alerts.gfx",
+        ))),
+    )
+    .expect("open alert sprites");
 
     let alerts = DocumentId::new("file:///tmp/common/alerts.txt");
     host.open_document(

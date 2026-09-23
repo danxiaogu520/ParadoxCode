@@ -597,7 +597,7 @@ mod tests {
         assert_eq!(
             rules.model().semantic.localisation_bindings.len(),
             // Declared bindings only; nothing is injected at compile time.
-            187,
+            188,
             "embedded source must carry the complete first-party type localisation map"
         );
         assert_eq!(
