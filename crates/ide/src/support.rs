@@ -511,13 +511,23 @@ pub(crate) fn same_location(left: &Location, right: &Location) -> bool {
 }
 
 /// Caps a hover text at 240 characters so pathological content cannot produce an unbounded
-/// tooltip. Consumed by hover documentation lines and localisation previews alike.
+/// tooltip. Consumed by hover documentation lines.
 pub(crate) fn truncate_hover_text(value: &str) -> String {
-    const MAX_CHARS: usize = 240;
+    truncate_text(value, 240)
+}
+
+/// Same bounding for localisation previews, which carry full event and description texts;
+/// 1000 characters covers the longest vanilla entries while still guarding hovers against
+/// pathological content.
+pub(crate) fn truncate_localisation_preview(value: &str) -> String {
+    truncate_text(value, 1000)
+}
+
+fn truncate_text(value: &str, max_chars: usize) -> String {
     let mut truncated = String::new();
     let mut overflow = false;
     for (index, character) in value.chars().enumerate() {
-        if index == MAX_CHARS {
+        if index == max_chars {
             overflow = true;
             break;
         }
