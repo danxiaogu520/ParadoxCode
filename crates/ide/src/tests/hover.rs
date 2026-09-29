@@ -1740,3 +1740,128 @@ fn texturefile_value_hover_reports_resolution_provenance() {
 
     std::fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn event_field_semantics_come_from_the_baked_rules() {
+    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let host = eu4_host(rules);
+    let snapshot = host.snapshot();
+    let semantics = crate::semantic::construct_field_semantics(&snapshot, "root:event");
+    assert!(
+        semantics
+            .localisation_fields
+            .iter()
+            .any(|field| field.eq_ignore_ascii_case("title"))
+            && semantics
+                .localisation_fields
+                .iter()
+                .any(|field| field.eq_ignore_ascii_case("desc")),
+        "title and desc stay typed as localisation keys: {:?}",
+        semantics.localisation_fields
+    );
+    assert!(
+        semantics
+            .sprite_fields
+            .iter()
+            .any(|field| field.eq_ignore_ascii_case("picture")),
+        "picture stays typed as a sprite name: {:?}",
+        semantics.sprite_fields
+    );
+}
+
+#[test]
+fn event_card_reads_fields_probe_and_chrome_from_declarations() {
+    let root = temp_root("hover-card-declarations");
+    std::fs::create_dir_all(root.join("interface")).expect("interface dir");
+    std::fs::create_dir_all(root.join("events")).expect("events dir");
+    std::fs::create_dir_all(root.join("gfx")).expect("gfx dir");
+    std::fs::write(
+        root.join("interface/test.gfx"),
+        "spriteTypes = {\n\
+         \tspriteType = {\n\
+         \t\tname = \"GFX_custom_bg\"\n\
+         \t\ttexturefile = \"gfx/t.dds\"\n\
+         \t}\n\
+         \tspriteType = {\n\
+         \t\tname = \"MOD_custom_banner\"\n\
+         \t\ttexturefile = \"gfx/t.dds\"\n\
+         \t}\n\
+         }",
+    )
+    .expect("write sprites");
+    std::fs::write(root.join("gfx/t.dds"), b"").expect("write texture");
+    let event_text = "country_event = { id = card.1 label = card_label banner = custom_banner }\n";
+    std::fs::write(root.join("events/custom.txt"), event_text).expect("write event");
+
+    // A rule set whose `root:custom_ctx` types `banner` as a sprite and
+    // `label` as a localisation key, plus a card declaration whose context,
+    // probe prefix, and chrome sprite are all invented for this test: nothing
+    // about the card may come from the renderer's knowledge of vanilla events.
+    let mut model = game::eu4::first_party_rules()
+        .expect("first-party rules")
+        .model()
+        .clone();
+    model.semantic.rules.push(SemanticRule {
+        value: ValueMatcher::Type("sprite".to_owned()),
+        ..semantic_rule("root:custom_ctx", "banner")
+    });
+    model.semantic.rules.push(SemanticRule {
+        value: ValueMatcher::Localisation,
+        ..semantic_rule("root:custom_ctx", "label")
+    });
+    let mut profile = game::eu4::profile();
+    profile.hover_cards.insert(
+        "event".to_owned(),
+        rules::ProfileHoverCardSpec {
+            context: Some("root:custom_ctx".to_owned()),
+            chrome: std::iter::once(("background_top".to_owned(), "GFX_custom_bg".to_owned()))
+                .collect(),
+            sprite_probes: std::iter::once(("banner".to_owned(), "MOD_".to_owned())).collect(),
+        },
+    );
+    let mut host = AnalysisHost::with_profile(RuleSet::from_model(model), profile);
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::Vanilla,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().expect("scan fixture");
+
+    let id = DocumentId::new("file:///tmp/events/custom.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        event_text.to_owned(),
+        Some(AbsPath::normalize(&root.join("events/custom.txt"))),
+    )
+    .expect("open event");
+    let card = crate::hover_card::hover_card_with_cancellation(
+        &host.snapshot(),
+        &id,
+        u32::try_from("count".len()).expect("offset"),
+        &CancellationToken::new(),
+    )
+    .expect("hover card")
+    .expect("the declared card renders");
+    let event = card.event.as_ref().expect("event payload");
+    // The sprite slot follows the rule-typed field (`banner`), resolved
+    // through the declared probe prefix; `title`/`desc` carry nothing because
+    // the custom context does not type them.
+    assert_eq!(event.picture.as_deref(), Some("custom_banner"));
+    assert_eq!(event.title_key, None);
+    assert_eq!(event.desc_key, None);
+    assert!(
+        card.asset
+            .as_ref()
+            .is_some_and(|asset| asset.sprite.as_deref() == Some("MOD_custom_banner")),
+        "the picture asset resolves through the declared probe: {card:?}"
+    );
+    assert!(
+        card.event_assets
+            .as_ref()
+            .and_then(|assets| assets.background_top.as_ref())
+            .is_some_and(|asset| asset.sprite.as_deref() == Some("GFX_custom_bg")),
+        "chrome follows the declared sprite: {card:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}

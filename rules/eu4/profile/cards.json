@@ -1,0 +1,23 @@
+{
+  "hover_cards": {
+    "event": {
+      "context": "root:event",
+      "chrome": {
+        "background_top": "GFX_event_bg_top",
+        "background_middle": "GFX_event_bg_middle",
+        "background_bottom_s": "GFX_event_bg_bottom_S",
+        "background_bottom_m": "GFX_event_bg_bottom_M",
+        "background_bottom_l": "GFX_event_bg_bottom_L",
+        "option_button": "GFX_event_button_547"
+      },
+      "sprite_probes": {
+        "picture": "GFX_"
+      }
+    },
+    "mission": {
+      "chrome": {
+        "frame": "GFX_mission_icons_frame"
+      }
+    }
+  }
+}

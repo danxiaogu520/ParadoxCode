@@ -496,6 +496,18 @@ fn validate_source_model(
             profile.game_id, manifest.game_id
         )));
     }
+    // A hover card's declared context drives the runtime field-semantics
+    // query; a context no rule carries would silently disable the card's data
+    // acquisition, so it must fail the bake instead.
+    for (kind, spec) in &profile.hover_cards {
+        if let Some(context) = spec.context.as_deref()
+            && !semantic.rules.iter().any(|rule| rule.context == context)
+        {
+            return Err(CompileError::Validation(format!(
+                "hover card `{kind}` declares unknown rule context `{context}`"
+            )));
+        }
+    }
     let model = RulesModel {
         game_id: manifest.game_id.clone(),
         file_categories: catalog.file_categories,
