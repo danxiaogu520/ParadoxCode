@@ -1,0 +1,59 @@
+[
+  {
+    "id": "common/00_small_types_consolidated:244:leaf-value:root:region_colors:int[0..255]",
+    "context": "root:region_colors",
+    "parent_path": [
+      "color"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 255
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 2,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 3,
+    "strict_min": true,
+    "max_occurs": 3,
+    "source_file": "semantic-rules.json",
+    "line": 103
+  },
+  {
+    "id": "common/00_small_types_consolidated:245:rule:root:region_colors:color",
+    "context": "root:region_colors",
+    "parent_path": [],
+    "key": {
+      "exact": "color"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 104
+  }
+]

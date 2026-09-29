@@ -1,0 +1,185 @@
+[
+  {
+    "id": "common/00_small_types_consolidated:164:rule:root:naval_doctrine:can_select",
+    "context": "root:naval_doctrine",
+    "parent_path": [],
+    "key": {
+      "exact": "can_select"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "country"
+      ],
+      [
+        "this",
+        "country"
+      ],
+      [
+        "from",
+        "country"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 53
+  },
+  {
+    "id": "common/00_small_types_consolidated:166:rule:root:naval_doctrine:country_modifier",
+    "context": "root:naval_doctrine",
+    "parent_path": [],
+    "key": {
+      "exact": "country_modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 54
+  },
+  {
+    "id": "common/00_small_types_consolidated:168:rule:root:naval_doctrine:effect",
+    "context": "root:naval_doctrine",
+    "parent_path": [],
+    "key": {
+      "exact": "effect"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 55
+  },
+  {
+    "id": "common/00_small_types_consolidated:170:rule:root:naval_doctrine:removed_effect",
+    "context": "root:naval_doctrine",
+    "parent_path": [],
+    "key": {
+      "exact": "removed_effect"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 56
+  },
+  {
+    "id": "common/00_small_types_consolidated:171:rule:root:naval_doctrine:cost",
+    "context": "root:naval_doctrine",
+    "parent_path": [],
+    "key": {
+      "exact": "cost"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "money cost per each sailor employed in the whole navy"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 57
+  },
+  {
+    "id": "common/00_small_types_consolidated:172:rule:root:naval_doctrine:button_gfx",
+    "context": "root:naval_doctrine",
+    "parent_path": [],
+    "key": {
+      "exact": "button_gfx"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 58
+  }
+]

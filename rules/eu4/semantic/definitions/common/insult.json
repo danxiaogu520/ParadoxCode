@@ -1,0 +1,43 @@
+[
+  {
+    "id": "common/00_small_types_consolidated:131:rule:root:insult:trigger",
+    "context": "root:insult",
+    "parent_path": [],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "country"
+      ],
+      [
+        "this",
+        "country"
+      ],
+      [
+        "from",
+        "country"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 33
+  }
+]

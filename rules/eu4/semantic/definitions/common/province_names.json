@@ -1,0 +1,80 @@
+[
+  {
+    "id": "common/00_small_types_consolidated:247:rule:root:province_names:<province_id>",
+    "context": "root:province_names",
+    "parent_path": [],
+    "key": {
+      "type": "province_id"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 105
+  },
+  {
+    "id": "common/00_small_types_consolidated:248:leaf-value:root:province_names:scalar",
+    "context": "root:province_names",
+    "parent_path": [
+      "<province_id>"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": "any_scalar",
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 2,
+    "source_file": "semantic-rules.json",
+    "line": 106
+  },
+  {
+    "id": "common/00_small_types_consolidated:249:rule:root:province_names:<province_id>",
+    "context": "root:province_names",
+    "parent_path": [],
+    "key": {
+      "type": "province_id"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 107
+  }
+]

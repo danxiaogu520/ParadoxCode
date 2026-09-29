@@ -1,0 +1,255 @@
+[
+  {
+    "id": "common/00_small_types_consolidated:189:rule:root:professionalism_modifier:hidden",
+    "context": "root:professionalism_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "hidden"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 66
+  },
+  {
+    "id": "common/00_small_types_consolidated:190:rule:root:professionalism_modifier:army_professionalism",
+    "context": "root:professionalism_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "army_professionalism"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": "0",
+        "max": "1"
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 67
+  },
+  {
+    "id": "common/00_small_types_consolidated:191:rule:root:professionalism_modifier:marker_sprite",
+    "context": "root:professionalism_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "marker_sprite"
+    },
+    "operator": "=",
+    "value": {
+      "type": "sprite"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 68
+  },
+  {
+    "id": "common/00_small_types_consolidated:192:rule:root:professionalism_modifier:unit_sprite_start",
+    "context": "root:professionalism_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "unit_sprite_start"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 69
+  },
+  {
+    "id": "common/00_small_types_consolidated:194:rule:root:professionalism_modifier:trigger",
+    "context": "root:professionalism_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 70
+  },
+  {
+    "id": "common/00_small_types_consolidated:196:rule:root:professionalism_modifier:may_build_supply_depot",
+    "context": "root:professionalism_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "may_build_supply_depot"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 71
+  },
+  {
+    "id": "common/00_small_types_consolidated:197:rule:root:professionalism_modifier:may_refill_garrison",
+    "context": "root:professionalism_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "may_refill_garrison"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 72
+  },
+  {
+    "id": "common/00_small_types_consolidated:198:rule:root:professionalism_modifier:may_return_manpower_on_disband",
+    "context": "root:professionalism_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "may_return_manpower_on_disband"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 73
+  },
+  {
+    "id": "common/00_small_types_consolidated:199:rule:root:professionalism_modifier:reserves_organisation",
+    "context": "root:professionalism_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "reserves_organisation"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 74
+  }
+]

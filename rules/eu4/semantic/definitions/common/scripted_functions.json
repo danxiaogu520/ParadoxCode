@@ -1,0 +1,146 @@
+[
+  {
+    "id": "common/scripted_functions:10:rule:root:scripted_function:effect",
+    "context": "root:scripted_function",
+    "parent_path": [],
+    "key": {
+      "exact": "effect"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2929
+  },
+  {
+    "id": "common/scripted_functions:3:rule:root:scripted_function:tooltip",
+    "context": "root:scripted_function",
+    "parent_path": [
+      "condition"
+    ],
+    "key": {
+      "exact": "tooltip"
+    },
+    "operator": "=",
+    "value": "localisation",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2930
+  },
+  {
+    "id": "common/scripted_functions:5:rule:root:scripted_function:potential",
+    "context": "root:scripted_function",
+    "parent_path": [
+      "condition"
+    ],
+    "key": {
+      "exact": "potential"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "If triggered it will prevent the action from being performed."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2931
+  },
+  {
+    "id": "common/scripted_functions:7:rule:root:scripted_function:allow",
+    "context": "root:scripted_function",
+    "parent_path": [
+      "condition"
+    ],
+    "key": {
+      "exact": "allow"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "If triggered then action can be performed, even if potential is triggered."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2932
+  },
+  {
+    "id": "common/scripted_functions:8:rule:root:scripted_function:condition",
+    "context": "root:scripted_function",
+    "parent_path": [],
+    "key": {
+      "exact": "condition"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block containing a tooltip, potential, and an allow section."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 2933
+  }
+]

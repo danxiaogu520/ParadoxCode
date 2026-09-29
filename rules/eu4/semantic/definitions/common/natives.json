@@ -1,0 +1,200 @@
+[
+  {
+    "id": "common/00_small_types_consolidated:133:rule:root:natives:graphical_culture",
+    "context": "root:natives",
+    "parent_path": [],
+    "key": {
+      "exact": "graphical_culture"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "graphical_cultures"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 34
+  },
+  {
+    "id": "common/00_small_types_consolidated:134:leaf-value:root:natives:int[0..255]",
+    "context": "root:natives",
+    "parent_path": [
+      "color"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 255
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 2,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 3,
+    "strict_min": true,
+    "max_occurs": 3,
+    "source_file": "semantic-rules.json",
+    "line": 35
+  },
+  {
+    "id": "common/00_small_types_consolidated:135:rule:root:natives:color",
+    "context": "root:natives",
+    "parent_path": [],
+    "key": {
+      "exact": "color"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 36
+  },
+  {
+    "id": "common/00_small_types_consolidated:136:rule:root:natives:icon",
+    "context": "root:natives",
+    "parent_path": [],
+    "key": {
+      "exact": "icon"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 37
+  },
+  {
+    "id": "common/00_small_types_consolidated:137:rule:root:natives:unit",
+    "context": "root:natives",
+    "parent_path": [],
+    "key": {
+      "exact": "unit"
+    },
+    "operator": "=",
+    "value": {
+      "type": "unit_type"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 38
+  },
+  {
+    "id": "common/00_small_types_consolidated:138:leaf-value:root:natives:<province_id>",
+    "context": "root:natives",
+    "parent_path": [
+      "provinces"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 39
+  },
+  {
+    "id": "common/00_small_types_consolidated:139:rule:root:natives:provinces",
+    "context": "root:natives",
+    "parent_path": [],
+    "key": {
+      "exact": "provinces"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 40
+  }
+]

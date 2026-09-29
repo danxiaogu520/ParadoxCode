@@ -1,0 +1,226 @@
+[
+  {
+    "id": "common/diplomatic_actions:10:rule:root:diplomatic_action:pre_effect",
+    "context": "root:diplomatic_action",
+    "parent_path": [],
+    "key": {
+      "exact": "pre_effect"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "do this before the peace is enforced, or there is no war enemy country"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "country"
+      ],
+      [
+        "root",
+        "country"
+      ],
+      [
+        "from",
+        "country"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 445
+  },
+  {
+    "id": "common/diplomatic_actions:12:rule:root:diplomatic_action:effect",
+    "context": "root:diplomatic_action",
+    "parent_path": [],
+    "key": {
+      "exact": "effect"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "country"
+      ],
+      [
+        "root",
+        "country"
+      ],
+      [
+        "from",
+        "country"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 446
+  },
+  {
+    "id": "common/diplomatic_actions:3:rule:root:diplomatic_action:tooltip",
+    "context": "root:diplomatic_action",
+    "parent_path": [
+      "condition"
+    ],
+    "key": {
+      "exact": "tooltip"
+    },
+    "operator": "=",
+    "value": "localisation",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 447
+  },
+  {
+    "id": "common/diplomatic_actions:5:rule:root:diplomatic_action:potential",
+    "context": "root:diplomatic_action",
+    "parent_path": [
+      "condition"
+    ],
+    "key": {
+      "exact": "potential"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Determines if the trigger is applicable or not. ROOT = actor, FROM = target"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "country"
+      ],
+      [
+        "root",
+        "country"
+      ],
+      [
+        "from",
+        "country"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 448
+  },
+  {
+    "id": "common/diplomatic_actions:7:rule:root:diplomatic_action:allow",
+    "context": "root:diplomatic_action",
+    "parent_path": [
+      "condition"
+    ],
+    "key": {
+      "exact": "allow"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Determines if the action is valid or not. ROOT = actor, FROM = target"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "country"
+      ],
+      [
+        "root",
+        "country"
+      ],
+      [
+        "from",
+        "country"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 449
+  },
+  {
+    "id": "common/diplomatic_actions:8:rule:root:diplomatic_action:condition",
+    "context": "root:diplomatic_action",
+    "parent_path": [],
+    "key": {
+      "exact": "condition"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "A diplomatic action can have any number of condition blocks, each with its own tooltip, potential and allow section."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 450
+  }
+]

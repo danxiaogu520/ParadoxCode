@@ -1,0 +1,1388 @@
+[
+  {
+    "id": "common/countries_consolidated:20:leaf-value:root:country_color_file:int[0..255]",
+    "context": "root:country_color_file",
+    "parent_path": [
+      "enum[country_tags]",
+      "color1"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 255
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 2,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 3,
+    "strict_min": true,
+    "max_occurs": 3,
+    "source_file": "semantic-rules.json",
+    "line": 341
+  },
+  {
+    "id": "common/countries_consolidated:21:rule:root:country_color_file:color1",
+    "context": "root:country_color_file",
+    "parent_path": [
+      "enum[country_tags]"
+    ],
+    "key": {
+      "exact": "color1"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "60% of character"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 342
+  },
+  {
+    "id": "common/countries_consolidated:22:leaf-value:root:country_color_file:int[0..255]",
+    "context": "root:country_color_file",
+    "parent_path": [
+      "enum[country_tags]",
+      "color2"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 255
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 2,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 3,
+    "strict_min": true,
+    "max_occurs": 3,
+    "source_file": "semantic-rules.json",
+    "line": 343
+  },
+  {
+    "id": "common/countries_consolidated:23:rule:root:country_color_file:color2",
+    "context": "root:country_color_file",
+    "parent_path": [
+      "enum[country_tags]"
+    ],
+    "key": {
+      "exact": "color2"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "30% of character"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 344
+  },
+  {
+    "id": "common/countries_consolidated:24:leaf-value:root:country_color_file:int[0..255]",
+    "context": "root:country_color_file",
+    "parent_path": [
+      "enum[country_tags]",
+      "color3"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 255
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 2,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 3,
+    "strict_min": true,
+    "max_occurs": 3,
+    "source_file": "semantic-rules.json",
+    "line": 345
+  },
+  {
+    "id": "common/countries_consolidated:25:rule:root:country_color_file:color3",
+    "context": "root:country_color_file",
+    "parent_path": [
+      "enum[country_tags]"
+    ],
+    "key": {
+      "exact": "color3"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Up to 10% -> try map color here"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 346
+  },
+  {
+    "id": "common/countries_consolidated:26:rule:root:country_color_file:enum[country_tags]",
+    "context": "root:country_color_file",
+    "parent_path": [],
+    "key": {
+      "enum": "country_tags"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 347
+  },
+  {
+    "id": "common/countries_consolidated:28:rule:root:country_file:graphical_culture",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "graphical_culture"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "graphical_cultures"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 348
+  },
+  {
+    "id": "common/countries_consolidated:29:rule:root:country_file:cannot_form_from_collapse_nation",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "cannot_form_from_collapse_nation"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 349
+  },
+  {
+    "id": "common/countries_consolidated:30:rule:root:country_file:preferred_religion",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "preferred_religion"
+    },
+    "operator": "=",
+    "value": {
+      "type": "religion"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 350
+  },
+  {
+    "id": "common/countries_consolidated:31:rule:root:country_file:historical_score",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "historical_score"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 351
+  },
+  {
+    "id": "common/countries_consolidated:32:rule:root:country_file:random_nation_chance",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "random_nation_chance"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 100
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 352
+  },
+  {
+    "id": "common/countries_consolidated:33:rule:root:country_file:colonial_parent",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "colonial_parent"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 353
+  },
+  {
+    "id": "common/countries_consolidated:34:rule:root:country_file:right_to_bear_arms",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "right_to_bear_arms"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Jan Mayen tag: Excludes them from random countries, makes sure they only can be spawned once"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 354
+  },
+  {
+    "id": "common/countries_consolidated:35:rule:root:country_file:historical_council",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "historical_council"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "council_positions"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 355
+  },
+  {
+    "id": "common/countries_consolidated:36:rule:root:country_file:special_unit_culture",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "special_unit_culture"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "south_east_asian_special"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 356
+  },
+  {
+    "id": "common/countries_consolidated:37:rule:root:country_file:all_your_core_are_belong_to_us",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "all_your_core_are_belong_to_us"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Synthetics tag: Excludes them from random countries, makes sure they only can be spawned once"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 357
+  },
+  {
+    "id": "common/countries_consolidated:38:leaf-value:root:country_file:int[0..255]",
+    "context": "root:country_file",
+    "parent_path": [
+      "color"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": 0,
+        "max": null
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 3,
+    "strict_min": true,
+    "max_occurs": 3,
+    "source_file": "semantic-rules.json",
+    "line": 358
+  },
+  {
+    "id": "common/countries_consolidated:39:rule:root:country_file:color",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "color"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 359
+  },
+  {
+    "id": "common/countries_consolidated:40:leaf-value:root:country_file:int[0..16]",
+    "context": "root:country_file",
+    "parent_path": [
+      "revolutionary_colors"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 16
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 3,
+    "strict_min": true,
+    "max_occurs": 3,
+    "source_file": "semantic-rules.json",
+    "line": 360
+  },
+  {
+    "id": "common/countries_consolidated:41:rule:root:country_file:revolutionary_colors",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "revolutionary_colors"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 361
+  },
+  {
+    "id": "common/countries_consolidated:42:leaf-value:root:country_file:<idea_group.selectable>",
+    "context": "root:country_file",
+    "parent_path": [
+      "historical_idea_groups"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "idea_group.selectable"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 8,
+    "strict_min": true,
+    "max_occurs": 8,
+    "source_file": "semantic-rules.json",
+    "line": 362
+  },
+  {
+    "id": "common/countries_consolidated:43:rule:root:country_file:historical_idea_groups",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "historical_idea_groups"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 2,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 363
+  },
+  {
+    "id": "common/countries_consolidated:44:leaf-value:root:country_file:<unit_type>",
+    "context": "root:country_file",
+    "parent_path": [
+      "historical_units"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "unit_type"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 364
+  },
+  {
+    "id": "common/countries_consolidated:45:rule:root:country_file:historical_units",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "historical_units"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 2,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 365
+  },
+  {
+    "id": "common/countries_consolidated:46:rule:root:country_file:scalar",
+    "context": "root:country_file",
+    "parent_path": [
+      "monarch_names"
+    ],
+    "key": "any_scalar",
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 366
+  },
+  {
+    "id": "common/countries_consolidated:47:rule:root:country_file:monarch_names",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "monarch_names"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 367
+  },
+  {
+    "id": "common/countries_consolidated:48:leaf-value:root:country_file:localisation_synced",
+    "context": "root:country_file",
+    "parent_path": [
+      "leader_names"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": "any_scalar",
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 368
+  },
+  {
+    "id": "common/countries_consolidated:49:rule:root:country_file:leader_names",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "leader_names"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 369
+  },
+  {
+    "id": "common/countries_consolidated:50:leaf-value:root:country_file:scalar",
+    "context": "root:country_file",
+    "parent_path": [
+      "ship_names"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": "any_scalar",
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 370
+  },
+  {
+    "id": "common/countries_consolidated:51:rule:root:country_file:ship_names",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "ship_names"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 2,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 371
+  },
+  {
+    "id": "common/countries_consolidated:52:leaf-value:root:country_file:scalar",
+    "context": "root:country_file",
+    "parent_path": [
+      "army_names"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": "any_scalar",
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 372
+  },
+  {
+    "id": "common/countries_consolidated:53:rule:root:country_file:army_names",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "army_names"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 373
+  },
+  {
+    "id": "common/countries_consolidated:54:leaf-value:root:country_file:scalar",
+    "context": "root:country_file",
+    "parent_path": [
+      "fleet_names"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": "any_scalar",
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 374
+  },
+  {
+    "id": "common/countries_consolidated:55:rule:root:country_file:fleet_names",
+    "context": "root:country_file",
+    "parent_path": [],
+    "key": {
+      "exact": "fleet_names"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 375
+  },
+  {
+    "id": "common/countries_consolidated:57:rule:root:custom_country_colors:num_symbols",
+    "context": "root:custom_country_colors",
+    "parent_path": [],
+    "key": {
+      "exact": "num_symbols"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 376
+  },
+  {
+    "id": "common/countries_consolidated:58:leaf-value:root:custom_country_colors:int[0..255]",
+    "context": "root:custom_country_colors",
+    "parent_path": [
+      "color"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": 0,
+        "max": null
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 3,
+    "strict_min": true,
+    "max_occurs": 3,
+    "source_file": "semantic-rules.json",
+    "line": 377
+  },
+  {
+    "id": "common/countries_consolidated:59:rule:root:custom_country_colors:color",
+    "context": "root:custom_country_colors",
+    "parent_path": [],
+    "key": {
+      "exact": "color"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 378
+  },
+  {
+    "id": "common/countries_consolidated:60:leaf-value:root:custom_country_colors:int[0..255]",
+    "context": "root:custom_country_colors",
+    "parent_path": [
+      "flag_color"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": 0,
+        "max": null
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 3,
+    "strict_min": true,
+    "max_occurs": 3,
+    "source_file": "semantic-rules.json",
+    "line": 379
+  },
+  {
+    "id": "common/countries_consolidated:61:rule:root:custom_country_colors:flag_color",
+    "context": "root:custom_country_colors",
+    "parent_path": [],
+    "key": {
+      "exact": "flag_color"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 380
+  },
+  {
+    "id": "common/countries_consolidated:62:rule:root:custom_country_colors:file",
+    "context": "root:custom_country_colors",
+    "parent_path": [
+      "textures",
+      "texture"
+    ],
+    "key": {
+      "exact": "file"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 381
+  },
+  {
+    "id": "common/countries_consolidated:63:rule:root:custom_country_colors:x",
+    "context": "root:custom_country_colors",
+    "parent_path": [
+      "textures",
+      "texture",
+      "size"
+    ],
+    "key": {
+      "exact": "x"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 382
+  },
+  {
+    "id": "common/countries_consolidated:64:rule:root:custom_country_colors:y",
+    "context": "root:custom_country_colors",
+    "parent_path": [
+      "textures",
+      "texture",
+      "size"
+    ],
+    "key": {
+      "exact": "y"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 383
+  },
+  {
+    "id": "common/countries_consolidated:65:rule:root:custom_country_colors:size",
+    "context": "root:custom_country_colors",
+    "parent_path": [
+      "textures",
+      "texture"
+    ],
+    "key": {
+      "exact": "size"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 384
+  },
+  {
+    "id": "common/countries_consolidated:66:rule:root:custom_country_colors:noOfFrames",
+    "context": "root:custom_country_colors",
+    "parent_path": [
+      "textures",
+      "texture"
+    ],
+    "key": {
+      "exact": "noOfFrames"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 385
+  },
+  {
+    "id": "common/countries_consolidated:67:rule:root:custom_country_colors:color",
+    "context": "root:custom_country_colors",
+    "parent_path": [
+      "textures",
+      "texture"
+    ],
+    "key": {
+      "exact": "color"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 386
+  },
+  {
+    "id": "common/countries_consolidated:68:rule:root:custom_country_colors:texture",
+    "context": "root:custom_country_colors",
+    "parent_path": [
+      "textures"
+    ],
+    "key": {
+      "exact": "texture"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 387
+  },
+  {
+    "id": "common/countries_consolidated:69:rule:root:custom_country_colors:textures",
+    "context": "root:custom_country_colors",
+    "parent_path": [],
+    "key": {
+      "exact": "textures"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "WHEN ADDING NEW, ALWAYS ADD AT THE END"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 388
+  }
+]

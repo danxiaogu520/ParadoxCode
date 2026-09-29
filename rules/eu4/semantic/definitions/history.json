@@ -1,5 +1,311 @@
 [
   {
+    "id": "history/history_consolidated:34:rule:root:advisor_id:advisor_id",
+    "context": "root:advisor_id",
+    "parent_path": [],
+    "key": {
+      "exact": "advisor_id"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5301
+  },
+  {
+    "id": "history/history_consolidated:35:rule:root:advisor_id:name",
+    "context": "root:advisor_id",
+    "parent_path": [],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5302
+  },
+  {
+    "id": "history/history_consolidated:36:rule:root:advisor_id:location",
+    "context": "root:advisor_id",
+    "parent_path": [],
+    "key": {
+      "exact": "location"
+    },
+    "operator": "=",
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5303
+  },
+  {
+    "id": "history/history_consolidated:37:rule:root:advisor_id:discount",
+    "context": "root:advisor_id",
+    "parent_path": [],
+    "key": {
+      "exact": "discount"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5304
+  },
+  {
+    "id": "history/history_consolidated:38:rule:root:advisor_id:skill",
+    "context": "root:advisor_id",
+    "parent_path": [],
+    "key": {
+      "exact": "skill"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 1,
+        "max": 3
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5305
+  },
+  {
+    "id": "history/history_consolidated:39:rule:root:advisor_id:type",
+    "context": "root:advisor_id",
+    "parent_path": [],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "type": "advisor_type"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5306
+  },
+  {
+    "id": "history/history_consolidated:40:rule:root:advisor_id:culture",
+    "context": "root:advisor_id",
+    "parent_path": [],
+    "key": {
+      "exact": "culture"
+    },
+    "operator": "=",
+    "value": {
+      "type": "culture"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5307
+  },
+  {
+    "id": "history/history_consolidated:41:rule:root:advisor_id:religion",
+    "context": "root:advisor_id",
+    "parent_path": [],
+    "key": {
+      "exact": "religion"
+    },
+    "operator": "=",
+    "value": {
+      "type": "religion"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5308
+  },
+  {
+    "id": "history/history_consolidated:42:rule:root:advisor_id:date",
+    "context": "root:advisor_id",
+    "parent_path": [],
+    "key": {
+      "exact": "date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5309
+  },
+  {
+    "id": "history/history_consolidated:43:rule:root:advisor_id:death_date",
+    "context": "root:advisor_id",
+    "parent_path": [],
+    "key": {
+      "exact": "death_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5310
+  },
+  {
+    "id": "history/history_consolidated:44:rule:root:advisor_id:female",
+    "context": "root:advisor_id",
+    "parent_path": [],
+    "key": {
+      "exact": "female"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5311
+  },
+  {
     "id": "history/history_consolidated:100:rule:root:province_history:latent_trade_goods",
     "context": "root:province_history",
     "parent_path": [],
