@@ -1729,7 +1729,7 @@ pub(crate) struct ConstructFieldSemantics {
 /// Collects the field semantics of `context`'s direct leaf fields.
 ///
 /// A field qualifies through any rule that types it; lenient sibling rules
-/// (vanilla's `any_scalar` catch-alls) never untype a field, matching the
+/// (vanilla's `any_scalar` catch-all rules) never untype a field, matching the
 /// diagnostics side's strictest-voice ownership.
 pub(crate) fn construct_field_semantics(
     snapshot: &AnalysisSnapshot,
