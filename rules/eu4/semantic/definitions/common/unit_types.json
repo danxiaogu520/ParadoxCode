@@ -1,0 +1,618 @@
+[
+  {
+    "id": "common/unit_types:13:rule:root:unit_type:type",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "unit_types"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3488
+  },
+  {
+    "id": "common/unit_types:14:rule:root:unit_type:unit_type",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "unit_type"
+    },
+    "operator": "=",
+    "value": {
+      "type": "technology_group"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3489
+  },
+  {
+    "id": "common/unit_types:15:rule:root:unit_type:maneuver",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "maneuver"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3490
+  },
+  {
+    "id": "common/unit_types:16:rule:root:unit_type:offensive_morale",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "offensive_morale"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3491
+  },
+  {
+    "id": "common/unit_types:17:rule:root:unit_type:defensive_morale",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "defensive_morale"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3492
+  },
+  {
+    "id": "common/unit_types:18:rule:root:unit_type:offensive_fire",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "offensive_fire"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3493
+  },
+  {
+    "id": "common/unit_types:19:rule:root:unit_type:defensive_fire",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "defensive_fire"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3494
+  },
+  {
+    "id": "common/unit_types:20:rule:root:unit_type:offensive_shock",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "offensive_shock"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3495
+  },
+  {
+    "id": "common/unit_types:21:rule:root:unit_type:defensive_shock",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "defensive_shock"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3496
+  },
+  {
+    "id": "common/unit_types:22:rule:root:unit_type:manpower",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "manpower"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Changes the manpower cost to recruit, 1 is 1000 manpower"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3497
+  },
+  {
+    "id": "common/unit_types:24:rule:root:unit_type:hull_size",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "hull_size"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3498
+  },
+  {
+    "id": "common/unit_types:25:rule:root:unit_type:base_cannons",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "base_cannons"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3499
+  },
+  {
+    "id": "common/unit_types:26:rule:root:unit_type:sail_speed",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "sail_speed"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3500
+  },
+  {
+    "id": "common/unit_types:27:rule:root:unit_type:sprite_level",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "sprite_level"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3501
+  },
+  {
+    "id": "common/unit_types:28:rule:root:unit_type:trade_power",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "trade_power"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3502
+  },
+  {
+    "id": "common/unit_types:29:rule:root:unit_type:blockade",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "blockade"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3503
+  },
+  {
+    "id": "common/unit_types:30:rule:root:unit_type:sailors",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "sailors"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3504
+  },
+  {
+    "id": "common/unit_types:33:rule:root:unit_type:trigger",
+    "context": "root:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "country"
+      ],
+      [
+        "root",
+        "country"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3505
+  },
+  {
+    "id": "common/unit_types:7:rule:type:unit_type:type",
+    "context": "type:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "land_unit_types"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3506
+  },
+  {
+    "id": "common/unit_types:9:rule:type:unit_type:type",
+    "context": "type:unit_type",
+    "parent_path": [],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "naval_unit_types"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3507
+  }
+]

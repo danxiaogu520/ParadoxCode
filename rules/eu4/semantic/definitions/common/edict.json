@@ -1,0 +1,389 @@
+[
+  {
+    "id": "common/00_small_types_consolidated:202:rule:root:edict:potential",
+    "context": "root:edict",
+    "parent_path": [],
+    "key": {
+      "exact": "potential"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "country"
+      ],
+      [
+        "this",
+        "country"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 75
+  },
+  {
+    "id": "common/00_small_types_consolidated:204:rule:root:edict:allow",
+    "context": "root:edict",
+    "parent_path": [],
+    "key": {
+      "exact": "allow"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "country"
+      ],
+      [
+        "this",
+        "country"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 76
+  },
+  {
+    "id": "common/00_small_types_consolidated:206:rule:root:edict:modifier",
+    "context": "root:edict",
+    "parent_path": [],
+    "key": {
+      "exact": "modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 77
+  },
+  {
+    "id": "common/00_small_types_consolidated:207:leaf-value:root:edict:int[0..255",
+    "context": "root:edict",
+    "parent_path": [
+      "color"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 255
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 2,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 3,
+    "strict_min": true,
+    "max_occurs": 3,
+    "source_file": "semantic-rules.json",
+    "line": 78
+  },
+  {
+    "id": "common/00_small_types_consolidated:208:rule:root:edict:color",
+    "context": "root:edict",
+    "parent_path": [],
+    "key": {
+      "exact": "color"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 79
+  },
+  {
+    "id": "common/00_small_types_consolidated:209:rule:root:edict:factor",
+    "context": "root:edict",
+    "parent_path": [
+      "ai_will_do"
+    ],
+    "key": {
+      "exact": "factor"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 80
+  },
+  {
+    "id": "common/00_small_types_consolidated:211:rule:root:edict:ai_will_do",
+    "context": "root:edict",
+    "parent_path": [],
+    "key": {
+      "exact": "ai_will_do"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier_rule",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 81
+  },
+  {
+    "id": "common/00_small_types_consolidated:213:rule:root:edict:notify_trigger",
+    "context": "root:edict",
+    "parent_path": [],
+    "key": {
+      "exact": "notify_trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "If true an alert will appear, ROOT is the country, FROM are the provinces owned by ROOT in the area"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "country"
+      ],
+      [
+        "this",
+        "country"
+      ],
+      [
+        "from",
+        "province"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 82
+  },
+  {
+    "id": "common/00_small_types_consolidated:215:rule:root:edict:on_state_edict_enacted",
+    "context": "root:edict",
+    "parent_path": [],
+    "key": {
+      "exact": "on_state_edict_enacted"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "triggers an effect when the state edict is added"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ],
+      [
+        "from",
+        "country"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 83
+  },
+  {
+    "id": "common/00_small_types_consolidated:217:rule:root:edict:on_state_edict_revoked",
+    "context": "root:edict",
+    "parent_path": [],
+    "key": {
+      "exact": "on_state_edict_revoked"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "triggers an effect when the state edict is revoked"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ],
+      [
+        "from",
+        "country"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 84
+  },
+  {
+    "id": "common/00_small_types_consolidated:218:rule:root:edict:years_to_notify",
+    "context": "root:edict",
+    "parent_path": [],
+    "key": {
+      "exact": "years_to_notify"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "How many years the edict needs to be active to show an alert"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 85
+  }
+]

@@ -1,0 +1,343 @@
+[
+  {
+    "id": "common/opinion_modifiers:10:rule:root:opinion_modifier:max",
+    "context": "root:opinion_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "max"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2549
+  },
+  {
+    "id": "common/opinion_modifiers:12:rule:root:opinion_modifier:min",
+    "context": "root:opinion_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "min"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2550
+  },
+  {
+    "id": "common/opinion_modifiers:14:rule:root:opinion_modifier:yearly_decay",
+    "context": "root:opinion_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "yearly_decay"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2551
+  },
+  {
+    "id": "common/opinion_modifiers:15:rule:root:opinion_modifier:years",
+    "context": "root:opinion_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "years"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2552
+  },
+  {
+    "id": "common/opinion_modifiers:16:rule:root:opinion_modifier:max",
+    "context": "root:opinion_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "max"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2553
+  },
+  {
+    "id": "common/opinion_modifiers:17:rule:root:opinion_modifier:months",
+    "context": "root:opinion_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "months"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2554
+  },
+  {
+    "id": "common/opinion_modifiers:18:rule:root:opinion_modifier:max_vassal",
+    "context": "root:opinion_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "max_vassal"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2555
+  },
+  {
+    "id": "common/opinion_modifiers:19:rule:root:opinion_modifier:max_in_other_direction",
+    "context": "root:opinion_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "max_in_other_direction"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2556
+  },
+  {
+    "id": "common/opinion_modifiers:3:rule:type:opinion_modifier:opinion",
+    "context": "type:opinion_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "opinion"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": -9999,
+        "max": -1
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2557
+  },
+  {
+    "id": "common/opinion_modifiers:5:rule:type:opinion_modifier:opinion",
+    "context": "type:opinion_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "opinion"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 9999
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2558
+  },
+  {
+    "id": "common/opinion_modifiers:9:rule:root:opinion_modifier:opinion",
+    "context": "root:opinion_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "opinion"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2559
+  }
+]
