@@ -15,17 +15,24 @@
 // The codec itself lives in the language server: classification, decode, and
 // encode travel over the `pdc/transcodeDecode` / `pdc/transcodeEncode`
 // requests (byte payloads as hex), so this file owns only the provider
-// plumbing, the client-side eligibility gates (pure path checks needed by
-// menus and auto-open decisions), the save gate's error presentation, and
-// file persistence. A missing server fails closed — eligible files are never
+// plumbing, the client-side eligibility gates (path checks for menus, plus a
+// charset prescreen for auto-open decisions — never a codec decision, the
+// server always confirms), the save gate's error presentation, and file
+// persistence. A missing server fails closed — eligible files are never
 // written without the encode guard.
 //
-// Entry is path-based: every eligible file (localisation yml or the
-// configured script globs) opens through its pdcloc:// twin, whatever its
-// bytes look like. Plain readable files pass through unchanged (a save
-// encodes their quoted CJK), damaged files pass through with an error, and
-// only the server-side classifier decides which decode applies — never the
-// caller.
+// Entry is path-scoped but content-gated: an eligible file (localisation yml
+// or the configured script globs) opens through its pdcloc:// twin only when
+// it actually participates in transcoding — an escaped or damaged form, or a
+// plain form whose quoted CJK a save would encode. Transcode fixed points (no
+// escape markers, no quoted CJK) stay on their `file://` URI untouched, so
+// VS Code search, diff, git, and timeline keep working on them; a fixed point
+// that later grows text a save would rewrite is promoted to its twin at that
+// moment (debounced), closing the typed-CJK gap without hijacking files that
+// have nothing to transcode. Plain readable files pass through unchanged (a
+// save encodes their quoted CJK), damaged files pass through with an error,
+// and only the server-side classifier decides which decode applies — never
+// the caller.
 //
 // Iron rule ② (never encode twice / decode twice) is enforced by the
 // server-side encoder — a save is refused outright when a string already
@@ -124,6 +131,8 @@ function lineAt(bytes: Uint8Array, offset: number): number {
 
 const TRANSCODE_AVAILABILITY_WAIT_MS = 30_000;
 const TRANSCODE_REQUEST_TIMEOUT_MS = 120_000;
+/** Pause after the last edit before a watched buffer is judged for promotion. */
+const TRANSCODE_PROMOTION_DEBOUNCE_MS = 700;
 
 /** How a buffer relates to the scoped form, mirroring the server's classifier. */
 type ScopedForm = 'plain' | 'whole' | 'scoped' | 'damaged';
@@ -191,19 +200,28 @@ async function sendTranscodeRequest<T>(method: string, params: object): Promise<
     }
 }
 
-/** Classifies and decodes one file server-side. Never throws for content. */
-async function transcodeDecode(real: vscode.Uri): Promise<DecodedView | 'invalid-utf8'> {
+/**
+ * Classifies and decodes one file server-side. Never throws for content.
+ * Pass `buffer` to classify an unsaved editor buffer instead of the on-disk
+ * bytes; the path still decides the transcoding profile.
+ */
+async function transcodeDecode(
+    real: vscode.Uri,
+    buffer?: Uint8Array,
+): Promise<DecodedView | 'invalid-utf8' | 'ineligible'> {
     const response = await sendTranscodeRequest<TranscodeDecodeResponse>(
         'pdc/transcodeDecode',
-        { path: real.fsPath },
+        buffer === undefined
+            ? { path: real.fsPath }
+            : { path: real.fsPath, bytes: bytesToHex(buffer) },
     );
     if (response?.error === 'invalid-utf8') {
         return 'invalid-utf8';
     }
     if (response?.eligible !== true || typeof response.bytes !== 'string') {
-        throw new TranscodeUnavailableError(
-            `unexpected pdc/transcodeDecode response for ${real.fsPath}`,
-        );
+        // The server disagrees with the client-side path scope (or answered
+        // garbage): there is nothing the twin could show or transform.
+        return 'ineligible';
     }
     return {
         form: response.form ?? 'plain',
@@ -251,6 +269,120 @@ async function transcodeEncode(real: vscode.Uri, bytes: Uint8Array): Promise<Enc
     throw new TranscodeUnavailableError(
         `unexpected pdc/transcodeEncode response for ${real.fsPath}`,
     );
+}
+
+// ---------------------------------------------------------------------------
+// Auto-open content gate
+// ---------------------------------------------------------------------------
+
+/**
+ * Conservative client-side prescreen mirroring the only signal characters the
+ * server classifier reads: escape markers (U+0010..=U+0013) and raw CJK-range
+ * code points. A buffer with neither is a transcode fixed point — the server
+ * can only answer `plain` without quoted CJK for it — so the (large) majority
+ * of ASCII files never costs a server round-trip. This never makes a codec
+ * decision: anything carrying a signal is still classified server-side.
+ */
+function hasTranscodeSignal(text: string): boolean {
+    for (const character of text) {
+        const codePoint = character.codePointAt(0) ?? 0;
+        if ((codePoint >= 0x10 && codePoint <= 0x13) || isRawCjkCodePoint(codePoint)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/** Mirror of the server's `transcode::is_raw_cjk` — keep the ranges in sync. */
+function isRawCjkCodePoint(codePoint: number): boolean {
+    return (
+        (codePoint >= 0x2e80 && codePoint <= 0x9fff) // CJK radicals, kana, unified ideographs, Yi
+        || (codePoint >= 0xac00 && codePoint <= 0xd7af) // Hangul syllables
+        || (codePoint >= 0xf900 && codePoint <= 0xfaff) // CJK compatibility ideographs
+        || (codePoint >= 0xff00 && codePoint <= 0xffef) // fullwidth forms
+        || (codePoint >= 0x20000 && codePoint <= 0x2fa1f) // supplementary planes B-F + compat supplement
+        || (codePoint >= 0x30000 && codePoint <= 0x3134f) // plane G+
+    );
+}
+
+/**
+ * Whether the transparent view would do work for this classification: the
+ * decoded form differs from the raw bytes, or a save through the twin would
+ * rewrite them. Only such files may take over a `file://` tab; transcode
+ * fixed points (`plain` without quoted CJK) stay on their real URI so VS Code
+ * search, diff, git, and timeline keep working on them.
+ */
+function needsDecodedView(view: DecodedView): boolean {
+    return (
+        view.form === 'whole'
+        || view.form === 'scoped'
+        || view.form === 'damaged'
+        || (view.form === 'plain' && view.quotedCjk)
+    );
+}
+
+/**
+ * Whether `buffer` is exactly the state the auto-promotion may act on: a
+ * plain form whose quoted CJK a save would encode. Unlike `needsDecodedView`
+ * this is safe for a mid-edit buffer — the raw save a promotion performs is
+ * byte-preserving here, so nothing is rewritten behind the user's back.
+ */
+function needsSaveTimeEncoding(view: DecodedView): boolean {
+    return view.form === 'plain' && view.quotedCjk;
+}
+
+/** How aggressively eligible files are moved onto their decoded twin. */
+type AutoOpenMode = 'needsTranscode' | 'always' | 'off';
+
+function autoOpenMode(): AutoOpenMode {
+    const configured = vscode.workspace
+        .getConfiguration('paradoxcode.localisation')
+        .get<string>('autoOpen', 'needsTranscode');
+    return configured === 'always' || configured === 'off' ? configured : 'needsTranscode';
+}
+
+/**
+ * Whether `uri` is currently rendered inside a diff editor (git changes,
+ * "Compare with…", `vscode.diff`). The decoded twin must never yank a tab out
+ * from under a diff: `takeoverShow` cannot replace a diff tab (it only tracks
+ * plain text tabs), so redirecting there pops duplicate tabs and re-fires on
+ * every focus change. Diff viewers get the raw `file://` form; the
+ * auto-redirect resumes once the diff closes.
+ */
+function isShownInDiff(uri: vscode.Uri): boolean {
+    const target = uri.toString();
+    for (const group of vscode.window.tabGroups.all) {
+        for (const tab of group.tabs) {
+            if (
+                tab.input instanceof vscode.TabInputTextDiff
+                && (tab.input.original.toString() === target || tab.input.modified.toString() === target)
+            ) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Real URIs currently passing through untouched (transcode fixed points).
+ * Their content is watched so a buffer that grows text a save would encode is
+ * promoted to its twin before a raw save can bypass the encode guard.
+ */
+const watchedPassThrough = new Set<string>();
+
+/** Debounce timers per watched URI (promotion is evaluated after typing settles). */
+const promotionTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** Drops a URI from the pass-through watch, cancelling any pending promotion. */
+function stopWatching(real: vscode.Uri | string): void {
+    const key = typeof real === 'string' ? real : real.toString();
+    watchedPassThrough.delete(key);
+    const timer = promotionTimers.get(key);
+    if (timer !== undefined) {
+        clearTimeout(timer);
+        promotionTimers.delete(key);
+    }
 }
 
 class PdclocFileSystemProvider implements vscode.FileSystemProvider {
@@ -307,7 +439,7 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
     async readFile(uri: vscode.Uri): Promise<Uint8Array> {
         const real = this.requireReal(uri);
         this.requireProfile(real);
-        let view: DecodedView | 'invalid-utf8';
+        let view: DecodedView | 'invalid-utf8' | 'ineligible';
         try {
             view = await transcodeDecode(real);
         } catch (error) {
@@ -319,6 +451,14 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
         if (view === 'invalid-utf8') {
             throw vscode.FileSystemError.Unavailable(
                 vscode.l10n.t('an escaped localisation file must be valid UTF-8 — the bytes are damaged'),
+            );
+        }
+        if (view === 'ineligible') {
+            throw vscode.FileSystemError.Unavailable(
+                vscode.l10n.t(
+                    'this file is not eligible for the transparent localisation view '
+                    + '(localisation yml or the configured script globs)',
+                ),
             );
         }
         this.publishReadDiagnostics(uri, real, view);
@@ -563,6 +703,31 @@ function restoreLine(editor: vscode.TextEditor | undefined, line: number | undef
     editor.revealRange(editor.document.lineAt(clamped).range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
 }
 
+/**
+ * Restores a full selection after a raw→decoded flip, keeping search-result
+ * jumps and other programmatic opens on the row and column they targeted —
+ * VS Code's built-in search indexes `file://` bytes only, so a jump always
+ * lands on the raw file first and the flip must carry the cursor over. Lines
+ * map one-to-one between the two forms (escape triples never contain newline
+ * bytes); columns clamp where a collapsed triple shortened the line, since
+ * raw and decoded columns diverge inside escaped spans.
+ */
+function restoreSelection(editor: vscode.TextEditor, selection: vscode.Selection): void {
+    const clamp = (position: vscode.Position): vscode.Position => {
+        const line = Math.min(Math.max(position.line, 0), editor.document.lineCount - 1);
+        return new vscode.Position(
+            line,
+            Math.min(position.character, editor.document.lineAt(line).text.length),
+        );
+    };
+    const restored = new vscode.Selection(clamp(selection.anchor), clamp(selection.active));
+    editor.selection = restored;
+    editor.revealRange(
+        new vscode.Range(restored.active, restored.active),
+        vscode.TextEditorRevealType.InCenterIfOutsideViewport,
+    );
+}
+
 async function openDecodedView(uri: vscode.Uri | undefined): Promise<void> {
     const real = commandResource(uri);
     if (!real || real.scheme !== 'file') {
@@ -580,11 +745,21 @@ async function openDecodedView(uri: vscode.Uri | undefined): Promise<void> {
         );
         return;
     }
-    // Eligibility is the only gate: readFile dispatches on the actual form —
-    // plain files pass through byte-identical, escaped and scoped files
-    // decode, damaged files show as-is with an error.
-    await takeoverShow(real, decodedUriOf(real));
+    // Eligibility is the only gate for this explicit command: readFile
+    // dispatches on the actual form — plain files pass through byte-identical,
+    // escaped and scoped files decode, damaged files show as-is with an error.
+    // Carry the cursor over: a search jump lands on the raw file first (with
+    // its match selection), and the flip to the twin must not strand the user
+    // at the top of the file instead of their target.
+    const active = vscode.window.activeTextEditor;
+    const selection =
+        active?.document.uri.toString() === real.toString() ? active.selection : undefined;
+    stopWatching(real);
+    const editor = await takeoverShow(real, decodedUriOf(real));
     supersedePeek(real);
+    if (selection) {
+        restoreSelection(editor, selection);
+    }
 }
 
 /** Pins the raw on-disk form: flips the decoded tab in place and keeps the raw view immune to the auto-redirect. */
@@ -596,6 +771,7 @@ async function revealOriginal(): Promise<void> {
     }
     const line = currentLine(active);
     manualRawViews.add(real.toString());
+    stopWatching(real);
     const editor = await takeoverShow(active.document.uri, real);
     restoreLine(editor, line);
 }
@@ -642,6 +818,7 @@ async function peekOriginal(): Promise<void> {
     }
     const line = currentLine(active);
     manualRawViews.add(real.toString());
+    stopWatching(real);
     const editor = await takeoverShow(decoded, real);
     restoreLine(editor, line);
     peek = { real, decoded, column: editor.viewColumn };
@@ -754,11 +931,20 @@ async function encodeFileManually(
     if (!real) {
         return;
     }
-    let view: DecodedView | 'invalid-utf8';
+    let view: DecodedView | 'invalid-utf8' | 'ineligible';
     try {
         view = await transcodeDecode(real);
     } catch (error) {
         reportManualTranscodeFailure('encode', real, log, error);
+        return;
+    }
+    if (view === 'ineligible') {
+        void vscode.window.showErrorMessage(
+            vscode.l10n.t(
+                'this file is not eligible for the transparent localisation view '
+                + '(localisation yml or the configured script globs)',
+            ),
+        );
         return;
     }
     if (view === 'invalid-utf8') {
@@ -840,11 +1026,20 @@ async function decodeFileManually(
     if (!real) {
         return;
     }
-    let view: DecodedView | 'invalid-utf8';
+    let view: DecodedView | 'invalid-utf8' | 'ineligible';
     try {
         view = await transcodeDecode(real);
     } catch (error) {
         reportManualTranscodeFailure('decode', real, log, error);
+        return;
+    }
+    if (view === 'ineligible') {
+        void vscode.window.showErrorMessage(
+            vscode.l10n.t(
+                'this file is not eligible for the transparent localisation view '
+                + '(localisation yml or the configured script globs)',
+            ),
+        );
         return;
     }
     if (view === 'invalid-utf8') {
@@ -903,8 +1098,8 @@ const TRANSCODE_ELIGIBLE_CONTEXT = 'paradoxcode.transcodeEligible';
 /**
  * Publishes `paradoxcode.transcodeEligible` for a document: true exactly when
  * its real path is in the transparent-encoding scope (localisation yml or the
- * configured script globs). A pure path check with no disk access — the same
- * gate the automatic takeover enforces, precomputed so menu `when` clauses
+ * configured script globs). A pure path check with no disk access — the path
+ * scope the automatic takeover starts from, precomputed so menu `when` clauses
  * reveal the eye icon instead of failing on click.
  */
 async function updateDecodedEntryContext(
@@ -918,14 +1113,134 @@ async function updateDecodedEntryContext(
 }
 
 /**
+ * Content gate for one eligible `file://` document: classify it and either
+ * take over its tab onto the decoded twin (the form would transcode) or keep
+ * it on the real URI and watch it (a transcode fixed point). A dirty buffer
+ * is never taken over here — the twin reads the on-disk bytes, so a flip
+ * would hide unsaved edits; the change watcher promotes it instead. When
+ * classification is unavailable the gate fails closed to the twin: eligible
+ * files are never left writable without the save-time encode guard.
+ */
+async function adoptDecodedView(
+    document: vscode.TextDocument,
+    log: vscode.OutputChannel,
+): Promise<void> {
+    const key = document.uri.toString();
+    const text = document.getText();
+    if (!hasTranscodeSignal(text)) {
+        // Fixed point by construction: no markers and no CJK anywhere means
+        // the classifier can only answer `plain` without quoted CJK.
+        watchedPassThrough.add(key);
+        return;
+    }
+    let view: DecodedView | 'invalid-utf8' | 'ineligible';
+    try {
+        view = await transcodeDecode(
+            document.uri,
+            document.isDirty ? new Uint8Array(Buffer.from(text, 'utf8')) : undefined,
+        );
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        log.appendLine(`transparentLoc: classification of ${document.uri.fsPath} failed: ${message}`);
+        stopWatching(key);
+        await openDecodedView(document.uri);
+        return;
+    }
+    if (view === 'invalid-utf8' || view === 'ineligible' || !needsDecodedView(view)) {
+        // Nothing the twin could show or transform (or nothing it may touch):
+        // stay on the real URI so search, diff, and git keep working.
+        watchedPassThrough.add(key);
+        return;
+    }
+    if (document.isDirty) {
+        // The twin reads the on-disk bytes; flipping now would hide unsaved
+        // edits. Stay watched — the change watcher promotes when the buffer
+        // settles into the save-time-encoding shape, and a clean reopen or
+        // focus change re-runs this gate.
+        watchedPassThrough.add(key);
+        return;
+    }
+    stopWatching(key);
+    await openDecodedView(document.uri);
+}
+
+/**
+ * Promotes a watched pass-through document the moment its buffer grows quoted
+ * CJK a save would encode — without this the typed-CJK gap would reopen and
+ * the next raw save would bypass the encode guard. The buffer is saved first
+ * (the promoted shape is byte-preserving on a raw save), then the tab flips to
+ * the twin keeping the cursor position: at swap time the twin content is
+ * byte-identical to what the user was editing.
+ */
+async function promoteWatchedDocument(
+    document: vscode.TextDocument,
+    opening: Set<string>,
+    log: vscode.OutputChannel,
+): Promise<void> {
+    const key = document.uri.toString();
+    if (
+        !watchedPassThrough.has(key)
+        || opening.has(key)
+        || manualRawViews.has(key)
+        || document.uri.scheme !== 'file'
+        || profileForRealPath(document.uri.fsPath, transparentScriptGlobs()) === undefined
+        || isShownInDiff(document.uri)
+        || vscode.window.activeTextEditor?.document.uri.toString() !== key
+    ) {
+        return;
+    }
+    if (autoOpenMode() === 'off') {
+        return;
+    }
+    const text = document.getText();
+    if (!hasTranscodeSignal(text)) {
+        return;
+    }
+    let view: DecodedView | 'invalid-utf8' | 'ineligible';
+    try {
+        view = await transcodeDecode(
+            document.uri,
+            document.isDirty ? new Uint8Array(Buffer.from(text, 'utf8')) : undefined,
+        );
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        log.appendLine(`transparentLoc: promotion classification of ${document.uri.fsPath} failed: ${message}`);
+        return; // keep watching — the next change retries
+    }
+    if (view === 'invalid-utf8' || view === 'ineligible' || !needsSaveTimeEncoding(view)) {
+        return;
+    }
+    opening.add(key);
+    try {
+        if (document.isDirty && !(await document.save())) {
+            return; // the save was declined or failed — stay raw and watched
+        }
+        if (vscode.window.activeTextEditor?.document.uri.toString() !== key) {
+            return; // focus moved while saving — the focus gate flips it later
+        }
+        stopWatching(key);
+        const editor = vscode.window.activeTextEditor;
+        const selection = editor?.document.uri.toString() === key ? editor.selection : undefined;
+        const promoted = await takeoverShow(document.uri, decodedUriOf(document.uri));
+        supersedePeek(document.uri);
+        if (selection) {
+            restoreSelection(promoted, selection);
+        }
+    } finally {
+        opening.delete(key);
+    }
+}
+
+/**
  * Opens the decoded view when an eligible file is opened through its raw
- * path, taking over the raw tab instead of adding a second one. Eligibility
- * is path-based (no disk read): plain files pass through their pdcloc twin
- * unchanged, whole-escaped and scoped files decode, and damaged files show
- * as-is with an error — the form dispatch lives in readFile, never here.
- * This also adopts files the moment they land on an eligible path (Save As
- * from an untitled buffer, a file moved into scope), closing the typed-CJK
- * gap: their next save goes through the scoped encoder.
+ * path, taking over the raw tab instead of adding a second one. The path
+ * decides scope; the content gate decides whether the twin adds anything —
+ * transcode fixed points pass through untouched, whole-escaped and scoped
+ * files decode, and damaged files show as-is with an error (the form dispatch
+ * lives in readFile, never here). This also adopts files the moment they land
+ * on an eligible path (Save As from an untitled buffer, a file moved into
+ * scope): the gate routes each one to the twin or to the change watcher,
+ * closing the typed-CJK gap.
  *
  * The `opening` set is only an in-flight guard. URIs deliberately pinned on
  * their raw view (revealOriginal, an active peek) are skipped until their tab
@@ -935,6 +1250,7 @@ async function updateDecodedEntryContext(
 async function maybeAutoOpenDecodedView(
     document: vscode.TextDocument,
     opening: Set<string>,
+    log: vscode.OutputChannel,
 ): Promise<void> {
     if (document.uri.scheme !== 'file') {
         return;
@@ -946,14 +1262,30 @@ async function maybeAutoOpenDecodedView(
     if (profileForRealPath(document.uri.fsPath, transparentScriptGlobs()) === undefined) {
         return;
     }
+    // Only take over the editor the user is actually looking at: invisible
+    // programmatic opens and quick tab switches must not pop a decoded tab.
+    if (vscode.window.activeTextEditor?.document.uri.toString() !== key) {
+        return;
+    }
+    // A document rendered inside a diff keeps its raw `file://` form — see
+    // `isShownInDiff`. Focusing it after the diff closes re-runs this gate.
+    if (isShownInDiff(document.uri)) {
+        return;
+    }
+    const mode = autoOpenMode();
+    if (mode === 'off') {
+        return;
+    }
     opening.add(key);
     try {
-        // Only take over the editor the user is actually looking at: invisible
-        // programmatic opens and quick tab switches must not pop a decoded tab.
-        if (vscode.window.activeTextEditor?.document.uri.toString() !== key) {
+        if (mode === 'always') {
+            // The legacy behaviour the escape hatch restores: every eligible
+            // file opens through its twin, whatever its bytes look like.
+            stopWatching(key);
+            await openDecodedView(document.uri);
             return;
         }
-        await openDecodedView(document.uri);
+        await adoptDecodedView(document, log);
     } finally {
         opening.delete(key);
     }
@@ -962,7 +1294,8 @@ async function maybeAutoOpenDecodedView(
 /**
  * Registers the transparent-localisation feature. `transparentEncoding` is
  * the master switch: on, the `pdcloc://` FileSystemProvider, decoded-view
- * commands, automatic path-based redirection, the status-bar indicator, and
+ * commands, automatic content-gated redirection (see
+ * `paradoxcode.localisation.autoOpen`), the status-bar indicator, and
  * save-time scoped encoding are all active; off, only the manual one-shot
  * encode/decode commands remain (their menus hide through the same config
  * check). When the artifact is missing the feature degrades to a log line,
@@ -1017,7 +1350,7 @@ export async function activateTransparentLocalisation(
             if (!document) {
                 return;
             }
-            void maybeAutoOpenDecodedView(document, openingDecodedViews).catch((error) => {
+            void maybeAutoOpenDecodedView(document, openingDecodedViews, log).catch((error) => {
                 const message = error instanceof Error ? error.message : String(error);
                 log.appendLine(`transparentLoc: automatic decoded view failed: ${message}`);
             });
@@ -1030,6 +1363,25 @@ export async function activateTransparentLocalisation(
                 const message = error instanceof Error ? error.message : String(error);
                 log.appendLine(`transparentLoc: decoded-view context update failed: ${message}`);
             });
+        };
+        // A pass-through buffer that grows text a save would encode is
+        // promoted to its twin (debounced), closing the typed-CJK gap.
+        const schedulePromotionCheck = (document: vscode.TextDocument): void => {
+            const key = document.uri.toString();
+            if (!watchedPassThrough.has(key)) {
+                return;
+            }
+            const pending = promotionTimers.get(key);
+            if (pending !== undefined) {
+                clearTimeout(pending);
+            }
+            promotionTimers.set(key, setTimeout(() => {
+                promotionTimers.delete(key);
+                void promoteWatchedDocument(document, openingDecodedViews, log).catch((error) => {
+                    const message = error instanceof Error ? error.message : String(error);
+                    log.appendLine(`transparentLoc: decoded-view promotion failed: ${message}`);
+                });
+            }, TRANSCODE_PROMOTION_DEBOUNCE_MS));
         };
         disposables.push(
             vscode.workspace.registerFileSystemProvider(PDCLOC_SCHEME, provider, {
@@ -1081,6 +1433,30 @@ export async function activateTransparentLocalisation(
             }),
             vscode.workspace.onDidOpenTextDocument(autoOpenDocument),
             vscode.workspace.onDidOpenTextDocument(updateEntryContext),
+            // A pass-through buffer that grows text a save would encode is
+            // promoted to its twin (debounced), closing the typed-CJK gap.
+            vscode.workspace.onDidChangeTextDocument((event) => {
+                if (event.document.uri.scheme === 'file') {
+                    schedulePromotionCheck(event.document);
+                }
+            }),
+            // The debounce can lose a race with auto-save or a fast manual
+            // save; re-judge after any raw save so the twin still takes over.
+            vscode.workspace.onDidSaveTextDocument((document) => {
+                if (document.uri.scheme === 'file') {
+                    schedulePromotionCheck(document);
+                }
+            }),
+            vscode.workspace.onDidCloseTextDocument((document) => {
+                stopWatching(document.uri.toString());
+            }),
+            new vscode.Disposable(() => {
+                for (const timer of promotionTimers.values()) {
+                    clearTimeout(timer);
+                }
+                promotionTimers.clear();
+                watchedPassThrough.clear();
+            }),
         );
         updateStatus();
         // `onLanguage` activation can happen after VS Code has already opened
