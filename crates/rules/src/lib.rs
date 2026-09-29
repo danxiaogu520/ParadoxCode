@@ -7,6 +7,13 @@
 
 pub mod rulec;
 
+/// Rules-v2 language front end (see `docs/rules-language.md`): the type-expression
+/// mini-syntax, the source model, and the compile-time semantic checks. It is not
+/// wired to the legacy runtime model yet; the switch happens in one cut.
+pub mod compile;
+pub mod expr;
+pub mod source;
+
 mod canonical;
 mod matcher;
 mod model;

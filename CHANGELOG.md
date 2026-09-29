@@ -9,6 +9,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The rules-v2 language front end lands, specified by the new
+  `docs/rules-language.md`: the type-expression mini-syntax parser
+  (`rules::expr`), the JSON source model with a `schemars`-generated JSON
+  Schema (`rules::source`, written to `rules/rules-language.schema.json` by
+  `rulec schema`), and the compile-time semantic checks (`rules::compile`, run
+  over a source directory by `rulec check`). Nothing consumes it yet: the
+  legacy model keeps working until the redesign's one-cut switch.
 - Hover localisation previews keep up to 1000 characters (was 240), covering
   the longest vanilla event and description texts.
 - New `pdc/transcodeDecode` and `pdc/transcodeEncode` requests expose the transparent-
