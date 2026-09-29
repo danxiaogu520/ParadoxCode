@@ -368,6 +368,7 @@ const requiredSettings = [
   'paradoxcode.diagnostics.severityOverrides',
   'paradoxcode.localisation.preferredLanguages',
   'paradoxcode.localisation.transparentEncoding',
+  'paradoxcode.localisation.autoOpen',
   'paradoxcode.completion.sourceLayers',
   'paradoxcode.completion.iconPreview',
   'paradoxcode.performance.profile',
@@ -384,6 +385,16 @@ for (const setting of requiredSettings) {
 }
 if (manifest.contributes.configuration?.properties?.['paradoxcode.localisation.transparentEncoding']?.default !== true) {
   fail('paradoxcode.localisation.transparentEncoding must default to true');
+}
+// Auto-open is content-gated by default: only files that actually participate
+// in transcoding may leave their `file://` URI (search, diff, and git stay
+// usable for everything else). `always` restores the legacy path-only takeover.
+const autoOpen = manifest.contributes.configuration?.properties?.['paradoxcode.localisation.autoOpen'];
+if (autoOpen?.default !== 'needsTranscode') {
+  fail('paradoxcode.localisation.autoOpen must default to needsTranscode');
+}
+if (JSON.stringify(autoOpen?.enum) !== JSON.stringify(['needsTranscode', 'always', 'off'])) {
+  fail('paradoxcode.localisation.autoOpen must offer exactly needsTranscode / always / off');
 }
 // Game-font rendering is on unless opted out, and font-mod auto-discovery is
 // the default path (empty override).
