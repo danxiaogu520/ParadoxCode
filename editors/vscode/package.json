@@ -1350,6 +1350,16 @@
           "default": true,
           "markdownDescription": "%configuration.localisation.transparentEncoding.description%"
         },
+        "paradoxcode.localisation.autoOpen": {
+          "type": "string",
+          "enum": [
+            "needsTranscode",
+            "always",
+            "off"
+          ],
+          "default": "needsTranscode",
+          "markdownDescription": "%configuration.localisation.autoOpen.description%"
+        },
         "paradoxcode.localisation.transparentScriptGlobs": {
           "type": "array",
           "items": {
