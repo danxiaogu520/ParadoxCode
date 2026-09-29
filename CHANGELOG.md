@@ -85,6 +85,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the cursor over now (lines map one-to-one, columns clamp): VS Code's built-in search
   indexes `file://` bytes only and always jumps to the raw file, so a search-result jump
   lands on its target row in the decoded view instead of the top of the file.
+- Rule-source hygiene ahead of the rules-language redesign: semantic rows no longer spell
+  explicit JSON defaults (`parent_path: []`, `operator: null`, `severity: null`,
+  `replace_scope: []`, `min_occurs: null`, … — `serde` defaults fill them); float bounds are
+  JSON numbers (`"min": "0"` → `0`) with `ValueMatcher::Float` bounds typed as
+  finite-validated `f64`; the `{"any_scalar": null}` key spelling is normalized to
+  `"any_scalar"`; `push_scope` `"Unit"` is normalized to `unit`; and `profile/lexicon.json`'s
+  `ruler_personality` member-kind alias no longer points at `ancestor_personalities` (every
+  other singular alias maps to itself).
 
 ### Removed
 
@@ -92,9 +100,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   it.
 - The `transcode` contract from `npm run test:contract` / `test:ci` (the remaining
   assets / extension / package / i18n contracts are unchanged).
+- The `catalog/records` rule tables (12,962 rows, about 5 MB embedded in the binary) and the
+  `RuleRecord` model. Nothing read their contents; they only changed the rule hash.
+- The `strict_min` rule field (true on every one of the 8,463 rows) and the
+  `SemanticRule.required` shorthand. Requiredness lives solely in `min_occurs` (`>= 1` means
+  the key is required in its container; the two rows that set `required` already carried
+  `min_occurs: 1`, and minimum-cardinality severity always followed the strict path). Retiring
+  the shorthand retires its two rule-driven surfaces — the hover "- required" bullet and the
+  completion boost that sorted missing required rules first, both lit up only for those two
+  rows — and `pdc/ruleSearch` entries no longer carry a `required` key.
 
 ### Fixed
 
+- Property-key hover no longer treats rule-metadata column names (`line`, `shape`,
+  `source_file`, `directives`, …) as known script keys. Hover and semantic-token coloring
+  now share one known-key set.
 - `AmbiguousDefinition` false positives from the decoded view's shadow copy. A decoded-view
   tab takeover transiently opens the raw `file://` document and its `pdcloc://` twin over the
   same backing path (and a window reload can restore both persistently); direct resolution

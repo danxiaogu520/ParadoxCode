@@ -12,19 +12,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of modifiers applied while the containing entry is active."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 120
@@ -32,35 +26,25 @@
   {
     "id": "common/advisortypes:12:rule:root:advisor_type:skill_scaled_modifier",
     "context": "root:advisor_type",
-    "parent_path": [],
     "key": {
       "exact": "skill_scaled_modifier"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Modifier scales by level of advisor, applies if trigger is true"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 121
   },
   {
     "id": "common/advisortypes:13:rule:root:advisor_type:allow_only_male",
     "context": "root:advisor_type",
-    "parent_path": [],
     "key": {
       "exact": "allow_only_male"
     },
@@ -69,18 +53,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 122
@@ -88,7 +64,6 @@
   {
     "id": "common/advisortypes:14:rule:root:advisor_type:allow_only_female",
     "context": "root:advisor_type",
-    "parent_path": [],
     "key": {
       "exact": "allow_only_female"
     },
@@ -97,18 +72,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 123
@@ -116,7 +83,6 @@
   {
     "id": "common/advisortypes:15:rule:root:advisor_type:allow_only_owner_religion",
     "context": "root:advisor_type",
-    "parent_path": [],
     "key": {
       "exact": "allow_only_owner_religion"
     },
@@ -125,18 +91,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 124
@@ -158,20 +116,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 125
@@ -179,7 +130,6 @@
   {
     "id": "common/advisortypes:18:rule:root:advisor_type:chance",
     "context": "root:advisor_type",
-    "parent_path": [],
     "key": {
       "exact": "chance"
     },
@@ -187,26 +137,20 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 126
@@ -228,20 +172,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 127
@@ -249,7 +186,6 @@
   {
     "id": "common/advisortypes:21:rule:root:advisor_type:ai_will_do",
     "context": "root:advisor_type",
-    "parent_path": [],
     "key": {
       "exact": "ai_will_do"
     },
@@ -257,28 +193,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "AI weighting block: factor = base weight, modifier blocks adjust it."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 128
@@ -286,7 +217,6 @@
   {
     "id": "common/advisortypes:6:rule:root:advisor_type:monarch_power",
     "context": "root:advisor_type",
-    "parent_path": [],
     "key": {
       "exact": "monarch_power"
     },
@@ -295,18 +225,10 @@
       "enum": "power_categories"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 129
@@ -324,16 +246,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "this",
@@ -341,7 +259,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 130

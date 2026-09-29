@@ -84,9 +84,8 @@ pub(crate) enum CompletionSpecificity {
 pub(crate) struct CompletionRankContext {
     pub(crate) schema_tier: CompletionSchemaTier,
     pub(crate) specificity: CompletionSpecificity,
-    /// Whether this candidate represents a required rule that is still missing in the current
-    /// block.  Required candidates sort before optional candidates within the same schema tier.
-    pub(crate) required: bool,
+    /// Whether the underlying rule is deprecated; deprecated candidates sort below current
+    /// ones within the same schema tier.
     pub(crate) deprecated: bool,
     /// Number of scope-link hops, when the candidate is a scope expression.
     pub(crate) scope_distance: u8,
@@ -96,13 +95,11 @@ impl CompletionRankContext {
     pub(crate) const fn new(
         schema_tier: CompletionSchemaTier,
         specificity: CompletionSpecificity,
-        required: bool,
         deprecated: bool,
     ) -> Self {
         Self {
             schema_tier,
             specificity,
-            required,
             deprecated,
             scope_distance: 0,
         }
@@ -120,7 +117,6 @@ impl CompletionRankContext {
 pub(crate) struct CompletionRank {
     pub(crate) schema_tier: CompletionSchemaTier,
     pub(crate) match_quality: CompletionMatchQuality,
-    pub(crate) required_penalty: u8,
     pub(crate) specificity: CompletionSpecificity,
     pub(crate) scope_distance: u8,
     pub(crate) deprecated: bool,
@@ -133,12 +129,10 @@ impl CompletionRank {
     pub(crate) fn sort_score(self) -> u32 {
         const SCHEMA_WEIGHT: u32 = 10_000_000;
         const MATCH_WEIGHT: u32 = 1_000_000;
-        const REQUIRED_WEIGHT: u32 = 10_000;
         const SPECIFICITY_WEIGHT: u32 = 1_000;
         const SCOPE_WEIGHT: u32 = 10;
         u32::from(self.schema_tier as u8) * SCHEMA_WEIGHT
             + u32::from(self.match_quality as u8) * MATCH_WEIGHT
-            + u32::from(self.required_penalty) * REQUIRED_WEIGHT
             + u32::from(self.specificity as u8) * SPECIFICITY_WEIGHT
             + u32::from(self.scope_distance.min(99)) * SCOPE_WEIGHT
             + u32::from(self.deprecated)
@@ -193,7 +187,6 @@ pub(crate) fn push_completion(
     let rank = CompletionRank {
         match_quality,
         schema_tier: context.schema_tier,
-        required_penalty: u8::from(!context.required),
         specificity: context.specificity,
         scope_distance: context.scope_distance,
         deprecated: context.deprecated,

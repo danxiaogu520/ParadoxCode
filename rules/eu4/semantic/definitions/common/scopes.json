@@ -7,23 +7,14 @@
       "aliases"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "country"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6819
@@ -31,25 +22,16 @@
   {
     "id": "scopes:10:rule:root:scopes:Trade Node",
     "context": "root:scopes",
-    "parent_path": [],
     "key": {
       "exact": "Trade Node"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6820
@@ -62,23 +44,14 @@
       "aliases"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "unit"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6821
@@ -95,18 +68,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6822
@@ -114,25 +79,16 @@
   {
     "id": "scopes:13:rule:root:scopes:Unit",
     "context": "root:scopes",
-    "parent_path": [],
     "key": {
       "exact": "Unit"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6823
@@ -145,23 +101,14 @@
       "aliases"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "monarch"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6824
@@ -178,18 +125,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6825
@@ -197,25 +136,16 @@
   {
     "id": "scopes:16:rule:root:scopes:Monarch",
     "context": "root:scopes",
-    "parent_path": [],
     "key": {
       "exact": "Monarch"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6826
@@ -228,23 +158,14 @@
       "aliases"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6827
@@ -261,18 +182,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6828
@@ -280,25 +193,16 @@
   {
     "id": "scopes:19:rule:root:scopes:Heir",
     "context": "root:scopes",
-    "parent_path": [],
     "key": {
       "exact": "Heir"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6829
@@ -315,18 +219,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6830
@@ -339,23 +235,14 @@
       "aliases"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "consort"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6831
@@ -372,18 +259,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6832
@@ -391,25 +270,16 @@
   {
     "id": "scopes:22:rule:root:scopes:Consort",
     "context": "root:scopes",
-    "parent_path": [],
     "key": {
       "exact": "Consort"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6833
@@ -422,23 +292,14 @@
       "aliases"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "mercenary_company"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6834
@@ -455,18 +316,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6835
@@ -474,25 +327,16 @@
   {
     "id": "scopes:25:rule:root:scopes:Mercenary Company",
     "context": "root:scopes",
-    "parent_path": [],
     "key": {
       "exact": "Mercenary Company"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6836
@@ -507,23 +351,14 @@
     "key": {
       "exact": "rebel_faction"
     },
-    "operator": null,
     "value": {
       "exact": "rebelfaction"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6837
@@ -540,18 +375,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6838
@@ -559,25 +386,16 @@
   {
     "id": "scopes:28:rule:root:scopes:Rebel Faction",
     "context": "root:scopes",
-    "parent_path": [],
     "key": {
       "exact": "Rebel Faction"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6839
@@ -590,23 +408,14 @@
       "aliases"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "religion"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6840
@@ -614,25 +423,16 @@
   {
     "id": "scopes:2:rule:root:scopes:Country",
     "context": "root:scopes",
-    "parent_path": [],
     "key": {
       "exact": "Country"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6841
@@ -649,18 +449,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6842
@@ -668,25 +460,16 @@
   {
     "id": "scopes:31:rule:root:scopes:Religion",
     "context": "root:scopes",
-    "parent_path": [],
     "key": {
       "exact": "Religion"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6843
@@ -699,23 +482,14 @@
       "aliases"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "culture"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6844
@@ -732,18 +506,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6845
@@ -751,25 +517,16 @@
   {
     "id": "scopes:34:rule:root:scopes:Culture",
     "context": "root:scopes",
-    "parent_path": [],
     "key": {
       "exact": "Culture"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6846
@@ -782,23 +539,14 @@
       "aliases"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6847
@@ -815,18 +563,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6848
@@ -834,25 +574,16 @@
   {
     "id": "scopes:37:rule:root:scopes:Advisor",
     "context": "root:scopes",
-    "parent_path": [],
     "key": {
       "exact": "Advisor"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6849
@@ -865,23 +596,14 @@
       "aliases"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "leader"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6850
@@ -898,18 +620,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6851
@@ -922,23 +636,14 @@
       "aliases"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "province"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6852
@@ -946,25 +651,16 @@
   {
     "id": "scopes:40:rule:root:scopes:Leader",
     "context": "root:scopes",
-    "parent_path": [],
     "key": {
       "exact": "Leader"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6853
@@ -977,23 +673,14 @@
       "aliases"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "trade_company"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6854
@@ -1010,18 +697,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6855
@@ -1029,25 +708,16 @@
   {
     "id": "scopes:43:rule:root:scopes:Trade Company",
     "context": "root:scopes",
-    "parent_path": [],
     "key": {
       "exact": "Trade Company"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6856
@@ -1064,18 +734,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6857
@@ -1083,25 +745,16 @@
   {
     "id": "scopes:5:rule:root:scopes:Province",
     "context": "root:scopes",
-    "parent_path": [],
     "key": {
       "exact": "Province"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6858
@@ -1116,23 +769,14 @@
     "key": {
       "exact": "trade_node"
     },
-    "operator": null,
     "value": {
       "exact": "tradenode"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6859
@@ -1149,18 +793,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6860
@@ -1173,23 +809,14 @@
       "is_subscope_of"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "province"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6861
@@ -1206,18 +833,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6862

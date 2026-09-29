@@ -2,27 +2,19 @@
   {
     "id": "interface/gfx:1:rule:root:sprite:texturefile",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "texturefile"
     },
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Path of the texture file, relative to the game or mod root. Forward and back slashes are both accepted; the file must exist (a .tga reference may fall back to a shipped .dds)."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -30,27 +22,19 @@
   {
     "id": "interface/gfx:2:rule:root:sprite:texturefile1",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "texturefile1"
     },
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "First texture of a progress bar or masked shield: the fill texture revealed as the bar advances."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -58,27 +42,19 @@
   {
     "id": "interface/gfx:3:rule:root:sprite:texturefile2",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "texturefile2"
     },
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Second texture of a progress bar or masked shield: the background texture being masked."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -86,27 +62,19 @@
   {
     "id": "interface/gfx:4:rule:root:sprite:texturefile3",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "texturefile3"
     },
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Third texture of a masked shield or trade route: the overlay texture blended on top."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -114,27 +82,19 @@
   {
     "id": "interface/gfx:5:rule:root:sprite:alphamaskfile",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "alphamaskfile"
     },
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Alpha mask texture blended over the sprite (used by the diplomacy overlay icons)."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -142,27 +102,19 @@
   {
     "id": "interface/gfx:6:rule:root:sprite:effectfile",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "effectfile"
     },
     "operator": "=",
     "value": "filepath",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "GUI shader effect driving the sprite's button states, named after a gfx/FX shader such as buttonstate. The engine resolves the compiled shader by name, so the historical .lua spelling of these references no longer exists on disk even in vanilla."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -170,7 +122,6 @@
   {
     "id": "interface/gfx:7:rule:root:sprite:loadtype",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "loadtype"
     },
@@ -179,20 +130,13 @@
       "enum": "sprite_load_type"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "When the texture is loaded: FRONTEND sprites load for the main menu, INGAME sprites load with a campaign."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -200,7 +144,6 @@
   {
     "id": "interface/gfx:8:rule:root:sprite:noofframes",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "noofframes"
     },
@@ -212,20 +155,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Number of frames stacked vertically in the texture; the engine crops the sprite to one frame and advances on demand."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -233,27 +169,19 @@
   {
     "id": "interface/gfx:9:rule:root:sprite:transparencecheck",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "transparencecheck"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether the engine tests the texture for transparent pixels (disable for full-frame textures)."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -261,27 +189,19 @@
   {
     "id": "interface/gfx:10:rule:root:sprite:alwaystransparent",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "alwaystransparent"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Marks the texture as fully transparent so the engine skips per-pixel transparency handling."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -289,27 +209,19 @@
   {
     "id": "interface/gfx:11:rule:root:sprite:norefcount",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "norefcount"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Keeps the texture permanently loaded by skipping reference counting."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -317,27 +229,19 @@
   {
     "id": "interface/gfx:12:rule:root:sprite:legacy_lazy_load",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "legacy_lazy_load"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Legacy flag restoring the pre-lazy-loading texture lifetime for the sprite."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -345,7 +249,6 @@
   {
     "id": "interface/gfx:13:rule:root:sprite:clicksound",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "clicksound"
     },
@@ -354,20 +257,13 @@
       "enum": "interface_click_sound"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Sound played when the sprite is clicked as a button."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -384,25 +280,18 @@
     "operator": "=",
     "value": {
       "float": {
-        "min": "0",
+        "min": 0,
         "max": null
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Duration of one scrolling or rotating animation cycle of the animated overlay, in seconds."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -419,20 +308,13 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Motion of the animated overlay: scrolling (the vanilla default), rotating, or pulsing."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -440,7 +322,6 @@
   {
     "id": "interface/gfx:14:rule:root:sprite:animation_rate_fps",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "animation_rate_fps"
     },
@@ -452,20 +333,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Playback speed of a frameAnimatedSpriteType, in frames per second."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -473,27 +347,19 @@
   {
     "id": "interface/gfx:15:rule:root:sprite:looping",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "looping"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether a frameAnimatedSpriteType restarts after the last frame."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -501,27 +367,19 @@
   {
     "id": "interface/gfx:16:rule:root:sprite:play_on_show",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "play_on_show"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether a frameAnimatedSpriteType starts playing when its window becomes visible."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -529,7 +387,6 @@
   {
     "id": "interface/gfx:17:rule:root:sprite:pause_on_loop",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "pause_on_loop"
     },
@@ -541,20 +398,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Seconds a frameAnimatedSpriteType rests on the last frame before looping."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -562,27 +412,19 @@
   {
     "id": "interface/gfx:18:rule:root:sprite:horizontal",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "horizontal"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether a progress bar fills horizontally instead of vertically."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -590,27 +432,19 @@
   {
     "id": "interface/gfx:19:rule:root:sprite:color",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "color"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Progress bar fill colour as an RGB float block: color = { 0.0 0.5 0.0 }."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -622,7 +456,6 @@
       "color"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "float": {
         "min": null,
@@ -630,48 +463,32 @@
       }
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "RGB channel value between 0.0 and 1.0."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:21:rule:root:sprite:colortwo",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "colortwo"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Progress bar background colour as an RGB float block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -683,7 +500,6 @@
       "colortwo"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "float": {
         "min": null,
@@ -691,48 +507,32 @@
       }
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "RGB channel value between 0.0 and 1.0."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:23:rule:root:sprite:size",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "size"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Pixel size block of a cornered tile sprite: size = { x = 10 y = 10 }."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -754,20 +554,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Width in pixels."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -789,20 +582,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Height in pixels."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -810,27 +596,19 @@
   {
     "id": "interface/gfx:26:rule:root:sprite:bordersize",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "bordersize"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Corner border thickness of a corneredTileSpriteType: borderSize = { x = 2 y = 2 }."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -852,20 +630,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Horizontal border thickness in pixels."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -887,20 +658,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Vertical border thickness in pixels."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -908,28 +672,19 @@
   {
     "id": "interface/gfx:29:rule:root:sprite:animation",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "animation"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Overlay animation played over the sprite texture (rotating or scrolling effects)."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
@@ -945,20 +700,13 @@
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Mask restricting where the animation texture is drawn."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -975,20 +723,13 @@
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Texture scrolled or rotated over the sprite by the animation."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1010,20 +751,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Frame count of the animation texture."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1040,20 +774,13 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether the animation restarts after its last frame."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1075,20 +802,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Seconds the animation waits before starting."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1110,20 +830,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Rotations per second applied to the animation texture."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1145,20 +858,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Initial rotation angle of the animation texture, in radians."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1177,20 +883,13 @@
       "exact": "overlay"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Blend mode used when drawing the animation over the sprite."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1212,20 +911,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Scale factor applied to the animation texture."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1233,7 +925,6 @@
   {
     "id": "interface/gfx:39:rule:root:sprite:overlay_frames_per_row",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "overlay_frames_per_row"
     },
@@ -1245,20 +936,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Columns in the overlay frame grid of a masked shield."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1266,7 +950,6 @@
   {
     "id": "interface/gfx:40:rule:root:sprite:overlay_rows",
     "context": "root:sprite",
-    "parent_path": [],
     "key": {
       "exact": "overlay_rows"
     },
@@ -1278,20 +961,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Rows in the overlay frame grid of a masked shield."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1299,27 +975,19 @@
   {
     "id": "interface/gfx:41:rule:root:object:name",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "name"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Object name. pdxmesh names are referenced by map ambient objects via their type blocks."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1327,27 +995,19 @@
   {
     "id": "interface/gfx:42:rule:root:object:file",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "file"
     },
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Mesh file of a pdxmesh object, such as gfx/models/Units/x.mesh."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1355,27 +1015,19 @@
   {
     "id": "interface/gfx:43:rule:root:object:type",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "type"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Particle-system name played by a pdxparticle object."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1383,7 +1035,6 @@
   {
     "id": "interface/gfx:44:rule:root:object:scale",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "scale"
     },
@@ -1395,20 +1046,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Uniform scale applied to the object."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1416,27 +1060,19 @@
   {
     "id": "interface/gfx:45:rule:root:object:cull_distance",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "cull_distance"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Camera distance beyond which the object stops rendering (values may carry an f suffix)."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1444,27 +1080,19 @@
   {
     "id": "interface/gfx:46:rule:root:object:texture",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "texture"
     },
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Diffuse texture of an arrowType map arrow."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1472,27 +1100,19 @@
   {
     "id": "interface/gfx:47:rule:root:object:normal",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "normal"
     },
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Normal-map texture of an arrowType map arrow."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1500,27 +1120,19 @@
   {
     "id": "interface/gfx:48:rule:root:object:specular",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "specular"
     },
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Specular texture of an arrowType map arrow."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1528,27 +1140,19 @@
   {
     "id": "interface/gfx:49:rule:root:object:effect",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "effect"
     },
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Shader effect for the object, a gfx/FX/*.lua file."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1556,27 +1160,19 @@
   {
     "id": "interface/gfx:50:rule:root:object:texturefile",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "texturefile"
     },
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Texture of a tradeRouteType, relative to the game or mod root."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1584,27 +1180,19 @@
   {
     "id": "interface/gfx:51:rule:root:object:texturefile1",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "texturefile1"
     },
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "First texture of a tradeRouteType arrow."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1612,27 +1200,19 @@
   {
     "id": "interface/gfx:52:rule:root:object:texturefile2",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "texturefile2"
     },
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Second texture of a tradeRouteType arrow."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1640,27 +1220,19 @@
   {
     "id": "interface/gfx:53:rule:root:object:texturefile3",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "texturefile3"
     },
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Third texture of a tradeRouteType arrow."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1668,28 +1240,19 @@
   {
     "id": "interface/gfx:54:rule:root:object:animation",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "animation"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Animation clip bound to a pdxmesh: animation = { id = \"idle_01\" type = \"gfx/models/x.anim\" }."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
@@ -1705,20 +1268,13 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Animation clip name referenced by the mesh's .anim metadata."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1735,20 +1291,13 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Animation clip bound to the state id: a shared clip name such as polearm_onehanded_attack_animation or seagulls_idle, resolved from the compiled unit animation set rather than a loose file path."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1756,28 +1305,19 @@
   {
     "id": "interface/gfx:57:rule:root:object:meshsettings",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "meshsettings"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Per-mesh material overrides for a pdxmesh."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
@@ -1798,20 +1338,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Zero-based mesh index the settings apply to."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1828,20 +1361,13 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Name of the sub-mesh the settings apply to."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1858,20 +1384,13 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Shader name used to render the sub-mesh."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1888,20 +1407,13 @@
     "operator": "=",
     "value": "texture_path",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Shader source file for the sub-mesh."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1918,20 +1430,13 @@
     "operator": "=",
     "value": "filepath",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Diffuse texture override for the sub-mesh, a bare file name resolved relative to the mesh's own directory rather than the game root."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1948,20 +1453,13 @@
     "operator": "=",
     "value": "filepath",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Normal-map texture override for the sub-mesh, a bare file name resolved relative to the mesh's own directory rather than the game root."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1978,20 +1476,13 @@
     "operator": "=",
     "value": "filepath",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Specular texture override for the sub-mesh, a bare file name resolved relative to the mesh's own directory rather than the game root."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -1999,7 +1490,6 @@
   {
     "id": "interface/gfx:65:rule:root:object:speed",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "speed"
     },
@@ -2011,20 +1501,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Scroll speed of an animatedmaptext label."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -2032,28 +1515,19 @@
   {
     "id": "interface/gfx:66:rule:root:object:textblock",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "textblock"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Rendered text of an animatedmaptext label: font, colour, and position settings."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
@@ -2067,19 +1541,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
@@ -2093,26 +1558,16 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:69:rule:root:object:size:int",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "size"
     },
@@ -2124,20 +1579,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Diameter in pixels of a PieChartType chart."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -2145,27 +1593,19 @@
   {
     "id": "interface/gfx:70:rule:root:object:size",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "size"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Pixel size block of a LineChartType chart: size = { x = 152 y = 40 }."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -2187,20 +1627,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Width in pixels."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -2222,20 +1655,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Height in pixels."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -2243,7 +1669,6 @@
   {
     "id": "interface/gfx:73:rule:root:object:linewidth",
     "context": "root:object",
-    "parent_path": [],
     "key": {
       "exact": "linewidth"
     },
@@ -2255,20 +1680,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Stroke width of a LineChartType chart."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -2276,27 +1694,19 @@
   {
     "id": "interface/gfx:74:rule:root:bitmap_font:name",
     "context": "root:bitmap_font",
-    "parent_path": [],
     "key": {
       "exact": "name"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Font name referenced from .gui files via font = \"...\"."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -2304,27 +1714,19 @@
   {
     "id": "interface/gfx:75:rule:root:bitmap_font:path",
     "context": "root:bitmap_font",
-    "parent_path": [],
     "key": {
       "exact": "path"
     },
     "operator": "=",
     "value": "filepath",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Font file stem under gfx/fonts, without extension: path = \"gfx/fonts/vic_36\"."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -2332,27 +1734,19 @@
   {
     "id": "interface/gfx:76:rule:root:bitmap_font:color",
     "context": "root:bitmap_font",
-    "parent_path": [],
     "key": {
       "exact": "color"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Default text colour as an ARGB hex literal, such as 0xffffffff."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -2360,27 +1754,19 @@
   {
     "id": "interface/gfx:77:rule:root:bitmap_font:border_color",
     "context": "root:bitmap_font",
-    "parent_path": [],
     "key": {
       "exact": "border_color"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Text outline colour as an ARGB hex literal."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -2388,27 +1774,19 @@
   {
     "id": "interface/gfx:78:rule:root:bitmap_font:effect",
     "context": "root:bitmap_font",
-    "parent_path": [],
     "key": {
       "exact": "effect"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether the font's shader effect is enabled."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -2416,27 +1794,19 @@
   {
     "id": "interface/gfx:79:rule:root:bitmap_font:textcolors",
     "context": "root:bitmap_font",
-    "parent_path": [],
     "key": {
       "exact": "textcolors"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Per-colour-code font variants: the G, R, Y (and optionally H, T) blocks override the font used for each localisation colour code."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -2451,19 +1821,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
@@ -2477,47 +1838,29 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:90:rule:root:sprite_entries:spriteTypes",
     "context": "root:sprite_entries",
-    "parent_path": [],
     "key": {
       "exact": "spriteTypes"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Wrapper block containing all sprite definitions (spriteType, textSpriteType, progress bars, shields, animated sprites)."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -2525,28 +1868,19 @@
   {
     "id": "interface/gfx:91:rule:root:sprite_entries:bitmapfonts",
     "context": "root:sprite_entries",
-    "parent_path": [],
     "key": {
       "exact": "bitmapfonts"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Wrapper block containing bitmap font definitions."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -2554,28 +1888,19 @@
   {
     "id": "interface/gfx:92:rule:root:sprite_entries:objectTypes",
     "context": "root:sprite_entries",
-    "parent_path": [],
     "key": {
       "exact": "objectTypes"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Wrapper block containing engine object definitions (pdxmesh, arrows, particles, map text, charts)."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -2583,202 +1908,133 @@
   {
     "id": "interface/gfx:93:rule:wrapper:sprite:spriteType",
     "context": "wrapper:sprite",
-    "parent_path": [],
     "key": {
       "exact": "spriteType"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Plain sprite: one texture file with optional frame slicing and load behaviour."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:94:rule:wrapper:sprite:textSpriteType",
     "context": "wrapper:sprite",
-    "parent_path": [],
     "key": {
       "exact": "textSpriteType"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Sprite whose texture is rendered behind dynamic text (names, numbers)."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:95:rule:wrapper:sprite:progressbartype",
     "context": "wrapper:sprite",
-    "parent_path": [],
     "key": {
       "exact": "progressbartype"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Progress bar sprite: texturefile1 fill over texturefile2 background, coloured through color and colortwo."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:96:rule:wrapper:sprite:corneredTileSpriteType",
     "context": "wrapper:sprite",
-    "parent_path": [],
     "key": {
       "exact": "corneredTileSpriteType"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Tiled sprite whose corners stay fixed while edges and centre stretch (size and bordersize)."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:97:rule:wrapper:sprite:maskedShieldType",
     "context": "wrapper:sprite",
-    "parent_path": [],
     "key": {
       "exact": "maskedShieldType"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Shield sprite masking texturefile with an overlay grid (texturefile3, overlay_frames_per_row, overlay_rows)."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:98:rule:wrapper:sprite:frameAnimatedSpriteType",
     "context": "wrapper:sprite",
-    "parent_path": [],
     "key": {
       "exact": "frameAnimatedSpriteType"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Frame-by-frame animated sprite (animation_rate_fps, looping, play_on_show, pause_on_loop)."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:99:rule:wrapper:sprite:cursor_offset",
     "context": "wrapper:sprite",
-    "parent_path": [],
     "key": {
       "exact": "cursor_offset"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Global cursor hotspot offset for every edit box: cursor_offset = { -5 -4 }."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "interface/*.gfx",
     "line": 1
@@ -2786,232 +2042,152 @@
   {
     "id": "interface/gfx:100:rule:wrapper:bitmap_font:bitmapfont",
     "context": "wrapper:bitmap_font",
-    "parent_path": [],
     "key": {
       "exact": "bitmapfont"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Bitmap font definition: name plus texture atlas path and colour tables."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:101:rule:wrapper:object:pdxmesh",
     "context": "wrapper:object",
-    "parent_path": [],
     "key": {
       "exact": "pdxmesh"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Mesh object referencing a .mesh file with optional animations and texture overrides."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:102:rule:wrapper:object:arrowType",
     "context": "wrapper:object",
-    "parent_path": [],
     "key": {
       "exact": "arrowType"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Map arrow object: texture, normal, and specular maps plus the arrow shader effect."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:103:rule:wrapper:object:tradeRouteType",
     "context": "wrapper:object",
-    "parent_path": [],
     "key": {
       "exact": "tradeRouteType"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Trade route object: arrow texture set and a cull distance."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:104:rule:wrapper:object:pdxparticle",
     "context": "wrapper:object",
-    "parent_path": [],
     "key": {
       "exact": "pdxparticle"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Particle system object driven by a named particle type."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:105:rule:wrapper:object:PieChartType",
     "context": "wrapper:object",
-    "parent_path": [],
     "key": {
       "exact": "PieChartType"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Pie chart object sized in pixels."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:106:rule:wrapper:object:LineChartType",
     "context": "wrapper:object",
-    "parent_path": [],
     "key": {
       "exact": "LineChartType"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Line chart object sized in pixels with a line width."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
   {
     "id": "interface/gfx:107:rule:wrapper:object:animatedmaptext",
     "context": "wrapper:object",
-    "parent_path": [],
     "key": {
       "exact": "animatedmaptext"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Floating map text label with a scroll speed and one or more textblock style blocks."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
@@ -3027,22 +2203,13 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Localisation-rendered text of the label."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
@@ -3058,22 +2225,13 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Text colour as an RGB float block: color = { 1.0 1.0 0.0 }."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
@@ -3093,22 +2251,13 @@
       }
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "RGB channel value between 0.0 and 1.0."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
@@ -3126,22 +2275,13 @@
       "type": "bitmap_font"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Bitmap font name, declared by a bitmapfont block in an interface .gfx file."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
@@ -3157,22 +2297,13 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Pixel position of the text block: position = { x = 0 y = 0 }."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
@@ -3194,22 +2325,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Horizontal pixel offset."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
@@ -3231,22 +2353,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Vertical pixel offset."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   },
@@ -3262,22 +2375,13 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Text alignment within the block; vanilla uses centre."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "interface/*.gfx",
     "line": 1
   }

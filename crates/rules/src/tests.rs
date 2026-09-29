@@ -1,7 +1,7 @@
 use super::{
     DynamicDefinitionDescriptor, DynamicDefinitionUsage, FileCategory, FileMatcher,
     FileResolutionPolicy, GameProfile, KeyMatcher, ParserKind, ProfileMatchMode,
-    ProfileTextMatcher, RuleRecord, RuleSet, RuleShape, RulesModel, SemanticRule, TypeDescriptor,
+    ProfileTextMatcher, RuleSet, RuleShape, RulesModel, SemanticRule, TypeDescriptor,
     TypeRootScope, ValueMatcher,
 };
 use std::collections::BTreeMap;
@@ -213,31 +213,34 @@ fn profile_shape_matching_ignores_extensions_but_keeps_common_whitelist() {
 }
 
 #[test]
-fn canonical_hash_is_independent_of_record_insertion_order() {
-    let mut first = RulesModel {
-        game_id: "test-game".to_owned(),
-        ..RulesModel::default()
+fn canonical_hash_is_independent_of_catalog_insertion_order() {
+    let category = |id: &str, path_prefix: &str| FileCategory {
+        id: id.to_owned(),
+        parser: ParserKind::Script,
+        resolution: FileResolutionPolicy::Merge,
+        matcher: FileMatcher {
+            path_prefix: Some(path_prefix.to_owned()),
+            path_exact: None,
+            extensions: vec!["txt".to_owned()],
+            path_suffix: None,
+            path_exclude_prefixes: Vec::new(),
+            case_sensitive: false,
+        },
     };
-    let records = [
-        RuleRecord {
-            table: "types".to_owned(),
-            logical_id: "a".to_owned(),
-            source_order: 1,
-            fields: BTreeMap::from([(String::from("name"), String::from("event"))]),
-        },
-        RuleRecord {
-            table: "enums".to_owned(),
-            logical_id: "b".to_owned(),
-            source_order: 0,
-            fields: BTreeMap::from([(String::from("name"), String::from("scope"))]),
-        },
+    let categories = [
+        category("events", "events"),
+        category("decisions", "decisions"),
     ];
-    first.records.extend(records.clone());
-    let mut second = RulesModel {
+    let first = RulesModel {
         game_id: "test-game".to_owned(),
+        file_categories: categories.to_vec(),
         ..RulesModel::default()
     };
-    second.records.extend(records.into_iter().rev());
+    let second = RulesModel {
+        game_id: "test-game".to_owned(),
+        file_categories: categories.into_iter().rev().collect(),
+        ..RulesModel::default()
+    };
     assert_eq!(
         RuleSet::from_model(first).rule_hash(),
         RuleSet::from_model(second).rule_hash()
@@ -257,14 +260,12 @@ fn exact_semantic_rule_index_is_case_insensitive_and_excludes_dynamic_matchers()
         child_context: None,
         alternative_id: None,
         severity: None,
-        required: false,
         deprecated: false,
         documentation: Vec::new(),
         allowed_scopes: Vec::new(),
         push_scope: None,
         replace_scope: Vec::new(),
         min_occurs: None,
-        strict_min: false,
         max_occurs: None,
         source_file: String::new(),
         line: 0,

@@ -2,7 +2,6 @@
   {
     "id": "common/00_small_types_consolidated:141:rule:root:decree:cost",
     "context": "root:decree",
-    "parent_path": [],
     "key": {
       "exact": "cost"
     },
@@ -14,20 +13,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Cost in meritocracy of enacting the decree"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 41
@@ -35,7 +27,6 @@
   {
     "id": "common/00_small_types_consolidated:142:rule:root:decree:duration",
     "context": "root:decree",
-    "parent_path": [],
     "key": {
       "exact": "duration"
     },
@@ -47,20 +38,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Duration in days of the modifier of the decree"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 42
@@ -68,7 +52,6 @@
   {
     "id": "common/00_small_types_consolidated:144:rule:root:decree:potential",
     "context": "root:decree",
-    "parent_path": [],
     "key": {
       "exact": "potential"
     },
@@ -76,19 +59,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If false the decree will not appear"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 43
@@ -96,7 +73,6 @@
   {
     "id": "common/00_small_types_consolidated:146:rule:root:decree:trigger",
     "context": "root:decree",
-    "parent_path": [],
     "key": {
       "exact": "trigger"
     },
@@ -104,19 +80,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If false you will not be able to take the decree"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 44
@@ -124,7 +94,6 @@
   {
     "id": "common/00_small_types_consolidated:148:rule:root:decree:modifier",
     "context": "root:decree",
-    "parent_path": [],
     "key": {
       "exact": "modifier"
     },
@@ -132,19 +101,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Modifiers active during the duration of the decree"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 45
@@ -152,7 +115,6 @@
   {
     "id": "common/00_small_types_consolidated:150:rule:root:decree:effect",
     "context": "root:decree",
-    "parent_path": [],
     "key": {
       "exact": "effect"
     },
@@ -160,19 +122,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effects to run when the decree is enacted"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 46
@@ -180,7 +136,6 @@
   {
     "id": "common/00_small_types_consolidated:152:rule:root:decree:removed_effect",
     "context": "root:decree",
-    "parent_path": [],
     "key": {
       "exact": "removed_effect"
     },
@@ -188,19 +143,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effects to run when the decree is expired"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 47
@@ -222,20 +171,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 48
@@ -243,7 +185,6 @@
   {
     "id": "common/00_small_types_consolidated:155:rule:root:decree:ai_will_do",
     "context": "root:decree",
-    "parent_path": [],
     "key": {
       "exact": "ai_will_do"
     },
@@ -251,16 +192,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "ai_will_do has to be 10 for AI to do it (with >=99 Meritocracy)."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -276,7 +213,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 49

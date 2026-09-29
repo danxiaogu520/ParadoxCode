@@ -2,7 +2,6 @@
   {
     "id": "common/00_small_types_consolidated:227:rule:root:client_state:region",
     "context": "root:client_state",
-    "parent_path": [],
     "key": {
       "exact": "region"
     },
@@ -11,18 +10,10 @@
       "type": "region"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 90
@@ -39,18 +30,10 @@
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 91
@@ -68,23 +51,19 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ],
       [
@@ -93,7 +72,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 92
@@ -101,26 +79,16 @@
   {
     "id": "common/00_small_types_consolidated:231:rule:root:client_state:name",
     "context": "root:client_state",
-    "parent_path": [],
     "key": {
       "exact": "name"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 93
   }

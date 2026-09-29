@@ -2,7 +2,6 @@
   {
     "id": "common/00_small_types_consolidated:83:rule:root:achievement:id",
     "context": "root:achievement",
-    "parent_path": [],
     "key": {
       "exact": "id"
     },
@@ -14,18 +13,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 110
@@ -33,25 +24,16 @@
   {
     "id": "common/00_small_types_consolidated:84:rule:root:achievement:localization",
     "context": "root:achievement",
-    "parent_path": [],
     "key": {
       "exact": "localization"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 111
@@ -59,7 +41,6 @@
   {
     "id": "common/00_small_types_consolidated:86:rule:root:achievement:visible",
     "context": "root:achievement",
-    "parent_path": [],
     "key": {
       "exact": "visible"
     },
@@ -67,14 +48,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -86,7 +62,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 112
@@ -94,7 +69,6 @@
   {
     "id": "common/00_small_types_consolidated:88:rule:root:achievement:possible",
     "context": "root:achievement",
-    "parent_path": [],
     "key": {
       "exact": "possible"
     },
@@ -102,14 +76,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -121,7 +90,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 113
@@ -129,7 +97,6 @@
   {
     "id": "common/00_small_types_consolidated:90:rule:root:achievement:provinces_to_highlight",
     "context": "root:achievement",
-    "parent_path": [],
     "key": {
       "exact": "provinces_to_highlight"
     },
@@ -137,14 +104,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -156,7 +118,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 114
@@ -164,7 +125,6 @@
   {
     "id": "common/00_small_types_consolidated:92:rule:root:achievement:happened",
     "context": "root:achievement",
-    "parent_path": [],
     "key": {
       "exact": "happened"
     },
@@ -172,14 +132,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -191,7 +146,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 115

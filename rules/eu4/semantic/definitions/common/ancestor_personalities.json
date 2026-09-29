@@ -12,19 +12,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions checked when using the entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 162
@@ -42,17 +36,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 163
@@ -60,34 +47,26 @@
   {
     "id": "common/ancestor_personalities:47:rule:root:ancestor_personalities:ruler_allow",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "ruler_allow"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 164
@@ -105,19 +84,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions checked when using the entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 165
@@ -135,17 +108,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 166
@@ -153,25 +119,16 @@
   {
     "id": "common/ancestor_personalities:52:rule:root:ancestor_personalities:heir_allow",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "heir_allow"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 167
@@ -189,19 +146,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions checked when using the entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 168
@@ -219,17 +170,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 169
@@ -237,25 +181,16 @@
   {
     "id": "common/ancestor_personalities:57:rule:root:ancestor_personalities:consort_allow",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "consort_allow"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 170
@@ -263,7 +198,6 @@
   {
     "id": "common/ancestor_personalities:59:rule:root:ancestor_personalities:allow",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "allow"
     },
@@ -271,19 +205,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions checked when using the entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 171
@@ -291,7 +219,6 @@
   {
     "id": "common/ancestor_personalities:61:rule:root:ancestor_personalities:chance",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "chance"
     },
@@ -299,17 +226,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 172
@@ -317,7 +237,6 @@
   {
     "id": "common/ancestor_personalities:63:rule:root:ancestor_personalities:war_priority",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "war_priority"
     },
@@ -325,17 +244,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 173
@@ -357,20 +269,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 174
@@ -378,7 +283,6 @@
   {
     "id": "common/ancestor_personalities:66:rule:root:ancestor_personalities:ai_pick_ancestor",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "ai_pick_ancestor"
     },
@@ -386,19 +290,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Each level of skill is worth 50."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 175
@@ -406,7 +304,6 @@
   {
     "id": "common/ancestor_personalities:67:rule:root:ancestor_personalities:alliance_acceptance",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "alliance_acceptance"
     },
@@ -418,18 +315,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 176
@@ -437,7 +326,6 @@
   {
     "id": "common/ancestor_personalities:68:rule:root:ancestor_personalities:building_budget_multiplier",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "building_budget_multiplier"
     },
@@ -449,18 +337,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 177
@@ -468,25 +348,16 @@
   {
     "id": "common/ancestor_personalities:69:rule:root:ancestor_personalities:custom_ai_explanation",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "custom_ai_explanation"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 178
@@ -494,7 +365,6 @@
   {
     "id": "common/ancestor_personalities:70:rule:root:ancestor_personalities:different_religion_war_multiplier",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "different_religion_war_multiplier"
     },
@@ -506,18 +376,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 179
@@ -525,7 +387,6 @@
   {
     "id": "common/ancestor_personalities:71:rule:root:ancestor_personalities:easy_war_chance_multiplier",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "easy_war_chance_multiplier"
     },
@@ -537,18 +398,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 180
@@ -556,7 +409,6 @@
   {
     "id": "common/ancestor_personalities:72:rule:root:ancestor_personalities:enemy_strength_multiplier",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "enemy_strength_multiplier"
     },
@@ -568,18 +420,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 181
@@ -587,25 +431,16 @@
   {
     "id": "common/ancestor_personalities:73:rule:root:ancestor_personalities:fair_fights",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "fair_fights"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 182
@@ -613,7 +448,6 @@
   {
     "id": "common/ancestor_personalities:74:rule:root:ancestor_personalities:gift_chance",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "gift_chance"
     },
@@ -625,18 +459,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 183
@@ -644,7 +470,6 @@
   {
     "id": "common/ancestor_personalities:75:rule:root:ancestor_personalities:heathen_ally_acceptance",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "heathen_ally_acceptance"
     },
@@ -656,18 +481,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 184
@@ -675,7 +492,6 @@
   {
     "id": "common/ancestor_personalities:76:rule:root:ancestor_personalities:heretic_ally_acceptance",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "heretic_ally_acceptance"
     },
@@ -687,18 +503,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 185
@@ -706,25 +514,16 @@
   {
     "id": "common/ancestor_personalities:77:rule:root:ancestor_personalities:knowledge_sharing",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "knowledge_sharing"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 186
@@ -732,7 +531,6 @@
   {
     "id": "common/ancestor_personalities:78:rule:root:ancestor_personalities:nation_designer_cost",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "nation_designer_cost"
     },
@@ -744,18 +542,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 187
@@ -763,7 +553,6 @@
   {
     "id": "common/ancestor_personalities:79:rule:root:ancestor_personalities:other_ai_help_us_multiplier",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "other_ai_help_us_multiplier"
     },
@@ -775,18 +564,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 188
@@ -794,7 +575,6 @@
   {
     "id": "common/ancestor_personalities:80:rule:root:ancestor_personalities:other_ai_peace_term_bonus",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "other_ai_peace_term_bonus"
     },
@@ -806,18 +586,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 189
@@ -825,7 +597,6 @@
   {
     "id": "common/ancestor_personalities:81:rule:root:ancestor_personalities:other_ai_war_chance_multiplier",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "other_ai_war_chance_multiplier"
     },
@@ -837,18 +608,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 190
@@ -856,7 +619,6 @@
   {
     "id": "common/ancestor_personalities:82:rule:root:ancestor_personalities:peace_desire",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "peace_desire"
     },
@@ -868,18 +630,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 191
@@ -887,25 +641,16 @@
   {
     "id": "common/ancestor_personalities:83:rule:root:ancestor_personalities:wants_avoid_debase",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "wants_avoid_debase"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 192
@@ -913,25 +658,16 @@
   {
     "id": "common/ancestor_personalities:84:rule:root:ancestor_personalities:wants_avoid_loans",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "wants_avoid_loans"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 193
@@ -939,25 +675,16 @@
   {
     "id": "common/ancestor_personalities:85:rule:root:ancestor_personalities:wants_colonies",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "wants_colonies"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 194
@@ -965,25 +692,16 @@
   {
     "id": "common/ancestor_personalities:86:rule:root:ancestor_personalities:wants_condottieri",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "wants_condottieri"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 195
@@ -991,25 +709,16 @@
   {
     "id": "common/ancestor_personalities:87:rule:root:ancestor_personalities:wants_ecumenical_council",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "wants_ecumenical_council"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 196
@@ -1017,25 +726,16 @@
   {
     "id": "common/ancestor_personalities:88:rule:root:ancestor_personalities:wants_excommunicate",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "wants_excommunicate"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 197
@@ -1043,25 +743,16 @@
   {
     "id": "common/ancestor_personalities:89:rule:root:ancestor_personalities:wants_explorers",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "wants_explorers"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 198
@@ -1069,25 +760,16 @@
   {
     "id": "common/ancestor_personalities:90:rule:root:ancestor_personalities:wants_gold",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "wants_gold"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 199
@@ -1095,7 +777,6 @@
   {
     "id": "common/ancestor_personalities:91:rule:root:ancestor_personalities:wants_heathen_land",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "wants_heathen_land"
     },
@@ -1104,18 +785,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 200
@@ -1123,7 +796,6 @@
   {
     "id": "common/ancestor_personalities:92:rule:root:ancestor_personalities:wants_heretic_land",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "wants_heretic_land"
     },
@@ -1132,18 +804,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 201
@@ -1151,7 +815,6 @@
   {
     "id": "common/ancestor_personalities:93:rule:root:ancestor_personalities:wants_land",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "wants_land"
     },
@@ -1160,18 +823,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 202
@@ -1179,7 +834,6 @@
   {
     "id": "common/ancestor_personalities:94:rule:root:ancestor_personalities:war_chance_multiplier",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "war_chance_multiplier"
     },
@@ -1191,18 +845,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 203
@@ -1210,25 +856,16 @@
   {
     "id": "common/ancestor_personalities:95:rule:root:ancestor_personalities:random_insults",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "random_insults"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 204
@@ -1236,25 +873,16 @@
   {
     "id": "common/ancestor_personalities:96:rule:root:ancestor_personalities:razing",
     "context": "root:ancestor_personalities",
-    "parent_path": [],
     "key": {
       "exact": "razing"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 205

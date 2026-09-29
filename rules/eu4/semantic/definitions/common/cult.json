@@ -2,7 +2,6 @@
   {
     "id": "common/00_small_types_consolidated:117:rule:root:cult:sprite",
     "context": "root:cult",
-    "parent_path": [],
     "key": {
       "exact": "sprite"
     },
@@ -14,18 +13,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 27
@@ -33,7 +24,6 @@
   {
     "id": "common/00_small_types_consolidated:119:rule:root:cult:allow",
     "context": "root:cult",
-    "parent_path": [],
     "key": {
       "exact": "allow"
     },
@@ -41,16 +31,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions checked when using the entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -62,7 +48,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 28
@@ -84,20 +69,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 29
@@ -105,7 +83,6 @@
   {
     "id": "common/00_small_types_consolidated:122:rule:root:cult:ai_will_do",
     "context": "root:cult",
-    "parent_path": [],
     "key": {
       "exact": "ai_will_do"
     },
@@ -113,16 +90,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "AI weighting block: factor = base weight, modifier blocks adjust it."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -134,7 +107,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 30
@@ -142,7 +114,6 @@
   {
     "id": "common/00_small_types_consolidated:124:rule:root:cult:effect",
     "context": "root:cult",
-    "parent_path": [],
     "key": {
       "exact": "effect"
     },
@@ -150,16 +121,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of effects executed by the containing entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -171,7 +138,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 31
@@ -179,7 +145,6 @@
   {
     "id": "common/00_small_types_consolidated:126:rule:root:cult:removed_effect",
     "context": "root:cult",
-    "parent_path": [],
     "key": {
       "exact": "removed_effect"
     },
@@ -187,14 +152,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -206,7 +166,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 32

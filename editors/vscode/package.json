@@ -1388,6 +1388,7 @@
     "package": "npm run compile && vsce package",
     "perf:probe": "node scripts/probe.mjs",
     "sweep": "node scripts/sweep.mjs",
+    "baseline": "node scripts/baseline.mjs",
     "mcp": "node scripts/mcp.mjs"
   },
   "dependencies": {

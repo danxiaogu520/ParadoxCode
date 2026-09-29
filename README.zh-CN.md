@@ -137,7 +137,7 @@ cargo run -p rules --bin bake -- build \
 
 官方 `paradoxcode` 二进制内嵌第一方 JSON 规则源，启动时直接编译进内存规则集；不存在持久化的规则工件。
 
-EU4 规则源按职责拆分：`catalog/` 保存文件类别、符号描述符与规范化记录，`semantic/` 按
+EU4 规则源按职责拆分：`catalog/` 保存文件类别，`semantic/` 按
 effect、trigger、modifier、on_action 以及 event、decision、mission、history 等目录语义组织规则，
 `types/`、`values/`、`localisation/` 保存支撑表，`profile/` 保存 EU4 的扫描路径、符号、作用域、
 动态值和语义继承配置。`rules/eu4/manifest.json` 显式列出全部片段；编译器把它们合并成一个
@@ -187,7 +187,7 @@ node editors/vscode/scripts/diagnose.mjs \
 | `rules/eu4/` | 权威第一方 EU4 规则树（catalog、semantic、支撑表与 profile） |
 | `fuzz/` | 解析、编辑、格式化与 HIR 模糊测试目标 |
 
-当前第一方 EU4 规则面向游戏版本 **1.37.5**（8,525 条语义规则、121 个文件类别、2,667 个符号描述符）。
+当前第一方 EU4 规则面向游戏版本 **1.37.5**（8,463 条语义规则、124 个文件类别）。
 `rules/manifest.json` 记录 schema/source 版本、规范 `rule_hash` 与工件校验和。
 
 ## 发布

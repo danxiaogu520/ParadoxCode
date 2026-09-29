@@ -11,18 +11,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2611
@@ -30,7 +22,6 @@
   {
     "id": "common/personalities:15:rule:root:leader_personality:allow",
     "context": "root:leader_personality",
-    "parent_path": [],
     "key": {
       "exact": "allow"
     },
@@ -38,16 +29,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions checked when using the entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -59,7 +46,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2612
@@ -77,16 +63,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions checked when using the entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -98,7 +80,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2613
@@ -116,14 +97,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -135,7 +111,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2614
@@ -143,25 +118,16 @@
   {
     "id": "common/personalities:22:rule:root:ruler_personality:ruler_allow",
     "context": "root:ruler_personality",
-    "parent_path": [],
     "key": {
       "exact": "ruler_allow"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2615
@@ -179,16 +145,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions checked when using the entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -200,7 +162,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2616
@@ -218,14 +179,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -237,7 +193,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2617
@@ -245,25 +200,16 @@
   {
     "id": "common/personalities:27:rule:root:ruler_personality:heir_allow",
     "context": "root:ruler_personality",
-    "parent_path": [],
     "key": {
       "exact": "heir_allow"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2618
@@ -281,16 +227,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions checked when using the entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -302,7 +244,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2619
@@ -320,14 +261,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -339,7 +275,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2620
@@ -347,25 +282,16 @@
   {
     "id": "common/personalities:32:rule:root:ruler_personality:consort_allow",
     "context": "root:ruler_personality",
-    "parent_path": [],
     "key": {
       "exact": "consort_allow"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2621
@@ -373,7 +299,6 @@
   {
     "id": "common/personalities:34:rule:root:ruler_personality:allow",
     "context": "root:ruler_personality",
-    "parent_path": [],
     "key": {
       "exact": "allow"
     },
@@ -381,16 +306,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions checked when using the entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -402,7 +323,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2622
@@ -410,7 +330,6 @@
   {
     "id": "common/personalities:36:rule:root:ruler_personality:chance",
     "context": "root:ruler_personality",
-    "parent_path": [],
     "key": {
       "exact": "chance"
     },
@@ -418,14 +337,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -437,7 +351,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2623
@@ -445,25 +358,16 @@
   {
     "id": "common/personalities:37:rule:root:ruler_personality:custom_ai_explanation",
     "context": "root:ruler_personality",
-    "parent_path": [],
     "key": {
       "exact": "custom_ai_explanation"
     },
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2624
@@ -471,7 +375,6 @@
   {
     "id": "common/personalities:41:rule:root:ruler_personality:war_priority",
     "context": "root:ruler_personality",
-    "parent_path": [],
     "key": {
       "exact": "war_priority"
     },
@@ -479,26 +382,20 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2625
@@ -506,7 +403,6 @@
   {
     "id": "common/personalities:42:rule:root:ruler_personality:nation_designer_cost",
     "context": "root:ruler_personality",
-    "parent_path": [],
     "key": {
       "exact": "nation_designer_cost"
     },
@@ -518,18 +414,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2626
@@ -537,7 +425,6 @@
   {
     "id": "common/personalities:43:rule:root:ruler_personality:immortal",
     "context": "root:ruler_personality",
-    "parent_path": [],
     "key": {
       "exact": "immortal"
     },
@@ -546,18 +433,10 @@
       "exact": "1"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2627
@@ -565,7 +444,6 @@
   {
     "id": "common/personalities:44:rule:root:ruler_personality:static",
     "context": "root:ruler_personality",
-    "parent_path": [],
     "key": {
       "exact": "static"
     },
@@ -574,20 +452,13 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Makes nation_designer_cost not scale with age etc."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2628

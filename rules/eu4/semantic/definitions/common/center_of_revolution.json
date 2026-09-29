@@ -16,20 +16,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 320
@@ -37,7 +30,6 @@
   {
     "id": "common/center_of_revolution:5:rule:root:center_of_revolution_conversion:target_province_weights",
     "context": "root:center_of_revolution_conversion",
-    "parent_path": [],
     "key": {
       "exact": "target_province_weights"
     },
@@ -45,16 +37,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "FROM = center of revolution"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -70,7 +58,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 321
@@ -78,7 +65,6 @@
   {
     "id": "common/center_of_revolution:7:rule:root:center_of_revolution_conversion:revolution_province_modifiers",
     "context": "root:center_of_revolution_conversion",
-    "parent_path": [],
     "key": {
       "exact": "revolution_province_modifiers"
     },
@@ -86,9 +72,6 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Values at 100 Absolutism"
     ],
@@ -96,9 +79,7 @@
       "any"
     ],
     "push_scope": "province",
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 322
@@ -106,7 +87,6 @@
   {
     "id": "common/center_of_revolution:9:rule:root:center_of_revolution_conversion:zeal_modifiers",
     "context": "root:center_of_revolution_conversion",
-    "parent_path": [],
     "key": {
       "exact": "zeal_modifiers"
     },
@@ -114,9 +94,6 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Values at 100 Revolutionary Zeal"
     ],
@@ -124,9 +101,7 @@
       "any"
     ],
     "push_scope": "country",
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 323

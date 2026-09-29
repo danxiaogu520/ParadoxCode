@@ -2,7 +2,6 @@
   {
     "id": "common/defender_of_faith:10:rule:root:defender_faith:modifier",
     "context": "root:defender_faith",
-    "parent_path": [],
     "key": {
       "exact": "modifier"
     },
@@ -10,19 +9,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of modifiers applied while the containing entry is active."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 438
@@ -30,7 +23,6 @@
   {
     "id": "common/defender_of_faith:12:rule:root:defender_faith:same_faith_modifier",
     "context": "root:defender_faith",
-    "parent_path": [],
     "key": {
       "exact": "same_faith_modifier"
     },
@@ -38,17 +30,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 439
@@ -70,20 +55,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 440
@@ -91,7 +69,6 @@
   {
     "id": "common/defender_of_faith:15:rule:root:defender_faith:ai_will_do",
     "context": "root:defender_faith",
-    "parent_path": [],
     "key": {
       "exact": "ai_will_do"
     },
@@ -99,19 +76,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "AI weighting block: factor = base weight, modifier blocks adjust it."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 441
@@ -119,7 +90,6 @@
   {
     "id": "common/defender_of_faith:6:rule:root:defender_faith:level",
     "context": "root:defender_faith",
-    "parent_path": [],
     "key": {
       "exact": "level"
     },
@@ -131,18 +101,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 442
@@ -150,7 +112,6 @@
   {
     "id": "common/defender_of_faith:7:rule:root:defender_faith:range_to",
     "context": "root:defender_faith",
-    "parent_path": [],
     "key": {
       "exact": "range_to"
     },
@@ -162,18 +123,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 443
@@ -181,7 +134,6 @@
   {
     "id": "common/defender_of_faith:8:rule:root:defender_faith:range_from",
     "context": "root:defender_faith",
-    "parent_path": [],
     "key": {
       "exact": "range_from"
     },
@@ -193,18 +145,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 444

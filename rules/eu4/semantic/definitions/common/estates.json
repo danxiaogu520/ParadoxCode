@@ -2,7 +2,6 @@
   {
     "id": "common/estates:100:rule:root:estate_privilege:on_revoked_province",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "on_revoked_province"
     },
@@ -10,16 +9,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effects executed upon the privilege being revoked by the country"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "this",
@@ -27,7 +22,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 529
@@ -35,7 +29,6 @@
   {
     "id": "common/estates:102:rule:root:estate_privilege:on_invalid",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "on_invalid"
     },
@@ -43,19 +36,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effects executed upon the privilege being removed due to invalidity (is_valid becomes false or the estate is removed)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 530
@@ -63,7 +50,6 @@
   {
     "id": "common/estates:104:rule:root:estate_privilege:on_invalid_province",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "on_invalid_province"
     },
@@ -71,16 +57,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effects executed upon the privilege being removed due to invalidity (is_valid becomes false or the estate is removed)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "this",
@@ -88,7 +70,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 531
@@ -96,7 +77,6 @@
   {
     "id": "common/estates:106:rule:root:estate_privilege:benefits",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "benefits"
     },
@@ -104,19 +84,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Positive modifiers granted while the privilege is active (creates different tooltip to penalties)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 532
@@ -124,7 +98,6 @@
   {
     "id": "common/estates:108:rule:root:estate_privilege:penalties",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "penalties"
     },
@@ -132,19 +105,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Negative modifiers granted while the privilege is active (creates different tooltip to benefits)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 533
@@ -162,19 +129,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 534
@@ -192,20 +153,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of modifiers applied while the containing entry is active."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 535
   },
@@ -221,20 +175,13 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Specifies whether the tooltip should list it as positive or not"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 536
@@ -242,28 +189,19 @@
   {
     "id": "common/estates:114:rule:root:estate_privilege:conditional_modifier",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "conditional_modifier"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Modifier that are applied if the specified conditions are true."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 537
   },
@@ -280,19 +218,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Conditions under which this modifier will be active, if empty it will be always"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 538
@@ -310,19 +242,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of modifiers applied while the containing entry is active."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 539
@@ -339,20 +265,13 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Specifies whether the tooltip should list it as positive or not"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 540
@@ -360,28 +279,19 @@
   {
     "id": "common/estates:120:rule:root:estate_privilege:influence_scaled_conditional_modifier",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "influence_scaled_conditional_modifier"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Modifier that are applied if the specified conditions are true. At 100% Influence you gain 100% of the modifier."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 541
   },
@@ -398,19 +308,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 542
@@ -428,19 +332,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of modifiers applied while the containing entry is active."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 543
@@ -457,20 +355,13 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Specifies whether the tooltip should list it as positive or not"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 544
@@ -478,35 +369,25 @@
   {
     "id": "common/estates:126:rule:root:estate_privilege:loyalty_scaled_conditional_modifier",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "loyalty_scaled_conditional_modifier"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Modifier that is applied if specified conditions are true, with its effect scaling on the loyalty of the estate"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 545
   },
   {
     "id": "common/estates:128:rule:root:estate_privilege:modifier_by_land_ownership",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "modifier_by_land_ownership"
     },
@@ -514,19 +395,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Multiplies the modifier by the % of land owned by the estate."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 546
@@ -538,23 +413,14 @@
       "mechanics"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "enables_cossack_regiments"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 547
@@ -566,23 +432,14 @@
       "mechanics"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "enables_rajput_regiments"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 548
@@ -594,23 +451,14 @@
       "mechanics"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "exempt_from_seize_land"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 549
@@ -622,23 +470,14 @@
       "mechanics"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "can_veto_heirs"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 550
@@ -650,23 +489,14 @@
       "mechanics"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "vassal_liberty_affected_by_loyalty"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 551
@@ -678,23 +508,14 @@
       "mechanics"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "can_give_agendas_without_interaction"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 552
@@ -706,23 +527,14 @@
       "mechanics"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "no_estate_crownland_loss_from_developing"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 553
@@ -730,27 +542,19 @@
   {
     "id": "common/estates:136:rule:root:estate_privilege:mechanics",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "mechanics"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Special mechanics the privilege enables"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 554
@@ -758,7 +562,6 @@
   {
     "id": "common/estates:137:rule:root:estate_privilege:cooldown_years",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "cooldown_years"
     },
@@ -770,20 +573,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Time limit before which the privilege cannot be revoked"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 555
@@ -791,7 +587,6 @@
   {
     "id": "common/estates:139:rule:root:estate_privilege:on_cooldown_expires",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "on_cooldown_expires"
     },
@@ -799,19 +594,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effect executed once the specified cooldown_years timer has run down"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 556
@@ -833,20 +622,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 557
@@ -854,7 +636,6 @@
   {
     "id": "common/estates:142:rule:root:estate_privilege:ai_will_do",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "ai_will_do"
     },
@@ -862,19 +643,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "AI weighting block: factor = base weight, modifier blocks adjust it."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 558
@@ -886,23 +661,14 @@
       "additional_description"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "cossacks_regiment"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 559
@@ -914,23 +680,14 @@
       "additional_description"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "rajput_regiment"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 560
@@ -942,49 +699,31 @@
       "additional_description"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": "any_scalar",
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 561
   },
   {
     "id": "common/estates:146:rule:root:estate_privilege:additional_description",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "additional_description"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "You can put static modifier names here as well as normal localisation keys"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 562
@@ -992,7 +731,6 @@
   {
     "id": "common/estates:148:rule:root:estate_agenda:max_days_active",
     "context": "root:estate_agenda",
-    "parent_path": [],
     "key": {
       "exact": "max_days_active"
     },
@@ -1004,20 +742,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Lets you override the default of 20 years for an agenda"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 563
@@ -1025,7 +756,6 @@
   {
     "id": "common/estates:150:rule:root:estate_agenda:can_select",
     "context": "root:estate_agenda",
-    "parent_path": [],
     "key": {
       "exact": "can_select"
     },
@@ -1033,19 +763,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Conditions for whether the agenda can be offered to you"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 564
@@ -1053,7 +777,6 @@
   {
     "id": "common/estates:152:rule:root:estate_agenda:provinces_to_highlight",
     "context": "root:estate_agenda",
-    "parent_path": [],
     "key": {
       "exact": "provinces_to_highlight"
     },
@@ -1061,9 +784,6 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Conditions for provinces to be highlighted by the agenda. Root = country, this = province."
     ],
@@ -1071,9 +791,7 @@
       "any"
     ],
     "push_scope": "province",
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 565
@@ -1090,25 +808,18 @@
     "operator": "=",
     "value": {
       "float": {
-        "min": "1",
+        "min": 1,
         "max": null
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 566
@@ -1116,7 +827,6 @@
   {
     "id": "common/estates:155:rule:root:estate_agenda:selection_weight",
     "context": "root:estate_agenda",
-    "parent_path": [],
     "key": {
       "exact": "selection_weight"
     },
@@ -1124,19 +834,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Determines how likely (compared to the estate's other agendas) this agenda is to be selected. Initial factor will ignore numbers below 1, use a modifier for that!"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 567
@@ -1144,7 +848,6 @@
   {
     "id": "common/estates:157:rule:root:estate_agenda:fail_if",
     "context": "root:estate_agenda",
-    "parent_path": [],
     "key": {
       "exact": "fail_if"
     },
@@ -1152,19 +855,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Conditions for when the agenda should be auto-failed"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 568
@@ -1172,7 +869,6 @@
   {
     "id": "common/estates:159:rule:root:estate_agenda:pre_effect",
     "context": "root:estate_agenda",
-    "parent_path": [],
     "key": {
       "exact": "pre_effect"
     },
@@ -1180,19 +876,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effects executed to set up the task (set flags and targets), before it is shown to the player."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 569
@@ -1200,7 +890,6 @@
   {
     "id": "common/estates:161:rule:root:estate_agenda:task_requirements",
     "context": "root:estate_agenda",
-    "parent_path": [],
     "key": {
       "exact": "task_requirements"
     },
@@ -1208,19 +897,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Conditions for completing the task successfully"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 570
@@ -1228,7 +911,6 @@
   {
     "id": "common/estates:163:rule:root:estate_agenda:immediate_effect",
     "context": "root:estate_agenda",
-    "parent_path": [],
     "key": {
       "exact": "immediate_effect"
     },
@@ -1236,19 +918,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effects executed when the agenda is accepted by the country"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 571
@@ -1256,7 +932,6 @@
   {
     "id": "common/estates:165:rule:root:estate_agenda:task_completed_effect",
     "context": "root:estate_agenda",
-    "parent_path": [],
     "key": {
       "exact": "task_completed_effect"
     },
@@ -1264,19 +939,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effects executed when the agenda is successfully completed"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 572
@@ -1284,7 +953,6 @@
   {
     "id": "common/estates:167:rule:root:estate_agenda:failing_effect",
     "context": "root:estate_agenda",
-    "parent_path": [],
     "key": {
       "exact": "failing_effect"
     },
@@ -1292,19 +960,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effects executed when the agenda is failed (i.e. when fail_if is true or time runs out)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 573
@@ -1312,7 +974,6 @@
   {
     "id": "common/estates:169:rule:root:estate_agenda:on_invalid",
     "context": "root:estate_agenda",
-    "parent_path": [],
     "key": {
       "exact": "on_invalid"
     },
@@ -1320,19 +981,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effects executed when the country no longer has that estate or the invalid_trigger is true. Useful for clearing flags, modifiers etc."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 574
@@ -1340,7 +995,6 @@
   {
     "id": "common/estates:171:rule:root:estate_agenda:invalid_trigger",
     "context": "root:estate_agenda",
-    "parent_path": [],
     "key": {
       "exact": "invalid_trigger"
     },
@@ -1348,19 +1002,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Conditions for when the agenda should end without it counting as a fail (executing on_invalid rather than failing_effect). Happens by default it the estate giving the agenda is removed."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 575
@@ -1368,7 +1016,6 @@
   {
     "id": "common/estates:173:rule:root:estate_agenda:modifier",
     "context": "root:estate_agenda",
-    "parent_path": [],
     "key": {
       "exact": "modifier"
     },
@@ -1376,19 +1023,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Country modifier granted while the agenda is active"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 576
@@ -1396,25 +1037,16 @@
   {
     "id": "common/estates:175:rule:root:estate_interaction:key",
     "context": "root:estate_interaction",
-    "parent_path": [],
     "key": {
       "exact": "key"
     },
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 577
@@ -1422,7 +1054,6 @@
   {
     "id": "common/estates:176:rule:root:estate_interaction:random_seed",
     "context": "root:estate_interaction",
-    "parent_path": [],
     "key": {
       "exact": "random_seed"
     },
@@ -1431,18 +1062,10 @@
       "exact": "crown_land_share"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 578
@@ -1450,7 +1073,6 @@
   {
     "id": "common/estates:177:rule:root:estate_interaction:random_seed",
     "context": "root:estate_interaction",
-    "parent_path": [],
     "key": {
       "exact": "random_seed"
     },
@@ -1459,18 +1081,10 @@
       "exact": "random"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 579
@@ -1478,7 +1092,6 @@
   {
     "id": "common/estates:178:rule:root:estate_interaction:cooldown_months",
     "context": "root:estate_interaction",
-    "parent_path": [],
     "key": {
       "exact": "cooldown_months"
     },
@@ -1490,18 +1103,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 580
@@ -1509,7 +1114,6 @@
   {
     "id": "common/estates:180:rule:root:estate_interaction:trigger",
     "context": "root:estate_interaction",
-    "parent_path": [],
     "key": {
       "exact": "trigger"
     },
@@ -1517,9 +1121,6 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
@@ -1527,9 +1128,7 @@
       "any"
     ],
     "push_scope": "country",
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 581
@@ -1537,7 +1136,6 @@
   {
     "id": "common/estates:182:rule:root:estate_interaction:effect",
     "context": "root:estate_interaction",
-    "parent_path": [],
     "key": {
       "exact": "effect"
     },
@@ -1545,9 +1143,6 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of effects executed by the containing entry."
     ],
@@ -1555,9 +1150,7 @@
       "any"
     ],
     "push_scope": "country",
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 582
@@ -1579,20 +1172,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 583
@@ -1600,7 +1186,6 @@
   {
     "id": "common/estates:185:rule:root:estate_interaction:ai_will_do",
     "context": "root:estate_interaction",
-    "parent_path": [],
     "key": {
       "exact": "ai_will_do"
     },
@@ -1608,9 +1193,6 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "AI weighting block: factor = base weight, modifier blocks adjust it."
     ],
@@ -1618,9 +1200,7 @@
       "any"
     ],
     "push_scope": "country",
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 584
@@ -1628,25 +1208,16 @@
   {
     "id": "common/estates:187:rule:root:estate_crown_land_bonus:key",
     "context": "root:estate_crown_land_bonus",
-    "parent_path": [],
     "key": {
       "exact": "key"
     },
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 585
@@ -1654,7 +1225,6 @@
   {
     "id": "common/estates:188:rule:root:estate_crown_land_bonus:range_from",
     "context": "root:estate_crown_land_bonus",
-    "parent_path": [],
     "key": {
       "exact": "range_from"
     },
@@ -1666,18 +1236,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 586
@@ -1685,7 +1247,6 @@
   {
     "id": "common/estates:189:rule:root:estate_crown_land_bonus:range_to",
     "context": "root:estate_crown_land_bonus",
-    "parent_path": [],
     "key": {
       "exact": "range_to"
     },
@@ -1697,18 +1258,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 587
@@ -1716,7 +1269,6 @@
   {
     "id": "common/estates:191:rule:root:estate_crown_land_bonus:modifier",
     "context": "root:estate_crown_land_bonus",
-    "parent_path": [],
     "key": {
       "exact": "modifier"
     },
@@ -1724,9 +1276,6 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of modifiers applied while the containing entry is active."
     ],
@@ -1734,9 +1283,7 @@
       "any"
     ],
     "push_scope": "country",
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 588
@@ -1744,7 +1291,6 @@
   {
     "id": "common/estates:32:rule:root:estate:icon",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "icon"
     },
@@ -1756,18 +1302,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 589
@@ -1775,7 +1313,6 @@
   {
     "id": "common/estates:33:rule:root:estate:other_religion_group_only",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "other_religion_group_only"
     },
@@ -1784,18 +1321,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 590
@@ -1807,7 +1336,6 @@
       "color"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "int": {
         "min": 0,
@@ -1815,18 +1343,10 @@
       }
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 3,
-    "strict_min": true,
     "max_occurs": 3,
     "source_file": "semantic-rules.json",
     "line": 591
@@ -1834,25 +1354,16 @@
   {
     "id": "common/estates:35:rule:root:estate:color",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "color"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 592
@@ -1860,7 +1371,6 @@
   {
     "id": "common/estates:36:rule:root:estate:independence_government",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "independence_government"
     },
@@ -1869,20 +1379,13 @@
       "type": "government"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Used for when declaring independence"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 593
@@ -1890,7 +1393,6 @@
   {
     "id": "common/estates:37:rule:root:estate:starting_reform",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "starting_reform"
     },
@@ -1899,18 +1401,10 @@
       "type": "government_reform"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 594
@@ -1918,7 +1412,6 @@
   {
     "id": "common/estates:38:rule:root:estate:independence_tech_group",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "independence_tech_group"
     },
@@ -1927,18 +1420,10 @@
       "type": "technology_group"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 595
@@ -1946,7 +1431,6 @@
   {
     "id": "common/estates:40:rule:root:estate:independence_trigger",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "independence_trigger"
     },
@@ -1954,28 +1438,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Used for when declaring independence"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 596
@@ -1983,7 +1462,6 @@
   {
     "id": "common/estates:42:rule:root:estate:trigger",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "trigger"
     },
@@ -1991,28 +1469,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If true, country will get estate"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 597
@@ -2020,7 +1493,6 @@
   {
     "id": "common/estates:44:rule:root:estate:country_modifier_happy",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "country_modifier_happy"
     },
@@ -2028,19 +1500,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "These scale with loyalty & power"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 598
@@ -2048,7 +1514,6 @@
   {
     "id": "common/estates:46:rule:root:estate:country_modifier_neutral",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "country_modifier_neutral"
     },
@@ -2056,19 +1521,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "These scale with loyalty & power"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 599
@@ -2076,7 +1535,6 @@
   {
     "id": "common/estates:48:rule:root:estate:country_modifier_angry",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "country_modifier_angry"
     },
@@ -2084,19 +1542,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "These scale with loyalty & power"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 600
@@ -2104,7 +1556,6 @@
   {
     "id": "common/estates:50:rule:root:estate:land_ownership_modifier",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "land_ownership_modifier"
     },
@@ -2112,19 +1563,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "These scale with loyalty & power"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 601
@@ -2132,7 +1577,6 @@
   {
     "id": "common/estates:51:rule:root:estate:base_influence",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "base_influence"
     },
@@ -2144,18 +1588,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 602
@@ -2172,18 +1608,10 @@
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 603
@@ -2201,28 +1629,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 604
@@ -2244,18 +1667,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 605
@@ -2263,26 +1678,16 @@
   {
     "id": "common/estates:56:rule:root:estate:influence_modifier",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "influence_modifier"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 606
   },
@@ -2298,18 +1703,10 @@
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 607
@@ -2327,28 +1724,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 608
@@ -2370,18 +1762,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 609
@@ -2389,26 +1773,16 @@
   {
     "id": "common/estates:61:rule:root:estate:loyalty_modifier",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "loyalty_modifier"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 610
   },
@@ -2424,18 +1798,10 @@
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 611
@@ -2453,28 +1819,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 612
@@ -2482,28 +1843,19 @@
   {
     "id": "common/estates:65:rule:root:estate:custom_name",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "custom_name"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Alternative naming of estates"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 613
   },
@@ -2519,18 +1871,10 @@
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 614
@@ -2548,28 +1892,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 615
@@ -2577,26 +1916,16 @@
   {
     "id": "common/estates:69:rule:root:estate:custom_desc",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "custom_desc"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 616
   },
@@ -2617,20 +1946,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 617
@@ -2638,7 +1960,6 @@
   {
     "id": "common/estates:72:rule:root:estate:province_independence_weight",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "province_independence_weight"
     },
@@ -2646,28 +1967,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "For each province bordering another country, the neighboring provinces with the highest weights are added, until (share of land ownership * total development) is reached. From all these tries (It will do 32 of the highest weight border provinces at most), the result with the highest total sum of weights is then selected and these provinces then become the new country."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 618
@@ -2675,7 +1991,6 @@
   {
     "id": "common/estates:73:rule:root:estate:influence_from_dev_modifier",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "influence_from_dev_modifier"
     },
@@ -2687,18 +2002,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 619
@@ -2706,7 +2013,6 @@
   {
     "id": "common/estates:74:rule:root:estate:contributes_to_curia_treasury",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "contributes_to_curia_treasury"
     },
@@ -2715,18 +2021,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 620
@@ -2738,49 +2036,30 @@
       "privileges"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "estate_privilege"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 621
   },
   {
     "id": "common/estates:76:rule:root:estate:privileges",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "privileges"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 622
@@ -2792,49 +2071,30 @@
       "agendas"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "estate_agenda"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 623
   },
   {
     "id": "common/estates:78:rule:root:estate:agendas",
     "context": "root:estate",
-    "parent_path": [],
     "key": {
       "exact": "agendas"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 624
@@ -2842,25 +2102,16 @@
   {
     "id": "common/estates:80:rule:root:estate_privilege:icon",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "icon"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 625
@@ -2868,7 +2119,6 @@
   {
     "id": "common/estates:81:rule:root:estate_privilege:land_share",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "land_share"
     },
@@ -2880,18 +2130,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 626
@@ -2899,7 +2141,6 @@
   {
     "id": "common/estates:82:rule:root:estate_privilege:max_absolutism",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "max_absolutism"
     },
@@ -2911,18 +2152,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 627
@@ -2930,30 +2163,21 @@
   {
     "id": "common/estates:83:rule:root:estate_privilege:loyalty",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "loyalty"
     },
     "operator": "=",
     "value": {
       "float": {
-        "min": "-0.95",
-        "max": "0.95"
+        "min": -0.95,
+        "max": 0.95
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 628
@@ -2961,30 +2185,21 @@
   {
     "id": "common/estates:84:rule:root:estate_privilege:influence",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "influence"
     },
     "operator": "=",
     "value": {
       "float": {
-        "min": "-0.95",
-        "max": "0.95"
+        "min": -0.95,
+        "max": 0.95
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 629
@@ -2992,7 +2207,6 @@
   {
     "id": "common/estates:85:rule:root:estate_privilege:check_valid_when_tag_switching",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "check_valid_when_tag_switching"
     },
@@ -3001,20 +2215,13 @@
       "exact": "no"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Defaults to yes"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 630
@@ -3022,7 +2229,6 @@
   {
     "id": "common/estates:87:rule:root:estate_privilege:is_valid",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "is_valid"
     },
@@ -3030,19 +2236,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Conditions for whether it is possible for the country to have this privilege (it will not display on the list if they are false, and will be revoked if it has already been granted)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 631
@@ -3050,27 +2250,19 @@
   {
     "id": "common/estates:88:rule:root:estate_privilege:can_revoke",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "can_revoke"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Conditions for whether it is possible for the country to revoke this privilege"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 632
@@ -3078,7 +2270,6 @@
   {
     "id": "common/estates:90:rule:root:estate_privilege:can_select",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "can_select"
     },
@@ -3086,19 +2277,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Conditions for whether the country is allowed to select the privilege (with conditions for why not displayed)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 633
@@ -3106,7 +2291,6 @@
   {
     "id": "common/estates:92:rule:root:estate_privilege:on_granted",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "on_granted"
     },
@@ -3114,19 +2298,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effects executed immediately upon the privilege being taken"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 634
@@ -3134,7 +2312,6 @@
   {
     "id": "common/estates:94:rule:root:estate_privilege:on_granted_province",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "on_granted_province"
     },
@@ -3142,16 +2319,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effects executed immediately upon the privilege being taken"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "this",
@@ -3159,7 +2332,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 635
@@ -3167,7 +2339,6 @@
   {
     "id": "common/estates:96:rule:root:estate_privilege:can_revoke",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "can_revoke"
     },
@@ -3175,19 +2346,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Conditions for whether the country can revoke the privilege"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 636
@@ -3195,7 +2360,6 @@
   {
     "id": "common/estates:98:rule:root:estate_privilege:on_revoked",
     "context": "root:estate_privilege",
-    "parent_path": [],
     "key": {
       "exact": "on_revoked"
     },
@@ -3203,19 +2367,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effects executed upon the privilege being revoked by the country"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 637

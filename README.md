@@ -202,9 +202,8 @@ cargo run -p rules --bin bake -- build \
 Official `paradoxcode` binaries embed the first-party JSON source and compile it straight into
 the in-memory rule set at startup; there is no persisted rules artifact.
 
-The EU4 source is intentionally split by responsibility. `catalog/` contains file categories,
-symbol descriptors, and normalized records; `semantic/` contains executable rule alternatives
-grouped by context and game-directory schema; `types/`, `values/`, and `localisation/` contain
+The EU4 source is intentionally split by responsibility. `catalog/` contains the file categories;
+`semantic/` contains executable rule alternatives grouped by context and game-directory schema; `types/`, `values/`, and `localisation/` contain
 the supporting semantic tables; and `profile/` contains the data-only EU4 filesystem, scope,
 symbol, dynamic-value, and semantic-inheritance profile. `rules/eu4/manifest.json` lists every
 fragment explicitly. The compiler merges those fragments into one logical `RulesModel`, and the
@@ -319,8 +318,8 @@ change the automation threshold. Use `--help` for all options.
 | `rules/eu4/` | Authoritative first-party EU4 rule tree (catalog, semantic, supporting tables, profile) |
 | `fuzz/` | Parser, edit, formatter, and HIR fuzz targets |
 
-The current first-party EU4 rules target game version **1.37.5** (8,525 semantic rules, 121 file
-categories, 2,667 symbol descriptors). The generated release manifest in `rules/manifest.json`
+The current first-party EU4 rules target game version **1.37.5** (8,463 semantic rules and 124 file
+categories). The generated release manifest in `rules/manifest.json`
 records the schema version, source format, canonical `rule_hash`, and artifact checksum.
 
 ## Releases

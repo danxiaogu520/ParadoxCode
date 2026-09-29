@@ -12,16 +12,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If 'po_demand_provinces' is on, badboy_factor applies to these provinces."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -37,7 +33,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 234
@@ -55,16 +50,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If 'po_demand_provinces' is on, badboy_factor applies to these provinces."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -80,7 +71,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 235
@@ -99,18 +89,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 236
@@ -129,20 +111,13 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Always allow annexation (even if other rules disallow)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 237
@@ -161,20 +136,13 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Always deny annexation (even if other rules allows it)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 238
@@ -192,14 +160,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -215,7 +178,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 239
@@ -237,20 +199,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Multiplied with the cost for transfering trade power."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 240
@@ -263,24 +218,14 @@
       "required_treaty_to_take_provinces"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 241
   },
@@ -292,24 +237,14 @@
       "required_treaty_to_take_provinces"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "enum": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 242
   },
@@ -325,18 +260,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 243
@@ -349,24 +276,14 @@
       "required_treaty_to_take_provinces"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 244
   },
@@ -382,18 +299,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 245
@@ -406,24 +315,14 @@
       "required_treaty_to_take_provinces"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "enum": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 246
   },
@@ -439,18 +338,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 247
@@ -463,24 +354,14 @@
       "peace_options"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 248
   },
@@ -492,24 +373,14 @@
       "peace_options"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "enum": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 249
   },
@@ -525,18 +396,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 250
@@ -549,24 +412,14 @@
       "peace_options"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 251
   },
@@ -577,23 +430,14 @@
       "peace_options"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "po_demand_provinces"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 252
@@ -610,18 +454,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 253
@@ -634,24 +470,14 @@
       "peace_options"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "enum": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 254
   },
@@ -667,18 +493,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 255
@@ -695,18 +513,10 @@
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 256
@@ -723,18 +533,10 @@
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 257
@@ -742,25 +544,16 @@
   {
     "id": "common/casus_belli_and_war_goals:125:rule:root:wargoal_type:attacker",
     "context": "root:wargoal_type",
-    "parent_path": [],
     "key": {
       "exact": "attacker"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 258
@@ -782,18 +575,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 259
@@ -812,18 +597,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 260
@@ -845,20 +622,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Multiplied with any prestige increase normally associated with a peace option."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 261
@@ -880,20 +650,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Multiplied with the cost of the peace options in the peace treaty."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 262
@@ -901,25 +664,16 @@
   {
     "id": "common/casus_belli_and_war_goals:12:rule:type:wargoal_type:peace_options",
     "context": "type:wargoal_type",
-    "parent_path": [],
     "key": {
       "exact": "peace_options"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 263
@@ -937,16 +691,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If 'po_demand_provinces' is on, badboy_factor applies to these provinces."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -962,7 +712,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 264
@@ -980,16 +729,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If 'po_demand_provinces' is on, badboy_factor applies to these provinces."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -1005,7 +750,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 265
@@ -1024,18 +768,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 266
@@ -1054,20 +790,13 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Always allow annexation (even if other rules disallow)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 267
@@ -1086,20 +815,13 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Always deny annexation (even if other rules allows it)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 268
@@ -1112,24 +834,14 @@
       "required_treaty_to_take_provinces"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 269
   },
@@ -1141,24 +853,14 @@
       "required_treaty_to_take_provinces"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "enum": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 270
   },
@@ -1174,18 +876,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 271
@@ -1198,24 +892,14 @@
       "required_treaty_to_take_provinces"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 272
   },
@@ -1231,18 +915,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 273
@@ -1255,24 +931,14 @@
       "required_treaty_to_take_provinces"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "enum": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 274
   },
@@ -1288,18 +954,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 275
@@ -1312,24 +970,14 @@
       "peace_options"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 276
   },
@@ -1341,24 +989,14 @@
       "peace_options"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "enum": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 277
   },
@@ -1374,20 +1012,13 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If po_demand_provinces is on for attacker it also needs to be on for defender"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 278
@@ -1400,24 +1031,14 @@
       "peace_options"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 279
   },
@@ -1433,18 +1054,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 280
@@ -1457,24 +1070,14 @@
       "peace_options"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "enum": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 281
   },
@@ -1490,18 +1093,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 282
@@ -1518,18 +1113,10 @@
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 283
@@ -1546,18 +1133,10 @@
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 284
@@ -1579,20 +1158,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Multiplied with the cost for transfering trade power."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 285
@@ -1600,25 +1172,16 @@
   {
     "id": "common/casus_belli_and_war_goals:154:rule:root:wargoal_type:defender",
     "context": "root:wargoal_type",
-    "parent_path": [],
     "key": {
       "exact": "defender"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 286
@@ -1626,25 +1189,16 @@
   {
     "id": "common/casus_belli_and_war_goals:155:rule:root:wargoal_type:war_name",
     "context": "root:wargoal_type",
-    "parent_path": [],
     "key": {
       "exact": "war_name"
     },
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 287
@@ -1652,7 +1206,6 @@
   {
     "id": "common/casus_belli_and_war_goals:4:rule:type:casus_belli:is_triggered_only",
     "context": "type:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "is_triggered_only"
     },
@@ -1661,18 +1214,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 288
@@ -1680,7 +1225,6 @@
   {
     "id": "common/casus_belli_and_war_goals:68:rule:root:casus_belli:war_goal",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "war_goal"
     },
@@ -1689,18 +1233,10 @@
       "type": "wargoal_type"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 294
@@ -1708,7 +1244,6 @@
   {
     "id": "common/casus_belli_and_war_goals:69:rule:root:casus_belli:coalition",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "coalition"
     },
@@ -1717,18 +1252,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 295
@@ -1736,7 +1263,6 @@
   {
     "id": "common/casus_belli_and_war_goals:70:rule:root:casus_belli:no_opinion_hit",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "no_opinion_hit"
     },
@@ -1745,20 +1271,13 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If yes you get no negative opinion from this"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 296
@@ -1766,7 +1285,6 @@
   {
     "id": "common/casus_belli_and_war_goals:71:rule:root:casus_belli:ai_peace_desire",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "ai_peace_desire"
     },
@@ -1778,18 +1296,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 297
@@ -1797,7 +1307,6 @@
   {
     "id": "common/casus_belli_and_war_goals:72:rule:root:casus_belli:league",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "league"
     },
@@ -1806,18 +1315,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 298
@@ -1825,7 +1326,6 @@
   {
     "id": "common/casus_belli_and_war_goals:73:rule:root:casus_belli:months",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "months"
     },
@@ -1837,20 +1337,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "The number of months this CB will be valid. Only works for triggered CBs."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 299
@@ -1858,7 +1351,6 @@
   {
     "id": "common/casus_belli_and_war_goals:75:rule:root:casus_belli:call_empire_members",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "call_empire_members"
     },
@@ -1867,18 +1359,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 300
@@ -1886,7 +1370,6 @@
   {
     "id": "common/casus_belli_and_war_goals:76:rule:root:casus_belli:months",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "months"
     },
@@ -1898,18 +1381,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 301
@@ -1917,7 +1392,6 @@
   {
     "id": "common/casus_belli_and_war_goals:78:rule:root:casus_belli:allowed_provinces",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "allowed_provinces"
     },
@@ -1925,26 +1399,20 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 302
@@ -1952,7 +1420,6 @@
   {
     "id": "common/casus_belli_and_war_goals:80:rule:root:casus_belli:prerequisites",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "prerequisites"
     },
@@ -1960,23 +1427,19 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "A condition that automatically activates a CB. Does not work for triggered CBs."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ],
       [
@@ -1985,7 +1448,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 303
@@ -1993,7 +1455,6 @@
   {
     "id": "common/casus_belli_and_war_goals:82:rule:root:casus_belli:prerequisites_self",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "prerequisites_self"
     },
@@ -2001,23 +1462,19 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Must be true for prequisites to be checked, used to avoid doing expensive prerequisite checks against every country in the world."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ],
       [
@@ -2026,7 +1483,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 304
@@ -2034,7 +1490,6 @@
   {
     "id": "common/casus_belli_and_war_goals:83:rule:root:casus_belli:holy_war",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "holy_war"
     },
@@ -2043,18 +1498,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 305
@@ -2062,25 +1509,16 @@
   {
     "id": "common/casus_belli_and_war_goals:84:rule:root:casus_belli:valid_for_subject",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "valid_for_subject"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 306
@@ -2088,7 +1526,6 @@
   {
     "id": "common/casus_belli_and_war_goals:85:rule:root:casus_belli:support_rebels",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "support_rebels"
     },
@@ -2097,18 +1534,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 307
@@ -2116,7 +1545,6 @@
   {
     "id": "common/casus_belli_and_war_goals:86:rule:root:casus_belli:is_triggered_only",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "is_triggered_only"
     },
@@ -2125,20 +1553,13 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Triggered from within the code or by event effects. DO NOT REMOVE THE STOCK ONES."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 308
@@ -2146,7 +1567,6 @@
   {
     "id": "common/casus_belli_and_war_goals:87:rule:root:casus_belli:exclusive",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "exclusive"
     },
@@ -2155,18 +1575,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 309
@@ -2174,7 +1586,6 @@
   {
     "id": "common/casus_belli_and_war_goals:88:rule:root:casus_belli:independence",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "independence"
     },
@@ -2183,18 +1594,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 310
@@ -2206,24 +1609,14 @@
       "attacker_disabled_po"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 311
   },
@@ -2234,49 +1627,30 @@
       "attacker_disabled_po"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "enum": "peace_options"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 312
   },
   {
     "id": "common/casus_belli_and_war_goals:91:rule:root:casus_belli:attacker_disabled_po",
     "context": "root:casus_belli",
-    "parent_path": [],
     "key": {
       "exact": "attacker_disabled_po"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 313
@@ -2284,7 +1658,6 @@
   {
     "id": "common/casus_belli_and_war_goals:93:rule:root:wargoal_type:type",
     "context": "root:wargoal_type",
-    "parent_path": [],
     "key": {
       "exact": "type"
     },
@@ -2293,18 +1666,10 @@
       "enum": "wargoal_types"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 314
@@ -2312,25 +1677,16 @@
   {
     "id": "common/casus_belli_and_war_goals:94:rule:root:wargoal_type:elector_relation",
     "context": "root:wargoal_type",
-    "parent_path": [],
     "key": {
       "exact": "elector_relation"
     },
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 315
@@ -2352,18 +1708,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 316
@@ -2385,20 +1733,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Multiplied with any prestige increase normally associated with a peace option."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 317
@@ -2420,20 +1761,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Multiplied with the cost of the peace options in the peace treaty."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 318
@@ -2455,18 +1789,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 319

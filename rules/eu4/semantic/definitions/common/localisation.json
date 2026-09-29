@@ -2,7 +2,6 @@
   {
     "id": "localisation:0:rule:root:localisation_commands:GetAdjective",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetAdjective"
     },
@@ -11,18 +10,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5362
@@ -30,7 +21,6 @@
   {
     "id": "localisation:100:rule:root:localisation_commands:GovernmentName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GovernmentName"
     },
@@ -39,18 +29,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5363
@@ -58,7 +40,6 @@
   {
     "id": "localisation:101:rule:root:localisation_commands:GetVaishyasName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetVaishyasName"
     },
@@ -67,18 +48,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5364
@@ -86,7 +59,6 @@
   {
     "id": "localisation:102:rule:root:localisation_commands:GetJainsName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetJainsName"
     },
@@ -95,18 +67,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5365
@@ -114,7 +78,6 @@
   {
     "id": "localisation:103:rule:root:localisation_commands:GetBrahminsName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetBrahminsName"
     },
@@ -123,18 +86,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5366
@@ -142,7 +97,6 @@
   {
     "id": "localisation:104:rule:root:localisation_commands:GetMarathasName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetMarathasName"
     },
@@ -151,18 +105,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5367
@@ -170,7 +116,6 @@
   {
     "id": "localisation:105:rule:root:localisation_commands:GetRajputsName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetRajputsName"
     },
@@ -179,18 +124,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5368
@@ -198,7 +135,6 @@
   {
     "id": "localisation:106:rule:root:localisation_commands:GetCossacksName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetCossacksName"
     },
@@ -207,18 +143,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5369
@@ -226,7 +154,6 @@
   {
     "id": "localisation:107:rule:root:localisation_commands:GetDhimmiName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetDhimmiName"
     },
@@ -235,18 +162,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5370
@@ -254,7 +173,6 @@
   {
     "id": "localisation:108:rule:root:localisation_commands:GetTribesName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetTribesName"
     },
@@ -263,18 +181,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5371
@@ -282,7 +192,6 @@
   {
     "id": "localisation:109:rule:root:localisation_commands:GetNobilityName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetNobilityName"
     },
@@ -291,18 +200,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5372
@@ -310,7 +211,6 @@
   {
     "id": "localisation:10:rule:root:localisation_commands:GetCapitalName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetCapitalName"
     },
@@ -319,18 +219,10 @@
       "exact": "province"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5373
@@ -338,7 +230,6 @@
   {
     "id": "localisation:110:rule:root:localisation_commands:GetClergyName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetClergyName"
     },
@@ -347,18 +238,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5374
@@ -366,7 +249,6 @@
   {
     "id": "localisation:111:rule:root:localisation_commands:GetBurghersName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetBurghersName"
     },
@@ -375,18 +257,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5375
@@ -394,7 +268,6 @@
   {
     "id": "localisation:112:rule:root:localisation_commands:GetCachedAgendasFlavorText",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetCachedAgendasFlavorText"
     },
@@ -403,18 +276,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5376
@@ -422,7 +287,6 @@
   {
     "id": "localisation:113:rule:root:localisation_commands:GetParliamentName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetParliamentName"
     },
@@ -431,18 +295,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5377
@@ -450,7 +306,6 @@
   {
     "id": "localisation:114:rule:root:localisation_commands:GetParliamentWithGrammer",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetParliamentWithGrammer"
     },
@@ -459,18 +314,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5378
@@ -478,7 +325,6 @@
   {
     "id": "localisation:115:rule:root:localisation_commands:Leader",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "Leader"
     },
@@ -487,18 +333,10 @@
       "exact": "unit"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5379
@@ -506,7 +344,6 @@
   {
     "id": "localisation:116:rule:root:localisation_commands:Location",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "Location"
     },
@@ -515,18 +352,10 @@
       "exact": "unit"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5380
@@ -534,7 +363,6 @@
   {
     "id": "localisation:117:rule:root:localisation_commands:enum[defined_text_commands]",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "enum": "defined_text_commands"
     },
@@ -543,18 +371,10 @@
       "exact": "any"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5381
@@ -562,7 +382,6 @@
   {
     "id": "localisation:118:rule:root:localisation_commands:GetJanissariesName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetJanissariesName"
     },
@@ -571,18 +390,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5382
@@ -590,7 +401,6 @@
   {
     "id": "localisation:119:rule:root:localisation_commands:GetEunuchsName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetEunuchsName"
     },
@@ -599,18 +409,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5383
@@ -618,7 +420,6 @@
   {
     "id": "localisation:11:rule:root:localisation_commands:GetCountryModifiers",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetCountryModifiers"
     },
@@ -627,18 +428,10 @@
       "exact": "religion"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5384
@@ -646,7 +439,6 @@
   {
     "id": "localisation:120:rule:root:localisation_commands:GetQizilbashName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetQizilbashName"
     },
@@ -655,18 +447,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5385
@@ -674,7 +458,6 @@
   {
     "id": "localisation:121:rule:root:localisation_commands:GetGhilmanName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetGhilmanName"
     },
@@ -683,18 +466,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5386
@@ -702,7 +477,6 @@
   {
     "id": "localisation:122:rule:root:localisation_commands:OriginalReligion",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "OriginalReligion"
     },
@@ -711,18 +485,10 @@
       "exact": "province"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5387
@@ -730,7 +496,6 @@
   {
     "id": "localisation:123:rule:root:localisation_commands:NativeCulture",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "NativeCulture"
     },
@@ -739,18 +504,10 @@
       "exact": "province"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5388
@@ -758,7 +515,6 @@
   {
     "id": "localisation:12:rule:root:localisation_commands:GetCult",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetCult"
     },
@@ -767,18 +523,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5389
@@ -786,7 +534,6 @@
   {
     "id": "localisation:13:rule:root:localisation_commands:GetCultureGroupName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetCultureGroupName"
     },
@@ -795,18 +542,10 @@
       "exact": "Variable"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5390
@@ -814,7 +553,6 @@
   {
     "id": "localisation:14:rule:root:localisation_commands:GetCultureName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetCultureName"
     },
@@ -823,18 +561,10 @@
       "exact": "Variable"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5391
@@ -842,7 +572,6 @@
   {
     "id": "localisation:15:rule:root:localisation_commands:GetDate",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetDate"
     },
@@ -851,18 +580,10 @@
       "exact": "any"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5392
@@ -870,7 +591,6 @@
   {
     "id": "localisation:16:rule:root:localisation_commands:GetDateText",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetDateText"
     },
@@ -879,18 +599,10 @@
       "exact": "any"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5393
@@ -904,23 +616,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5394
@@ -934,23 +637,14 @@
     "key": {
       "exact": "consort"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5395
@@ -958,25 +652,16 @@
   {
     "id": "localisation:19:rule:root:localisation_commands:GetDaughterSon",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetDaughterSon"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5396
@@ -984,7 +669,6 @@
   {
     "id": "localisation:1:rule:root:localisation_commands:GetAdjectiveCap",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetAdjectiveCap"
     },
@@ -993,18 +677,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5397
@@ -1012,7 +688,6 @@
   {
     "id": "localisation:20:rule:root:localisation_commands:GetDip",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetDip"
     },
@@ -1021,18 +696,10 @@
       "exact": "monarch"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5398
@@ -1040,7 +707,6 @@
   {
     "id": "localisation:21:rule:root:localisation_commands:GetFlagshipName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetFlagshipName"
     },
@@ -1049,18 +715,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5399
@@ -1074,23 +732,14 @@
     "key": {
       "exact": "religion"
     },
-    "operator": null,
     "value": {
       "exact": "culture"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5400
@@ -1098,25 +747,16 @@
   {
     "id": "localisation:23:rule:root:localisation_commands:GetGroupName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetGroupName"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5401
@@ -1130,23 +770,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5402
@@ -1160,23 +791,14 @@
     "key": {
       "exact": "consort"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5403
@@ -1188,23 +810,14 @@
       "GetHerHim"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "leader"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5404
@@ -1212,25 +825,16 @@
   {
     "id": "localisation:27:rule:root:localisation_commands:GetHerHim",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetHerHim"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5405
@@ -1244,23 +848,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5406
@@ -1274,23 +869,14 @@
     "key": {
       "exact": "consort"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5407
@@ -1298,7 +884,6 @@
   {
     "id": "localisation:2:rule:root:localisation_commands:GetAdm",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetAdm"
     },
@@ -1307,18 +892,10 @@
       "exact": "monarch"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5408
@@ -1330,23 +907,14 @@
       "GetHerHimCap"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "leader"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5409
@@ -1354,25 +922,16 @@
   {
     "id": "localisation:31:rule:root:localisation_commands:GetHerHimCap",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetHerHimCap"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5410
@@ -1386,23 +945,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5411
@@ -1416,23 +966,14 @@
     "key": {
       "exact": "consort"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5412
@@ -1444,23 +985,14 @@
       "GetHerHis"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "leader"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5413
@@ -1468,25 +1000,16 @@
   {
     "id": "localisation:35:rule:root:localisation_commands:GetHerHis",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetHerHis"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5414
@@ -1500,23 +1023,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5415
@@ -1530,23 +1044,14 @@
     "key": {
       "exact": "consort"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5416
@@ -1558,23 +1063,14 @@
       "GetHerHisCap"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "leader"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5417
@@ -1582,25 +1078,16 @@
   {
     "id": "localisation:39:rule:root:localisation_commands:GetHerHisCap",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetHerHisCap"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5418
@@ -1608,7 +1095,6 @@
   {
     "id": "localisation:3:rule:root:localisation_commands:GetAreaName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetAreaName"
     },
@@ -1617,18 +1103,10 @@
       "exact": "province"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5419
@@ -1642,23 +1120,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5420
@@ -1672,23 +1141,14 @@
     "key": {
       "exact": "consort"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5421
@@ -1700,23 +1160,14 @@
       "GetHerselfHimself"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "leader"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5422
@@ -1724,25 +1175,16 @@
   {
     "id": "localisation:43:rule:root:localisation_commands:GetHerselfHimself",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetHerselfHimself"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5423
@@ -1756,23 +1198,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5424
@@ -1786,23 +1219,14 @@
     "key": {
       "exact": "consort"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5425
@@ -1814,23 +1238,14 @@
       "GetHerselfHimselfCap"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "leader"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5426
@@ -1838,25 +1253,16 @@
   {
     "id": "localisation:47:rule:root:localisation_commands:GetHerselfHimselfCap",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetHerselfHimselfCap"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5427
@@ -1870,23 +1276,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5428
@@ -1900,23 +1297,14 @@
     "key": {
       "exact": "consort"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5429
@@ -1924,7 +1312,6 @@
   {
     "id": "localisation:4:rule:root:localisation_commands:GetRegionName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetRegionName"
     },
@@ -1933,18 +1320,10 @@
       "exact": "province"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5430
@@ -1956,23 +1335,14 @@
       "GetHersHis"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "leader"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5431
@@ -1980,25 +1350,16 @@
   {
     "id": "localisation:51:rule:root:localisation_commands:GetHersHis",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetHersHis"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5432
@@ -2012,23 +1373,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5433
@@ -2042,23 +1394,14 @@
     "key": {
       "exact": "consort"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5434
@@ -2070,23 +1413,14 @@
       "GetHersHisCap"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "leader"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5435
@@ -2094,25 +1428,16 @@
   {
     "id": "localisation:55:rule:root:localisation_commands:GetHersHisCap",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetHersHisCap"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5436
@@ -2120,7 +1445,6 @@
   {
     "id": "localisation:56:rule:root:localisation_commands:GetLeaderName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetLeaderName"
     },
@@ -2129,18 +1453,10 @@
       "exact": "rebel_faction"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5437
@@ -2148,7 +1464,6 @@
   {
     "id": "localisation:57:rule:root:localisation_commands:GetLostFlagshipName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetLostFlagshipName"
     },
@@ -2157,18 +1472,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5438
@@ -2176,7 +1483,6 @@
   {
     "id": "localisation:58:rule:root:localisation_commands:GetMil",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetMil"
     },
@@ -2185,18 +1491,10 @@
       "exact": "monarch"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5439
@@ -2204,7 +1502,6 @@
   {
     "id": "localisation:59:rule:root:localisation_commands:GetMonth",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetMonth"
     },
@@ -2213,18 +1510,10 @@
       "exact": "any"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5440
@@ -2232,7 +1521,6 @@
   {
     "id": "localisation:5:rule:root:localisation_commands:GetSuperRegionName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetSuperRegionName"
     },
@@ -2241,18 +1529,10 @@
       "exact": "province"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5441
@@ -2266,23 +1546,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5442
@@ -2296,23 +1567,14 @@
     "key": {
       "exact": "consort"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5443
@@ -2320,25 +1582,16 @@
   {
     "id": "localisation:62:rule:root:localisation_commands:GetMotherFather",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetMotherFather"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5444
@@ -2346,7 +1599,6 @@
   {
     "id": "localisation:63:rule:root:localisation_commands:GetName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetName"
     },
@@ -2355,18 +1607,10 @@
       "exact": "any"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5445
@@ -2374,7 +1618,6 @@
   {
     "id": "localisation:64:rule:root:localisation_commands:GetName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetName"
     },
@@ -2383,18 +1626,10 @@
       "exact": "Variable"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5446
@@ -2402,7 +1637,6 @@
   {
     "id": "localisation:65:rule:root:localisation_commands:GetProvinceModifiers",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetProvinceModifiers"
     },
@@ -2411,18 +1645,10 @@
       "exact": "religion"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5447
@@ -2430,7 +1656,6 @@
   {
     "id": "localisation:66:rule:root:localisation_commands:GetRandomShipName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetRandomShipName"
     },
@@ -2439,18 +1664,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5448
@@ -2462,23 +1679,14 @@
       "GetRegion"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "trade_company"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5449
@@ -2486,25 +1694,16 @@
   {
     "id": "localisation:68:rule:root:localisation_commands:GetRegion",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetRegion"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5450
@@ -2512,7 +1711,6 @@
   {
     "id": "localisation:69:rule:root:localisation_commands:GetReligionGroupName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetReligionGroupName"
     },
@@ -2521,18 +1719,10 @@
       "exact": "Variable"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5451
@@ -2540,7 +1730,6 @@
   {
     "id": "localisation:6:rule:root:localisation_commands:GetContinentName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetContinentName"
     },
@@ -2549,18 +1738,10 @@
       "exact": "province"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5452
@@ -2568,7 +1749,6 @@
   {
     "id": "localisation:70:rule:root:localisation_commands:GetReligionName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetReligionName"
     },
@@ -2577,18 +1757,10 @@
       "exact": "Variable"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5453
@@ -2596,7 +1768,6 @@
   {
     "id": "localisation:71:rule:root:localisation_commands:GetReligiousSchool",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetReligiousSchool"
     },
@@ -2605,18 +1776,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5454
@@ -2624,7 +1787,6 @@
   {
     "id": "localisation:72:rule:root:localisation_commands:GetReligiousSchoolCountryModifiers",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetReligiousSchoolCountryModifiers"
     },
@@ -2633,18 +1795,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5455
@@ -2658,23 +1812,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5456
@@ -2688,23 +1833,14 @@
     "key": {
       "exact": "consort"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5457
@@ -2716,23 +1852,14 @@
       "GetSheHe"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "leader"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5458
@@ -2740,25 +1867,16 @@
   {
     "id": "localisation:76:rule:root:localisation_commands:GetSheHe",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetSheHe"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5459
@@ -2772,23 +1890,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5460
@@ -2802,23 +1911,14 @@
     "key": {
       "exact": "consort"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5461
@@ -2830,23 +1930,14 @@
       "GetSheHeCap"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "leader"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5462
@@ -2854,7 +1945,6 @@
   {
     "id": "localisation:7:rule:root:localisation_commands:GetColonialRegionName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetColonialRegionName"
     },
@@ -2863,18 +1953,10 @@
       "exact": "province"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5463
@@ -2882,25 +1964,16 @@
   {
     "id": "localisation:80:rule:root:localisation_commands:GetSheHeCap",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetSheHeCap"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5464
@@ -2914,23 +1987,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5465
@@ -2944,23 +2008,14 @@
     "key": {
       "exact": "consort"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5466
@@ -2968,25 +2023,16 @@
   {
     "id": "localisation:83:rule:root:localisation_commands:GetSisterBrother",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetSisterBrother"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5467
@@ -3000,23 +2046,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5468
@@ -3024,25 +2061,16 @@
   {
     "id": "localisation:85:rule:root:localisation_commands:GetStats",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetStats"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5469
@@ -3050,7 +2078,6 @@
   {
     "id": "localisation:86:rule:root:localisation_commands:GetTag",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetTag"
     },
@@ -3059,18 +2086,10 @@
       "exact": "country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5470
@@ -3084,23 +2103,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5471
@@ -3114,23 +2124,14 @@
     "key": {
       "exact": "consort"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5472
@@ -3138,25 +2139,16 @@
   {
     "id": "localisation:89:rule:root:localisation_commands:GetTitle",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetTitle"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5473
@@ -3164,7 +2156,6 @@
   {
     "id": "localisation:8:rule:root:localisation_commands:GetTradeNodeName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetTradeNodeName"
     },
@@ -3173,18 +2164,10 @@
       "exact": "province"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5474
@@ -3192,7 +2175,6 @@
   {
     "id": "localisation:90:rule:root:localisation_commands:GetTradeGoodsName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetTradeGoodsName"
     },
@@ -3201,18 +2183,10 @@
       "exact": "province"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5475
@@ -3220,7 +2194,6 @@
   {
     "id": "localisation:91:rule:root:localisation_commands:GetValue",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetValue"
     },
@@ -3229,18 +2202,10 @@
       "exact": "variable"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5476
@@ -3254,23 +2219,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5477
@@ -3284,23 +2240,14 @@
     "key": {
       "exact": "consort"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5478
@@ -3308,25 +2255,16 @@
   {
     "id": "localisation:94:rule:root:localisation_commands:GetWifeHusband",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetWifeHusband"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5479
@@ -3340,23 +2278,14 @@
     "key": {
       "exact": "monarch"
     },
-    "operator": null,
     "value": {
       "exact": "heir"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5480
@@ -3370,23 +2299,14 @@
     "key": {
       "exact": "consort"
     },
-    "operator": null,
     "value": {
       "exact": "advisor"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5481
@@ -3398,23 +2318,14 @@
       "GetWomanMan"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "leader"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5482
@@ -3422,25 +2333,16 @@
   {
     "id": "localisation:98:rule:root:localisation_commands:GetWomanMan",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetWomanMan"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5483
@@ -3448,7 +2350,6 @@
   {
     "id": "localisation:99:rule:root:localisation_commands:GetYear",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetYear"
     },
@@ -3457,18 +2358,10 @@
       "exact": "any"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5484
@@ -3476,7 +2369,6 @@
   {
     "id": "localisation:9:rule:root:localisation_commands:GetArmyName",
     "context": "root:localisation_commands",
-    "parent_path": [],
     "key": {
       "exact": "GetArmyName"
     },
@@ -3485,18 +2377,10 @@
       "exact": "rebel_faction"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5485

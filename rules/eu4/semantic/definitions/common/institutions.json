@@ -2,25 +2,16 @@
   {
     "id": "common/institutions:10:rule:root:institution:historical_start_date",
     "context": "root:institution",
-    "parent_path": [],
     "key": {
       "exact": "historical_start_date"
     },
     "operator": "=",
     "value": "date",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1232
@@ -28,7 +19,6 @@
   {
     "id": "common/institutions:11:rule:root:institution:historical_start_province",
     "context": "root:institution",
-    "parent_path": [],
     "key": {
       "exact": "historical_start_province"
     },
@@ -37,18 +27,10 @@
       "type": "province_id"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1233
@@ -56,7 +38,6 @@
   {
     "id": "common/institutions:13:rule:root:institution:history",
     "context": "root:institution",
-    "parent_path": [],
     "key": {
       "exact": "history"
     },
@@ -64,26 +45,20 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1234
@@ -91,7 +66,6 @@
   {
     "id": "common/institutions:15:rule:root:institution:can_start",
     "context": "root:institution",
-    "parent_path": [],
     "key": {
       "exact": "can_start"
     },
@@ -99,26 +73,20 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1235
@@ -126,7 +94,6 @@
   {
     "id": "common/institutions:16:rule:root:institution:start_chance",
     "context": "root:institution",
-    "parent_path": [],
     "key": {
       "exact": "start_chance"
     },
@@ -138,18 +105,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1236
@@ -157,7 +116,6 @@
   {
     "id": "common/institutions:17:rule:root:institution:on_start",
     "context": "root:institution",
-    "parent_path": [],
     "key": {
       "exact": "on_start"
     },
@@ -166,18 +124,10 @@
       "type": "event.country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1237
@@ -185,7 +135,6 @@
   {
     "id": "common/institutions:19:rule:root:institution:can_embrace",
     "context": "root:institution",
-    "parent_path": [],
     "key": {
       "exact": "can_embrace"
     },
@@ -193,26 +142,20 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1238
@@ -220,7 +163,6 @@
   {
     "id": "common/institutions:21:rule:root:institution:effect",
     "context": "root:institution",
-    "parent_path": [],
     "key": {
       "exact": "effect"
     },
@@ -228,28 +170,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effect that runs when the country embraces it"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1239
@@ -272,20 +209,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1240
@@ -303,20 +233,13 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "if a modifier is scaled, it is multiplied with development in the province."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1241
@@ -336,20 +259,13 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Hide the this modifier when potential is false"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1242
@@ -369,9 +285,6 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "any_friendly_coast_border_province is a special scope made for institution spread. It checks for adjacent provinces or provinces one seazone away. Friendly is defined as at positive relations or owned by the same country that owns the province."
     ],
@@ -379,9 +292,7 @@
       "any"
     ],
     "push_scope": "province",
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1243
@@ -400,19 +311,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions evaluated once; gate the entry's visibility."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1244
@@ -431,18 +336,10 @@
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1245
@@ -462,9 +359,6 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "any_friendly_coast_border_province is a special scope made for institution spread. It checks for adjacent provinces or provinces one seazone away. Friendly is defined as at positive relations or owned by the same country that owns the province."
     ],
@@ -472,9 +366,7 @@
       "any"
     ],
     "push_scope": "province",
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1246
@@ -493,17 +385,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1247
@@ -521,56 +406,42 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of modifiers applied while the containing entry is active."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 1248
   },
   {
     "id": "common/institutions:36:rule:root:institution:embracement_speed",
     "context": "root:institution",
-    "parent_path": [],
     "key": {
       "exact": "embracement_speed"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "any_friendly_coast_border_province is a special scope made for institution spread. It checks for adjacent provinces or provinces one seazone away. Friendly is defined as at positive relations or owned by the same country that owns the province."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1249
@@ -592,20 +463,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1250
@@ -613,7 +477,6 @@
   {
     "id": "common/institutions:39:rule:root:institution:ai_will_do",
     "context": "root:institution",
-    "parent_path": [],
     "key": {
       "exact": "ai_will_do"
     },
@@ -621,19 +484,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Cost of embracing institution must be lower than this factor * last month's regular income, and higher if loans are needed. (Or it has a more than long term goal...)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1251
@@ -641,7 +498,6 @@
   {
     "id": "common/institutions:8:rule:root:institution:bonus",
     "context": "root:institution",
-    "parent_path": [],
     "key": {
       "exact": "bonus"
     },
@@ -649,17 +505,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1252
@@ -667,7 +516,6 @@
   {
     "id": "common/institutions:9:rule:root:institution:trade_company_efficiency",
     "context": "root:institution",
-    "parent_path": [],
     "key": {
       "exact": "trade_company_efficiency"
     },
@@ -679,18 +527,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1253

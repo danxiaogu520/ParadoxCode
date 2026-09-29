@@ -4,18 +4,7 @@
   "target_game_version": "1.37.5",
   "files": {
     "catalog": [
-      "catalog/file-categories.json",
-      "catalog/records/aliases.json",
-      "catalog/records/effects.json",
-      "catalog/records/enums.json",
-      "catalog/records/localisation.json",
-      "catalog/records/modifiers.json",
-      "catalog/records/rule_nodes.json",
-      "catalog/records/scopes.json",
-      "catalog/records/subtypes.json",
-      "catalog/records/triggers.json",
-      "catalog/records/types.json",
-      "catalog/symbol-descriptors.json"
+      "catalog/file-categories.json"
     ],
     "semantic": [
       "semantic/contexts/effect.json",

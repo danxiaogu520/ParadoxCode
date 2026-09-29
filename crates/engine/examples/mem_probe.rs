@@ -338,28 +338,6 @@ fn main() {
             mib(rule_string_bytes as f64),
             mib((rule_vec_elements * std::mem::size_of::<String>()) as f64),
         );
-        let model = rules.model();
-        let record_struct_bytes = model.records.len() * std::mem::size_of::<rules::RuleRecord>();
-        let mut record_field_count = 0usize;
-        let mut record_string_bytes = 0usize;
-        for record in &model.records {
-            add_str(&mut record_string_bytes, &record.table);
-            add_str(&mut record_string_bytes, &record.logical_id);
-            for (key, value) in &record.fields {
-                record_field_count += 1;
-                add_str(&mut record_string_bytes, key);
-                add_str(&mut record_string_bytes, value);
-            }
-        }
-        println!(
-            "records: {} x {}B = {:.0} MiB structs; {} fields = {:.0} MiB nodes; strings {:.0} MiB",
-            model.records.len(),
-            std::mem::size_of::<rules::RuleRecord>(),
-            mib(record_struct_bytes as f64),
-            record_field_count,
-            mib((record_field_count * 80) as f64),
-            mib(record_string_bytes as f64),
-        );
     }
 
     // Phase timing over the same corpus: read, parse, lower. The remainder of

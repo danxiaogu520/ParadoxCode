@@ -2,7 +2,6 @@
   {
     "id": "common/00_small_types_consolidated:105:rule:root:fervor:cost",
     "context": "root:fervor",
-    "parent_path": [],
     "key": {
       "exact": "cost"
     },
@@ -14,18 +13,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 21
@@ -33,7 +24,6 @@
   {
     "id": "common/00_small_types_consolidated:107:rule:root:fervor:effect",
     "context": "root:fervor",
-    "parent_path": [],
     "key": {
       "exact": "effect"
     },
@@ -41,19 +31,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of effects executed by the containing entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 22
@@ -61,7 +45,6 @@
   {
     "id": "common/00_small_types_consolidated:109:rule:root:fervor:potential",
     "context": "root:fervor",
-    "parent_path": [],
     "key": {
       "exact": "potential"
     },
@@ -69,19 +52,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions evaluated once; gate the entry's visibility."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 23
@@ -89,7 +66,6 @@
   {
     "id": "common/00_small_types_consolidated:111:rule:root:fervor:trigger",
     "context": "root:fervor",
-    "parent_path": [],
     "key": {
       "exact": "trigger"
     },
@@ -97,19 +73,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 24
@@ -131,20 +101,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 25
@@ -152,7 +115,6 @@
   {
     "id": "common/00_small_types_consolidated:114:rule:root:fervor:ai_will_do",
     "context": "root:fervor",
-    "parent_path": [],
     "key": {
       "exact": "ai_will_do"
     },
@@ -160,16 +122,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "AI weighting block: factor = base weight, modifier blocks adjust it."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -181,7 +139,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 26

@@ -2,25 +2,16 @@
   {
     "id": "map/default_map:10:rule:root:default_map:sea_starts",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "sea_starts"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5541
@@ -32,49 +23,30 @@
       "only_used_for_random"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "province_id"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 5542
   },
   {
     "id": "map/default_map:12:rule:root:default_map:only_used_for_random",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "only_used_for_random"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5543
@@ -86,49 +58,30 @@
       "lakes"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "province_id"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 5544
   },
   {
     "id": "map/default_map:14:rule:root:default_map:lakes",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "lakes"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5545
@@ -140,49 +93,30 @@
       "force_coastal"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "province_id"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 5546
   },
   {
     "id": "map/default_map:16:rule:root:default_map:force_coastal",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "force_coastal"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5547
@@ -190,25 +124,16 @@
   {
     "id": "map/default_map:17:rule:root:default_map:definitions",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "definitions"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5548
@@ -216,25 +141,16 @@
   {
     "id": "map/default_map:18:rule:root:default_map:provinces",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "provinces"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5549
@@ -242,25 +158,16 @@
   {
     "id": "map/default_map:19:rule:root:default_map:positions",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "positions"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5550
@@ -268,25 +175,16 @@
   {
     "id": "map/default_map:20:rule:root:default_map:terrain",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "terrain"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5551
@@ -294,25 +192,16 @@
   {
     "id": "map/default_map:21:rule:root:default_map:rivers",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "rivers"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5552
@@ -320,25 +209,16 @@
   {
     "id": "map/default_map:22:rule:root:default_map:terrain_definition",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "terrain_definition"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5553
@@ -346,25 +226,16 @@
   {
     "id": "map/default_map:23:rule:root:default_map:heightmap",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "heightmap"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5554
@@ -372,25 +243,16 @@
   {
     "id": "map/default_map:24:rule:root:default_map:tree_definition",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "tree_definition"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5555
@@ -398,25 +260,16 @@
   {
     "id": "map/default_map:25:rule:root:default_map:continent",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "continent"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5556
@@ -424,25 +277,16 @@
   {
     "id": "map/default_map:26:rule:root:default_map:adjacencies",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "adjacencies"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5557
@@ -450,25 +294,16 @@
   {
     "id": "map/default_map:27:rule:root:default_map:climate",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "climate"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5558
@@ -476,25 +311,16 @@
   {
     "id": "map/default_map:28:rule:root:default_map:region",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "region"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5559
@@ -502,25 +328,16 @@
   {
     "id": "map/default_map:29:rule:root:default_map:superregion",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "superregion"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5560
@@ -528,25 +345,16 @@
   {
     "id": "map/default_map:30:rule:root:default_map:area",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "area"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5561
@@ -554,25 +362,16 @@
   {
     "id": "map/default_map:31:rule:root:default_map:provincegroup",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "provincegroup"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5562
@@ -580,25 +379,16 @@
   {
     "id": "map/default_map:32:rule:root:default_map:ambient_object",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "ambient_object"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5563
@@ -606,25 +396,16 @@
   {
     "id": "map/default_map:33:rule:root:default_map:seasons",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "seasons"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5564
@@ -632,25 +413,16 @@
   {
     "id": "map/default_map:34:rule:root:default_map:trade_winds",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "trade_winds"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5565
@@ -667,18 +439,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5566
@@ -700,18 +464,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5567
@@ -733,18 +489,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5568
@@ -752,26 +500,16 @@
   {
     "id": "map/default_map:38:rule:root:default_map:canal_definition",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "canal_definition"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 5569
   },
@@ -782,7 +520,6 @@
       "tree"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "int": {
         "min": 0,
@@ -790,18 +527,10 @@
       }
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 4,
     "source_file": "semantic-rules.json",
     "line": 5570
@@ -809,25 +538,16 @@
   {
     "id": "map/default_map:40:rule:root:default_map:tree",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "tree"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5571
@@ -835,7 +555,6 @@
   {
     "id": "map/default_map:6:rule:root:default_map:width",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "width"
     },
@@ -847,18 +566,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5572
@@ -866,7 +577,6 @@
   {
     "id": "map/default_map:7:rule:root:default_map:height",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "height"
     },
@@ -878,18 +588,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5573
@@ -897,7 +599,6 @@
   {
     "id": "map/default_map:8:rule:root:default_map:max_provinces",
     "context": "root:default_map",
-    "parent_path": [],
     "key": {
       "exact": "max_provinces"
     },
@@ -909,20 +610,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "There is an unknown minimum number required due to a paradox bug. If a custom map is crashing try a higher number."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5574
@@ -934,24 +628,14 @@
       "sea_starts"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "province_id"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 5575
   }

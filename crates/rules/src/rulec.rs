@@ -12,8 +12,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::{
-    FileCategory, GameProfile, KeyMatcher, RuleRecord, RuleSet, RulesModel, SemanticModel,
-    SymbolDescriptor, TypeRootScope, ValueMatcher,
+    FileCategory, GameProfile, KeyMatcher, RuleSet, RulesModel, SemanticModel, TypeRootScope,
+    ValueMatcher,
 };
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -82,10 +82,6 @@ pub struct SourceFiles {
 struct CatalogSource {
     #[serde(default)]
     file_categories: Vec<FileCategory>,
-    #[serde(default)]
-    symbol_descriptors: Vec<SymbolDescriptor>,
-    #[serde(default)]
-    records: Vec<RuleRecord>,
 }
 
 type ParsedTypeFragments = (
@@ -137,8 +133,6 @@ pub struct ArtifactManifest {
     pub semantic_rule_count: usize,
     /// Number of file categories.
     pub file_category_count: usize,
-    /// Number of symbol descriptors.
-    pub symbol_descriptor_count: usize,
 }
 
 /// Errors emitted by source loading, validation, and artifact publication.
@@ -263,10 +257,6 @@ fn parse_catalog_fragments(
     let mut catalog = CatalogSource::default();
     for fragment in read_fragments_parallel::<CatalogSource>(paths, files)? {
         catalog.file_categories.extend(fragment.file_categories);
-        catalog
-            .symbol_descriptors
-            .extend(fragment.symbol_descriptors);
-        catalog.records.extend(fragment.records);
     }
     Ok(catalog)
 }
@@ -511,8 +501,6 @@ fn validate_source_model(
     let model = RulesModel {
         game_id: manifest.game_id.clone(),
         file_categories: catalog.file_categories,
-        symbol_descriptors: catalog.symbol_descriptors,
-        records: catalog.records,
         semantic,
         profile,
     };
@@ -570,7 +558,6 @@ pub fn compile(source: &Path, manifest_output: &Path) -> Result<ArtifactManifest
         rule_hash: rules.rule_hash().to_hex(),
         semantic_rule_count: rules.model().semantic.rules.len(),
         file_category_count: rules.model().file_categories.len(),
-        symbol_descriptor_count: rules.model().symbol_descriptors.len(),
     };
     let temporary = temporary_path(manifest_output);
     if temporary.exists() {
@@ -595,6 +582,21 @@ pub fn compile(source: &Path, manifest_output: &Path) -> Result<ArtifactManifest
 
 /// Validates one rule's key matcher against source invariants.
 ///
+/// Guards the `Eq` contract of [`crate::ValueMatcher`]: float bounds must be finite.
+/// JSON cannot spell `NaN`, but an out-of-range literal such as `1e400` parses to
+/// infinity, which would silently weaken a bound into a one-sided one.
+fn validate_value_matcher(rule: &crate::SemanticRule) -> Result<(), CompileError> {
+    if let crate::ValueMatcher::Float { min, max } = &rule.value
+        && (min.is_some_and(|bound| !bound.is_finite()) || max.is_some_and(|bound| !bound.is_finite()))
+    {
+        return Err(CompileError::Validation(format!(
+            "semantic rule {} has a non-finite float bound",
+            rule.id
+        )));
+    }
+    Ok(())
+}
+
 /// Exact keys must not contain `<...>` placeholder spellings: those describe a
 /// parameterized family, which only a `template` matcher can express — an exact
 /// placeholder never matches a real key. Template parameters must resolve
@@ -663,13 +665,6 @@ fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
         "file category",
     )?;
     unique_nonempty(
-        model
-            .symbol_descriptors
-            .iter()
-            .map(|item| item.kind_id.as_str()),
-        "symbol descriptor",
-    )?;
-    unique_nonempty(
         model.semantic.rules.iter().map(|item| item.id.as_str()),
         "semantic rule",
     )?;
@@ -700,18 +695,7 @@ fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
                 rule.id
             )));
         }
-        if rule.required && rule.min_occurs.is_some_and(|minimum| minimum == 0) {
-            return Err(CompileError::Validation(format!(
-                "semantic rule {} marks a zero-minimum field as required",
-                rule.id
-            )));
-        }
-        if rule.required && rule.max_occurs.is_some_and(|maximum| maximum == 0) {
-            return Err(CompileError::Validation(format!(
-                "semantic rule {} marks a zero-maximum field as required",
-                rule.id
-            )));
-        }
+        validate_value_matcher(rule)?;
         if matches!(rule.shape, crate::RuleShape::QuotedScript) {
             if rule
                 .child_context
@@ -1287,14 +1271,12 @@ mod tests {
             child_context: None,
             alternative_id: None,
             severity: None,
-            required: false,
             deprecated: false,
             documentation: Vec::new(),
             allowed_scopes: Vec::new(),
             push_scope: None,
             replace_scope: Vec::new(),
             min_occurs: None,
-            strict_min: true,
             max_occurs: None,
             source_file: "semantic-rules.json".to_owned(),
             line: 1,
@@ -1315,14 +1297,12 @@ mod tests {
             child_context: None,
             alternative_id: None,
             severity: None,
-            required: false,
             deprecated: false,
             documentation: Vec::new(),
             allowed_scopes: Vec::new(),
             push_scope: None,
             replace_scope: Vec::new(),
             min_occurs: None,
-            strict_min: true,
             max_occurs: None,
             source_file: "semantic-rules.json".to_owned(),
             line: 1,
@@ -1444,14 +1424,12 @@ mod tests {
             child_context: None,
             alternative_id: None,
             severity: None,
-            required: false,
             deprecated: false,
             documentation: Vec::new(),
             allowed_scopes: Vec::new(),
             push_scope: None,
             replace_scope: Vec::new(),
             min_occurs: Some(2),
-            strict_min: true,
             max_occurs: Some(1),
             source_file: "semantic-rules.json".to_owned(),
             line: 1,
@@ -1476,14 +1454,12 @@ mod tests {
             child_context: None,
             alternative_id: None,
             severity: None,
-            required: false,
             deprecated: false,
             documentation: Vec::new(),
             allowed_scopes: Vec::new(),
             push_scope: None,
             replace_scope: Vec::new(),
             min_occurs: None,
-            strict_min: false,
             max_occurs: None,
             source_file: "semantic-rules.json".to_owned(),
             line: 1,
@@ -1590,14 +1566,12 @@ mod tests {
                 child_context: None,
                 alternative_id: None,
                 severity: None,
-                required: false,
                 deprecated: false,
                 documentation: Vec::new(),
                 allowed_scopes: Vec::new(),
                 push_scope: None,
                 replace_scope: Vec::new(),
                 min_occurs: None,
-                strict_min: false,
                 max_occurs: None,
                 source_file: "semantic-rules.json".to_owned(),
                 line: 1,
@@ -1656,14 +1630,12 @@ mod tests {
             child_context: None,
             alternative_id: None,
             severity: None,
-            required: false,
             deprecated: false,
             documentation: Vec::new(),
             allowed_scopes: Vec::new(),
             push_scope: None,
             replace_scope: Vec::new(),
             min_occurs: None,
-            strict_min: true,
             max_occurs: None,
             source_file: "semantic-rules.json".to_owned(),
             line: 1,
@@ -1748,8 +1720,6 @@ mod tests {
             read_json(&root.join("rules/manifest.json")).expect("committed manifest");
         let (_, source_model) = load_source(&root.join("rules/eu4")).expect("source model");
         assert_eq!(source_model.file_categories.len(), 124);
-        assert_eq!(source_model.symbol_descriptors.len(), 2657);
-        assert_eq!(source_model.records.len(), 12_962);
         assert_eq!(source_model.semantic.rules.len(), 8_463);
         assert_eq!(source_model.semantic.enum_values.len(), 63);
         assert_eq!(source_model.semantic.type_root_keys.len(), 7);

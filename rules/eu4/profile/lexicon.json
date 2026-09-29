@@ -29,7 +29,7 @@
     "religion": "religion",
     "religions": "religion",
     "ruler_personalities": "ruler_personality",
-    "ruler_personality": "ancestor_personalities",
+    "ruler_personality": "ruler_personality",
     "scripted_effect_params": "scripted_effect_param",
     "scripted_effect_params_dollar": "scripted_effect_param_dollar",
     "static_modifier": "static_modifier",

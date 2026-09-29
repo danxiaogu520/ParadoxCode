@@ -2,24 +2,18 @@
   {
     "id": "common/subject_types:100:rule:root:subject_type:can_fight",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_fight"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Root = subject, from = overlord."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -35,7 +29,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3178
@@ -54,19 +47,10 @@
       "type": "subject_type"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3179
   },
@@ -84,19 +68,10 @@
       "type": "subject_type"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3180
   },
@@ -114,19 +89,10 @@
       "exact": "all"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3181
   },
@@ -142,18 +108,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3182
@@ -170,18 +128,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3183
@@ -198,18 +148,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3184
@@ -226,18 +168,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3185
@@ -245,24 +179,18 @@
   {
     "id": "common/subject_types:108:rule:root:subject_type:can_rival",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_rival"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Root = subject, from = overlord."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -278,7 +206,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3186
@@ -297,26 +224,16 @@
       "type": "subject_type"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3187
   },
   {
     "id": "common/subject_types:10:rule:root:subject_type:copy_from",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "copy_from"
     },
@@ -325,20 +242,13 @@
       "type": "subject_type"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "copy_from copies everything except count and is_potential_overlord"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3188
@@ -357,19 +267,10 @@
       "type": "subject_type"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3189
   },
@@ -387,19 +288,10 @@
       "exact": "all"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3190
   },
@@ -415,18 +307,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3191
@@ -443,18 +327,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3192
@@ -471,18 +347,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3193
@@ -499,18 +367,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3194
@@ -518,24 +378,18 @@
   {
     "id": "common/subject_types:116:rule:root:subject_type:can_ally",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_ally"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Root = subject, from = overlord."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -551,7 +405,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3195
@@ -570,19 +423,10 @@
       "type": "subject_type"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3196
   },
@@ -600,19 +444,10 @@
       "exact": "all"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3197
   },
@@ -630,26 +465,16 @@
       "type": "subject_type"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3198
   },
   {
     "id": "common/subject_types:11:rule:root:subject_type:count",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "count"
     },
@@ -658,20 +483,13 @@
       "type": "subject_type"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "count = x means it \"counts as\" x in some triggers."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3199
@@ -690,19 +508,10 @@
       "exact": "all"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3200
   },
@@ -718,18 +527,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3201
@@ -746,18 +547,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3202
@@ -774,18 +567,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3203
@@ -802,18 +587,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3204
@@ -821,24 +598,18 @@
   {
     "id": "common/subject_types:125:rule:root:subject_type:can_marry",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_marry"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Root = subject, from = overlord."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -854,7 +625,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3205
@@ -862,27 +632,19 @@
   {
     "id": "common/subject_types:126:rule:root:subject_type:embargo_rivals",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "embargo_rivals"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Subject Interactions: (continuous)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3206
@@ -890,27 +652,19 @@
   {
     "id": "common/subject_types:127:rule:root:subject_type:support_loyalists",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "support_loyalists"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Subject Interactions:"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3207
@@ -918,25 +672,16 @@
   {
     "id": "common/subject_types:128:rule:root:subject_type:subsidize_armies",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "subsidize_armies"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3208
@@ -944,27 +689,19 @@
   {
     "id": "common/subject_types:129:rule:root:subject_type:scutage",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "scutage"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Subject Interactions:"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3209
@@ -972,7 +709,6 @@
   {
     "id": "common/subject_types:12:rule:root:subject_type:sprite",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "sprite"
     },
@@ -981,20 +717,13 @@
       "type": "sprite"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Graphics:"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3210
@@ -1002,25 +731,16 @@
   {
     "id": "common/subject_types:130:rule:root:subject_type:send_officers",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "send_officers"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3211
@@ -1028,25 +748,16 @@
   {
     "id": "common/subject_types:131:rule:root:subject_type:divert_trade",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "divert_trade"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3212
@@ -1054,27 +765,19 @@
   {
     "id": "common/subject_types:132:rule:root:subject_type:placate_rulers",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "placate_rulers"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "(immediate)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3213
@@ -1082,25 +785,16 @@
   {
     "id": "common/subject_types:133:rule:root:subject_type:place_relative_on_throne",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "place_relative_on_throne"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3214
@@ -1108,27 +802,19 @@
   {
     "id": "common/subject_types:134:rule:root:subject_type:enforce_religion",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "enforce_religion"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Subject Interactions: (immediate)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3215
@@ -1136,27 +822,19 @@
   {
     "id": "common/subject_types:135:rule:root:subject_type:customize_subject",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "customize_subject"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Subject Interactions:"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3216
@@ -1164,27 +842,19 @@
   {
     "id": "common/subject_types:136:rule:root:subject_type:replace_governor",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "replace_governor"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Subject Interactions:"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3217
@@ -1192,25 +862,16 @@
   {
     "id": "common/subject_types:137:rule:root:subject_type:grant_province",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "grant_province"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3218
@@ -1218,25 +879,16 @@
   {
     "id": "common/subject_types:138:rule:root:subject_type:enforce_culture",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "enforce_culture"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3219
@@ -1244,25 +896,16 @@
   {
     "id": "common/subject_types:139:rule:root:subject_type:siphon_income",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "siphon_income"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3220
@@ -1270,7 +913,6 @@
   {
     "id": "common/subject_types:13:rule:root:subject_type:diplomacy_overlord_sprite",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "diplomacy_overlord_sprite"
     },
@@ -1279,20 +921,13 @@
       "type": "sprite"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "The one that the overlord sees"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3221
@@ -1300,25 +935,16 @@
   {
     "id": "common/subject_types:140:rule:root:subject_type:fortify_march",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "fortify_march"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3222
@@ -1326,25 +952,16 @@
   {
     "id": "common/subject_types:141:rule:root:subject_type:seize_territory",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "seize_territory"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3223
@@ -1352,25 +969,16 @@
   {
     "id": "common/subject_types:142:rule:root:subject_type:start_colonial_war",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "start_colonial_war"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3224
@@ -1378,25 +986,16 @@
   {
     "id": "common/subject_types:143:rule:root:subject_type:grant_core_claim",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "grant_core_claim"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3225
@@ -1404,25 +1003,16 @@
   {
     "id": "common/subject_types:144:rule:root:subject_type:sacrifice_ruler",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "sacrifice_ruler"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3226
@@ -1430,25 +1020,16 @@
   {
     "id": "common/subject_types:145:rule:root:subject_type:sacrifice_heir",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "sacrifice_heir"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3227
@@ -1456,25 +1037,16 @@
   {
     "id": "common/subject_types:146:rule:root:subject_type:increase_tariffs",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "increase_tariffs"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3228
@@ -1482,25 +1054,16 @@
   {
     "id": "common/subject_types:147:rule:root:subject_type:decrease_tariffs",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "decrease_tariffs"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3229
@@ -1508,25 +1071,16 @@
   {
     "id": "common/subject_types:148:rule:root:subject_type:takeondebt",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "takeondebt"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3230
@@ -1534,25 +1088,16 @@
   {
     "id": "common/subject_types:149:rule:root:subject_type:bestow_gifts",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "bestow_gifts"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3231
@@ -1560,7 +1105,6 @@
   {
     "id": "common/subject_types:14:rule:root:subject_type:diplomacy_subject_sprite",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "diplomacy_subject_sprite"
     },
@@ -1569,20 +1113,13 @@
       "type": "sprite"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "The one that the subject sees"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3232
@@ -1590,25 +1127,16 @@
   {
     "id": "common/subject_types:150:rule:root:subject_type:send_additional_troops",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "send_additional_troops"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3233
@@ -1616,25 +1144,16 @@
   {
     "id": "common/subject_types:151:rule:root:subject_type:demand_artifacts",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "demand_artifacts"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3234
@@ -1642,25 +1161,16 @@
   {
     "id": "common/subject_types:152:rule:root:subject_type:demand_additional_tribute",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "demand_additional_tribute"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3235
@@ -1668,27 +1178,19 @@
   {
     "id": "common/subject_types:153:rule:root:subject_type:force_seppuku",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "force_seppuku"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "(enable)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3236
@@ -1696,25 +1198,16 @@
   {
     "id": "common/subject_types:154:rule:root:subject_type:press_sailors",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "press_sailors"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3237
@@ -1722,27 +1215,19 @@
   {
     "id": "common/subject_types:155:rule:root:subject_type:contribute_to_capital",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "contribute_to_capital"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "(enable)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3238
@@ -1750,25 +1235,16 @@
   {
     "id": "common/subject_types:156:rule:root:subject_type:force_isolation",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "force_isolation"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3239
@@ -1776,25 +1252,16 @@
   {
     "id": "common/subject_types:157:rule:root:subject_type:return_land",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "return_land"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3240
@@ -1802,25 +1269,16 @@
   {
     "id": "common/subject_types:158:rule:root:subject_type:conscript_general",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "conscript_general"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3241
@@ -1828,25 +1286,16 @@
   {
     "id": "common/subject_types:159:rule:root:subject_type:knowledge_sharing",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "knowledge_sharing"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3242
@@ -1854,27 +1303,19 @@
   {
     "id": "common/subject_types:160:rule:root:subject_type:block_settlement_growth",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "block_settlement_growth"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Subject Interactions: (immediate)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3243
@@ -1882,25 +1323,16 @@
   {
     "id": "common/subject_types:161:rule:root:subject_type:allow_settlement_growth",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "allow_settlement_growth"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3244
@@ -1908,25 +1340,16 @@
   {
     "id": "common/subject_types:162:rule:root:subject_type:change_colonial_type",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "change_colonial_type"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3245
@@ -1934,25 +1357,16 @@
   {
     "id": "common/subject_types:163:rule:root:subject_type:change_colonial_type",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "change_colonial_type"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3246
@@ -1960,25 +1374,16 @@
   {
     "id": "common/subject_types:164:rule:root:subject_type:upgrade_subject_type",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "upgrade_subject_type"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3247
@@ -1986,27 +1391,19 @@
   {
     "id": "common/subject_types:165:rule:root:subject_type:seize_court_resources",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "seize_court_resources"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Seizes a month's worth of monarch power generation for +25% Liberty Desire"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3248
@@ -2014,27 +1411,19 @@
   {
     "id": "common/subject_types:166:rule:root:subject_type:request_extra_levies",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "request_extra_levies"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Seizes a month's worth of manpower and sailors for +25% Liberty Desire"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3249
@@ -2042,27 +1431,19 @@
   {
     "id": "common/subject_types:167:rule:root:subject_type:grant_administrative_autonomy",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "grant_administrative_autonomy"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Grants -10% Liberty Desire at the cost of -20 Reform Progress"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3250
@@ -2070,27 +1451,19 @@
   {
     "id": "common/subject_types:168:rule:root:subject_type:disable_inheritance",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "disable_inheritance"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Use this for Personal Union types of subjects to disallow the inheriting mechanic"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3251
@@ -2098,27 +1471,19 @@
   {
     "id": "common/subject_types:169:rule:root:subject_type:sword_hunt",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "sword_hunt"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "(special)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3252
@@ -2126,7 +1491,6 @@
   {
     "id": "common/subject_types:16:rule:root:subject_type:is_potential_overlord",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "is_potential_overlord"
     },
@@ -2134,16 +1498,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "This part is not copied in copy_from. Actual default is equivalent to always = yes. In overlord scope."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -2155,7 +1515,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3253
@@ -2163,25 +1522,16 @@
   {
     "id": "common/subject_types:170:rule:root:subject_type:sankin_kotai",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "sankin_kotai"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3254
@@ -2189,25 +1539,16 @@
   {
     "id": "common/subject_types:171:rule:root:subject_type:expel_ronin",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "expel_ronin"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3255
@@ -2215,7 +1556,6 @@
   {
     "id": "common/subject_types:172:rule:root:subject_type:modifier_subject",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "modifier_subject"
     },
@@ -2224,21 +1564,13 @@
       "exact": "clear"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Use \"clear\" to clear after copy_from. Otherwise it just adds a static modifier."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3256
   },
@@ -2256,20 +1588,13 @@
       "type": "static_modifier"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of modifiers applied while the containing entry is active."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3257
@@ -2288,20 +1613,13 @@
       "type": "event_modifier"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of modifiers applied while the containing entry is active."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3258
@@ -2319,16 +1637,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Root = subject, from = overlord."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -2344,7 +1658,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3259
@@ -2361,18 +1674,10 @@
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3260
@@ -2389,18 +1694,10 @@
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3261
@@ -2408,55 +1705,38 @@
   {
     "id": "common/subject_types:179:rule:root:subject_type:modifier_subject",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "modifier_subject"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Use \"clear\" to clear after copy_from. Otherwise it just adds a static modifier."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3262
   },
   {
     "id": "common/subject_types:17:rule:root:subject_type:has_overlords_ruler",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "has_overlords_ruler"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Properties:"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3263
@@ -2464,7 +1744,6 @@
   {
     "id": "common/subject_types:180:rule:root:subject_type:modifier_overlord",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "modifier_overlord"
     },
@@ -2473,21 +1752,13 @@
       "exact": "clear"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Use \"clear\" to clear after copy_from. Otherwise it just adds a static modifier."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3264
   },
@@ -2505,20 +1776,13 @@
       "type": "static_modifier"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of modifiers applied while the containing entry is active."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3265
@@ -2537,20 +1801,13 @@
       "type": "event_modifier"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of modifiers applied while the containing entry is active."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3266
@@ -2568,16 +1825,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Root = subject, from = overlord."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -2593,7 +1846,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3267
@@ -2610,18 +1862,10 @@
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3268
@@ -2638,18 +1882,10 @@
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3269
@@ -2657,35 +1893,25 @@
   {
     "id": "common/subject_types:187:rule:root:subject_type:modifier_overlord",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "modifier_overlord"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Use \"clear\" to clear after copy_from. Otherwise it just adds a static modifier."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3270
   },
   {
     "id": "common/subject_types:188:rule:root:subject_type:overlord_opinion_modifier",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "overlord_opinion_modifier"
     },
@@ -2694,20 +1920,13 @@
       "exact": "null"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If not \"null\" it will look for a modifier with that name in 00_opinion_modifiers.txt and other files in that directory."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3271
@@ -2715,7 +1934,6 @@
   {
     "id": "common/subject_types:189:rule:root:subject_type:overlord_opinion_modifier",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "overlord_opinion_modifier"
     },
@@ -2724,20 +1942,13 @@
       "type": "opinion_modifier"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If not \"null\" it will look for a modifier with that name in 00_opinion_modifiers.txt and other files in that directory."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3272
@@ -2745,27 +1956,19 @@
   {
     "id": "common/subject_types:18:rule:root:subject_type:can_fight_independence_war",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_fight_independence_war"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Properties:"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3273
@@ -2773,7 +1976,6 @@
   {
     "id": "common/subject_types:190:rule:root:subject_type:subject_opinion_modifier",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "subject_opinion_modifier"
     },
@@ -2782,20 +1984,13 @@
       "exact": "null"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If not \"null\" it will look for a modifier with that name in 00_opinion_modifiers.txt and other files in that directory."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3274
@@ -2803,7 +1998,6 @@
   {
     "id": "common/subject_types:191:rule:root:subject_type:subject_opinion_modifier",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "subject_opinion_modifier"
     },
@@ -2812,20 +2006,13 @@
       "type": "opinion_modifier"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If not \"null\" it will look for a modifier with that name in 00_opinion_modifiers.txt and other files in that directory."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3275
@@ -2833,7 +2020,6 @@
   {
     "id": "common/subject_types:194:rule:root:subject_upgrades:can_upgrade_trigger",
     "context": "root:subject_upgrades",
-    "parent_path": [],
     "key": {
       "exact": "can_upgrade_trigger"
     },
@@ -2841,14 +2027,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -2860,7 +2041,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3276
@@ -2868,7 +2048,6 @@
   {
     "id": "common/subject_types:195:rule:root:subject_upgrades:cost",
     "context": "root:subject_upgrades",
-    "parent_path": [],
     "key": {
       "exact": "cost"
     },
@@ -2880,18 +2059,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3277
@@ -2899,7 +2070,6 @@
   {
     "id": "common/subject_types:197:rule:root:subject_upgrades:effect",
     "context": "root:subject_upgrades",
-    "parent_path": [],
     "key": {
       "exact": "effect"
     },
@@ -2907,16 +2077,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of effects executed by the containing entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -2928,7 +2094,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3278
@@ -2936,7 +2101,6 @@
   {
     "id": "common/subject_types:199:rule:root:subject_upgrades:removed_effect",
     "context": "root:subject_upgrades",
-    "parent_path": [],
     "key": {
       "exact": "removed_effect"
     },
@@ -2944,14 +2108,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -2963,7 +2122,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3279
@@ -2971,27 +2129,19 @@
   {
     "id": "common/subject_types:19:rule:root:subject_type:is_voluntary",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "is_voluntary"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether they can leave the relationship whenever they want"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3280
@@ -2999,7 +2149,6 @@
   {
     "id": "common/subject_types:201:rule:root:subject_upgrades:modifier_overlord",
     "context": "root:subject_upgrades",
-    "parent_path": [],
     "key": {
       "exact": "modifier_overlord"
     },
@@ -3007,14 +2156,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -3026,7 +2170,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3281
@@ -3034,7 +2177,6 @@
   {
     "id": "common/subject_types:203:rule:root:subject_upgrades:modifier_subject",
     "context": "root:subject_upgrades",
-    "parent_path": [],
     "key": {
       "exact": "modifier_subject"
     },
@@ -3042,14 +2184,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -3061,7 +2198,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3282
@@ -3069,27 +2205,19 @@
   {
     "id": "common/subject_types:20:rule:root:subject_type:transfer_trade_power",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "transfer_trade_power"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Properties:"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3283
@@ -3097,27 +2225,19 @@
   {
     "id": "common/subject_types:21:rule:root:subject_type:transfer_trade_if_merchant_republic",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "transfer_trade_if_merchant_republic"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Properties:"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3284
@@ -3125,25 +2245,16 @@
   {
     "id": "common/subject_types:22:rule:root:subject_type:joins_overlords_wars",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "joins_overlords_wars"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3285
@@ -3151,25 +2262,16 @@
   {
     "id": "common/subject_types:23:rule:root:subject_type:joins_colonial_wars",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "joins_colonial_wars"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3286
@@ -3177,25 +2279,16 @@
   {
     "id": "common/subject_types:24:rule:root:subject_type:can_be_integrated",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_be_integrated"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3287
@@ -3203,27 +2296,19 @@
   {
     "id": "common/subject_types:25:rule:root:subject_type:can_release_and_play",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_release_and_play"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "\"Release Colony\" in SubjectView"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3288
@@ -3231,25 +2316,16 @@
   {
     "id": "common/subject_types:26:rule:root:subject_type:uses_tariffs",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "uses_tariffs"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3289
@@ -3257,27 +2333,19 @@
   {
     "id": "common/subject_types:27:rule:root:subject_type:dynamically_created_during_history",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "dynamically_created_during_history"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If the country is automatically created. ( Makes for special checks during history )"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3290
@@ -3285,27 +2353,19 @@
   {
     "id": "common/subject_types:28:rule:root:subject_type:eats_overlords_colonies",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "eats_overlords_colonies"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether subject assumes control of overlord's colonies in same colonial region."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3291
@@ -3313,27 +2373,19 @@
   {
     "id": "common/subject_types:29:rule:root:subject_type:has_colonial_parent",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "has_colonial_parent"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Regulates most rules that should hold only for colonies"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3292
@@ -3341,27 +2393,19 @@
   {
     "id": "common/subject_types:30:rule:root:subject_type:overlord_can_attack",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "overlord_can_attack"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Properties:"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3293
@@ -3369,25 +2413,16 @@
   {
     "id": "common/subject_types:31:rule:root:subject_type:overlord_can_be_subject",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "overlord_can_be_subject"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3294
@@ -3395,25 +2430,16 @@
   {
     "id": "common/subject_types:32:rule:root:subject_type:can_have_subjects_of_other_types",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_have_subjects_of_other_types"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3295
@@ -3421,27 +2447,19 @@
   {
     "id": "common/subject_types:33:rule:root:subject_type:can_be_annexed",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_be_annexed"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Properties:"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3296
@@ -3449,25 +2467,16 @@
   {
     "id": "common/subject_types:34:rule:root:subject_type:takes_diplo_slot",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "takes_diplo_slot"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3297
@@ -3475,27 +2484,19 @@
   {
     "id": "common/subject_types:35:rule:root:subject_type:has_power_projection",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "has_power_projection"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Properties:"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3298
@@ -3503,25 +2504,16 @@
   {
     "id": "common/subject_types:36:rule:root:subject_type:can_release_in_peace",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_release_in_peace"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3299
@@ -3529,25 +2521,16 @@
   {
     "id": "common/subject_types:37:rule:root:subject_type:uses_military_focus",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "uses_military_focus"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3300
@@ -3555,27 +2538,19 @@
   {
     "id": "common/subject_types:38:rule:root:subject_type:created_by_overlord",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "created_by_overlord"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Properties:"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3301
@@ -3583,25 +2558,16 @@
   {
     "id": "common/subject_types:39:rule:root:subject_type:transfer_subjects_when_made",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "transfer_subjects_when_made"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3302
@@ -3609,7 +2575,6 @@
   {
     "id": "common/subject_types:40:rule:root:subject_type:restoration_cb",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "restoration_cb"
     },
@@ -3618,18 +2583,10 @@
       "type": "casus_belli"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3303
@@ -3637,27 +2594,19 @@
   {
     "id": "common/subject_types:41:rule:root:subject_type:overlord_protects_external",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "overlord_protects_external"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether overlord always gets called (declinable) against countries without the same overlord. When this is 'no' overlord will only join if the defender would have been blocked (by its subject type) from attacking the attacker."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3304
@@ -3665,27 +2614,19 @@
   {
     "id": "common/subject_types:42:rule:root:subject_type:counts_for_borders",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "counts_for_borders"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether distance between borders counts this subject type as part of its overlord's borders."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3305
@@ -3693,25 +2634,16 @@
   {
     "id": "common/subject_types:43:rule:root:subject_type:counts_as_overlord_holding",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "counts_as_overlord_holding"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3306
@@ -3719,25 +2651,16 @@
   {
     "id": "common/subject_types:44:rule:root:subject_type:integration_requires_same_religion_group",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "integration_requires_same_religion_group"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3307
@@ -3745,27 +2668,19 @@
   {
     "id": "common/subject_types:45:rule:root:subject_type:overlord_enforce_peace_attacking",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "overlord_enforce_peace_attacking"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether the overlord can enforce peace on the subject's enemy even when the subject is the attacker"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3308
@@ -3773,27 +2688,19 @@
   {
     "id": "common/subject_types:46:rule:root:subject_type:can_use_claims",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_use_claims"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether the overlord can use the subject's claims and cores for declaring war"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3309
@@ -3801,25 +2708,16 @@
   {
     "id": "common/subject_types:47:rule:root:subject_type:gives_daimyo_bonuses",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "gives_daimyo_bonuses"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3310
@@ -3827,27 +2725,19 @@
   {
     "id": "common/subject_types:48:rule:root:subject_type:gets_help_with_rebels",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "gets_help_with_rebels"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Only for AI. Bidirectional."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3311
@@ -3855,27 +2745,19 @@
   {
     "id": "common/subject_types:49:rule:root:subject_type:share_rebel_popup",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "share_rebel_popup"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether the Overlord gets popups about Subject's rebels and sees them in Stability View."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3312
@@ -3883,27 +2765,19 @@
   {
     "id": "common/subject_types:50:rule:root:subject_type:separatists_become_subjects",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "separatists_become_subjects"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether separatist rebels enforcing demands will become subjects of the overlord."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3313
@@ -3911,25 +2785,16 @@
   {
     "id": "common/subject_types:51:rule:root:subject_type:allows_taking_land_without_independence",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "allows_taking_land_without_independence"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3314
@@ -3937,27 +2802,19 @@
   {
     "id": "common/subject_types:52:rule:root:subject_type:can_transfer_in_peace",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_transfer_in_peace"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether this subject type can be made into a vassal with the \"Transfer Subject\" Age Ability."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3315
@@ -3965,25 +2822,16 @@
   {
     "id": "common/subject_types:53:rule:root:subject_type:can_set_mil_focus",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_set_mil_focus"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3316
@@ -3991,27 +2839,19 @@
   {
     "id": "common/subject_types:54:rule:root:subject_type:can_send_missionary_to_subject",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_send_missionary_to_subject"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Requires Cradle of Civilization"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3317
@@ -4019,27 +2859,19 @@
   {
     "id": "common/subject_types:55:rule:root:subject_type:can_union_break",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_union_break"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Only works together with has_overlords_ruler"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3318
@@ -4047,25 +2879,16 @@
   {
     "id": "common/subject_types:56:rule:root:subject_type:overlord_can_fabricate_for",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "overlord_can_fabricate_for"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3319
@@ -4073,25 +2896,16 @@
   {
     "id": "common/subject_types:57:rule:root:subject_type:does_overlord_size_count_for_warscore_cost",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "does_overlord_size_count_for_warscore_cost"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3320
@@ -4099,25 +2913,16 @@
   {
     "id": "common/subject_types:58:rule:root:subject_type:is_colony_subtype",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "is_colony_subtype"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3321
@@ -4125,25 +2930,16 @@
   {
     "id": "common/subject_types:59:rule:root:subject_type:is_march",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "is_march"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3322
@@ -4151,25 +2947,16 @@
   {
     "id": "common/subject_types:60:rule:root:subject_type:forms_trade_companies",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "forms_trade_companies"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3323
@@ -4177,25 +2964,16 @@
   {
     "id": "common/subject_types:61:rule:root:subject_type:can_concentrate_development",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_concentrate_development"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3324
@@ -4203,25 +2981,16 @@
   {
     "id": "common/subject_types:62:rule:root:subject_type:can_have_great_projects_moved_by_overlord",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_have_great_projects_moved_by_overlord"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3325
@@ -4229,25 +2998,16 @@
   {
     "id": "common/subject_types:63:rule:root:subject_type:extend_trading_range",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "extend_trading_range"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3326
@@ -4255,27 +3015,19 @@
   {
     "id": "common/subject_types:64:rule:root:subject_type:can_gain_favors",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_gain_favors"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If favors can be gained with subject like allies"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3327
@@ -4283,27 +3035,19 @@
   {
     "id": "common/subject_types:65:rule:root:subject_type:can_be_co_belligerented",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_be_co_belligerented"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Enemies can force this subject to join its overlord into the defense war. Only used when the subject has the \"joins_overlords_wars = no\". By default it's \"no\"."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3328
@@ -4311,27 +3055,19 @@
   {
     "id": "common/subject_types:66:rule:root:subject_type:must_accept_cta_from_overlord",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "must_accept_cta_from_overlord"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Overlord can ask subject to join wars like it could ask allies to join. You would require favors to call them to wars. Only used when the subject has the \"joins_overlords_wars = no\". By default it's \"no\""
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3329
@@ -4339,7 +3075,6 @@
   {
     "id": "common/subject_types:67:rule:root:subject_type:favors_cost_to_join_offensive_wars",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "favors_cost_to_join_offensive_wars"
     },
@@ -4351,20 +3086,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Defines how much favors the overlord need to invest to call the subject into an offensive war"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3330
@@ -4372,7 +3100,6 @@
   {
     "id": "common/subject_types:68:rule:root:subject_type:favors_cost_to_join_defensive_wars",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "favors_cost_to_join_defensive_wars"
     },
@@ -4384,20 +3111,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Defines how much favors the overlord need to invest to call the subject into a defensive war"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3331
@@ -4405,7 +3125,6 @@
   {
     "id": "common/subject_types:69:rule:root:subject_type:opinion_cost_to_join_offensive_wars",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "opinion_cost_to_join_offensive_wars"
     },
@@ -4417,20 +3136,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Defines how much opinion the subject loses of the overlord to call the subject into an offensive war. Applied if you do not have Leviathan"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3332
@@ -4438,7 +3150,6 @@
   {
     "id": "common/subject_types:70:rule:root:subject_type:opinion_cost_to_join_defensive_wars",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "opinion_cost_to_join_defensive_wars"
     },
@@ -4450,20 +3161,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Defines how much opinion the subject loses of the overlord to call the subject into a defensive war. Applied if you do not have Leviathan"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3333
@@ -4471,27 +3175,19 @@
   {
     "id": "common/subject_types:71:rule:root:subject_type:opinion_cost_instead_of_favors_cost",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "opinion_cost_instead_of_favors_cost"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether subject require favors or opinion to join the war, if yes requires opinion, if no requires favors, which is the default unless Leviathan DLC is owned"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3334
@@ -4499,7 +3195,6 @@
   {
     "id": "common/subject_types:72:rule:root:subject_type:opinion_on_subject_integration",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "opinion_on_subject_integration"
     },
@@ -4511,20 +3206,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Opinion hit on subjects from seeing another subject integrated, defaults to -30"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3335
@@ -4532,32 +3220,24 @@
   {
     "id": "common/subject_types:73:rule:root:subject_type:annex_cost_per_development",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "annex_cost_per_development"
     },
     "operator": "=",
     "value": {
       "float": {
-        "min": "0",
+        "min": 0,
         "max": null
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "How much it costs in DIP to annex, based on development"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3336
@@ -4565,25 +3245,16 @@
   {
     "id": "common/subject_types:74:rule:root:subject_type:can_send_tribute",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "can_send_tribute"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3337
@@ -4591,7 +3262,6 @@
   {
     "id": "common/subject_types:75:rule:root:subject_type:max_government_rank",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "max_government_rank"
     },
@@ -4603,20 +3273,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "0 means no limit"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3338
@@ -4624,7 +3287,6 @@
   {
     "id": "common/subject_types:76:rule:root:subject_type:cities_required_for_bonuses",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "cities_required_for_bonuses"
     },
@@ -4636,20 +3298,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "How many cities the subject needs before giving bonuses to overlord"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3339
@@ -4657,7 +3312,6 @@
   {
     "id": "common/subject_types:77:rule:root:subject_type:trust_on_start",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "trust_on_start"
     },
@@ -4669,20 +3323,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Overlord and subject will each get this much extra trust with each other at game start"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3340
@@ -4690,7 +3337,6 @@
   {
     "id": "common/subject_types:78:rule:root:subject_type:base_liberty_desire",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "base_liberty_desire"
     },
@@ -4702,18 +3348,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3341
@@ -4721,7 +3359,6 @@
   {
     "id": "common/subject_types:79:rule:root:subject_type:liberty_desire_revolution",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "liberty_desire_revolution"
     },
@@ -4733,20 +3370,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Liberty desire at 100% revolution spread in country"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3342
@@ -4754,7 +3384,6 @@
   {
     "id": "common/subject_types:80:rule:root:subject_type:liberty_desire_negative_prestige",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "liberty_desire_negative_prestige"
     },
@@ -4766,18 +3395,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3343
@@ -4785,7 +3406,6 @@
   {
     "id": "common/subject_types:81:rule:root:subject_type:liberty_desire_development_ratio",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "liberty_desire_development_ratio"
     },
@@ -4797,18 +3417,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3344
@@ -4816,7 +3428,6 @@
   {
     "id": "common/subject_types:82:rule:root:subject_type:liberty_desire_same_dynasty",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "liberty_desire_same_dynasty"
     },
@@ -4828,18 +3439,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3345
@@ -4847,7 +3450,6 @@
   {
     "id": "common/subject_types:83:rule:root:subject_type:liberty_desire_revolution",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "liberty_desire_revolution"
     },
@@ -4859,20 +3461,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Liberty desire at 100% revolution spread in country"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3346
@@ -4880,7 +3475,6 @@
   {
     "id": "common/subject_types:84:rule:root:subject_type:pays_overlord",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "pays_overlord"
     },
@@ -4892,20 +3486,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "1.0 represents the amount payed by vassals"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3347
@@ -4913,7 +3500,6 @@
   {
     "id": "common/subject_types:85:rule:root:subject_type:forcelimit_to_overlord",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "forcelimit_to_overlord"
     },
@@ -4925,20 +3511,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Percent of subject FL to use as base for modifiers"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3348
@@ -4946,7 +3525,6 @@
   {
     "id": "common/subject_types:86:rule:root:subject_type:naval_forcelimit_to_overlord",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "naval_forcelimit_to_overlord"
     },
@@ -4958,20 +3536,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Percent of subject FL to use as base for modifiers"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3349
@@ -4979,7 +3550,6 @@
   {
     "id": "common/subject_types:87:rule:root:subject_type:manpower_to_overlord",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "manpower_to_overlord"
     },
@@ -4991,20 +3561,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Percent of subject FL to use as base for modifiers"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3350
@@ -5012,7 +3575,6 @@
   {
     "id": "common/subject_types:88:rule:root:subject_type:sailors_to_overlord",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "sailors_to_overlord"
     },
@@ -5024,20 +3586,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Percent of subject FL to use as base for modifiers"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3351
@@ -5045,7 +3600,6 @@
   {
     "id": "common/subject_types:89:rule:root:subject_type:military_focus",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "military_focus"
     },
@@ -5057,20 +3611,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "How much the AI subject should spend etc. on army and forts. 0 should make them spend nothing. Very high values will probably not make a big difference since there will be sanity checks."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3352
@@ -5078,7 +3625,6 @@
   {
     "id": "common/subject_types:90:rule:root:subject_type:relative_power_class",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "relative_power_class"
     },
@@ -5090,20 +3636,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "relative_power_class decides how Subjects are grouped together when considering relative strenghth towards overlord: If it is 0 they won't consider relative power and if it is 1 they will only consider their own power (and those supporting their independence) compared to their Overlord's. Otherwise they will sum up the power of every Subject of the same relative_power_class as themselves, and all countries who support either themselves or one of their allies in the same relative_power_class."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3353
@@ -5111,25 +3650,16 @@
   {
     "id": "common/subject_types:91:rule:root:subject_type:should_quit_wars_on_activation",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "should_quit_wars_on_activation"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3354
@@ -5137,7 +3667,6 @@
   {
     "id": "common/subject_types:92:rule:root:subject_type:diplomacy_view_class",
     "context": "root:subject_type",
-    "parent_path": [],
     "key": {
       "exact": "diplomacy_view_class"
     },
@@ -5149,20 +3678,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "diplomacy_view_class decides how subjects are grouped together in diplomacy view and in foreign province view: 0 means it won't be listed, 1 means it will be listed together only with the same subject type. Other values means it will be listed together with all subjects of the same diplomacy_view_class"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3355
@@ -5181,19 +3703,10 @@
       "type": "subject_type"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3356
   },
@@ -5211,19 +3724,10 @@
       "exact": "all"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3357
   },
@@ -5241,19 +3745,10 @@
       "type": "subject_type"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3358
   },
@@ -5269,18 +3764,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3359
@@ -5297,18 +3784,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3360
@@ -5325,18 +3804,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3361
@@ -5353,18 +3824,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3362

@@ -2,7 +2,6 @@
   {
     "id": "common/disasters:11:rule:root:disaster:can_stop",
     "context": "root:disaster",
-    "parent_path": [],
     "key": {
       "exact": "can_stop"
     },
@@ -10,16 +9,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Determines when the ticker from 0 to 100 can be disabled once enabled."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -31,7 +26,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 509
@@ -39,7 +33,6 @@
   {
     "id": "common/disasters:13:rule:root:disaster:can_end",
     "context": "root:disaster",
-    "parent_path": [],
     "key": {
       "exact": "can_end"
     },
@@ -47,16 +40,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Determines when the disaster can end once it has started (i.e. after the ticker has reached 100)."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -68,7 +57,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 510
@@ -76,7 +64,6 @@
   {
     "id": "common/disasters:15:rule:root:disaster:progress",
     "context": "root:disaster",
-    "parent_path": [],
     "key": {
       "exact": "progress"
     },
@@ -84,16 +71,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Sets conditions for the disaster's prgress ticker to tick upwards."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -105,7 +88,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 511
@@ -127,20 +109,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 512
@@ -148,7 +123,6 @@
   {
     "id": "common/disasters:18:rule:root:disaster:down_progress",
     "context": "root:disaster",
-    "parent_path": [],
     "key": {
       "exact": "down_progress"
     },
@@ -156,16 +130,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Sets conditions for the disaster's prgress ticker to tick downwards."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -177,7 +147,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 513
@@ -185,7 +154,6 @@
   {
     "id": "common/disasters:20:rule:root:disaster:modifier",
     "context": "root:disaster",
-    "parent_path": [],
     "key": {
       "exact": "modifier"
     },
@@ -193,16 +161,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Modifier enabled for the country during the disaster."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -214,7 +178,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 514
@@ -222,7 +185,6 @@
   {
     "id": "common/disasters:21:rule:root:disaster:stability_hit_on_war",
     "context": "root:disaster",
-    "parent_path": [],
     "key": {
       "exact": "stability_hit_on_war"
     },
@@ -234,18 +196,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 515
@@ -253,7 +207,6 @@
   {
     "id": "common/disasters:22:rule:root:disaster:on_start",
     "context": "root:disaster",
-    "parent_path": [],
     "key": {
       "exact": "on_start"
     },
@@ -262,20 +215,13 @@
       "type": "event.country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Event fired on the disaster's progress reaching 100 and the disaster officially starting."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 516
@@ -283,7 +229,6 @@
   {
     "id": "common/disasters:23:rule:root:disaster:on_end",
     "context": "root:disaster",
-    "parent_path": [],
     "key": {
       "exact": "on_end"
     },
@@ -292,20 +237,13 @@
       "type": "event.country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Event fired when the disaster ends (after having officially started)."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 517
@@ -313,7 +251,6 @@
   {
     "id": "common/disasters:25:rule:root:disaster:on_start_effect",
     "context": "root:disaster",
-    "parent_path": [],
     "key": {
       "exact": "on_start_effect"
     },
@@ -321,19 +258,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effects executed when the disaster reaches 100% progress and happens."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 518
@@ -346,24 +277,14 @@
       "events"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "event.country"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 519
   },
@@ -379,18 +300,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 520
@@ -408,19 +321,10 @@
       "exact": "0"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 521
   },
@@ -437,19 +341,10 @@
       "type": "event.country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 522
   },
@@ -465,18 +360,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 523
@@ -484,27 +371,19 @@
   {
     "id": "common/disasters:31:rule:root:disaster:on_monthly",
     "context": "root:disaster",
-    "parent_path": [],
     "key": {
       "exact": "on_monthly"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Events triggered monthly after the disaster has fired (i.e. between on_start and on_end)."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 524
@@ -512,7 +391,6 @@
   {
     "id": "common/disasters:33:rule:root:disaster:on_progress_effect",
     "context": "root:disaster",
-    "parent_path": [],
     "key": {
       "exact": "on_progress_effect"
     },
@@ -520,19 +398,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "triggered monthly when it is ticking up to 100. The progress is saved in a variable that is <disaster key>_progress"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 525
@@ -540,7 +412,6 @@
   {
     "id": "common/disasters:5:rule:root:disaster:ended_by_country_breaking_to_rebels",
     "context": "root:disaster",
-    "parent_path": [],
     "key": {
       "exact": "ended_by_country_breaking_to_rebels"
     },
@@ -549,18 +420,10 @@
       "exact": "no"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 526
@@ -568,7 +431,6 @@
   {
     "id": "common/disasters:7:rule:root:disaster:potential",
     "context": "root:disaster",
-    "parent_path": [],
     "key": {
       "exact": "potential"
     },
@@ -576,16 +438,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Determines whether the disaster is visible."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -597,7 +455,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 527
@@ -605,7 +462,6 @@
   {
     "id": "common/disasters:9:rule:root:disaster:can_start",
     "context": "root:disaster",
-    "parent_path": [],
     "key": {
       "exact": "can_start"
     },
@@ -613,16 +469,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Determines whether the ticker from 0 to 100 will be enabled."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -634,7 +486,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 528

@@ -420,7 +420,7 @@ impl AnalysisHost {
         shards.extend(self.index.shards.values().cloned());
         // One combined build sets the case policy and derives the lookup maps together, so the
         // merged cache + workspace shards are not rebuilt twice.
-        let mut index = WorkspaceIndex::from_shards_with_rules(shards, self.rules.as_ref());
+        let mut index = WorkspaceIndex::from_shards(shards);
         // Source-file IDs were checked for collisions above, so the cached and existing position
         // keys are disjoint. Merge the existing snapshot positions in one pass: calling
         // `replace_position_ranges` once per Project file would repeatedly rebuild the
@@ -441,7 +441,7 @@ impl AnalysisHost {
         );
         index.replace_all_position_ranges(position_ranges);
         let priorities = source_priorities(&roots, &files);
-        index.resolve_priorities(&priorities, self.rules.as_ref());
+        index.resolve_priorities(&priorities);
 
         // Cache installation owns the preview identity of its files: drop any
         // scanned entries for them so the serving map never mixes the two
@@ -791,11 +791,7 @@ impl AnalysisHost {
                     .map(|(_, shard)| shard.clone()),
             );
         }
-        let mut index = WorkspaceIndex::from_shards_cancellable_with_rules(
-            shards,
-            self.rules.as_ref(),
-            cancellation,
-        )?;
+        let mut index = WorkspaceIndex::from_shards_cancellable(shards, cancellation)?;
         let mut position_ranges = self.index.position_ranges().clone();
         position_ranges.retain_files(|file_id| {
             files.contains_key(&file_id) && !file_states.contains_key(&file_id)
@@ -816,7 +812,7 @@ impl AnalysisHost {
             .nth(1)
             .is_some();
         if !self.installed_caches.is_empty() || has_multiple_source_roots {
-            index.resolve_priorities_cancellable(&priorities, self.rules.as_ref(), cancellation)?;
+            index.resolve_priorities_cancellable(&priorities, cancellation)?;
         }
         cancellation.checkpoint()?;
         self.source_files = Arc::new(files);
@@ -951,7 +947,7 @@ impl AnalysisHost {
                     paths.remove(&change.path);
                     file_states.remove(&id);
                     let priorities = source_priorities(&self.roots, &files);
-                    index.remove_shard_resolved(id, &priorities, self.rules.as_ref());
+                    index.remove_shard_resolved(id, &priorities);
                     index.remove_position_ranges(id);
                     preview_files.push(id);
                     changed = true;
@@ -1025,7 +1021,7 @@ impl AnalysisHost {
             file_states.insert(id, Arc::clone(&state));
             preview_files.push(id);
             let priorities = source_priorities(&self.roots, &files);
-            index.replace_shard_resolved(state.shard_handle(), &priorities, self.rules.as_ref());
+            index.replace_shard_resolved(state.shard_handle(), &priorities);
             report.indexed_files = report.indexed_files.saturating_add(1);
             changed = true;
         }
@@ -1063,11 +1059,7 @@ impl AnalysisHost {
         let file_id = shard.file_id;
         let priorities = source_priorities(&self.roots, &self.source_files);
         let shard = Arc::new(shard);
-        Arc::make_mut(&mut self.index).replace_shard_resolved(
-            Arc::clone(&shard),
-            &priorities,
-            self.rules.as_ref(),
-        );
+        Arc::make_mut(&mut self.index).replace_shard_resolved(Arc::clone(&shard), &priorities);
         Arc::make_mut(&mut self.index).remove_position_ranges(file_id);
         if let Some(previous) = self.file_states.get(&file_id) {
             let mut replacement = previous.as_ref().clone();

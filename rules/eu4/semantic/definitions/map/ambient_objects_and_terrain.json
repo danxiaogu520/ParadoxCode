@@ -2,25 +2,16 @@
   {
     "id": "map/ambient_objects_and_terrain:29:rule:root:ambient_object_basis:type",
     "context": "root:ambient_object_basis",
-    "parent_path": [],
     "key": {
       "exact": "type"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5486
@@ -28,25 +19,16 @@
   {
     "id": "map/ambient_objects_and_terrain:30:rule:root:ambient_object_basis:use_animation",
     "context": "root:ambient_object_basis",
-    "parent_path": [],
     "key": {
       "exact": "use_animation"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5487
@@ -54,7 +36,6 @@
   {
     "id": "map/ambient_objects_and_terrain:31:rule:root:ambient_object_basis:scale",
     "context": "root:ambient_object_basis",
-    "parent_path": [],
     "key": {
       "exact": "scale"
     },
@@ -66,18 +47,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5488
@@ -85,7 +58,6 @@
   {
     "id": "map/ambient_objects_and_terrain:32:rule:root:ambient_object_basis:time_duration",
     "context": "root:ambient_object_basis",
-    "parent_path": [],
     "key": {
       "exact": "time_duration"
     },
@@ -97,18 +69,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5489
@@ -116,7 +80,6 @@
   {
     "id": "map/ambient_objects_and_terrain:33:rule:root:ambient_object_basis:always_visible",
     "context": "root:ambient_object_basis",
-    "parent_path": [],
     "key": {
       "exact": "always_visible"
     },
@@ -125,18 +88,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5490
@@ -144,7 +99,6 @@
   {
     "id": "map/ambient_objects_and_terrain:34:rule:root:ambient_object_basis:visible_in_all_map_modes",
     "context": "root:ambient_object_basis",
-    "parent_path": [],
     "key": {
       "exact": "visible_in_all_map_modes"
     },
@@ -153,18 +107,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5491
@@ -181,18 +127,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5492
@@ -209,18 +147,10 @@
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5493
@@ -233,7 +163,6 @@
       "position"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "float": {
         "min": null,
@@ -241,18 +170,10 @@
       }
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 3,
-    "strict_min": true,
     "max_occurs": 3,
     "source_file": "semantic-rules.json",
     "line": 5494
@@ -269,18 +190,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5495
@@ -293,7 +206,6 @@
       "rotation"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "float": {
         "min": null,
@@ -301,18 +213,10 @@
       }
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 3,
-    "strict_min": true,
     "max_occurs": 3,
     "source_file": "semantic-rules.json",
     "line": 5496
@@ -329,18 +233,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5497
@@ -348,33 +244,22 @@
   {
     "id": "map/ambient_objects_and_terrain:41:rule:root:ambient_object_basis:object",
     "context": "root:ambient_object_basis",
-    "parent_path": [],
     "key": {
       "exact": "object"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 5498
   },
   {
     "id": "map/ambient_objects_and_terrain:43:rule:root:terrain:type",
     "context": "root:terrain",
-    "parent_path": [],
     "key": {
       "exact": "type"
     },
@@ -383,20 +268,13 @@
       "enum": "terrain_types"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Types are used by the game to apply certain bonuses/maluses on movement/combat etc."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5499
@@ -404,7 +282,6 @@
   {
     "id": "map/ambient_objects_and_terrain:44:rule:root:terrain:sound_type",
     "context": "root:terrain",
-    "parent_path": [],
     "key": {
       "exact": "sound_type"
     },
@@ -413,18 +290,10 @@
       "enum": "terrain_sound_types"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5500
@@ -432,7 +301,6 @@
   {
     "id": "map/ambient_objects_and_terrain:45:rule:root:terrain:is_water",
     "context": "root:terrain",
-    "parent_path": [],
     "key": {
       "exact": "is_water"
     },
@@ -441,18 +309,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5501
@@ -460,7 +320,6 @@
   {
     "id": "map/ambient_objects_and_terrain:46:rule:root:terrain:inland_sea",
     "context": "root:terrain",
-    "parent_path": [],
     "key": {
       "exact": "inland_sea"
     },
@@ -469,18 +328,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5502
@@ -492,7 +343,6 @@
       "color"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "int": {
         "min": 0,
@@ -500,18 +350,10 @@
       }
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 3,
-    "strict_min": true,
     "max_occurs": 3,
     "source_file": "semantic-rules.json",
     "line": 5503
@@ -519,25 +361,16 @@
   {
     "id": "map/ambient_objects_and_terrain:48:rule:root:terrain:color",
     "context": "root:terrain",
-    "parent_path": [],
     "key": {
       "exact": "color"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5504
@@ -545,7 +378,6 @@
   {
     "id": "map/ambient_objects_and_terrain:50:rule:root:terrain:cs_only_local_development_cost",
     "context": "root:terrain",
-    "parent_path": [],
     "key": {
       "exact": "cs_only_local_development_cost"
     },
@@ -557,18 +389,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5505
@@ -576,7 +400,6 @@
   {
     "id": "map/ambient_objects_and_terrain:51:rule:root:terrain:defence",
     "context": "root:terrain",
-    "parent_path": [],
     "key": {
       "exact": "defence"
     },
@@ -588,20 +411,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Addition to defence roll in combat in this terrain"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5506
@@ -609,7 +425,6 @@
   {
     "id": "map/ambient_objects_and_terrain:52:rule:root:terrain:combat_width",
     "context": "root:terrain",
-    "parent_path": [],
     "key": {
       "exact": "combat_width"
     },
@@ -621,20 +436,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Multiplier to increase or decrease combat width in this terrain"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5507
@@ -642,7 +450,6 @@
   {
     "id": "map/ambient_objects_and_terrain:53:rule:root:terrain:movement_cost",
     "context": "root:terrain",
-    "parent_path": [],
     "key": {
       "exact": "movement_cost"
     },
@@ -654,20 +461,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Multiplier to movement time into/out of province with terrain"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5508
@@ -675,7 +475,6 @@
   {
     "id": "map/ambient_objects_and_terrain:54:rule:root:terrain:nation_designer_cost_multiplier",
     "context": "root:terrain",
-    "parent_path": [],
     "key": {
       "exact": "nation_designer_cost_multiplier"
     },
@@ -687,20 +486,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Extra cost multiplier when picked in the Nation Designer"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5509
@@ -712,49 +504,30 @@
       "terrain_override"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "province_id"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 5510
   },
   {
     "id": "map/ambient_objects_and_terrain:56:rule:root:terrain:terrain_override",
     "context": "root:terrain",
-    "parent_path": [],
     "key": {
       "exact": "terrain_override"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5511
@@ -762,7 +535,6 @@
   {
     "id": "map/ambient_objects_and_terrain:58:rule:root:graphical_terrain:type",
     "context": "root:graphical_terrain",
-    "parent_path": [],
     "key": {
       "exact": "type"
     },
@@ -771,18 +543,10 @@
       "type": "terrain"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5512
@@ -794,7 +558,6 @@
       "color"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "int": {
         "min": null,
@@ -802,18 +565,10 @@
       }
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5513
@@ -821,25 +576,16 @@
   {
     "id": "map/ambient_objects_and_terrain:60:rule:root:graphical_terrain:color",
     "context": "root:graphical_terrain",
-    "parent_path": [],
     "key": {
       "exact": "color"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5514
@@ -847,7 +593,6 @@
   {
     "id": "map/ambient_objects_and_terrain:62:rule:root:tree_terrain:terrain",
     "context": "root:tree_terrain",
-    "parent_path": [],
     "key": {
       "exact": "terrain"
     },
@@ -856,18 +601,10 @@
       "type": "terrain"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5515
@@ -879,7 +616,6 @@
       "color"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "int": {
         "min": null,
@@ -887,44 +623,26 @@
       }
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 5516
   },
   {
     "id": "map/ambient_objects_and_terrain:64:rule:root:tree_terrain:color",
     "context": "root:tree_terrain",
-    "parent_path": [],
     "key": {
       "exact": "color"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5517
@@ -932,7 +650,6 @@
   {
     "id": "map/ambient_objects_and_terrain:66:rule:root:trade_winds:<province_id>",
     "context": "root:trade_winds",
-    "parent_path": [],
     "key": {
       "type": "province_id"
     },
@@ -944,45 +661,27 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "province id = rotation in degrees, 0 is pointing right, then ccw"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 5518
   },
   {
     "id": "map/ambient_objects_and_terrain:47:rule:root:terrain:any_scalar",
     "context": "root:terrain",
-    "parent_path": [],
     "key": "any_scalar",
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 47
   }

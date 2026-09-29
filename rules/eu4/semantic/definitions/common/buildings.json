@@ -2,7 +2,6 @@
   {
     "id": "common/buildings:11:rule:root:building:modifier",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "modifier"
     },
@@ -10,19 +9,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of modifiers applied while the containing entry is active."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 206
@@ -30,7 +23,6 @@
   {
     "id": "common/buildings:13:rule:root:building:build_trigger",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "build_trigger"
     },
@@ -38,16 +30,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "An and trigger that needs to be fullfilled to build the building"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -63,7 +51,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 207
@@ -71,7 +58,6 @@
   {
     "id": "common/buildings:15:rule:root:building:keep_trigger",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "keep_trigger"
     },
@@ -79,16 +65,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "An and trigger that needs to be fullfilled to keep the building"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -104,7 +86,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 208
@@ -112,7 +93,6 @@
   {
     "id": "common/buildings:17:rule:root:building:potential",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "potential"
     },
@@ -120,16 +100,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions evaluated once; gate the entry's visibility."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -145,7 +121,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 209
@@ -153,7 +128,6 @@
   {
     "id": "common/buildings:19:rule:root:building:on_built",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "on_built"
     },
@@ -161,16 +135,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "THIS = Province, FROM = Builder(not nessecairly owner, can be overlord)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -186,7 +156,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 210
@@ -194,7 +163,6 @@
   {
     "id": "common/buildings:21:rule:root:building:on_destroyed",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "on_destroyed"
     },
@@ -202,16 +170,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "THIS = Province, FROM = Destroyer, Will not be called on buildings made obsolete!"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -227,7 +191,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 211
@@ -235,7 +198,6 @@
   {
     "id": "common/buildings:23:rule:root:building:on_obsolete",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "on_obsolete"
     },
@@ -243,16 +205,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "THIS = Province, FROM = Destroyer, Will not be called on buildings destroyed!"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -268,7 +226,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 212
@@ -276,7 +233,6 @@
   {
     "id": "common/buildings:24:rule:root:building:government_specific",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "government_specific"
     },
@@ -285,18 +241,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 213
@@ -304,27 +252,19 @@
   {
     "id": "common/buildings:25:rule:root:building:one_per_country",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "one_per_country"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "if yes, only one of these can exist in a country"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 214
@@ -332,7 +272,6 @@
   {
     "id": "common/buildings:26:rule:root:building:allow_in_gold_provinces",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "allow_in_gold_provinces"
     },
@@ -341,18 +280,10 @@
       "exact": "no"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 215
@@ -360,7 +291,6 @@
   {
     "id": "common/buildings:27:rule:root:building:influencing_fort",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "influencing_fort"
     },
@@ -369,18 +299,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 216
@@ -388,7 +310,6 @@
   {
     "id": "common/buildings:28:rule:root:building:make_obsolete",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "make_obsolete"
     },
@@ -397,18 +318,10 @@
       "type": "building"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 217
@@ -416,7 +329,6 @@
   {
     "id": "common/buildings:29:rule:root:building:indestructible",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "indestructible"
     },
@@ -425,18 +337,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 218
@@ -444,7 +348,6 @@
   {
     "id": "common/buildings:30:rule:root:building:show_separate",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "show_separate"
     },
@@ -453,20 +356,13 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Means as a manufactory it will be shown according to the old way"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 219
@@ -478,24 +374,14 @@
       "manufactory"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "trade_good"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 220
   },
@@ -506,23 +392,14 @@
       "manufactory"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "exact": "all"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 221
@@ -530,27 +407,19 @@
   {
     "id": "common/buildings:33:rule:root:building:manufactory",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "manufactory"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "List of trade goods that get a production bonus"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 222
@@ -562,51 +431,33 @@
       "bonus_manufactory"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "trade_good"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 223
   },
   {
     "id": "common/buildings:35:rule:root:building:bonus_manufactory",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "bonus_manufactory"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "List of trade goods that get an extra production bonus"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 224
@@ -614,7 +465,6 @@
   {
     "id": "common/buildings:37:rule:root:building:bonus_modifier",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "bonus_modifier"
     },
@@ -622,17 +472,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 225
@@ -640,27 +483,19 @@
   {
     "id": "common/buildings:39:rule:root:building:onmap",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "onmap"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Show as a sprite on the map"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 226
@@ -668,7 +503,6 @@
   {
     "id": "common/buildings:3:rule:type:building:cost",
     "context": "type:building",
-    "parent_path": [],
     "key": {
       "exact": "cost"
     },
@@ -680,18 +514,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 227
@@ -713,20 +539,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 228
@@ -734,7 +553,6 @@
   {
     "id": "common/buildings:42:rule:root:building:ai_will_do",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "ai_will_do"
     },
@@ -742,16 +560,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Building AI is now mainly hard-coded. The AI will estimate how much it gains yearly from each building, convert the value to ducats, and take the building with biggest yearly return as a percentage of the build cost. If lower than 1%, the AI will not consider the yearly return worth it. It will also require higher yearly return if the economy in not in prime shape. Forts' value also get converted to a yearly return based on terrain and strategic position, as well as available budget for fort maintenance. AI can still be modded though; it will multiply the yearly return with the value of ai_will_do. If you don't want the AI to build a building at all, make ai_will_do become 0. AI will consider each building to be worth 0.01 ducats per year as a base, so making ai_will_do above cost will have them build it at some point. It will still check whether it can afford a building before doing so though, but may save up to it."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -767,7 +581,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 229
@@ -775,7 +588,6 @@
   {
     "id": "common/buildings:44:rule:root:building:on_construction_started",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "on_construction_started"
     },
@@ -783,16 +595,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Fires when you start the construction, ROOT - Province FROM - Country that started"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -804,7 +612,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 230
@@ -812,7 +619,6 @@
   {
     "id": "common/buildings:46:rule:root:building:on_construction_canceled",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "on_construction_canceled"
     },
@@ -820,16 +626,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Fires when you cancel the construction, ROOT - Province FROM - Country that canceled"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -841,7 +643,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 231
@@ -849,7 +650,6 @@
   {
     "id": "common/buildings:7:rule:root:building:cost",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "cost"
     },
@@ -861,20 +661,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "cost in $ to build (subject to other modifiers)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 232
@@ -882,7 +675,6 @@
   {
     "id": "common/buildings:8:rule:root:building:time",
     "context": "root:building",
-    "parent_path": [],
     "key": {
       "exact": "time"
     },
@@ -894,20 +686,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Time in months to build"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 233

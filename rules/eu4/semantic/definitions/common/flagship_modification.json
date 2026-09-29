@@ -16,20 +16,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 645
@@ -37,7 +30,6 @@
   {
     "id": "common/flagship_modification:12:rule:root:flagship_modification:ai_trade_score",
     "context": "root:flagship_modification",
-    "parent_path": [],
     "key": {
       "exact": "ai_trade_score"
     },
@@ -45,26 +37,20 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 646
@@ -86,20 +72,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 647
@@ -107,7 +86,6 @@
   {
     "id": "common/flagship_modification:15:rule:root:flagship_modification:ai_war_score",
     "context": "root:flagship_modification",
-    "parent_path": [],
     "key": {
       "exact": "ai_war_score"
     },
@@ -115,26 +93,20 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 648
@@ -142,7 +114,6 @@
   {
     "id": "common/flagship_modification:6:rule:root:flagship_modification:trigger",
     "context": "root:flagship_modification",
-    "parent_path": [],
     "key": {
       "exact": "trigger"
     },
@@ -150,28 +121,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 668
@@ -179,7 +145,6 @@
   {
     "id": "common/flagship_modification:8:rule:root:flagship_modification:modifier",
     "context": "root:flagship_modification",
-    "parent_path": [],
     "key": {
       "exact": "modifier"
     },
@@ -187,19 +152,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "flagship_modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of modifiers applied while the containing entry is active."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 669
@@ -207,7 +166,6 @@
   {
     "id": "common/flagship_modification:9:rule:root:flagship_modification:base_modification",
     "context": "root:flagship_modification",
-    "parent_path": [],
     "key": {
       "exact": "base_modification"
     },
@@ -216,18 +174,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 670

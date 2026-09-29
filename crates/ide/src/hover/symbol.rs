@@ -9,12 +9,11 @@ use crate::localisation::{
     localisation_preview_section, localisation_previews_for_name, symbol_localisation_preview,
     unlabelled_preview_rows,
 };
-use crate::resolution::{symbol_candidates_for_hover, symbol_resolution_policy};
+use crate::resolution::symbol_candidates_for_hover;
 use crate::semantic::dynamic_definition_summary;
 use crate::support::{root_for_path, same_location};
 use crate::types::{CancellationToken, Cancelled, Location};
 use engine::{AnalysisSnapshot, SourceRootKind};
-use rules::SymbolResolutionPolicy;
 use text::TextRange;
 
 /// Maximum number of candidate paths rendered before the list is truncated.
@@ -33,7 +32,6 @@ pub(crate) fn hover_for_symbol(
     cancellation: &CancellationToken,
 ) -> Result<HoverModel, Cancelled> {
     let candidates = symbol_candidates_for_hover(snapshot, kind, name, cancellation)?;
-    let policy = symbol_resolution_policy(snapshot, kind);
     let mut model = HoverModel::new(format!("### {} {}", kind, code_span(name)));
     if candidates.is_empty() {
         model.push_section(format!("#### unresolved {kind} symbol"));
@@ -43,19 +41,10 @@ pub(crate) fn hover_for_symbol(
             .map(|candidate| candidate.priority)
             .max()
             .unwrap_or(0);
-        let active = match policy {
-            SymbolResolutionPolicy::ReplaceBySymbol => candidates
-                .iter()
-                .filter(|candidate| candidate.priority == highest)
-                .collect::<Vec<_>>(),
-            SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique => {
-                if candidates.len() == 1 {
-                    vec![&candidates[0]]
-                } else {
-                    Vec::new()
-                }
-            }
-        };
+        let active = candidates
+            .iter()
+            .filter(|candidate| candidate.priority == highest)
+            .collect::<Vec<_>>();
         if active.len() == 1 {
             let definition = active[0];
             model.push_section(format!(
@@ -206,43 +195,8 @@ pub(crate) fn symbol_source_root(snapshot: &AnalysisSnapshot, location: &Locatio
     }
 }
 
+/// Script keys the rules and profile know about, shared with semantic-token classification so
+/// hover and coloring agree on what counts as a known key.
 pub(crate) fn known_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<String>> {
-    // The key set is a pure function of the immutable snapshot but is consulted on every
-    // property-key hover; memoize per revision instead of rebuilding it each time.
-    let revision = snapshot.revision();
-    let key = "hover-known-keys";
-    if let Some(cached) = snapshot
-        .query_cache()
-        .get::<BTreeSet<String>>(revision, key)
-    {
-        return cached;
-    }
-    let mut keys = snapshot
-        .game_profile()
-        .fallback_keys
-        .iter()
-        .map(|key| key.to_ascii_lowercase())
-        .collect::<BTreeSet<_>>();
-    for record in &snapshot.rules().model().records {
-        keys.extend(record.fields.keys().map(|key| key.to_ascii_lowercase()));
-    }
-    // The imported descriptor catalog is the authoritative extension point for semantic keys.
-    // Keep profile fallbacks useful in degraded mode, then admit every descriptor name supplied
-    // by a validated rules artifact.
-    keys.extend(
-        snapshot
-            .rules()
-            .model()
-            .symbol_descriptors
-            .iter()
-            .map(|descriptor| descriptor.kind_id.to_ascii_lowercase()),
-    );
-    let keys = Arc::new(keys);
-    snapshot.query_cache().insert(
-        revision,
-        engine::CacheDomain::Index,
-        key.to_owned(),
-        Arc::clone(&keys),
-    );
-    keys
+    crate::semantic_tokens::static_semantic_keys(snapshot)
 }

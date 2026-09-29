@@ -662,13 +662,9 @@ fn ambient_scope_section(
 
 fn semantic_hover_cardinality_details(rule: &rules::SemanticRule) -> Vec<String> {
     let mut details = Vec::new();
-    if rule.required {
-        details.push("- required".to_owned());
-    }
     // `min_occurs = 1` is the generator's default for scalar keys and aliases;
-    // surfacing it contradicts the unenforced `required` flag and repeats the
-    // same noise `max_occurs = 1` already suppresses.  Real floors (>= 2,
-    // diagnostics-enforced) stay visible.
+    // surfacing it would repeat the same noise `max_occurs = 1` already
+    // suppresses.  Real floors (>= 2, diagnostics-enforced) stay visible.
     if let Some(min) = rule.min_occurs.filter(|min| *min > 1) {
         details.push(format!("- at least {min}"));
     }
@@ -720,7 +716,7 @@ pub(crate) fn semantic_value_hover_label(matcher: &ValueMatcher) -> String {
         ValueMatcher::Bool => "bool (`yes` / `no`)".to_owned(),
         ValueMatcher::Int { min, max } => semantic_numeric_hover_label("integer", *min, *max),
         ValueMatcher::Float { min, max } => {
-            semantic_numeric_hover_label("float", min.as_deref(), max.as_deref())
+            semantic_numeric_hover_label("float", *min, *max)
         }
         ValueMatcher::Date => "date (`YYYY.MM.DD`)".to_owned(),
         ValueMatcher::Type(value) => format!("symbol type `{value}`"),
@@ -790,7 +786,6 @@ fn semantic_rule_documentation_uncached(snapshot: &AnalysisSnapshot, key: &str) 
     rules.sort_by_key(|rule| (&rule.context, &rule.parent_path, &rule.id));
     let rule = rules.into_iter().find(|rule| {
         !rule.documentation.is_empty()
-            || rule.required
             || rule.min_occurs.is_some_and(|min| min > 0)
             || rule.max_occurs.is_some_and(|max| max != 1)
             || !rule.allowed_scopes.is_empty()
@@ -873,9 +868,6 @@ pub(crate) fn semantic_rule_documentation_for_rule(rule: &rules::SemanticRule) -
     }
 
     let mut constraints = Vec::new();
-    if rule.required {
-        constraints.push("- required".to_owned());
-    }
     if let Some(min) = rule.min_occurs.filter(|min| *min > 1) {
         constraints.push(format!("- at least {min}"));
     }

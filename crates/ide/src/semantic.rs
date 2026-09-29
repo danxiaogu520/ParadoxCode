@@ -630,13 +630,6 @@ pub(crate) fn semantic_rule_is_selected(
         .is_none_or(|alternative| selected == Some(alternative))
 }
 
-/// `required` is the declarative shorthand for one minimum occurrence.  Explicit cardinality
-/// remains authoritative when both fields are present, which keeps generated rules backwards
-/// compatible while making a standalone required field executable.
-pub(crate) fn semantic_min_occurs(rule: &rules::SemanticRule) -> Option<u32> {
-    rule.min_occurs.or(rule.required.then_some(1))
-}
-
 /// Alias-definition cardinality describes the fields inside one invocation. It must not be
 /// applied to sibling invocations in the surrounding effect/trigger container.
 pub(crate) fn semantic_rule_is_alias_definition(rule: &rules::SemanticRule) -> bool {
@@ -1201,22 +1194,16 @@ fn numeric_range_overflow(matcher: &ValueMatcher, value: &str) -> bool {
             let Ok(value) = value.parse::<f64>() else {
                 return false;
             };
-            let lower = min.as_deref().and_then(|min| min.parse::<f64>().ok());
-            let upper = max.as_deref().and_then(|max| max.parse::<f64>().ok());
-            lower.is_some_and(|min| value < min) || upper.is_some_and(|max| value > max)
+            min.is_some_and(|min| value < min) || max.is_some_and(|max| value > max)
         }
         _ => false,
     }
 }
 
 pub(crate) fn semantic_min_cardinality_severity(rule: &rules::SemanticRule) -> Severity {
-    if !rule.strict_min {
-        Severity::Warning
-    } else {
-        rule.severity
-            .map(Severity::from_rule_number)
-            .unwrap_or(DiagnosticCode::Cardinality.severity())
-    }
+    rule.severity
+        .map(Severity::from_rule_number)
+        .unwrap_or(DiagnosticCode::Cardinality.severity())
 }
 
 pub(crate) fn semantic_scope_allows(rule: &rules::SemanticRule, scope: &ScopeContext) -> bool {
@@ -2566,9 +2553,7 @@ fn overlay_hidden_counts(snapshot: &AnalysisSnapshot) -> Arc<OverlayHiddenCounts
             if !active || !completion_source_file_allowed(snapshot, file_id) {
                 continue;
             }
-            let folded = snapshot
-                .index()
-                .definition_name_key(&definition.kind, &definition.name);
+            let folded = snapshot.index().definition_name_key(&definition.name);
             counts
                 .0
                 .entry(Box::from(definition.kind.as_ref()))
@@ -2622,7 +2607,7 @@ impl WorkspaceMembership {
         };
         let index = snapshot.index();
         for kind in view.kinds.iter() {
-            let folded = index.definition_name_key(kind, member);
+            let folded = index.definition_name_key(member);
             if self.indexed(hidden, kind, folded.as_ref()) {
                 return true;
             }
@@ -2630,7 +2615,7 @@ impl WorkspaceMembership {
         for suffix in view.suffixes.iter() {
             let candidate = format!("{member}{suffix}");
             for kind in view.kinds.iter() {
-                let folded = index.definition_name_key(kind, &candidate);
+                let folded = index.definition_name_key(&candidate);
                 if self.indexed(hidden, kind, folded.as_ref()) {
                     return true;
                 }
@@ -2689,7 +2674,7 @@ impl WorkspaceMembership {
         }
         if names.iter().any(|name| {
             kinds.iter().any(|kind| {
-                let folded = snapshot.index().definition_name_key(kind, name);
+                let folded = snapshot.index().definition_name_key(name);
                 self.indexed(hidden, kind, folded.as_ref())
             })
         }) {
@@ -2774,9 +2759,7 @@ fn workspace_membership(snapshot: &AnalysisSnapshot) -> Arc<WorkspaceMembership>
         if !active || !completion_source_file_allowed(snapshot, definition.file_id) {
             continue;
         }
-        let folded = snapshot
-            .index()
-            .definition_name_key(&definition.kind, &definition.name);
+        let folded = snapshot.index().definition_name_key(&definition.name);
         *kinds
             .entry(Box::from(definition.kind.as_ref()))
             .or_default()

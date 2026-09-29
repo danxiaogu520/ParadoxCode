@@ -10,7 +10,7 @@ pub(crate) use super::{
     TextChange, TextureCatalog, WorkspaceChange, WorkspaceError, WorkspaceIndex,
     WorkspaceScanFilters, WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanToken,
 };
-use rules::{RuleSet, RulesModel, SymbolDescriptor, SymbolResolutionPolicy};
+use rules::RuleSet;
 use text::{LogicalPath, Position, PositionRange, TextRange};
 
 fn eu4_host() -> AnalysisHost {

@@ -24,7 +24,6 @@ function firstPartyRuleMetadata() {
       manifest_rule_hash: manifest.rule_hash ?? null,
       semantic_rule_count: manifest.semantic_rule_count ?? null,
       file_category_count: manifest.file_category_count ?? null,
-      symbol_descriptor_count: manifest.symbol_descriptor_count ?? null,
     };
   } catch (error) {
     return { manifest_path: manifestPath, read_error: error.message };

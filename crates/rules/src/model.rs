@@ -49,27 +49,6 @@ impl FileResolutionPolicy {
     }
 }
 
-/// Symbol-level conflict behavior used by the index.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum SymbolResolutionPolicy {
-    /// A higher-priority definition shadows lower-priority definitions.
-    ReplaceBySymbol,
-    /// Definitions from all roots remain visible.
-    Merge,
-    /// Multiple definitions are an error at validation time.
-    Unique,
-}
-
-impl SymbolResolutionPolicy {
-    pub(crate) fn as_str(self) -> &'static str {
-        match self {
-            Self::ReplaceBySymbol => "replace-by-symbol",
-            Self::Merge => "merge",
-            Self::Unique => "unique",
-        }
-    }
-}
 /// A complete file-category rule.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -84,31 +63,6 @@ pub struct FileCategory {
     pub matcher: FileMatcher,
 }
 
-/// The symbol policy for one semantic definition kind.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct SymbolDescriptor {
-    /// Stable semantic kind, for example `event` or `localisation`.
-    pub kind_id: String,
-    /// Conflict behavior.
-    pub resolution: SymbolResolutionPolicy,
-    /// Whether names are case-sensitive.
-    pub case_sensitive: bool,
-}
-/// A normalized rule row. Values are intentionally scalar and deterministic; runtime crates do
-/// not need to understand the first-party source representation.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct RuleRecord {
-    /// Normalized table family.
-    pub table: String,
-    /// Stable logical identity within the table.
-    pub logical_id: String,
-    /// Source order retained for diagnostics and deterministic lowering.
-    pub source_order: u32,
-    /// Normalized scalar fields.
-    pub fields: BTreeMap<String, String>,
-}
 /// Source shape of a semantic rule.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -369,27 +323,32 @@ pub struct SemanticRule {
     /// Semantic root, such as `trigger`, `effect`, or `type:event`.
     pub context: String,
     /// Parent keys below the semantic root.
+    #[serde(default)]
     pub parent_path: Vec<String>,
     /// Key matcher.
     pub key: KeyMatcher,
     /// Operator used by the first-party declaration, when it is semantically significant.
+    #[serde(default)]
     pub operator: Option<String>,
     /// Value matcher.
     pub value: ValueMatcher,
     /// Source shape.
     pub shape: RuleShape,
     /// Semantic context to use for children of this block.
+    #[serde(default)]
     pub child_context: Option<String>,
     /// Source alias alternative this rule belongs to, when the first-party declaration has alternatives.
+    #[serde(default)]
     pub alternative_id: Option<String>,
     /// Optional LSP severity from the semantic rule (`1` error, `2` warning, `3` info).
+    #[serde(default)]
     pub severity: Option<u8>,
-    /// Whether the first-party declaration explicitly requires this field.
-    pub required: bool,
-    /// Whether the first-party declaration marks this rule as deprecated.
+    /// Whether the first-party declaration marks this rule as deprecated. Deprecated rules
+    /// still match and diagnose, but completion sorts and flags them below current rules.
     #[serde(default)]
     pub deprecated: bool,
     /// Documentation comments attached to the first-party declaration.
+    #[serde(default)]
     pub documentation: Vec<String>,
     /// Scopes in which this rule is valid.
     ///
@@ -397,14 +356,19 @@ pub struct SemanticRule {
     /// normalizes that declaration to an empty runtime list for compatibility and hashing.
     pub allowed_scopes: Vec<String>,
     /// Scope entered by a nested block matched by this rule.
+    #[serde(default)]
     pub push_scope: Option<String>,
     /// Scope registers replaced by this rule, represented as `(register, scope)` pairs.
+    #[serde(default)]
     pub replace_scope: Vec<(String, String)>,
     /// Minimum number of occurrences when specified by source cardinality.
+    ///
+    /// This is the single requiredness encoding: `min_occurs >= 1` means the key is
+    /// required in its container (the diagnostics' "missing required key" gate).
+    #[serde(default)]
     pub min_occurs: Option<u32>,
-    /// Whether a minimum violation is strict (`cardinality` without `~`).
-    pub strict_min: bool,
     /// Maximum number of occurrences when specified by source cardinality.
+    #[serde(default)]
     pub max_occurs: Option<u32>,
     /// Source file retained for explainable diagnostics.
     pub source_file: String,
@@ -530,10 +494,6 @@ pub struct RulesModel {
     pub game_id: String,
     /// File classification catalog.
     pub file_categories: Vec<FileCategory>,
-    /// Symbol descriptors.
-    pub symbol_descriptors: Vec<SymbolDescriptor>,
-    /// Normalized semantic rule rows.
-    pub records: Vec<RuleRecord>,
     /// Executable semantic matcher model used by semantic analysis.
     pub semantic: SemanticModel,
     /// Data-only game profile consumed by the generic engine and selected by the composition root.
@@ -572,14 +532,12 @@ mod tests {
             child_context: None,
             alternative_id: None,
             severity: None,
-            required: false,
             deprecated: false,
             documentation: Vec::new(),
             allowed_scopes: Vec::new(),
             push_scope: None,
             replace_scope: Vec::new(),
             min_occurs: None,
-            strict_min: false,
             max_occurs: None,
             source_file: "semantic/trigger.json".to_owned(),
             line: 1,

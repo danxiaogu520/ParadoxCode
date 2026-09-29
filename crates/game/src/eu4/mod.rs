@@ -12,57 +12,12 @@ use crate::{GameInstallDescriptor, PlatformExecutablePaths};
 use rules::rulec::{SourceBundle, SourceFile, load_source_bundle};
 use rules::{
     FileCategory, FileMatcher, FileResolutionPolicy, GameProfile, ParserKind, RuleSet, RulesModel,
-    SymbolDescriptor, SymbolResolutionPolicy,
 };
 
 const FIRST_PARTY_FILES: &[SourceFile<'static>] = &[
     SourceFile {
         path: "catalog/file-categories.json",
         bytes: include_bytes!("../../../../rules/eu4/catalog/file-categories.json"),
-    },
-    SourceFile {
-        path: "catalog/records/aliases.json",
-        bytes: include_bytes!("../../../../rules/eu4/catalog/records/aliases.json"),
-    },
-    SourceFile {
-        path: "catalog/records/effects.json",
-        bytes: include_bytes!("../../../../rules/eu4/catalog/records/effects.json"),
-    },
-    SourceFile {
-        path: "catalog/records/enums.json",
-        bytes: include_bytes!("../../../../rules/eu4/catalog/records/enums.json"),
-    },
-    SourceFile {
-        path: "catalog/records/localisation.json",
-        bytes: include_bytes!("../../../../rules/eu4/catalog/records/localisation.json"),
-    },
-    SourceFile {
-        path: "catalog/records/modifiers.json",
-        bytes: include_bytes!("../../../../rules/eu4/catalog/records/modifiers.json"),
-    },
-    SourceFile {
-        path: "catalog/records/rule_nodes.json",
-        bytes: include_bytes!("../../../../rules/eu4/catalog/records/rule_nodes.json"),
-    },
-    SourceFile {
-        path: "catalog/records/scopes.json",
-        bytes: include_bytes!("../../../../rules/eu4/catalog/records/scopes.json"),
-    },
-    SourceFile {
-        path: "catalog/records/subtypes.json",
-        bytes: include_bytes!("../../../../rules/eu4/catalog/records/subtypes.json"),
-    },
-    SourceFile {
-        path: "catalog/records/triggers.json",
-        bytes: include_bytes!("../../../../rules/eu4/catalog/records/triggers.json"),
-    },
-    SourceFile {
-        path: "catalog/records/types.json",
-        bytes: include_bytes!("../../../../rules/eu4/catalog/records/types.json"),
-    },
-    SourceFile {
-        path: "catalog/symbol-descriptors.json",
-        bytes: include_bytes!("../../../../rules/eu4/catalog/symbol-descriptors.json"),
     },
     SourceFile {
         path: "semantic/contexts/effect.json",
@@ -794,29 +749,6 @@ pub fn bootstrap_model() -> RulesModel {
                 },
             },
         ],
-        symbol_descriptors: vec![
-            SymbolDescriptor {
-                kind_id: "event".to_owned(),
-                resolution: SymbolResolutionPolicy::ReplaceBySymbol,
-                case_sensitive: false,
-            },
-            SymbolDescriptor {
-                kind_id: "scripted_effect".to_owned(),
-                resolution: SymbolResolutionPolicy::ReplaceBySymbol,
-                case_sensitive: false,
-            },
-            SymbolDescriptor {
-                kind_id: "scripted_trigger".to_owned(),
-                resolution: SymbolResolutionPolicy::ReplaceBySymbol,
-                case_sensitive: false,
-            },
-            SymbolDescriptor {
-                kind_id: "localisation".to_owned(),
-                resolution: SymbolResolutionPolicy::ReplaceBySymbol,
-                case_sensitive: false,
-            },
-        ],
-        records: Vec::new(),
         semantic: rules::SemanticModel::default(),
         profile: GameProfile::default(),
     }
@@ -846,13 +778,6 @@ mod tests {
                 .file_categories
                 .iter()
                 .any(|category| category.id == "script")
-        );
-        assert!(
-            rules
-                .model()
-                .symbol_descriptors
-                .iter()
-                .any(|symbol| symbol.kind_id == "event")
         );
         let profile = profile();
         assert_eq!(profile.game_id, GAME_ID);

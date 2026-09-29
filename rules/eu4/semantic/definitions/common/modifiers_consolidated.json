@@ -2,31 +2,20 @@
   {
     "id": "common/modifiers_consolidated:1:rule:type:event_modifier:scalar",
     "context": "type:event_modifier",
-    "parent_path": [],
     "key": "any_scalar",
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 1395
   },
   {
     "id": "common/modifiers_consolidated:28:rule:root:event_modifier:religion",
     "context": "root:event_modifier",
-    "parent_path": [],
     "key": {
       "exact": "religion"
     },
@@ -35,18 +24,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1396
@@ -54,25 +35,16 @@
   {
     "id": "common/modifiers_consolidated:29:rule:root:event_modifier:picture",
     "context": "root:event_modifier",
-    "parent_path": [],
     "key": {
       "exact": "picture"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1397
@@ -80,7 +52,6 @@
   {
     "id": "common/modifiers_consolidated:30:rule:root:event_modifier:secondary_religion",
     "context": "root:event_modifier",
-    "parent_path": [],
     "key": {
       "exact": "secondary_religion"
     },
@@ -89,20 +60,13 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Event-modifier-only flag: the modifier disappears when the country changes its syncretic religion."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1396
@@ -110,25 +74,16 @@
   {
     "id": "common/modifiers_consolidated:32:rule:root:static_modifier:picture",
     "context": "root:static_modifier",
-    "parent_path": [],
     "key": {
       "exact": "picture"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1398
@@ -136,7 +91,6 @@
   {
     "id": "common/modifiers_consolidated:33:rule:root:static_modifier:religion_sub_modifier",
     "context": "root:static_modifier",
-    "parent_path": [],
     "key": {
       "exact": "religion_sub_modifier"
     },
@@ -145,20 +99,13 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Will make icon placed next to religion modifier"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1399
@@ -166,7 +113,6 @@
   {
     "id": "common/modifiers_consolidated:34:rule:root:static_modifier:religion",
     "context": "root:static_modifier",
-    "parent_path": [],
     "key": {
       "exact": "religion"
     },
@@ -175,18 +121,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1400
@@ -194,7 +132,6 @@
   {
     "id": "common/modifiers_consolidated:35:rule:root:static_modifier:is_scholar_modifier",
     "context": "root:static_modifier",
-    "parent_path": [],
     "key": {
       "exact": "is_scholar_modifier"
     },
@@ -203,20 +140,13 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Tells the AI and will only show the alert if country has none"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1401
@@ -224,25 +154,16 @@
   {
     "id": "common/modifiers_consolidated:36:rule:root:static_modifier:expire_message_type",
     "context": "root:static_modifier",
-    "parent_path": [],
     "key": {
       "exact": "expire_message_type"
     },
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1402
@@ -250,7 +171,6 @@
   {
     "id": "common/modifiers_consolidated:39:rule:root:triggered_modifier:potential",
     "context": "root:triggered_modifier",
-    "parent_path": [],
     "key": {
       "exact": "potential"
     },
@@ -258,28 +178,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions evaluated once; gate the entry's visibility."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1403
@@ -287,7 +202,6 @@
   {
     "id": "common/modifiers_consolidated:41:rule:root:triggered_modifier:trigger",
     "context": "root:triggered_modifier",
-    "parent_path": [],
     "key": {
       "exact": "trigger"
     },
@@ -295,28 +209,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1404
@@ -338,20 +247,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1405
@@ -359,25 +261,16 @@
   {
     "id": "common/modifiers_consolidated:44:rule:root:triggered_modifier:ai_weight",
     "context": "root:triggered_modifier",
-    "parent_path": [],
     "key": {
       "exact": "ai_weight"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1406
@@ -385,25 +278,16 @@
   {
     "id": "common/modifiers_consolidated:46:rule:root:province_triggered_modifier:picture",
     "context": "root:province_triggered_modifier",
-    "parent_path": [],
     "key": {
       "exact": "picture"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1407
@@ -411,7 +295,6 @@
   {
     "id": "common/modifiers_consolidated:48:rule:root:province_triggered_modifier:potential",
     "context": "root:province_triggered_modifier",
-    "parent_path": [],
     "key": {
       "exact": "potential"
     },
@@ -419,28 +302,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions evaluated once; gate the entry's visibility."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1408
@@ -448,7 +326,6 @@
   {
     "id": "common/modifiers_consolidated:50:rule:root:province_triggered_modifier:trigger",
     "context": "root:province_triggered_modifier",
-    "parent_path": [],
     "key": {
       "exact": "trigger"
     },
@@ -456,28 +333,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1409
@@ -485,7 +357,6 @@
   {
     "id": "common/modifiers_consolidated:53:rule:root:province_triggered_modifier:on_activation",
     "context": "root:province_triggered_modifier",
-    "parent_path": [],
     "key": {
       "exact": "on_activation"
     },
@@ -493,28 +364,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Province scope"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1410
@@ -522,7 +388,6 @@
   {
     "id": "common/modifiers_consolidated:55:rule:root:province_triggered_modifier:on_deactivation",
     "context": "root:province_triggered_modifier",
-    "parent_path": [],
     "key": {
       "exact": "on_deactivation"
     },
@@ -530,26 +395,20 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1411
@@ -557,7 +416,6 @@
   {
     "id": "common/modifiers_consolidated:56:rule:root:province_triggered_modifier:hidden",
     "context": "root:province_triggered_modifier",
-    "parent_path": [],
     "key": {
       "exact": "hidden"
     },
@@ -566,20 +424,13 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Province modifier will be hidden from view even while active"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1412
@@ -601,18 +452,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1413
@@ -634,18 +477,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1414
@@ -653,25 +488,16 @@
   {
     "id": "common/modifiers_consolidated:60:rule:root:timed_modifier:enum[timed_modifier_liberty]",
     "context": "root:timed_modifier",
-    "parent_path": [],
     "key": {
       "enum": "timed_modifier_liberty"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1415

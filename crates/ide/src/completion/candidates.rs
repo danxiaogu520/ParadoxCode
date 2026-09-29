@@ -156,7 +156,6 @@ fn add_typed_prefix_value_items(
             CompletionRankContext::new(
                 schema_tier,
                 CompletionSpecificity::Value,
-                false,
                 deprecated,
             ),
         );
@@ -218,7 +217,6 @@ fn add_template_key_item(
     key_suffix: &str,
     detail: &str,
     snapshot: &AnalysisSnapshot,
-    context: &SemanticCompletionContext,
     candidate: &SemanticCompletionRule<'_, '_>,
     items: &mut Vec<RankedCompletionItem>,
     replacement_range: TextRange,
@@ -246,12 +244,7 @@ fn add_template_key_item(
             resolve_data: Some(format!("rule:{}", rule.id)),
         },
         query_prefix,
-        rule_rank_context(
-            snapshot,
-            context,
-            candidate,
-            key_specificity(snapshot, rule),
-        ),
+        rule_rank_context(candidate, key_specificity(snapshot, rule)),
     );
 }
 
@@ -310,36 +303,11 @@ fn dynamic_members_for_scope(
     }
 }
 
-fn rule_required_missing(
-    snapshot: &AnalysisSnapshot,
-    context: &SemanticCompletionContext,
-    candidate: &SemanticCompletionRule<'_, '_>,
-) -> bool {
-    // `min_occurs` is populated with the parser's default cardinality for nearly every rule;
-    // the explicit `required` flag is the schema's signal that a member is expected in the
-    // current container.  Treating every `min_occurs = 1` row as required would bury ordinary
-    // commands such as `always` behind hundreds of mandatory-looking aliases.
-    if !candidate.rule.required {
-        return false;
-    }
-    !context
-        .existing_keys
-        .iter()
-        .any(|key| semantic_rule_key_matches(snapshot, candidate.rule, candidate.parent_path, key))
-}
-
 fn rule_rank_context(
-    snapshot: &AnalysisSnapshot,
-    context: &SemanticCompletionContext,
     candidate: &SemanticCompletionRule<'_, '_>,
     specificity: CompletionSpecificity,
 ) -> CompletionRankContext {
-    CompletionRankContext::new(
-        candidate.schema_tier,
-        specificity,
-        rule_required_missing(snapshot, context, candidate),
-        candidate.rule.deprecated,
-    )
+    CompletionRankContext::new(candidate.schema_tier, specificity, candidate.rule.deprecated)
 }
 
 pub(crate) fn semantic_rules_for_completion<'rule, 'path>(
@@ -516,7 +484,7 @@ pub(crate) fn add_semantic_key_items_ranked(
                     resolve_data: Some(format!("rule:{}", rule.id)),
                 },
                 prefix,
-                rule_rank_context(snapshot, context, &candidate, CompletionSpecificity::Exact),
+                rule_rank_context(&candidate, CompletionSpecificity::Exact),
             ),
             KeyMatcher::Type(type_name) => {
                 for label in dynamic_members_for_scope(
@@ -548,12 +516,7 @@ pub(crate) fn add_semantic_key_items_ranked(
                             resolve_data: Some(format!("rule:{}", rule.id)),
                         },
                         prefix,
-                        rule_rank_context(
-                            snapshot,
-                            context,
-                            &candidate,
-                            key_specificity(snapshot, rule),
-                        ),
+                        rule_rank_context(&candidate, key_specificity(snapshot, rule)),
                     );
                 }
             }
@@ -575,12 +538,7 @@ pub(crate) fn add_semantic_key_items_ranked(
                                     resolve_data: Some(format!("rule:{}", rule.id)),
                                 },
                                 prefix,
-                                rule_rank_context(
-                                    snapshot,
-                                    context,
-                                    &candidate,
-                                    CompletionSpecificity::Enum,
-                                ),
+                                rule_rank_context(&candidate, CompletionSpecificity::Enum),
                             );
                         }
                     }
@@ -601,12 +559,7 @@ pub(crate) fn add_semantic_key_items_ranked(
                                     resolve_data: Some(format!("rule:{}", rule.id)),
                                 },
                                 prefix,
-                                rule_rank_context(
-                                    snapshot,
-                                    context,
-                                    &candidate,
-                                    CompletionSpecificity::Enum,
-                                ),
+                                rule_rank_context(&candidate, CompletionSpecificity::Enum),
                             );
                         }
                     }
@@ -635,12 +588,7 @@ pub(crate) fn add_semantic_key_items_ranked(
                             resolve_data: Some(format!("rule:{}", rule.id)),
                         },
                         prefix,
-                        rule_rank_context(
-                            snapshot,
-                            context,
-                            &candidate,
-                            CompletionSpecificity::Dynamic,
-                        ),
+                        rule_rank_context(&candidate, CompletionSpecificity::Dynamic),
                     );
                 }
             }
@@ -666,7 +614,6 @@ pub(crate) fn add_semantic_key_items_ranked(
                             key_suffix,
                             &detail,
                             snapshot,
-                            context,
                             &candidate,
                             items,
                             replacement_range,
@@ -684,7 +631,6 @@ pub(crate) fn add_semantic_key_items_ranked(
                             key_suffix,
                             &detail,
                             snapshot,
-                            context,
                             &candidate,
                             items,
                             replacement_range,
@@ -836,7 +782,6 @@ fn add_type_root_key_items(
                 CompletionSchemaTier::CurrentContext,
                 CompletionSpecificity::Exact,
                 false,
-                false,
             ),
         );
     }
@@ -897,7 +842,6 @@ fn add_leaf_value_member_items(
                     CompletionRankContext::new(
                         schema_tier,
                         CompletionSpecificity::Type,
-                        false,
                         rule.deprecated,
                     ),
                 );
@@ -922,7 +866,6 @@ fn add_leaf_value_member_items(
                     CompletionRankContext::new(
                         schema_tier,
                         CompletionSpecificity::Enum,
-                        false,
                         rule.deprecated,
                     ),
                 );
@@ -959,7 +902,6 @@ fn add_leaf_value_member_items(
                     CompletionRankContext::new(
                         schema_tier,
                         CompletionSpecificity::Value,
-                        false,
                         rule.deprecated,
                     ),
                 );
@@ -984,7 +926,6 @@ fn add_leaf_value_member_items(
                     CompletionRankContext::new(
                         schema_tier,
                         CompletionSpecificity::Dynamic,
-                        false,
                         rule.deprecated,
                     ),
                 );
@@ -1832,7 +1773,6 @@ fn add_texture_path_items(
                 rank: CompletionRankContext::new(
                     schema_tier,
                     CompletionSpecificity::Value,
-                    false,
                     deprecated,
                 ),
             },
@@ -2140,7 +2080,7 @@ fn add_value_completion_ranked(
             prefix,
             deprecated,
             kind: CompletionKind::Value,
-            rank: CompletionRankContext::new(schema_tier, specificity, false, deprecated),
+            rank: CompletionRankContext::new(schema_tier, specificity, deprecated),
         },
     );
 }
@@ -2169,7 +2109,6 @@ fn add_enum_member_completion_ranked(
             rank: CompletionRankContext::new(
                 schema_tier,
                 CompletionSpecificity::Enum,
-                false,
                 deprecated,
             ),
         },
@@ -2200,7 +2139,6 @@ fn add_scope_completion_ranked(
             rank: CompletionRankContext::new(
                 schema_tier,
                 CompletionSpecificity::Scope,
-                false,
                 deprecated,
             )
             .with_scope_distance(label.matches('.').count().min(99) as u8),
@@ -2271,7 +2209,6 @@ fn add_localisation_value_completion_ranked(
         CompletionRankContext::new(
             schema_tier,
             CompletionSpecificity::Localisation,
-            false,
             deprecated,
         ),
     );

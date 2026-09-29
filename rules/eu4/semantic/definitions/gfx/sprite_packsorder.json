@@ -2,7 +2,6 @@
   {
     "id": "gfx/sprite_packsorder:313:rule:root:packorder:<packentity>",
     "context": "root:packorder",
-    "parent_path": [],
     "key": {
       "type": "packentity"
     },
@@ -14,26 +13,16 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 5080
   },
   {
     "id": "gfx/sprite_packsorder:314:rule:root:packorder:enum[spritepacks]",
     "context": "root:packorder",
-    "parent_path": [],
     "key": {
       "enum": "spritepacks"
     },
@@ -45,29 +34,17 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 5081
   },
   {
     "id": "gfx/sprite_packsorder:315:rule:root:packorder:any",
     "context": "root:packorder",
-    "parent_path": [],
-    "key": {
-      "any_scalar": null
-    },
+    "key": "any_scalar",
     "operator": "=",
     "value": {
       "int": {
@@ -76,19 +53,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 5081
   }

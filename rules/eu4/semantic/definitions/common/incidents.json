@@ -2,7 +2,6 @@
   {
     "id": "common/incidents:11:rule:root:incident:trigger",
     "context": "root:incident",
-    "parent_path": [],
     "key": {
       "exact": "trigger"
     },
@@ -10,28 +9,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1225
@@ -53,18 +47,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1226
@@ -72,7 +58,6 @@
   {
     "id": "common/incidents:14:rule:root:incident:mean_time_to_happen",
     "context": "root:incident",
-    "parent_path": [],
     "key": {
       "exact": "mean_time_to_happen"
     },
@@ -80,26 +65,20 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1227
@@ -107,7 +86,6 @@
   {
     "id": "common/incidents:16:rule:root:incident:immediate_effect",
     "context": "root:incident",
-    "parent_path": [],
     "key": {
       "exact": "immediate_effect"
     },
@@ -115,26 +93,20 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1228
@@ -142,7 +114,6 @@
   {
     "id": "common/incidents:6:rule:root:incident:frame",
     "context": "root:incident",
-    "parent_path": [],
     "key": {
       "exact": "frame"
     },
@@ -154,18 +125,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1229
@@ -173,7 +136,6 @@
   {
     "id": "common/incidents:7:rule:root:incident:variable_initial",
     "context": "root:incident",
-    "parent_path": [],
     "key": {
       "exact": "variable_initial"
     },
@@ -185,18 +147,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1230
@@ -204,7 +158,6 @@
   {
     "id": "common/incidents:9:rule:root:incident:potential",
     "context": "root:incident",
-    "parent_path": [],
     "key": {
       "exact": "potential"
     },
@@ -212,28 +165,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions evaluated once; gate the entry's visibility."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1231

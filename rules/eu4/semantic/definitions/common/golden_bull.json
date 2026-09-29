@@ -2,7 +2,6 @@
   {
     "id": "common/golden_bull:11:rule:root:golden_bull:trigger",
     "context": "root:golden_bull",
-    "parent_path": [],
     "key": {
       "exact": "trigger"
     },
@@ -10,19 +9,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 671
@@ -30,7 +23,6 @@
   {
     "id": "common/golden_bull:13:rule:root:golden_bull:potential",
     "context": "root:golden_bull",
-    "parent_path": [],
     "key": {
       "exact": "potential"
     },
@@ -38,19 +30,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions evaluated once; gate the entry's visibility."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 672
@@ -72,20 +58,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 673
@@ -93,7 +72,6 @@
   {
     "id": "common/golden_bull:16:rule:root:golden_bull:ai_will_do",
     "context": "root:golden_bull",
-    "parent_path": [],
     "key": {
       "exact": "ai_will_do"
     },
@@ -101,19 +79,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "AI weighting block: factor = base weight, modifier blocks adjust it."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 674
@@ -121,7 +93,6 @@
   {
     "id": "common/golden_bull:7:rule:root:golden_bull:modifier",
     "context": "root:golden_bull",
-    "parent_path": [],
     "key": {
       "exact": "modifier"
     },
@@ -129,19 +100,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of modifiers applied while the containing entry is active."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 675
@@ -153,23 +118,14 @@
       "mechanics"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "enum": "golden_bull_mechanics"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 676
@@ -177,25 +133,16 @@
   {
     "id": "common/golden_bull:9:rule:root:golden_bull:mechanics",
     "context": "root:golden_bull",
-    "parent_path": [],
     "key": {
       "exact": "mechanics"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 677

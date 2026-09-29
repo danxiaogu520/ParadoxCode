@@ -14,6 +14,23 @@ fn known_keys_are_memoized_per_snapshot() {
 }
 
 #[test]
+fn known_keys_exclude_rule_metadata_names() {
+    let host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let keys = crate::hover::known_keys(&host.snapshot());
+    // Real script keys from the first-party rules are known.
+    for key in ["is_triggered_only", "mean_time_to_happen"] {
+        assert!(keys.contains(key), "`{key}` is a first-party rule key");
+    }
+    // Column names of the retired rule-record catalog are not script keys.
+    for key in ["line", "shape", "source_file", "directives", "child_count"] {
+        assert!(
+            !keys.contains(key),
+            "`{key}` is rule metadata, not a script key"
+        );
+    }
+}
+
+#[test]
 fn pattern_rule_hint_reports_matched_families() {
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/common/events/hint.txt");

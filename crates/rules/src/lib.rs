@@ -17,9 +17,8 @@ pub use canonical::RuleHash;
 pub use matcher::{FileMatcher, KeyMatcher, TemplateParameter, TypedPrefixOperand, ValueMatcher};
 pub use model::{
     DynamicDefinitionDescriptor, DynamicDefinitionUsage, FileCategory, FileResolutionPolicy,
-    ParserKind, RuleRecord, RuleShape, RulesModel, SemanticModel, SemanticRule, SymbolBinding,
-    SymbolBindingCondition, SymbolDescriptor, SymbolResolutionPolicy, TypeDescriptor,
-    TypeRootScope, entry_wrapper_reroutes,
+    ParserKind, RuleShape, RulesModel, SemanticModel, SemanticRule, SymbolBinding,
+    SymbolBindingCondition, TypeDescriptor, TypeRootScope, entry_wrapper_reroutes,
 };
 pub use profile::{
     GameProfile, ProfileConditionalDefinitionRule, ProfileContainerDefinitionRule,

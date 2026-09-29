@@ -7,27 +7,17 @@
       "path"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "type": "province_id"
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Province IDs traversed by an outgoing trade-node connection."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 6068
   },
@@ -43,21 +33,13 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Province path for an outgoing trade-node connection."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6069
@@ -65,28 +47,19 @@
   {
     "id": "eu4:trading_policy:unique",
     "context": "root:trading_policy",
-    "parent_path": [],
     "key": {
       "exact": "unique"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Whether only one country may select the policy in a trade node."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 7002
@@ -94,7 +67,6 @@
   {
     "id": "eu4:event:goto_scope",
     "context": "root:event",
-    "parent_path": [],
     "key": {
       "exact": "goto"
     },
@@ -103,21 +75,13 @@
       "scope": null
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Scope-based event camera target."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5003
@@ -136,21 +100,13 @@
       "scope": null
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
     "documentation": [
       "Scope-based event option camera target."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5033

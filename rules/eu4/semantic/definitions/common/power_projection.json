@@ -2,7 +2,6 @@
   {
     "id": "common/00_small_types_consolidated:220:rule:root:power_projection:power",
     "context": "root:power_projection",
-    "parent_path": [],
     "key": {
       "exact": "power"
     },
@@ -14,18 +13,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 86
@@ -33,7 +24,6 @@
   {
     "id": "common/00_small_types_consolidated:221:rule:root:power_projection:max",
     "context": "root:power_projection",
-    "parent_path": [],
     "key": {
       "exact": "max"
     },
@@ -45,18 +35,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 87
@@ -64,7 +46,6 @@
   {
     "id": "common/00_small_types_consolidated:223:rule:root:power_projection:min",
     "context": "root:power_projection",
-    "parent_path": [],
     "key": {
       "exact": "min"
     },
@@ -76,18 +57,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 88
@@ -95,7 +68,6 @@
   {
     "id": "common/00_small_types_consolidated:225:rule:root:power_projection:yearly_decay",
     "context": "root:power_projection",
-    "parent_path": [],
     "key": {
       "exact": "yearly_decay"
     },
@@ -107,18 +79,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 89
@@ -126,25 +90,16 @@
   {
     "id": "common/00_small_types_consolidated:226:rule:root:power_projection:decay",
     "context": "root:power_projection",
-    "parent_path": [],
     "key": {
       "exact": "decay"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 90

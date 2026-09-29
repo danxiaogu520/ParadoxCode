@@ -66,33 +66,6 @@ pub(crate) fn canonical_hash(model: &RulesModel) -> RuleHash {
         }
         bytes.push(u8::from(category.matcher.case_sensitive));
     }
-    let mut descriptors = model.symbol_descriptors.clone();
-    descriptors.sort_by(|left, right| left.kind_id.cmp(&right.kind_id));
-    put_len(&mut bytes, descriptors.len());
-    for descriptor in descriptors {
-        put_str(&mut bytes, &descriptor.kind_id);
-        put_str(&mut bytes, descriptor.resolution.as_str());
-        bytes.push(u8::from(descriptor.case_sensitive));
-    }
-    let mut records = model.records.clone();
-    records.sort_by(|left, right| {
-        (&left.table, &left.logical_id, left.source_order).cmp(&(
-            &right.table,
-            &right.logical_id,
-            right.source_order,
-        ))
-    });
-    put_len(&mut bytes, records.len());
-    for record in records {
-        put_str(&mut bytes, &record.table);
-        put_str(&mut bytes, &record.logical_id);
-        bytes.extend_from_slice(&record.source_order.to_le_bytes());
-        put_len(&mut bytes, record.fields.len());
-        for (key, value) in record.fields {
-            put_str(&mut bytes, &key);
-            put_str(&mut bytes, &value);
-        }
-    }
     let mut semantic_rules = model.semantic.rules.clone();
     semantic_rules.sort_by(|left, right| left.id.cmp(&right.id));
     put_len(&mut bytes, semantic_rules.len());
@@ -116,7 +89,6 @@ pub(crate) fn canonical_hash(model: &RulesModel) -> RuleHash {
             }
             None => bytes.push(0),
         }
-        bytes.push(u8::from(rule.required));
         bytes.push(u8::from(rule.deprecated));
         put_len(&mut bytes, rule.documentation.len());
         for documentation in &rule.documentation {
@@ -150,7 +122,6 @@ pub(crate) fn canonical_hash(model: &RulesModel) -> RuleHash {
             }
             None => bytes.push(0),
         }
-        bytes.push(u8::from(rule.strict_min));
         put_str(&mut bytes, &rule.source_file);
         bytes.extend_from_slice(&rule.line.to_le_bytes());
     }
@@ -419,8 +390,8 @@ fn put_semantic_value(bytes: &mut Vec<u8>, matcher: &ValueMatcher) {
         }
         ValueMatcher::Float { min, max } => {
             put_str(bytes, "float");
-            put_opt_str(bytes, min.as_deref());
-            put_opt_str(bytes, max.as_deref());
+            put_opt_str(bytes, min.map(|value| value.to_string()).as_deref());
+            put_opt_str(bytes, max.map(|value| value.to_string()).as_deref());
         }
         ValueMatcher::Date => put_str(bytes, "date"),
         ValueMatcher::Type(value) => {

@@ -718,18 +718,6 @@ fn contains_text_range(text: &str, range: TextRange, needle: &str) -> bool {
 }
 
 #[test]
-fn required_rule_without_explicit_minimum_reports_missing_property() {
-    let (host, id) = semantic_snapshot_with_constraints("trigger = { }\n", None, None, None);
-    let results = diagnostics(&host.snapshot(), &id);
-    assert!(
-        results
-            .iter()
-            .any(|item| item.code == DiagnosticCode::Cardinality),
-        "required must imply one minimum occurrence"
-    );
-}
-
-#[test]
 fn cancellable_queries_stop_at_internal_checkpoints() {
     let (host, id) = snapshot(
         "country_event = { id = cancel.1 immediate = { country_event = { id = cancel.1 } } }\n",
@@ -977,14 +965,12 @@ fn semantic_value_clause_validates_bare_values_and_cardinality() {
         child_context: None,
         alternative_id: None,
         severity: None,
-        required: false,
         deprecated: false,
         documentation: Vec::new(),
         allowed_scopes: Vec::new(),
         push_scope: None,
         replace_scope: Vec::new(),
         min_occurs: Some(3),
-        strict_min: true,
         max_occurs: Some(3),
         source_file: "fixture.semantic".to_owned(),
         line: 2,
@@ -1901,7 +1887,6 @@ fn empty_dynamic_calls_map_required_cardinality_to_the_call() {
     model.semantic.rules.push(SemanticRule {
         id: "fixture:effect:required-in-empty-definition".to_owned(),
         value: ValueMatcher::Bool,
-        required: true,
         min_occurs: Some(1),
         ..semantic_rule("effect", "fixture_required")
     });

@@ -2,7 +2,6 @@
   {
     "id": "common/parliaments:10:rule:root:parliament_bribe:estate",
     "context": "root:parliament_bribe",
-    "parent_path": [],
     "key": {
       "exact": "estate"
     },
@@ -11,18 +10,10 @@
       "type": "estate"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2560
@@ -30,7 +21,6 @@
   {
     "id": "common/parliaments:12:rule:root:parliament_bribe:trigger",
     "context": "root:parliament_bribe",
-    "parent_path": [],
     "key": {
       "exact": "trigger"
     },
@@ -38,16 +28,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -63,7 +49,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2561
@@ -71,7 +56,6 @@
   {
     "id": "common/parliaments:14:rule:root:parliament_bribe:effect",
     "context": "root:parliament_bribe",
-    "parent_path": [],
     "key": {
       "exact": "effect"
     },
@@ -79,16 +63,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of effects executed by the containing entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -104,7 +84,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2562
@@ -126,20 +105,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2563
@@ -147,7 +119,6 @@
   {
     "id": "common/parliaments:17:rule:root:parliament_bribe:chance",
     "context": "root:parliament_bribe",
-    "parent_path": [],
     "key": {
       "exact": "chance"
     },
@@ -155,16 +126,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Chance a bribe will appear in a parliament issue"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -176,7 +143,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2564
@@ -198,20 +164,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2565
@@ -219,7 +178,6 @@
   {
     "id": "common/parliaments:20:rule:root:parliament_bribe:ai_will_do",
     "context": "root:parliament_bribe",
-    "parent_path": [],
     "key": {
       "exact": "ai_will_do"
     },
@@ -227,16 +185,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "AI weighting block: factor = base weight, modifier blocks adjust it."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -252,7 +206,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2566
@@ -260,7 +213,6 @@
   {
     "id": "common/parliaments:22:rule:root:parliament_issue:category",
     "context": "root:parliament_issue",
-    "parent_path": [],
     "key": {
       "exact": "category"
     },
@@ -272,18 +224,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2567
@@ -291,7 +235,6 @@
   {
     "id": "common/parliaments:24:rule:root:parliament_issue:allow",
     "context": "root:parliament_issue",
-    "parent_path": [],
     "key": {
       "exact": "allow"
     },
@@ -299,16 +242,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions checked when using the entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -320,7 +259,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2568
@@ -328,7 +266,6 @@
   {
     "id": "common/parliaments:26:rule:root:parliament_issue:effect",
     "context": "root:parliament_issue",
-    "parent_path": [],
     "key": {
       "exact": "effect"
     },
@@ -336,16 +273,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of effects executed by the containing entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -357,7 +290,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2569
@@ -365,7 +297,6 @@
   {
     "id": "common/parliaments:28:rule:root:parliament_issue:on_issue_taken",
     "context": "root:parliament_issue",
-    "parent_path": [],
     "key": {
       "exact": "on_issue_taken"
     },
@@ -373,14 +304,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -392,7 +318,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2570
@@ -400,7 +325,6 @@
   {
     "id": "common/parliaments:30:rule:root:parliament_issue:modifier",
     "context": "root:parliament_issue",
-    "parent_path": [],
     "key": {
       "exact": "modifier"
     },
@@ -408,19 +332,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of modifiers applied while the containing entry is active."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2571
@@ -428,7 +346,6 @@
   {
     "id": "common/parliaments:32:rule:root:parliament_issue:influence_scaled_modifier",
     "context": "root:parliament_issue",
-    "parent_path": [],
     "key": {
       "exact": "influence_scaled_modifier"
     },
@@ -436,17 +353,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2572
@@ -454,7 +364,6 @@
   {
     "id": "common/parliaments:33:rule:root:parliament_issue:scale_estate_influence",
     "context": "root:parliament_issue",
-    "parent_path": [],
     "key": {
       "exact": "scale_estate_influence"
     },
@@ -463,18 +372,10 @@
       "type": "estate"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2573
@@ -496,20 +397,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2574
@@ -517,7 +411,6 @@
   {
     "id": "common/parliaments:36:rule:root:parliament_issue:chance",
     "context": "root:parliament_issue",
-    "parent_path": [],
     "key": {
       "exact": "chance"
     },
@@ -525,14 +418,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -544,7 +432,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2575
@@ -566,20 +453,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2576
@@ -587,7 +467,6 @@
   {
     "id": "common/parliaments:39:rule:root:parliament_issue:ai_will_do",
     "context": "root:parliament_issue",
-    "parent_path": [],
     "key": {
       "exact": "ai_will_do"
     },
@@ -595,16 +474,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "AI weighting block: factor = base weight, modifier blocks adjust it."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -616,7 +491,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2577
@@ -624,7 +498,6 @@
   {
     "id": "common/parliaments:40:rule:root:parliament_issue:backing_percentage",
     "context": "root:parliament_issue",
-    "parent_path": [],
     "key": {
       "exact": "backing_percentage"
     },
@@ -636,20 +509,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Percentage of seats that will back up the issue. Defaults to PARLIAMENT_BACKING_PERCENTAGE"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2578
@@ -657,7 +523,6 @@
   {
     "id": "common/parliaments:41:rule:root:parliament_issue:effect_duration",
     "context": "root:parliament_issue",
-    "parent_path": [],
     "key": {
       "exact": "effect_duration"
     },
@@ -669,20 +534,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "How many years the effects of a passed issue last, also prevents picking a new issue, defaults to PARLIAMENT_EFFECT_DURATION"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2579
@@ -690,7 +548,6 @@
   {
     "id": "common/parliaments:42:rule:root:parliament_issue:debate_duration",
     "context": "root:parliament_issue",
-    "parent_path": [],
     "key": {
       "exact": "debate_duration"
     },
@@ -702,20 +559,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "How many years an issue will last before being able to be randomly decided on, defaults to PARLIAMENT_DEBATE_DURATION"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2580
@@ -723,7 +573,6 @@
   {
     "id": "common/parliaments:43:rule:root:parliament_issue:chance_of_decision",
     "context": "root:parliament_issue",
-    "parent_path": [],
     "key": {
       "exact": "chance_of_decision"
     },
@@ -735,20 +584,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Chance debate is decided upon after debate duration, defaults to PARLIAMENT_CHANCE_OF_DECISION"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2581
@@ -756,25 +598,16 @@
   {
     "id": "common/parliaments:9:rule:root:parliament_bribe:name",
     "context": "root:parliament_bribe",
-    "parent_path": [],
     "key": {
       "exact": "name"
     },
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2582

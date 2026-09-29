@@ -6,7 +6,6 @@
       "color"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "int": {
         "min": 0,
@@ -14,18 +13,11 @@
       }
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
     "severity": 2,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 3,
-    "strict_min": true,
     "max_occurs": 3,
     "source_file": "semantic-rules.json",
     "line": 101
@@ -33,26 +25,16 @@
   {
     "id": "common/00_small_types_consolidated:242:rule:root:dynasty_colors:color",
     "context": "root:dynasty_colors",
-    "parent_path": [],
     "key": {
       "exact": "color"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 102
   }

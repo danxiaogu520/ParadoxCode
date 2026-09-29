@@ -116,8 +116,6 @@ impl RuleSet {
             model: RulesModel {
                 game_id: String::new(),
                 file_categories: Vec::new(),
-                symbol_descriptors: Vec::new(),
-                records: Vec::new(),
                 semantic: SemanticModel {
                     rules: Vec::new(),
                     enum_values: BTreeMap::new(),
@@ -146,16 +144,6 @@ impl RuleSet {
         model
             .file_categories
             .sort_by(|left, right| left.id.cmp(&right.id));
-        model
-            .symbol_descriptors
-            .sort_by(|left, right| left.kind_id.cmp(&right.kind_id));
-        model.records.sort_by(|left, right| {
-            (&left.table, &left.logical_id, left.source_order).cmp(&(
-                &right.table,
-                &right.logical_id,
-                right.source_order,
-            ))
-        });
         model
             .semantic
             .rules
@@ -627,14 +615,12 @@ mod tests {
             child_context: None,
             alternative_id: None,
             severity: None,
-            required: false,
             deprecated: false,
             documentation: Vec::new(),
             allowed_scopes: Vec::new(),
             push_scope: None,
             replace_scope: Vec::new(),
             min_occurs: None,
-            strict_min: false,
             max_occurs: None,
             source_file: "semantic/test.json".to_owned(),
             line: 1,

@@ -122,7 +122,7 @@ pub(crate) fn value_description(snapshot: &AnalysisSnapshot, matcher: &ValueMatc
         ),
         ValueMatcher::Float { min, max } => format!(
             "a number{}",
-            numeric_bounds(min.as_deref(), max.as_deref()).phrase_suffix()
+            numeric_bounds(*min, *max).phrase_suffix()
         ),
         ValueMatcher::Date => "a date, such as 1444.11.11".to_owned(),
         ValueMatcher::Type(kind) => format!("{} `{kind}` name", article_for(kind)),
@@ -163,7 +163,7 @@ pub(crate) fn value_plural(snapshot: &AnalysisSnapshot, matcher: &ValueMatcher) 
         ),
         ValueMatcher::Float { min, max } => format!(
             "numbers{}",
-            numeric_bounds(min.as_deref(), max.as_deref()).phrase_suffix()
+            numeric_bounds(*min, *max).phrase_suffix()
         ),
         ValueMatcher::Date => "dates".to_owned(),
         ValueMatcher::Type(kind) => format!("`{kind}` names"),

@@ -2,7 +2,6 @@
   {
     "id": "common/technology_groups:10:rule:root:technology_group:nation_designer_unit_type",
     "context": "root:technology_group",
-    "parent_path": [],
     "key": {
       "exact": "nation_designer_unit_type"
     },
@@ -11,18 +10,10 @@
       "type": "technology_group"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3411
@@ -30,7 +21,6 @@
   {
     "id": "common/technology_groups:11:rule:root:technology_group:is_primitive",
     "context": "root:technology_group",
-    "parent_path": [],
     "key": {
       "exact": "is_primitive"
     },
@@ -39,18 +29,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3412
@@ -58,7 +40,6 @@
   {
     "id": "common/technology_groups:13:rule:root:technology_group:nation_designer_trigger",
     "context": "root:technology_group",
-    "parent_path": [],
     "key": {
       "exact": "nation_designer_trigger"
     },
@@ -66,17 +47,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3413
@@ -94,16 +68,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -115,7 +85,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3414
@@ -137,18 +106,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3415
@@ -156,25 +117,16 @@
   {
     "id": "common/technology_groups:17:rule:root:technology_group:nation_designer_cost",
     "context": "root:technology_group",
-    "parent_path": [],
     "key": {
       "exact": "nation_designer_cost"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3416
@@ -182,7 +134,6 @@
   {
     "id": "common/technology_groups:8:rule:root:technology_group:start_level",
     "context": "root:technology_group",
-    "parent_path": [],
     "key": {
       "exact": "start_level"
     },
@@ -194,18 +145,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3417
@@ -213,7 +156,6 @@
   {
     "id": "common/technology_groups:9:rule:root:technology_group:start_cost_modifier",
     "context": "root:technology_group",
-    "parent_path": [],
     "key": {
       "exact": "start_cost_modifier"
     },
@@ -225,18 +167,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3418

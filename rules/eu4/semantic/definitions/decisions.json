@@ -2,7 +2,6 @@
   {
     "id": "decisions/decisions:11:rule:root:decision:provinces_to_highlight",
     "context": "root:decision",
-    "parent_path": [],
     "key": {
       "exact": "provinces_to_highlight"
     },
@@ -10,16 +9,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Customizes highlighted provinces to supplement the Allow section and fill missing tooltips."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -31,7 +26,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3513
@@ -39,7 +33,6 @@
   {
     "id": "decisions/decisions:13:rule:root:decision:allow",
     "context": "root:decision",
-    "parent_path": [],
     "key": {
       "exact": "allow"
     },
@@ -47,16 +40,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Conditions for the decision to be enactable once visible; the green tick in the UI."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -68,7 +57,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3514
@@ -76,7 +64,6 @@
   {
     "id": "decisions/decisions:15:rule:root:decision:effect",
     "context": "root:decision",
-    "parent_path": [],
     "key": {
       "exact": "effect"
     },
@@ -84,16 +71,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Effects executed immediately after the decision is enacted."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -105,7 +88,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3515
@@ -127,20 +109,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3516
@@ -148,7 +123,6 @@
   {
     "id": "decisions/decisions:18:rule:root:decision:ai_will_do",
     "context": "root:decision",
-    "parent_path": [],
     "key": {
       "exact": "ai_will_do"
     },
@@ -156,16 +130,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "AI instructions for when to use the decision; optional."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -177,7 +147,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3517
@@ -185,7 +154,6 @@
   {
     "id": "decisions/decisions:19:rule:root:decision:ai_importance",
     "context": "root:decision",
-    "parent_path": [],
     "key": {
       "exact": "ai_importance"
     },
@@ -197,20 +165,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "How highly the AI prioritises enacting this decision; a factor around 400 appears to be high priority."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3518
@@ -218,7 +179,6 @@
   {
     "id": "decisions/decisions:20:rule:root:decision:do_not_integrate",
     "context": "root:decision",
-    "parent_path": [],
     "key": {
       "exact": "do_not_integrate"
     },
@@ -227,28 +187,19 @@
       "enum": "country_tags"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "The AI will not try to integrate this country if the decision is available, meant to prevent them from using diplomatic power integrating countries that will get annexed or changed."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3519
   },
   {
     "id": "decisions/decisions:21:rule:root:decision:do_not_core",
     "context": "root:decision",
-    "parent_path": [],
     "key": {
       "exact": "do_not_core"
     },
@@ -257,21 +208,13 @@
       "type": "province_id"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "The AI will not try to core this province if the decision is available, meant to prevent them from using monarch power coring provinces that will get cored or given away to another country."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3520
   },
@@ -282,7 +225,6 @@
       "color"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "int": {
         "min": 0,
@@ -290,18 +232,10 @@
       }
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 3,
-    "strict_min": true,
     "max_occurs": 3,
     "source_file": "semantic-rules.json",
     "line": 3521
@@ -309,27 +243,19 @@
   {
     "id": "decisions/decisions:23:rule:root:decision:color",
     "context": "root:decision",
-    "parent_path": [],
     "key": {
       "exact": "color"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Changes the color used in the decision tab"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3522
@@ -337,7 +263,6 @@
   {
     "id": "decisions/decisions:7:rule:root:decision:major",
     "context": "root:decision",
-    "parent_path": [],
     "key": {
       "exact": "major"
     },
@@ -346,18 +271,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3523
@@ -365,7 +282,6 @@
   {
     "id": "decisions/decisions:9:rule:root:decision:potential",
     "context": "root:decision",
-    "parent_path": [],
     "key": {
       "exact": "potential"
     },
@@ -373,16 +289,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Conditions for the decision to be visible in the decisions panel; even the AI cannot use it when they are unmet."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -394,7 +306,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3524
@@ -402,27 +313,19 @@
   {
     "id": "decisions/decisions:24:rule:root:decision_entries:country_decisions",
     "context": "root:decision_entries",
-    "parent_path": [],
     "key": {
       "exact": "country_decisions"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Wrapper block containing all country decision instances."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1

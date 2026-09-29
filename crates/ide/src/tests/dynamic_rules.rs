@@ -86,8 +86,8 @@ fn dynamic_rows_derive_contract_signature_and_value_constraints() {
     assert_eq!(
         manpower.sites,
         vec![vec![ValueMatcher::Float {
-            min: Some("-999".to_owned()),
-            max: Some("999".to_owned())
+            min: Some(-999.0),
+            max: Some(999.0)
         }]]
     );
 }

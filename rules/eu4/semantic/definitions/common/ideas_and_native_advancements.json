@@ -2,7 +2,6 @@
   {
     "id": "common/ideas_and_native_advancements:100:rule:root:customideas:extra_manpower_at_religious_war",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "extra_manpower_at_religious_war"
     },
@@ -11,18 +10,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1134
@@ -30,7 +21,6 @@
   {
     "id": "common/ideas_and_native_advancements:101:rule:root:customideas:may_not_reduce_inflation",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "may_not_reduce_inflation"
     },
@@ -39,18 +29,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1135
@@ -58,7 +40,6 @@
   {
     "id": "common/ideas_and_native_advancements:103:rule:root:customideas:enabled",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "enabled"
     },
@@ -66,26 +47,20 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1136
@@ -107,20 +82,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1137
@@ -143,20 +111,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1138
@@ -174,54 +135,39 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of modifiers applied while the containing entry is active."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 1139
   },
   {
     "id": "common/ideas_and_native_advancements:108:rule:root:customideas:chance",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "chance"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1140
@@ -229,7 +175,6 @@
   {
     "id": "common/ideas_and_native_advancements:34:rule:root:idea_group:important",
     "context": "root:idea_group",
-    "parent_path": [],
     "key": {
       "exact": "important"
     },
@@ -238,18 +183,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1141
@@ -271,20 +208,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1142
@@ -292,7 +222,6 @@
   {
     "id": "common/ideas_and_native_advancements:37:rule:root:idea_group:ai_will_do",
     "context": "root:idea_group",
-    "parent_path": [],
     "key": {
       "exact": "ai_will_do"
     },
@@ -300,19 +229,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "AI weighting block: factor = base weight, modifier blocks adjust it."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1143
@@ -320,7 +243,6 @@
   {
     "id": "common/ideas_and_native_advancements:38:rule:root:idea_group:category",
     "context": "root:idea_group",
-    "parent_path": [],
     "key": {
       "exact": "category"
     },
@@ -329,18 +251,10 @@
       "enum": "power_categories"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1144
@@ -358,19 +272,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of effects executed by the containing entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1145
@@ -388,17 +296,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1146
@@ -406,7 +307,6 @@
   {
     "id": "common/ideas_and_native_advancements:46:rule:root:idea_group:bonus",
     "context": "root:idea_group",
-    "parent_path": [],
     "key": {
       "exact": "bonus"
     },
@@ -414,17 +314,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1147
@@ -432,7 +325,6 @@
   {
     "id": "common/ideas_and_native_advancements:48:rule:root:idea_group:trigger",
     "context": "root:idea_group",
-    "parent_path": [],
     "key": {
       "exact": "trigger"
     },
@@ -440,28 +332,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of trigger conditions; all must hold for the containing entry to apply."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1148
@@ -479,19 +366,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of effects executed by the containing entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1149
@@ -509,17 +390,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1150
@@ -527,7 +401,6 @@
   {
     "id": "common/ideas_and_native_advancements:55:rule:root:idea_group:<idea>",
     "context": "root:idea_group",
-    "parent_path": [],
     "key": {
       "type": "idea"
     },
@@ -535,17 +408,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 7,
     "source_file": "semantic-rules.json",
     "line": 1151
@@ -553,7 +419,6 @@
   {
     "id": "common/ideas_and_native_advancements:58:rule:root:idea_group:start",
     "context": "root:idea_group",
-    "parent_path": [],
     "key": {
       "exact": "start"
     },
@@ -561,17 +426,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1152
@@ -579,7 +437,6 @@
   {
     "id": "common/ideas_and_native_advancements:59:rule:root:idea_group:free",
     "context": "root:idea_group",
-    "parent_path": [],
     "key": {
       "exact": "free"
     },
@@ -588,18 +445,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1153
@@ -607,7 +456,6 @@
   {
     "id": "common/ideas_and_native_advancements:61:rule:root:idea_group:effect",
     "context": "root:idea_group",
-    "parent_path": [],
     "key": {
       "exact": "effect"
     },
@@ -615,19 +463,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Block of effects executed by the containing entry."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1154
@@ -635,7 +477,6 @@
   {
     "id": "common/ideas_and_native_advancements:63:rule:root:idea_group:removed_effect",
     "context": "root:idea_group",
-    "parent_path": [],
     "key": {
       "exact": "removed_effect"
     },
@@ -643,17 +484,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1155
@@ -661,25 +495,16 @@
   {
     "id": "common/ideas_and_native_advancements:6:rule:type:idea_group:category",
     "context": "type:idea_group",
-    "parent_path": [],
     "key": {
       "exact": "category"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1158
@@ -687,7 +512,6 @@
   {
     "id": "common/ideas_and_native_advancements:73:rule:root:customideas:important",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "important"
     },
@@ -696,18 +520,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1161
@@ -729,20 +545,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1162
@@ -750,7 +559,6 @@
   {
     "id": "common/ideas_and_native_advancements:76:rule:root:customideas:ai_will_do",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "ai_will_do"
     },
@@ -758,19 +566,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "AI weighting block: factor = base weight, modifier blocks adjust it."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1163
@@ -778,7 +580,6 @@
   {
     "id": "common/ideas_and_native_advancements:77:rule:root:customideas:category",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "category"
     },
@@ -787,18 +588,10 @@
       "enum": "power_categories"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1164
@@ -806,7 +599,6 @@
   {
     "id": "common/ideas_and_native_advancements:80:rule:root:customideas:max_level",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "max_level"
     },
@@ -818,18 +610,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1165
@@ -837,7 +621,6 @@
   {
     "id": "common/ideas_and_native_advancements:81:rule:root:customideas:level_cost_1",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "level_cost_1"
     },
@@ -849,18 +632,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1166
@@ -868,7 +643,6 @@
   {
     "id": "common/ideas_and_native_advancements:82:rule:root:customideas:level_cost_2",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "level_cost_2"
     },
@@ -880,18 +654,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1167
@@ -899,7 +665,6 @@
   {
     "id": "common/ideas_and_native_advancements:83:rule:root:customideas:level_cost_3",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "level_cost_3"
     },
@@ -911,18 +676,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1168
@@ -930,7 +687,6 @@
   {
     "id": "common/ideas_and_native_advancements:84:rule:root:customideas:level_cost_4",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "level_cost_4"
     },
@@ -942,18 +698,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1169
@@ -961,7 +709,6 @@
   {
     "id": "common/ideas_and_native_advancements:85:rule:root:customideas:level_cost_5",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "level_cost_5"
     },
@@ -973,18 +720,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1170
@@ -992,7 +731,6 @@
   {
     "id": "common/ideas_and_native_advancements:86:rule:root:customideas:level_cost_6",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "level_cost_6"
     },
@@ -1004,18 +742,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1171
@@ -1023,7 +753,6 @@
   {
     "id": "common/ideas_and_native_advancements:87:rule:root:customideas:level_cost_7",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "level_cost_7"
     },
@@ -1035,18 +764,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1172
@@ -1054,7 +775,6 @@
   {
     "id": "common/ideas_and_native_advancements:88:rule:root:customideas:level_cost_8",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "level_cost_8"
     },
@@ -1066,18 +786,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1173
@@ -1085,7 +797,6 @@
   {
     "id": "common/ideas_and_native_advancements:89:rule:root:customideas:level_cost_9",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "level_cost_9"
     },
@@ -1097,18 +808,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1174
@@ -1116,7 +819,6 @@
   {
     "id": "common/ideas_and_native_advancements:8:rule:type:idea_group:free",
     "context": "type:idea_group",
-    "parent_path": [],
     "key": {
       "exact": "free"
     },
@@ -1125,18 +827,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1175
@@ -1144,7 +838,6 @@
   {
     "id": "common/ideas_and_native_advancements:90:rule:root:customideas:level_cost_10",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "level_cost_10"
     },
@@ -1156,18 +849,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1176
@@ -1175,7 +860,6 @@
   {
     "id": "common/ideas_and_native_advancements:91:rule:root:customideas:default",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "default"
     },
@@ -1187,18 +871,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1177
@@ -1206,7 +882,6 @@
   {
     "id": "common/ideas_and_native_advancements:92:rule:root:customideas:may_perform_slave_raid",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "may_perform_slave_raid"
     },
@@ -1215,18 +890,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1178
@@ -1234,7 +901,6 @@
   {
     "id": "common/ideas_and_native_advancements:93:rule:root:customideas:auto_explore_adjacent_to_colony",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "auto_explore_adjacent_to_colony"
     },
@@ -1243,18 +909,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1179
@@ -1262,7 +920,6 @@
   {
     "id": "common/ideas_and_native_advancements:94:rule:root:customideas:no_religion_penalty",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "no_religion_penalty"
     },
@@ -1271,18 +928,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1180
@@ -1290,7 +939,6 @@
   {
     "id": "common/ideas_and_native_advancements:95:rule:root:customideas:cb_on_primitives",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "cb_on_primitives"
     },
@@ -1299,18 +947,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1181
@@ -1318,7 +958,6 @@
   {
     "id": "common/ideas_and_native_advancements:96:rule:root:customideas:may_establish_frontier",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "may_establish_frontier"
     },
@@ -1327,18 +966,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1182
@@ -1346,7 +977,6 @@
   {
     "id": "common/ideas_and_native_advancements:97:rule:root:customideas:idea_claim_colonies",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "idea_claim_colonies"
     },
@@ -1355,18 +985,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1183
@@ -1374,7 +996,6 @@
   {
     "id": "common/ideas_and_native_advancements:98:rule:root:customideas:reduced_stab_impacts",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "reduced_stab_impacts"
     },
@@ -1383,18 +1004,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1184
@@ -1402,7 +1015,6 @@
   {
     "id": "common/ideas_and_native_advancements:99:rule:root:customideas:may_explore",
     "context": "root:customideas",
-    "parent_path": [],
     "key": {
       "exact": "may_explore"
     },
@@ -1411,18 +1023,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1185

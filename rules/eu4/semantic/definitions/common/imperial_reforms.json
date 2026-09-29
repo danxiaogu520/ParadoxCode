@@ -2,25 +2,16 @@
   {
     "id": "common/imperial_reforms:11:rule:type:imperial_reform:province",
     "context": "type:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "province"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1191
@@ -28,25 +19,16 @@
   {
     "id": "common/imperial_reforms:13:rule:type:imperial_reform:emperor_per_prince",
     "context": "type:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "emperor_per_prince"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1192
@@ -54,25 +36,16 @@
   {
     "id": "common/imperial_reforms:15:rule:type:imperial_reform:elector_per_prince",
     "context": "type:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "elector_per_prince"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1193
@@ -80,7 +53,6 @@
   {
     "id": "common/imperial_reforms:1:rule:type:imperial_reform:empire",
     "context": "type:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "empire"
     },
@@ -89,18 +61,10 @@
       "exact": "hre"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1194
@@ -108,7 +72,6 @@
   {
     "id": "common/imperial_reforms:37:rule:root:imperial_reform:empire",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "empire"
     },
@@ -117,18 +80,10 @@
       "exact": "hre"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1195
@@ -136,7 +91,6 @@
   {
     "id": "common/imperial_reforms:38:rule:root:imperial_reform:required_reform",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "required_reform"
     },
@@ -145,18 +99,10 @@
       "type": "imperial_reform.hre"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1196
@@ -164,7 +110,6 @@
   {
     "id": "common/imperial_reforms:39:rule:root:imperial_reform:disabled_by",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "disabled_by"
     },
@@ -173,18 +118,10 @@
       "type": "imperial_reform.hre"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1197
@@ -192,7 +129,6 @@
   {
     "id": "common/imperial_reforms:3:rule:type:imperial_reform:empire",
     "context": "type:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "empire"
     },
@@ -201,18 +137,10 @@
       "exact": "celestial_empire"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1198
@@ -220,7 +148,6 @@
   {
     "id": "common/imperial_reforms:40:rule:root:imperial_reform:gui_container",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "gui_container"
     },
@@ -229,18 +156,10 @@
       "exact": "mainline"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1199
@@ -248,7 +167,6 @@
   {
     "id": "common/imperial_reforms:41:rule:root:imperial_reform:gui_container",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "gui_container"
     },
@@ -257,18 +175,10 @@
       "exact": "left_branch"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1200
@@ -276,7 +186,6 @@
   {
     "id": "common/imperial_reforms:42:rule:root:imperial_reform:gui_container",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "gui_container"
     },
@@ -285,18 +194,10 @@
       "exact": "right_branch"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1201
@@ -304,7 +205,6 @@
   {
     "id": "common/imperial_reforms:43:rule:root:imperial_reform:gui_container",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "gui_container"
     },
@@ -313,18 +213,10 @@
       "exact": "nodlc"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1202
@@ -332,7 +224,6 @@
   {
     "id": "common/imperial_reforms:44:rule:root:imperial_reform:ai_acceptance_centralize",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "ai_acceptance_centralize"
     },
@@ -341,18 +232,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1203
@@ -360,7 +243,6 @@
   {
     "id": "common/imperial_reforms:45:rule:root:imperial_reform:ai_acceptance_decentralize",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "ai_acceptance_decentralize"
     },
@@ -369,18 +251,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1204
@@ -388,7 +262,6 @@
   {
     "id": "common/imperial_reforms:47:rule:root:imperial_reform:all",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "all"
     },
@@ -396,17 +269,11 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
     "push_scope": "country",
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1205
@@ -414,7 +281,6 @@
   {
     "id": "common/imperial_reforms:49:rule:root:imperial_reform:province",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "province"
     },
@@ -422,17 +288,11 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
     "push_scope": "province",
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1206
@@ -440,7 +300,6 @@
   {
     "id": "common/imperial_reforms:51:rule:root:imperial_reform:emperor_per_prince",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "emperor_per_prince"
     },
@@ -448,17 +307,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1207
@@ -466,7 +318,6 @@
   {
     "id": "common/imperial_reforms:53:rule:root:imperial_reform:elector_per_prince",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "elector_per_prince"
     },
@@ -474,17 +325,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1208
@@ -492,7 +336,6 @@
   {
     "id": "common/imperial_reforms:55:rule:root:imperial_reform:potential",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "potential"
     },
@@ -500,19 +343,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions evaluated once; gate the entry's visibility."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1209
@@ -520,7 +357,6 @@
   {
     "id": "common/imperial_reforms:56:rule:root:imperial_reform:disables_hre_badboy_points",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "disables_hre_badboy_points"
     },
@@ -529,18 +365,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1210
@@ -548,7 +376,6 @@
   {
     "id": "common/imperial_reforms:58:rule:root:imperial_reform:empire",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "empire"
     },
@@ -557,18 +384,10 @@
       "exact": "celestial_empire"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1211
@@ -576,7 +395,6 @@
   {
     "id": "common/imperial_reforms:59:rule:root:imperial_reform:required_reform",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "required_reform"
     },
@@ -585,18 +403,10 @@
       "type": "imperial_reform.china"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1212
@@ -604,25 +414,16 @@
   {
     "id": "common/imperial_reforms:5:rule:type:imperial_reform:member",
     "context": "type:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "member"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1213
@@ -630,7 +431,6 @@
   {
     "id": "common/imperial_reforms:60:rule:root:imperial_reform:disabled_by",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "disabled_by"
     },
@@ -639,18 +439,10 @@
       "type": "imperial_reform.china"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1214
@@ -658,7 +450,6 @@
   {
     "id": "common/imperial_reforms:62:rule:root:imperial_reform:trigger",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "trigger"
     },
@@ -666,19 +457,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether the reform can be enacted"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1215
@@ -686,7 +471,6 @@
   {
     "id": "common/imperial_reforms:64:rule:root:imperial_reform:war",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "war"
     },
@@ -695,20 +479,13 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Special AI check for a reform that may cause a war"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1216
@@ -716,25 +493,16 @@
   {
     "id": "common/imperial_reforms:65:rule:root:imperial_reform:discounted_from_foreign_overlord_check",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "discounted_from_foreign_overlord_check"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1217
@@ -742,7 +510,6 @@
   {
     "id": "common/imperial_reforms:67:rule:root:imperial_reform:member",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "member"
     },
@@ -750,17 +517,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1218
@@ -768,7 +528,6 @@
   {
     "id": "common/imperial_reforms:69:rule:root:imperial_reform:emperor",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "emperor"
     },
@@ -776,17 +535,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1219
@@ -794,7 +546,6 @@
   {
     "id": "common/imperial_reforms:71:rule:root:imperial_reform:elector",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "elector"
     },
@@ -802,17 +553,10 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1220
@@ -820,7 +564,6 @@
   {
     "id": "common/imperial_reforms:73:rule:root:imperial_reform:on_effect",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "on_effect"
     },
@@ -828,26 +571,20 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1221
@@ -855,7 +592,6 @@
   {
     "id": "common/imperial_reforms:75:rule:root:imperial_reform:off_effect",
     "context": "root:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "off_effect"
     },
@@ -863,26 +599,20 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1222
@@ -890,25 +620,16 @@
   {
     "id": "common/imperial_reforms:7:rule:type:imperial_reform:emperor",
     "context": "type:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "emperor"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1223
@@ -916,25 +637,16 @@
   {
     "id": "common/imperial_reforms:9:rule:type:imperial_reform:elector",
     "context": "type:imperial_reform",
-    "parent_path": [],
     "key": {
       "exact": "elector"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1224

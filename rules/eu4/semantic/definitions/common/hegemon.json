@@ -2,7 +2,6 @@
   {
     "id": "common/hegemon:10:rule:root:hegemon:scale",
     "context": "root:hegemon",
-    "parent_path": [],
     "key": {
       "exact": "scale"
     },
@@ -10,9 +9,6 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "At max 100% tickup."
     ],
@@ -20,9 +16,7 @@
       "any"
     ],
     "push_scope": "country",
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1116
@@ -30,7 +24,6 @@
   {
     "id": "common/hegemon:12:rule:root:hegemon:max",
     "context": "root:hegemon",
-    "parent_path": [],
     "key": {
       "exact": "max"
     },
@@ -38,17 +31,11 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
     "push_scope": "country",
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1117
@@ -56,7 +43,6 @@
   {
     "id": "common/hegemon:14:rule:root:hegemon:effect",
     "context": "root:hegemon",
-    "parent_path": [],
     "key": {
       "exact": "effect"
     },
@@ -64,19 +50,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "When Hegemony is proclaimed"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1118
@@ -84,7 +64,6 @@
   {
     "id": "common/hegemon:16:rule:root:hegemon:removed_effect",
     "context": "root:hegemon",
-    "parent_path": [],
     "key": {
       "exact": "removed_effect"
     },
@@ -92,19 +71,13 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "When Hegemony is lost"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1119
@@ -112,7 +85,6 @@
   {
     "id": "common/hegemon:6:rule:root:hegemon:allow",
     "context": "root:hegemon",
-    "parent_path": [],
     "key": {
       "exact": "allow"
     },
@@ -120,9 +92,6 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Trigger conditions checked when using the entry."
     ],
@@ -130,9 +99,7 @@
       "any"
     ],
     "push_scope": "country",
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1120
@@ -140,7 +107,6 @@
   {
     "id": "common/hegemon:8:rule:root:hegemon:base",
     "context": "root:hegemon",
-    "parent_path": [],
     "key": {
       "exact": "base"
     },
@@ -148,17 +114,11 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
     "push_scope": "country",
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1121

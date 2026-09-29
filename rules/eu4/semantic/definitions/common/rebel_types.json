@@ -6,7 +6,6 @@
       "color"
     ],
     "key": "any_scalar",
-    "operator": null,
     "value": {
       "int": {
         "min": 0,
@@ -14,18 +13,10 @@
       }
     },
     "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 3,
-    "strict_min": true,
     "max_occurs": 3,
     "source_file": "semantic-rules.json",
     "line": 2671
@@ -33,25 +24,16 @@
   {
     "id": "common/rebel_types:43:rule:root:rebel_type:color",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "color"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2672
@@ -59,7 +41,6 @@
   {
     "id": "common/rebel_types:44:rule:root:rebel_type:area",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "area"
     },
@@ -68,18 +49,10 @@
       "enum": "rebel_areas"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2673
@@ -87,7 +60,6 @@
   {
     "id": "common/rebel_types:45:rule:root:rebel_type:government",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "government"
     },
@@ -96,18 +68,10 @@
       "enum": "rebel_governments"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2674
@@ -115,7 +79,6 @@
   {
     "id": "common/rebel_types:46:rule:root:rebel_type:has_reform",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "has_reform"
     },
@@ -124,18 +87,10 @@
       "type": "government_reform"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2675
@@ -143,7 +98,6 @@
   {
     "id": "common/rebel_types:47:rule:root:rebel_type:religion",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "religion"
     },
@@ -152,18 +106,10 @@
       "type": "religion"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2676
@@ -171,7 +117,6 @@
   {
     "id": "common/rebel_types:48:rule:root:rebel_type:defection",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "defection"
     },
@@ -180,18 +125,10 @@
       "enum": "rebel_defection"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2677
@@ -199,7 +136,6 @@
   {
     "id": "common/rebel_types:49:rule:root:rebel_type:defect_delay",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "defect_delay"
     },
@@ -211,20 +147,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Held provinces will auto-defect after 18 months, regardless of accept/enforce demands."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2678
@@ -232,7 +161,6 @@
   {
     "id": "common/rebel_types:50:rule:root:rebel_type:independence",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "independence"
     },
@@ -241,18 +169,10 @@
       "enum": "rebel_independence"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2679
@@ -260,25 +180,16 @@
   {
     "id": "common/rebel_types:51:rule:root:rebel_type:unit_transfer",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "unit_transfer"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2680
@@ -286,7 +197,6 @@
   {
     "id": "common/rebel_types:52:rule:root:rebel_type:gfx_type",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "gfx_type"
     },
@@ -295,18 +205,10 @@
       "enum": "rebel_gfx_type"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2681
@@ -314,27 +216,19 @@
   {
     "id": "common/rebel_types:53:rule:root:rebel_type:will_relocate",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "will_relocate"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Units will relocate if they have sieged all provinces nearby and has to move over sea."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2682
@@ -342,25 +236,16 @@
   {
     "id": "common/rebel_types:54:rule:root:rebel_type:disband_on_leader_death",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "disband_on_leader_death"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2683
@@ -368,25 +253,16 @@
   {
     "id": "common/rebel_types:55:rule:root:rebel_type:dynasty",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "dynasty"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2684
@@ -394,25 +270,16 @@
   {
     "id": "common/rebel_types:56:rule:root:rebel_type:handle_action_change_culture",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "handle_action_change_culture"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2685
@@ -420,25 +287,16 @@
   {
     "id": "common/rebel_types:57:rule:root:rebel_type:resilient",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "resilient"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2686
@@ -446,27 +304,19 @@
   {
     "id": "common/rebel_types:58:rule:root:rebel_type:reinforcing",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "reinforcing"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Will reinforce (double rate in rebel controlled provinces)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2687
@@ -474,25 +324,16 @@
   {
     "id": "common/rebel_types:59:rule:root:rebel_type:general",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "general"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2688
@@ -500,27 +341,19 @@
   {
     "id": "common/rebel_types:60:rule:root:rebel_type:smart",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "smart"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Do assault forts, tactically withdraw from battle, etc."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2689
@@ -528,25 +361,16 @@
   {
     "id": "common/rebel_types:61:rule:root:rebel_type:revolutionary",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "revolutionary"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2690
@@ -554,30 +378,21 @@
   {
     "id": "common/rebel_types:62:rule:root:rebel_type:artillery",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "artillery"
     },
     "operator": "=",
     "value": {
       "float": {
-        "min": "0",
-        "max": "1"
+        "min": 0,
+        "max": 1
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2691
@@ -585,30 +400,21 @@
   {
     "id": "common/rebel_types:63:rule:root:rebel_type:infantry",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "infantry"
     },
     "operator": "=",
     "value": {
       "float": {
-        "min": "0",
-        "max": "1"
+        "min": 0,
+        "max": 1
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2692
@@ -616,30 +422,21 @@
   {
     "id": "common/rebel_types:64:rule:root:rebel_type:cavalry",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "cavalry"
     },
     "operator": "=",
     "value": {
       "float": {
-        "min": "0",
-        "max": "1"
+        "min": 0,
+        "max": 1
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2693
@@ -647,7 +444,6 @@
   {
     "id": "common/rebel_types:65:rule:root:rebel_type:morale",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "morale"
     },
@@ -659,18 +455,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2694
@@ -678,25 +466,16 @@
   {
     "id": "common/rebel_types:66:rule:root:rebel_type:handle_action_negotiate",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "handle_action_negotiate"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2695
@@ -704,25 +483,16 @@
   {
     "id": "common/rebel_types:67:rule:root:rebel_type:handle_action_stability",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "handle_action_stability"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2696
@@ -730,25 +500,16 @@
   {
     "id": "common/rebel_types:68:rule:root:rebel_type:handle_action_build_core",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "handle_action_build_core"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2697
@@ -756,25 +517,16 @@
   {
     "id": "common/rebel_types:69:rule:root:rebel_type:handle_action_send_missionary",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "handle_action_send_missionary"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2698
@@ -796,20 +548,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2699
@@ -817,7 +562,6 @@
   {
     "id": "common/rebel_types:72:rule:root:rebel_type:spawn_chance",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "spawn_chance"
     },
@@ -825,28 +569,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "The rebel type with the highest modifier for this province gets picked"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2700
@@ -868,20 +607,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base weight multiplier in the enclosing weight/AI block."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2701
@@ -889,7 +621,6 @@
   {
     "id": "common/rebel_types:75:rule:root:rebel_type:movement_evaluation",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "movement_evaluation"
     },
@@ -897,28 +628,23 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "This is checked for EACH province in the Area of Operations"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2702
@@ -926,7 +652,6 @@
   {
     "id": "common/rebel_types:77:rule:root:rebel_type:siege_won_trigger",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "siege_won_trigger"
     },
@@ -934,23 +659,19 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "root = province, from = owner"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ],
       [
@@ -959,7 +680,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2703
@@ -967,7 +687,6 @@
   {
     "id": "common/rebel_types:79:rule:root:rebel_type:siege_won_effect",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "siege_won_effect"
     },
@@ -975,23 +694,19 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "root = province, from = owner"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "province"
       ],
       [
-        "root",
+        "this",
         "province"
       ],
       [
@@ -1000,7 +715,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2704
@@ -1008,7 +722,6 @@
   {
     "id": "common/rebel_types:81:rule:root:rebel_type:can_negotiate_trigger",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "can_negotiate_trigger"
     },
@@ -1016,23 +729,19 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "root = country negotiating, from = rebels"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ],
       [
@@ -1041,7 +750,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2705
@@ -1049,7 +757,6 @@
   {
     "id": "common/rebel_types:83:rule:root:rebel_type:can_enforce_trigger",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "can_enforce_trigger"
     },
@@ -1057,23 +764,19 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "root = country negotiating, from = rebels"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ],
       [
@@ -1082,7 +785,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2706
@@ -1090,27 +792,19 @@
   {
     "id": "common/rebel_types:84:rule:root:rebel_type:demands_description",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "demands_description"
     },
     "operator": "=",
     "value": "localisation",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Localisation for their demands"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2707
@@ -1118,7 +812,6 @@
   {
     "id": "common/rebel_types:86:rule:root:rebel_type:demands_enforced_effect",
     "context": "root:rebel_type",
-    "parent_path": [],
     "key": {
       "exact": "demands_enforced_effect"
     },
@@ -1126,23 +819,19 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "root = country negotiating, from = rebels"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
-        "this",
+        "root",
         "country"
       ],
       [
-        "root",
+        "this",
         "country"
       ],
       [
@@ -1151,7 +840,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2708

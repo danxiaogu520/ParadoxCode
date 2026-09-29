@@ -381,11 +381,6 @@ pub(crate) fn analyze_input_with_cancellation(
                                 defined
                             )
                         }
-                        Resolution::Ambiguous => format!(
-                            "localisation key `{}` is missing in {}",
-                            reference.name,
-                            snapshot.localisation_preview_language()
-                        ),
                         Resolution::Missing => format!(
                             "unknown localisation key `{}`{}",
                             reference.name,
@@ -424,10 +419,6 @@ pub(crate) fn analyze_input_with_cancellation(
                     ),
                 ));
             }
-            // Definitions may repeat legally (replace files, per-context members); the
-            // game resolves same-name definitions deterministically by source priority,
-            // so ambiguity is never a runtime error and is intentionally not diagnosed.
-            Resolution::Ambiguous => {}
             Resolution::Unique(_) => {}
         }
     }
@@ -443,12 +434,7 @@ pub(crate) fn analyze_input_with_cancellation(
         if !game::eu4::resolved_symbol_kind(&definition.kind) {
             continue;
         }
-        // Only replacement-policy kinds can shadow; merge/unique kinds (such as
-        // localisation) legally repeat the same name.
-        let Some(ordered) = resolution.ordered_candidates(&definition.kind, &definition.name)
-        else {
-            continue;
-        };
+        let ordered = resolution.ordered_candidates(&definition.kind, &definition.name);
         // Candidates above were already reduced to one priority, so any earlier
         // sibling here comes from the same source root; cross-root overrides
         // (for example a mod replacing a vanilla definition) stay silent.
@@ -1653,7 +1639,7 @@ fn validate_semantic_container(
             let min_occurs = if matches!(rule.shape, RuleShape::LeafValue) {
                 None
             } else {
-                semantic_min_occurs(rule).filter(|min_occurs| *min_occurs > 0)
+                rule.min_occurs.filter(|min_occurs| *min_occurs > 0)
             };
             if min_occurs.is_none() && !matches!(rule.shape, RuleShape::LeafValue) {
                 continue;
@@ -1674,7 +1660,7 @@ fn validate_semantic_container(
                     .count();
                 let count = u32::try_from(count).unwrap_or(u32::MAX);
                 let plural = value_plural(snapshot, &rule.value);
-                if let Some(min_occurs) = semantic_min_occurs(rule)
+                if let Some(min_occurs) = rule.min_occurs
                     && count < min_occurs
                 {
                     diagnostics.push(semantic_diagnostic(

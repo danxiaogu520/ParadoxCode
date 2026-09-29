@@ -81,7 +81,7 @@ pub fn semantic_tokens_in_range_with_cancellation(
 ///
 /// Tens of thousands of exact rule keys are lowercased into this set; doing
 /// that per semantic-tokens request dominated the request cost.
-fn static_semantic_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<String>> {
+pub(crate) fn static_semantic_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<String>> {
     let revision = snapshot.revision();
     const KEY: &str = "semantic-keys:static";
     if let Some(cached) = snapshot
@@ -101,13 +101,17 @@ fn static_semantic_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<String>> {
             keys.insert(key.to_ascii_lowercase());
         }
     }
+    // Root entry keys (`country_event`, every on_action name) select type instances rather
+    // than matching an exact rule key, but they are script keys all the same.
     keys.extend(
         snapshot
             .rules()
             .model()
-            .symbol_descriptors
-            .iter()
-            .map(|descriptor| descriptor.kind_id.to_ascii_lowercase()),
+            .semantic
+            .type_root_keys
+            .values()
+            .flatten()
+            .map(|key| key.to_ascii_lowercase()),
     );
     let keys = Arc::new(keys);
     snapshot.query_cache().insert(

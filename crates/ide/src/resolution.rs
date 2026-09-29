@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use engine::{AnalysisSnapshot, Definition, DocumentId, DocumentSource, Reference, SourceFileId};
 use hir::{HirFile, HirReference, HirReferenceOrigin};
-use rules::{KeyMatcher, RuleShape, SymbolResolutionPolicy};
+use rules::{KeyMatcher, RuleShape};
 #[cfg(test)]
 use std::cell::Cell;
 use text::{LogicalPath, TextRange, TextSize};
@@ -73,7 +73,6 @@ pub(crate) struct RenameTarget {
 
 pub(crate) enum Resolution {
     Unique(ResolutionDefinition),
-    Ambiguous,
     Missing,
 }
 
@@ -915,20 +914,9 @@ pub(crate) fn resolve_symbol(
     kind: &str,
     name: &str,
 ) -> Resolution {
-    let mut candidates = symbol_candidates(snapshot, all, kind, name);
+    let candidates = symbol_candidates(snapshot, all, kind, name);
     if candidates.is_empty() {
         return Resolution::Missing;
-    }
-    let policy = symbol_resolution_policy(snapshot, kind);
-    if matches!(
-        policy,
-        SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique
-    ) {
-        return if candidates.len() == 1 {
-            Resolution::Unique(candidates.remove(0))
-        } else {
-            Resolution::Ambiguous
-        };
     }
     let mut ordered = retain_highest_and_order(candidates);
     match ordered.pop() {
@@ -1037,21 +1025,6 @@ pub(crate) fn symbol_candidates_for_hover(
         candidates = prefer_localisation_language_for_snapshot(snapshot, candidates);
     }
     Ok(candidates)
-}
-
-pub(crate) fn symbol_resolution_policy(
-    snapshot: &AnalysisSnapshot,
-    kind: &str,
-) -> SymbolResolutionPolicy {
-    snapshot
-        .rules()
-        .model()
-        .symbol_descriptors
-        .iter()
-        .find(|descriptor| descriptor.kind_id.eq_ignore_ascii_case(kind))
-        .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| {
-            descriptor.resolution
-        })
 }
 
 pub(crate) fn symbol_location_sort_key(location: &Location) -> (String, u32, u32) {
@@ -1234,29 +1207,9 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
     }
 
     pub(crate) fn resolve(&self, kind: &str, name: &str) -> Resolution {
-        let mut candidates = self.candidates(kind, name);
+        let candidates = self.candidates(kind, name);
         if candidates.is_empty() {
             return Resolution::Missing;
-        }
-        let policy = self
-            .snapshot
-            .rules()
-            .model()
-            .symbol_descriptors
-            .iter()
-            .find(|descriptor| descriptor.kind_id.eq_ignore_ascii_case(kind))
-            .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| {
-                descriptor.resolution
-            });
-        if matches!(
-            policy,
-            SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique
-        ) {
-            return if candidates.len() == 1 {
-                Resolution::Unique(candidates.remove(0))
-            } else {
-                Resolution::Ambiguous
-            };
         }
         let mut ordered = retain_highest_and_order(candidates);
         match ordered.pop() {
@@ -1290,32 +1243,9 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
         candidates
     }
 
-    /// Returns the load-ordered candidates whose priority can actually win, or
-    /// `None` for symbol kinds with merge or unique semantics where existence,
-    /// not ordering, is what analysis needs.
-    pub(crate) fn ordered_candidates(
-        &self,
-        kind: &str,
-        name: &str,
-    ) -> Option<Vec<ResolutionDefinition>> {
-        let candidates = self.candidates(kind, name);
-        let policy = self
-            .snapshot
-            .rules()
-            .model()
-            .symbol_descriptors
-            .iter()
-            .find(|descriptor| descriptor.kind_id.eq_ignore_ascii_case(kind))
-            .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| {
-                descriptor.resolution
-            });
-        if matches!(
-            policy,
-            SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique
-        ) {
-            return None;
-        }
-        Some(retain_highest_and_order(candidates))
+    /// Returns the load-ordered candidates whose priority can actually win.
+    pub(crate) fn ordered_candidates(&self, kind: &str, name: &str) -> Vec<ResolutionDefinition> {
+        retain_highest_and_order(self.candidates(kind, name))
     }
 }
 

@@ -605,6 +605,23 @@ fn workspace_summary_reports_identity_roots_and_zone_counts() {
             .as_u64()
             .is_some_and(|count| count >= 4)
     );
+    let symbols = &summary["result"]["symbols"];
+    assert_eq!(
+        symbols["definitions"]["scripted_effect"].as_u64(),
+        Some(2),
+        "per-kind definition counts cover the fixture: {summary}"
+    );
+    assert!(
+        symbols["definitions"]["event"]
+            .as_u64()
+            .is_some_and(|count| count >= 2)
+    );
+    assert!(
+        symbols["references"]["scripted_effect"]
+            .as_u64()
+            .is_some_and(|count| count >= 1),
+        "per-kind reference counts cover the caller: {summary}"
+    );
 
     let rejected = responses
         .iter()

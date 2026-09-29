@@ -296,7 +296,7 @@ pub enum TypedPrefixOperand {
 }
 
 /// A value matcher compiled from a first-party field declaration.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ValueMatcher {
     /// Accepts any scalar value.
@@ -308,10 +308,7 @@ pub enum ValueMatcher {
     /// Accepts an integer, optionally constrained by an inclusive range.
     Int { min: Option<i64>, max: Option<i64> },
     /// Accepts a floating point value, optionally constrained by an inclusive range.
-    Float {
-        min: Option<String>,
-        max: Option<String>,
-    },
+    Float { min: Option<f64>, max: Option<f64> },
     /// Accepts a campaign date such as `1444.11.11`, `1444.11`, or `1444`.
     Date,
     /// Accepts a member supplied by the workspace index.
@@ -348,6 +345,11 @@ pub enum ValueMatcher {
     Opaque(String),
 }
 
+/// The `Float` bounds are `f64`, which is not `Eq`. Bounds come from JSON number literals
+/// in validated rule sources — JSON cannot spell `NaN` — and `rulec` rejects non-finite
+/// bounds at load, so equality stays reflexive and the model tree keeps its `Eq` derives.
+impl Eq for ValueMatcher {}
+
 impl ValueMatcher {
     /// Tests a scalar value against the compiled matcher.
     #[must_use]
@@ -372,9 +374,7 @@ impl ValueMatcher {
                 let Ok(value) = value.parse::<f64>() else {
                     return false;
                 };
-                let lower = min.as_deref().and_then(|min| min.parse::<f64>().ok());
-                let upper = max.as_deref().and_then(|max| max.parse::<f64>().ok());
-                lower.is_none_or(|min| value >= min) && upper.is_none_or(|max| value <= max)
+                min.is_none_or(|min| value >= min) && max.is_none_or(|max| value <= max)
             }
             Self::Date => is_eu4_date(value),
             Self::Type(type_name) => type_members(type_name, value),

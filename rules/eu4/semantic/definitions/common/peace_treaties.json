@@ -2,7 +2,6 @@
   {
     "id": "common/peace_treaties:10:rule:root:peace_treaty:power_projection",
     "context": "root:peace_treaty",
-    "parent_path": [],
     "key": {
       "exact": "power_projection"
     },
@@ -11,18 +10,10 @@
       "exact": "no"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2583
@@ -30,7 +21,6 @@
   {
     "id": "common/peace_treaties:11:rule:root:peace_treaty:power_cost_base",
     "context": "root:peace_treaty",
-    "parent_path": [],
     "key": {
       "exact": "power_cost_base"
     },
@@ -42,20 +32,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base factor for diplomatic power cost when treaty is not allowed by casus belli. Scales with war score cost."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2584
@@ -63,7 +46,6 @@
   {
     "id": "common/peace_treaties:12:rule:root:peace_treaty:prestige_base",
     "context": "root:peace_treaty",
-    "parent_path": [],
     "key": {
       "exact": "prestige_base"
     },
@@ -75,20 +57,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base factor for prestige gain and loss. Scales with war score cost."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2585
@@ -96,7 +71,6 @@
   {
     "id": "common/peace_treaties:13:rule:root:peace_treaty:ae_base",
     "context": "root:peace_treaty",
-    "parent_path": [],
     "key": {
       "exact": "ae_base"
     },
@@ -108,20 +82,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Base factor for aggressive expansion. Scales with war score cost."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2586
@@ -138,25 +105,18 @@
     "operator": "=",
     "value": {
       "float": {
-        "min": "0",
+        "min": 0,
         "max": null
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "All the giver's provinces"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2587
@@ -173,25 +133,18 @@
     "operator": "=",
     "value": {
       "float": {
-        "min": "0",
+        "min": 0,
         "max": null
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "This is just a constant. Equivalent to a single province with with war score cost 1"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2588
@@ -208,25 +161,18 @@
     "operator": "=",
     "value": {
       "float": {
-        "min": "0",
+        "min": 0,
         "max": null
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "The provinces that are not of any of the types below"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2589
@@ -243,25 +189,18 @@
     "operator": "=",
     "value": {
       "float": {
-        "min": "0",
+        "min": 0,
         "max": null
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Provinces that are selected by a Demand Province treaty"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2590
@@ -278,25 +217,18 @@
     "operator": "=",
     "value": {
       "float": {
-        "min": "0",
+        "min": 0,
         "max": null
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Provinces that are selected by a Return Core treaty"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2591
@@ -313,25 +245,18 @@
     "operator": "=",
     "value": {
       "float": {
-        "min": "0",
+        "min": 0,
         "max": null
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Provinces that will become a part of a selected released-to-be nation"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2592
@@ -348,25 +273,18 @@
     "operator": "=",
     "value": {
       "float": {
-        "min": "0",
+        "min": 0,
         "max": null
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "This one should not be relevant here since Giver can't be a cancelled subject. Including anyway for completeness"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2593
@@ -383,25 +301,18 @@
     "operator": "=",
     "value": {
       "float": {
-        "min": "0",
+        "min": 0,
         "max": null
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "This one should not be relevant here since Giver can't be a cancelled subject. Including anyway for completeness"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2594
@@ -409,27 +320,19 @@
   {
     "id": "common/peace_treaties:22:rule:root:peace_treaty:warscore_cost",
     "context": "root:peace_treaty",
-    "parent_path": [],
     "key": {
       "exact": "warscore_cost"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Which of the giver's provinces' war score costs are included and by how much. All entries default to 0. Any combination of entries can be used. Try negative values at your own risk."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2595
@@ -437,7 +340,6 @@
   {
     "id": "common/peace_treaties:23:rule:root:peace_treaty:warscore_cap",
     "context": "root:peace_treaty",
-    "parent_path": [],
     "key": {
       "exact": "warscore_cap"
     },
@@ -449,20 +351,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Warscore cost will never go above this value. Only enabled if non-negative. This value defaults to -1."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2596
@@ -470,27 +365,19 @@
   {
     "id": "common/peace_treaties:24:rule:root:peace_treaty:requires_demand_independence",
     "context": "root:peace_treaty",
-    "parent_path": [],
     "key": {
       "exact": "requires_demand_independence"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Whether this can be demanded by the former subject in an independence war without also demanding independence."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2597
@@ -498,27 +385,19 @@
   {
     "id": "common/peace_treaties:25:rule:root:peace_treaty:is_make_subject",
     "context": "root:peace_treaty",
-    "parent_path": [],
     "key": {
       "exact": "is_make_subject"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "This will make the treaty mutually exclusive with other treaties that makes the giver a subject, or that explicitly frees the giver from their current overlord."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2598
@@ -526,27 +405,19 @@
   {
     "id": "common/peace_treaties:26:rule:root:peace_treaty:requires_is_allowed",
     "context": "root:peace_treaty",
-    "parent_path": [],
     "key": {
       "exact": "requires_is_allowed"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If set to \"yes\", treaty will only be visible when explicitly allowed by casus belli. If not, it will be available but cost diplomatic power."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2599
@@ -554,27 +425,19 @@
   {
     "id": "common/peace_treaties:27:rule:root:peace_treaty:applies_to_war_target",
     "context": "root:peace_treaty",
-    "parent_path": [],
     "key": {
       "exact": "applies_to_war_target"
     },
     "operator": "=",
     "value": "bool",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "If set to \"yes\", the peace treaty option will only be to the target of the war, not the war leader"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2600
@@ -582,7 +445,6 @@
   {
     "id": "common/peace_treaties:29:rule:root:peace_treaty:is_visible",
     "context": "root:peace_treaty",
-    "parent_path": [],
     "key": {
       "exact": "is_visible"
     },
@@ -590,16 +452,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Defaults to equivalent of \"always = yes\""
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -615,7 +473,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2601
@@ -623,7 +480,6 @@
   {
     "id": "common/peace_treaties:31:rule:root:peace_treaty:is_allowed",
     "context": "root:peace_treaty",
-    "parent_path": [],
     "key": {
       "exact": "is_allowed"
     },
@@ -631,16 +487,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Defaults to equivalent of \"always = yes\""
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -656,7 +508,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2602
@@ -664,7 +515,6 @@
   {
     "id": "common/peace_treaties:33:rule:root:peace_treaty:effect",
     "context": "root:peace_treaty",
-    "parent_path": [],
     "key": {
       "exact": "effect"
     },
@@ -672,16 +522,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "effect",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Defaults to empty effect (which makes error log entry but is safe)"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -697,7 +543,6 @@
       ]
     ],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2603
@@ -717,20 +562,13 @@
       "exact": "ai_value"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Mandatory to have entry called \"ai_value\". Its value at the end of the ai_weight scope is what will be used"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2604
@@ -753,18 +591,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2605
@@ -781,18 +611,10 @@
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2606
@@ -810,16 +632,12 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "if limit evaluates false, ai_weight will evaluate to 0 regardless"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -835,7 +653,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2607
@@ -843,27 +660,19 @@
   {
     "id": "common/peace_treaties:39:rule:root:peace_treaty:ai_weight",
     "context": "root:peace_treaty",
-    "parent_path": [],
     "key": {
       "exact": "ai_weight"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Defaults to always evaluate to 0. Mandatory to have entry called \"ai_value\". Its value at the end of the ai_weight scope is what will be used"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2608
@@ -871,7 +680,6 @@
   {
     "id": "common/peace_treaties:8:rule:root:peace_treaty:category",
     "context": "root:peace_treaty",
-    "parent_path": [],
     "key": {
       "exact": "category"
     },
@@ -883,20 +691,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Any number between 0 and 6. Represents the tab under which it will be listed. 6 corresponds to \"treaties\". This value currently defaults to 6."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2609
@@ -904,7 +705,6 @@
   {
     "id": "common/peace_treaties:9:rule:root:peace_treaty:power_projection",
     "context": "root:peace_treaty",
-    "parent_path": [],
     "key": {
       "exact": "power_projection"
     },
@@ -913,20 +713,13 @@
       "type": "power_projection"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "\"power_projection\" will only be applied if giver is your rival."
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 2610

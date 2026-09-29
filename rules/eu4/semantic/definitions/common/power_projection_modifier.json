@@ -2,30 +2,21 @@
   {
     "id": "common/00_small_types_consolidated:57:rule:type:power_projection_modifier:power",
     "context": "type:power_projection_modifier",
-    "parent_path": [],
     "key": {
       "exact": "power"
     },
     "operator": "=",
     "value": {
       "float": {
-        "min": "0.1",
+        "min": 0.1,
         "max": null
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 108
@@ -33,30 +24,21 @@
   {
     "id": "common/00_small_types_consolidated:59:rule:type:power_projection_modifier:power",
     "context": "type:power_projection_modifier",
-    "parent_path": [],
     "key": {
       "exact": "power"
     },
     "operator": "=",
     "value": {
       "float": {
-        "min": "-1000",
-        "max": "-0.1"
+        "min": -1000,
+        "max": -0.1
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 109

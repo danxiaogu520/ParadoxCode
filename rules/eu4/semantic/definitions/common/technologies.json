@@ -2,7 +2,6 @@
   {
     "id": "common/technologies:10:rule:root:technology:development_cost_modifier",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "development_cost_modifier"
     },
@@ -14,20 +13,13 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
     "documentation": [
       "Modifiers base cost of developing by X amount, replaces development_efficiency"
     ],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3363
@@ -35,7 +27,6 @@
   {
     "id": "common/technologies:11:rule:root:technology:trade_efficiency",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "trade_efficiency"
     },
@@ -47,18 +38,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3364
@@ -66,7 +49,6 @@
   {
     "id": "common/technologies:12:rule:root:technology:allowed_idea_groups",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "allowed_idea_groups"
     },
@@ -78,18 +60,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3365
@@ -97,7 +71,6 @@
   {
     "id": "common/technologies:13:rule:root:technology:governing_capacity",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "governing_capacity"
     },
@@ -109,18 +82,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3366
@@ -128,7 +93,6 @@
   {
     "id": "common/technologies:14:rule:root:technology:may_force_march",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "may_force_march"
     },
@@ -137,18 +101,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3367
@@ -156,7 +112,6 @@
   {
     "id": "common/technologies:15:rule:root:technology:may_fabricate_claims",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "may_fabricate_claims"
     },
@@ -165,18 +120,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3368
@@ -184,7 +131,6 @@
   {
     "id": "common/technologies:16:rule:root:technology:may_support_rebels",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "may_support_rebels"
     },
@@ -193,18 +139,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3369
@@ -212,7 +150,6 @@
   {
     "id": "common/technologies:17:rule:root:technology:naval_morale",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "naval_morale"
     },
@@ -224,18 +161,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3370
@@ -243,7 +172,6 @@
   {
     "id": "common/technologies:18:rule:root:technology:naval_maintenance",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "naval_maintenance"
     },
@@ -255,18 +183,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3371
@@ -274,7 +194,6 @@
   {
     "id": "common/technologies:19:rule:root:technology:range",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "range"
     },
@@ -286,18 +205,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3372
@@ -305,7 +216,6 @@
   {
     "id": "common/technologies:20:rule:root:technology:merchants",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "merchants"
     },
@@ -314,18 +224,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3373
@@ -333,7 +235,6 @@
   {
     "id": "common/technologies:21:rule:root:technology:trade_range",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "trade_range"
     },
@@ -345,18 +246,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3374
@@ -364,7 +257,6 @@
   {
     "id": "common/technologies:22:rule:root:technology:global_colonial_growth",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "global_colonial_growth"
     },
@@ -376,18 +268,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3375
@@ -395,7 +279,6 @@
   {
     "id": "common/technologies:23:rule:root:technology:num_accepted_cultures",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "num_accepted_cultures"
     },
@@ -407,18 +290,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3376
@@ -426,7 +301,6 @@
   {
     "id": "common/technologies:24:rule:root:technology:may_steal_maps",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "may_steal_maps"
     },
@@ -435,18 +309,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3377
@@ -454,7 +320,6 @@
   {
     "id": "common/technologies:25:rule:root:technology:may_study_technology",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "may_study_technology"
     },
@@ -463,18 +328,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3378
@@ -482,7 +339,6 @@
   {
     "id": "common/technologies:26:rule:root:technology:may_sabotage_recruitment",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "may_sabotage_recruitment"
     },
@@ -491,18 +347,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3379
@@ -510,7 +358,6 @@
   {
     "id": "common/technologies:27:rule:root:technology:may_sabotage_reputation",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "may_sabotage_reputation"
     },
@@ -519,18 +366,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3380
@@ -538,7 +377,6 @@
   {
     "id": "common/technologies:28:rule:root:technology:reduced_naval_attrition",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "reduced_naval_attrition"
     },
@@ -547,18 +385,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3381
@@ -566,7 +396,6 @@
   {
     "id": "common/technologies:29:rule:root:technology:allow_client_states",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "allow_client_states"
     },
@@ -575,18 +404,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3382
@@ -594,7 +415,6 @@
   {
     "id": "common/technologies:30:rule:root:technology:may_corrupt_officials",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "may_corrupt_officials"
     },
@@ -603,18 +423,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3383
@@ -622,7 +434,6 @@
   {
     "id": "common/technologies:31:rule:root:technology:may_agitate_for_liberty",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "may_agitate_for_liberty"
     },
@@ -631,18 +442,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3384
@@ -650,7 +453,6 @@
   {
     "id": "common/technologies:32:rule:root:technology:may_infiltrate_administration",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "may_infiltrate_administration"
     },
@@ -659,18 +461,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3385
@@ -678,7 +472,6 @@
   {
     "id": "common/technologies:33:rule:root:technology:may_slander_merchants",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "may_slander_merchants"
     },
@@ -687,18 +480,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3386
@@ -706,7 +491,6 @@
   {
     "id": "common/technologies:34:rule:root:technology:may_sow_discontent",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "may_sow_discontent"
     },
@@ -715,18 +499,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3387
@@ -734,7 +510,6 @@
   {
     "id": "common/technologies:35:rule:root:technology:combat_width",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "combat_width"
     },
@@ -746,18 +521,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3388
@@ -765,7 +532,6 @@
   {
     "id": "common/technologies:36:rule:root:technology:cavalry_shock",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "cavalry_shock"
     },
@@ -777,18 +543,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3389
@@ -796,7 +554,6 @@
   {
     "id": "common/technologies:37:rule:root:technology:infantry_shock",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "infantry_shock"
     },
@@ -808,18 +565,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3390
@@ -827,7 +576,6 @@
   {
     "id": "common/technologies:38:rule:root:technology:artillery_shock",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "artillery_shock"
     },
@@ -839,18 +587,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3391
@@ -858,7 +598,6 @@
   {
     "id": "common/technologies:39:rule:root:technology:cavalry_fire",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "cavalry_fire"
     },
@@ -870,18 +609,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3392
@@ -889,7 +620,6 @@
   {
     "id": "common/technologies:40:rule:root:technology:infantry_fire",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "infantry_fire"
     },
@@ -901,18 +631,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3393
@@ -920,7 +642,6 @@
   {
     "id": "common/technologies:41:rule:root:technology:artillery_fire",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "artillery_fire"
     },
@@ -932,18 +653,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3394
@@ -951,7 +664,6 @@
   {
     "id": "common/technologies:42:rule:root:technology:military_tactics",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "military_tactics"
     },
@@ -963,18 +675,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3395
@@ -982,7 +686,6 @@
   {
     "id": "common/technologies:43:rule:root:technology:maneuver_value",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "maneuver_value"
     },
@@ -994,18 +697,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3396
@@ -1013,7 +708,6 @@
   {
     "id": "common/technologies:44:rule:root:technology:land_morale",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "land_morale"
     },
@@ -1025,18 +719,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3397
@@ -1044,7 +730,6 @@
   {
     "id": "common/technologies:45:rule:root:technology:supply_limit",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "supply_limit"
     },
@@ -1056,18 +741,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3398
@@ -1075,7 +752,6 @@
   {
     "id": "common/technologies:46:rule:root:technology:sprite_level",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "sprite_level"
     },
@@ -1087,18 +763,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3399
@@ -1106,7 +774,6 @@
   {
     "id": "common/technologies:47:rule:root:technology:<government_reform>",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "type": "government_reform"
     },
@@ -1115,26 +782,16 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3400
   },
   {
     "id": "common/technologies:48:rule:root:technology:<building>",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "type": "building"
     },
@@ -1143,26 +800,16 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3401
   },
   {
     "id": "common/technologies:49:rule:root:technology:enable",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "enable"
     },
@@ -1171,26 +818,16 @@
       "type": "unit_type"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3402
   },
   {
     "id": "common/technologies:50:rule:root:technology:naval_engagement_width",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "naval_engagement_width"
     },
@@ -1202,26 +839,16 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3403
   },
   {
     "id": "common/technologies:51:rule:root:technology:may_build_flagships",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "may_build_flagships"
     },
@@ -1230,26 +857,16 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3404
   },
   {
     "id": "common/technologies:52:rule:root:technology:may_drill",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "may_drill"
     },
@@ -1258,19 +875,10 @@
       "exact": "yes"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3405
   },
@@ -1291,44 +899,26 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 3406
   },
   {
     "id": "common/technologies:54:rule:root:technology:expects_institution",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "expects_institution"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3407
@@ -1336,7 +926,6 @@
   {
     "id": "common/technologies:7:rule:root:technology:year",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "year"
     },
@@ -1348,18 +937,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3408
@@ -1367,7 +948,6 @@
   {
     "id": "common/technologies:8:rule:root:technology:administrative_efficiency",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "administrative_efficiency"
     },
@@ -1379,18 +959,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3409
@@ -1398,7 +970,6 @@
   {
     "id": "common/technologies:9:rule:root:technology:production_efficiency",
     "context": "root:technology",
-    "parent_path": [],
     "key": {
       "exact": "production_efficiency"
     },
@@ -1410,18 +981,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 3410

@@ -2,25 +2,16 @@
   {
     "id": "common/technology:12:rule:root:technology_group:adm_tech",
     "context": "root:technology_group",
-    "parent_path": [],
     "key": {
       "exact": "adm_tech"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 12
@@ -28,25 +19,16 @@
   {
     "id": "common/technology:12:rule:root:technology_group:dip_tech",
     "context": "root:technology_group",
-    "parent_path": [],
     "key": {
       "exact": "dip_tech"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 12
@@ -54,25 +36,16 @@
   {
     "id": "common/technology:12:rule:root:technology_group:mil_tech",
     "context": "root:technology_group",
-    "parent_path": [],
     "key": {
       "exact": "mil_tech"
     },
     "operator": "=",
     "value": "any_scalar",
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 12

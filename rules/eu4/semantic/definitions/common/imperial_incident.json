@@ -2,7 +2,6 @@
   {
     "id": "common/imperial_incident:10:rule:root:imperial_incident:can_stop",
     "context": "root:imperial_incident",
-    "parent_path": [],
     "key": {
       "exact": "can_stop"
     },
@@ -10,14 +9,9 @@
     "value": "any_scalar",
     "shape": "node",
     "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
     "replace_scope": [
       [
         "root",
@@ -29,7 +23,6 @@
       ]
     ],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1186
@@ -37,23 +30,15 @@
   {
     "id": "common/imperial_incident:14:rule:root:imperial_incident:int[0..3]",
     "context": "root:imperial_incident",
-    "parent_path": [],
     "key": "any_scalar",
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
     "child_context": "imperial_incident_option",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 0,
-    "strict_min": true,
     "max_occurs": 3,
     "source_file": "semantic-rules.json",
     "line": 1188
@@ -61,7 +46,6 @@
   {
     "id": "common/imperial_incident:7:rule:root:imperial_incident:event",
     "context": "root:imperial_incident",
-    "parent_path": [],
     "key": {
       "exact": "event"
     },
@@ -70,18 +54,10 @@
       "type": "event.country"
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1189
@@ -89,7 +65,6 @@
   {
     "id": "common/imperial_incident:8:rule:root:imperial_incident:default_option",
     "context": "root:imperial_incident",
-    "parent_path": [],
     "key": {
       "exact": "default_option"
     },
@@ -101,18 +76,10 @@
       }
     },
     "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
     "allowed_scopes": [
       "any"
     ],
-    "push_scope": null,
-    "replace_scope": [],
     "min_occurs": 1,
-    "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1190

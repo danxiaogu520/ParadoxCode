@@ -683,7 +683,6 @@ impl SnapshotRequestContext {
                 "allowedScopes": rule.allowed_scopes,
                 "pushScope": rule.push_scope,
                 "deprecated": rule.deprecated,
-                "required": rule.required,
                 "documentation": bounded_documentation(&rule.documentation),
             }));
         }
@@ -919,6 +918,16 @@ impl SnapshotRequestContext {
             }
         }
         let scan = self.snapshot.scan_report();
+        // Per-kind symbol counts let a Vanilla sweep compare definition and reference
+        // coverage across rule changes, not just diagnostics.
+        let mut definitions = BTreeMap::<&str, usize>::new();
+        for definition in self.snapshot.index().definitions_iter() {
+            *definitions.entry(&definition.kind).or_default() += 1;
+        }
+        let mut references = BTreeMap::<&str, usize>::new();
+        for (_, reference) in self.snapshot.index().references_iter() {
+            *references.entry(&reference.kind).or_default() += 1;
+        }
         Ok(serde_json::json!({
             "gameId": self.snapshot.game_profile().game_id,
             "ruleHash": self.snapshot.rules().rule_hash().to_hex(),
@@ -935,6 +944,10 @@ impl SnapshotRequestContext {
                 "legacyEncodedFiles": scan.legacy_encoded_files,
                 "skippedEntries": scan.skipped_entries,
                 "issues": scan.issues.len(),
+            },
+            "symbols": {
+                "definitions": definitions,
+                "references": references,
             },
         }))
     }
