@@ -279,6 +279,28 @@ pub struct ProfileRootEntrySpec {
     pub repeatable: bool,
 }
 
+/// Rendered hover-card declaration for one definition kind.
+///
+/// A spec carries only presentation facts the rule set cannot express: the
+/// fixed chrome sprites of the rendered window (keyed by renderer slot) and
+/// per-field sprite-name probe prefixes. Field semantics — which fields hold
+/// localisation keys or sprite names — stay in the semantic rules and are
+/// queried at hover time, so cards and validation share one source of truth.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ProfileHoverCardSpec {
+    /// Rule context whose leaf fields the card summarizes, when the anchored
+    /// kind has one (for example `root:event`).
+    pub context: Option<String>,
+    /// Fixed chrome sprites keyed by the renderer's slot name.
+    pub chrome: BTreeMap<String, String>,
+    /// Probe prefixes by sprite-valued field name: when the field's exact
+    /// spelling misses, the prefixed spelling is tried before giving up
+    /// (vanilla event pictures name their sprites without `GFX_`, mods
+    /// sometimes define them with it).
+    pub sprite_probes: BTreeMap<String, String>,
+}
+
 /// Data-only game-specific interpretation selected by the composition root.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -414,6 +436,16 @@ pub struct GameProfile {
     /// The map is keyed by the `root_entries` context name from a type descriptor.  An absent
     /// entry preserves the legacy behavior: semantic rules and `type_root_keys` are used as-is.
     pub root_entry_specs: BTreeMap<String, ProfileRootEntrySpec>,
+    /// Rendered hover-card declarations, keyed by the symbol kind of the anchored
+    /// definition (see [`ProfileDefinitionRule::kind`]).
+    ///
+    /// A card spec holds only what the rule set cannot know: the fixed chrome
+    /// sprites of the rendered window and per-field sprite-name tolerances. Which
+    /// fields carry localisation keys or sprite names is not declared here — it is
+    /// queried from the semantic rules at hover time so the card and validation can
+    /// never drift apart. An empty map keeps hover cards out entirely.
+    #[serde(default)]
+    pub hover_cards: BTreeMap<String, ProfileHoverCardSpec>,
 }
 
 /// Exact-key lookup accelerator over a game profile's ordered rule lists.
@@ -614,7 +646,18 @@ impl GameProfile {
             control_flow_keys: Vec::new(),
             enum_extra_members: BTreeMap::new(),
             root_entry_specs: BTreeMap::new(),
+            hover_cards: BTreeMap::new(),
         }
+    }
+
+    /// Returns the hover-card declaration for a definition kind, if cards exist
+    /// for it.
+    #[must_use]
+    pub fn hover_card(&self, kind: &str) -> Option<&ProfileHoverCardSpec> {
+        self.hover_cards
+            .iter()
+            .find(|(candidate, _)| candidate.eq_ignore_ascii_case(kind))
+            .map(|(_, spec)| spec)
     }
 
     /// Returns additional rule contexts inherited by `context`.

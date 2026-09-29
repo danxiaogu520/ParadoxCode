@@ -23,8 +23,8 @@ pub use model::{
 };
 pub use profile::{
     GameProfile, ProfileConditionalDefinitionRule, ProfileContainerDefinitionRule,
-    ProfileContainerValueDefinitionRule, ProfileDefinitionRule, ProfileMatchMode,
-    ProfileMemberNameSuffixRule, ProfileReferenceRule, ProfileRootEntryInsertion,
+    ProfileContainerValueDefinitionRule, ProfileDefinitionRule, ProfileHoverCardSpec,
+    ProfileMatchMode, ProfileMemberNameSuffixRule, ProfileReferenceRule, ProfileRootEntryInsertion,
     ProfileRootEntrySource, ProfileRootEntrySpec, ProfileRootScopeRule, ProfileScopeCompatibility,
     ProfileTextMatcher, ProfileTokenDefinitionRule, ProfileValueDefinitionRule, SourceEncoding,
 };
