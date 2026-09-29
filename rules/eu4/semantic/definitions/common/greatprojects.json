@@ -1,0 +1,2937 @@
+[
+  {
+    "id": "common/greatprojects:101:rule:root:great_project:add_canal",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_2",
+      "on_upgraded"
+    ],
+    "key": {
+      "exact": "add_canal"
+    },
+    "operator": "=",
+    "value": {
+      "type": "great_project.canal"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1028
+  },
+  {
+    "id": "common/greatprojects:102:rule:root:great_project:on_upgraded",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_2"
+    ],
+    "key": {
+      "exact": "on_upgraded"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Effects to run when the project is upgraded to tier 2"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1029
+  },
+  {
+    "id": "common/greatprojects:104:rule:root:great_project:tooltip_potential",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_2",
+      "conditional_modifier"
+    ],
+    "key": {
+      "exact": "tooltip_potential"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "If true will show the conditional modifier, will be hidden otherwise"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1030
+  },
+  {
+    "id": "common/greatprojects:106:rule:root:great_project:trigger",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_2",
+      "conditional_modifier"
+    ],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1031
+  },
+  {
+    "id": "common/greatprojects:108:rule:root:great_project:modifier",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_2",
+      "conditional_modifier"
+    ],
+    "key": {
+      "exact": "modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1032
+  },
+  {
+    "id": "common/greatprojects:109:rule:root:great_project:is_bad",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_2",
+      "conditional_modifier"
+    ],
+    "key": {
+      "exact": "is_bad"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Specifies whether the tooltip should list it as positive or not"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1033
+  },
+  {
+    "id": "common/greatprojects:10:rule:root:great_project:start",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "start"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "province it starts in"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1034
+  },
+  {
+    "id": "common/greatprojects:110:rule:root:great_project:conditional_modifier",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_2"
+    ],
+    "key": {
+      "exact": "conditional_modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifier that are applied if the specified conditions are true."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1035
+  },
+  {
+    "id": "common/greatprojects:111:rule:root:great_project:tier_2",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "tier_2"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "tier data"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1036
+  },
+  {
+    "id": "common/greatprojects:112:rule:root:great_project:months",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_3",
+      "upgrade_time"
+    ],
+    "key": {
+      "exact": "months"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1037
+  },
+  {
+    "id": "common/greatprojects:113:rule:root:great_project:upgrade_time",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_3"
+    ],
+    "key": {
+      "exact": "upgrade_time"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "time to upgrade to this level (0 for tier 0)"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1038
+  },
+  {
+    "id": "common/greatprojects:114:rule:root:great_project:factor",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_3",
+      "cost_to_upgrade"
+    ],
+    "key": {
+      "exact": "factor"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1039
+  },
+  {
+    "id": "common/greatprojects:115:rule:root:great_project:cost_to_upgrade",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_3"
+    ],
+    "key": {
+      "exact": "cost_to_upgrade"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "cost to upgrade to this level (0 for tier 0)"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1040
+  },
+  {
+    "id": "common/greatprojects:117:rule:root:great_project:province_modifiers",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_3"
+    ],
+    "key": {
+      "exact": "province_modifiers"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "what modifiers are added to the province when we have this project here on this tier"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1041
+  },
+  {
+    "id": "common/greatprojects:119:rule:root:great_project:area_modifier",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_3"
+    ],
+    "key": {
+      "exact": "area_modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "what modifiers are added to the provinces in the map area when we have this project here on this tier"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1042
+  },
+  {
+    "id": "common/greatprojects:11:rule:root:great_project:date",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "date"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "date built in real life (so anything built during game time will be there if you start a game after that date)"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1043
+  },
+  {
+    "id": "common/greatprojects:121:rule:root:great_project:region_modifier",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_3"
+    ],
+    "key": {
+      "exact": "region_modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1044
+  },
+  {
+    "id": "common/greatprojects:123:rule:root:great_project:country_modifiers",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_3"
+    ],
+    "key": {
+      "exact": "country_modifiers"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "what modifiers are added to the country when we have this project here on this tier"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "country"
+      ],
+      [
+        "this",
+        "country"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1045
+  },
+  {
+    "id": "common/greatprojects:125:rule:root:great_project:add_canal",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_3",
+      "on_upgraded"
+    ],
+    "key": {
+      "exact": "add_canal"
+    },
+    "operator": "=",
+    "value": {
+      "type": "great_project.canal"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1046
+  },
+  {
+    "id": "common/greatprojects:126:rule:root:great_project:on_upgraded",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_3"
+    ],
+    "key": {
+      "exact": "on_upgraded"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Effects to run when the project is upgraded to tier 3"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1047
+  },
+  {
+    "id": "common/greatprojects:128:rule:root:great_project:tooltip_potential",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_3",
+      "conditional_modifier"
+    ],
+    "key": {
+      "exact": "tooltip_potential"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "If true will show the conditional modifier, will be hidden otherwise"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1048
+  },
+  {
+    "id": "common/greatprojects:12:rule:root:great_project:months",
+    "context": "root:great_project",
+    "parent_path": [
+      "time"
+    ],
+    "key": {
+      "exact": "months"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1049
+  },
+  {
+    "id": "common/greatprojects:130:rule:root:great_project:trigger",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_3",
+      "conditional_modifier"
+    ],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1050
+  },
+  {
+    "id": "common/greatprojects:132:rule:root:great_project:modifier",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_3",
+      "conditional_modifier"
+    ],
+    "key": {
+      "exact": "modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1051
+  },
+  {
+    "id": "common/greatprojects:133:rule:root:great_project:is_bad",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_3",
+      "conditional_modifier"
+    ],
+    "key": {
+      "exact": "is_bad"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Specifies whether the tooltip should list it as positive or not"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1052
+  },
+  {
+    "id": "common/greatprojects:134:rule:root:great_project:conditional_modifier",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_3"
+    ],
+    "key": {
+      "exact": "conditional_modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifier that are applied if the specified conditions are true."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1053
+  },
+  {
+    "id": "common/greatprojects:135:rule:root:great_project:tier_3",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "tier_3"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "tier data"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1054
+  },
+  {
+    "id": "common/greatprojects:13:rule:root:great_project:time",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "time"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "time to build"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1055
+  },
+  {
+    "id": "common/greatprojects:14:rule:root:great_project:build_cost",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "build_cost"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "how much to build one"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1056
+  },
+  {
+    "id": "common/greatprojects:15:rule:root:great_project:can_be_moved",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "can_be_moved"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "can we move it?"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1057
+  },
+  {
+    "id": "common/greatprojects:16:rule:root:great_project:move_days_per_unit_distance",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "move_days_per_unit_distance"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "time to move the project one unit of distance, in days"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1058
+  },
+  {
+    "id": "common/greatprojects:17:rule:root:great_project:starting_tier",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "starting_tier"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "tier that the project starts at when first placed in the game (be that at game start or when built by a country as the game progresses)"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1059
+  },
+  {
+    "id": "common/greatprojects:18:rule:root:great_project:type",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "monument"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "project type"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1060
+  },
+  {
+    "id": "common/greatprojects:20:rule:root:great_project:type",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "canal"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "project type"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1061
+  },
+  {
+    "id": "common/greatprojects:23:rule:root:great_project:build_trigger",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "build_trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "can we build it?"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ],
+      [
+        "from",
+        "owner"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1062
+  },
+  {
+    "id": "common/greatprojects:24:rule:root:great_project:add_canal",
+    "context": "root:great_project",
+    "parent_path": [
+      "on_built"
+    ],
+    "key": {
+      "exact": "add_canal"
+    },
+    "operator": "=",
+    "value": {
+      "type": "great_project.canal"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1063
+  },
+  {
+    "id": "common/greatprojects:25:rule:root:great_project:show_ambient_object",
+    "context": "root:great_project",
+    "parent_path": [
+      "on_built"
+    ],
+    "key": {
+      "exact": "show_ambient_object"
+    },
+    "operator": "=",
+    "value": {
+      "type": "great_project"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 2,
+    "source_file": "semantic-rules.json",
+    "line": 1064
+  },
+  {
+    "id": "common/greatprojects:26:rule:root:great_project:show_ambient_object",
+    "context": "root:great_project",
+    "parent_path": [
+      "on_built"
+    ],
+    "key": {
+      "exact": "show_ambient_object"
+    },
+    "operator": "=",
+    "value": {
+      "type": "ambient_object"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 2,
+    "source_file": "semantic-rules.json",
+    "line": 1065
+  },
+  {
+    "id": "common/greatprojects:28:rule:root:great_project:on_built",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "on_built"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "what to do when it's built"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ],
+      [
+        "from",
+        "owner"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1066
+  },
+  {
+    "id": "common/greatprojects:29:rule:root:great_project:remove_canal",
+    "context": "root:great_project",
+    "parent_path": [
+      "on_destroyed"
+    ],
+    "key": {
+      "exact": "remove_canal"
+    },
+    "operator": "=",
+    "value": {
+      "type": "great_project.canal"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1067
+  },
+  {
+    "id": "common/greatprojects:30:rule:root:great_project:hide_ambient_object",
+    "context": "root:great_project",
+    "parent_path": [
+      "on_destroyed"
+    ],
+    "key": {
+      "exact": "hide_ambient_object"
+    },
+    "operator": "=",
+    "value": {
+      "type": "great_project"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 2,
+    "source_file": "semantic-rules.json",
+    "line": 1068
+  },
+  {
+    "id": "common/greatprojects:31:rule:root:great_project:hide_ambient_object",
+    "context": "root:great_project",
+    "parent_path": [
+      "on_destroyed"
+    ],
+    "key": {
+      "exact": "hide_ambient_object"
+    },
+    "operator": "=",
+    "value": {
+      "type": "ambient_object"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 2,
+    "source_file": "semantic-rules.json",
+    "line": 1069
+  },
+  {
+    "id": "common/greatprojects:33:rule:root:great_project:on_destroyed",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "on_destroyed"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "what to do when it's destroyed"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ],
+      [
+        "from",
+        "owner"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1070
+  },
+  {
+    "id": "common/greatprojects:35:rule:root:great_project:can_use_modifiers_trigger",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "can_use_modifiers_trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "can our country use it?"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ],
+      [
+        "from",
+        "owner"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1071
+  },
+  {
+    "id": "common/greatprojects:37:rule:root:great_project:can_upgrade_trigger",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "can_upgrade_trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "can our country upgrade it?"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ],
+      [
+        "from",
+        "owner"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1072
+  },
+  {
+    "id": "common/greatprojects:39:rule:root:great_project:keep_trigger",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "keep_trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "can our country keep it or is it destroyed when we get hold of it?"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ],
+      [
+        "from",
+        "owner"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1073
+  },
+  {
+    "id": "common/greatprojects:40:rule:root:great_project:months",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_0",
+      "upgrade_time"
+    ],
+    "key": {
+      "exact": "months"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1074
+  },
+  {
+    "id": "common/greatprojects:41:rule:root:great_project:upgrade_time",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_0"
+    ],
+    "key": {
+      "exact": "upgrade_time"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "time to upgrade to this level (0 for tier 0)"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1075
+  },
+  {
+    "id": "common/greatprojects:42:rule:root:great_project:factor",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_0",
+      "cost_to_upgrade"
+    ],
+    "key": {
+      "exact": "factor"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1076
+  },
+  {
+    "id": "common/greatprojects:43:rule:root:great_project:cost_to_upgrade",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_0"
+    ],
+    "key": {
+      "exact": "cost_to_upgrade"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "cost to upgrade to this level (0 for tier 0)"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1077
+  },
+  {
+    "id": "common/greatprojects:45:rule:root:great_project:province_modifiers",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_0"
+    ],
+    "key": {
+      "exact": "province_modifiers"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "what modifiers are added to the province when we have this project here on this tier"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1078
+  },
+  {
+    "id": "common/greatprojects:47:rule:root:great_project:area_modifier",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_0"
+    ],
+    "key": {
+      "exact": "area_modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "what modifiers are added to the provinces in the map area when we have this project here on this tier"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1079
+  },
+  {
+    "id": "common/greatprojects:49:rule:root:great_project:region_modifier",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_0"
+    ],
+    "key": {
+      "exact": "region_modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1080
+  },
+  {
+    "id": "common/greatprojects:4:rule:type:great_project:type",
+    "context": "type:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "monument"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1081
+  },
+  {
+    "id": "common/greatprojects:51:rule:root:great_project:country_modifiers",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_0"
+    ],
+    "key": {
+      "exact": "country_modifiers"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "what modifiers are added to the country when we have this project here on this tier"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "country"
+      ],
+      [
+        "this",
+        "country"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1082
+  },
+  {
+    "id": "common/greatprojects:53:rule:root:great_project:add_canal",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_0",
+      "on_upgraded"
+    ],
+    "key": {
+      "exact": "add_canal"
+    },
+    "operator": "=",
+    "value": {
+      "type": "great_project.canal"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1083
+  },
+  {
+    "id": "common/greatprojects:54:rule:root:great_project:on_upgraded",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_0"
+    ],
+    "key": {
+      "exact": "on_upgraded"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Effects to run when the project is upgraded to tier 0"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1084
+  },
+  {
+    "id": "common/greatprojects:56:rule:root:great_project:tooltip_potential",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_0",
+      "conditional_modifier"
+    ],
+    "key": {
+      "exact": "tooltip_potential"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "If true will show the conditional modifier, will be hidden otherwise"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1085
+  },
+  {
+    "id": "common/greatprojects:58:rule:root:great_project:trigger",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_0",
+      "conditional_modifier"
+    ],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1086
+  },
+  {
+    "id": "common/greatprojects:60:rule:root:great_project:modifier",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_0",
+      "conditional_modifier"
+    ],
+    "key": {
+      "exact": "modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1087
+  },
+  {
+    "id": "common/greatprojects:61:rule:root:great_project:is_bad",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_0",
+      "conditional_modifier"
+    ],
+    "key": {
+      "exact": "is_bad"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Specifies whether the tooltip should list it as positive or not"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1088
+  },
+  {
+    "id": "common/greatprojects:62:rule:root:great_project:conditional_modifier",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_0"
+    ],
+    "key": {
+      "exact": "conditional_modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifier that are applied if the specified conditions are true."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1089
+  },
+  {
+    "id": "common/greatprojects:63:rule:root:great_project:tier_0",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "tier_0"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "tier data"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1090
+  },
+  {
+    "id": "common/greatprojects:64:rule:root:great_project:months",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_1",
+      "upgrade_time"
+    ],
+    "key": {
+      "exact": "months"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1091
+  },
+  {
+    "id": "common/greatprojects:65:rule:root:great_project:upgrade_time",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_1"
+    ],
+    "key": {
+      "exact": "upgrade_time"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "time to upgrade to this level (0 for tier 0)"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1092
+  },
+  {
+    "id": "common/greatprojects:66:rule:root:great_project:factor",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_1",
+      "cost_to_upgrade"
+    ],
+    "key": {
+      "exact": "factor"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1093
+  },
+  {
+    "id": "common/greatprojects:67:rule:root:great_project:cost_to_upgrade",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_1"
+    ],
+    "key": {
+      "exact": "cost_to_upgrade"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "cost to upgrade to this level (0 for tier 0)"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1094
+  },
+  {
+    "id": "common/greatprojects:69:rule:root:great_project:province_modifiers",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_1"
+    ],
+    "key": {
+      "exact": "province_modifiers"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "what modifiers are added to the province when we have this project here on this tier"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1095
+  },
+  {
+    "id": "common/greatprojects:6:rule:type:great_project:type",
+    "context": "type:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "canal"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1096
+  },
+  {
+    "id": "common/greatprojects:71:rule:root:great_project:area_modifier",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_1"
+    ],
+    "key": {
+      "exact": "area_modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "what modifiers are added to the provinces in the map area when we have this project here on this tier"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1097
+  },
+  {
+    "id": "common/greatprojects:73:rule:root:great_project:region_modifier",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_1"
+    ],
+    "key": {
+      "exact": "region_modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1098
+  },
+  {
+    "id": "common/greatprojects:75:rule:root:great_project:country_modifiers",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_1"
+    ],
+    "key": {
+      "exact": "country_modifiers"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "what modifiers are added to the country when we have this project here on this tier"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "country"
+      ],
+      [
+        "this",
+        "country"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1099
+  },
+  {
+    "id": "common/greatprojects:77:rule:root:great_project:add_canal",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_1",
+      "on_upgraded"
+    ],
+    "key": {
+      "exact": "add_canal"
+    },
+    "operator": "=",
+    "value": {
+      "type": "great_project.canal"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1100
+  },
+  {
+    "id": "common/greatprojects:78:rule:root:great_project:on_upgraded",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_1"
+    ],
+    "key": {
+      "exact": "on_upgraded"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Effects to run when the project is upgraded to tier 1"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1101
+  },
+  {
+    "id": "common/greatprojects:80:rule:root:great_project:tooltip_potential",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_1",
+      "conditional_modifier"
+    ],
+    "key": {
+      "exact": "tooltip_potential"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "If true will show the conditional modifier, will be hidden otherwise"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1102
+  },
+  {
+    "id": "common/greatprojects:82:rule:root:great_project:trigger",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_1",
+      "conditional_modifier"
+    ],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1103
+  },
+  {
+    "id": "common/greatprojects:84:rule:root:great_project:modifier",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_1",
+      "conditional_modifier"
+    ],
+    "key": {
+      "exact": "modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1104
+  },
+  {
+    "id": "common/greatprojects:85:rule:root:great_project:is_bad",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_1",
+      "conditional_modifier"
+    ],
+    "key": {
+      "exact": "is_bad"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Specifies whether the tooltip should list it as positive or not"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1105
+  },
+  {
+    "id": "common/greatprojects:86:rule:root:great_project:conditional_modifier",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_1"
+    ],
+    "key": {
+      "exact": "conditional_modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifier that are applied if the specified conditions are true."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1106
+  },
+  {
+    "id": "common/greatprojects:87:rule:root:great_project:tier_1",
+    "context": "root:great_project",
+    "parent_path": [],
+    "key": {
+      "exact": "tier_1"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "tier data"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1107
+  },
+  {
+    "id": "common/greatprojects:88:rule:root:great_project:months",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_2",
+      "upgrade_time"
+    ],
+    "key": {
+      "exact": "months"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1108
+  },
+  {
+    "id": "common/greatprojects:89:rule:root:great_project:upgrade_time",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_2"
+    ],
+    "key": {
+      "exact": "upgrade_time"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "time to upgrade to this level (0 for tier 0)"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1109
+  },
+  {
+    "id": "common/greatprojects:90:rule:root:great_project:factor",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_2",
+      "cost_to_upgrade"
+    ],
+    "key": {
+      "exact": "factor"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1110
+  },
+  {
+    "id": "common/greatprojects:91:rule:root:great_project:cost_to_upgrade",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_2"
+    ],
+    "key": {
+      "exact": "cost_to_upgrade"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "cost to upgrade to this level (0 for tier 0)"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1111
+  },
+  {
+    "id": "common/greatprojects:93:rule:root:great_project:province_modifiers",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_2"
+    ],
+    "key": {
+      "exact": "province_modifiers"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "what modifiers are added to the province when we have this project here on this tier"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1112
+  },
+  {
+    "id": "common/greatprojects:95:rule:root:great_project:area_modifier",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_2"
+    ],
+    "key": {
+      "exact": "area_modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "what modifiers are added to the provinces in the map area when we have this project here on this tier"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1113
+  },
+  {
+    "id": "common/greatprojects:97:rule:root:great_project:region_modifier",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_2"
+    ],
+    "key": {
+      "exact": "region_modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "province"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1114
+  },
+  {
+    "id": "common/greatprojects:99:rule:root:great_project:country_modifiers",
+    "context": "root:great_project",
+    "parent_path": [
+      "tier_2"
+    ],
+    "key": {
+      "exact": "country_modifiers"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "what modifiers are added to the country when we have this project here on this tier"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "country"
+      ],
+      [
+        "this",
+        "country"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1115
+  }
+]

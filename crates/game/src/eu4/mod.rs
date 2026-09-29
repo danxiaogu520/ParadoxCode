@@ -85,8 +85,366 @@ const FIRST_PARTY_FILES: &[SourceFile<'static>] = &[
         bytes: include_bytes!("../../../../rules/eu4/semantic/contexts/trigger.json"),
     },
     SourceFile {
-        path: "semantic/definitions/common.json",
-        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common.json"),
+        path: "semantic/definitions/common/achievement.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/achievement.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/advisortypes.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/advisortypes.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/ages.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/ages.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/ai_army.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/ai_army.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/ai_personalities.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/ai_personalities.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/alerts.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/alerts.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/ancestor_personalities.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/ancestor_personalities.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/bookmark.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/bookmark.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/buildings.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/buildings.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/casus_belli_and_war_goals.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/casus_belli_and_war_goals.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/center_of_revolution.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/center_of_revolution.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/client_state.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/client_state.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/colonial_region.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/colonial_region.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/countries_consolidated.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/countries_consolidated.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/cult.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/cult.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/cultures.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/cultures.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/custom_gui.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/custom_gui.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/custom_locs.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/custom_locs.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/decree.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/decree.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/defender_of_faith.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/defender_of_faith.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/diplomatic_actions.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/diplomatic_actions.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/diplomatic_actions_new.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/diplomatic_actions_new.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/disasters.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/disasters.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/dynasty_colors.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/dynasty_colors.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/edict.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/edict.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/estates.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/estates.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/eu4.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/eu4.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/faction.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/faction.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/federation_advancements.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/federation_advancements.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/fervor.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/fervor.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/flagship_modification.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/flagship_modification.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/golden_bull.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/golden_bull.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/governments_and_reforms.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/governments_and_reforms.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/greatprojects.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/greatprojects.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/hegemon.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/hegemon.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/historial_lucky.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/historial_lucky.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/holy_order.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/holy_order.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/ideas_and_native_advancements.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/ideas_and_native_advancements.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/imperial_incident.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/imperial_incident.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/imperial_reforms.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/imperial_reforms.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/incidents.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/incidents.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/institutions.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/institutions.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/insult.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/insult.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/isolationism.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/isolationism.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/localisation.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/localisation.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/mercenary_company.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/mercenary_company.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/modifiers_consolidated.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/modifiers_consolidated.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/natives.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/natives.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/naval_doctrine.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/naval_doctrine.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/opinion_modifiers.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/opinion_modifiers.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/parliaments.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/parliaments.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/peace_treaties.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/peace_treaties.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/personalities.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/personalities.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/policy.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/policy.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/power_projection.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/power_projection.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/power_projection_modifier.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/power_projection_modifier.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/professionalism_modifier.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/professionalism_modifier.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/province_names.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/province_names.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/rebel_types.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/rebel_types.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/region_colors.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/region_colors.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/religions_and_related.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/religions_and_related.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/scopes.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/scopes.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/scripted_functions.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/scripted_functions.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/subject_types.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/subject_types.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/technologies.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/technologies.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/technology.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/technology.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/technology_groups.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/technology_groups.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/trade_consolidated.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/trade_consolidated.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/unit_types.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common/unit_types.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common/units_display.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/common/units_display.json"
+        ),
     },
     SourceFile {
         path: "semantic/definitions/decisions.json",
@@ -97,16 +455,42 @@ const FIRST_PARTY_FILES: &[SourceFile<'static>] = &[
         bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/events.json"),
     },
     SourceFile {
+        path: "semantic/definitions/gfx/sprite_packs.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/gfx/sprite_packs.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/gfx/sprite_packsorder.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/gfx/sprite_packsorder.json"
+        ),
+    },
+    SourceFile {
         path: "semantic/definitions/history.json",
         bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/history.json"),
     },
     SourceFile {
-        path: "semantic/definitions/interface.json",
-        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/interface.json"),
+        path: "semantic/definitions/interface/gfx.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/interface/gfx.json"),
     },
     SourceFile {
-        path: "semantic/definitions/map.json",
-        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/map.json"),
+        path: "semantic/definitions/interface/sprites.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/interface/sprites.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/map/ambient_objects_and_terrain.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/map/ambient_objects_and_terrain.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/map/areas_regions_etc.json",
+        bytes: include_bytes!(
+            "../../../../rules/eu4/semantic/definitions/map/areas_regions_etc.json"
+        ),
+    },
+    SourceFile {
+        path: "semantic/definitions/map/default_map.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/map/default_map.json"),
     },
     SourceFile {
         path: "semantic/definitions/missions.json",
