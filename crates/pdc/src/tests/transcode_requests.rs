@@ -90,6 +90,13 @@ fn decode_request(path: &Path) -> Value {
     json!({"method":"pdc/transcodeDecode","params":{"path":path.to_string_lossy()}})
 }
 
+fn decode_request_with_bytes(path: &Path, bytes: &[u8]) -> Value {
+    json!({"method":"pdc/transcodeDecode","params":{
+        "path":path.to_string_lossy(),
+        "bytes":hex(bytes),
+    }})
+}
+
 fn encode_request(path: &Path, bytes: &[u8]) -> Value {
     json!({"method":"pdc/transcodeEncode","params":{
         "path":path.to_string_lossy(),
@@ -180,6 +187,66 @@ fn transcode_decode_reports_damaged_content_and_ineligibility() {
     assert_eq!(run.result(4), &json!({"eligible": false}));
 
     fs::remove_file(&outside).expect("cleanup outside fixture");
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn transcode_decode_classifies_supplied_buffer_bytes_over_disk() {
+    let (root, root_uri) = temp_workspace_dir();
+    // On disk: pure ASCII — a fixed point the transparent view must leave alone.
+    let ascii_script = write_file(&root, "events/plain.txt", b"name = \"x\"\n");
+    let ascii_loc = write_file(&root, "localisation/plain_l_english.yml", b"l_english:\n");
+    let whole_bytes = encode_file(READABLE_LOC, Profile::Localisation, EscapeSet::Paratranz)
+        .expect("whole-encoded fixture");
+
+    let run = run_transcode_session(
+        &root,
+        &root_uri,
+        json!({}),
+        vec![
+            // Unsaved readable buffer over the ASCII script file: judged as
+            // plain with quoted CJK a save would encode.
+            decode_request_with_bytes(&ascii_script, READABLE_SCRIPT.as_bytes()),
+            // Unsaved readable buffer with CJK only outside the quoted span:
+            // plain and a fixed point again.
+            decode_request_with_bytes(&ascii_script, "# 中文注释\nname = \"x\"\n".as_bytes()),
+            // Unsaved already-escaped buffer: classified and decoded as whole.
+            decode_request_with_bytes(&ascii_loc, &whole_bytes),
+            // Without `bytes` the on-disk content still decides.
+            decode_request(&ascii_script),
+            // Malformed hex is a protocol error, not a classification.
+            json!({"method":"pdc/transcodeDecode","params":{
+                "path":ascii_script.to_string_lossy(),
+                "bytes":"abc",
+            }}),
+        ],
+    );
+
+    let result = run.result(2);
+    assert_eq!(result["form"], json!("plain"));
+    assert_eq!(result["quotedCjk"], json!(true));
+    assert_eq!(result["bytes"], json!(hex(READABLE_SCRIPT.as_bytes())));
+
+    let result = run.result(3);
+    assert_eq!(result["form"], json!("plain"));
+    assert_eq!(result["quotedCjk"], json!(false));
+    assert_eq!(
+        result["bytes"],
+        json!(hex("# 中文注释\nname = \"x\"\n".as_bytes()))
+    );
+
+    let result = run.result(4);
+    assert_eq!(result["profile"], json!("localisation"));
+    assert_eq!(result["form"], json!("whole"));
+    assert_eq!(result["bytes"], json!(hex(READABLE_LOC.as_bytes())));
+
+    let result = run.result(5);
+    assert_eq!(result["form"], json!("plain"));
+    assert_eq!(result["quotedCjk"], json!(false));
+    assert_eq!(result["bytes"], json!(hex(b"name = \"x\"\n")));
+
+    assert_eq!(run.error(6)["code"], json!(-32602));
+
     fs::remove_dir_all(root).expect("cleanup");
 }
 

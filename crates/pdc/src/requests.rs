@@ -263,6 +263,11 @@ struct TextDiagnosticsParams {
 struct TranscodeDecodeParams {
     /// Absolute path, `file:` URI, or `pdcloc:` URI of the file to classify and decode.
     path: String,
+    /// Optional hex-encoded buffer to classify instead of the on-disk bytes — an
+    /// unsaved editor buffer the caller wants judged before a save. The path
+    /// still decides the transcoding profile; the response classifies exactly
+    /// the supplied buffer.
+    bytes: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -473,21 +478,28 @@ impl SnapshotRequestContext {
         Ok(Value::Array(results))
     }
 
-    /// Reads one file from disk and classifies/decodes it for the transparent-localisation
-    /// view: `plain`/`damaged` bytes pass through unchanged, `whole` takes the legacy
-    /// whole-file decoder, and `scoped` resolves escape triples inside quoted strings only.
-    /// Nothing is written; the client owns the file bytes, the write gate, and the
-    /// presentation of the refusal metadata (`broken`, `damagedAt`, `quotedCjk`).
+    /// Classifies/decodes one file for the transparent-localisation view: `plain`/`damaged`
+    /// bytes pass through unchanged, `whole` takes the legacy whole-file decoder, and
+    /// `scoped` resolves escape triples inside quoted strings only. The bytes come from
+    /// disk unless the caller supplies a `bytes` buffer (an unsaved editor buffer) to
+    /// classify instead. Nothing is written; the client owns the file bytes, the write
+    /// gate, and the presentation of the refusal metadata (`broken`, `damagedAt`,
+    /// `quotedCjk`).
     fn transcode_decode(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<TranscodeDecodeParams>(params, "transcode decode")?;
         self.ensure_active()?;
         let path = transcode_target_path(&params.path)?;
-        let bytes = std::fs::read(&path).map_err(|error| {
-            RpcError::new(
-                INVALID_PARAMS,
-                format!("cannot read {}: {error}", params.path),
-            )
-        })?;
+        let bytes = match params.bytes.as_deref() {
+            Some(hex) => decode_hex(hex).ok_or_else(|| {
+                RpcError::new(INVALID_PARAMS, "bytes must be an even-length hex string")
+            })?,
+            None => std::fs::read(&path).map_err(|error| {
+                RpcError::new(
+                    INVALID_PARAMS,
+                    format!("cannot read {}: {error}", params.path),
+                )
+            })?,
+        };
         if bytes.len() > MAX_TEXT_DIAGNOSTIC_BYTES {
             return Err(RpcError::new(
                 INVALID_PARAMS,

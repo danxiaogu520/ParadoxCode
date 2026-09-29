@@ -21,6 +21,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `alreadyEscaped`, `unencodable`). Nothing is written by the server — the client owns the
   file bytes, the write gate, and the presentation. Byte payloads travel as hex strings.
   This is the server-side groundwork for retiring the extension's TypeScript codec twin.
+- `pdc/transcodeDecode` accepts an optional `bytes` payload: when present, the request
+  classifies the supplied buffer (an unsaved editor buffer) instead of the on-disk bytes,
+  while the path still decides the transcoding profile. The extension uses it to judge
+  edited buffers before a save. The extension also gains
+  `paradoxcode.localisation.autoOpen` (`needsTranscode` / `always` / `off`, default
+  `needsTranscode`), selecting when an eligible file is moved onto its decoded twin.
 
 ### Changed
 
@@ -64,6 +70,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   harness (`scripts/transcode.mjs`, 74,549 vectors), and the `transcode-vectors`
   generator binary are retired; `crates/transcode` is the single codec implementation,
   still pinned by its corpus, matrix, and fuzz suites.
+- The transparent-localisation auto-redirect is content-gated instead of path-only: only
+  files that actually participate in transcoding — escaped or damaged forms, or plain
+  text whose quoted CJK a save would encode — take over the raw tab and open through
+  their `pdcloc://` twin. Transcode fixed points (no escape markers, no CJK in quoted
+  strings) keep their ordinary `file://` URI, so search, diff, git, and timeline keep
+  working on them; a charset prescreen keeps plain ASCII files free of server
+  round-trips, and the server classifier still decides every form (classification
+  failure fails closed to the twin, preserving the save guard). A passed-through buffer
+  that later grows quoted CJK is promoted to its twin after the typing settles (the raw
+  save it performs is byte-preserving for that shape), keeping the typed-CJK gap closed;
+  documents rendered inside a diff editor are never taken over; and `autoOpen: "always"`
+  restores the legacy takeover of every eligible file. The flip to the twin also carries
+  the cursor over now (lines map one-to-one, columns clamp): VS Code's built-in search
+  indexes `file://` bytes only and always jumps to the raw file, so a search-result jump
+  lands on its target row in the decoded view instead of the top of the file.
 
 ### Removed
 
