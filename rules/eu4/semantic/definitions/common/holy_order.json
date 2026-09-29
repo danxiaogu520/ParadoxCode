@@ -1,0 +1,388 @@
+[
+  {
+    "id": "common/holy_order:10:rule:root:holy_order:cost_type",
+    "context": "root:holy_order",
+    "parent_path": [],
+    "key": {
+      "exact": "cost_type"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "holy_order_cost_types"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1122
+  },
+  {
+    "id": "common/holy_order:11:leaf-value:root:holy_order:int[0..255]",
+    "context": "root:holy_order",
+    "parent_path": [
+      "color"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": 0,
+        "max": null
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 3,
+    "strict_min": true,
+    "max_occurs": 3,
+    "source_file": "semantic-rules.json",
+    "line": 1123
+  },
+  {
+    "id": "common/holy_order:12:rule:root:holy_order:color",
+    "context": "root:holy_order",
+    "parent_path": [],
+    "key": {
+      "exact": "color"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1124
+  },
+  {
+    "id": "common/holy_order:14:rule:root:holy_order:per_province_effect",
+    "context": "root:holy_order",
+    "parent_path": [],
+    "key": {
+      "exact": "per_province_effect"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "province"
+      ],
+      [
+        "root",
+        "province"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1125
+  },
+  {
+    "id": "common/holy_order:16:rule:root:holy_order:per_province_abandon_effect",
+    "context": "root:holy_order",
+    "parent_path": [],
+    "key": {
+      "exact": "per_province_abandon_effect"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "province"
+      ],
+      [
+        "root",
+        "province"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1126
+  },
+  {
+    "id": "common/holy_order:18:rule:root:holy_order:modifier",
+    "context": "root:holy_order",
+    "parent_path": [],
+    "key": {
+      "exact": "modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "province"
+      ],
+      [
+        "root",
+        "province"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1127
+  },
+  {
+    "id": "common/holy_order:19:rule:root:holy_order:factor",
+    "context": "root:holy_order",
+    "parent_path": [
+      "ai_priority"
+    ],
+    "key": {
+      "exact": "factor"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1128
+  },
+  {
+    "id": "common/holy_order:21:rule:root:holy_order:ai_priority",
+    "context": "root:holy_order",
+    "parent_path": [],
+    "key": {
+      "exact": "ai_priority"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier_rule",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "province"
+      ],
+      [
+        "root",
+        "province"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1129
+  },
+  {
+    "id": "common/holy_order:22:rule:root:holy_order:localization",
+    "context": "root:holy_order",
+    "parent_path": [],
+    "key": {
+      "exact": "localization"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "The right hand side must have localisation for $_short and $_full"
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1130
+  },
+  {
+    "id": "common/holy_order:6:rule:root:holy_order:icon",
+    "context": "root:holy_order",
+    "parent_path": [],
+    "key": {
+      "exact": "icon"
+    },
+    "operator": "=",
+    "value": {
+      "type": "sprite"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1131
+  },
+  {
+    "id": "common/holy_order:8:rule:root:holy_order:trigger",
+    "context": "root:holy_order",
+    "parent_path": [],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "country"
+      ],
+      [
+        "root",
+        "country"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1132
+  },
+  {
+    "id": "common/holy_order:9:rule:root:holy_order:cost",
+    "context": "root:holy_order",
+    "parent_path": [],
+    "key": {
+      "exact": "cost"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1133
+  }
+]
