@@ -436,13 +436,43 @@ trigger/effect 中的作用域切换块不再逐条手写，由一个 pattern �
 | D5 | 源格式 JSON；不以 `SemanticRule` 为中间层；`parent_path`、`context` 字符串、`alternative_id` 一次去掉 | 原决策 |
 | D6 | 正确性靠 golden 测试 + 原版全量扫描（sweep）的**基线对比**（第 6 节），不做新旧逐行对拍 | 原决策，补充基线 |
 | D7 | Schemas / Types / Scopes 三个正交子系统为骨架；root entry 通过 `files` + `def` 合入结构；mixin 与 trait 分离 | 原决策 |
-| D8 | enum 与 table 合一（可带列）；控制流为字段属性而非顶层段；作用域效应只有对象形式；字段 `card` 默认 `0..1` | 技术决定 |
+| D8 | enum 与 table 合一（可带列）；控制流为字段属性而非顶层段；作用域效应只有对象形式；字段 `card` 默认 `0..1`（**该默认已被 D14 推翻：`card` 改为必填显式**） | 技术决定 |
 | D9 | 删除全局 `references` 表：引用只来自 schema 中的 `ref<>`。未被 schema 覆盖的位置不再产生引用——这是有意的行为变化，由基线中的引用计数对比兜底 | 技术决定 |
 | D10 | 参数化 schema 编译期单态化；runtime 无泛型、无动态派发 | 技术决定 |
 | D11 | 第一版内置 trait 固定为 Localised / HasIcon / ModifierSource / Callable | 技术决定 |
 | D12 | profile 拆分：非语言部分（install、filesystem 扫描、hover_cards、fallback_keys）移入 `game.json` 且不参与语言语义；其余全部并入语言（第 4 节表） | 技术决定 |
+| D13 | **职责分离：机制闭集、策略全量。** `engine`/`hir`/`ide`/`pdc`/`parser` 只实现机制（匹配、作用域、单态化、索引、诊断框架）；一切游戏策略（键、形状、作用域、名字、目录）只能来自规则数据。程序**不按规则目录结构读规则**（全盘读取，D16）；规则目录只服务人工维护 | 用户决策 |
+| D14 | **规则显隐（默认值哲学）。** 高频设默认、低频强制显式；默认值**只许出现在收紧语义一侧**（放宽型默认必须挂基线）；默认准入门槛为单值占比 ≥2/3；一切默认可机械展开（`fmt --expanded` / hover）。据此 **`card` 无默认、强制显式**（数据：`1` 占 50%、`0..1` 占 35%、可重复型 13%，无多数派，且它驱动「缺必填键 / 重复键」两类诊断），`FileRule.resolution` 默认翻转为 `merge` | 用户决策 |
+| D15 | **避免重复的边界。** 复用（mixin / 参数化 schema / enum 列 / trait / `self`）必须满足三次法则（≥3 个真实站点才抽象）；深度上限为 `include` 一层、参数一层、禁止传递链；复用不得破坏溯源 | 用户决策（配套） |
+| D16 | **废除 manifest + 全盘读取。** 目录是维护单元，清单是派生物；全盘扫 → 路径排序合并 → 同名定义报错（确定性由排序保证）。规则 hash 降级为**身份/断言**（基线对拍、bug 报告、CI 漂移），不参与运行时缓存决策；**缓存以构建身份为戳，更新即强制重建**；构建身份预留规则 hash 字段（D4 精神） | 用户决策 |
+| D17 | **任务树三层归属。** `crates/game/src/eu4/mission` 拆为：事实→规则（顶层块=树、`required_missions`=边、`slot`/`position`=几何字段）；机制→引擎（引用图组装、环检测、稳定字段序回写）；游戏形态→游戏包，经**能力接口**暴露。引擎与 ide 不得按 `game_id` 分支；第二个结构化视图出现前不抽象 `tree_views` DSL | 用户决策 |
+| D18 | **`INSTALL_DESCRIPTOR` 进 `game.json`。** 判据：平台探测是机制（留引擎），游戏识别是数据（进 `game.json` 的 `install` 段，细化 D12） | 代定（用户授权） |
+| D19 | **特性准入门槛（硬性变更模板）。** 新增语法 / trait / control kind 必须列出：≥3 处真实语料用例、IR 退化形态、对 64 实例上限的影响、规范 diff。机制闭集（`control.kind`、四个内置 trait）的修改视同规范修改 | 代定（用户授权） |
+| D20 | **无猜测、无静默回退。** 规则没说的，引擎不猜；`open` / `opaque` / `builtin` / `fallback_keys` 是显式豁免通道，数量只减不增、目标归零 | 提案（待认可） |
 
 技术决定均可在实施中凭数据推翻，推翻时更新本表。
+
+### 3.1 边界的判定测试与例外
+
+| # | 判定测试 | 例外 / 备注 |
+|---|---|---|
+| D13 | 实现第二个游戏（或测试内假想游戏）时 Rust 侧 diff 为零；grep 门：`engine`/`hir`/`ide`/`pdc`/`parser` 除 fixture 外零游戏专名 | 机制闭集（`control.kind`、四个内置 trait）有意留 Rust，是特性不是违例；`crates/game` 定性为游戏数据包 |
+| D14 | 每个可省字段的默认值都有多数派数据（逐字段清单以 `docs/rules-language.md` 各表的 Default 列为唯一权威）；必填缺失在解析层即拒绝（无 `serde(default)` + `deny_unknown_fields`），语义层再查 | `scope.in`（`any` 59%）是唯一弱多数，靠 sweep 基线兜底；`doc` 是内容字段不参与裁决 |
+| D15 | 每个抽象提案必须列出 ≥3 个具体站点 | 局部重复优于跨文件链 |
+| D16 | 同一输入两次全盘读取 → 同合并结果、同 hash；目录内增删无关文件不影响产物 | `game.json` 是包配置不是 manifest（保留文件名） |
+| D17 | 引擎/ide 无 `game_id` 分支；移除 `mission` 模块后引擎仍可编译 | 游戏形态的布局算法（EMT 箭头、网格语义）暂留游戏包 |
+| D18 | `game.json` 含 `install` 段；引擎侧无 EU4 可执行文件名字面量 | — |
+| D19 | 变更说明的四个字段齐全 | 机制闭集修改走规范流程 |
+| D20 | `opaque` / `open` / fallback 计数报表只减不增 | 临时豁免须在迁移/覆盖率报告登记 |
+
+### 3.2 本轮边界引出的落地缺口
+
+1. `card` 去 `serde(default)` + 转换器始终输出 card + `rules/eu4-v2` 重生成 + 规范 §3.1 默认列与论证按 50/35/13 重写（D14）。
+2. `FileRule.resolution` 默认翻转为 `merge`（现默认只命中 6%，全表唯一打不中多数的默认值）（D14）。
+3. `FileRule.root` 对 `script` parser 的必填检查（规范已要求，`compile` 未实现）（D14 强制力）。
+4. `MapSpec.value|body`、`BindingSpec.loc|sprite` 的「至少一个」检查（D14 强制力）。
+5. 烘焙硬门：`compile::check` 成为 bake 的强制前置——源有 error 即拒绝产出嵌入产物（D14「拒绝烘焙」的保证），已写入阶段 5 退出标准第 6 条。
+6. card 语法 lint：`0..0` 警告（这是禁用不是基数）、`N..N` 提示定长元组（改用 `list` + card 元数）、同名键不同 card 提示核对（D14 配套）。
 
 ## 4. 现有数据的去向
 
@@ -562,6 +592,7 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 > - `ModifierSource` trait 暂不带 `requires: {include: "modifier_block"}`：`semantic_context_inheritance` 的 type:X→modifier 是"实例体自带 modifier 字段"而非"含 `modifier` 子块"，两种形态并存，requires 形态留人工收口（连同 trait impl 一起）。
 > - 修了两处 phase 1 的实现缺陷：`compile::check_instantiation_cap` 的迭代计数原为逐轮累加、域 ≥3 必然打到上限，改为不动点重算；`source` 源类型补 `Serialize`（转换器序列化输出用），JSON Schema 工件随之重新生成（schemars 现在能写出 `default` 值）。
 > - 人工清单按类别落在 `docs/rules-migrate-report.md`：38 个魔法段位置的 def/ref 判定、`strip_prefix` 模板、typed-prefix 算子过滤、`when` 谓词、trait impl（含子类型折叠）、文件类目扩展名/排除前缀、孤儿结构位置等。
+> - D14（`card` 无默认、`FileRule.resolution` 默认翻转等显隐裁决）落地后需重跑 `rules-migrate` 重生成 `rules/eu4-v2`——转换器已确定性，重跑无额外成本；这是 §3.2 缺口 1–4 的一部分。
 
 - **自动部分**：`parent_path` 扁平行 → 嵌套 schema；alternative → 重载/union；matcher → 表达式字符串；去重（1,227 条）；on_action 折叠为 enum + 参数化 schema；纯链接行折叠进 `scopes.links`；profile 各表按第 4 节搬迁；`member_kind_aliases` 归一。
 - **人工部分**：324 处魔法段的真实结构、subtype 的 `when`、trait impl、`control` mixin、mixin 抽取。
@@ -584,7 +615,8 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
   2. sweep 对比基线：无未解释的新增 error；每类型定义数一致或有解释；每类型引用数一致或有解释（D9 的兜底）；
   3. 补全候选对比：固定位置的候选集合一致或有解释；
   4. `mem_probe` 内存与规则加载时间不劣于切换前；
-  5. 1.3 列出的硬编码全部删除（grep 验证）。
+  5. 1.3 列出的硬编码全部删除（grep 验证）；
+  6. `compile::check` 是 bake 的强制前置：源有 error 即拒绝产出嵌入产物（D14 的「拒绝烘焙」保证）。
 
 ## 7. 风险
 
