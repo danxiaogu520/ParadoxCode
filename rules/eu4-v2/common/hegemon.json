@@ -21,6 +21,7 @@
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "When Hegemony is proclaimed",
           "when": null
         },
@@ -34,6 +35,7 @@
         },
         "removed_effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "When Hegemony is lost",
           "when": null
         },

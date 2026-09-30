@@ -4,16 +4,19 @@
       "fields": {
         "alerts": {
           "body": "alerts_definitions",
+          "card": "0..1",
           "doc": "Named alert definitions and their default severity.",
           "when": null
         },
         "icon": {
           "body": "alerts_body__icon",
+          "card": "0..1",
           "doc": "Alert icon assignments by severity level.",
           "when": null
         },
         "sound": {
           "body": "alerts_sound",
+          "card": "0..1",
           "doc": "Alert sound assignments by severity level.",
           "when": null
         }
@@ -22,18 +25,21 @@
     "alerts_body__icon": {
       "fields": {
         "HIGH": {
+          "card": "0..1",
           "doc": "Sprite shown for high-severity alerts.",
           "override": true,
           "value": "ref<sprite>",
           "when": null
         },
         "LOW": {
+          "card": "0..1",
           "doc": "Sprite shown for low-severity alerts.",
           "override": true,
           "value": "ref<sprite>",
           "when": null
         },
         "MEDIUM": {
+          "card": "0..1",
           "doc": "Sprite shown for medium-severity alerts.",
           "override": true,
           "value": "ref<sprite>",

@@ -19,6 +19,7 @@
     "leader_personality_body__allow": {
       "fields": {
         "is_admiral": {
+          "card": "0..1",
           "override": true,
           "value": "bool",
           "when": null
@@ -32,6 +33,7 @@
       "fields": {
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "scope": {
             "set": {
@@ -43,6 +45,7 @@
         },
         "chance": {
           "body": "modifier_rule",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",
@@ -53,17 +56,21 @@
         },
         "consort_allow": {
           "body": "ruler_personality_body__consort_allow",
+          "card": "0..1",
           "when": null
         },
         "custom_ai_explanation": {
+          "card": "0..1",
           "value": "loc",
           "when": null
         },
         "heir_allow": {
           "body": "ruler_personality_body__heir_allow",
+          "card": "0..1",
           "when": null
         },
         "immortal": {
+          "card": "0..1",
           "value": "'1'",
           "when": null
         },
@@ -74,15 +81,18 @@
         },
         "ruler_allow": {
           "body": "ruler_personality_body__ruler_allow",
+          "card": "0..1",
           "when": null
         },
         "static": {
+          "card": "0..1",
           "doc": "Makes nation_designer_cost not scale with age etc.",
           "value": "'yes'",
           "when": null
         },
         "war_priority": {
           "body": "modifier_rule",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",
@@ -97,6 +107,7 @@
       "fields": {
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "scope": {
             "set": {
@@ -108,6 +119,7 @@
         },
         "chance": {
           "body": "modifier_rule",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",
@@ -122,6 +134,7 @@
       "fields": {
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "scope": {
             "set": {
@@ -133,6 +146,7 @@
         },
         "chance": {
           "body": "modifier_rule",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",
@@ -147,6 +161,7 @@
       "fields": {
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "scope": {
             "set": {
@@ -158,6 +173,7 @@
         },
         "chance": {
           "body": "modifier_rule",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",

@@ -786,6 +786,7 @@
     "on_actions": {
       "ext": "txt",
       "path": "common/on_actions",
+      "resolution": "replace-by-path",
       "root": "on_actions_file"
     }
   },
@@ -793,17 +794,20 @@
     "keys__type_event": {
       "fields": {
         "hidden": {
+          "card": "0..1",
           "doc": "If yes, the event runs in the background without popping up for the player.",
           "value": "'yes'",
           "when": null
         },
         "is_triggered_only": {
+          "card": "0..1",
           "doc": "If yes, the event has no MTTH and only occurs when triggered from another source (an event or an on_action pulse).",
           "value": "'yes'",
           "when": null
         },
         "mean_time_to_happen": {
           "body": "event_type_body__empty",
+          "card": "0..1",
           "doc": "How frequently the event fires when triggers are met; the base is defined in days or months and adjusted by modifier blocks.",
           "when": null
         }
@@ -815,6 +819,7 @@
       "fields": {
         "after": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Effects executed after an option has been chosen, without repeating them in every option.",
           "override": true,
           "when": null
@@ -836,18 +841,21 @@
           }
         ],
         "fire_only_once": {
+          "card": "0..1",
           "doc": "If yes, after this event fires it will never fire again for any country, even when triggered directly in code.",
           "override": true,
           "value": "bool",
           "when": null
         },
         "goto": {
+          "card": "0..1",
           "doc": "Scope-based event camera target.\nHighlights and refocuses the camera to the given province when the option is taken.",
           "override": true,
           "value": "scope<any> | ref<province_id> | ref<event_target> | ref<global_event_target> | 'root' | 'from' | ref<estate>",
           "when": null
         },
         "hidden": {
+          "card": "0..1",
           "doc": "If yes, the event runs in the background without popping up for the player.",
           "override": true,
           "severity": "warning",
@@ -863,23 +871,27 @@
         },
         "immediate": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Effects executed immediately on the event firing, before any option is chosen.",
           "override": true,
           "when": null
         },
         "is_mtth_scaled_to_size": {
+          "card": "0..1",
           "override": true,
           "value": "float",
           "when": null
         },
         "is_triggered_only": [
           {
+            "card": "0..1",
             "doc": "If yes, the event has no MTTH and only occurs when triggered from another source (an event or an on_action pulse).",
             "override": true,
             "value": "bool",
             "when": null
           },
           {
+            "card": "0..1",
             "doc": "If yes, the event has no MTTH and only occurs when triggered from another source (an event or an on_action pulse).",
             "override": true,
             "severity": "warning",
@@ -888,6 +900,7 @@
           }
         ],
         "major": {
+          "card": "0..1",
           "doc": "If yes, every country will be notified which options are selected.",
           "override": true,
           "value": "bool",
@@ -895,12 +908,14 @@
         },
         "major_trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Only displays the event to country validating the trigger",
           "override": true,
           "when": null
         },
         "mean_time_to_happen": {
           "body": "event_body__mean_time_to_happen",
+          "card": "0..1",
           "doc": "How frequently the event fires when triggers are met; the base is defined in days or months and adjusted by modifier blocks.",
           "override": true,
           "when": null
@@ -929,6 +944,7 @@
           }
         ],
         "title": {
+          "card": "0..1",
           "doc": "Localisation key for the event title.",
           "override": true,
           "value": "scalar | loc",
@@ -936,6 +952,7 @@
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Conditions that must all be true for the event (or, inside an option, for that option) to be available.",
           "override": true,
           "when": null
@@ -964,6 +981,7 @@
     "event_body__mean_time_to_happen": {
       "fields": {
         "days": {
+          "card": "0..1",
           "doc": "Base mean time to happen in days (months = <int> is the alternative).",
           "override": true,
           "value": "'1'",
@@ -975,6 +993,7 @@
       ],
       "patterns": [
         {
+          "card": "0..1",
           "key": "enum<days_months_years>",
           "override": true,
           "value": "int | '1'",
@@ -986,17 +1005,20 @@
       "fields": {
         "ai_chance": {
           "body": "event_body__option__ai_chance",
+          "card": "0..1",
           "doc": "Relative weight for the AI choosing this option; factors are relative, by convention specified out of 100.",
           "override": true,
           "when": null
         },
         "goto": {
+          "card": "0..1",
           "doc": "Scope-based event option camera target.\nHighlights and refocuses the camera to the given province when the option is taken.",
           "override": true,
           "value": "scope<any> | ref<province_id> | ref<event_target> | 'root' | 'from' | ref<estate>",
           "when": null
         },
         "highlight": {
+          "card": "0..1",
           "doc": "Adds a highlight to the option (a status effect shown in the option tooltip).",
           "override": true,
           "value": "'yes'",
@@ -1004,12 +1026,14 @@
         },
         "name": [
           {
+            "card": "0..1",
             "doc": "Localisation key for the option text.",
             "override": true,
             "value": "scalar",
             "when": null
           },
           {
+            "card": "0..1",
             "doc": "Localisation key for the option text.",
             "override": true,
             "severity": "warning",
@@ -1025,6 +1049,7 @@
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Conditions that must all be true for the event (or, inside an option, for that option) to be available.",
           "override": true,
           "when": null
@@ -1068,6 +1093,7 @@
       "fields": {
         "country_event": {
           "body": "event_body",
+          "card": "0..1",
           "def": {
             "name": "field:id",
             "type": "event.country"
@@ -1081,17 +1107,20 @@
           "when": null
         },
         "namespace": {
+          "card": "0..1",
           "doc": "Event id namespace; declared at most once per file.",
           "value": "scalar",
           "when": null
         },
         "normal_or_historical_nations": {
+          "card": "0..1",
           "doc": "Restrict events to normal or historical nations.",
           "value": "bool",
           "when": null
         },
         "province_event": {
           "body": "event_body",
+          "card": "0..1",
           "def": {
             "name": "field:id",
             "type": "event.province"
@@ -1110,17 +1139,20 @@
     "event_type_body": {
       "fields": {
         "hidden": {
+          "card": "0..1",
           "doc": "If yes, the event runs in the background without popping up for the player.",
           "value": "'yes'",
           "when": null
         },
         "is_triggered_only": {
+          "card": "0..1",
           "doc": "If yes, the event has no MTTH and only occurs when triggered from another source (an event or an on_action pulse).",
           "value": "'yes'",
           "when": null
         },
         "mean_time_to_happen": {
           "body": "event_type_body__empty",
+          "card": "0..1",
           "doc": "How frequently the event fires when triggers are met; the base is defined in days or months and adjusted by modifier blocks.",
           "when": null
         }
@@ -1130,6 +1162,7 @@
     "on_action_body<S>": {
       "fields": {
         "clr_ruler_flag": {
+          "card": "0..1",
           "value": "'marriage_length'",
           "when": null
         },
@@ -1139,6 +1172,7 @@
           "when": null
         },
         "random_events": {
+          "card": "0..1",
           "map": {
             "key": "int",
             "value": "ref<event.$S> | '0'"
@@ -1151,11 +1185,13 @@
       "patterns": [
         {
           "body": "on_action_body<$key.scope>",
+          "card": "0..1",
           "key": "enum<on_actions>",
           "when": null
         },
         {
           "body": "on_action_body<country>",
+          "card": "0..1",
           "key": "'on_harmonized_{scalar}'",
           "when": null
         }

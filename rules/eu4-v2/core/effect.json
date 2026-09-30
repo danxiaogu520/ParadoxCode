@@ -563,6 +563,7 @@
           "when": null
         },
         "add_garrison": {
+          "card": "0..1",
           "doc": "Adds the given number of men to the province garrison.",
           "scope": {
             "in": [
@@ -826,6 +827,7 @@
           "when": null
         },
         "add_latent_trade_goods": {
+          "card": "0..1",
           "doc": "Adds a latent trade good to the province.",
           "scope": {
             "in": [
@@ -4237,6 +4239,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "doc": "Scalar spelling accepted by kill_leader (e.g. kill_leader = general).",
             "scope": {
               "in": [
@@ -4318,6 +4321,7 @@
         ],
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -4474,6 +4478,7 @@
           "when": null
         },
         "move_great_project": {
+          "card": "0..1",
           "doc": "Moves the specified great project to the current province.",
           "scope": {
             "in": [
@@ -5101,6 +5106,7 @@
           "when": null
         },
         "remove_alliance": {
+          "card": "0..1",
           "doc": "Ends the alliance with the specified country.",
           "scope": {
             "in": [
@@ -5257,6 +5263,7 @@
           "when": null
         },
         "remove_defender_of_the_faith": {
+          "card": "0..1",
           "doc": "Removes the Defender of the Faith from the current country.",
           "scope": {
             "in": [
@@ -5445,6 +5452,7 @@
           "when": null
         },
         "remove_latent_trade_goods": {
+          "card": "0..1",
           "doc": "Removes a latent trade good from the province.",
           "scope": {
             "in": [
@@ -5890,6 +5898,7 @@
           "when": null
         },
         "set_army_professionalism": {
+          "card": "0..1",
           "doc": "Sets the country army professionalism to the given value.",
           "scope": {
             "in": [
@@ -6333,6 +6342,7 @@
           "when": null
         },
         "set_papacy_active": {
+          "card": "0..1",
           "doc": "Enables or disables the papacy mechanic globally.",
           "value": "bool",
           "when": null
@@ -7422,6 +7432,7 @@
           "when": null
         },
         "add_garrison": {
+          "card": "0..1",
           "doc": "Adds the given number of men to the province garrison.",
           "scope": {
             "in": [
@@ -7685,6 +7696,7 @@
           "when": null
         },
         "add_latent_trade_goods": {
+          "card": "0..1",
           "doc": "Adds a latent trade good to the province.",
           "scope": {
             "in": [
@@ -11096,6 +11108,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "doc": "Scalar spelling accepted by kill_leader (e.g. kill_leader = general).",
             "scope": {
               "in": [
@@ -11177,6 +11190,7 @@
         ],
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -11333,6 +11347,7 @@
           "when": null
         },
         "move_great_project": {
+          "card": "0..1",
           "doc": "Moves the specified great project to the current province.",
           "scope": {
             "in": [
@@ -11960,6 +11975,7 @@
           "when": null
         },
         "remove_alliance": {
+          "card": "0..1",
           "doc": "Ends the alliance with the specified country.",
           "scope": {
             "in": [
@@ -12116,6 +12132,7 @@
           "when": null
         },
         "remove_defender_of_the_faith": {
+          "card": "0..1",
           "doc": "Removes the Defender of the Faith from the current country.",
           "scope": {
             "in": [
@@ -12304,6 +12321,7 @@
           "when": null
         },
         "remove_latent_trade_goods": {
+          "card": "0..1",
           "doc": "Removes a latent trade good from the province.",
           "scope": {
             "in": [
@@ -12749,6 +12767,7 @@
           "when": null
         },
         "set_army_professionalism": {
+          "card": "0..1",
           "doc": "Sets the country army professionalism to the given value.",
           "scope": {
             "in": [
@@ -13192,6 +13211,7 @@
           "when": null
         },
         "set_papacy_active": {
+          "card": "0..1",
           "doc": "Enables or disables the papacy mechanic globally.",
           "value": "bool",
           "when": null
@@ -13870,14 +13890,17 @@
           "when": null
         },
         "dip_reward": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "free": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "value": {
+          "card": "0..1",
           "doc": "Defaults to a 100 dip",
           "value": "int",
           "when": null
@@ -13887,6 +13910,7 @@
     "effect__add_aggressive_expansion": {
       "fields": {
         "apply_calc": {
+          "card": "0..1",
           "doc": "Defaults to yes",
           "value": "bool",
           "when": null
@@ -13911,11 +13935,13 @@
           "when": null
         },
         "cost": {
+          "card": "0..1",
           "doc": "Percentage of the base cost to build, i.e 0.5 means 50% of the cost",
           "value": "float[0.0..]",
           "when": null
         },
         "speed": {
+          "card": "0..1",
           "doc": "Percentage of the base time to build, i.e 0.5 means built twice as fast",
           "value": "float[0.0..]",
           "when": null
@@ -13925,6 +13951,7 @@
     "effect__add_casus_belli": {
       "fields": {
         "months": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
@@ -13959,6 +13986,7 @@
     "effect__add_country_modifier": {
       "fields": {
         "desc": {
+          "card": "0..1",
           "doc": "The string used to override the automatic duration string.",
           "value": "loc",
           "when": null
@@ -13970,15 +13998,18 @@
           "when": null
         },
         "hidden": {
+          "card": "0..1",
           "doc": "If the modifier appears in the country modifier screen.",
           "value": "'yes'",
           "when": null
         },
         "message": {
+          "card": "0..1",
           "value": "enum<message_options>",
           "when": null
         },
         "message_data": {
+          "card": "0..1",
           "value": "enum<message_data_options>",
           "when": null
         },
@@ -14089,10 +14120,12 @@
     "effect__add_estate_influence_modifier": {
       "fields": {
         "add": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "desc": {
+          "card": "0..1",
           "value": "loc",
           "when": null
         },
@@ -14102,6 +14135,7 @@
           "when": null
         },
         "estate": {
+          "card": "0..1",
           "value": "ref<estate> | 'all'",
           "when": null
         },
@@ -14111,6 +14145,7 @@
           "when": null
         },
         "short": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }
@@ -14129,6 +14164,7 @@
           "when": null
         },
         "short": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }
@@ -14171,6 +14207,7 @@
           "when": null
         },
         "perform_readjustment": {
+          "card": "0..1",
           "value": "'no'",
           "when": null
         }
@@ -14204,6 +14241,7 @@
           "when": null
         },
         "scaled_with_gain_modifier": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
@@ -14228,6 +14266,7 @@
           "when": null
         },
         "scaled_with_gain_modifier": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
@@ -14241,10 +14280,12 @@
     "effect__add_great_project": {
       "fields": {
         "builder": {
+          "card": "0..1",
           "value": "scope<country>",
           "when": null
         },
         "instant": {
+          "card": "0..1",
           "doc": "Defines if the Great Project will be built instantly or not.",
           "value": "bool",
           "when": null
@@ -14318,6 +14359,7 @@
           "when": null
         },
         "estate_loan": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }
@@ -14353,11 +14395,13 @@
           "when": null
         },
         "months": {
+          "card": "0..1",
           "doc": "Optional: Set an expiry date for the modifier.",
           "value": "int",
           "when": null
         },
         "multiplier": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
@@ -14367,6 +14411,7 @@
           "when": null
         },
         "years": {
+          "card": "0..1",
           "doc": "Optional: Set an expiry date for the modifier.",
           "value": "int",
           "when": null
@@ -14376,22 +14421,26 @@
     "effect__add_owned_provinces_development_ducats": {
       "fields": {
         "age_multiplier": {
+          "card": "0..1",
           "doc": "Multiply number of ducats gained based on age",
           "value": "float",
           "when": null
         },
         "custom_tooltip": {
+          "card": "0..1",
           "doc": "Custom description to use in tooltip",
           "value": "loc",
           "when": null
         },
         "multiplier": {
+          "card": "0..1",
           "doc": "multiply number of ducats gained",
           "value": "float",
           "when": null
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Only consider provinces that pass this trigger",
           "scope": {
             "push": "province"
@@ -14403,22 +14452,26 @@
     "effect__add_owned_provinces_development_manpower": {
       "fields": {
         "age_multiplier": {
+          "card": "0..1",
           "doc": "Multiply manpower gained based on age",
           "value": "float",
           "when": null
         },
         "custom_tooltip": {
+          "card": "0..1",
           "doc": "Custom description to use in tooltip",
           "value": "loc",
           "when": null
         },
         "multiplier": {
+          "card": "0..1",
           "doc": "multiply manpower gained",
           "value": "float",
           "when": null
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Only consider provinces that pass this trigger",
           "scope": {
             "push": "province"
@@ -14430,15 +14483,18 @@
     "effect__add_permanent_province_modifier": {
       "fields": {
         "desc": {
+          "card": "0..1",
           "doc": "The string used to override the automatic duration string.",
           "value": "loc",
           "when": null
         },
         "duration": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "hidden": {
+          "card": "0..1",
           "doc": "If the modifier is hidden from the province modifier view.",
           "value": "'yes'",
           "when": null
@@ -14467,6 +14523,7 @@
     "effect__add_province_modifier": {
       "fields": {
         "desc": {
+          "card": "0..1",
           "doc": "The string used to override the automatic duration string.",
           "value": "loc",
           "when": null
@@ -14478,6 +14535,7 @@
           "when": null
         },
         "hidden": {
+          "card": "0..1",
           "doc": "If the modifier is hidden from the province modifier view.",
           "value": "'yes'",
           "when": null
@@ -14502,6 +14560,7 @@
     "effect__add_rebel_progress": {
       "fields": {
         "rebel_type": {
+          "card": "0..1",
           "value": "ref<rebel_type>",
           "when": null
         },
@@ -14515,14 +14574,17 @@
     "effect__add_ruler_modifier": {
       "fields": {
         "desc": {
+          "card": "0..1",
           "value": "loc",
           "when": null
         },
         "duration": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "hidden": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -14574,22 +14636,26 @@
     "effect__add_subjects_development_ducats": {
       "fields": {
         "age_multiplier": {
+          "card": "0..1",
           "doc": "Multiply number of ducats gained based on age",
           "value": "float",
           "when": null
         },
         "custom_tooltip": {
+          "card": "0..1",
           "doc": "Custom description to use in tooltip",
           "value": "loc",
           "when": null
         },
         "multiplier": {
+          "card": "0..1",
           "doc": "multiply number of ducats gained",
           "value": "float",
           "when": null
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Only consider subjects that pass this trigger",
           "scope": {
             "push": "province"
@@ -14601,22 +14667,26 @@
     "effect__add_subjects_development_manpower": {
       "fields": {
         "age_multiplier": {
+          "card": "0..1",
           "doc": "Multiply manpower gained based on age",
           "value": "float",
           "when": null
         },
         "custom_tooltip": {
+          "card": "0..1",
           "doc": "Custom description to use in tooltip",
           "value": "loc",
           "when": null
         },
         "multiplier": {
+          "card": "0..1",
           "doc": "multiply manpower gained",
           "value": "float",
           "when": null
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Only consider subjects that pass this trigger",
           "scope": {
             "push": "province"
@@ -14669,6 +14739,7 @@
     "effect__add_trust": {
       "fields": {
         "mutual": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -14687,6 +14758,7 @@
     "effect__add_unit_construction": {
       "fields": {
         "amount": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
@@ -14697,6 +14769,7 @@
           "when": null
         },
         "mercenary": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -14716,6 +14789,7 @@
     "effect__add_years_of_owned_provinces_manpower": {
       "fields": {
         "custom_tooltip": {
+          "card": "0..1",
           "value": "loc",
           "when": null
         },
@@ -14737,11 +14811,13 @@
     "effect__add_years_of_owned_provinces_production_income": {
       "fields": {
         "custom_tooltip": {
+          "card": "0..1",
           "value": "loc",
           "when": null
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Which provinces to include in the calculation, defaults to 'always = yes' if not defined.",
           "scope": {
             "push": "province"
@@ -14759,6 +14835,7 @@
     "effect__add_years_of_owned_provinces_sailors": {
       "fields": {
         "custom_tooltip": {
+          "card": "0..1",
           "value": "loc",
           "when": null
         },
@@ -14781,6 +14858,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -14796,6 +14874,7 @@
     "effect__area_used": {
       "fields": {
         "amount": {
+          "card": "0..1",
           "doc": "How many provinces to apply the effect, implies 'type = random' unless explicitly set",
           "override": true,
           "value": "int[1..]",
@@ -14803,6 +14882,7 @@
         },
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -14811,6 +14891,7 @@
           "when": null
         },
         "type": {
+          "card": "0..1",
           "doc": "Apply effect to random provinces in the area, use combined with amount",
           "override": true,
           "value": "enum<random_repeating>",
@@ -14824,36 +14905,44 @@
     "effect__build_to_forcelimit": {
       "fields": {
         "artillery": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "cavalry": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "galley": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "heavy_ship": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "infantry": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "light_ship": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "transport": {
+          "card": "0..1",
           "value": "float",
           "when": null
         }
       },
       "patterns": [
         {
+          "card": "0..1",
           "key": "ref<unit_type>",
           "value": "float",
           "when": null
@@ -14885,6 +14974,7 @@
           "when": null
         },
         "province": {
+          "card": "0..1",
           "doc": "This will set it to change estate land share by the development of the province / development of the country X share",
           "value": "scope<province> | ref<province_id>",
           "when": null
@@ -14966,6 +15056,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -14981,6 +15072,7 @@
     "effect__continent": {
       "fields": {
         "amount": {
+          "card": "0..1",
           "doc": "How many provinces to apply the effect, implies 'type = random' unless explicitly set",
           "override": true,
           "value": "int",
@@ -14988,6 +15080,7 @@
         },
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -14996,6 +15089,7 @@
           "when": null
         },
         "type": {
+          "card": "0..1",
           "doc": "Apply effect to random provinces in the continent, use combined with amount",
           "override": true,
           "value": "enum<random_repeating>",
@@ -15009,6 +15103,7 @@
     "effect__country_event": {
       "fields": {
         "days": {
+          "card": "0..1",
           "doc": "The number of days to wait after the effect is executed to fire the event.",
           "value": "int",
           "when": null
@@ -15019,6 +15114,7 @@
           "when": null
         },
         "random": {
+          "card": "0..1",
           "control": {
             "kind": "chance"
           },
@@ -15027,6 +15123,7 @@
           "when": null
         },
         "tooltip": {
+          "card": "0..1",
           "control": {
             "kind": "display_only"
           },
@@ -15039,35 +15136,42 @@
     "effect__create_admiral": {
       "fields": {
         "add_fire": {
+          "card": "0..1",
           "doc": "Added to randomly generated value",
           "value": "int",
           "when": null
         },
         "add_manuever": {
+          "card": "0..1",
           "doc": "Added to randomly generated value",
           "value": "int",
           "when": null
         },
         "add_shock": {
+          "card": "0..1",
           "doc": "Added to randomly generated value",
           "value": "int",
           "when": null
         },
         "add_siege": {
+          "card": "0..1",
           "doc": "Added to randomly generated value",
           "value": "int",
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "doc": "Gives the general a random name from the specified culture.",
           "value": "ref<culture> | enum<culture_new_variables> | scope<province> | ref<province_id> | scope<country> | enum<country_tags>",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
@@ -15081,35 +15185,42 @@
     "effect__create_conquistador": {
       "fields": {
         "add_fire": {
+          "card": "0..1",
           "doc": "Added to randomly generated value",
           "value": "int",
           "when": null
         },
         "add_manuever": {
+          "card": "0..1",
           "doc": "Added to randomly generated value",
           "value": "int",
           "when": null
         },
         "add_shock": {
+          "card": "0..1",
           "doc": "Added to randomly generated value",
           "value": "int",
           "when": null
         },
         "add_siege": {
+          "card": "0..1",
           "doc": "Added to randomly generated value",
           "value": "int",
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "doc": "Gives the general a random name from the specified culture.",
           "value": "ref<culture> | enum<culture_new_variables> | scope<province> | ref<province_id> | scope<country> | enum<country_tags>",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
@@ -15123,35 +15234,42 @@
     "effect__create_explorer": {
       "fields": {
         "add_fire": {
+          "card": "0..1",
           "doc": "Added to randomly generated value",
           "value": "int",
           "when": null
         },
         "add_manuever": {
+          "card": "0..1",
           "doc": "Added to randomly generated value",
           "value": "int",
           "when": null
         },
         "add_shock": {
+          "card": "0..1",
           "doc": "Added to randomly generated value",
           "value": "int",
           "when": null
         },
         "add_siege": {
+          "card": "0..1",
           "doc": "Added to randomly generated value",
           "value": "int",
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "doc": "Gives the general a random name from the specified culture.",
           "value": "ref<culture> | enum<culture_new_variables> | scope<province> | ref<province_id> | scope<country> | enum<country_tags>",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
@@ -15165,6 +15283,7 @@
     "effect__create_flagship": {
       "fields": {
         "name": {
+          "card": "0..1",
           "doc": "Name of the flagship, defaults to a random culture one",
           "value": "scalar",
           "when": null
@@ -15179,35 +15298,42 @@
     "effect__create_general": {
       "fields": {
         "add_fire": {
+          "card": "0..1",
           "doc": "Added to randomly generated value",
           "value": "int",
           "when": null
         },
         "add_manuever": {
+          "card": "0..1",
           "doc": "Added to randomly generated value",
           "value": "int",
           "when": null
         },
         "add_shock": {
+          "card": "0..1",
           "doc": "Added to randomly generated value",
           "value": "int",
           "when": null
         },
         "add_siege": {
+          "card": "0..1",
           "doc": "Added to randomly generated value",
           "value": "int",
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "doc": "Gives the general a random name from the specified culture.",
           "value": "ref<culture> | enum<culture_new_variables> | scope<province> | ref<province_id> | scope<country> | enum<country_tags>",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
@@ -15222,6 +15348,7 @@
     "effect__create_independent_estate": {
       "fields": {
         "custom_national_ideas": {
+          "card": "0..1",
           "value": "ref<idea_group.country_idea>",
           "when": null
         },
@@ -15231,14 +15358,17 @@
           "when": null
         },
         "government": {
+          "card": "0..1",
           "value": "ref<government>",
           "when": null
         },
         "government_reform": {
+          "card": "0..1",
           "value": "ref<government_reform>",
           "when": null
         },
         "play_as": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         }
@@ -15247,6 +15377,7 @@
     "effect__create_independent_estate_from_religion": {
       "fields": {
         "custom_national_ideas": {
+          "card": "0..1",
           "value": "ref<idea_group.country_idea>",
           "when": null
         },
@@ -15256,14 +15387,17 @@
           "when": null
         },
         "government": {
+          "card": "0..1",
           "value": "ref<government>",
           "when": null
         },
         "government_reform": {
+          "card": "0..1",
           "value": "ref<government_reform>",
           "when": null
         },
         "play_as": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         }
@@ -15286,10 +15420,12 @@
     "effect__create_subject": {
       "fields": {
         "keep_liberty_desire": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "message": {
+          "card": "0..1",
           "value": "'no'",
           "when": null
         },
@@ -15330,14 +15466,17 @@
     "effect__create_unit_forcelimit_percentage": {
       "fields": {
         "capped_by_special_force_limit": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "force_limit_percentage": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "special_unit_category": {
+          "card": "0..1",
           "doc": "Does not respect special_unit_category restrictions to a unit type, allowing creation of nonsencial units, for example 'Man of War Infantry', 'Carolean Heavy Frigate', 'Samurai Coehorn Mortar', etc.",
           "value": "enum<special_units>",
           "when": null
@@ -15358,6 +15497,7 @@
           "when": null
         },
         "war_goal_province": {
+          "card": "0..1",
           "value": "ref<province_id>",
           "when": null
         },
@@ -15371,6 +15511,7 @@
     "effect__define_admiral": {
       "fields": {
         "female": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
@@ -15385,6 +15526,7 @@
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "scalar | ref<saved_name>",
           "when": null
         },
@@ -15394,6 +15536,7 @@
           "when": null
         },
         "siege": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
@@ -15407,47 +15550,58 @@
     "effect__define_advisor": {
       "fields": {
         "age": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "cost_multiplier": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "value": "ref<culture> | enum<culture_new_variables> | scope<country> | enum<country_tags> | ref<province_id> | scope<province>",
           "when": null
         },
         "discount": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "location": {
+          "card": "0..1",
           "doc": "Scopes to the unit's current location.",
           "value": "scope<province> | ref<province_id>",
           "when": null
         },
         "max_age": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "min_age": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "scalar | ref<saved_name>",
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "value": "ref<religion> | enum<religion_new_variables> | scope<country> | enum<country_tags> | scope<province> | ref<province_id>",
           "when": null
         },
         "skill": {
+          "card": "0..1",
           "value": "int[1..5]",
           "when": null
         },
@@ -15461,6 +15615,7 @@
     "effect__define_conquistador": {
       "fields": {
         "female": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
@@ -15475,6 +15630,7 @@
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "scalar | ref<saved_name>",
           "when": null
         },
@@ -15484,6 +15640,7 @@
           "when": null
         },
         "siege": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
@@ -15497,59 +15654,73 @@
     "effect__define_consort": {
       "fields": {
         "adm": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "age": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "birth_date": {
+          "card": "0..1",
           "value": "date",
           "when": null
         },
         "claim": {
+          "card": "0..1",
           "value": "int[0..100]",
           "when": null
         },
         "country_of_origin": {
+          "card": "0..1",
           "value": "scope<country> | enum<country_tags>",
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "value": "ref<culture> | enum<culture_new_variables> | scope<country> | enum<country_tags> | scope<province> | ref<province_id>",
           "when": null
         },
         "dip": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "dynasty": {
+          "card": "0..1",
           "value": "scalar | scope<country> | enum<country_tags> | 'original_dynasty'",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "hide_skills": {
+          "card": "0..1",
           "doc": "Hides the skill values for this ruler.",
           "value": "'yes'",
           "when": null
         },
         "male": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "mil": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "value": "ref<religion> | enum<religion_new_variables> | scope<country> | enum<country_tags> | scope<province> | ref<province_id>",
           "when": null
         }
@@ -15558,26 +15729,32 @@
     "effect__define_exiled_ruler": {
       "fields": {
         "adm": {
+          "card": "0..1",
           "value": "int[-6..6]",
           "when": null
         },
         "change_adm": {
+          "card": "0..1",
           "value": "int[-6..6]",
           "when": null
         },
         "change_dip": {
+          "card": "0..1",
           "value": "int[-6..6]",
           "when": null
         },
         "change_mil": {
+          "card": "0..1",
           "value": "int[-6..6]",
           "when": null
         },
         "dip": {
+          "card": "0..1",
           "value": "int[-6..6]",
           "when": null
         },
         "dynasty": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
@@ -15587,22 +15764,27 @@
           "when": null
         },
         "max_age": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "mil": {
+          "card": "0..1",
           "value": "int[-6..6]",
           "when": null
         },
         "min_age": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "option": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "random_gender": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         }
@@ -15611,6 +15793,7 @@
     "effect__define_explorer": {
       "fields": {
         "female": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
@@ -15625,6 +15808,7 @@
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "scalar | ref<saved_name>",
           "when": null
         },
@@ -15634,6 +15818,7 @@
           "when": null
         },
         "siege": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
@@ -15647,6 +15832,7 @@
     "effect__define_general": {
       "fields": {
         "female": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
@@ -15661,6 +15847,7 @@
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "scalar | ref<saved_name>",
           "when": null
         },
@@ -15670,6 +15857,7 @@
           "when": null
         },
         "siege": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
@@ -15683,97 +15871,120 @@
     "effect__define_heir": {
       "fields": {
         "adm": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "age": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "birth_date": {
+          "card": "0..1",
           "value": "date",
           "when": null
         },
         "block_disinherit": {
+          "card": "0..1",
           "doc": "Disables the disinherit button",
           "value": "'yes'",
           "when": null
         },
         "change_adm": {
+          "card": "0..1",
           "value": "int[-6..6]",
           "when": null
         },
         "change_dip": {
+          "card": "0..1",
           "value": "int[-6..6]",
           "when": null
         },
         "change_mil": {
+          "card": "0..1",
           "value": "int[-6..6]",
           "when": null
         },
         "claim": {
+          "card": "0..1",
           "value": "int[0..100]",
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "value": "ref<culture> | enum<culture_new_variables> | scope<country> | enum<country_tags> | scope<province> | ref<province_id>",
           "when": null
         },
         "dip": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "dynasty": {
+          "card": "0..1",
           "value": "scalar | scope<country> | enum<country_tags> | 'original_dynasty'",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "hidden": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "hide_skills": {
+          "card": "0..1",
           "doc": "Hides the skill values for this ruler.",
           "value": "'yes'",
           "when": null
         },
         "male": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "max_random_adm": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "max_random_dip": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "max_random_mil": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "mil": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "monarch_name": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "scalar | ref<saved_name>",
           "when": null
         },
         "no_consort_with_heir": {
+          "card": "0..1",
           "doc": "Makes the heir a child not of the consort, i.e. a bastard",
           "value": "'yes'",
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "value": "ref<religion> | enum<religion_new_variables> | scope<country> | enum<country_tags> | scope<province> | ref<province_id>",
           "when": null
         }
@@ -15787,6 +15998,7 @@
           "when": null
         },
         "hidden": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
@@ -15810,31 +16022,38 @@
     "effect__define_leader_to_ruler": {
       "fields": {
         "adm": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "claim": {
+          "card": "0..1",
           "value": "int[0..100]",
           "when": null
         },
         "dip": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "fixed": {
+          "card": "0..1",
           "doc": "Makes the ruler skill roll fixed to the defined minimums.",
           "value": "'yes'",
           "when": null
         },
         "mil": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "type": {
+          "card": "0..1",
           "value": "enum<military_leader_types>",
           "when": null
         }
@@ -15843,114 +16062,141 @@
     "effect__define_ruler": {
       "fields": {
         "adm": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "age": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "attach_leader": {
+          "card": "0..1",
           "doc": "The name of the leader to generate with the ruler.",
           "value": "scalar",
           "when": null
         },
         "change_adm": {
+          "card": "0..1",
           "value": "int[-6..6]",
           "when": null
         },
         "change_dip": {
+          "card": "0..1",
           "value": "int[-6..6]",
           "when": null
         },
         "change_mil": {
+          "card": "0..1",
           "value": "int[-6..6]",
           "when": null
         },
         "change_original_dynasty": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "claim": {
+          "card": "0..1",
           "value": "int[0..100]",
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "value": "ref<culture> | enum<culture_new_variables> | scope<country> | enum<country_tags> | scope<province> | ref<province_id>",
           "when": null
         },
         "dip": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "dynasty": {
+          "card": "0..1",
           "value": "scalar | scope<country> | enum<country_tags> | 'original_dynasty' | 'historic_dynasty'",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "force_republican_names": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "hide_skills": {
+          "card": "0..1",
           "doc": "Hides the skill values for this ruler.",
           "value": "'yes'",
           "when": null
         },
         "male": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "max_age": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "max_random_adm": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "max_random_dip": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "max_random_mil": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "mil": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "min_age": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "ref<saved_name> | scalar",
           "when": null
         },
         "random_gender": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "rebel": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "regency": [
           {
+            "card": "0..1",
             "value": "bool",
             "when": null
           },
           {
             "body": "effect__define_ruler__regency",
+            "card": "0..1",
             "when": null
           }
         ],
         "religion": {
+          "card": "0..1",
           "value": "ref<religion> | enum<religion_new_variables> | scope<country> | enum<country_tags> | scope<province> | ref<province_id>",
           "when": null
         }
@@ -15988,6 +16234,7 @@
           "when": null
         },
         "trait": {
+          "card": "0..1",
           "value": "ref<leader_personality>",
           "when": null
         }
@@ -16050,6 +16297,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16066,6 +16314,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16082,6 +16331,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16098,6 +16348,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16114,6 +16365,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16130,6 +16382,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16146,6 +16399,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16162,6 +16416,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16178,6 +16433,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16194,6 +16450,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16210,6 +16467,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16226,6 +16484,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16242,6 +16501,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16258,6 +16518,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16274,6 +16535,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16290,6 +16552,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16306,6 +16569,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16322,6 +16586,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16338,6 +16603,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16354,6 +16620,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16370,6 +16637,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16386,6 +16654,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16402,6 +16671,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16418,6 +16688,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16434,6 +16705,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16450,6 +16722,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16466,6 +16739,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16482,6 +16756,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16498,6 +16773,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16513,6 +16789,7 @@
     "effect__exile_ruler_as": {
       "fields": {
         "kill_monarch": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
@@ -16532,11 +16809,13 @@
           "when": null
         },
         "who": {
+          "card": "0..1",
           "doc": "Takes a country scope for country-level value and a province scope on province-level value",
           "value": "scope<country> | enum<country_tags> | scope<province>",
           "when": null
         },
         "with": {
+          "card": "0..1",
           "value": "scope<country>",
           "when": null
         }
@@ -16567,6 +16846,7 @@
     "effect__extend_province_modifier": {
       "fields": {
         "duration": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
@@ -16613,47 +16893,58 @@
     "effect__hire_advisor": {
       "fields": {
         "age": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "cost_multiplier": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "value": "ref<culture> | enum<culture_new_variables> | scope<country> | enum<country_tags> | ref<province_id> | scope<province>",
           "when": null
         },
         "discount": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "location": {
+          "card": "0..1",
           "doc": "Scopes to the unit's current location.",
           "value": "scope<province> | ref<province_id>",
           "when": null
         },
         "max_age": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "min_age": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "scalar | ref<saved_name>",
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "value": "ref<religion> | enum<religion_new_variables> | scope<country> | enum<country_tags> | scope<province> | ref<province_id>",
           "when": null
         },
         "skill": {
+          "card": "0..1",
           "value": "int[1..5]",
           "when": null
         },
@@ -16684,6 +16975,7 @@
     "effect__kill_heir": {
       "fields": {
         "allow_new_heir": {
+          "card": "0..1",
           "doc": "Whether there is a chance to immediately spawn a new heir.",
           "value": "bool",
           "when": null
@@ -16714,10 +17006,12 @@
     "effect__kill_units": {
       "fields": {
         "amount": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "type": {
+          "card": "0..1",
           "value": "enum<unit_types> | ref<unit_type>",
           "when": null
         },
@@ -16731,6 +17025,7 @@
     "effect__modulo_variable": {
       "fields": {
         "value": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
@@ -16772,6 +17067,7 @@
     "effect__province_event": {
       "fields": {
         "days": {
+          "card": "0..1",
           "doc": "The number of days to wait after the effect is executed to fire the event.",
           "value": "int",
           "when": null
@@ -16782,6 +17078,7 @@
           "when": null
         },
         "random": {
+          "card": "0..1",
           "control": {
             "kind": "chance"
           },
@@ -16790,6 +17087,7 @@
           "when": null
         },
         "tooltip": {
+          "card": "0..1",
           "control": {
             "kind": "display_only"
           },
@@ -16803,6 +17101,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16819,6 +17118,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16849,6 +17149,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16865,6 +17166,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16881,6 +17183,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16897,6 +17200,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16913,6 +17217,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16929,6 +17234,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16945,6 +17251,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16961,6 +17268,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16977,6 +17285,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -16993,6 +17302,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17009,6 +17319,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17025,6 +17336,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17041,6 +17353,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17057,6 +17370,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17073,6 +17387,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17089,6 +17404,7 @@
       "fields": {
         "fallback": {
           "body": "self",
+          "card": "0..1",
           "when": null
         }
       },
@@ -17105,10 +17421,12 @@
       "fields": {
         "modifier": {
           "body": "effect__random_list__int__modifier",
+          "card": "0..1",
           "when": null
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Must return true for this to be considered, if false this chance block is not considered",
           "when": null
         }
@@ -17117,6 +17435,7 @@
     "effect__random_list__int__modifier": {
       "fields": {
         "factor": {
+          "card": "0..1",
           "override": true,
           "value": "float",
           "when": null
@@ -17130,6 +17449,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17146,6 +17466,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17162,6 +17483,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17178,6 +17500,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17193,6 +17516,7 @@
     "effect__random_owned_province": {
       "fields": {
         "amount": {
+          "card": "0..1",
           "doc": "How many provinces to apply the effect, implies 'type = random' unless explicitly set",
           "override": true,
           "value": "int[1..]",
@@ -17200,6 +17524,7 @@
         },
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17208,6 +17533,7 @@
           "when": null
         },
         "type": {
+          "card": "0..1",
           "doc": "Apply effect to random provinces in the area, use combined with amount",
           "override": true,
           "value": "enum<random_repeating>",
@@ -17222,6 +17548,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17238,6 +17565,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17254,6 +17582,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17270,6 +17599,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17286,6 +17616,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17302,6 +17633,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17318,6 +17650,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17334,6 +17667,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17349,6 +17683,7 @@
     "effect__random_variable": {
       "fields": {
         "value": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
@@ -17364,6 +17699,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17379,6 +17715,7 @@
     "effect__region": {
       "fields": {
         "amount": {
+          "card": "0..1",
           "doc": "How many provinces to apply the effect, implies 'type = random' unless explicitly set",
           "override": true,
           "value": "int",
@@ -17386,6 +17723,7 @@
         },
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -17394,6 +17732,7 @@
           "when": null
         },
         "type": {
+          "card": "0..1",
           "doc": "Apply effect to random provinces in the region, use combined with amount",
           "override": true,
           "value": "enum<random_repeating>",
@@ -17440,6 +17779,7 @@
     "effect__remove_heir": {
       "fields": {
         "allow_new_heir": {
+          "card": "0..1",
           "doc": "Whether there is a chance to immediately spawn a new heir.",
           "value": "bool",
           "when": null
@@ -17490,6 +17830,7 @@
     "effect__remove_power_projection": {
       "fields": {
         "amount": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
@@ -17546,6 +17887,7 @@
     "effect__reverse_add_aggressive_expansion": {
       "fields": {
         "apply_calc": {
+          "card": "0..1",
           "doc": "Defaults to yes",
           "value": "bool",
           "when": null
@@ -17565,6 +17907,7 @@
     "effect__reverse_add_casus_belli": {
       "fields": {
         "months": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
@@ -17588,11 +17931,13 @@
           "when": null
         },
         "months": {
+          "card": "0..1",
           "doc": "Optional: Set an expiry date for the modifier.",
           "value": "int",
           "when": null
         },
         "multiplier": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
@@ -17602,6 +17947,7 @@
           "when": null
         },
         "years": {
+          "card": "0..1",
           "doc": "Optional: Set an expiry date for the modifier.",
           "value": "int",
           "when": null
@@ -17669,6 +18015,7 @@
           "when": null
         },
         "locked": {
+          "card": "0..1",
           "doc": "Whether the personality can be re-evaluated and changed.",
           "value": "bool",
           "when": null
@@ -17698,6 +18045,7 @@
     "effect__set_defender_of_the_faith": {
       "fields": {
         "religion": {
+          "card": "0..1",
           "value": "scope<country> | enum<country_tags>",
           "when": null
         },
@@ -17787,6 +18135,7 @@
     "effect__set_saved_name": {
       "fields": {
         "female": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
@@ -17796,10 +18145,12 @@
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "scope": {
+          "card": "0..1",
           "doc": "Only with type = advisor",
           "value": "scope<country> | scope<province>",
           "when": null
@@ -17828,6 +18179,7 @@
     "effect__set_variable": {
       "fields": {
         "value": {
+          "card": "0..1",
           "value": "float | ref<variable> | enum<export_to_variable_data>",
           "when": null
         },
@@ -17849,10 +18201,12 @@
     "effect__spawn_large_scaled_rebels": {
       "fields": {
         "no_defined_leader": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "type": {
+          "card": "0..1",
           "value": "ref<rebel_type>",
           "when": null
         }
@@ -17861,43 +18215,53 @@
     "effect__spawn_rebels": {
       "fields": {
         "as_if_faction": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "value": "ref<culture> | enum<culture_new_variables> | enum<country_tags> | scope<country> | ref<province_id> | scope<province>",
           "when": null
         },
         "estate": {
+          "card": "0..1",
           "value": "ref<estate>",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "friend": {
+          "card": "0..1",
           "doc": "Associate a country with the rebels.",
           "value": "scope<country> | enum<country_tags>",
           "when": null
         },
         "leader": {
+          "card": "0..1",
           "value": "scalar | ref<saved_name>",
           "when": null
         },
         "leader_dynasty": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "value": "ref<religion> | enum<religion_new_variables> | enum<country_tags> | scope<country> | ref<province_id> | scope<province>",
           "when": null
         },
         "separatists_target": {
+          "card": "0..1",
           "value": "scope<country> | enum<country_tags>",
           "when": null
         },
         "should_take_capital": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -17907,27 +18271,33 @@
           "when": null
         },
         "type": {
+          "card": "0..1",
           "value": "ref<rebel_type> | 'religious_rebels'",
           "when": null
         },
         "unrest": {
+          "card": "0..1",
           "doc": "Adds this amount of unrest to the province the rebels spawn in.",
           "value": "int",
           "when": null
         },
         "use_consort_as_leader": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "use_heir_as_leader": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "use_monarch_as_leader": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "win": {
+          "card": "0..1",
           "doc": "Changes control of the province the rebels spawn in to the rebels.",
           "value": "'yes'",
           "when": null
@@ -17937,10 +18307,12 @@
     "effect__spawn_small_scaled_rebels": {
       "fields": {
         "no_defined_leader": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "type": {
+          "card": "0..1",
           "value": "ref<rebel_type>",
           "when": null
         }
@@ -17985,6 +18357,7 @@
     "effect__superregion": {
       "fields": {
         "amount": {
+          "card": "0..1",
           "doc": "How many provinces to apply the effect, implies 'type = random' unless explicitly set",
           "override": true,
           "value": "int",
@@ -17992,6 +18365,7 @@
         },
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -18000,6 +18374,7 @@
           "when": null
         },
         "type": {
+          "card": "0..1",
           "doc": "Apply effect to random provinces in the superregion, use combined with amount",
           "override": true,
           "value": "enum<random_repeating>",
@@ -18014,6 +18389,7 @@
       "fields": {
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -18030,14 +18406,17 @@
       "fields": {
         "advisor_events_adm": {
           "body": "effect__trigger_switch__advisor_events_adm",
+          "card": "0..1",
           "when": null
         },
         "advisor_events_dip": {
           "body": "effect__trigger_switch__advisor_events_dip",
+          "card": "0..1",
           "when": null
         },
         "advisor_events_mil": {
           "body": "effect__trigger_switch__advisor_events_mil",
+          "card": "0..1",
           "when": null
         },
         "on_trigger": {
@@ -18059,6 +18438,7 @@
       "fields": {
         "kill_advisor_by_category_effect": {
           "body": "effect__trigger_switch__advisor_events_adm__kill_advisor_by_category_effect",
+          "card": "0..1",
           "override": true,
           "when": null
         }
@@ -18070,6 +18450,7 @@
     "effect__trigger_switch__advisor_events_adm__kill_advisor_by_category_effect": {
       "fields": {
         "ADM": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }
@@ -18079,6 +18460,7 @@
       "fields": {
         "kill_advisor_by_category_effect": {
           "body": "effect__trigger_switch__advisor_events_dip__kill_advisor_by_category_effect",
+          "card": "0..1",
           "override": true,
           "when": null
         }
@@ -18090,6 +18472,7 @@
     "effect__trigger_switch__advisor_events_dip__kill_advisor_by_category_effect": {
       "fields": {
         "DIP": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }
@@ -18099,6 +18482,7 @@
       "fields": {
         "kill_advisor_by_category_effect": {
           "body": "effect__trigger_switch__advisor_events_mil__kill_advisor_by_category_effect",
+          "card": "0..1",
           "override": true,
           "when": null
         }
@@ -18110,6 +18494,7 @@
     "effect__trigger_switch__advisor_events_mil__kill_advisor_by_category_effect": {
       "fields": {
         "MIL": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }

@@ -563,6 +563,7 @@
           "when": null
         },
         "add_garrison": {
+          "card": "0..1",
           "doc": "Adds the given number of men to the province garrison.",
           "scope": {
             "in": [
@@ -826,6 +827,7 @@
           "when": null
         },
         "add_latent_trade_goods": {
+          "card": "0..1",
           "doc": "Adds a latent trade good to the province.",
           "scope": {
             "in": [
@@ -3959,6 +3961,7 @@
           "when": null
         },
         "government": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
@@ -4241,6 +4244,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "doc": "Scalar spelling accepted by kill_leader (e.g. kill_leader = general).",
             "scope": {
               "in": [
@@ -4322,6 +4326,7 @@
         ],
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -4478,6 +4483,7 @@
           "when": null
         },
         "move_great_project": {
+          "card": "0..1",
           "doc": "Moves the specified great project to the current province.",
           "scope": {
             "in": [
@@ -5051,6 +5057,7 @@
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "value": "'sunni'",
           "when": null
         },
@@ -5109,6 +5116,7 @@
           "when": null
         },
         "remove_alliance": {
+          "card": "0..1",
           "doc": "Ends the alliance with the specified country.",
           "scope": {
             "in": [
@@ -5265,6 +5273,7 @@
           "when": null
         },
         "remove_defender_of_the_faith": {
+          "card": "0..1",
           "doc": "Removes the Defender of the Faith from the current country.",
           "scope": {
             "in": [
@@ -5453,6 +5462,7 @@
           "when": null
         },
         "remove_latent_trade_goods": {
+          "card": "0..1",
           "doc": "Removes a latent trade good from the province.",
           "scope": {
             "in": [
@@ -5898,6 +5908,7 @@
           "when": null
         },
         "set_army_professionalism": {
+          "card": "0..1",
           "doc": "Sets the country army professionalism to the given value.",
           "scope": {
             "in": [
@@ -6341,6 +6352,7 @@
           "when": null
         },
         "set_papacy_active": {
+          "card": "0..1",
           "doc": "Enables or disables the papacy mechanic globally.",
           "value": "bool",
           "when": null
@@ -7429,6 +7441,7 @@
           "when": null
         },
         "add_garrison": {
+          "card": "0..1",
           "doc": "Adds the given number of men to the province garrison.",
           "scope": {
             "in": [
@@ -7692,6 +7705,7 @@
           "when": null
         },
         "add_latent_trade_goods": {
+          "card": "0..1",
           "doc": "Adds a latent trade good to the province.",
           "scope": {
             "in": [
@@ -11103,6 +11117,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "doc": "Scalar spelling accepted by kill_leader (e.g. kill_leader = general).",
             "scope": {
               "in": [
@@ -11184,6 +11199,7 @@
         ],
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -11340,6 +11356,7 @@
           "when": null
         },
         "move_great_project": {
+          "card": "0..1",
           "doc": "Moves the specified great project to the current province.",
           "scope": {
             "in": [
@@ -11399,6 +11416,7 @@
           "when": null
         },
         "owner": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
@@ -11971,6 +11989,7 @@
           "when": null
         },
         "remove_alliance": {
+          "card": "0..1",
           "doc": "Ends the alliance with the specified country.",
           "scope": {
             "in": [
@@ -12127,6 +12146,7 @@
           "when": null
         },
         "remove_defender_of_the_faith": {
+          "card": "0..1",
           "doc": "Removes the Defender of the Faith from the current country.",
           "scope": {
             "in": [
@@ -12315,6 +12335,7 @@
           "when": null
         },
         "remove_latent_trade_goods": {
+          "card": "0..1",
           "doc": "Removes a latent trade good from the province.",
           "scope": {
             "in": [
@@ -12760,6 +12781,7 @@
           "when": null
         },
         "set_army_professionalism": {
+          "card": "0..1",
           "doc": "Sets the country army professionalism to the given value.",
           "scope": {
             "in": [
@@ -13203,6 +13225,7 @@
           "when": null
         },
         "set_papacy_active": {
+          "card": "0..1",
           "doc": "Enables or disables the papacy mechanic globally.",
           "value": "bool",
           "when": null
@@ -13566,6 +13589,7 @@
           "when": null
         },
         "trade_goods": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
@@ -13741,6 +13765,7 @@
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "value": "ref<culture>",
           "when": null
         },
@@ -13755,10 +13780,12 @@
           "when": null
         },
         "discount": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -13773,6 +13800,7 @@
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "value": "ref<religion>",
           "when": null
         },
@@ -13797,37 +13825,44 @@
           "when": null
         },
         "capital": {
+          "card": "0..1",
           "override": true,
           "value": "ref<province_id>",
           "when": null
         },
         "elector": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "federation": {
           "body": "country_history_body__federation",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "fixed_capital": {
+          "card": "0..1",
           "doc": "Cannot move capital away from this province & no power cost to move to it",
           "override": true,
           "value": "ref<province_id>",
           "when": null
         },
         "government": {
+          "card": "0..1",
           "override": true,
           "value": "ref<government>",
           "when": null
         },
         "government_rank": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "historical_council": {
+          "card": "0..1",
           "override": true,
           "value": "enum<council_positions>",
           "when": null
@@ -13845,41 +13880,49 @@
           "when": null
         },
         "mercantilism": {
+          "card": "0..1",
           "override": true,
           "value": "int[0..100]",
           "when": null
         },
         "national_focus": {
+          "card": "0..1",
           "override": true,
           "value": "enum<power_categories>",
           "when": null
         },
         "primary_culture": {
+          "card": "0..1",
           "override": true,
           "value": "ref<culture>",
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "override": true,
           "value": "ref<religion>",
           "when": null
         },
         "religious_school": {
+          "card": "0..1",
           "override": true,
           "value": "ref<religious_school>",
           "when": null
         },
         "secondary_religion": {
+          "card": "0..1",
           "override": true,
           "value": "ref<religion>",
           "when": null
         },
         "technology_group": {
+          "card": "0..1",
           "override": true,
           "value": "ref<technology_group>",
           "when": null
         },
         "unit_type": {
+          "card": "0..1",
           "override": true,
           "value": "ref<technology_group>",
           "when": null
@@ -13901,19 +13944,23 @@
     "country_history_body__date_field": {
       "fields": {
         "capital": {
+          "card": "0..1",
           "value": "ref<province_id>",
           "when": null
         },
         "changed_tag_from": {
+          "card": "0..1",
           "value": "enum<country_tags>",
           "when": null
         },
         "clear_scripted_personalities": {
+          "card": "0..1",
           "doc": "Pretty sure this one only works when a leader is spawned",
           "value": "'yes'",
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "value": "ref<culture>",
           "when": null
         },
@@ -13923,26 +13970,32 @@
           "when": null
         },
         "elector": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "government": {
+          "card": "0..1",
           "value": "ref<government>",
           "when": null
         },
         "government_rank": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "heir": {
           "body": "country_history_body__date_field__heir",
+          "card": "0..1",
           "when": null
         },
         "historical_friend": {
+          "card": "0..1",
           "value": "enum<country_tags>",
           "when": null
         },
         "historical_rival": {
+          "card": "0..1",
           "value": "enum<country_tags>",
           "when": null
         },
@@ -13952,39 +14005,48 @@
           "when": null
         },
         "mercantilism": {
+          "card": "0..1",
           "value": "int[0..100]",
           "when": null
         },
         "monarch": {
           "body": "country_history_body__date_field__monarch",
+          "card": "0..1",
           "when": null
         },
         "monarch_consort": {
           "body": "country_history_body__date_field__monarch_consort",
+          "card": "0..1",
           "when": null
         },
         "primary_culture": {
+          "card": "0..1",
           "value": "ref<culture>",
           "when": null
         },
         "queen": {
           "body": "country_history_body__date_field__queen",
+          "card": "0..1",
           "doc": "Defines a consort",
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "value": "ref<religion>",
           "when": null
         },
         "religious_school": {
+          "card": "0..1",
           "value": "ref<religious_school>",
           "when": null
         },
         "revolution_target": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "technology_group": {
+          "card": "0..1",
           "value": "ref<technology_group>",
           "when": null
         }
@@ -13993,6 +14055,7 @@
     "country_history_body__date_field__heir": {
       "fields": {
         "adm": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
@@ -14002,18 +14065,22 @@
           "when": null
         },
         "block_disinherit": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "claim": {
+          "card": "0..1",
           "value": "int[0..100]",
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "value": "ref<culture>",
           "when": null
         },
         "death_date": {
+          "card": "0..1",
           "value": "date",
           "when": null
         },
@@ -14023,15 +14090,18 @@
           "when": null
         },
         "dynasty": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "leader": {
           "body": "country_history_body__date_field__heir__leader",
+          "card": "0..1",
           "when": null
         },
         "mil": {
@@ -14040,6 +14110,7 @@
           "when": null
         },
         "monarch_name": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
@@ -14049,6 +14120,7 @@
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "value": "ref<religion>",
           "when": null
         }
@@ -14057,14 +14129,17 @@
     "country_history_body__date_field__heir__leader": {
       "fields": {
         "birth_date": {
+          "card": "0..1",
           "value": "date",
           "when": null
         },
         "death_date": {
+          "card": "0..1",
           "value": "date",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -14084,6 +14159,7 @@
           "when": null
         },
         "personality": {
+          "card": "0..1",
           "value": "ref<leader_personality>",
           "when": null
         },
@@ -14107,14 +14183,17 @@
     "country_history_body__date_field__leader": {
       "fields": {
         "birth_date": {
+          "card": "0..1",
           "value": "date",
           "when": null
         },
         "death_date": {
+          "card": "0..1",
           "value": "date",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -14134,6 +14213,7 @@
           "when": null
         },
         "personality": {
+          "card": "0..1",
           "value": "ref<leader_personality>",
           "when": null
         },
@@ -14162,18 +14242,22 @@
           "when": null
         },
         "birth_date": {
+          "card": "0..1",
           "value": "date",
           "when": null
         },
         "claim": {
+          "card": "0..1",
           "value": "int[0..100]",
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "value": "ref<culture>",
           "when": null
         },
         "death_date": {
+          "card": "0..1",
           "value": "date",
           "when": null
         },
@@ -14183,15 +14267,18 @@
           "when": null
         },
         "dynasty": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "leader": {
           "body": "country_history_body__date_field__monarch__leader",
+          "card": "0..1",
           "when": null
         },
         "mil": {
@@ -14200,15 +14287,18 @@
           "when": null
         },
         "name": {
+          "card": "0..1",
           "severity": "warning",
           "value": "scalar",
           "when": null
         },
         "regent": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "value": "ref<religion>",
           "when": null
         }
@@ -14217,14 +14307,17 @@
     "country_history_body__date_field__monarch__leader": {
       "fields": {
         "birth_date": {
+          "card": "0..1",
           "value": "date",
           "when": null
         },
         "death_date": {
+          "card": "0..1",
           "value": "date",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -14244,6 +14337,7 @@
           "when": null
         },
         "personality": {
+          "card": "0..1",
           "value": "ref<leader_personality>",
           "when": null
         },
@@ -14272,6 +14366,7 @@
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "value": "ref<culture>",
           "when": null
         },
@@ -14281,10 +14376,12 @@
           "when": null
         },
         "dynasty": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -14294,6 +14391,7 @@
           "when": null
         },
         "monarch_name": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
@@ -14303,10 +14401,12 @@
           "when": null
         },
         "regent": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "value": "ref<religion>",
           "when": null
         }
@@ -14325,15 +14425,18 @@
           "when": null
         },
         "country_of_origin": {
+          "card": "0..1",
           "doc": "Country of Origin for the consort, defaults to the current country.",
           "value": "enum<country_tags>",
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "value": "ref<culture>",
           "when": null
         },
         "death_date": {
+          "card": "0..1",
           "value": "date",
           "when": null
         },
@@ -14348,11 +14451,13 @@
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "leader": {
           "body": "country_history_body__date_field__queen__leader",
+          "card": "0..1",
           "when": null
         },
         "mil": {
@@ -14366,6 +14471,7 @@
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "value": "ref<religion>",
           "when": null
         }
@@ -14374,10 +14480,12 @@
     "country_history_body__date_field__queen__leader": {
       "fields": {
         "death_date": {
+          "card": "0..1",
           "value": "date",
           "when": null
         },
         "female": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -14397,6 +14505,7 @@
           "when": null
         },
         "personality": {
+          "card": "0..1",
           "value": "ref<leader_personality>",
           "when": null
         },
@@ -14437,10 +14546,12 @@
     "country_history_type_body": {
       "fields": {
         "government": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "value": "'sunni'",
           "when": null
         }
@@ -14514,6 +14625,7 @@
           "when": null
         },
         "trade_league": {
+          "card": "0..1",
           "value": "'1'",
           "when": null
         }
@@ -14627,36 +14739,43 @@
           "when": null
         },
         "base_manpower": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "base_production": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "base_tax": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "capital": {
+          "card": "0..1",
           "override": true,
           "value": "scalar",
           "when": null
         },
         "center_of_trade": {
+          "card": "0..1",
           "override": true,
           "value": "int[1..3]",
           "when": null
         },
         "controller": {
+          "card": "0..1",
           "override": true,
           "value": "enum<country_tags>",
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "override": true,
           "value": "ref<culture>",
           "when": null
@@ -14668,26 +14787,31 @@
           "when": null
         },
         "estate": {
+          "card": "0..1",
           "override": true,
           "value": "ref<estate>",
           "when": null
         },
         "extra_cost": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "hre": {
+          "card": "0..1",
           "override": true,
           "value": "bool",
           "when": null
         },
         "is_city": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "latent_trade_goods": {
+          "card": "0..1",
           "list": "ref<trade_good.latent>",
           "override": true,
           "when": null
@@ -14701,6 +14825,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "float[0.0..10.0]",
             "when": null
@@ -14715,6 +14840,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "float[0.0..10.0]",
             "when": null
@@ -14729,42 +14855,50 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "int",
             "when": null
           }
         ],
         "owner": {
+          "card": "0..1",
           "override": true,
           "value": "enum<country_tags>",
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "override": true,
           "value": "ref<religion>",
           "when": null
         },
         "revolt_risk": {
+          "card": "0..1",
           "override": true,
           "value": "int[0..100]",
           "when": null
         },
         "seat_in_parliament": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "trade_goods": {
+          "card": "0..1",
           "override": true,
           "value": "ref<trade_good> | 'unknown'",
           "when": null
         },
         "tribal_owner": {
+          "card": "0..1",
           "override": true,
           "value": "enum<country_tags>",
           "when": null
         },
         "unrest": {
+          "card": "0..1",
           "override": true,
           "value": "int[0..100]",
           "when": null
@@ -14801,18 +14935,22 @@
     "province_history_body__date_field__revolt": {
       "fields": {
         "leader": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "size": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "type": {
+          "card": "0..1",
           "value": "ref<rebel_type> | 'religious_rebels'",
           "when": null
         }
@@ -14825,10 +14963,12 @@
     "province_history_type_body": {
       "fields": {
         "owner": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "trade_goods": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         }
@@ -14837,15 +14977,18 @@
     "war_history_body": {
       "fields": {
         "name": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "succession": {
+          "card": "0..1",
           "value": "enum<country_tags>",
           "when": null
         },
         "war_goal": {
           "body": "war_history_body__war_goal",
+          "card": "0..1",
           "when": null
         }
       },
@@ -14872,6 +15015,7 @@
         },
         "battle": {
           "body": "war_history_body__date_field__battle",
+          "card": "0..1",
           "when": null
         },
         "rem_attacker": {
@@ -14980,10 +15124,12 @@
           "when": null
         },
         "province": {
+          "card": "0..1",
           "value": "ref<province_id>",
           "when": null
         },
         "tag": {
+          "card": "0..1",
           "value": "enum<country_tags>",
           "when": null
         },

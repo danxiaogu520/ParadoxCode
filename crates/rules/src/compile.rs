@@ -12,8 +12,8 @@ use std::fmt;
 
 use crate::expr::{self, Expr, Param, Primary, Segment};
 use crate::source::{
-    EnumSpec, FieldOverloads, FieldSpec, MapSpec, MixinSpec, RootSpec, RuleFile, SchemaSpec,
-    Severity, TraitSpec, TypeSpec,
+    EnumSpec, ExtSpec, FieldOverloads, FieldSpec, MapSpec, MixinSpec, RootSpec, RuleFile,
+    SchemaSpec, Severity, SourceParser, TraitSpec, TypeSpec,
 };
 
 /// One compile diagnostic: provenance plus the finding.
@@ -61,6 +61,8 @@ pub enum DiagnosticCode {
     UnsatisfiedTraitRequirement,
     /// Check 8: a type impls one trait twice.
     DuplicateTraitImpl,
+    /// D14 card syntax lint (`0..0`, fixed-length tuples, card disagreement).
+    CardLint,
 }
 
 impl fmt::Display for DiagnosticCode {
@@ -77,6 +79,7 @@ impl fmt::Display for DiagnosticCode {
             Self::ScopeReferenceError => "ScopeReferenceError",
             Self::UnsatisfiedTraitRequirement => "UnsatisfiedTraitRequirement",
             Self::DuplicateTraitImpl => "DuplicateTraitImpl",
+            Self::CardLint => "CardLint",
         })
     }
 }
@@ -109,6 +112,7 @@ pub fn check(sources: &[(String, RuleFile)]) -> Vec<Diagnostic> {
     checker.check_scopes();
     checker.check_traits();
     checker.check_subtype_gates();
+    checker.check_card_disagreement();
     checker.check_undefined_references();
     checker.check_unused_definitions();
     let Checker { mut diagnostics, .. } = checker;
@@ -354,6 +358,60 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// D14 card lints: `0..0` disables rather than bounds, `N..N` is a
+    /// fixed-length tuple better written as `list` plus the arity, and two
+    /// overloads of one key disagreeing on the card deserve a look.
+    fn lint_card(&mut self, at: &At, raw: &str) {
+        let Ok((min, max)) = parse_card(raw) else {
+            return;
+        };
+        if max == Some(0) {
+            report(
+                &mut self.diagnostics,
+                at,
+                DiagnosticCode::CardLint,
+                Severity::Warning,
+                format!("card `{raw}` disables the field; write nothing instead"),
+            );
+        } else if max == Some(min) && min > 1 {
+            report(
+                &mut self.diagnostics,
+                at,
+                DiagnosticCode::CardLint,
+                Severity::Info,
+                format!(
+                    "card `{raw}` is a fixed-length tuple; prefer `\"list\"` plus card `\"{min}\"`"
+                ),
+            );
+        }
+    }
+
+    /// D14: two overloads of one key with different cards are worth a look.
+    fn check_card_disagreement(&mut self) {
+        let sources = self.sources;
+        let mut diagnostics = Vec::new();
+        for (file_name, file) in sources {
+            for (schema_name, schema) in &file.schemas {
+                let at = At {
+                    file: file_name.clone(),
+                    pointer: join_pointer("/schemas", schema_name),
+                };
+                let SchemaSpec::Block(block) = schema else {
+                    continue;
+                };
+                lint_field_cards(&mut diagnostics, &at.child("fields"), &block.fields);
+            }
+            for (mixin_name, mixin) in &file.mixins {
+                let at = At {
+                    file: file_name.clone(),
+                    pointer: join_pointer("/mixins", mixin_name),
+                };
+                lint_field_cards(&mut diagnostics, &at.child("fields"), &mixin.fields);
+            }
+        }
+        self.diagnostics.extend(diagnostics);
+    }
+
     fn collect(&mut self) {
         self.collect_scopes();
         for (file_name, file) in self.sources {
@@ -450,10 +508,34 @@ impl<'a> Checker<'a> {
             };
             self.forbid_params(&at, &rule.path, "a files path");
             if let Some(ext) = &rule.ext {
-                self.forbid_params(&at.child("ext"), ext, "a files extension");
+                let ext_at = at.child("ext");
+                for (index, value) in ext.iter().enumerate() {
+                    let spec_at = match ext {
+                        ExtSpec::One(_) => ext_at.clone(),
+                        ExtSpec::Many(_) => ext_at.index(index),
+                    };
+                    self.forbid_params(&spec_at, value, "a files extension");
+                }
             }
             if let Some(name) = &rule.file {
                 self.forbid_params(&at.child("file"), name, "a files file name");
+            }
+            for (index, prefix) in rule.exclude.iter().enumerate() {
+                self.forbid_params(&at.child("exclude").index(index), prefix, "a files exclusion");
+            }
+            // D14: a `script` entry without a root would silently validate
+            // nothing, which the no-guessing rule forbids; `localisation` and
+            // `asset` files have no script structure to declare.
+            if rule.parser.unwrap_or(SourceParser::Script) == SourceParser::Script
+                && rule.root.is_none()
+            {
+                report(
+                    &mut self.diagnostics,
+                    &at,
+                    DiagnosticCode::Parse,
+                    Severity::Error,
+                    "a `script` file entry must declare `root`".to_owned(),
+                );
             }
             match rule.root.as_ref() {
                 Some(RootSpec::Schema(name)) => {
@@ -682,6 +764,28 @@ impl<'a> Checker<'a> {
                         at: at.child("requires").child("include"),
                     });
                 }
+            for (binding_name, binding) in &spec.bindings {
+                let binding_at = at.child("bindings").child(binding_name);
+                if binding.loc.is_some() == binding.sprite.is_some() {
+                    report(&mut self.diagnostics, 
+                        &binding_at,
+                        DiagnosticCode::Parse,
+                        Severity::Error,
+                        format!(
+                            "trait binding `{binding_name}` must declare exactly one of \
+                             `loc` / `sprite`"
+                        ),
+                    );
+                }
+                for (key, value) in [
+                    ("loc", binding.loc.as_deref()),
+                    ("sprite", binding.sprite.as_deref()),
+                ] {
+                    if let Some(value) = value {
+                        self.forbid_params(&binding_at.child(key), value, "a binding template");
+                    }
+                }
+            }
         }
 
         for (name, spec) in &file.enums {
@@ -869,6 +973,15 @@ impl<'a> Checker<'a> {
             if let Some(body) = &map.body {
                 self.collect_body_ref(&map_at.child("body"), body, &map_ctx, Some(&map.key), owner);
             }
+            if map.value.is_some() == map.body.is_some() {
+                report(
+                    &mut self.diagnostics,
+                    &map_at,
+                    DiagnosticCode::Parse,
+                    Severity::Error,
+                    "a map must declare exactly one of `value` / `body`".to_owned(),
+                );
+            }
         }
         if payload_count > 1 {
             report(&mut self.diagnostics, 
@@ -878,11 +991,11 @@ impl<'a> Checker<'a> {
                 "a field must declare exactly one of `value` / `body` / `list` / `map`".to_owned(),
             );
         }
-        if let Some(card) = &field.card {
-            self.forbid_params(&at.child("card"), card, "a card");
-            if let Err(failure) = parse_card(card) {
-                report_parse(&mut self.diagnostics, &at.child("card"), None, failure);
-            }
+        self.forbid_params(&at.child("card"), &field.card, "a card");
+        if let Err(failure) = parse_card(&field.card) {
+            report_parse(&mut self.diagnostics, &at.child("card"), None, failure);
+        } else {
+            self.lint_card(&at.child("card"), &field.card);
         }
         if let Some(scope) = &field.scope {
             let scope_at = at.child("scope");
@@ -2144,6 +2257,45 @@ fn report_parse(diagnostics: &mut Vec<Diagnostic>, at: &At, column: Option<usize
     });
 }
 
+/// D14 card lint for one field map: shape overloads of one key must agree on
+/// the cardinality upper bound, or one of them is almost certainly wrong.
+///
+/// Only the upper bound is compared: the legacy corpus has 576 overload pairs
+/// that differ solely in the leaf-versus-node default (`0..1` versus `1`),
+/// which is a migration artefact rather than a finding.
+fn lint_field_cards(
+    diagnostics: &mut Vec<Diagnostic>,
+    at: &At,
+    fields: &BTreeMap<String, FieldOverloads>,
+) {
+    for (key, overloads) in fields {
+        let FieldOverloads::Many(specs) = overloads else {
+            continue;
+        };
+        let maxima: BTreeSet<Option<u32>> = specs
+            .iter()
+            .filter_map(|spec| parse_card(&spec.card).ok().map(|(_, max)| max))
+            .collect();
+        if maxima.len() > 1 {
+            report(
+                diagnostics,
+                &at.child(key),
+                DiagnosticCode::CardLint,
+                Severity::Info,
+                format!(
+                    "overloads of `{key}` disagree on the `card` upper bound ({}); \
+                     check the arity",
+                    specs
+                        .iter()
+                        .map(|spec| spec.card.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            );
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -2169,46 +2321,46 @@ mod tests {
           "include": ["gated"],
           "fields": {
             "id":                 { "value": "scalar", "card": "1" },
-            "title":              { "value": "loc" },
-            "is_triggered_only":  { "value": "bool" },
-            "mean_time_to_happen": { "body": "mtth", "unless": "triggered" },
+            "title":              { "value": "loc", "card": "0..1" },
+            "is_triggered_only":  { "value": "bool", "card": "0..1" },
+            "mean_time_to_happen": { "body": "mtth", "card": "0..1", "unless": "triggered" },
             "option":             { "body": "event_option", "card": "0..*" },
             "picture":            { "value": "ref<sprite> | enum<pictures>", "card": "0..*" }
           }
         },
         "event_option": { "fields": {
-          "name":     { "value": "loc" },
-          "ai_chance": { "body": "mtth" }
+          "name":     { "value": "loc", "card": "0..1" },
+          "ai_chance": { "body": "mtth", "card": "0..1" }
         }},
         "mtth": { "fields": {
-          "days":   { "value": "int[0..]" },
-          "factor": { "value": "float" }
+          "days":   { "value": "int[0..]", "card": "0..1" },
+          "factor": { "value": "float", "card": "0..1" }
         }},
         "scripted_effects_file": { "map": { "key": "def<scripted_effect>", "body": "effect" } },
         "effect": {
           "fields": {
-            "add_prestige":  { "value": "int" },
+            "add_prestige":  { "value": "int", "card": "0..*" },
             "if":            { "body": "self", "card": "0..*", "control": { "kind": "branch", "guard": "limit", "chain": ["else"] } },
             "else":          { "body": "self", "card": "0..*", "control": { "kind": "branch_continue" } },
-            "limit":         { "body": "trigger", "control": { "kind": "guard" } },
-            "hidden_effect": { "body": "self", "control": { "kind": "transparent" } }
+            "limit":         { "body": "trigger", "card": "0..1", "control": { "kind": "guard" } },
+            "hidden_effect": { "body": "self", "card": "0..*", "control": { "kind": "transparent" } }
           },
-          "patterns": [ { "key": "link", "body": "self" } ]
+          "patterns": [ { "key": "link", "body": "self", "card": "0..*" } ]
         },
         "trigger": {
           "fields": {
-            "always":              { "value": "bool" },
-            "has_country_modifier": { "value": "ref<event_modifier>" }
+            "always":              { "value": "bool", "card": "0..1" },
+            "has_country_modifier": { "value": "ref<event_modifier>", "card": "0..1" }
           },
-          "patterns": [ { "key": "link", "body": "self" } ]
+          "patterns": [ { "key": "link", "body": "self", "card": "0..*" } ]
         },
         "on_actions_file": { "map": { "key": "enum<on_actions>", "body": "on_action_body<$key.scope>" } },
         "on_action_body<S>": { "fields": {
-          "events": { "list": "ref<event.$S>" }
+          "events": { "list": "ref<event.$S>", "card": "0..*" }
         }}
       },
       "mixins": {
-        "gated": { "fields": { "potential": { "body": "trigger" } } }
+        "gated": { "fields": { "potential": { "body": "trigger", "card": "0..1" } } }
       },
       "types": {
         "event": {
@@ -2255,11 +2407,106 @@ mod tests {
             .map(|(name, json)| {
                 (
                     (*name).to_owned(),
-                    serde_json::from_str(json).expect("source parses"),
+                    serde_json::from_str(&fill_cards(json)).expect("source parses"),
                 )
             })
             .collect::<Vec<_>>();
         check(&parsed)
+    }
+
+    /// Fixtures predate the D14 mandatory `card`, so the corpus-neutral
+    /// `0..1` is filled in mechanically and each fixture only spells what it
+    /// is about. `missing_card_is_a_parse_error` covers the requirement.
+    fn fill_cards(json: &str) -> String {
+        let mut value: serde_json::Value = serde_json::from_str(json).expect("fixture is JSON");
+        fill_cards_in(&mut value);
+        serde_json::to_string(&value).expect("fixture serializes")
+    }
+
+    fn fill_cards_in(value: &mut serde_json::Value) {
+        let serde_json::Value::Object(document) = value else {
+            return;
+        };
+        for (key, entry) in document.iter_mut() {
+            match key.as_str() {
+                "schemas" => {
+                    if let serde_json::Value::Object(schemas) = entry {
+                        for schema in schemas.values_mut() {
+                            fill_block_cards(schema);
+                        }
+                    }
+                }
+                "mixins" => {
+                    if let serde_json::Value::Object(mixins) = entry {
+                        for mixin in mixins.values_mut() {
+                            if let Some(fields) = mixin.get_mut("fields") {
+                                fill_field_cards(fields);
+                            }
+                        }
+                    }
+                }
+                "files" => {
+                    if let serde_json::Value::Object(files) = entry {
+                        for rule in files.values_mut() {
+                            if let Some(root) = rule.get_mut("root") {
+                                fill_spec_cards(root);
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// At schema position `{"map": …}` / `{"list": …}` are the shorthands;
+    /// anything else is a block.
+    fn fill_block_cards(schema: &mut serde_json::Value) {
+        let serde_json::Value::Object(block) = schema else {
+            return;
+        };
+        if block.len() == 1 && (block.contains_key("map") || block.contains_key("list")) {
+            return;
+        }
+        if let Some(fields) = block.get_mut("fields") {
+            fill_field_cards(fields);
+        }
+        if let Some(serde_json::Value::Array(patterns)) = block.get_mut("patterns") {
+            for pattern in patterns {
+                fill_spec_cards(pattern);
+            }
+        }
+    }
+
+    fn fill_field_cards(fields: &mut serde_json::Value) {
+        let serde_json::Value::Object(fields) = fields else {
+            return;
+        };
+        for overloads in fields.values_mut() {
+            match overloads {
+                serde_json::Value::Array(specs) => {
+                    for spec in specs {
+                        fill_spec_cards(spec);
+                    }
+                }
+                spec => fill_spec_cards(spec),
+            }
+        }
+    }
+
+    fn fill_spec_cards(spec: &mut serde_json::Value) {
+        let serde_json::Value::Object(spec) = spec else {
+            return;
+        };
+        let is_field_spec = ["value", "body", "list", "map"]
+            .iter()
+            .any(|key| spec.contains_key(*key));
+        if is_field_spec && !spec.contains_key("card") {
+            spec.insert(
+                "card".to_owned(),
+                serde_json::Value::String("0..1".to_owned()),
+            );
+        }
     }
 
     fn errors(diagnostics: &[Diagnostic]) -> Vec<DiagnosticCode> {
@@ -2655,5 +2902,97 @@ mod tests {
         let first = run(&[("core.json", CLEAN)]);
         let second = run(&[("core.json", CLEAN)]);
         assert_eq!(first, second);
+    }
+
+    /// D14: a `script` file entry without `root` validates nothing, so it is
+    /// rejected instead of silently accepted.
+    #[test]
+    fn script_files_must_declare_a_root() {
+        let diagnostics = run(&[(
+            "core.json",
+            r#"{
+              "files": {
+                "rooted":   { "path": "a", "ext": "txt", "root": "s" },
+                "rootless": { "path": "b", "ext": "txt" },
+                "localisation": { "path": "localisation", "ext": "yml", "parser": "localisation" }
+              },
+              "schemas": { "s": { "fields": { "k": { "value": "bool" } } } }
+            }"#,
+        )]);
+        assert_eq!(
+            errors(&diagnostics),
+            vec![DiagnosticCode::Parse],
+            "{diagnostics:?}"
+        );
+        assert!(
+            diagnostics[0].pointer.ends_with("rootless"),
+            "{diagnostics:?}"
+        );
+    }
+
+    /// D14: `map` needs exactly one value shape, and a trait binding is
+    /// either a localisation key or a sprite — never neither, never both.
+    #[test]
+    fn maps_and_bindings_declare_exactly_one_shape() {
+        let diagnostics = run(&[(
+            "core.json",
+            r#"{
+              "files": { "e": { "path": "e", "ext": "txt", "root": "s" } },
+              "schemas": { "s": { "fields": {
+                "both":  { "map": { "key": "scalar", "value": "bool", "body": "s" } },
+                "neither": { "map": { "key": "scalar" } }
+              }}},
+              "traits": {
+                "T": { "bindings": {
+                  "both": { "loc": "{x}", "sprite": "{x}" },
+                  "neither": {}
+                }}
+              }
+            }"#,
+        )]);
+        // Two `map` payloads and two trait bindings are each malformed.
+        assert_eq!(
+            errors(&diagnostics),
+            vec![
+                DiagnosticCode::Parse,
+                DiagnosticCode::Parse,
+                DiagnosticCode::Parse,
+                DiagnosticCode::Parse
+            ],
+            "{diagnostics:?}"
+        );
+    }
+
+    /// D14 card lint: `0..0` disables a field, `N..N` is a tuple, and
+    /// overloads of one key must agree on the cardinality.
+    #[test]
+    fn card_lints_flag_disabling_tuples_and_disagreement() {
+        let diagnostics = run(&[(
+            "core.json",
+            r#"{
+              "files": { "e": { "path": "e", "ext": "txt", "root": "s" } },
+              "schemas": { "s": { "fields": {
+                "disabled": { "value": "bool", "card": "0..0" },
+                "tuple":    { "value": "scalar", "card": "3..3" },
+                "mixed": [
+                  { "value": "scalar", "card": "1" },
+                  { "body": "s", "card": "0..*" }
+                ]
+              }}}
+            }"#,
+        )]);
+        let card_lints: Vec<&Diagnostic> = diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.code == DiagnosticCode::CardLint)
+            .collect();
+        assert_eq!(card_lints.len(), 3, "{diagnostics:?}");
+        assert_eq!(
+            card_lints
+                .iter()
+                .filter(|diagnostic| diagnostic.severity == Severity::Warning)
+                .count(),
+            1,
+            "{diagnostics:?}"
+        );
     }
 }

@@ -36,6 +36,7 @@
         },
         "provinces_to_highlight": {
           "body": "trigger",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",
@@ -46,6 +47,7 @@
         },
         "visible": {
           "body": "trigger",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",

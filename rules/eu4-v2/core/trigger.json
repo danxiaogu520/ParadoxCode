@@ -2000,6 +2000,7 @@
         },
         "has_administration_efficiency_value": {
           "body": "trigger__has_administration_efficiency_value",
+          "card": "0..1",
           "doc": "Returns true if the country has at least as high administrative efficiency as specified.",
           "scope": {
             "in": [
@@ -2173,6 +2174,7 @@
           "when": null
         },
         "has_center_of_trade_of_level": {
+          "card": "0..1",
           "doc": "Returns true if the country has a center of trade of at least the given level.",
           "scope": {
             "in": [
@@ -3037,6 +3039,7 @@
           "when": null
         },
         "has_num_flagships": {
+          "card": "0..1",
           "doc": "Returns true if the country has at least X flagships.",
           "scope": {
             "in": [
@@ -4254,6 +4257,7 @@
           "when": null
         },
         "is_any_heresy_enabled": {
+          "card": "0..1",
           "doc": "Returns true if the religion of the current scope has a heresy enabled.",
           "scope": {
             "in": [
@@ -5051,6 +5055,7 @@
           "when": null
         },
         "is_most_powerful_estate": {
+          "card": "0..1",
           "doc": "Returns true if the most powerful estate in the country is the given one.",
           "scope": {
             "in": [
@@ -5119,6 +5124,7 @@
         },
         "is_or_was_tag": {
           "body": "trigger__is_or_was_tag",
+          "card": "0..1",
           "doc": "Returns true if the current scope is or has been the specified tag.",
           "scope": {
             "in": [
@@ -5761,6 +5767,7 @@
           "when": null
         },
         "last_mission": {
+          "card": "0..1",
           "doc": "Returns true if the last mission of the country was the specified one.",
           "scope": {
             "in": [
@@ -6073,6 +6080,7 @@
           "when": null
         },
         "militarised_society": {
+          "card": "0..1",
           "doc": "Returns true if the country has a militarisation of society of at least X.",
           "scope": {
             "in": [
@@ -6237,6 +6245,7 @@
           "when": null
         },
         "nationalism_debug": {
+          "card": "0..1",
           "doc": "DO NOT USE THIS. This key is used by Paradox Internally to test things but it has made into the released files of 1.34, so we are adding it here to avoid confusing errors.",
           "scope": {
             "in": [
@@ -7033,6 +7042,7 @@
           "when": null
         },
         "num_of_marches": {
+          "card": "0..1",
           "doc": "Returns true if the country has at least X marches.",
           "scope": {
             "in": [
@@ -8037,6 +8047,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "doc": "Returns true if the province has a center of trade of at least this level.",
             "scope": {
               "in": [
@@ -8081,6 +8092,7 @@
           "when": null
         },
         "province_size": {
+          "card": "0..1",
           "doc": "Returns true if the province, in provinces.bmp, contains at least X pixels.",
           "scope": {
             "in": [
@@ -8113,6 +8125,7 @@
           "when": null
         },
         "provinces_on_continent": {
+          "card": "0..1",
           "doc": "Returns true if the current scope has provinces on the specified continent.",
           "scope": {
             "in": [
@@ -9563,6 +9576,7 @@
           "when": null
         },
         "will_back_next_reform": {
+          "card": "0..1",
           "doc": "Returns true if the member of the HRE is backing the next imperial reform.",
           "scope": {
             "in": [
@@ -11664,6 +11678,7 @@
         },
         "has_administration_efficiency_value": {
           "body": "trigger__has_administration_efficiency_value",
+          "card": "0..1",
           "doc": "Returns true if the country has at least as high administrative efficiency as specified.",
           "scope": {
             "in": [
@@ -11837,6 +11852,7 @@
           "when": null
         },
         "has_center_of_trade_of_level": {
+          "card": "0..1",
           "doc": "Returns true if the country has a center of trade of at least the given level.",
           "scope": {
             "in": [
@@ -12701,6 +12717,7 @@
           "when": null
         },
         "has_num_flagships": {
+          "card": "0..1",
           "doc": "Returns true if the country has at least X flagships.",
           "scope": {
             "in": [
@@ -13918,6 +13935,7 @@
           "when": null
         },
         "is_any_heresy_enabled": {
+          "card": "0..1",
           "doc": "Returns true if the religion of the current scope has a heresy enabled.",
           "scope": {
             "in": [
@@ -14715,6 +14733,7 @@
           "when": null
         },
         "is_most_powerful_estate": {
+          "card": "0..1",
           "doc": "Returns true if the most powerful estate in the country is the given one.",
           "scope": {
             "in": [
@@ -14783,6 +14802,7 @@
         },
         "is_or_was_tag": {
           "body": "trigger__is_or_was_tag",
+          "card": "0..1",
           "doc": "Returns true if the current scope is or has been the specified tag.",
           "scope": {
             "in": [
@@ -15425,6 +15445,7 @@
           "when": null
         },
         "last_mission": {
+          "card": "0..1",
           "doc": "Returns true if the last mission of the country was the specified one.",
           "scope": {
             "in": [
@@ -15737,6 +15758,7 @@
           "when": null
         },
         "militarised_society": {
+          "card": "0..1",
           "doc": "Returns true if the country has a militarisation of society of at least X.",
           "scope": {
             "in": [
@@ -15901,6 +15923,7 @@
           "when": null
         },
         "nationalism_debug": {
+          "card": "0..1",
           "doc": "DO NOT USE THIS. This key is used by Paradox Internally to test things but it has made into the released files of 1.34, so we are adding it here to avoid confusing errors.",
           "scope": {
             "in": [
@@ -16697,6 +16720,7 @@
           "when": null
         },
         "num_of_marches": {
+          "card": "0..1",
           "doc": "Returns true if the country has at least X marches.",
           "scope": {
             "in": [
@@ -17701,6 +17725,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "doc": "Returns true if the province has a center of trade of at least this level.",
             "scope": {
               "in": [
@@ -17745,6 +17770,7 @@
           "when": null
         },
         "province_size": {
+          "card": "0..1",
           "doc": "Returns true if the province, in provinces.bmp, contains at least X pixels.",
           "scope": {
             "in": [
@@ -17777,6 +17803,7 @@
           "when": null
         },
         "provinces_on_continent": {
+          "card": "0..1",
           "doc": "Returns true if the current scope has provinces on the specified continent.",
           "scope": {
             "in": [
@@ -19227,6 +19254,7 @@
           "when": null
         },
         "will_back_next_reform": {
+          "card": "0..1",
           "doc": "Returns true if the member of the HRE is backing the next imperial reform.",
           "scope": {
             "in": [
@@ -19553,6 +19581,7 @@
     "trigger__area_for_scope_province": {
       "fields": {
         "type": {
+          "card": "0..1",
           "override": true,
           "value": "enum<any_all>",
           "when": null
@@ -19565,6 +19594,7 @@
     "trigger__area_used": {
       "fields": {
         "type": {
+          "card": "0..1",
           "override": true,
           "value": "enum<any_all>",
           "when": null
@@ -19625,6 +19655,7 @@
           "when": null
         },
         "desc": {
+          "card": "0..1",
           "override": true,
           "value": "scalar",
           "when": null
@@ -19682,6 +19713,7 @@
     "trigger__check_variable": {
       "fields": {
         "value": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
@@ -19711,6 +19743,7 @@
     "trigger__colonial_region": {
       "fields": {
         "type": {
+          "card": "0..1",
           "override": true,
           "value": "enum<any_all>",
           "when": null
@@ -19723,6 +19756,7 @@
     "trigger__colonial_region_for_scope_province": {
       "fields": {
         "type": {
+          "card": "0..1",
           "override": true,
           "value": "enum<any_all>",
           "when": null
@@ -19764,6 +19798,7 @@
     "trigger__continent": {
       "fields": {
         "type": {
+          "card": "0..1",
           "override": true,
           "value": "enum<any_all>",
           "when": null
@@ -19776,11 +19811,13 @@
     "trigger__current_war_losses": {
       "fields": {
         "amount": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "cause": [
           {
+            "card": "0..1",
             "value": "'attrition'",
             "when": null
           },
@@ -19791,11 +19828,13 @@
           }
         ],
         "type": {
+          "card": "0..1",
           "doc": "This, as of 1.34.3.0, doesn't work, use 'soldiers' instead\nLand Units",
           "value": "enum<unit_types> | 'men' | 'soldiers' | 'ships' | 'all'",
           "when": null
         },
         "who_with": {
+          "card": "0..1",
           "value": "scope<country> | enum<country_tags>",
           "when": null
         }
@@ -19820,6 +19859,7 @@
     "trigger__development_in_provinces": {
       "fields": {
         "estate": {
+          "card": "0..1",
           "override": true,
           "value": "ref<estate>",
           "when": null
@@ -19855,39 +19895,48 @@
     "trigger__employed_advisor": {
       "fields": {
         "category": {
+          "card": "0..1",
           "value": "enum<power_categories>",
           "when": null
         },
         "culture": {
+          "card": "0..1",
           "value": "ref<culture> | enum<culture_new_variables> | scope<country> | enum<country_tags> | scope<province> | ref<province_id>",
           "when": null
         },
         "is_discounted": {
+          "card": "0..1",
           "doc": "Optional. Whether the advisor must be (or must not be) discounted.",
           "value": "bool",
           "when": null
         },
         "is_female": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "is_male": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "value": "ref<religion> | enum<religion_new_variables> | scope<country> | enum<country_tags> | scope<province> | ref<province_id> | 'heretic' | 'heathen'",
           "when": null
         },
         "skill": {
+          "card": "0..1",
           "value": "int[0..5]",
           "when": null
         },
         "type": {
+          "card": "0..1",
           "value": "ref<advisor_type>",
           "when": null
         }
@@ -19906,6 +19955,7 @@
           "when": null
         },
         "less_than": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }
@@ -20123,6 +20173,7 @@
           "when": null
         },
         "value": {
+          "card": "0..1",
           "doc": "Specify the value of influence the modifier has to contribute.",
           "value": "int",
           "when": null
@@ -20132,6 +20183,7 @@
     "trigger__has_estate_led_regency": {
       "fields": {
         "duration": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
@@ -20155,6 +20207,7 @@
           "when": null
         },
         "value": {
+          "card": "0..1",
           "doc": "Specify the value of loyalty the modifier has to contribute.",
           "value": "int",
           "when": null
@@ -20164,6 +20217,7 @@
     "trigger__has_global_modifier_value": {
       "fields": {
         "extra_shortcut": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
@@ -20201,6 +20255,7 @@
     "trigger__has_great_project": {
       "fields": {
         "tier": {
+          "card": "0..1",
           "doc": "Returns true if this great project is tier X or higher",
           "value": "int[0..100]",
           "when": null
@@ -20215,32 +20270,39 @@
     "trigger__has_leader_with": {
       "fields": {
         "fire": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "is_monarch_leader": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "manuever": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "shock": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "siege": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "total_pips": {
+          "card": "0..1",
           "value": "int",
           "when": null
         }
       },
       "patterns": [
         {
+          "card": "0..1",
           "key": "enum<military_leader_types>",
           "value": "'yes'",
           "when": null
@@ -20250,6 +20312,7 @@
     "trigger__has_leaders": {
       "fields": {
         "has_trait": {
+          "card": "0..1",
           "value": "ref<leader_personality>",
           "when": null
         },
@@ -20311,6 +20374,7 @@
           "when": null
         },
         "value": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
@@ -20416,6 +20480,7 @@
     "trigger__has_won_war_against": {
       "fields": {
         "max_years_since": {
+          "card": "0..1",
           "doc": "Default = infinity",
           "value": "int",
           "when": null
@@ -20485,6 +20550,7 @@
     "trigger__is_in_war": {
       "fields": {
         "attacker_leader": {
+          "card": "0..1",
           "value": "scope<country> | enum<country_tags>",
           "when": null
         },
@@ -20494,10 +20560,12 @@
           "when": null
         },
         "casus_belli": {
+          "card": "0..1",
           "value": "ref<casus_belli>",
           "when": null
         },
         "defender_leader": {
+          "card": "0..1",
           "value": "scope<country> | enum<country_tags>",
           "when": null
         },
@@ -20507,6 +20575,7 @@
           "when": null
         },
         "duration": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
@@ -20516,14 +20585,17 @@
           "when": null
         },
         "start_date": {
+          "card": "0..1",
           "value": "date",
           "when": null
         },
         "war_goal_province": {
+          "card": "0..1",
           "value": "ref<province_id>",
           "when": null
         },
         "war_score": {
+          "card": "0..1",
           "doc": "Using negative war_score is currently bugged, it will always return false",
           "severity": "warning",
           "value": "int[0..100]",
@@ -20729,10 +20801,12 @@
     "trigger__num_of_religion": {
       "fields": {
         "religion": {
+          "card": "0..1",
           "value": "ref<religion>",
           "when": null
         },
         "secondary": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -20783,10 +20857,12 @@
           "when": null
         },
         "type": {
+          "card": "0..1",
           "value": "enum<unit_types>",
           "when": null
         },
         "who": {
+          "card": "0..1",
           "value": "scope<country> | enum<country_tags>",
           "when": null
         }
@@ -20828,6 +20904,7 @@
     "trigger__privateer_power": {
       "fields": {
         "country": {
+          "card": "0..1",
           "value": "scope<country> | enum<country_tags>",
           "when": null
         },
@@ -20846,6 +20923,7 @@
           "when": null
         },
         "value": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         }
@@ -20868,12 +20946,14 @@
     "trigger__province_group_used": {
       "fields": {
         "amount": {
+          "card": "0..1",
           "doc": "How many provinces to apply the effect, implies 'type = random' unless explicitly set",
           "override": true,
           "value": "int",
           "when": null
         },
         "type": {
+          "card": "0..1",
           "doc": "Apply effect to random provinces in the province group, use combined with amount",
           "override": true,
           "value": "enum<any_all> | enum<random_repeating>",
@@ -20911,6 +20991,7 @@
     "trigger__rebel_progress_at_least": {
       "fields": {
         "rebel_type": {
+          "card": "0..1",
           "doc": "The rebel faction to check. Defaults to any faction if unspecified.",
           "value": "ref<rebel_type>",
           "when": null
@@ -20925,6 +21006,7 @@
     "trigger__region": {
       "fields": {
         "type": {
+          "card": "0..1",
           "override": true,
           "value": "enum<any_all>",
           "when": null
@@ -20937,6 +21019,7 @@
     "trigger__region_for_scope_province": {
       "fields": {
         "type": {
+          "card": "0..1",
           "override": true,
           "value": "enum<any_all>",
           "when": null
@@ -20992,6 +21075,7 @@
           "when": null
         },
         "value": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
@@ -21049,6 +21133,7 @@
     "trigger__superregion": {
       "fields": {
         "type": {
+          "card": "0..1",
           "override": true,
           "value": "enum<any_all>",
           "when": null
@@ -21080,6 +21165,7 @@
     "trigger__trade_company": {
       "fields": {
         "type": {
+          "card": "0..1",
           "override": true,
           "value": "enum<any_all>",
           "when": null
@@ -21188,6 +21274,7 @@
           "when": null
         },
         "custom_tooltip": {
+          "card": "0..1",
           "override": true,
           "value": "loc",
           "when": null
@@ -21230,6 +21317,7 @@
     "trigger__variable_arithmetic_trigger__change_variable": {
       "fields": {
         "value": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
@@ -21243,6 +21331,7 @@
     "trigger__variable_arithmetic_trigger__check_variable": {
       "fields": {
         "value": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
@@ -21283,10 +21372,12 @@
           "when": null
         },
         "who": {
+          "card": "0..1",
           "value": "scope<country> | enum<country_tags>",
           "when": null
         },
         "with": {
+          "card": "0..1",
           "value": "scope<country> | enum<country_tags>",
           "when": null
         }
@@ -21312,6 +21403,7 @@
     "trigger__variable_arithmetic_trigger__multiply_variable": {
       "fields": {
         "value": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
@@ -21325,6 +21417,7 @@
     "trigger__variable_arithmetic_trigger__subtract_variable": {
       "fields": {
         "value": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
@@ -21366,6 +21459,7 @@
     "trigger__years_in_vassalage_under": {
       "fields": {
         "all_subject_country": {
+          "card": "0..1",
           "doc": "Do not limit by subject type",
           "value": "'yes'",
           "when": null

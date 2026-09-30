@@ -8,6 +8,7 @@
           "when": null
         },
         "hidden": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -17,18 +18,22 @@
           "when": null
         },
         "may_build_supply_depot": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "may_refill_garrison": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "may_return_manpower_on_disband": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "reserves_organisation": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },

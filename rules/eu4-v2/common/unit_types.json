@@ -14,83 +14,99 @@
     "unit_type_body": {
       "fields": {
         "base_cannons": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "blockade": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "defensive_fire": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "defensive_morale": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "defensive_shock": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "hull_size": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "maneuver": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "manpower": {
+          "card": "0..1",
           "doc": "Changes the manpower cost to recruit, 1 is 1000 manpower",
           "override": true,
           "value": "float",
           "when": null
         },
         "offensive_fire": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "offensive_morale": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "offensive_shock": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "sail_speed": {
+          "card": "0..1",
           "override": true,
           "value": "float",
           "when": null
         },
         "sailors": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "sprite_level": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "trade_power": {
+          "card": "0..1",
           "override": true,
           "value": "float",
           "when": null
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
           "override": true,
           "scope": {
@@ -108,6 +124,7 @@
           "when": null
         },
         "unit_type": {
+          "card": "0..1",
           "override": true,
           "value": "ref<technology_group>",
           "when": null

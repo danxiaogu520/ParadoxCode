@@ -336,6 +336,22 @@
         }
       ]
     },
+    "ExtSpec": {
+      "description": "One file extension, or a list of them. The singular form keeps the\none-extension case readable; the list form replaces the legacy\n`extensions` array without splitting one category into several entries.",
+      "anyOf": [
+        {
+          "description": "One extension.",
+          "type": "string"
+        },
+        {
+          "description": "Several extensions.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
     "FieldOverloads": {
       "description": "One exact key's field spec, or several shape overloads of it.",
       "anyOf": [
@@ -365,12 +381,8 @@
           "default": null
         },
         "card": {
-          "description": "Cardinality, e.g. `\"1\"`, `\"0..1\"`, `\"2..5\"`; defaults to `\"0..1\"`.",
-          "type": [
-            "string",
-            "null"
-          ],
-          "default": null
+          "description": "Cardinality, e.g. `\"1\"`, `\"0..1\"`, `\"2..5\"`. Mandatory: the corpus has\nno majority value, and the field drives missing/repeated-key\ndiagnostics, so it is never defaulted (D14).",
+          "type": "string"
         },
         "control": {
           "description": "Control-flow primitive (field attribute, never a global key name).",
@@ -497,17 +509,31 @@
           "default": null
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "required": [
+        "card"
+      ]
     },
     "FileRule": {
       "description": "One `files` entry: which documents a rule selects and how their root\nstructure is described.",
       "type": "object",
       "properties": {
+        "exclude": {
+          "description": "Path prefixes this entry does not apply to (the legacy\n`path_exclude_prefixes`).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "ext": {
-          "description": "File extension without the dot.",
-          "type": [
-            "string",
-            "null"
+          "description": "File extension without the dot, or a list of extensions (the legacy\n`extensions` list); absent means every extension.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExtSpec"
+            },
+            {
+              "type": "null"
+            }
           ],
           "default": null
         },
@@ -536,16 +562,9 @@
           "type": "string"
         },
         "resolution": {
-          "description": "Definition-priority policy; defaults to `replace-by-path`.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/SourceFileResolution"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
+          "description": "Definition-priority policy; defaults to `merge` (D14: the default must\ncover the corpus majority).",
+          "$ref": "#/$defs/SourceFileResolution",
+          "default": "merge"
         },
         "root": {
           "description": "Root structure: a schema name, or a field spec with `def` describing a\nwhole-file symbol instance. Parsers without script structure\n(`localisation`, `asset`) may omit it.",

@@ -3,6 +3,7 @@
     "keys__type_government": {
       "fields": {
         "basic_reform": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         }
@@ -25,6 +26,7 @@
     "keys__type_government_name": {
       "fields": {
         "government_reform": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         }
@@ -33,10 +35,12 @@
     "keys__type_government_reform": {
       "fields": {
         "basic_reform": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "legacy_government": {
+          "card": "0..1",
           "value": "'yes' | 'no'",
           "when": null
         }
@@ -48,15 +52,18 @@
       "fields": {
         "all_mechanics": {
           "body": "government_body__all_mechanics",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "basic_reform": {
+          "card": "0..1",
           "override": true,
           "value": "ref<government_reform.basic>",
           "when": null
         },
         "color": {
+          "card": "0..1",
           "list": "int[0..]",
           "override": true,
           "when": null
@@ -69,22 +76,26 @@
           "when": null
         },
         "legacy_government": {
+          "card": "0..1",
           "list": "ref<government_reform.legacy> | enum<hardcoded_legacygovernments>",
           "override": true,
           "when": null
         },
         "native_council": {
           "body": "government_body__native_council",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "reform_levels": {
           "body": "government_body__empty",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "tribal_democracy": {
           "body": "government_body__tribal_democracy",
+          "card": "0..1",
           "override": true,
           "when": null
         }
@@ -95,11 +106,13 @@
       "patterns": [
         {
           "body": "government_body__government_reform",
+          "card": "0..1",
           "key": "ref<government_reform>",
           "override": true,
           "when": null
         },
         {
+          "card": "0..1",
           "key": "ref<government_reform>",
           "map": {
             "body": "government_body__government_reform",
@@ -206,17 +219,20 @@
     "government_mechanic_body": {
       "fields": {
         "alert_icon_gfx": {
+          "card": "0..1",
           "doc": "GFX icon strip the alert icon to use for this mechanic is in",
           "value": "ref<sprite>",
           "when": null
         },
         "alert_icon_index": {
+          "card": "0..1",
           "doc": "the index of the icon for this mechanic in the strip of alert_icon_gfx",
           "value": "int[1..]",
           "when": null
         },
         "available": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "criteria for the mechanic to be available, regardless of what is here one must have a government reform with the mechanic in its government_mechanic = { } block.",
           "scope": {
             "set": {
@@ -228,10 +244,12 @@
         },
         "interactions": {
           "body": "government_mechanic_body__interactions",
+          "card": "0..1",
           "when": null
         },
         "powers": {
           "body": "government_mechanic_body__powers",
+          "card": "0..1",
           "when": null
         }
       }
@@ -253,6 +271,7 @@
       "fields": {
         "ai_chance": {
           "body": "government_mechanic_body__interactions__government_mechanic_interaction__ai_chance",
+          "card": "0..1",
           "doc": "AI weighting block for options: factor = base relative weight.",
           "scope": {
             "set": {
@@ -263,28 +282,34 @@
           "when": null
         },
         "center": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "cooldown_desc": {
+          "card": "0..1",
           "doc": "defines the string to use for the name of the cooldown. If not specified, it will use the name of the interaction.",
           "value": "loc",
           "when": null
         },
         "cooldown_token": {
+          "card": "0..1",
           "doc": "Token to use on cooldown, can be re-used across actions to make them all be put on cooldown when any is used",
           "value": "def<cooldown_token> | ref<cooldown_token>",
           "when": null
         },
         "cooldown_years": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "cost": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "cost_type": {
+          "card": "0..1",
           "doc": "Must be one of the costs defined in its powers",
           "value": "ref<government_mechanic_power>",
           "when": null
@@ -302,15 +327,18 @@
           "when": null
         },
         "gui": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "icon": {
+          "card": "0..1",
           "value": "ref<sprite>",
           "when": null
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
           "scope": {
             "set": {
@@ -325,6 +353,7 @@
     "government_mechanic_body__interactions__government_mechanic_interaction__ai_chance": {
       "fields": {
         "factor": {
+          "card": "0..1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
           "value": "float[0.0..10000.0]",
@@ -351,44 +380,52 @@
     "government_mechanic_body__powers__government_mechanic_power": {
       "fields": {
         "base_monthly_growth": {
+          "card": "0..1",
           "doc": "How much it grows by each month",
           "override": true,
           "value": "float",
           "when": null
         },
         "default": {
+          "card": "0..1",
           "doc": "default power when resetting",
           "override": true,
           "value": "int",
           "when": null
         },
         "development_scale_cap": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "development_scaled_capped_monthly_growth": {
+          "card": "0..1",
           "override": true,
           "value": "float",
           "when": null
         },
         "development_scaled_monthly_growth": {
+          "card": "0..1",
           "override": true,
           "value": "float",
           "when": null
         },
         "gui": {
+          "card": "0..1",
           "doc": "link to the gui that will be used to display this power. By default, it will be government_shared_power if it's not a power only associated with one action, or if it is a unique power for one interaction, this will be ignored and the bar from the interaction's gui will be used. New versions of this will need to contain the same elements so they can be filled in.",
           "override": true,
           "value": "scalar",
           "when": null
         },
         "increases_with_global": {
+          "card": "0..1",
           "override": true,
           "value": "bool",
           "when": null
         },
         "is_good": {
+          "card": "0..1",
           "override": true,
           "value": "bool",
           "when": null
@@ -401,12 +438,14 @@
           "when": null
         },
         "min": {
+          "card": "0..1",
           "doc": "Minimum value the bar can go",
           "override": true,
           "value": "int",
           "when": null
         },
         "monarch_power": {
+          "card": "0..1",
           "doc": "Category of monarch power used for this mechanic",
           "override": true,
           "value": "enum<power_categories>",
@@ -414,11 +453,13 @@
         },
         "on_max_reached": {
           "body": "effect",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "on_min_reached": {
           "body": "effect",
+          "card": "0..1",
           "override": true,
           "when": null
         },
@@ -430,6 +471,7 @@
           "when": null
         },
         "reset_on_new_ruler": {
+          "card": "0..1",
           "doc": "Resets back to value defined in default (or 0 if not defined) when your ruler dies",
           "override": true,
           "value": "bool",
@@ -448,6 +490,7 @@
           "when": null
         },
         "show_before_interactions": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
@@ -460,6 +503,7 @@
     "government_mechanic_body__powers__government_mechanic_power__range_modifier": {
       "fields": {
         "end_value": {
+          "card": "0..1",
           "doc": "Default is 100, must be bigger or equal to start_value",
           "value": "int",
           "when": null
@@ -471,12 +515,14 @@
           "when": null
         },
         "start_value": {
+          "card": "0..1",
           "doc": "Default is 0, must be lower or equal to end_value",
           "value": "int",
           "when": null
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
           "when": null
         }
@@ -485,11 +531,13 @@
     "government_mechanic_body__powers__government_mechanic_power__reverse_scaled_modifier": {
       "fields": {
         "end_value": {
+          "card": "0..1",
           "doc": "Default is 100",
           "value": "int",
           "when": null
         },
         "extend_beyond_value": {
+          "card": "0..1",
           "doc": "Default is 'yes'",
           "value": "bool",
           "when": null
@@ -501,12 +549,14 @@
           "when": null
         },
         "start_value": {
+          "card": "0..1",
           "doc": "Default is 0",
           "value": "int",
           "when": null
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
           "when": null
         }
@@ -515,6 +565,7 @@
     "government_mechanic_body__powers__government_mechanic_power__scaled_modifier": {
       "fields": {
         "end_value": {
+          "card": "0..1",
           "doc": "Optional, default is 100. Determines to which value modifier should still be applying/scaling. I.e. if set to 90, it will scale to 100% for anything above 90. If set to a value lower than start_value it will work like a reverse_scaled_modifier",
           "value": "int",
           "when": null
@@ -526,12 +577,14 @@
           "when": null
         },
         "start_value": {
+          "card": "0..1",
           "doc": "Default is 0, Determines from which value modifier should start applying. I.e. if set to 5, it will scale to 0% for anything below 5. If set to a value higher than end_value it will work like a reverse_scaled_modifier",
           "value": "int",
           "when": null
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
           "when": null
         }
@@ -555,26 +608,31 @@
       "fields": {
         "consort_female": {
           "body": "government_name_body__consort_female",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "consort_male": {
           "body": "government_name_body__consort_male",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "government_reform": {
+          "card": "0..1",
           "override": true,
           "value": "ref<government_reform.basic>",
           "when": null
         },
         "heir_female": {
           "body": "government_name_body__heir_female",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "heir_male": {
           "body": "government_name_body__heir_male",
+          "card": "0..1",
           "override": true,
           "when": null
         },
@@ -593,6 +651,7 @@
           },
           {
             "body": "government_name_body__ruler_female",
+            "card": "0..1",
             "override": true,
             "when": null
           }
@@ -606,6 +665,7 @@
           },
           {
             "body": "government_name_body__ruler_male",
+            "card": "0..1",
             "override": true,
             "when": null
           }
@@ -743,6 +803,7 @@
     "government_name_type_body": {
       "fields": {
         "government_reform": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         }
@@ -774,6 +835,7 @@
         },
         "ai": {
           "body": "government_reform_body__ai",
+          "card": "0..1",
           "override": true,
           "scope": {
             "set": {
@@ -803,6 +865,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -816,6 +879,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -829,6 +893,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -842,6 +907,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -855,6 +921,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -868,6 +935,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -881,6 +949,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -894,6 +963,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -908,11 +978,13 @@
           },
           {
             "body": "government_reform_body__assimilation_cultures",
+            "card": "0..1",
             "override": true,
             "when": null
           }
         ],
         "basic_reform": {
+          "card": "0..1",
           "doc": "invisible/does not take up a slot",
           "override": true,
           "value": "'yes'",
@@ -926,6 +998,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -939,6 +1012,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -952,6 +1026,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -965,6 +1040,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -978,6 +1054,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1015,6 +1092,7 @@
         },
         "custom_attributes": {
           "body": "government_reform_body__custom_attributes",
+          "card": "0..1",
           "override": true,
           "when": null
         },
@@ -1026,6 +1104,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1039,6 +1118,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "int",
             "when": null
@@ -1052,6 +1132,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "int",
             "when": null
@@ -1065,6 +1146,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "list": "ref<trade_good>",
             "override": true,
             "when": null
@@ -1078,6 +1160,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "int",
             "when": null
@@ -1085,6 +1168,7 @@
         ],
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "override": true,
           "scope": {
@@ -1103,6 +1187,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1116,6 +1201,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "list": "ref<faction>",
             "override": true,
             "when": null
@@ -1129,6 +1215,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "'2' | '9'",
             "when": null
@@ -1142,6 +1229,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "int",
             "when": null
@@ -1161,6 +1249,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1186,6 +1275,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1199,6 +1289,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1212,12 +1303,14 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
           }
         ],
         "government_abilities": {
+          "card": "0..1",
           "list": "ref<government_mechanic>",
           "override": true,
           "when": null
@@ -1230,6 +1323,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1243,6 +1337,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1286,6 +1381,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1299,6 +1395,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1312,12 +1409,14 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
           }
         ],
         "icon": {
+          "card": "0..1",
           "override": true,
           "severity": "info",
           "value": "scalar",
@@ -1331,6 +1430,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1344,6 +1444,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1357,22 +1458,26 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
           }
         ],
         "legacy_equivalent": {
+          "card": "0..1",
           "override": true,
           "value": "ref<government_reform.legacy> | enum<hardcoded_legacygovernments>",
           "when": null
         },
         "legacy_government": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "lock_level_when_selected": {
+          "card": "0..1",
           "override": true,
           "value": "bool",
           "when": null
@@ -1385,6 +1490,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1404,6 +1510,7 @@
         },
         "modifiers": {
           "body": "modifier",
+          "card": "0..1",
           "override": true,
           "scope": {
             "set": {
@@ -1421,6 +1528,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1434,6 +1542,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1447,6 +1556,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "int",
             "when": null
@@ -1461,6 +1571,7 @@
           },
           {
             "body": "trigger",
+            "card": "0..1",
             "override": true,
             "scope": {
               "set": {
@@ -1479,6 +1590,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1492,6 +1604,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1505,6 +1618,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1512,11 +1626,13 @@
         ],
         "post_removed_effect": {
           "body": "effect",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "override": true,
           "scope": {
@@ -1535,6 +1651,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1548,6 +1665,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1561,6 +1679,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1568,6 +1687,7 @@
         ],
         "removed_effect": {
           "body": "effect",
+          "card": "0..1",
           "override": true,
           "scope": {
             "set": {
@@ -1578,6 +1698,7 @@
           "when": null
         },
         "replacement_on_independence_war": {
+          "card": "0..1",
           "override": true,
           "value": "ref<government_reform.new>",
           "when": null
@@ -1590,6 +1711,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1603,6 +1725,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1616,6 +1739,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1630,6 +1754,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "doc": "Used By Revolutionary Client State",
             "override": true,
             "value": "bool",
@@ -1644,6 +1769,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1657,6 +1783,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1670,6 +1797,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "float",
             "when": null
@@ -1695,6 +1823,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1702,6 +1831,7 @@
         ],
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
           "override": true,
           "scope": {
@@ -1720,6 +1850,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1733,6 +1864,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1746,6 +1878,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "override": true,
             "value": "bool",
             "when": null
@@ -1793,12 +1926,14 @@
       "fields": {
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Run when the culture fully assimilated",
           "override": true,
           "when": null
         },
         "removed_effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Run when the culture is no longer fully assimilated",
           "override": true,
           "when": null
@@ -1817,114 +1952,142 @@
           "when": null
         },
         "allow_banners": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "allow_carolean": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "allow_cawa": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "allow_draft_transport_ships": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "allow_migration": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "can_form_trade_league": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "can_use_trade_post": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "claim_states": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "custom_attributes": {
           "body": "government_reform_body__conditional__custom_attributes",
+          "card": "0..1",
           "when": null
         },
         "duration": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "election_on_death": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "factions": {
+          "card": "0..1",
           "list": "ref<faction>",
           "when": null
         },
         "foreign_slave_rulers": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "government_abilities": {
+          "card": "0..1",
           "list": "ref<government_mechanic>",
           "when": null
         },
         "has_devotion": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "has_harem": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "has_janissaries": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "has_meritocracy": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "has_parliament": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "has_pashas": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "has_term_election": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "heir": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "is_elective": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "is_eligible_for_hre_emperor": {
+          "card": "0..1",
           "value": "'no'",
           "when": null
         },
         "queen": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "raze_province": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "states_general_mechanic": {
           "body": "government_reform_body__conditional__states_general_mechanic",
+          "card": "0..1",
           "when": null
         },
         "trade_city_reform": {
+          "card": "0..1",
           "value": "ref<government_reform>",
           "when": null
         }
@@ -1996,70 +2159,87 @@
     "government_reform_body__conditional__custom_attributes": {
       "fields": {
         "admirals_become_rulers": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "better_purbias_interaction": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "block_cultural_union": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "can_remove_idea_group": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "cannot_become_dictatorship": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "election_on_death": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "enables_aristocratic_idea_group": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "enables_nepotism": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "enables_plutocratic_idea_group": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "force_admiral_leader": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "force_general_leader": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "gives_war_against_the_world_tooltip_dummy": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "is_merchant_republic": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "locked_government_type": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "lottery_election": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "maratha_general_interaction": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "mercs_do_not_cost_army_professionalism": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         }
@@ -2101,70 +2281,87 @@
     "government_reform_body__custom_attributes": {
       "fields": {
         "admirals_become_rulers": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "better_purbias_interaction": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "block_cultural_union": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "can_remove_idea_group": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "cannot_become_dictatorship": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "election_on_death": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "enables_aristocratic_idea_group": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "enables_nepotism": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "enables_plutocratic_idea_group": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "force_admiral_leader": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "force_general_leader": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "gives_war_against_the_world_tooltip_dummy": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "is_merchant_republic": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "locked_government_type": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "lottery_election": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "maratha_general_interaction": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "mercs_do_not_cost_army_professionalism": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         }
@@ -2191,10 +2388,12 @@
     "government_reform_type_body": {
       "fields": {
         "basic_reform": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "legacy_government": {
+          "card": "0..1",
           "value": "'yes' | 'no'",
           "when": null
         }
@@ -2203,6 +2402,7 @@
     "government_type_body": {
       "fields": {
         "basic_reform": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         }

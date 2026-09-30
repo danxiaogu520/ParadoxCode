@@ -29,6 +29,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `rulec schema`), and the compile-time semantic checks (`rules::compile`, run
   over a source directory by `rulec check`). Nothing consumes it yet: the
   legacy model keeps working until the redesign's one-cut switch.
+- The D14 explicit-defaults pass lands ahead of the manual refinement: `card`
+  is a mandatory field-spec key (rejected at parse time, never defaulted),
+  `FileRule.resolution` defaults to `merge`, a `script` file entry must declare
+  `root` (an unmodelled category now says so with an open schema rather than
+  validating nothing), a `map` must declare exactly one of `value`/`body`, a
+  trait binding exactly one of `loc`/`sprite`, `files.ext` accepts an extension
+  list, and the new `files.exclude` carries the legacy `path_exclude_prefixes`.
+  `rulec check` gains the `CardLint` family (`0..0` warning, `N..N` info,
+  overload upper-bound disagreement) and `rules/eu4-v2/` is regenerated from
+  the deterministic converter: 0 errors, 340 warnings, and the manual checklist
+  drops from 119 to 109 items.
 - Hover localisation previews keep up to 1000 characters (was 240), covering
   the longest vanilla event and description texts.
 - New `pdc/transcodeDecode` and `pdc/transcodeEncode` requests expose the transparent-

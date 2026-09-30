@@ -3,38 +3,47 @@
     "technology_group_body": {
       "fields": {
         "adm_tech": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "dip_tech": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "is_primitive": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "mil_tech": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "nation_designer_cost": {
           "body": "technology_group_body__nation_designer_cost",
+          "card": "0..1",
           "when": null
         },
         "nation_designer_trigger": {
           "body": "trigger",
+          "card": "0..1",
           "when": null
         },
         "nation_designer_unit_type": {
+          "card": "0..1",
           "value": "ref<technology_group>",
           "when": null
         },
         "start_cost_modifier": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "start_level": {
+          "card": "0..1",
           "value": "int",
           "when": null
         }
@@ -44,6 +53,7 @@
       "fields": {
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
           "scope": {
             "set": {

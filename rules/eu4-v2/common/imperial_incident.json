@@ -4,6 +4,7 @@
       "fields": {
         "can_stop": {
           "body": "trigger",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",

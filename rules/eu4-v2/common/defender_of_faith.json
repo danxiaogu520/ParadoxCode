@@ -15,19 +15,23 @@
         },
         "modifier": {
           "body": "modifier",
+          "card": "0..1",
           "doc": "Block of modifiers applied while the containing entry is active.",
           "when": null
         },
         "range_from": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "range_to": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "same_faith_modifier": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         }
       }

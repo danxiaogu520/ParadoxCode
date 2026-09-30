@@ -3,6 +3,7 @@
     "bookmark_body": {
       "fields": {
         "center": {
+          "card": "0..1",
           "value": "ref<province_id>",
           "when": null
         },
@@ -17,6 +18,7 @@
           "when": null
         },
         "default": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },

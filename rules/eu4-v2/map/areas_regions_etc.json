@@ -7,6 +7,7 @@
     "area_body": {
       "fields": {
         "color": {
+          "card": "0..1",
           "list": "int[0..]",
           "override": true,
           "when": null
@@ -86,6 +87,7 @@
     "region_body": {
       "fields": {
         "areas": {
+          "card": "0..1",
           "list": "ref<area.used>",
           "when": null
         },

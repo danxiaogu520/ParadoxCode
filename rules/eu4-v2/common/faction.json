@@ -4,6 +4,7 @@
       "fields": {
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "when": null
         },
@@ -25,6 +26,7 @@
         },
         "triggered_faction_name": {
           "body": "faction_body__triggered_faction_name",
+          "card": "0..1",
           "when": null
         }
       }

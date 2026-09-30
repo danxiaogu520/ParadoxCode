@@ -28,6 +28,7 @@
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "when": null
         },
@@ -50,6 +51,7 @@
         },
         "removed_effect": {
           "body": "effect",
+          "card": "0..1",
           "when": null
         }
       }

@@ -3,6 +3,7 @@
     "keys__type_casus_belli": {
       "fields": {
         "is_triggered_only": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }
@@ -11,6 +12,7 @@
     "keys__type_wargoal_type": {
       "fields": {
         "peace_options": {
+          "card": "0..1",
           "list": "'po_demand_provinces'",
           "when": null
         }
@@ -21,12 +23,14 @@
     "casus_belli_body": {
       "fields": {
         "ai_peace_desire": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "allowed_provinces": {
           "body": "trigger",
+          "card": "0..1",
           "override": true,
           "scope": {
             "set": {
@@ -37,53 +41,63 @@
           "when": null
         },
         "attacker_disabled_po": {
+          "card": "0..1",
           "list": "ref<peace_options> | enum<peace_options>",
           "override": true,
           "when": null
         },
         "call_empire_members": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "coalition": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "exclusive": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "holy_war": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "independence": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "is_triggered_only": {
+          "card": "0..1",
           "doc": "Triggered from within the code or by event effects. DO NOT REMOVE THE STOCK ONES.",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "league": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "months": {
+          "card": "0..1",
           "doc": "The number of months this CB will be valid. Only works for triggered CBs.",
           "override": true,
           "value": "int",
           "when": null
         },
         "no_opinion_hit": {
+          "card": "0..1",
           "doc": "If yes you get no negative opinion from this",
           "override": true,
           "value": "'yes'",
@@ -91,6 +105,7 @@
         },
         "prerequisites": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "A condition that automatically activates a CB. Does not work for triggered CBs.",
           "override": true,
           "scope": {
@@ -104,6 +119,7 @@
         },
         "prerequisites_self": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Must be true for prequisites to be checked, used to avoid doing expensive prerequisite checks against every country in the world.",
           "override": true,
           "scope": {
@@ -116,11 +132,13 @@
           "when": null
         },
         "support_rebels": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "valid_for_subject": {
+          "card": "0..1",
           "override": true,
           "value": "bool",
           "when": null
@@ -142,6 +160,7 @@
     "casus_belli_type_body": {
       "fields": {
         "is_triggered_only": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }
@@ -162,6 +181,7 @@
           "when": null
         },
         "elector_relation": {
+          "card": "0..1",
           "override": true,
           "value": "loc",
           "when": null
@@ -173,6 +193,7 @@
           "when": null
         },
         "war_name": {
+          "card": "0..1",
           "override": true,
           "value": "loc",
           "when": null
@@ -185,12 +206,14 @@
     "wargoal_type_body__attacker": {
       "fields": {
         "allow_annex": {
+          "card": "0..1",
           "doc": "Always allow annexation (even if other rules disallow)",
           "value": "'yes'",
           "when": null
         },
         "allowed_countries": {
           "body": "trigger",
+          "card": "0..1",
           "scope": {
             "set": {
               "from": "country",
@@ -202,6 +225,7 @@
         },
         "allowed_provinces": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "If 'po_demand_provinces' is on, badboy_factor applies to these provinces.",
           "scope": {
             "set": {
@@ -213,11 +237,13 @@
           "when": null
         },
         "allowed_provinces_are_eligible": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "allowed_tribal_provinces": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "If 'po_demand_provinces' is on, badboy_factor applies to these provinces.",
           "scope": {
             "set": {
@@ -229,45 +255,55 @@
           "when": null
         },
         "badboy_factor": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "country_desc": {
+          "card": "0..1",
           "value": "loc",
           "when": null
         },
         "deny_annex": {
+          "card": "0..1",
           "doc": "Always deny annexation (even if other rules allows it)",
           "value": "'yes'",
           "when": null
         },
         "peace_cost_factor": {
+          "card": "0..1",
           "doc": "Multiplied with the cost of the peace options in the peace treaty.",
           "value": "float",
           "when": null
         },
         "peace_cost_factor_non_allowed_treaty": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "peace_options": {
+          "card": "0..1",
           "list": "ref<peace_options> | enum<peace_options>",
           "when": null
         },
         "prestige_factor": {
+          "card": "0..1",
           "doc": "Multiplied with any prestige increase normally associated with a peace option.",
           "value": "float",
           "when": null
         },
         "prov_desc": {
+          "card": "0..1",
           "value": "loc",
           "when": null
         },
         "required_treaty_to_take_provinces": {
+          "card": "0..1",
           "list": "ref<peace_options> | enum<peace_options>",
           "when": null
         },
         "transfer_trade_cost_factor": {
+          "card": "0..1",
           "doc": "Multiplied with the cost for transfering trade power.",
           "value": "float",
           "when": null
@@ -283,12 +319,14 @@
     "wargoal_type_body__defender": {
       "fields": {
         "allow_annex": {
+          "card": "0..1",
           "doc": "Always allow annexation (even if other rules disallow)",
           "value": "'yes'",
           "when": null
         },
         "allowed_provinces": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "If 'po_demand_provinces' is on, badboy_factor applies to these provinces.",
           "scope": {
             "set": {
@@ -300,11 +338,13 @@
           "when": null
         },
         "allowed_provinces_are_eligible": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "allowed_tribal_provinces": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "If 'po_demand_provinces' is on, badboy_factor applies to these provinces.",
           "scope": {
             "set": {
@@ -316,46 +356,56 @@
           "when": null
         },
         "badboy_factor": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "country_desc": {
+          "card": "0..1",
           "value": "loc",
           "when": null
         },
         "deny_annex": {
+          "card": "0..1",
           "doc": "Always deny annexation (even if other rules allows it)",
           "value": "'yes'",
           "when": null
         },
         "is_excommunication": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "peace_cost_factor": {
+          "card": "0..1",
           "doc": "Multiplied with the cost of the peace options in the peace treaty.",
           "value": "float",
           "when": null
         },
         "peace_options": {
+          "card": "0..1",
           "doc": "If po_demand_provinces is on for attacker it also needs to be on for defender",
           "list": "ref<peace_options> | enum<peace_options>",
           "when": null
         },
         "prestige_factor": {
+          "card": "0..1",
           "doc": "Multiplied with any prestige increase normally associated with a peace option.",
           "value": "float",
           "when": null
         },
         "prov_desc": {
+          "card": "0..1",
           "value": "loc",
           "when": null
         },
         "required_treaty_to_take_provinces": {
+          "card": "0..1",
           "list": "ref<peace_options> | enum<peace_options>",
           "when": null
         },
         "transfer_trade_cost_factor": {
+          "card": "0..1",
           "doc": "Multiplied with the cost for transfering trade power.",
           "value": "float",
           "when": null
@@ -371,6 +421,7 @@
     "wargoal_type_type_body": {
       "fields": {
         "peace_options": {
+          "card": "0..1",
           "list": "'po_demand_provinces'",
           "when": null
         }

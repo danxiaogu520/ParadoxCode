@@ -28,6 +28,7 @@
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "scope": {
             "set": {
@@ -39,6 +40,7 @@
         },
         "removed_effect": {
           "body": "effect",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",

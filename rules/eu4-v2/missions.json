@@ -3,16 +3,19 @@
     "mission_series_body": {
       "fields": {
         "ai": {
+          "card": "0..1",
           "doc": "Whether the AI will claim missions in this series. Series-level only.",
           "value": "bool",
           "when": null
         },
         "generic": {
+          "card": "0..1",
           "doc": "if a mission without generic = yes wants this slot then it overrides this.",
           "value": "bool",
           "when": null
         },
         "has_country_shield": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
@@ -30,6 +33,7 @@
         },
         "potential_on_load": {
           "body": "trigger",
+          "card": "0..1",
           "when": null
         },
         "slot": {
@@ -55,6 +59,7 @@
       "fields": {
         "ai_weight": {
           "body": "mission_series_body__mission__ai_weight",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",
@@ -64,6 +69,7 @@
           "when": null
         },
         "completed_by": {
+          "card": "0..1",
           "value": "date",
           "when": null
         },
@@ -81,6 +87,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "doc": "Quoted Script form of a mission completion effect.",
             "scope": {
               "set": {
@@ -98,11 +105,13 @@
           "when": null
         },
         "position": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "provinces_to_highlight": {
           "body": "trigger",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",
@@ -112,6 +121,7 @@
           "when": null
         },
         "required_missions": {
+          "card": "0..1",
           "list": "ref<mission>",
           "when": null
         },
@@ -129,6 +139,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "doc": "Quoted Script form of a mission completion trigger.",
             "scope": {
               "set": {
@@ -163,6 +174,7 @@
       "fields": {
         "has_completed_idea_group_of_category": {
           "body": "mission_series_body__mission__trigger__has_completed_idea_group_of_category",
+          "card": "0..1",
           "override": true,
           "when": null
         }

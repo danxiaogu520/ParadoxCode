@@ -3,10 +3,12 @@
     "keys__type_idea_group": {
       "fields": {
         "category": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "free": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }
@@ -18,23 +20,28 @@
       "fields": {
         "ai_will_do": {
           "body": "customideas_body__ai_will_do",
+          "card": "0..1",
           "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
           "when": null
         },
         "auto_explore_adjacent_to_colony": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "category": {
+          "card": "0..1",
           "value": "enum<power_categories>",
           "when": null
         },
         "cb_on_primitives": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "chance": {
           "body": "customideas_body__chance",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",
@@ -44,11 +51,13 @@
           "when": null
         },
         "default": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "enabled": {
           "body": "trigger",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",
@@ -58,82 +67,102 @@
           "when": null
         },
         "extra_manpower_at_religious_war": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "idea_claim_colonies": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "important": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "level_cost_1": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "level_cost_10": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "level_cost_2": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "level_cost_3": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "level_cost_4": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "level_cost_5": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "level_cost_6": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "level_cost_7": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "level_cost_8": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "level_cost_9": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "max_level": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "may_establish_frontier": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "may_explore": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "may_not_reduce_inflation": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "may_perform_slave_raid": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "no_religion_penalty": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "reduced_stab_impacts": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }
@@ -187,6 +216,7 @@
       "fields": {
         "ai_will_do": {
           "body": "idea_group_body__ai_will_do",
+          "card": "0..1",
           "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
           "override": true,
           "when": null
@@ -198,38 +228,45 @@
           "when": null
         },
         "category": {
+          "card": "0..1",
           "override": true,
           "value": "enum<power_categories>",
           "when": null
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "override": true,
           "when": null
         },
         "free": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "important": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "removed_effect": {
           "body": "effect",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "start": {
           "body": "modifier",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
           "override": true,
           "scope": {
@@ -275,12 +312,14 @@
       "fields": {
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "override": true,
           "when": null
         },
         "removed_effect": {
           "body": "effect",
+          "card": "0..1",
           "override": true,
           "when": null
         }
@@ -293,12 +332,14 @@
       "fields": {
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "override": true,
           "when": null
         },
         "removed_effect": {
           "body": "effect",
+          "card": "0..1",
           "override": true,
           "when": null
         }
@@ -310,10 +351,12 @@
     "idea_group_type_body": {
       "fields": {
         "category": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "free": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }

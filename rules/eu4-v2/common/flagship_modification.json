@@ -4,6 +4,7 @@
       "fields": {
         "ai_trade_score": {
           "body": "flagship_modification_body__ai_trade_score",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",
@@ -14,6 +15,7 @@
         },
         "ai_war_score": {
           "body": "flagship_modification_body__ai_war_score",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",
@@ -23,6 +25,7 @@
           "when": null
         },
         "base_modification": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -34,6 +37,7 @@
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
           "scope": {
             "set": {

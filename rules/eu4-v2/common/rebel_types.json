@@ -49,6 +49,7 @@
           "when": null
         },
         "defect_delay": {
+          "card": "0..1",
           "doc": "Held provinces will auto-defect after 18 months, regardless of accept/enforce demands.",
           "value": "int",
           "when": null
@@ -78,10 +79,12 @@
           "when": null
         },
         "disband_on_leader_death": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "dynasty": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
@@ -96,14 +99,17 @@
           "when": null
         },
         "government": {
+          "card": "0..1",
           "value": "enum<rebel_governments>",
           "when": null
         },
         "handle_action_build_core": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "handle_action_change_culture": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
@@ -113,6 +119,7 @@
           "when": null
         },
         "handle_action_send_missionary": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
@@ -122,6 +129,7 @@
           "when": null
         },
         "has_reform": {
+          "card": "0..1",
           "value": "ref<government_reform>",
           "when": null
         },
@@ -159,6 +167,7 @@
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "value": "ref<religion>",
           "when": null
         },
@@ -168,6 +177,7 @@
           "when": null
         },
         "revolutionary": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },

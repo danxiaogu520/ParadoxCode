@@ -53,26 +53,59 @@ pub struct RuleFile {
 pub struct FileRule {
     /// Logical directory prefix (the legacy `game/` prefix is not spelled).
     pub path: String,
-    /// File extension without the dot.
+    /// File extension without the dot, or a list of extensions (the legacy
+    /// `extensions` list); absent means every extension.
     #[serde(default)]
-    pub ext: Option<String>,
+    pub ext: Option<ExtSpec>,
     /// Exact file name within `path`.
     #[serde(default)]
     pub file: Option<String>,
     /// When true, `path` does not recurse into subdirectories.
     #[serde(default)]
     pub strict: Option<bool>,
+    /// Path prefixes this entry does not apply to (the legacy
+    /// `path_exclude_prefixes`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude: Vec<String>,
     /// Document parser; defaults to `script`.
     #[serde(default)]
     pub parser: Option<SourceParser>,
-    /// Definition-priority policy; defaults to `replace-by-path`.
-    #[serde(default)]
-    pub resolution: Option<SourceFileResolution>,
+    /// Definition-priority policy; defaults to `merge` (D14: the default must
+    /// cover the corpus majority).
+    #[serde(default = "default_file_resolution")]
+    pub resolution: SourceFileResolution,
     /// Root structure: a schema name, or a field spec with `def` describing a
     /// whole-file symbol instance. Parsers without script structure
     /// (`localisation`, `asset`) may omit it.
     #[serde(default)]
     pub root: Option<RootSpec>,
+}
+
+/// One file extension, or a list of them. The singular form keeps the
+/// one-extension case readable; the list form replaces the legacy
+/// `extensions` array without splitting one category into several entries.
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ExtSpec {
+    /// One extension.
+    One(String),
+    /// Several extensions.
+    Many(Vec<String>),
+}
+
+impl ExtSpec {
+    /// Every extension this spec selects.
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
+        match self {
+            Self::One(ext) => std::slice::from_ref(ext).iter().map(String::as_str),
+            Self::Many(exts) => exts.iter().map(String::as_str),
+        }
+    }
+}
+
+/// The `files` resolution default: `merge` (D14).
+fn default_file_resolution() -> SourceFileResolution {
+    SourceFileResolution::Merge
 }
 
 /// The document parser selected by a [`FileRule`].
@@ -184,9 +217,10 @@ pub struct FieldSpec {
     /// Homogeneous map block.
     #[serde(default)]
     pub map: Option<MapSpec>,
-    /// Cardinality, e.g. `"1"`, `"0..1"`, `"2..5"`; defaults to `"0..1"`.
-    #[serde(default)]
-    pub card: Option<String>,
+    /// Cardinality, e.g. `"1"`, `"0..1"`, `"2..5"`. Mandatory: the corpus has
+    /// no majority value, and the field drives missing/repeated-key
+    /// diagnostics, so it is never defaulted (D14).
+    pub card: String,
     /// Scope effect: `in` / `push` / `set`.
     #[serde(default)]
     pub scope: Option<ScopeEffect>,
@@ -532,14 +566,14 @@ mod tests {
                               "body": "event_body", "card": "0..*" }
         }},
         "on_action_body<S>": { "fields": {
-          "events":        { "list": "ref<event.$S>" },
-          "random_events": { "map": { "key": "int", "value": "ref<event.$S> | '0'" } }
+          "events":        { "list": "ref<event.$S>", "card": "0..*" },
+          "random_events": { "map": { "key": "int", "value": "ref<event.$S> | '0'" }, "card": "0..*" }
         }},
         "scripted_effects_file": { "map": { "key": "def<scripted_effect>", "body": "effect" } },
         "bare_list": { "list": "scalar" }
       },
       "mixins": {
-        "gated": { "fields": { "potential": { "body": "trigger" } } }
+        "gated": { "fields": { "potential": { "body": "trigger", "card": "0..1" } } }
       },
       "types": {
         "event": {
@@ -583,8 +617,7 @@ mod tests {
     }"#;
 
     #[test]
-    fn design_examples_deserialize() {
-        let file: RuleFile = serde_json::from_str(EVENTS).expect("deserializes");
+    fn design_examples_deserialize() {        let file: RuleFile = serde_json::from_str(EVENTS).expect("deserializes");
         assert_eq!(file.files.len(), 2);
         assert_eq!(
             file.files["events"].parser,
@@ -615,7 +648,7 @@ mod tests {
                 body: None,
                 list: Some("ref<event.$S>".to_owned()),
                 map: None,
-                card: None,
+                card: "0..*".to_owned(),
                 scope: None,
                 def: None,
                 when: None,
@@ -767,5 +800,48 @@ mod tests {
                 "`{section}` is described: {rendered}"
             );
         }
+    }
+
+    /// D14: `card` has no default, so a field spec without one is rejected
+    /// while parsing — not silently widened to `0..1`.
+    ///
+    /// The direct `FieldSpec` parse carries the precise message; inside a
+    /// `RuleFile` the untagged `SchemaSpec` wrapper reports the mismatch
+    /// generically, so that case only asserts rejection.
+    #[test]
+    fn missing_card_is_a_parse_error() {
+        let failure = serde_json::from_str::<FieldSpec>(r#"{ "value": "bool" }"#)
+            .expect_err("a field spec must spell `card`");
+        assert!(failure.to_string().contains("card"), "{failure}");
+        assert!(
+            serde_json::from_str::<RuleFile>(
+                r#"{ "schemas": { "s": { "fields": { "a": { "value": "bool" } } } } }"#
+            )
+            .is_err(),
+            "the document-level parse rejects a card-less field spec"
+        );
+    }
+
+    /// D14: `files` resolution defaults to `merge`, and an extension list is
+    /// spelled as an array.
+    #[test]
+    fn file_defaults_and_extension_lists() {
+        let file: RuleFile = serde_json::from_str(
+            r#"{
+              "files": {
+                "default": { "path": "a", "ext": ["txt", "gui"], "root": "s",
+                             "exclude": ["a/vendor"] }
+              },
+              "schemas": { "s": { "fields": { "k": { "value": "bool", "card": "0..1" } } } }
+            }"#,
+        )
+        .expect("deserializes");
+        let rule = &file.files["default"];
+        assert_eq!(rule.resolution, SourceFileResolution::Merge);
+        assert_eq!(rule.exclude, vec!["a/vendor".to_owned()]);
+        let Some(ExtSpec::Many(exts)) = &rule.ext else {
+            panic!("the extension list survives: {:?}", rule.ext);
+        };
+        assert_eq!(exts, &vec!["txt".to_owned(), "gui".to_owned()]);
     }
 }

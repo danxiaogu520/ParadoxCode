@@ -8,6 +8,7 @@
           "when": null
         },
         "random": {
+          "card": "0..1",
           "control": {
             "kind": "chance"
           },
@@ -31,6 +32,7 @@
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
           "when": null
         }

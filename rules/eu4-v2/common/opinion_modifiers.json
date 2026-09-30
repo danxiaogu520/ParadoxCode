@@ -14,26 +14,31 @@
     "opinion_modifier_body": {
       "fields": {
         "max": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "max_in_other_direction": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "max_vassal": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "min": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "months": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
@@ -45,11 +50,13 @@
           "when": null
         },
         "yearly_decay": {
+          "card": "0..1",
           "override": true,
           "value": "float",
           "when": null
         },
         "years": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null

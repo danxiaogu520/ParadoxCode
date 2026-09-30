@@ -3,10 +3,12 @@
     "sprite_pack_body": {
       "fields": {
         "available_for_custom_nation": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "continents": {
+          "card": "0..1",
           "list": "ref<continent>",
           "when": null
         },
@@ -22,19 +24,23 @@
           "when": null
         },
         "graphical_cultures": {
+          "card": "0..1",
           "list": "enum<graphical_cultures>",
           "when": null
         },
         "sprite_artillery": {
           "body": "sprite_pack_body__sprite_artillery",
+          "card": "0..1",
           "when": null
         },
         "sprite_cavalry": {
           "body": "sprite_pack_body__sprite_cavalry",
+          "card": "0..1",
           "when": null
         },
         "sprite_infantry": {
           "body": "sprite_pack_body__sprite_infantry",
+          "card": "0..1",
           "when": null
         }
       }
@@ -48,18 +54,22 @@
     "sprite_pack_body__sprite_artillery": {
       "fields": {
         "0": {
+          "card": "0..1",
           "value": "scalar | enum<builtin_dlc>",
           "when": null
         },
         "1": {
+          "card": "0..1",
           "value": "scalar | enum<builtin_dlc>",
           "when": null
         },
         "2": {
+          "card": "0..1",
           "value": "scalar | enum<builtin_dlc>",
           "when": null
         },
         "3": {
+          "card": "0..1",
           "value": "scalar | enum<builtin_dlc>",
           "when": null
         }
@@ -68,18 +78,22 @@
     "sprite_pack_body__sprite_cavalry": {
       "fields": {
         "0": {
+          "card": "0..1",
           "value": "scalar | enum<builtin_dlc>",
           "when": null
         },
         "1": {
+          "card": "0..1",
           "value": "scalar | enum<builtin_dlc>",
           "when": null
         },
         "2": {
+          "card": "0..1",
           "value": "scalar | enum<builtin_dlc>",
           "when": null
         },
         "3": {
+          "card": "0..1",
           "value": "scalar | enum<builtin_dlc>",
           "when": null
         }
@@ -88,18 +102,22 @@
     "sprite_pack_body__sprite_infantry": {
       "fields": {
         "0": {
+          "card": "0..1",
           "value": "scalar | enum<builtin_dlc>",
           "when": null
         },
         "1": {
+          "card": "0..1",
           "value": "scalar | enum<builtin_dlc>",
           "when": null
         },
         "2": {
+          "card": "0..1",
           "value": "scalar | enum<builtin_dlc>",
           "when": null
         },
         "3": {
+          "card": "0..1",
           "value": "scalar | enum<builtin_dlc>",
           "when": null
         }

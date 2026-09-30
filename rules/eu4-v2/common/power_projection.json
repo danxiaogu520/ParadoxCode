@@ -3,22 +3,27 @@
     "power_projection_body": {
       "fields": {
         "decay": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "max": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "min": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "power": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "yearly_decay": {
+          "card": "0..1",
           "value": "float",
           "when": null
         }

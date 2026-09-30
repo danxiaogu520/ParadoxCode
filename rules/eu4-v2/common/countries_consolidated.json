@@ -44,19 +44,23 @@
     "country_file_body": {
       "fields": {
         "all_your_core_are_belong_to_us": {
+          "card": "0..1",
           "doc": "Synthetics tag: Excludes them from random countries, makes sure they only can be spawned once",
           "value": "'yes'",
           "when": null
         },
         "army_names": {
+          "card": "0..1",
           "list": "scalar",
           "when": null
         },
         "cannot_form_from_collapse_nation": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "colonial_parent": {
+          "card": "0..1",
           "value": "enum<country_tags>",
           "when": null
         },
@@ -66,6 +70,7 @@
           "when": null
         },
         "fleet_names": {
+          "card": "0..1",
           "list": "scalar",
           "when": null
         },
@@ -75,19 +80,23 @@
           "when": null
         },
         "historical_council": {
+          "card": "0..1",
           "value": "enum<council_positions>",
           "when": null
         },
         "historical_idea_groups": {
+          "card": "0..1",
           "list": "ref<idea_group.selectable>",
           "severity": "warning",
           "when": null
         },
         "historical_score": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "historical_units": {
+          "card": "0..1",
           "list": "ref<unit_type>",
           "severity": "warning",
           "when": null
@@ -103,28 +112,34 @@
           "when": null
         },
         "preferred_religion": {
+          "card": "0..1",
           "value": "ref<religion>",
           "when": null
         },
         "random_nation_chance": {
+          "card": "0..1",
           "value": "int[0..100]",
           "when": null
         },
         "revolutionary_colors": {
+          "card": "0..1",
           "list": "int[0..16]",
           "when": null
         },
         "right_to_bear_arms": {
+          "card": "0..1",
           "doc": "Jan Mayen tag: Excludes them from random countries, makes sure they only can be spawned once",
           "value": "'yes'",
           "when": null
         },
         "ship_names": {
+          "card": "0..1",
           "list": "scalar",
           "severity": "warning",
           "when": null
         },
         "special_unit_culture": {
+          "card": "0..1",
           "value": "'south_east_asian_special'",
           "when": null
         }

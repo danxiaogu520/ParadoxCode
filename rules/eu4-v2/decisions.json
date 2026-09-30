@@ -3,12 +3,14 @@
     "decision_body": {
       "fields": {
         "ai_importance": {
+          "card": "0..1",
           "doc": "How highly the AI prioritises enacting this decision; a factor around 400 appears to be high priority.",
           "value": "int",
           "when": null
         },
         "ai_will_do": {
           "body": "decision_body__ai_will_do",
+          "card": "0..1",
           "doc": "AI instructions for when to use the decision; optional.",
           "scope": {
             "set": {
@@ -31,6 +33,7 @@
           "when": null
         },
         "color": {
+          "card": "0..1",
           "doc": "Changes the color used in the decision tab",
           "list": "int[0..]",
           "when": null
@@ -60,6 +63,7 @@
           "when": null
         },
         "major": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -77,6 +81,7 @@
         },
         "provinces_to_highlight": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Customizes highlighted provinces to supplement the Allow section and fill missing tooltips.",
           "scope": {
             "set": {
@@ -109,6 +114,7 @@
       "fields": {
         "country_decisions": {
           "body": "decision_file__empty",
+          "card": "0..1",
           "doc": "Wrapper block containing all country decision instances.",
           "when": null
         }

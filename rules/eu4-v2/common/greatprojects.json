@@ -91,6 +91,7 @@
           "when": null
         },
         "move_days_per_unit_distance": {
+          "card": "0..1",
           "doc": "time to move the project one unit of distance, in days",
           "override": true,
           "value": "int",
@@ -98,6 +99,7 @@
         },
         "on_built": {
           "body": "great_project_body__on_built",
+          "card": "0..1",
           "doc": "what to do when it's built",
           "override": true,
           "scope": {
@@ -111,6 +113,7 @@
         },
         "on_destroyed": {
           "body": "great_project_body__on_destroyed",
+          "card": "0..1",
           "doc": "what to do when it's destroyed",
           "override": true,
           "scope": {
@@ -186,6 +189,7 @@
     "great_project_body__on_built": {
       "fields": {
         "add_canal": {
+          "card": "0..1",
           "override": true,
           "value": "ref<great_project.canal>",
           "when": null
@@ -210,6 +214,7 @@
           "when": null
         },
         "remove_canal": {
+          "card": "0..1",
           "override": true,
           "value": "ref<great_project.canal>",
           "when": null
@@ -223,6 +228,7 @@
       "fields": {
         "area_modifier": {
           "body": "modifier",
+          "card": "0..1",
           "doc": "what modifiers are added to the provinces in the map area when we have this project here on this tier",
           "scope": {
             "set": {
@@ -246,6 +252,7 @@
         },
         "country_modifiers": {
           "body": "modifier",
+          "card": "0..1",
           "doc": "what modifiers are added to the country when we have this project here on this tier",
           "scope": {
             "set": {
@@ -257,6 +264,7 @@
         },
         "on_upgraded": {
           "body": "great_project_body__tier_0__on_upgraded",
+          "card": "0..1",
           "doc": "Effects to run when the project is upgraded to tier 0",
           "scope": {
             "set": {
@@ -280,6 +288,7 @@
         },
         "region_modifier": {
           "body": "modifier",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "province",
@@ -299,6 +308,7 @@
     "great_project_body__tier_0__conditional_modifier": {
       "fields": {
         "is_bad": {
+          "card": "0..1",
           "doc": "Specifies whether the tooltip should list it as positive or not",
           "value": "bool",
           "when": null
@@ -311,6 +321,7 @@
         },
         "tooltip_potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "If true will show the conditional modifier, will be hidden otherwise",
           "when": null
         },
@@ -335,6 +346,7 @@
     "great_project_body__tier_0__on_upgraded": {
       "fields": {
         "add_canal": {
+          "card": "0..1",
           "override": true,
           "value": "ref<great_project.canal>",
           "when": null
@@ -381,6 +393,7 @@
         },
         "country_modifiers": {
           "body": "modifier",
+          "card": "0..1",
           "doc": "what modifiers are added to the country when we have this project here on this tier",
           "scope": {
             "set": {
@@ -392,6 +405,7 @@
         },
         "on_upgraded": {
           "body": "great_project_body__tier_1__on_upgraded",
+          "card": "0..1",
           "doc": "Effects to run when the project is upgraded to tier 1",
           "scope": {
             "set": {
@@ -415,6 +429,7 @@
         },
         "region_modifier": {
           "body": "modifier",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "province",
@@ -434,6 +449,7 @@
     "great_project_body__tier_1__conditional_modifier": {
       "fields": {
         "is_bad": {
+          "card": "0..1",
           "doc": "Specifies whether the tooltip should list it as positive or not",
           "value": "bool",
           "when": null
@@ -446,6 +462,7 @@
         },
         "tooltip_potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "If true will show the conditional modifier, will be hidden otherwise",
           "when": null
         },
@@ -470,6 +487,7 @@
     "great_project_body__tier_1__on_upgraded": {
       "fields": {
         "add_canal": {
+          "card": "0..1",
           "override": true,
           "value": "ref<great_project.canal>",
           "when": null
@@ -516,6 +534,7 @@
         },
         "country_modifiers": {
           "body": "modifier",
+          "card": "0..1",
           "doc": "what modifiers are added to the country when we have this project here on this tier",
           "scope": {
             "set": {
@@ -527,6 +546,7 @@
         },
         "on_upgraded": {
           "body": "great_project_body__tier_2__on_upgraded",
+          "card": "0..1",
           "doc": "Effects to run when the project is upgraded to tier 2",
           "scope": {
             "set": {
@@ -550,6 +570,7 @@
         },
         "region_modifier": {
           "body": "modifier",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "province",
@@ -569,6 +590,7 @@
     "great_project_body__tier_2__conditional_modifier": {
       "fields": {
         "is_bad": {
+          "card": "0..1",
           "doc": "Specifies whether the tooltip should list it as positive or not",
           "value": "bool",
           "when": null
@@ -581,6 +603,7 @@
         },
         "tooltip_potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "If true will show the conditional modifier, will be hidden otherwise",
           "when": null
         },
@@ -605,6 +628,7 @@
     "great_project_body__tier_2__on_upgraded": {
       "fields": {
         "add_canal": {
+          "card": "0..1",
           "override": true,
           "value": "ref<great_project.canal>",
           "when": null
@@ -651,6 +675,7 @@
         },
         "country_modifiers": {
           "body": "modifier",
+          "card": "0..1",
           "doc": "what modifiers are added to the country when we have this project here on this tier",
           "scope": {
             "set": {
@@ -662,6 +687,7 @@
         },
         "on_upgraded": {
           "body": "great_project_body__tier_3__on_upgraded",
+          "card": "0..1",
           "doc": "Effects to run when the project is upgraded to tier 3",
           "scope": {
             "set": {
@@ -685,6 +711,7 @@
         },
         "region_modifier": {
           "body": "modifier",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "province",
@@ -704,6 +731,7 @@
     "great_project_body__tier_3__conditional_modifier": {
       "fields": {
         "is_bad": {
+          "card": "0..1",
           "doc": "Specifies whether the tooltip should list it as positive or not",
           "value": "bool",
           "when": null
@@ -716,6 +744,7 @@
         },
         "tooltip_potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "If true will show the conditional modifier, will be hidden otherwise",
           "when": null
         },
@@ -740,6 +769,7 @@
     "great_project_body__tier_3__on_upgraded": {
       "fields": {
         "add_canal": {
+          "card": "0..1",
           "override": true,
           "value": "ref<great_project.canal>",
           "when": null

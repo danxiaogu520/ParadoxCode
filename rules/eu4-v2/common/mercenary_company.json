@@ -4,149 +4,184 @@
       "fields": {
         "artillery_fire": {
           "body": "mercenary_company_body__artillery_fire",
+          "card": "0..1",
           "when": null
         },
         "artillery_power": {
           "body": "mercenary_company_body__artillery_power",
+          "card": "0..1",
           "when": null
         },
         "artillery_shock": {
           "body": "mercenary_company_body__artillery_shock",
+          "card": "0..1",
           "when": null
         },
         "artillery_weight": {
+          "card": "0..1",
           "value": "float[0.0..1.0]",
           "when": null
         },
         "cavalry_cap": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "cavalry_fire": {
           "body": "mercenary_company_body__cavalry_fire",
+          "card": "0..1",
           "when": null
         },
         "cavalry_flanking": {
           "body": "mercenary_company_body__cavalry_flanking",
+          "card": "0..1",
           "when": null
         },
         "cavalry_power": {
           "body": "mercenary_company_body__cavalry_power",
+          "card": "0..1",
           "when": null
         },
         "cavalry_shock": {
           "body": "mercenary_company_body__cavalry_shock",
+          "card": "0..1",
           "when": null
         },
         "cavalry_weight": {
+          "card": "0..1",
           "value": "float[0.0..1.0]",
           "when": null
         },
         "cost_modifier": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "counts_towards_force_limit": {
+          "card": "0..1",
           "doc": "If mercenary company counts toward force limit",
           "value": "'no'",
           "when": null
         },
         "discipline": {
           "body": "mercenary_company_body__discipline",
+          "card": "0..1",
           "when": null
         },
         "fire_damage": {
           "body": "mercenary_company_body__fire_damage",
+          "card": "0..1",
           "when": null
         },
         "fire_damage_received": {
           "body": "mercenary_company_body__fire_damage_received",
+          "card": "0..1",
           "when": null
         },
         "home_province": {
+          "card": "0..1",
           "doc": "No home province means local mercenary company",
           "value": "ref<province_id>",
           "when": null
         },
         "infantry_fire": {
           "body": "mercenary_company_body__infantry_fire",
+          "card": "0..1",
           "when": null
         },
         "infantry_power": {
           "body": "mercenary_company_body__infantry_power",
+          "card": "0..1",
           "when": null
         },
         "infantry_shock": {
           "body": "mercenary_company_body__infantry_shock",
+          "card": "0..1",
           "when": null
         },
         "land_attrition": {
           "body": "mercenary_company_body__land_attrition",
+          "card": "0..1",
           "when": null
         },
         "land_morale": {
           "body": "mercenary_company_body__land_morale",
+          "card": "0..1",
           "when": null
         },
         "manpower_pool": {
+          "card": "0..1",
           "doc": "Starting manpower pool",
           "value": "int[1..]",
           "when": null
         },
         "max_size": {
+          "card": "0..1",
           "doc": "Maximum size of the mercenary army",
           "value": "int[1..]",
           "when": null
         },
         "mercenary_desc_key": {
+          "card": "0..1",
           "value": "loc",
           "when": null
         },
         "min_size": {
+          "card": "0..1",
           "doc": "Minimum size of the mercenary army",
           "value": "int[1..]",
           "when": null
         },
         "modifier": {
           "body": "mercenary_company_body__modifier",
+          "card": "0..1",
           "doc": "Block of modifiers applied while the containing entry is active.",
           "when": null
         },
         "movement_speed": {
           "body": "mercenary_company_body__movement_speed",
+          "card": "0..1",
           "when": null
         },
         "no_additional_manpower_from_max_size": {
+          "card": "0..1",
           "doc": "If extra manpower from company being above max_size is trasfered to company's manpower pool",
           "value": "'yes'",
           "when": null
         },
         "prestige_from_land": {
           "body": "mercenary_company_body__prestige_from_land",
+          "card": "0..1",
           "when": null
         },
         "regiments_per_development": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "reinforce_speed": {
           "body": "mercenary_company_body__reinforce_speed",
+          "card": "0..1",
           "when": null
         },
         "shock_damage": {
           "body": "mercenary_company_body__shock_damage",
+          "card": "0..1",
           "when": null
         },
         "shock_damage_received": {
           "body": "mercenary_company_body__shock_damage_received",
+          "card": "0..1",
           "when": null
         },
         "sprites": {
+          "card": "0..1",
           "list": "scalar",
           "when": null
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Default: Always = yes",
           "scope": {
             "set": {
@@ -571,6 +606,7 @@
     "mercenary_company_body__modifier": {
       "fields": {
         "may_recruit_female_generals": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null

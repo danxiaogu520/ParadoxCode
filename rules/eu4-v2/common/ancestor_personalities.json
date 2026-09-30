@@ -4,100 +4,124 @@
       "fields": {
         "ai_pick_ancestor": {
           "body": "ancestor_personalities_body__ai_pick_ancestor",
+          "card": "0..1",
           "doc": "Each level of skill is worth 50.",
           "when": null
         },
         "alliance_acceptance": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "when": null
         },
         "building_budget_multiplier": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "chance": {
           "body": "modifier_rule",
+          "card": "0..1",
           "when": null
         },
         "consort_allow": {
           "body": "ancestor_personalities_body__consort_allow",
+          "card": "0..1",
           "when": null
         },
         "custom_ai_explanation": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "different_religion_war_multiplier": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "easy_war_chance_multiplier": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "enemy_strength_multiplier": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "fair_fights": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "gift_chance": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "heathen_ally_acceptance": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "heir_allow": {
           "body": "ancestor_personalities_body__heir_allow",
+          "card": "0..1",
           "when": null
         },
         "heretic_ally_acceptance": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "knowledge_sharing": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "nation_designer_cost": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "other_ai_help_us_multiplier": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "other_ai_peace_term_bonus": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "other_ai_war_chance_multiplier": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "peace_desire": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "random_insults": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "razing": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "ruler_allow": {
           "body": "ancestor_personalities_body__ruler_allow",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",
@@ -107,55 +131,68 @@
           "when": null
         },
         "wants_avoid_debase": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "wants_avoid_loans": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "wants_colonies": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "wants_condottieri": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "wants_ecumenical_council": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "wants_excommunicate": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "wants_explorers": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "wants_gold": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "wants_heathen_land": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "wants_heretic_land": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "wants_land": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "war_chance_multiplier": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "war_priority": {
           "body": "modifier_rule",
+          "card": "0..1",
           "when": null
         }
       }
@@ -178,6 +215,7 @@
       "fields": {
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "when": null
         },
@@ -192,6 +230,7 @@
       "fields": {
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "when": null
         },
@@ -206,6 +245,7 @@
       "fields": {
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "when": null
         },

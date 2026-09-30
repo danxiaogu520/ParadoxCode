@@ -1,6 +1,16 @@
 {
   "files": {
     "asset": {
+      "ext": [
+        "png",
+        "dds",
+        "tga",
+        "jpg",
+        "jpeg",
+        "ogg",
+        "wav",
+        "fnt"
+      ],
       "parser": "asset",
       "path": "",
       "resolution": "replace-by-path"
@@ -51,7 +61,8 @@
       "ext": "txt",
       "parser": "script",
       "path": "common/ai_attitudes",
-      "resolution": "merge"
+      "resolution": "merge",
+      "root": "open_script_file"
     },
     "eu4_path_common_ai_personalities": {
       "ext": "txt",
@@ -65,7 +76,8 @@
       "file": "alerts.txt",
       "parser": "script",
       "path": "common",
-      "resolution": "merge"
+      "resolution": "merge",
+      "root": "alerts_body"
     },
     "eu4_path_common_ancestor_personalities": {
       "ext": "txt",
@@ -130,6 +142,7 @@
       "resolution": "merge",
       "root": {
         "body": "country_file_body",
+        "card": "0..1",
         "def": {
           "name": "file",
           "type": "country_file"
@@ -144,6 +157,7 @@
       "resolution": "merge",
       "root": {
         "body": "country_color_file_body",
+        "card": "0..1",
         "def": {
           "name": "file",
           "type": "country_color_file"
@@ -155,19 +169,22 @@
       "ext": "txt",
       "parser": "script",
       "path": "common/country_tags",
-      "resolution": "merge"
+      "resolution": "merge",
+      "root": "open_script_file"
     },
     "eu4_path_common_cultures": {
       "ext": "txt",
       "parser": "script",
       "path": "common/cultures",
-      "resolution": "merge"
+      "resolution": "merge",
+      "root": "open_script_file"
     },
     "eu4_path_common_custom_country_colors": {
       "ext": "txt",
       "parser": "script",
       "path": "common/custom_country_colors",
-      "resolution": "merge"
+      "resolution": "merge",
+      "root": "open_script_file"
     },
     "eu4_path_common_custom_gui": {
       "ext": "txt",
@@ -201,7 +218,8 @@
       "ext": "txt",
       "parser": "script",
       "path": "common/defines",
-      "resolution": "merge"
+      "resolution": "merge",
+      "root": "open_script_file"
     },
     "eu4_path_common_defines_lua": {
       "ext": "lua",
@@ -230,6 +248,7 @@
       "resolution": "merge",
       "root": {
         "body": "dynasty_colors_body",
+        "card": "0..1",
         "def": {
           "name": "file",
           "type": "dynasty_colors"
@@ -339,7 +358,8 @@
       "ext": "txt",
       "parser": "script",
       "path": "common/government_ranks",
-      "resolution": "merge"
+      "resolution": "merge",
+      "root": "open_script_file"
     },
     "eu4_path_common_government_reforms": {
       "ext": "txt",
@@ -360,7 +380,8 @@
       "file": "graphicalculturetype.txt",
       "parser": "script",
       "path": "common",
-      "resolution": "merge"
+      "resolution": "merge",
+      "root": "open_script_file"
     },
     "eu4_path_common_great_projects": {
       "ext": "txt",
@@ -475,12 +496,6 @@
       "resolution": "merge",
       "root": "common_new_diplomatic_actions_file"
     },
-    "eu4_path_common_on_actions": {
-      "ext": "txt",
-      "parser": "script",
-      "path": "common/on_actions",
-      "resolution": "merge"
-    },
     "eu4_path_common_opinion_modifiers": {
       "ext": "txt",
       "parser": "script",
@@ -537,6 +552,7 @@
       "resolution": "merge",
       "root": {
         "body": "prices_body",
+        "card": "0..1",
         "def": {
           "name": "file",
           "type": "prices"
@@ -558,6 +574,7 @@
       "resolution": "merge",
       "root": {
         "body": "province_names_body",
+        "card": "0..1",
         "def": {
           "name": "file",
           "type": "province_names"
@@ -586,6 +603,7 @@
       "resolution": "merge",
       "root": {
         "body": "region_colors_body",
+        "card": "0..1",
         "def": {
           "name": "file",
           "type": "region_colors"
@@ -653,19 +671,22 @@
       "ext": "txt",
       "parser": "script",
       "path": "common/scripted_loc",
-      "resolution": "merge"
+      "resolution": "merge",
+      "root": "open_script_file"
     },
     "eu4_path_common_scripted_localisation": {
       "ext": "txt",
       "parser": "script",
       "path": "common/scripted_localisation",
-      "resolution": "merge"
+      "resolution": "merge",
+      "root": "open_script_file"
     },
     "eu4_path_common_scripted_localization": {
       "ext": "txt",
       "parser": "script",
       "path": "common/scripted_localization",
-      "resolution": "merge"
+      "resolution": "merge",
+      "root": "open_script_file"
     },
     "eu4_path_common_scripted_triggers": {
       "ext": "txt",
@@ -699,7 +720,8 @@
       "ext": "txt",
       "parser": "script",
       "path": "common/subject_types",
-      "resolution": "merge"
+      "resolution": "merge",
+      "root": "open_script_file"
     },
     "eu4_path_common_technologies": {
       "ext": "txt",
@@ -741,7 +763,8 @@
       "ext": "txt",
       "parser": "script",
       "path": "common/tradegoods",
-      "resolution": "merge"
+      "resolution": "merge",
+      "root": "open_script_file"
     },
     "eu4_path_common_tradenodes": {
       "ext": "txt",
@@ -771,6 +794,7 @@
       "resolution": "merge",
       "root": {
         "body": "unit_type_body",
+        "card": "0..1",
         "def": {
           "name": "file",
           "type": "unit_type"
@@ -785,6 +809,7 @@
       "resolution": "merge",
       "root": {
         "body": "units_display_body",
+        "card": "0..1",
         "def": {
           "type": "units_display"
         },
@@ -809,13 +834,15 @@
       "ext": "txt",
       "parser": "script",
       "path": "decisions",
-      "resolution": "merge"
+      "resolution": "merge",
+      "root": "decision_file"
     },
     "eu4_path_events": {
       "ext": "txt",
       "parser": "script",
       "path": "events",
-      "resolution": "merge"
+      "resolution": "merge",
+      "root": "event_file"
     },
     "eu4_path_gfx_sprite_packs": {
       "ext": "txt",
@@ -831,6 +858,7 @@
       "resolution": "merge",
       "root": {
         "body": "packorder_body",
+        "card": "0..1",
         "def": {
           "name": "file",
           "type": "packorder"
@@ -852,6 +880,7 @@
       "resolution": "merge",
       "root": {
         "body": "country_history_body",
+        "card": "0..1",
         "def": {
           "name": "file",
           "type": "country_history"
@@ -872,6 +901,7 @@
       "resolution": "merge",
       "root": {
         "body": "diplomacy_history_body",
+        "card": "0..1",
         "def": {
           "name": "file",
           "type": "diplomacy_history"
@@ -886,6 +916,7 @@
       "resolution": "merge",
       "root": {
         "body": "province_history_body",
+        "card": "0..1",
         "def": {
           "name": "file",
           "type": "province_history"
@@ -906,6 +937,7 @@
       "resolution": "merge",
       "root": {
         "body": "war_history_body",
+        "card": "0..1",
         "def": {
           "name": "field:name",
           "type": "war_history"
@@ -921,10 +953,14 @@
       "root": "sprite_file"
     },
     "eu4_path_map": {
+      "exclude": [
+        "map/random/tiles"
+      ],
       "ext": "txt",
       "parser": "script",
       "path": "map",
-      "resolution": "merge"
+      "resolution": "merge",
+      "root": "open_script_file"
     },
     "eu4_path_missions": {
       "ext": "txt",
@@ -937,8 +973,10 @@
       "file": "00_custom_country_colors.txt",
       "parser": "script",
       "path": "common/custom_country_colors",
+      "resolution": "replace-by-path",
       "root": {
         "body": "custom_country_colors_body",
+        "card": "0..1",
         "def": {
           "name": "file",
           "type": "custom_country_colors"
@@ -951,8 +989,10 @@
       "file": "00_government_ranks.txt",
       "parser": "script",
       "path": "common/government_ranks",
+      "resolution": "replace-by-path",
       "root": {
         "body": "government_ranks_body",
+        "card": "0..1",
         "def": {
           "name": "file",
           "type": "government_ranks"
@@ -964,20 +1004,24 @@
       "file": "ambient_object.txt",
       "parser": "script",
       "path": "map",
+      "resolution": "replace-by-path",
       "root": "map_file"
     },
     "files_map_area_txt": {
       "file": "area.txt",
       "parser": "script",
       "path": "map",
+      "resolution": "replace-by-path",
       "root": "map_file"
     },
     "files_map_climate_txt": {
       "file": "climate.txt",
       "parser": "script",
       "path": "map",
+      "resolution": "replace-by-path",
       "root": {
         "body": "mapclimate_body",
+        "card": "0..1",
         "def": {
           "type": "mapclimate"
         },
@@ -988,14 +1032,17 @@
       "file": "continent.txt",
       "parser": "script",
       "path": "map",
+      "resolution": "replace-by-path",
       "root": "map_file"
     },
     "files_map_default_map": {
       "file": "default.map",
       "parser": "script",
       "path": "map",
+      "resolution": "replace-by-path",
       "root": {
         "body": "default_map_body",
+        "card": "0..1",
         "def": {
           "name": "file",
           "type": "default_map"
@@ -1007,38 +1054,45 @@
       "file": "positions.txt",
       "parser": "script",
       "path": "map",
+      "resolution": "replace-by-path",
       "root": "map_file"
     },
     "files_map_provincegroup_txt": {
       "file": "provincegroup.txt",
       "parser": "script",
       "path": "map",
+      "resolution": "replace-by-path",
       "root": "map_file"
     },
     "files_map_region_txt": {
       "file": "region.txt",
       "parser": "script",
       "path": "map",
+      "resolution": "replace-by-path",
       "root": "map_file"
     },
     "files_map_superregion_txt": {
       "file": "superregion.txt",
       "parser": "script",
       "path": "map",
+      "resolution": "replace-by-path",
       "root": "map_file"
     },
     "files_map_terrain_txt": {
       "file": "terrain.txt",
       "parser": "script",
       "path": "map",
+      "resolution": "replace-by-path",
       "root": "map_file"
     },
     "files_map_trade_winds_txt": {
       "file": "trade_winds.txt",
       "parser": "script",
       "path": "map",
+      "resolution": "replace-by-path",
       "root": {
         "body": "trade_winds_body",
+        "card": "0..1",
         "def": {
           "name": "file",
           "type": "trade_winds"
@@ -1047,16 +1101,41 @@
       }
     },
     "localisation": {
+      "ext": [
+        "yml",
+        "yaml"
+      ],
       "parser": "localisation",
       "path": "localisation",
       "resolution": "replace-by-path"
     },
     "script": {
+      "exclude": [
+        "common",
+        "map/random/tiles",
+        "dlc_metadata",
+        "gfx/entities"
+      ],
+      "ext": [
+        "txt",
+        "gui",
+        "gfx",
+        "asset",
+        "sfx"
+      ],
       "parser": "script",
       "path": "",
-      "resolution": "replace-by-path"
+      "resolution": "replace-by-path",
+      "root": "open_script_file"
     },
     "syntax_only": {
+      "exclude": [
+        "common"
+      ],
+      "ext": [
+        "json",
+        "lua"
+      ],
       "parser": "syntax-only",
       "path": "",
       "resolution": "replace-by-path"
@@ -1070,6 +1149,7 @@
       "patterns": [
         {
           "body": "advisor_type_body",
+          "card": "0..1",
           "key": "def<advisor_type>",
           "when": null
         }
@@ -1079,6 +1159,7 @@
       "patterns": [
         {
           "body": "game_age_body",
+          "card": "0..1",
           "key": "def<game_age>",
           "when": null
         }
@@ -1088,6 +1169,7 @@
       "fields": {
         "province": {
           "body": "common_ai_army_file__province",
+          "card": "0..1",
           "when": null
         }
       }
@@ -1096,6 +1178,7 @@
       "patterns": [
         {
           "body": "ai_army_body",
+          "card": "0..1",
           "key": "def<ai_army>",
           "when": null
         }
@@ -1105,6 +1188,7 @@
       "patterns": [
         {
           "body": "ai_personality_body",
+          "card": "0..1",
           "key": "def<ai_personality>",
           "when": null
         }
@@ -1114,11 +1198,13 @@
       "patterns": [
         {
           "body": "ancestor_personalities_body",
+          "card": "0..1",
           "key": "def<ancestor_personalities>",
           "when": null
         },
         {
           "body": "ancestor_personality_body",
+          "card": "0..1",
           "key": "def<ancestor_personality>",
           "when": null
         }
@@ -1128,6 +1214,7 @@
       "fields": {
         "bookmark": {
           "body": "bookmark_body",
+          "card": "0..1",
           "def": {
             "name": "field:name",
             "type": "bookmark"
@@ -1140,6 +1227,7 @@
       "patterns": [
         {
           "body": "building_body",
+          "card": "0..1",
           "key": "def<building>",
           "when": null
         }
@@ -1149,6 +1237,7 @@
       "patterns": [
         {
           "body": "casus_belli_body",
+          "card": "0..1",
           "key": "def<casus_belli>",
           "when": null
         }
@@ -1158,6 +1247,7 @@
       "patterns": [
         {
           "body": "trade_center_body",
+          "card": "0..1",
           "key": "def<trade_center>",
           "when": null
         }
@@ -1167,6 +1257,7 @@
       "patterns": [
         {
           "body": "aspects_and_blessings_body",
+          "card": "0..1",
           "key": "def<aspects_and_blessings>",
           "when": null
         }
@@ -1176,6 +1267,7 @@
       "patterns": [
         {
           "body": "client_state_body",
+          "card": "0..1",
           "key": "def<client_state>",
           "when": null
         }
@@ -1185,6 +1277,7 @@
       "patterns": [
         {
           "body": "colonial_region_body",
+          "card": "0..1",
           "key": "def<colonial_region>",
           "when": null
         }
@@ -1194,6 +1287,7 @@
       "patterns": [
         {
           "body": "customideas_body",
+          "card": "0..1",
           "key": "def<customideas>",
           "when": null
         }
@@ -1203,6 +1297,7 @@
       "patterns": [
         {
           "body": "decree_body",
+          "card": "0..1",
           "key": "def<decree>",
           "when": null
         }
@@ -1212,6 +1307,7 @@
       "patterns": [
         {
           "body": "defender_faith_body",
+          "card": "0..1",
           "key": "def<defender_faith>",
           "when": null
         }
@@ -1221,6 +1317,7 @@
       "patterns": [
         {
           "body": "diplomatic_action_body",
+          "card": "0..1",
           "key": "def<diplomatic_action>",
           "when": null
         }
@@ -1230,6 +1327,7 @@
       "patterns": [
         {
           "body": "disaster_body",
+          "card": "0..1",
           "key": "def<disaster>",
           "when": null
         }
@@ -1239,6 +1337,7 @@
       "patterns": [
         {
           "body": "estate_agenda_body",
+          "card": "0..1",
           "key": "def<estate_agenda>",
           "when": null
         }
@@ -1248,6 +1347,7 @@
       "fields": {
         "bonus": {
           "body": "estate_crown_land_bonus_body",
+          "card": "0..1",
           "def": {
             "name": "field:key",
             "type": "estate_crown_land_bonus"
@@ -1256,6 +1356,7 @@
         },
         "interaction": {
           "body": "estate_interaction_body",
+          "card": "0..1",
           "def": {
             "name": "field:key",
             "type": "estate_interaction"
@@ -1268,6 +1369,7 @@
       "patterns": [
         {
           "body": "estate_privilege_body",
+          "card": "0..1",
           "key": "def<estate_privilege>",
           "when": null
         }
@@ -1277,6 +1379,7 @@
       "patterns": [
         {
           "body": "estate_body",
+          "card": "0..1",
           "key": "def<estate>",
           "when": null
         }
@@ -1286,6 +1389,7 @@
       "patterns": [
         {
           "body": "estate_modifier_body",
+          "card": "0..1",
           "key": "def<estate_modifier>",
           "when": null
         }
@@ -1295,6 +1399,7 @@
       "patterns": [
         {
           "body": "modifier",
+          "card": "0..1",
           "key": "def<event_modifier>",
           "when": null
         }
@@ -1304,6 +1409,7 @@
       "patterns": [
         {
           "body": "faction_body",
+          "card": "0..1",
           "key": "def<faction>",
           "when": null
         }
@@ -1313,6 +1419,7 @@
       "patterns": [
         {
           "body": "federation_advancements_body",
+          "card": "0..1",
           "key": "def<federation_advancements>",
           "when": null
         }
@@ -1322,6 +1429,7 @@
       "patterns": [
         {
           "body": "fervor_body",
+          "card": "0..1",
           "key": "def<fervor>",
           "when": null
         }
@@ -1331,6 +1439,7 @@
       "patterns": [
         {
           "body": "cult_body",
+          "card": "0..1",
           "key": "def<cult>",
           "when": null
         }
@@ -1340,6 +1449,7 @@
       "patterns": [
         {
           "body": "achievement_body",
+          "card": "0..1",
           "key": "def<achievement>",
           "when": null
         }
@@ -1349,6 +1459,7 @@
       "patterns": [
         {
           "body": "flagship_modification_body",
+          "card": "0..1",
           "key": "def<flagship_modification>",
           "when": null
         }
@@ -1358,6 +1469,7 @@
       "patterns": [
         {
           "body": "golden_bull_body",
+          "card": "0..1",
           "key": "def<golden_bull>",
           "when": null
         }
@@ -1367,6 +1479,7 @@
       "patterns": [
         {
           "body": "government_mechanic_body",
+          "card": "0..1",
           "key": "def<government_mechanic>",
           "when": null
         }
@@ -1376,6 +1489,7 @@
       "patterns": [
         {
           "body": "government_name_body",
+          "card": "0..1",
           "key": "def<government_name>",
           "when": null
         }
@@ -1385,6 +1499,7 @@
       "patterns": [
         {
           "body": "government_attributes_body",
+          "card": "0..1",
           "key": "def<government_attributes>",
           "when": null
         }
@@ -1394,6 +1509,7 @@
       "patterns": [
         {
           "body": "government_body",
+          "card": "0..1",
           "key": "def<government>",
           "when": null
         }
@@ -1403,6 +1519,7 @@
       "patterns": [
         {
           "body": "great_project_body",
+          "card": "0..1",
           "key": "def<great_project>",
           "when": null
         }
@@ -1412,6 +1529,7 @@
       "patterns": [
         {
           "body": "hegemon_body",
+          "card": "0..1",
           "key": "def<hegemon>",
           "when": null
         }
@@ -1421,6 +1539,7 @@
       "patterns": [
         {
           "body": "holy_order_body",
+          "card": "0..1",
           "key": "def<holy_order>",
           "when": null
         }
@@ -1430,6 +1549,7 @@
       "patterns": [
         {
           "body": "idea_group_body",
+          "card": "0..1",
           "key": "def<idea_group>",
           "when": null
         }
@@ -1439,6 +1559,7 @@
       "patterns": [
         {
           "body": "imperial_incident_body",
+          "card": "0..1",
           "key": "def<imperial_incident>",
           "when": null
         }
@@ -1448,6 +1569,7 @@
       "patterns": [
         {
           "body": "imperial_reform_body",
+          "card": "0..1",
           "key": "def<imperial_reform>",
           "when": null
         }
@@ -1457,6 +1579,7 @@
       "patterns": [
         {
           "body": "incident_body",
+          "card": "0..1",
           "key": "def<incident>",
           "when": null
         }
@@ -1466,6 +1589,7 @@
       "patterns": [
         {
           "body": "institution_body",
+          "card": "0..1",
           "key": "def<institution>",
           "when": null
         }
@@ -1475,6 +1599,7 @@
       "patterns": [
         {
           "body": "insult_body",
+          "card": "0..1",
           "key": "def<insult>",
           "when": null
         }
@@ -1484,6 +1609,7 @@
       "patterns": [
         {
           "body": "isolationism_body",
+          "card": "0..1",
           "key": "def<isolationism>",
           "when": null
         }
@@ -1493,6 +1619,7 @@
       "patterns": [
         {
           "body": "leader_personality_body",
+          "card": "0..1",
           "key": "def<leader_personality>",
           "when": null
         }
@@ -1502,6 +1629,7 @@
       "patterns": [
         {
           "body": "mercenary_company_body",
+          "card": "0..1",
           "key": "def<mercenary_company>",
           "when": null
         }
@@ -1511,6 +1639,7 @@
       "patterns": [
         {
           "body": "natives_body",
+          "card": "0..1",
           "key": "def<natives>",
           "when": null
         }
@@ -1520,6 +1649,7 @@
       "patterns": [
         {
           "body": "naval_doctrine_body",
+          "card": "0..1",
           "key": "def<naval_doctrine>",
           "when": null
         }
@@ -1529,6 +1659,7 @@
       "patterns": [
         {
           "body": "new_diplomatic_action_body",
+          "card": "0..1",
           "key": "def<new_diplomatic_action>",
           "when": null
         }
@@ -1538,6 +1669,7 @@
       "patterns": [
         {
           "body": "opinion_modifier_body",
+          "card": "0..1",
           "key": "def<opinion_modifier>",
           "when": null
         }
@@ -1547,6 +1679,7 @@
       "patterns": [
         {
           "body": "parliament_bribe_body",
+          "card": "0..1",
           "key": "def<parliament_bribe>",
           "when": null
         }
@@ -1556,6 +1689,7 @@
       "patterns": [
         {
           "body": "parliament_issue_body",
+          "card": "0..1",
           "key": "def<parliament_issue>",
           "when": null
         }
@@ -1565,11 +1699,13 @@
       "patterns": [
         {
           "body": "peace_options_body",
+          "card": "0..1",
           "key": "def<peace_options>",
           "when": null
         },
         {
           "body": "peace_treaty_body",
+          "card": "0..1",
           "key": "def<peace_treaty>",
           "when": null
         }
@@ -1579,6 +1715,7 @@
       "patterns": [
         {
           "body": "personal_deity_body",
+          "card": "0..1",
           "key": "def<personal_deity>",
           "when": null
         }
@@ -1588,6 +1725,7 @@
       "patterns": [
         {
           "body": "policy_body",
+          "card": "0..1",
           "key": "def<policy>",
           "when": null
         }
@@ -1597,6 +1735,7 @@
       "patterns": [
         {
           "body": "power_projection_body",
+          "card": "0..1",
           "key": "def<power_projection>",
           "when": null
         }
@@ -1606,6 +1745,7 @@
       "patterns": [
         {
           "body": "professionalism_modifier_body",
+          "card": "0..1",
           "key": "def<professionalism_modifier>",
           "when": null
         }
@@ -1615,6 +1755,7 @@
       "patterns": [
         {
           "body": "province_triggered_modifier_body",
+          "card": "0..1",
           "key": "def<province_triggered_modifier>",
           "when": null
         }
@@ -1624,11 +1765,13 @@
       "patterns": [
         {
           "body": "rebel_demand_loc_body",
+          "card": "0..1",
           "key": "def<rebel_demand_loc>",
           "when": null
         },
         {
           "body": "rebel_type_body",
+          "card": "0..1",
           "key": "def<rebel_type>",
           "when": null
         }
@@ -1638,11 +1781,13 @@
       "patterns": [
         {
           "body": "papal_policy_body",
+          "card": "0..1",
           "key": "def<papal_policy>",
           "when": null
         },
         {
           "body": "religion_group_body",
+          "card": "0..1",
           "key": "def<religion_group>",
           "when": null
         }
@@ -1652,6 +1797,7 @@
       "patterns": [
         {
           "body": "religion_propagation_body",
+          "card": "0..1",
           "key": "def<religion_propagation>",
           "when": null
         }
@@ -1661,6 +1807,7 @@
       "patterns": [
         {
           "body": "religious_reform_group_body",
+          "card": "0..1",
           "key": "def<religious_reform_group>",
           "when": null
         }
@@ -1670,6 +1817,7 @@
       "patterns": [
         {
           "body": "revolt_trigger_body",
+          "card": "0..1",
           "key": "def<revolt_trigger>",
           "when": null
         }
@@ -1679,6 +1827,7 @@
       "patterns": [
         {
           "body": "center_of_revolution_conversion_body",
+          "card": "0..1",
           "key": "def<center_of_revolution_conversion>",
           "when": null
         }
@@ -1688,6 +1837,7 @@
       "patterns": [
         {
           "body": "ruler_personality_body",
+          "card": "0..1",
           "key": "def<ruler_personality>",
           "when": null
         }
@@ -1697,6 +1847,7 @@
       "patterns": [
         {
           "body": "effect",
+          "card": "0..1",
           "key": "def<scripted_effect>",
           "when": null
         }
@@ -1706,6 +1857,7 @@
       "patterns": [
         {
           "body": "scripted_function_body",
+          "card": "0..1",
           "key": "def<scripted_function>",
           "when": null
         }
@@ -1715,6 +1867,7 @@
       "patterns": [
         {
           "body": "trigger",
+          "card": "0..1",
           "key": "def<scripted_trigger>",
           "when": null
         }
@@ -1724,6 +1877,7 @@
       "patterns": [
         {
           "body": "edict_body",
+          "card": "0..1",
           "key": "def<edict>",
           "when": null
         }
@@ -1733,6 +1887,7 @@
       "patterns": [
         {
           "body": "static_modifier_body",
+          "card": "0..1",
           "key": "def<static_modifier>",
           "when": null
         }
@@ -1742,6 +1897,7 @@
       "patterns": [
         {
           "body": "subject_upgrades_body",
+          "card": "0..1",
           "key": "def<subject_upgrades>",
           "when": null
         }
@@ -1751,6 +1907,7 @@
       "fields": {
         "ahead_of_time": {
           "body": "tech_ahead_of_time_body",
+          "card": "0..1",
           "def": {
             "type": "tech_ahead_of_time"
           },
@@ -1758,6 +1915,7 @@
         },
         "technology": {
           "body": "technology_body",
+          "card": "0..1",
           "def": {
             "type": "technology"
           },
@@ -1769,6 +1927,7 @@
       "patterns": [
         {
           "body": "timed_modifier_body",
+          "card": "0..1",
           "key": "def<timed_modifier>",
           "when": null
         }
@@ -1778,6 +1937,7 @@
       "patterns": [
         {
           "body": "trade_company_body",
+          "card": "0..1",
           "key": "def<trade_company>",
           "when": null
         }
@@ -1787,6 +1947,7 @@
       "patterns": [
         {
           "body": "trade_company_investment_body",
+          "card": "0..1",
           "key": "def<trade_company_investment>",
           "when": null
         }
@@ -1796,11 +1957,13 @@
       "patterns": [
         {
           "body": "trade_node_body",
+          "card": "0..1",
           "key": "def<trade_node>",
           "when": null
         },
         {
           "body": "trade_node_name_body",
+          "card": "0..1",
           "key": "def<trade_node_name>",
           "when": null
         }
@@ -1810,6 +1973,7 @@
       "patterns": [
         {
           "body": "trading_policy_body",
+          "card": "0..1",
           "key": "def<trading_policy>",
           "when": null
         }
@@ -1819,6 +1983,7 @@
       "patterns": [
         {
           "body": "triggered_modifier_body",
+          "card": "0..1",
           "key": "def<triggered_modifier>",
           "when": null
         }
@@ -1828,6 +1993,7 @@
       "patterns": [
         {
           "body": "wargoal_type_body",
+          "card": "0..1",
           "key": "def<wargoal_type>",
           "when": null
         }
@@ -1840,6 +2006,7 @@
       "fields": {
         "custom_button": {
           "body": "custom_gui_body",
+          "card": "0..1",
           "def": {
             "type": "custom_gui"
           },
@@ -1847,6 +2014,7 @@
         },
         "custom_icon": {
           "body": "custom_gui_body",
+          "card": "0..1",
           "def": {
             "type": "custom_gui"
           },
@@ -1854,6 +2022,7 @@
         },
         "custom_shield": {
           "body": "custom_gui_body",
+          "card": "0..1",
           "def": {
             "type": "custom_gui"
           },
@@ -1861,6 +2030,7 @@
         },
         "custom_text_box": {
           "body": "custom_gui_body",
+          "card": "0..1",
           "def": {
             "type": "custom_gui"
           },
@@ -1868,6 +2038,7 @@
         },
         "custom_window": {
           "body": "custom_gui_body",
+          "card": "0..1",
           "def": {
             "type": "custom_gui"
           },
@@ -1879,6 +2050,7 @@
       "patterns": [
         {
           "body": "defined_text_body",
+          "card": "0..1",
           "key": "def<defined_text>",
           "when": null
         }
@@ -1890,11 +2062,13 @@
       "patterns": [
         {
           "body": "packentity_body",
+          "card": "0..1",
           "key": "def<packentity>",
           "when": null
         },
         {
           "body": "sprite_pack_body",
+          "card": "0..1",
           "key": "def<sprite_pack>",
           "when": null
         }
@@ -1914,6 +2088,7 @@
       "patterns": [
         {
           "body": "advisor_id_body",
+          "card": "0..1",
           "key": "def<advisor_id>",
           "when": null
         }
@@ -1924,6 +2099,7 @@
       "fields": {
         "bitmapfont": {
           "body": "bitmap_font_body",
+          "card": "0..1",
           "def": {
             "name": "field:name",
             "type": "bitmap_font"
@@ -1936,6 +2112,7 @@
       "fields": {
         "bitmapfont": {
           "body": "bitmap_font_body",
+          "card": "0..1",
           "def": {
             "name": "field:name",
             "type": "bitmap_font"
@@ -1948,6 +2125,7 @@
       "fields": {
         "LineChartType": {
           "body": "object_body",
+          "card": "0..1",
           "def": {
             "name": "field:name",
             "type": "object"
@@ -1956,6 +2134,7 @@
         },
         "PieChartType": {
           "body": "object_body",
+          "card": "0..1",
           "def": {
             "name": "field:name",
             "type": "object"
@@ -1964,6 +2143,7 @@
         },
         "animatedmaptext": {
           "body": "object_body",
+          "card": "0..1",
           "def": {
             "name": "field:name",
             "type": "object"
@@ -1972,6 +2152,7 @@
         },
         "arrowType": {
           "body": "object_body",
+          "card": "0..1",
           "def": {
             "name": "field:name",
             "type": "object"
@@ -1980,6 +2161,7 @@
         },
         "pdxmesh": {
           "body": "object_body",
+          "card": "0..1",
           "def": {
             "name": "field:name",
             "type": "object"
@@ -1988,6 +2170,7 @@
         },
         "pdxparticle": {
           "body": "object_body",
+          "card": "0..1",
           "def": {
             "name": "field:name",
             "type": "object"
@@ -1996,6 +2179,7 @@
         },
         "tradeRouteType": {
           "body": "object_body",
+          "card": "0..1",
           "def": {
             "name": "field:name",
             "type": "object"
@@ -2008,12 +2192,14 @@
       "fields": {
         "type": {
           "body": "map_file__type",
+          "card": "0..1",
           "when": null
         }
       },
       "patterns": [
         {
           "body": "ambient_object_basis_body",
+          "card": "0..1",
           "key": "def<ambient_object_basis>",
           "when": null
         }
@@ -2023,6 +2209,7 @@
       "patterns": [
         {
           "body": "terrain_body",
+          "card": "0..1",
           "key": "def<terrain>",
           "when": null
         }
@@ -2032,6 +2219,7 @@
       "patterns": [
         {
           "body": "graphical_terrain_body",
+          "card": "0..1",
           "key": "def<graphical_terrain>",
           "when": null
         }
@@ -2041,6 +2229,7 @@
       "patterns": [
         {
           "body": "tree_terrain_body",
+          "card": "0..1",
           "key": "def<tree_terrain>",
           "when": null
         }
@@ -2050,6 +2239,7 @@
       "patterns": [
         {
           "body": "ambient_object_body",
+          "card": "0..1",
           "key": "def<ambient_object>",
           "when": null
         }
@@ -2060,10 +2250,14 @@
       "patterns": [
         {
           "body": "mission_series_body",
+          "card": "0..1",
           "key": "def<mission_series>",
           "when": null
         }
       ]
+    },
+    "open_script_file": {
+      "open": true
     },
     "orthodox_icon_body": {},
     "packentity_body": {},
@@ -2085,6 +2279,7 @@
       "fields": {
         "groups": {
           "body": "technology_file_body",
+          "card": "0..1",
           "def": {
             "type": "technology_file"
           },
@@ -2092,6 +2287,7 @@
         },
         "tables": {
           "body": "technology_file_body",
+          "card": "0..1",
           "def": {
             "type": "technology_file"
           },
@@ -2103,6 +2299,7 @@
       "patterns": [
         {
           "body": "technology_group_body",
+          "card": "0..1",
           "key": "def<technology_group>",
           "when": null
         }

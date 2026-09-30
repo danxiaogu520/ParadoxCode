@@ -15,6 +15,7 @@
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "when": null
         }

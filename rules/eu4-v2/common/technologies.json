@@ -3,38 +3,47 @@
     "technology_body": {
       "fields": {
         "administrative_efficiency": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "allow_client_states": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "allowed_idea_groups": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "artillery_fire": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "artillery_shock": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "cavalry_fire": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "cavalry_shock": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "combat_width": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "development_cost_modifier": {
+          "card": "0..1",
           "doc": "Modifiers base cost of developing by X amount, replaces development_efficiency",
           "value": "float",
           "when": null
@@ -46,33 +55,41 @@
         },
         "expects_institution": {
           "body": "technology_body__expects_institution",
+          "card": "0..1",
           "when": null
         },
         "global_colonial_growth": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "governing_capacity": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "infantry_fire": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "infantry_shock": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "land_morale": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "maneuver_value": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "may_agitate_for_liberty": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -82,6 +99,7 @@
           "when": null
         },
         "may_corrupt_officials": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -91,50 +109,62 @@
           "when": null
         },
         "may_fabricate_claims": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "may_force_march": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "may_infiltrate_administration": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "may_sabotage_recruitment": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "may_sabotage_reputation": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "may_slander_merchants": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "may_sow_discontent": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "may_steal_maps": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "may_study_technology": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "may_support_rebels": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "merchants": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "military_tactics": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
@@ -144,42 +174,52 @@
           "when": null
         },
         "naval_maintenance": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "naval_morale": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "num_accepted_cultures": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "production_efficiency": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "range": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "reduced_naval_attrition": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "sprite_level": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "supply_limit": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "trade_efficiency": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "trade_range": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },

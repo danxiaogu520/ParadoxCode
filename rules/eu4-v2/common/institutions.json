@@ -26,6 +26,7 @@
         },
         "can_start": {
           "body": "trigger",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "province",
@@ -36,6 +37,7 @@
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Effect that runs when the country embraces it",
           "scope": {
             "set": {
@@ -58,10 +60,12 @@
           "when": null
         },
         "historical_start_date": {
+          "card": "0..1",
           "value": "date",
           "when": null
         },
         "historical_start_province": {
+          "card": "0..1",
           "value": "ref<province_id>",
           "when": null
         },
@@ -77,14 +81,17 @@
           "when": null
         },
         "on_start": {
+          "card": "0..1",
           "value": "ref<event.country>",
           "when": null
         },
         "start_chance": {
+          "card": "0..1",
           "value": "int[0..100]",
           "when": null
         },
         "trade_company_efficiency": {
+          "card": "0..1",
           "value": "float",
           "when": null
         }
@@ -118,6 +125,7 @@
       "fields": {
         "custom_trigger_tooltip": {
           "body": "institution_body__embracement_speed__modifier__custom_trigger_tooltip",
+          "card": "0..1",
           "override": true,
           "when": null
         },
@@ -129,6 +137,7 @@
           "when": null
         },
         "force_potential": {
+          "card": "0..1",
           "doc": "Hide the this modifier when potential is false",
           "override": true,
           "value": "'yes'",
@@ -136,11 +145,13 @@
         },
         "potential": {
           "body": "institution_body__embracement_speed__modifier__potential",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "override": true,
           "when": null
         },
         "scale": {
+          "card": "0..1",
           "doc": "if a modifier is scaled, it is multiplied with development in the province.",
           "override": true,
           "value": "bool",
@@ -155,6 +166,7 @@
       "fields": {
         "any_friendly_coast_border_province": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "any_friendly_coast_border_province is a special scope made for institution spread. It checks for adjacent provinces or provinces one seazone away. Friendly is defined as at positive relations or owned by the same country that owns the province.",
           "override": true,
           "scope": {
@@ -180,6 +192,7 @@
       "fields": {
         "any_friendly_coast_border_province": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "any_friendly_coast_border_province is a special scope made for institution spread. It checks for adjacent provinces or provinces one seazone away. Friendly is defined as at positive relations or owned by the same country that owns the province.",
           "override": true,
           "scope": {

@@ -3,18 +3,22 @@
     "keys__type_imperial_reform": {
       "fields": {
         "elector": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "elector_per_prince": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "emperor": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "emperor_per_prince": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
@@ -24,10 +28,12 @@
           "when": null
         },
         "member": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "province": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         }
@@ -38,17 +44,20 @@
     "imperial_reform_body": {
       "fields": {
         "ai_acceptance_centralize": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "ai_acceptance_decentralize": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "all": {
           "body": "modifier",
+          "card": "0..1",
           "override": true,
           "scope": {
             "push": "country"
@@ -56,37 +65,44 @@
           "when": null
         },
         "disabled_by": {
+          "card": "0..1",
           "override": true,
           "value": "ref<imperial_reform.hre> | ref<imperial_reform.china>",
           "when": null
         },
         "disables_hre_badboy_points": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "discounted_from_foreign_overlord_check": {
+          "card": "0..1",
           "override": true,
           "value": "bool",
           "when": null
         },
         "elector": {
           "body": "modifier",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "elector_per_prince": {
           "body": "modifier",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "emperor": {
           "body": "modifier",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "emperor_per_prince": {
           "body": "modifier",
+          "card": "0..1",
           "override": true,
           "when": null
         },
@@ -97,17 +113,20 @@
           "when": null
         },
         "gui_container": {
+          "card": "0..1",
           "override": true,
           "value": "'mainline' | 'left_branch' | 'right_branch' | 'nodlc'",
           "when": null
         },
         "member": {
           "body": "modifier",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "off_effect": {
           "body": "effect",
+          "card": "0..1",
           "override": true,
           "scope": {
             "set": {
@@ -119,6 +138,7 @@
         },
         "on_effect": {
           "body": "effect",
+          "card": "0..1",
           "override": true,
           "scope": {
             "set": {
@@ -130,12 +150,14 @@
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "override": true,
           "when": null
         },
         "province": {
           "body": "modifier",
+          "card": "0..1",
           "override": true,
           "scope": {
             "push": "province"
@@ -143,17 +165,20 @@
           "when": null
         },
         "required_reform": {
+          "card": "0..1",
           "override": true,
           "value": "ref<imperial_reform.hre> | ref<imperial_reform.china>",
           "when": null
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Whether the reform can be enacted",
           "override": true,
           "when": null
         },
         "war": {
+          "card": "0..1",
           "doc": "Special AI check for a reform that may cause a war",
           "override": true,
           "value": "'yes'",
@@ -167,18 +192,22 @@
     "imperial_reform_type_body": {
       "fields": {
         "elector": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "elector_per_prince": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "emperor": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "emperor_per_prince": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
@@ -188,10 +217,12 @@
           "when": null
         },
         "member": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         },
         "province": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         }

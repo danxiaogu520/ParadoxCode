@@ -9,16 +9,19 @@
           "when": null
         },
         "mechanics": {
+          "card": "0..1",
           "list": "enum<golden_bull_mechanics>",
           "when": null
         },
         "modifier": {
           "body": "modifier",
+          "card": "0..1",
           "doc": "Block of modifiers applied while the containing entry is active.",
           "when": null
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "when": null
         },

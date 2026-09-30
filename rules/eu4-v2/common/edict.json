@@ -39,6 +39,7 @@
         },
         "notify_trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "If true an alert will appear, ROOT is the country, FROM are the provinces owned by ROOT in the area",
           "scope": {
             "set": {
@@ -51,6 +52,7 @@
         },
         "on_state_edict_enacted": {
           "body": "effect",
+          "card": "0..1",
           "doc": "triggers an effect when the state edict is added",
           "scope": {
             "set": {
@@ -63,6 +65,7 @@
         },
         "on_state_edict_revoked": {
           "body": "effect",
+          "card": "0..1",
           "doc": "triggers an effect when the state edict is revoked",
           "scope": {
             "set": {
@@ -86,6 +89,7 @@
           "when": null
         },
         "years_to_notify": {
+          "card": "0..1",
           "doc": "How many years the edict needs to be active to show an alert",
           "value": "int",
           "when": null

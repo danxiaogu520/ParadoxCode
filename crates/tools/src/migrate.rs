@@ -20,10 +20,10 @@ use std::path::{Path, PathBuf};
 
 use rules::rulec;
 use rules::source::{
-    BlockSchema, CompatSpec, ControlKind, ControlSpec, DefSpec, EnumSpec, FieldOverloads,
+    BlockSchema, CompatSpec, ControlKind, ControlSpec, DefSpec, EnumSpec, ExtSpec, FieldOverloads,
     FieldSpec, FileRule, ImplSpec, LinkSpec, MapSpec, MixinSpec, RegisterSpec, RootSpec, RuleFile,
-    SchemaSpec, ScopeEffect, ScopesSpec, Severity, SubtypeCond, SubtypeSpec, TraitSpec, TypeSpec,
-    TypeResolution,
+    SchemaSpec, ScopeEffect, ScopesSpec, Severity, SourceFileResolution, SubtypeCond, SubtypeSpec,
+    TraitSpec, TypeSpec, TypeResolution,
 };
 use rules::{KeyMatcher, RuleShape, RulesModel, SemanticRule, ValueMatcher};
 
@@ -86,7 +86,7 @@ enum SpecClass {
 /// Attributes that must match for two rows to merge into one field spec.
 #[derive(Clone, Debug, PartialEq)]
 struct FieldAttrs {
-    card: Option<String>,
+    card: String,
     scope: Option<ScopeEffect>,
     control: Option<ControlSpec>,
     severity: Option<Severity>,
@@ -505,7 +505,7 @@ impl<'model> Cvt<'model> {
                 block.patterns.push(FieldSpec {
                     key: Some("link".to_owned()),
                     body: Some("self".to_owned()),
-                    card: Some("0..*".to_owned()),
+                    card: "0..*".to_owned(),
                     ..empty_spec()
                 });
             }
@@ -1060,7 +1060,7 @@ impl<'model> Cvt<'model> {
             "events".to_owned(),
             FieldOverloads::One(Box::new(FieldSpec {
                 list: Some("ref<event.$S>".to_owned()),
-                card: Some("0..*".to_owned()),
+                card: "0..*".to_owned(),
                 ..empty_spec()
             })),
         );
@@ -1125,11 +1125,12 @@ impl<'model> Cvt<'model> {
             "on_actions".to_owned(),
             FileRule {
                 path: "common/on_actions".to_owned(),
-                ext: Some("txt".to_owned()),
+                ext: Some(ExtSpec::One("txt".to_owned())),
                 file: None,
                 strict: None,
+                exclude: Vec::new(),
                 parser: None,
-                resolution: None,
+                resolution: SourceFileResolution::ReplaceByPath,
                 root: Some(RootSpec::Schema("on_actions_file".to_owned())),
             },
         );
@@ -1592,29 +1593,14 @@ impl<'model> Cvt<'model> {
                 },
                 _ => (String::new(), None),
             };
-            let ext = if matcher.extensions.len() == 1 {
-                matcher.extensions.first().cloned()
-            } else {
-                None
+            let ext = match matcher.extensions.len() {
+                0 => None,
+                1 => Some(ExtSpec::One(matcher.extensions[0].clone())),
+                _ => Some(ExtSpec::Many(matcher.extensions.clone())),
             };
-            if !matcher.path_exclude_prefixes.is_empty() {
-                self.manual(
-                    "files",
-                    format!(
-                        "file category `{}`: path_exclude_prefixes {:?} have no `files` form",
-                        category.id, matcher.path_exclude_prefixes
-                    ),
-                );
-            }
+            let exclude = matcher.path_exclude_prefixes.clone();
             if matcher.extensions.len() > 1 {
-                self.manual(
-                    "files",
-                    format!(
-                        "file category `{}`: extension list {:?} narrowed to \"any extension\" \
-                         (`FileRule.ext` is singular)",
-                        category.id, matcher.extensions
-                    ),
-                );
+                self.count("file categories with extension lists");
             }
             let name = sanitize(&category.id);
             entry_key.insert((path.clone(), file.clone()), name.clone());
@@ -1625,6 +1611,7 @@ impl<'model> Cvt<'model> {
                     ext,
                     file,
                     strict: None,
+                    exclude,
                     parser: Some(match category.parser {
                         rules::ParserKind::Script => rules::source::SourceParser::Script,
                         rules::ParserKind::Localisation => {
@@ -1633,7 +1620,7 @@ impl<'model> Cvt<'model> {
                         rules::ParserKind::Asset => rules::source::SourceParser::Asset,
                         rules::ParserKind::SyntaxOnly => rules::source::SourceParser::SyntaxOnly,
                     }),
-                    resolution: Some(match category.resolution {
+                    resolution: match category.resolution {
                         rules::FileResolutionPolicy::ReplaceByRelativePath => {
                             rules::source::SourceFileResolution::ReplaceByPath
                         }
@@ -1643,7 +1630,7 @@ impl<'model> Cvt<'model> {
                         rules::FileResolutionPolicy::ReplaceDirectory => {
                             rules::source::SourceFileResolution::ReplaceDirectory
                         }
-                    }),
+                    },
                     root: None,
                 },
             );
@@ -1684,11 +1671,15 @@ impl<'model> Cvt<'model> {
                     generated.clone(),
                     FileRule {
                         path,
-                        ext: descriptor.path_extension.clone(),
+                        ext: descriptor
+                            .path_extension
+                            .clone()
+                            .map(ExtSpec::One),
                         file,
                         strict: descriptor.path_strict.then_some(true),
+                        exclude: Vec::new(),
                         parser: Some(rules::source::SourceParser::Script),
-                        resolution: None,
+                        resolution: SourceFileResolution::ReplaceByPath,
                         root: None,
                     },
                 );
@@ -1719,8 +1710,13 @@ impl<'model> Cvt<'model> {
                 }
                 if let Some(entries_context) = &descriptor.root_entries {
                     // The entry context already describes the file root; the
-                    // def fields are patched below.
+                    // def fields are patched below. A context the corpus never
+                    // populated has no schema, so the entry falls through to
+                    // the open root instead of referencing a missing one.
                     root_name = self.root_schema_name(&format!("root:{entries_context}"));
+                    if self.schema_file.contains_key(&root_name) {
+                        roots.insert(entry_name.clone(), root_name.clone());
+                    }
                     continue;
                 }
                 if descriptor.type_per_file {
@@ -1902,14 +1898,56 @@ impl<'model> Cvt<'model> {
         for (name, rule) in entries {
             self.file("core/files.json").files.insert(name, rule);
         }
+        // A catalog entry that duplicates a dedicated entry (same path,
+        // extension, and file name) would fight it for the same documents;
+        // the dedicated entry wins and the redundant catalog entry is dropped.
+        let mut dedicated: BTreeSet<(String, Option<String>, Option<String>)> = BTreeSet::new();
+        for (output, file) in &self.files {
+            if output == "core/files.json" {
+                continue;
+            }
+            for rule in file.files.values() {
+                if rule.root.is_some() {
+                    dedicated.insert(file_entry_key(rule));
+                }
+            }
+        }
         // Attach roots to entries.
         let files_section = &mut self.file("core/files.json").files;
+        let mut needs_open_root = false;
         for (entry_name, root) in roots {
             if let Some(entry) = files_section.get_mut(&entry_name)
                 && entry.root.is_none()
             {
                 entry.root = Some(RootSpec::Schema(root));
             }
+        }
+        // D14: a `script` entry without a root validates nothing silently.
+        // Entries the legacy corpus never described get one explicit open
+        // schema, which says "structure unknown" rather than guessing.
+        let redundant: Vec<String> = files_section
+            .iter()
+            .filter(|(_, rule)| rule.root.is_none() && dedicated.contains(&file_entry_key(rule)))
+            .map(|(name, _)| name.clone())
+            .collect();
+        for name in redundant {
+            files_section.remove(&name);
+        }
+        let parser_of = |entry: &FileRule| {
+            entry
+                .parser
+                .unwrap_or(rules::source::SourceParser::Script)
+        };
+        for entry in files_section.values_mut() {
+            if parser_of(entry) == rules::source::SourceParser::Script && entry.root.is_none() {
+                entry.root = Some(RootSpec::Schema("open_script_file".to_owned()));
+                needs_open_root = true;
+            }
+        }
+        if needs_open_root {
+            let mut block = BlockSchema::default();
+            block.open = true;
+            self.place_schema("open_script_file", "core/files.json", block);
         }
     }
 
@@ -2342,6 +2380,17 @@ fn split_subtype(name: &str) -> (&str, Option<&str>) {
     }
 }
 
+/// Identity of a `files` entry, for redundant-catalog-entry detection.
+fn file_entry_key(rule: &FileRule) -> (String, Option<String>, Option<String>) {
+    (
+        rule.path.clone(),
+        rule.ext
+            .as_ref()
+            .map(|ext| ext.iter().collect::<Vec<_>>().join("|")),
+        rule.file.clone(),
+    )
+}
+
 fn mixin_name(contexts: &[String]) -> String {
     let mut name = String::from("keys__");
     for (index, context) in contexts.iter().enumerate() {
@@ -2360,7 +2409,9 @@ fn empty_spec() -> FieldSpec {
         body: None,
         list: None,
         map: None,
-        card: None,
+        // Overwritten by every construction path that knows the real arity;
+        // the placeholder is the corpus-neutral `0..1`.
+        card: "0..1".to_owned(),
         scope: None,
         def: None,
         when: None,
@@ -2400,15 +2451,17 @@ fn merge_overloads(existing: &mut FieldOverloads, incoming: &FieldOverloads) {
     };
 }
 
-fn card_of(rule: &SemanticRule) -> Option<String> {
+fn card_of(rule: &SemanticRule) -> String {
     let min = rule.min_occurs.unwrap_or(0);
     match (min, rule.max_occurs) {
-        (0, Some(1)) => None,
-        (1, Some(1)) => Some("1".to_owned()),
-        (m, Some(n)) => Some(format!("{m}..{n}")),
-        (0, None) => Some("0..*".to_owned()),
-        (1, None) => Some("1..*".to_owned()),
-        (m, None) => Some(format!("{m}..*")),
+        // D14: `card` is mandatory, so the former implicit `0..1` default is
+        // written out like every other value.
+        (0, Some(1)) => "0..1".to_owned(),
+        (1, Some(1)) => "1".to_owned(),
+        (m, Some(n)) => format!("{m}..{n}"),
+        (0, None) => "0..*".to_owned(),
+        (1, None) => "1..*".to_owned(),
+        (m, None) => format!("{m}..*"),
     }
 }
 

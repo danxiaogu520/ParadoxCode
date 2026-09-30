@@ -15,6 +15,7 @@
       "fields": {
         "ai_acceptance": {
           "body": "new_diplomatic_action_body__ai_acceptance",
+          "card": "0..1",
           "doc": "This works similarly to variable_arithmetic_trigger, but does not support triggers generally. Instead, \"limit\" will be evaluated first and the rest ignored if it isn't passed.",
           "override": true,
           "when": null
@@ -34,11 +35,13 @@
           "when": null
         },
         "alert_index": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "alert_tooltip": {
+          "card": "0..1",
           "override": true,
           "value": "loc",
           "when": null
@@ -91,6 +94,7 @@
           },
           {
             "body": "effect",
+            "card": "0..1",
             "override": true,
             "scope": {
               "set": {
@@ -104,6 +108,7 @@
         ],
         "on_decline": {
           "body": "effect",
+          "card": "0..1",
           "override": true,
           "scope": {
             "set": {
@@ -115,6 +120,7 @@
           "when": null
         },
         "require_acceptance": {
+          "card": "0..1",
           "doc": "Can the other side decline? defaults to no",
           "override": true,
           "value": "bool",
@@ -170,6 +176,7 @@
         },
         "limit": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "guard"
           },
@@ -263,10 +270,12 @@
           "when": null
         },
         "who": {
+          "card": "0..1",
           "value": "scope<country>",
           "when": null
         },
         "with": {
+          "card": "0..1",
           "value": "scope<country>",
           "when": null
         }
@@ -297,6 +306,7 @@
     "new_diplomatic_action_body__ai_acceptance__add_entry__multiply_variable": {
       "fields": {
         "ai_value": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
@@ -334,6 +344,7 @@
     "new_diplomatic_action_body__ai_acceptance__add_entry__subtract_variable": {
       "fields": {
         "ai_value": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },

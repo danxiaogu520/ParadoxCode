@@ -3,6 +3,7 @@
     "keys__type_trade_good": {
       "fields": {
         "is_latent": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }
@@ -33,6 +34,7 @@
           "when": null
         },
         "goldtype": {
+          "card": "0..1",
           "doc": "This resource works like 'gold' if yes, using prices from mine-value in province instead of supply/demand and baseprice. Also creates gold-inflation",
           "override": true,
           "value": "'yes'",
@@ -46,15 +48,18 @@
     "trade_center_body": {
       "fields": {
         "cost": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "development": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "global_modifiers": {
           "body": "modifier",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",
@@ -70,6 +75,7 @@
         },
         "province_modifiers": {
           "body": "modifier",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "province",
@@ -80,6 +86,7 @@
         },
         "state_modifiers": {
           "body": "modifier",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "province",
@@ -126,6 +133,7 @@
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
           "scope": {
             "set": {
@@ -159,6 +167,7 @@
         },
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "scope": {
             "set": {
@@ -170,6 +179,7 @@
         },
         "area_modifier": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         },
         "category": {
@@ -179,10 +189,12 @@
         },
         "company_province_area_modifier": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         },
         "company_region_modifier": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         },
         "cost": {
@@ -192,10 +204,12 @@
         },
         "owner_company_region_modifier": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         },
         "owner_modifier": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         },
         "sprite": {
@@ -204,6 +218,7 @@
           "when": null
         },
         "upgrades_to": {
+          "card": "0..1",
           "value": "ref<trade_company_investment>",
           "when": null
         }
@@ -243,6 +258,7 @@
       "fields": {
         "chance": {
           "body": "trade_good_body__chance",
+          "card": "0..1",
           "override": true,
           "scope": {
             "set": {
@@ -259,17 +275,20 @@
           "when": null
         },
         "is_latent": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "is_valuable": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "modifier": {
           "body": "modifier",
+          "card": "0..1",
           "doc": "Block of modifiers applied while the containing entry is active.",
           "override": true,
           "scope": {
@@ -282,6 +301,7 @@
         },
         "province": {
           "body": "modifier",
+          "card": "0..1",
           "override": true,
           "scope": {
             "set": {
@@ -292,6 +312,7 @@
           "when": null
         },
         "rnw_latent_chance": {
+          "card": "0..1",
           "doc": "\"Kind of on average how many provinces we want to spawn with it.\"",
           "override": true,
           "value": "int",
@@ -299,6 +320,7 @@
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
           "override": true,
           "scope": {
@@ -334,6 +356,7 @@
     "trade_good_type_body": {
       "fields": {
         "is_latent": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }
@@ -342,18 +365,22 @@
     "trade_node_body": {
       "fields": {
         "ai_will_propagate_through_trade": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "color": {
+          "card": "0..1",
           "list": "int[0..]",
           "when": null
         },
         "end": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "inland": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -393,6 +420,7 @@
           "when": null
         },
         "path": {
+          "card": "0..1",
           "doc": "Province path for an outgoing trade-node connection.",
           "list": "ref<province_id>",
           "when": null
@@ -414,6 +442,7 @@
         },
         "can_maintain": {
           "body": "trigger",
+          "card": "0..1",
           "scope": {
             "set": {
               "from": "trade_node",
@@ -436,15 +465,18 @@
           "when": null
         },
         "center_of_reformation": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "cooldown": {
+          "card": "0..1",
           "value": "bool",
           "when": null
         },
         "countries_with_merchant_modifier": {
           "body": "modifier",
+          "card": "0..1",
           "doc": "Also applied versus countries with the node as their home node",
           "scope": {
             "set": {
@@ -456,6 +488,7 @@
         },
         "node_province_modifier": {
           "body": "modifier",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "trade_node",
@@ -466,18 +499,22 @@
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "when": null
         },
         "show_alert": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "trade_power": {
           "body": "trading_policy_body__trade_power",
+          "card": "0..1",
           "when": null
         },
         "unique": {
+          "card": "0..1",
           "doc": "Whether only one country may select the policy in a trade node.",
           "value": "bool",
           "when": null

@@ -15,14 +15,17 @@
           "when": null
         },
         "allow_only_female": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "allow_only_male": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "allow_only_owner_religion": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -88,6 +91,7 @@
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
           "scope": {
             "set": {

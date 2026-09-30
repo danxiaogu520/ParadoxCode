@@ -3,6 +3,7 @@
     "keys__type_aspects_and_blessings": {
       "fields": {
         "is_blessing": {
+          "card": "0..1",
           "value": "'yes' | 'no'",
           "when": null
         }
@@ -20,6 +21,7 @@
     "keys__type_religion_group": {
       "fields": {
         "harmonized_modifier": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         }
@@ -28,6 +30,7 @@
     "keys__type_religion_propagation": {
       "fields": {
         "trading_policy": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }
@@ -39,6 +42,7 @@
       "fields": {
         "ai_will_do": {
           "body": "aspects_and_blessings_body__ai_will_do",
+          "card": "0..1",
           "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
           "override": true,
           "scope": {
@@ -50,12 +54,14 @@
           "when": null
         },
         "cost": {
+          "card": "0..1",
           "override": true,
           "value": "int",
           "when": null
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "override": true,
           "scope": {
@@ -67,12 +73,14 @@
           "when": null
         },
         "is_blessing": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "modifier": {
           "body": "modifier",
+          "card": "0..1",
           "doc": "Block of modifiers applied while the containing entry is active.",
           "override": true,
           "scope": {
@@ -84,12 +92,14 @@
           "when": null
         },
         "monarch_power": {
+          "card": "0..1",
           "override": true,
           "value": "'adm' | 'dip' | 'mil'",
           "when": null
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "override": true,
           "scope": {
@@ -101,12 +111,14 @@
           "when": null
         },
         "sprite": {
+          "card": "0..1",
           "override": true,
           "value": "ref<sprite> | 'GFX_diplomats_of_the_reformation_aspect' | 'GFX_expel_heretics_aspect' | 'GFX_icons_of_the_church_icon' | 'GFX_innovativeness_aspect'",
           "when": null
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
           "override": true,
           "scope": {
@@ -139,6 +151,7 @@
     "aspects_and_blessings_type_body": {
       "fields": {
         "is_blessing": {
+          "card": "0..1",
           "value": "'yes' | 'no'",
           "when": null
         }
@@ -160,11 +173,13 @@
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "when": null
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Whether the deity is visible to be picked",
           "scope": {
             "set": {
@@ -176,6 +191,7 @@
         },
         "removed_effect": {
           "body": "effect",
+          "card": "0..1",
           "when": null
         },
         "sprite": {
@@ -185,6 +201,7 @@
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Requirements for picking the deity",
           "scope": {
             "set": {
@@ -213,16 +230,19 @@
     "religion_group_body": {
       "fields": {
         "ai_will_propagate_through_trade": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "can_form_personal_unions": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "center_of_religion": {
+          "card": "0..1",
           "override": true,
           "value": "ref<province_id>",
           "when": null
@@ -234,28 +254,33 @@
           "when": null
         },
         "defender_of_faith": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "flag_emblem_index_range": {
+          "card": "0..1",
           "list": "int",
           "override": true,
           "when": null
         },
         "flags_with_emblem_percentage": {
+          "card": "0..1",
           "doc": "Flag emblem values - Used for Dynamic Setup of Random Nations. Emblem texture: game/gfx/interface/client_state_symbols_large.dds Can be overridden per religion.",
           "override": true,
           "value": "int[0..100]",
           "when": null
         },
         "harmonized_modifier": {
+          "card": "0..1",
           "override": true,
           "value": "ref<event_modifier>",
           "when": null
         },
         "religious_schools": {
           "body": "religion_group_body__religious_schools",
+          "card": "0..1",
           "override": true,
           "scope": {
             "set": {
@@ -288,52 +313,62 @@
     "religion_group_body__religion": {
       "fields": {
         "allow_female_defenders_of_the_faith": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "allowed_center_conversion": {
+          "card": "0..1",
           "list": "ref<religion>",
           "override": true,
           "when": null
         },
         "allowed_conversion": {
+          "card": "0..1",
           "list": "ref<religion>",
           "override": true,
           "when": null
         },
         "ancestors": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "aspects": {
+          "card": "0..1",
           "list": "ref<aspects_and_blessings.church_aspect>",
           "override": true,
           "when": null
         },
         "aspects_name": {
+          "card": "0..1",
           "override": true,
           "value": "scalar",
           "when": null
         },
         "authority": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "blessings": {
+          "card": "0..1",
           "list": "ref<aspects_and_blessings.blessing>",
           "override": true,
           "when": null
         },
         "can_have_secondary_religion": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "celebrate": {
           "body": "religion_group_body__religion__celebrate",
+          "card": "0..1",
           "override": true,
           "when": null
         },
@@ -345,6 +380,7 @@
         },
         "country": {
           "body": "modifier",
+          "card": "0..1",
           "override": true,
           "scope": {
             "set": {
@@ -356,6 +392,7 @@
         },
         "country_as_secondary": {
           "body": "modifier",
+          "card": "0..1",
           "override": true,
           "scope": {
             "set": {
@@ -366,51 +403,61 @@
           "when": null
         },
         "date": {
+          "card": "0..1",
           "override": true,
           "value": "date",
           "when": null
         },
         "declare_war_in_regency": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "doom": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "fervor": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "fetishist_cult": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "flag_emblem_index_range": {
+          "card": "0..1",
           "list": "int",
           "override": true,
           "when": null
         },
         "flags_with_emblem_percentage": {
+          "card": "0..1",
           "override": true,
           "value": "int[0..100]",
           "when": null
         },
         "gurus": {
           "body": "religion_group_body__religion__gurus",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "harmonized_modifier": {
+          "card": "0..1",
           "override": true,
           "value": "ref<event_modifier>",
           "when": null
         },
         "has_patriarchs": {
+          "card": "0..1",
           "doc": "Uses patriarch authority",
           "override": true,
           "value": "'yes'",
@@ -423,16 +470,19 @@
           "when": null
         },
         "holy_sites": {
+          "card": "0..1",
           "list": "ref<province_id>",
           "override": true,
           "when": null
         },
         "hre_heretic_religion": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "hre_religion": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
@@ -444,6 +494,7 @@
           "when": null
         },
         "misguided_heretic": {
+          "card": "0..1",
           "doc": "Other christians hate them less",
           "override": true,
           "value": "'yes'",
@@ -451,83 +502,99 @@
         },
         "on_convert": {
           "body": "effect",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "orthodox_icons": {
           "body": "religion_group_body__religion__orthodox_icons",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "papacy": {
           "body": "religion_group_body__religion__papacy",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "personal_deity": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "province": {
           "body": "modifier",
+          "card": "0..1",
           "override": true,
           "when": null
         },
         "reform_tooltip": {
+          "card": "0..1",
           "override": true,
           "value": "loc",
           "when": null
         },
         "religious_reforms": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "require_reformed_for_institution_development": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "uses_anglican_power": {
+          "card": "0..1",
           "doc": "Uses church power/aspect mechanics",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "uses_church_power": {
+          "card": "0..1",
           "doc": "Uses church power/aspect mechanics",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "uses_harmony": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "uses_hussite_power": {
+          "card": "0..1",
           "doc": "Uses church power/aspect mechanics",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "uses_isolationism": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "uses_judaism_power": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "uses_karma": {
+          "card": "0..1",
           "override": true,
           "value": "'yes'",
           "when": null
         },
         "uses_piety": {
+          "card": "0..1",
           "doc": "Uses piety mechanics",
           "override": true,
           "value": "'yes'",
@@ -535,6 +602,7 @@
         },
         "will_get_center": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Refered to even for initial CoR Spawn",
           "override": true,
           "scope": {
@@ -667,6 +735,7 @@
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "when": null
         },
@@ -735,6 +804,7 @@
           "when": null
         },
         "type": {
+          "card": "0..1",
           "override": true,
           "value": "'ADM' | 'DIP' | 'MIL'",
           "when": null
@@ -814,14 +884,17 @@
       "fields": {
         "bless_monarch": {
           "body": "religion_group_body__religion__papacy__bless_monarch",
+          "card": "0..1",
           "when": null
         },
         "concessions": {
           "body": "religion_group_body__religion__papacy__concessions",
+          "card": "0..1",
           "when": null
         },
         "concilatory": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         },
         "election_cost": {
@@ -831,30 +904,37 @@
         },
         "forgiveness_for_usury": {
           "body": "religion_group_body__religion__papacy__forgiveness_for_usury",
+          "card": "0..1",
           "when": null
         },
         "harsh": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         },
         "indulgence_for_sins": {
           "body": "religion_group_body__religion__papacy__indulgence_for_sins",
+          "card": "0..1",
           "when": null
         },
         "investigate_heresy": {
           "body": "religion_group_body__religion__papacy__investigate_heresy",
+          "card": "0..1",
           "when": null
         },
         "levy_church_tax": {
           "body": "religion_group_body__religion__papacy__levy_church_tax",
+          "card": "0..1",
           "when": null
         },
         "local_saint": {
           "body": "religion_group_body__religion__papacy__local_saint",
+          "card": "0..1",
           "when": null
         },
         "neutral": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         },
         "papal_tag": {
@@ -864,10 +944,12 @@
         },
         "proclaim_holy_war": {
           "body": "religion_group_body__religion__papacy__proclaim_holy_war",
+          "card": "0..1",
           "when": null
         },
         "sanction_commercial_monopoly": {
           "body": "religion_group_body__religion__papacy__sanction_commercial_monopoly",
+          "card": "0..1",
           "when": null
         },
         "seat_of_papacy": {
@@ -877,6 +959,7 @@
         },
         "send_papal_legate": {
           "body": "religion_group_body__religion__papacy__send_papal_legate",
+          "card": "0..1",
           "when": null
         }
       }
@@ -885,6 +968,7 @@
       "fields": {
         "ai_will_do": {
           "body": "religion_group_body__religion__papacy__bless_monarch__ai_will_do",
+          "card": "0..1",
           "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
           "scope": {
             "set": {
@@ -896,6 +980,7 @@
         },
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "scope": {
             "set": {
@@ -906,11 +991,13 @@
           "when": null
         },
         "cost": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "scope": {
             "set": {
@@ -922,6 +1009,7 @@
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "scope": {
             "set": {
@@ -951,18 +1039,22 @@
       "fields": {
         "first_concession": {
           "body": "religion_group_body__religion__papacy__concessions__first_concession",
+          "card": "0..1",
           "when": null
         },
         "fourth_concession": {
           "body": "religion_group_body__religion__papacy__concessions__fourth_concession",
+          "card": "0..1",
           "when": null
         },
         "second_concession": {
           "body": "religion_group_body__religion__papacy__concessions__second_concession",
+          "card": "0..1",
           "when": null
         },
         "third_concession": {
           "body": "religion_group_body__religion__papacy__concessions__third_concession",
+          "card": "0..1",
           "when": null
         }
       }
@@ -971,10 +1063,12 @@
       "fields": {
         "concilatory": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         },
         "harsh": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         }
       }
@@ -983,10 +1077,12 @@
       "fields": {
         "concilatory": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         },
         "harsh": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         }
       }
@@ -995,10 +1091,12 @@
       "fields": {
         "concilatory": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         },
         "harsh": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         }
       }
@@ -1007,10 +1105,12 @@
       "fields": {
         "concilatory": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         },
         "harsh": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         }
       }
@@ -1019,6 +1119,7 @@
       "fields": {
         "ai_will_do": {
           "body": "religion_group_body__religion__papacy__forgiveness_for_usury__ai_will_do",
+          "card": "0..1",
           "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
           "scope": {
             "set": {
@@ -1030,6 +1131,7 @@
         },
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "scope": {
             "set": {
@@ -1040,11 +1142,13 @@
           "when": null
         },
         "cost": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "scope": {
             "set": {
@@ -1056,6 +1160,7 @@
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "scope": {
             "set": {
@@ -1085,6 +1190,7 @@
       "fields": {
         "ai_will_do": {
           "body": "religion_group_body__religion__papacy__indulgence_for_sins__ai_will_do",
+          "card": "0..1",
           "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
           "scope": {
             "set": {
@@ -1096,6 +1202,7 @@
         },
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "scope": {
             "set": {
@@ -1106,11 +1213,13 @@
           "when": null
         },
         "cost": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "scope": {
             "set": {
@@ -1122,6 +1231,7 @@
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "scope": {
             "set": {
@@ -1151,6 +1261,7 @@
       "fields": {
         "ai_will_do": {
           "body": "religion_group_body__religion__papacy__investigate_heresy__ai_will_do",
+          "card": "0..1",
           "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
           "scope": {
             "set": {
@@ -1162,6 +1273,7 @@
         },
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "scope": {
             "set": {
@@ -1172,11 +1284,13 @@
           "when": null
         },
         "curia_treasury_cost": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "scope": {
             "set": {
@@ -1188,6 +1302,7 @@
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "scope": {
             "set": {
@@ -1217,6 +1332,7 @@
       "fields": {
         "ai_will_do": {
           "body": "religion_group_body__religion__papacy__levy_church_tax__ai_will_do",
+          "card": "0..1",
           "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
           "scope": {
             "set": {
@@ -1228,6 +1344,7 @@
         },
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "scope": {
             "set": {
@@ -1238,11 +1355,13 @@
           "when": null
         },
         "cost": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "scope": {
             "set": {
@@ -1254,6 +1373,7 @@
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "scope": {
             "set": {
@@ -1283,6 +1403,7 @@
       "fields": {
         "ai_will_do": {
           "body": "religion_group_body__religion__papacy__local_saint__ai_will_do",
+          "card": "0..1",
           "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
           "scope": {
             "set": {
@@ -1294,6 +1415,7 @@
         },
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "scope": {
             "set": {
@@ -1304,11 +1426,13 @@
           "when": null
         },
         "cost": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "scope": {
             "set": {
@@ -1320,6 +1444,7 @@
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "scope": {
             "set": {
@@ -1349,6 +1474,7 @@
       "fields": {
         "ai_will_do": {
           "body": "religion_group_body__religion__papacy__proclaim_holy_war__ai_will_do",
+          "card": "0..1",
           "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
           "scope": {
             "set": {
@@ -1360,6 +1486,7 @@
         },
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "scope": {
             "set": {
@@ -1370,11 +1497,13 @@
           "when": null
         },
         "cost": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "scope": {
             "set": {
@@ -1386,6 +1515,7 @@
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "scope": {
             "set": {
@@ -1415,6 +1545,7 @@
       "fields": {
         "ai_will_do": {
           "body": "religion_group_body__religion__papacy__sanction_commercial_monopoly__ai_will_do",
+          "card": "0..1",
           "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
           "scope": {
             "set": {
@@ -1426,6 +1557,7 @@
         },
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "scope": {
             "set": {
@@ -1436,11 +1568,13 @@
           "when": null
         },
         "cost": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "scope": {
             "set": {
@@ -1452,6 +1586,7 @@
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "scope": {
             "set": {
@@ -1481,6 +1616,7 @@
       "fields": {
         "ai_will_do": {
           "body": "religion_group_body__religion__papacy__send_papal_legate__ai_will_do",
+          "card": "0..1",
           "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
           "scope": {
             "set": {
@@ -1492,6 +1628,7 @@
         },
         "allow": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions checked when using the entry.",
           "scope": {
             "set": {
@@ -1502,11 +1639,13 @@
           "when": null
         },
         "cost": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "scope": {
             "set": {
@@ -1518,6 +1657,7 @@
         },
         "potential": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
           "scope": {
             "set": {
@@ -1619,6 +1759,7 @@
     "religion_group_type_body": {
       "fields": {
         "harmonized_modifier": {
+          "card": "0..1",
           "value": "scalar",
           "when": null
         }
@@ -1639,12 +1780,14 @@
           "when": null
         },
         "max_distance": {
+          "card": "0..1",
           "doc": "From Center of Reformation center province (default is NDefines::NReligion::MAX_RELIGIOUS_CENTER_SPREAD_DISTANCE).",
           "override": true,
           "value": "float",
           "when": null
         },
         "religion": {
+          "card": "0..1",
           "override": true,
           "value": "ref<religion>",
           "when": null
@@ -1663,6 +1806,7 @@
           "when": null
         },
         "trading_policy": {
+          "card": "0..1",
           "doc": "Religion is taken from country using the trading policy. max_distance is not used.",
           "override": true,
           "value": "'yes'",
@@ -1690,6 +1834,7 @@
     "religion_propagation_type_body": {
       "fields": {
         "trading_policy": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }

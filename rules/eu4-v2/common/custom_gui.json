@@ -69,6 +69,7 @@
           "when": null
         },
         "frame_variable": {
+          "card": "0..1",
           "doc": "Use the value of a variable to determine the icon frame",
           "value": "scalar",
           "when": null
@@ -86,6 +87,7 @@
           "when": null
         },
         "tooltip": {
+          "card": "0..1",
           "control": {
             "kind": "display_only"
           },
@@ -144,6 +146,7 @@
           "when": null
         },
         "tooltip": {
+          "card": "0..1",
           "control": {
             "kind": "display_only"
           },
@@ -174,6 +177,7 @@
           "when": null
         },
         "tooltip": {
+          "card": "0..1",
           "control": {
             "kind": "display_only"
           },

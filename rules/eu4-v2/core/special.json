@@ -1698,6 +1698,7 @@
           "when": null
         },
         "factor": {
+          "card": "0..1",
           "value": "float[-10000.0..10000.0]",
           "when": null
         },
@@ -2116,6 +2117,7 @@
         },
         "has_administration_efficiency_value": {
           "body": "trigger__has_administration_efficiency_value",
+          "card": "0..1",
           "doc": "Returns true if the country has at least as high administrative efficiency as specified.",
           "scope": {
             "in": [
@@ -2289,6 +2291,7 @@
           "when": null
         },
         "has_center_of_trade_of_level": {
+          "card": "0..1",
           "doc": "Returns true if the country has a center of trade of at least the given level.",
           "scope": {
             "in": [
@@ -3153,6 +3156,7 @@
           "when": null
         },
         "has_num_flagships": {
+          "card": "0..1",
           "doc": "Returns true if the country has at least X flagships.",
           "scope": {
             "in": [
@@ -4370,6 +4374,7 @@
           "when": null
         },
         "is_any_heresy_enabled": {
+          "card": "0..1",
           "doc": "Returns true if the religion of the current scope has a heresy enabled.",
           "scope": {
             "in": [
@@ -5167,6 +5172,7 @@
           "when": null
         },
         "is_most_powerful_estate": {
+          "card": "0..1",
           "doc": "Returns true if the most powerful estate in the country is the given one.",
           "scope": {
             "in": [
@@ -5235,6 +5241,7 @@
         },
         "is_or_was_tag": {
           "body": "trigger__is_or_was_tag",
+          "card": "0..1",
           "doc": "Returns true if the current scope is or has been the specified tag.",
           "scope": {
             "in": [
@@ -5877,6 +5884,7 @@
           "when": null
         },
         "last_mission": {
+          "card": "0..1",
           "doc": "Returns true if the last mission of the country was the specified one.",
           "scope": {
             "in": [
@@ -6189,6 +6197,7 @@
           "when": null
         },
         "militarised_society": {
+          "card": "0..1",
           "doc": "Returns true if the country has a militarisation of society of at least X.",
           "scope": {
             "in": [
@@ -6359,6 +6368,7 @@
           "when": null
         },
         "nationalism_debug": {
+          "card": "0..1",
           "doc": "DO NOT USE THIS. This key is used by Paradox Internally to test things but it has made into the released files of 1.34, so we are adding it here to avoid confusing errors.",
           "scope": {
             "in": [
@@ -7155,6 +7165,7 @@
           "when": null
         },
         "num_of_marches": {
+          "card": "0..1",
           "doc": "Returns true if the country has at least X marches.",
           "scope": {
             "in": [
@@ -8159,6 +8170,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "doc": "Returns true if the province has a center of trade of at least this level.",
             "scope": {
               "in": [
@@ -8203,6 +8215,7 @@
           "when": null
         },
         "province_size": {
+          "card": "0..1",
           "doc": "Returns true if the province, in provinces.bmp, contains at least X pixels.",
           "scope": {
             "in": [
@@ -8235,6 +8248,7 @@
           "when": null
         },
         "provinces_on_continent": {
+          "card": "0..1",
           "doc": "Returns true if the current scope has provinces on the specified continent.",
           "scope": {
             "in": [
@@ -9685,6 +9699,7 @@
           "when": null
         },
         "will_back_next_reform": {
+          "card": "0..1",
           "doc": "Returns true if the member of the HRE is backing the next imperial reform.",
           "scope": {
             "in": [
@@ -11370,6 +11385,7 @@
           "when": null
         },
         "factor": {
+          "card": "0..1",
           "doc": "Weight multiplier inside an imperial incident option modifier.",
           "value": "float",
           "when": null
@@ -11789,6 +11805,7 @@
         },
         "has_administration_efficiency_value": {
           "body": "trigger__has_administration_efficiency_value",
+          "card": "0..1",
           "doc": "Returns true if the country has at least as high administrative efficiency as specified.",
           "scope": {
             "in": [
@@ -11962,6 +11979,7 @@
           "when": null
         },
         "has_center_of_trade_of_level": {
+          "card": "0..1",
           "doc": "Returns true if the country has a center of trade of at least the given level.",
           "scope": {
             "in": [
@@ -12826,6 +12844,7 @@
           "when": null
         },
         "has_num_flagships": {
+          "card": "0..1",
           "doc": "Returns true if the country has at least X flagships.",
           "scope": {
             "in": [
@@ -14043,6 +14062,7 @@
           "when": null
         },
         "is_any_heresy_enabled": {
+          "card": "0..1",
           "doc": "Returns true if the religion of the current scope has a heresy enabled.",
           "scope": {
             "in": [
@@ -14840,6 +14860,7 @@
           "when": null
         },
         "is_most_powerful_estate": {
+          "card": "0..1",
           "doc": "Returns true if the most powerful estate in the country is the given one.",
           "scope": {
             "in": [
@@ -14908,6 +14929,7 @@
         },
         "is_or_was_tag": {
           "body": "trigger__is_or_was_tag",
+          "card": "0..1",
           "doc": "Returns true if the current scope is or has been the specified tag.",
           "scope": {
             "in": [
@@ -15550,6 +15572,7 @@
           "when": null
         },
         "last_mission": {
+          "card": "0..1",
           "doc": "Returns true if the last mission of the country was the specified one.",
           "scope": {
             "in": [
@@ -15862,6 +15885,7 @@
           "when": null
         },
         "militarised_society": {
+          "card": "0..1",
           "doc": "Returns true if the country has a militarisation of society of at least X.",
           "scope": {
             "in": [
@@ -16026,6 +16050,7 @@
           "when": null
         },
         "nationalism_debug": {
+          "card": "0..1",
           "doc": "DO NOT USE THIS. This key is used by Paradox Internally to test things but it has made into the released files of 1.34, so we are adding it here to avoid confusing errors.",
           "scope": {
             "in": [
@@ -16822,6 +16847,7 @@
           "when": null
         },
         "num_of_marches": {
+          "card": "0..1",
           "doc": "Returns true if the country has at least X marches.",
           "scope": {
             "in": [
@@ -17826,6 +17852,7 @@
             "when": null
           },
           {
+            "card": "0..1",
             "doc": "Returns true if the province has a center of trade of at least this level.",
             "scope": {
               "in": [
@@ -17870,6 +17897,7 @@
           "when": null
         },
         "province_size": {
+          "card": "0..1",
           "doc": "Returns true if the province, in provinces.bmp, contains at least X pixels.",
           "scope": {
             "in": [
@@ -17902,6 +17930,7 @@
           "when": null
         },
         "provinces_on_continent": {
+          "card": "0..1",
           "doc": "Returns true if the current scope has provinces on the specified continent.",
           "scope": {
             "in": [
@@ -19352,6 +19381,7 @@
           "when": null
         },
         "will_back_next_reform": {
+          "card": "0..1",
           "doc": "Returns true if the member of the HRE is backing the next imperial reform.",
           "scope": {
             "in": [
@@ -19479,6 +19509,7 @@
       "fields": {
         "OR": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "logic",
             "op": "OR"
@@ -19601,6 +19632,7 @@
     "alerts_icon": {
       "patterns": [
         {
+          "card": "0..1",
           "key": "enum<alert_level>",
           "value": "scalar",
           "when": null
@@ -19610,6 +19642,7 @@
     "alerts_sound": {
       "patterns": [
         {
+          "card": "0..1",
           "key": "enum<alert_level>",
           "value": "scalar",
           "when": null
@@ -19718,6 +19751,7 @@
     "imperial_incident_option": {
       "fields": {
         "factor": {
+          "card": "0..1",
           "value": "float[-10000.0..10000.0]",
           "when": null
         },
@@ -19732,6 +19766,7 @@
     "imperial_incident_option_modifier": {
       "fields": {
         "factor": {
+          "card": "0..1",
           "doc": "Weight multiplier inside an imperial incident option modifier.",
           "value": "float",
           "when": null
@@ -19994,6 +20029,7 @@
       "fields": {
         "OR": {
           "body": "trigger",
+          "card": "0..1",
           "control": {
             "kind": "logic",
             "op": "OR"

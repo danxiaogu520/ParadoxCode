@@ -17,6 +17,7 @@
         },
         "chance": {
           "body": "parliament_bribe_body__chance",
+          "card": "0..1",
           "doc": "Chance a bribe will appear in a parliament issue",
           "scope": {
             "set": {
@@ -40,10 +41,12 @@
           "when": null
         },
         "estate": {
+          "card": "0..1",
           "value": "ref<estate>",
           "when": null
         },
         "name": {
+          "card": "0..1",
           "value": "loc",
           "when": null
         },
@@ -117,6 +120,7 @@
           "when": null
         },
         "backing_percentage": {
+          "card": "0..1",
           "doc": "Percentage of seats that will back up the issue. Defaults to PARLIAMENT_BACKING_PERCENTAGE",
           "value": "int",
           "when": null
@@ -128,6 +132,7 @@
         },
         "chance": {
           "body": "parliament_issue_body__chance",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",
@@ -137,17 +142,20 @@
           "when": null
         },
         "chance_of_decision": {
+          "card": "0..1",
           "doc": "Chance debate is decided upon after debate duration, defaults to PARLIAMENT_CHANCE_OF_DECISION",
           "value": "float",
           "when": null
         },
         "debate_duration": {
+          "card": "0..1",
           "doc": "How many years an issue will last before being able to be randomly decided on, defaults to PARLIAMENT_DEBATE_DURATION",
           "value": "int",
           "when": null
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "scope": {
             "set": {
@@ -158,21 +166,25 @@
           "when": null
         },
         "effect_duration": {
+          "card": "0..1",
           "doc": "How many years the effects of a passed issue last, also prevents picking a new issue, defaults to PARLIAMENT_EFFECT_DURATION",
           "value": "int",
           "when": null
         },
         "influence_scaled_modifier": {
           "body": "modifier",
+          "card": "0..1",
           "when": null
         },
         "modifier": {
           "body": "modifier",
+          "card": "0..1",
           "doc": "Block of modifiers applied while the containing entry is active.",
           "when": null
         },
         "on_issue_taken": {
           "body": "effect",
+          "card": "0..1",
           "scope": {
             "set": {
               "root": "country",
@@ -182,6 +194,7 @@
           "when": null
         },
         "scale_estate_influence": {
+          "card": "0..1",
           "value": "ref<estate>",
           "when": null
         }

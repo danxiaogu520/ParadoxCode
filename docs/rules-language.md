@@ -151,14 +151,14 @@ A schema describes one block:
     "include": [],                                   // mixin names, expanded at compile time (§7)
     "fields": {                                      // exact keys, hash lookup
       "id":      { "value": "scalar", "card": "1" },
-      "title":   { "value": "loc" },
+      "title":   { "value": "loc", "card": "0..1" },
       "picture": { "value": "ref<sprite>|enum<dlc_event_pictures>", "card": "0..*" },
       "desc":    [ { "value": "loc", "card": "0..*" },               // array = shape overloads
                    { "body": "conditional_desc", "card": "0..*" } ],
       "option":  { "body": "event_option", "card": "0..*" }
     },
     "patterns": [                                    // non-exact keys, tried in order
-      { "key": "ref<scripted_trigger>", "value": "scalar" }
+      { "key": "ref<scripted_trigger>", "value": "scalar", "card": "0..1" }
     ],
     "items": null,                                   // type of bare values in the block (list block)
     "open": false                                    // are undeclared keys allowed; default false
@@ -179,15 +179,19 @@ A field specification is the value of a `fields` entry or an element of
 |---|---|---|
 | `key` | Patterns only: the type expression for the key | — |
 | `value` / `body` / `list` / `map` | Exactly one of four: a scalar type expression / a block schema name (or `"self"`) / a bare-value list block whose value is the element type expression / a homogeneous map block `{"key": expr, "value": expr}` or `{"key": expr, "body": schema}` | — |
-| `card` | `"1"`, `"0..1"`, `"1..*"`, `"0..*"`, `"2..5"` | `"0..1"` |
+| `card` | `"1"`, `"0..1"`, `"1..*"`, `"0..*"`, `"2..5"`; **mandatory** (D14) | — |
 | `scope` | Scope effect, see §8 | none |
 | `def` | Defines a symbol instance at this position, see §4 | none |
 | `when` / `unless` | Subtype conditions, see §5 | none |
 | `control` | Control-flow primitive, see §9 | none |
 | `doc` / `severity` / `deprecated` | Documentation / diagnostic severity / deprecation | empty / `error` / `false` |
 
-The `card` default matches the existing corpus: of 8,463 current rule rows,
-7,355 have `max = 1` and 1,013 have no upper bound.
+`card` is a **required** key and is rejected while parsing when missing. It has
+no default because the corpus has no majority value — of the 8,463 legacy rule
+rows, `1` is 50%, `0..1` is 35%, and the repeatable forms are 13% — and because
+it is what drives the missing-required-key and repeated-key diagnostics; a
+guessed default would decide both. `fmt` may expand the value, but the source
+always spells it.
 
 **`value` and `body` are strictly distinct.** `value` (and the `"value"` of a
 `map`) is always a type expression; `body` is always a schema name. The two are
@@ -217,8 +221,8 @@ runtime carries no generics:
 
 ```jsonc
 "on_action_body<S>": { "fields": {
-  "events":        { "list": "ref<event.$S>" },
-  "random_events": { "map": { "key": "int", "value": "ref<event.$S>|'0'" } }
+  "events":        { "list": "ref<event.$S>", "card": "0..*" },
+  "random_events": { "map": { "key": "int", "value": "ref<event.$S>|'0'" }, "card": "0..*" }
 }}
 ```
 
@@ -266,12 +270,17 @@ are declared with `def` at chosen positions in schemas:
 | Field | Meaning |
 |---|---|
 | `path` | Directory prefix (the legacy `game/` prefix is dropped) |
-| `ext` | File extension |
+| `ext` | File extension(s): one string, or an array when the category selects several (the legacy `extensions` list). Absent means every extension |
 | `file` | Exact file name (replaces `path_file`) |
 | `strict` | Do not recurse into subdirectories |
+| `exclude` | Path prefixes this entry does not apply to (the legacy `path_exclude_prefixes`) |
 | `parser` | `script` / `localisation` / `asset` / `syntax-only`; default `script` |
-| `resolution` | `replace-by-path` / `merge` / `replace-directory`; default `replace-by-path` |
-| `root` | Root schema name; or a field specification carrying `def`, meaning the whole file is one instance. Required for the `script` parser; `localisation` and `asset` entries MAY omit it |
+| `resolution` | `replace-by-path` / `merge` / `replace-directory`; default `merge` (D14: a default must cover the corpus majority) |
+| `root` | Root schema name; or a field specification carrying `def`, meaning the whole file is one instance. **Required for the `script` parser** — without it the entry would validate nothing, and the no-guessing rule forbids that; `localisation` and `asset` entries MAY omit it |
+
+A category whose structure the rules do not model still declares a root: an
+open schema (`{ "open": true }`) says "any key, no rules" explicitly instead of
+leaving the file unvalidated by omission.
 
 ### 4.2 The `def` specification
 
@@ -327,9 +336,9 @@ value of `null` means "this field is absent" (replacing the `absent_field` of
 
 ```jsonc
 "event_body": { "fields": {
-  "is_triggered_only":   { "value": "bool" },
-  "mean_time_to_happen": { "body": "mtth", "unless": "triggered" },
-  "trigger":             { "body": "trigger" }
+  "is_triggered_only":   { "value": "bool", "card": "0..1" },
+  "mean_time_to_happen": { "body": "mtth", "card": "0..1", "unless": "triggered" },
+  "trigger":             { "body": "trigger", "card": "0..*" }
 }}
 ```
 
@@ -402,11 +411,11 @@ at compile time, and does not exist at runtime:
 
 ```jsonc
 "mixins": {
-  "gated":       { "fields": { "potential": { "body": "trigger" }, "allow": { "body": "trigger" } } },
-  "ai_weighted": { "fields": { "ai_will_do": { "body": "modifier_rule" } } },
-  "modifier_block": { "fields": { "modifier": { "body": "modifier" } } }
+  "gated":       { "fields": { "potential": { "body": "trigger", "card": "0..1" }, "allow": { "body": "trigger", "card": "0..1" } } },
+  "ai_weighted": { "fields": { "ai_will_do": { "body": "modifier_rule", "card": "0..1" } } },
+  "modifier_block": { "fields": { "modifier": { "body": "modifier", "card": "0..1" } } }
 },
-"schemas": { "decision_body": { "include": ["gated", "ai_weighted"], "fields": { "effect": { "body": "effect" } } } }
+"schemas": { "decision_body": { "include": ["gated", "ai_weighted"], "fields": { "effect": { "body": "effect", "card": "0..*" } } } }
 ```
 
 `include` lists mixin names to expand into the schema. An include conflict —
@@ -504,7 +513,7 @@ Scope-switch blocks in trigger/effect schemas are no longer written row by
 row; one pattern describes them uniformly:
 
 ```jsonc
-"trigger": { "patterns": [ { "key": "link", "body": "self" } ] }
+"trigger": { "patterns": [ { "key": "link", "body": "self", "card": "0..*" } ] }
 ```
 
 When a `link` key matches, the compiler already knows the link's `from`/`to`;
@@ -526,12 +535,12 @@ attributes on field specifications, written in the mixins of
   "if":             { "body": "self", "card": "0..*", "control": { "kind": "branch", "guard": "limit", "chain": ["else_if", "else"] } },
   "else_if":        { "body": "self", "card": "0..*", "control": { "kind": "branch_continue", "guard": "limit" } },
   "else":           { "body": "self", "card": "0..*", "control": { "kind": "branch_continue" } },
-  "limit":          { "body": "trigger", "control": { "kind": "guard" } },
-  "random_list":    { "map": { "key": "int", "body": "self" }, "control": { "kind": "weighted" } },
-  "random":         { "body": "random_body", "control": { "kind": "chance" } },       // random_body = self + chance field
-  "trigger_switch": { "body": "trigger_switch_body", "control": { "kind": "switch", "on": "on_trigger" } },
-  "hidden_effect":  { "body": "self", "control": { "kind": "transparent" } },
-  "tooltip":        { "body": "self", "control": { "kind": "display_only" } }
+  "limit":          { "body": "trigger", "card": "0..1", "control": { "kind": "guard" } },
+  "random_list":    { "map": { "key": "int", "body": "self" }, "card": "0..*", "control": { "kind": "weighted" } },
+  "random":         { "body": "random_body", "card": "0..1", "control": { "kind": "chance" } },       // random_body = self + chance field
+  "trigger_switch": { "body": "trigger_switch_body", "card": "0..1", "control": { "kind": "switch", "on": "on_trigger" } },
+  "hidden_effect":  { "body": "self", "card": "0..*", "control": { "kind": "transparent" } },
+  "tooltip":        { "body": "self", "card": "0..1", "control": { "kind": "display_only" } }
 }}}
 ```
 
@@ -620,7 +629,8 @@ metadata; provenance is derived, never authored.
 
 | Diagnostic | Severity | Trigger |
 |---|---|---|
-| Parse error | error | An illegal identifier or number; a range after a primitive other than `int`/`float`; non-whole `int` bounds or a lower bound above its upper bound; an invalid escape; an unterminated literal or hole; an invalid `arg`; an empty union branch; a union mixing scalar and quoted branches (§2); a malformed link-key template, schema reference, `card`, `def` name, or enum column declaration |
+| Parse error | error | An illegal identifier or number; a range after a primitive other than `int`/`float`; non-whole `int` bounds or a lower bound above its upper bound; an invalid escape; an unterminated literal or hole; an invalid `arg`; an empty union branch; a union mixing scalar and quoted branches (§2); a malformed link-key template, schema reference, `card`, `def` name, or enum column declaration; a missing `card`; a `script` files entry without `root`; a `map` without exactly one of `value`/`body`; a trait binding without exactly one of `loc`/`sprite` |
+| `CardLint` | warning / info | `card` is `0..0` (warning: disables the field rather than bounding it), `N..N` (info: a fixed-length tuple better written as `list` plus the arity), or two overloads of one key disagree on the upper bound (info) |
 | `DuplicateName` | error | A schema, mixin, type, enum, trait, files entry, or scope declaration is defined twice across sources (§1) |
 | `UndefinedReference` | error | A referenced schema, type, enum, mixin, or trait is not defined (check 1) |
 | `UnusedDefinition` | warning | A definition is never referenced (check 1) |

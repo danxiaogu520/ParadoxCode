@@ -3,6 +3,7 @@
     "ambient_object_basis_body": {
       "fields": {
         "always_visible": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
@@ -12,10 +13,12 @@
           "when": null
         },
         "scale": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "time_duration": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
@@ -30,6 +33,7 @@
           "when": null
         },
         "visible_in_all_map_modes": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         }
@@ -85,50 +89,61 @@
     "terrain_body": {
       "fields": {
         "color": {
+          "card": "0..1",
           "list": "int[0..]",
           "when": null
         },
         "combat_width": {
+          "card": "0..1",
           "doc": "Multiplier to increase or decrease combat width in this terrain",
           "value": "float",
           "when": null
         },
         "cs_only_local_development_cost": {
+          "card": "0..1",
           "value": "float",
           "when": null
         },
         "defence": {
+          "card": "0..1",
           "doc": "Addition to defence roll in combat in this terrain",
           "value": "int",
           "when": null
         },
         "inland_sea": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "is_water": {
+          "card": "0..1",
           "value": "'yes'",
           "when": null
         },
         "movement_cost": {
+          "card": "0..1",
           "doc": "Multiplier to movement time into/out of province with terrain",
           "value": "float",
           "when": null
         },
         "nation_designer_cost_multiplier": {
+          "card": "0..1",
           "doc": "Extra cost multiplier when picked in the Nation Designer",
           "value": "float",
           "when": null
         },
         "sound_type": {
+          "card": "0..1",
           "value": "enum<terrain_sound_types>",
           "when": null
         },
         "terrain_override": {
+          "card": "0..1",
           "list": "ref<province_id>",
           "when": null
         },
         "type": {
+          "card": "0..1",
           "doc": "Types are used by the game to apply certain bonuses/maluses on movement/combat etc.",
           "value": "enum<terrain_types>",
           "when": null

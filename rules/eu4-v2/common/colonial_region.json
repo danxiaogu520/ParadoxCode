@@ -9,6 +9,7 @@
         },
         "culture": {
           "body": "colonial_region_body__culture",
+          "card": "0..1",
           "when": null
         },
         "names": {
@@ -17,31 +18,38 @@
           "when": null
         },
         "native_ferocity": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "native_hostileness": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "native_size": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "provinces": {
+          "card": "0..1",
           "list": "ref<province_id>",
           "when": null
         },
         "religion": {
           "body": "colonial_region_body__religion",
+          "card": "0..1",
           "when": null
         },
         "tax_income": {
+          "card": "0..1",
           "value": "int",
           "when": null
         },
         "trade_goods": {
           "body": "colonial_region_body__trade_goods",
+          "card": "0..1",
           "when": null
         }
       }
@@ -68,6 +76,7 @@
         },
         "trigger": {
           "body": "trigger",
+          "card": "0..1",
           "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
           "scope": {
             "set": {

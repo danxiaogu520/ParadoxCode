@@ -10,6 +10,7 @@
         },
         "effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "Block of effects executed by the containing entry.",
           "scope": {
             "set": {
@@ -22,6 +23,7 @@
         },
         "pre_effect": {
           "body": "effect",
+          "card": "0..1",
           "doc": "do this before the peace is enforced, or there is no war enemy country",
           "scope": {
             "set": {
@@ -63,6 +65,7 @@
           "when": null
         },
         "tooltip": {
+          "card": "0..1",
           "control": {
             "kind": "display_only"
           },
