@@ -598,7 +598,7 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 
 - `docs/rules-language.md` 规范；`source` 源类型 + 生成的 JSON Schema；类型表达式解析器（附解析错误的定位测试）；编译器语义检查（2.10 列表，逐条有单测）。本阶段不接 runtime。
 
-### 阶段 2：转换脚本 — **自动部分已完成**（2026-09-30）
+### 阶段 2：转换脚本 — **已完成**（自动部分 2026-09-30，人工收口 2026-10-01）
 
 > 实施备注：
 > - 工具为 `crates/tools` 下的 `rules-migrate`（`cargo run -p tools --bin rules-migrate`，切换后删除），读 `rules/eu4`（旧 manifest），写 `rules/eu4-v2/`（新源暂存区，阶段 5 切换时改名顶替）与 `docs/rules-migrate-report.md`（覆盖率 + 人工清单）。可重复运行、输出确定（重复运行逐字节一致，实测）。
@@ -611,8 +611,14 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 
 - **自动部分**：`parent_path` 扁平行 → 嵌套 schema；alternative → 重载/union；matcher → 表达式字符串；去重（1,227 条）；on_action 折叠为 enum + 参数化 schema；纯链接行折叠进 `scopes.links`；profile 各表按第 4 节搬迁；`member_kind_aliases` 归一。
 - **人工部分**：324 处魔法段的真实结构、subtype 的 `when`、trait impl、`control` mixin、mixin 抽取。
+- **人工收口结果**（2026-10-01）：`docs/rules-migrate-report.md` 的人工清单为空，全部条目要么被机械化、要么作为**显式损失**记入覆盖率表：
+  - 魔法段 def/ref 判定：非定义上下文（`trigger`/`effect`）的 `{type: X}` 键判为调用位（20 处）；跨目录引用按「上下文的 profile 路径 vs 类型的 profile 路径」判定（5 处转 ref pattern，13 处保持 def map）。
+  - `Localised`/`HasIcon` 改为 **impl 逐条枚举 binding**（D19 变更说明见 §2.7），trait 不再声明固定 binding；子类型条件的 binding 还原为 subtype impl + `when` 谓词。
+  - `date_field` 伪段与 `key_segment` 对齐、同路径多类型的 file root 合并、`when`/`params` 中的 `null` 不再被裁掉、条件定义挂到同路径的定义类型上。
+  - `token_definitions` 参数键折叠进 `Callable` 的 dynamic-key 能力（最后一个空 enum 桩消失）；`strip_prefix` 模板在表达式语法中新增 `strip_prefix` 子句（D19 三处用例）。
+  - 显式损失（覆盖率表逐条计数）：typed-prefix 算子过滤 3、on-action `from` 列 258、实例名前缀条件的 binding 3、field 源 binding 0、参数键 6。
 - 自动部分必须**可重复运行、结果确定**：人工精修开始前如果 main 上的 `rules/eu4` 有改动，重跑即可；人工精修开始后冻结 main 上的 `rules/eu4`（如有紧急修改，在两边手工同步）。
-- 验收：输出通过 `rulec check`；报告自动覆盖率（按行数）与人工清单。
+- 验收：输出通过 `rulec check`；报告自动覆盖率（按行数）与人工清单。**已满足**：`rulec check rules/eu4-v2` 0 error（273 条迁移期 `UnusedDefinition` warning）、8,463 行对平、人工清单为空、`rules-migrate` 重复运行逐字节一致。
 
 ### 阶段 3：IR 与查询 API
 
