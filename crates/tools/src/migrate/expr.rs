@@ -162,7 +162,10 @@ pub fn key_segment(key: &KeyMatcher) -> String {
         KeyMatcher::Enum(name) => format!("enum[{}]", name.to_lowercase()),
         KeyMatcher::AnyScalar => "any_scalar".to_owned(),
         KeyMatcher::Int { .. } => "int".to_owned(),
-        KeyMatcher::Date => "date".to_owned(),
+        // The legacy `parent_path` spells a date-keyed block as the pseudo
+        // segment `date_field`; a `date` matcher must resolve to the same
+        // position, or the declaring row and its rows land in two schemas.
+        KeyMatcher::Date => "date_field".to_owned(),
         KeyMatcher::Template {
             prefix,
             parameter,

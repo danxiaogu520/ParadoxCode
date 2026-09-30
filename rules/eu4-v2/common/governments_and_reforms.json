@@ -695,12 +695,6 @@
           "key": "scalar",
           "value": "loc",
           "when": null
-        },
-        {
-          "card": "0..10",
-          "key": "scalar",
-          "value": "loc",
-          "when": null
         }
       ]
     },
@@ -708,12 +702,6 @@
       "patterns": [
         {
           "card": "1..10",
-          "key": "scalar",
-          "value": "loc",
-          "when": null
-        },
-        {
-          "card": "0..10",
           "key": "scalar",
           "value": "loc",
           "when": null
@@ -727,12 +715,6 @@
           "key": "scalar",
           "value": "loc",
           "when": null
-        },
-        {
-          "card": "0..10",
-          "key": "scalar",
-          "value": "loc",
-          "when": null
         }
       ]
     },
@@ -740,12 +722,6 @@
       "patterns": [
         {
           "card": "1..10",
-          "key": "scalar",
-          "value": "loc",
-          "when": null
-        },
-        {
-          "card": "0..10",
           "key": "scalar",
           "value": "loc",
           "when": null
@@ -759,12 +735,6 @@
           "key": "scalar",
           "value": "loc",
           "when": null
-        },
-        {
-          "card": "0..10",
-          "key": "scalar",
-          "value": "loc",
-          "when": null
         }
       ]
     },
@@ -775,12 +745,6 @@
           "key": "scalar",
           "value": "loc",
           "when": null
-        },
-        {
-          "card": "0..10",
-          "key": "scalar",
-          "value": "loc",
-          "when": null
         }
       ]
     },
@@ -788,12 +752,6 @@
       "patterns": [
         {
           "card": "1..10",
-          "key": "scalar",
-          "value": "loc",
-          "when": null
-        },
-        {
-          "card": "0..10",
           "key": "scalar",
           "value": "loc",
           "when": null

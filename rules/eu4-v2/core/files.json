@@ -1452,6 +1452,12 @@
           "card": "0..1",
           "key": "def<achievement>",
           "when": null
+        },
+        {
+          "body": "luck_body",
+          "card": "0..1",
+          "key": "def<luck>",
+          "when": null
         }
       ]
     },
@@ -2190,6 +2196,21 @@
     },
     "map_file": {
       "fields": {
+        "categories": {
+          "body": "map_file__categories",
+          "card": "0..1",
+          "when": null
+        },
+        "terrain": {
+          "body": "map_file__terrain",
+          "card": "0..1",
+          "when": null
+        },
+        "tree": {
+          "body": "map_file__tree",
+          "card": "0..1",
+          "when": null
+        },
         "type": {
           "body": "map_file__type",
           "card": "0..1",
@@ -2201,6 +2222,42 @@
           "body": "ambient_object_basis_body",
           "card": "0..1",
           "key": "def<ambient_object_basis>",
+          "when": null
+        },
+        {
+          "body": "area_body",
+          "card": "0..1",
+          "key": "def<area>",
+          "when": null
+        },
+        {
+          "body": "continent_body",
+          "card": "0..1",
+          "key": "def<continent>",
+          "when": null
+        },
+        {
+          "body": "province_group_body",
+          "card": "0..1",
+          "key": "def<province_group>",
+          "when": null
+        },
+        {
+          "body": "province_id_body",
+          "card": "0..1",
+          "key": "def<province_id>",
+          "when": null
+        },
+        {
+          "body": "region_body",
+          "card": "0..1",
+          "key": "def<region>",
+          "when": null
+        },
+        {
+          "body": "superregion_body",
+          "card": "0..1",
+          "key": "def<superregion>",
           "when": null
         }
       ]

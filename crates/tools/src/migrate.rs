@@ -418,7 +418,14 @@ impl<'model> Cvt<'model> {
                 orphans.push(key.clone());
             }
         }
+        let mut date_orphans: Vec<(String, usize)> = Vec::new();
         for orphan in &orphans {
+            if last_segment(orphan) == "date_field" {
+                if let Some(rows) = positions.get(orphan) {
+                    date_orphans.push((orphan.clone(), rows.len()));
+                }
+                continue;
+            }
             if let Some(rows) = positions.remove(orphan) {
                 self.count_n("rows orphaned", rows.len());
                 self.manual(
@@ -499,7 +506,8 @@ impl<'model> Cvt<'model> {
                 };
                 block.fields.insert(display, entry);
             }
-            self.order_patterns(&mut block.patterns);
+            order_patterns(&mut block.patterns);
+            self.dedupe_patterns(&mut block.patterns);
             if folded_link {
                 // §8: one `link` pattern replaces the folded scope-switch rows.
                 block.patterns.push(FieldSpec {
@@ -538,6 +546,42 @@ impl<'model> Cvt<'model> {
             }
             self.place_schema(&root_name, &owner, block);
         }
+        // `date_field` is a pseudo segment: a date-keyed block. A position the
+        // corpus never declares explicitly still has a shape — when the date
+        // is the key, the block is one pattern on the `date` primitive.
+        for (key, rows) in date_orphans {
+            let path = split_pos(&key);
+            let child = self.schema_name(context, &path);
+            let parent = self.schema_name(context, &path[..path.len().saturating_sub(1)]);
+            self.count_n("rows folded into date patterns", rows);
+            self.add_schema_pattern(
+                &parent,
+                FieldSpec {
+                    key: Some("date".to_owned()),
+                    body: Some(child),
+                    card: "0..*".to_owned(),
+                    ..empty_spec()
+                },
+            );
+        }
+    }
+
+    /// Appends one pattern to an already-placed block schema.
+    fn add_schema_pattern(&mut self, schema: &str, spec: FieldSpec) {
+        let Some(path) = self.schema_file.get(schema).cloned() else {
+            self.manual(
+                "structure",
+                format!("schema `{schema}` was not generated for the date pattern"),
+            );
+            return;
+        };
+        let Some(file) = self.files.get_mut(&path) else {
+            return;
+        };
+        let Some(SchemaSpec::Block(block)) = file.schemas.get_mut(schema) else {
+            return;
+        };
+        block.patterns.push(spec);
     }
 
     /// Builds field specs for one row (a folded link row folds away).
@@ -935,6 +979,37 @@ impl<'model> Cvt<'model> {
             .map_or_else(|| "core/misc.json".to_owned(), |(path, _)| path)
     }
 
+    /// Places a schema, or merges it into an existing schema of the same name.
+    ///
+    /// A file entry can gather several types: one of them may have named the
+    /// root through its `root_entries` context (already placed by the context
+    /// pass), while the others contribute wrapper fields. Re-placing the name
+    /// would drop those fields and report a bogus collision, so they merge.
+    fn place_or_merge_root(&mut self, name: &str, owner: &str, block: BlockSchema) {
+        let Some(path) = self.schema_file.get(name).cloned() else {
+            self.place_schema(name, owner, block);
+            return;
+        };
+        let Some(file) = self.files.get_mut(&path) else {
+            return;
+        };
+        let Some(SchemaSpec::Block(existing)) = file.schemas.get_mut(name) else {
+            return;
+        };
+        for (key, overloads) in block.fields {
+            match existing.fields.get_mut(&key) {
+                Some(current) => merge_overloads(current, &overloads),
+                None => {
+                    existing.fields.insert(key, overloads);
+                }
+            }
+        }
+        existing.patterns.extend(block.patterns);
+        existing.include.extend(block.include);
+        existing.open |= block.open;
+        order_patterns(&mut existing.patterns);
+    }
+
     fn place_schema(&mut self, name: &str, owner: &str, block: BlockSchema) {
         if let Some(previous) = self.schema_file.get(name) {
             if previous != owner {
@@ -951,21 +1026,31 @@ impl<'model> Cvt<'model> {
             .insert(name.to_owned(), SchemaSpec::Block(block));
     }
 
-    /// Orders patterns from most to least specific (§3.2 fall-through).
-    fn order_patterns(&self, patterns: &mut [FieldSpec]) {
-        patterns.sort_by_key(|pattern| {
-            let rank = match pattern.key.as_deref() {
-                None => 5,
-                Some(key) if key == "link" => 6,
-                Some(key) if key == "scalar" => 5,
-                Some(key) if key.starts_with("def<") => 4,
-                Some(key) if key.starts_with("int") || key == "date" => 3,
-                Some(key) if key.starts_with("ref<") || key.starts_with("enum<") => 1,
-                Some(key) if key.starts_with("'") => 0,
-                _ => 2,
-            };
-            (rank, pattern.key.clone().unwrap_or_default())
-        });
+    /// Two legacy rows can describe the same position once their child
+    /// resolves to the same schema (the declarative and the warning-fallback
+    /// row of a `date_field`, for instance). Identical patterns are one
+    /// pattern; a lenient `severity` from the dropped duplicate is kept, since
+    /// that row's whole point was to tolerate unmodelled keys.
+    fn dedupe_patterns(&mut self, patterns: &mut Vec<FieldSpec>) {
+        let mut merged: Vec<FieldSpec> = Vec::with_capacity(patterns.len());
+        for spec in patterns.drain(..) {
+            if spec.key.is_some()
+                && let Some(existing) = merged.iter_mut().find(|existing| {
+                    existing.key == spec.key
+                        && existing.body == spec.body
+                        && existing.when == spec.when
+                        && existing.unless == spec.unless
+                })
+            {
+                if spec.severity.is_some() && existing.severity.is_none() {
+                    existing.severity = spec.severity;
+                }
+                self.count("duplicate patterns merged");
+                continue;
+            }
+            merged.push(spec);
+        }
+        *patterns = merged;
     }
 
     fn scope_effect(&self, row: &SemanticRule) -> Option<ScopeEffect> {
@@ -1837,7 +1922,7 @@ impl<'model> Cvt<'model> {
                 }
             } else if !block.fields.is_empty() || !block.patterns.is_empty() {
                 roots.insert(entry_name.clone(), root_name.clone());
-                self.place_schema(&root_name, "core/files.json", block);
+                self.place_or_merge_root(&root_name, "core/files.json", block);
             }
         }
         // `type_root_keys` def fields on entry-context schemas.
@@ -2371,6 +2456,23 @@ fn sanitize(text: &str) -> String {
         }
     }
     out.trim_matches('_').to_owned()
+}
+
+/// Orders patterns from most to least specific (§3.2 fall-through).
+fn order_patterns(patterns: &mut [FieldSpec]) {
+    patterns.sort_by_key(|pattern| {
+        let rank = match pattern.key.as_deref() {
+            None => 5,
+            Some(key) if key == "link" => 6,
+            Some(key) if key == "scalar" => 5,
+            Some(key) if key.starts_with("def<") => 4,
+            Some(key) if key.starts_with("int") || key == "date" => 3,
+            Some(key) if key.starts_with("ref<") || key.starts_with("enum<") => 1,
+            Some(key) if key.starts_with("'") => 0,
+            _ => 2,
+        };
+        (rank, pattern.key.clone().unwrap_or_default())
+    });
 }
 
 fn split_subtype(name: &str) -> (&str, Option<&str>) {

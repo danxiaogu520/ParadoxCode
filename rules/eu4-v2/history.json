@@ -13933,7 +13933,7 @@
       ],
       "patterns": [
         {
-          "body": "effect",
+          "body": "country_history_body__date_field",
           "card": "0..*",
           "key": "date",
           "override": true,
@@ -13945,82 +13945,98 @@
       "fields": {
         "capital": {
           "card": "0..1",
+          "override": true,
           "value": "ref<province_id>",
           "when": null
         },
         "changed_tag_from": {
           "card": "0..1",
+          "override": true,
           "value": "enum<country_tags>",
           "when": null
         },
         "clear_scripted_personalities": {
           "card": "0..1",
           "doc": "Pretty sure this one only works when a leader is spawned",
+          "override": true,
           "value": "'yes'",
           "when": null
         },
         "culture": {
           "card": "0..1",
+          "override": true,
           "value": "ref<culture>",
           "when": null
         },
         "decision": {
           "card": "0..*",
+          "override": true,
           "value": "ref<decision>",
           "when": null
         },
         "elector": {
           "card": "0..1",
+          "override": true,
           "value": "bool",
           "when": null
         },
         "government": {
           "card": "0..1",
+          "override": true,
           "value": "ref<government>",
           "when": null
         },
         "government_rank": {
           "card": "0..1",
+          "override": true,
           "value": "int",
           "when": null
         },
         "heir": {
           "body": "country_history_body__date_field__heir",
           "card": "0..1",
+          "override": true,
           "when": null
         },
         "historical_friend": {
           "card": "0..1",
+          "override": true,
           "value": "enum<country_tags>",
           "when": null
         },
         "historical_rival": {
           "card": "0..1",
+          "override": true,
           "value": "enum<country_tags>",
           "when": null
         },
         "leader": {
           "body": "country_history_body__date_field__leader",
           "card": "0..*",
+          "override": true,
           "when": null
         },
         "mercantilism": {
           "card": "0..1",
+          "override": true,
           "value": "int[0..100]",
           "when": null
         },
         "monarch": {
           "body": "country_history_body__date_field__monarch",
           "card": "0..1",
+          "override": true,
           "when": null
         },
         "monarch_consort": {
           "body": "country_history_body__date_field__monarch_consort",
           "card": "0..1",
+          "override": true,
           "when": null
         },
         "primary_culture": {
           "card": "0..1",
+          "override": true,
           "value": "ref<culture>",
           "when": null
         },
@@ -14028,29 +14044,37 @@
           "body": "country_history_body__date_field__queen",
           "card": "0..1",
           "doc": "Defines a consort",
+          "override": true,
           "when": null
         },
         "religion": {
           "card": "0..1",
+          "override": true,
           "value": "ref<religion>",
           "when": null
         },
         "religious_school": {
           "card": "0..1",
+          "override": true,
           "value": "ref<religious_school>",
           "when": null
         },
         "revolution_target": {
           "card": "0..1",
+          "override": true,
           "value": "bool",
           "when": null
         },
         "technology_group": {
           "card": "0..1",
+          "override": true,
           "value": "ref<technology_group>",
           "when": null
         }
-      }
+      },
+      "include": [
+        "keys__effect"
+      ]
     },
     "country_history_body__date_field__heir": {
       "fields": {
@@ -14594,7 +14618,7 @@
           "when": null
         },
         {
-          "body": "diplomacy_history_body__empty",
+          "body": "diplomacy_history_body__date_field",
           "card": "0..*",
           "key": "date",
           "override": true,
@@ -14631,6 +14655,20 @@
         }
       }
     },
+    "diplomacy_history_body__date_field": {
+      "fields": {
+        "celestial_emperor": {
+          "card": "0..1",
+          "value": "enum<country_tags> | '---'",
+          "when": null
+        },
+        "emperor": {
+          "card": "0..1",
+          "value": "enum<country_tags> | '---'",
+          "when": null
+        }
+      }
+    },
     "diplomacy_history_body__dependency": {
       "fields": {
         "end_date": {
@@ -14660,7 +14698,6 @@
         }
       }
     },
-    "diplomacy_history_body__empty": {},
     "diplomacy_history_body__enum_other_diplo_history": {
       "fields": {
         "end_date": {
@@ -14712,7 +14749,7 @@
     "diplomacy_history_type_body": {
       "patterns": [
         {
-          "body": "diplomacy_history_type_body__empty",
+          "body": "diplomacy_history_type_body__date_field",
           "card": "0..0",
           "key": "date",
           "when": null
@@ -14729,7 +14766,6 @@
         }
       ]
     },
-    "diplomacy_history_type_body__empty": {},
     "province_history_body": {
       "fields": {
         "add_core": {
@@ -14916,18 +14952,189 @@
           "when": null
         },
         {
-          "body": "effect",
-          "card": "0..*",
-          "key": "date",
-          "override": true,
-          "when": null
-        },
-        {
-          "body": "province_history_body__empty",
+          "body": "province_history_body__date_field",
           "card": "0..*",
           "key": "date",
           "override": true,
           "severity": "warning",
+          "when": null
+        }
+      ]
+    },
+    "province_history_body__date_field": {
+      "fields": {
+        "add_core": {
+          "card": "0..*",
+          "override": true,
+          "value": "enum<country_tags>",
+          "when": null
+        },
+        "base_manpower": {
+          "card": "0..1",
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "base_production": {
+          "card": "0..1",
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "base_tax": {
+          "card": "0..1",
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "capital": {
+          "card": "0..1",
+          "override": true,
+          "value": "scalar",
+          "when": null
+        },
+        "center_of_trade": {
+          "card": "0..1",
+          "override": true,
+          "value": "int[1..3]",
+          "when": null
+        },
+        "citysize": {
+          "card": "0..1",
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "controller": {
+          "card": "0..1",
+          "override": true,
+          "value": "enum<country_tags> | '---'",
+          "when": null
+        },
+        "culture": {
+          "card": "0..1",
+          "override": true,
+          "value": "ref<culture>",
+          "when": null
+        },
+        "discovered_by": {
+          "card": "0..*",
+          "override": true,
+          "value": "enum<country_tags> | ref<technology_group>",
+          "when": null
+        },
+        "estate": {
+          "card": "0..1",
+          "override": true,
+          "value": "ref<estate>",
+          "when": null
+        },
+        "extra_cost": {
+          "card": "0..1",
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "hre": {
+          "card": "0..1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "is_city": {
+          "card": "0..1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "native_ferocity": {
+          "card": "0..1",
+          "override": true,
+          "value": "float[0.0..10.0]",
+          "when": null
+        },
+        "native_hostileness": {
+          "card": "0..1",
+          "override": true,
+          "value": "float[0.0..10.0]",
+          "when": null
+        },
+        "native_size": {
+          "card": "0..1",
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "owner": {
+          "card": "0..1",
+          "override": true,
+          "value": "enum<country_tags> | '---'",
+          "when": null
+        },
+        "reformation_center": {
+          "card": "0..1",
+          "override": true,
+          "value": "ref<religion>",
+          "when": null
+        },
+        "religion": {
+          "card": "0..1",
+          "override": true,
+          "value": "ref<religion>",
+          "when": null
+        },
+        "remove_core": {
+          "card": "0..*",
+          "override": true,
+          "value": "enum<country_tags>",
+          "when": null
+        },
+        "revolt": {
+          "body": "province_history_body__date_field__revolt",
+          "card": "0..2",
+          "override": true,
+          "when": null
+        },
+        "revolt_risk": {
+          "card": "0..1",
+          "override": true,
+          "value": "int[0..100]",
+          "when": null
+        },
+        "seat_in_parliament": {
+          "card": "0..2",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "trade_goods": {
+          "card": "0..1",
+          "override": true,
+          "value": "ref<trade_good>",
+          "when": null
+        },
+        "tribal_owner": {
+          "card": "0..1",
+          "override": true,
+          "value": "enum<country_tags>",
+          "when": null
+        },
+        "unrest": {
+          "card": "0..1",
+          "override": true,
+          "value": "int[0..100]",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__effect"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "ref<building>",
+          "override": true,
+          "value": "bool",
           "when": null
         }
       ]
@@ -14956,7 +15163,6 @@
         }
       }
     },
-    "province_history_body__empty": {},
     "province_history_body__latent_trade_goods": {
       "items": "ref<trade_good.latent>"
     },
@@ -14994,7 +15200,7 @@
       },
       "patterns": [
         {
-          "body": "war_history_body__empty",
+          "body": "war_history_body__date_field",
           "card": "0..*",
           "key": "date",
           "when": null
@@ -15115,7 +15321,6 @@
         }
       ]
     },
-    "war_history_body__empty": {},
     "war_history_body__war_goal": {
       "fields": {
         "casus_belli": {
