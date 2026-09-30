@@ -675,9 +675,48 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 
 - 实现第 5 节 IR、编译降级与查询 API；以 events + on_action + decisions 为样板写 IR 级单测（def 收集、subtype 判定、单态化、`link` pattern）。
 
-### 阶段 4：消费方改造
+### 阶段 4：消费方改造 — **进行中**（2026-10-01 起步）
 
 - 按 5.3 的顺序改造 hir → ide；每完成一个模块就跑 golden，允许 golden 变化，但每个变化须在提交说明中归类为“预期（新语言更精确）”或“已修复的回归”。
+
+> 实施备注（增量 1：IR 进入运行时，行为中性）：
+> - 新增 `crates/rules/src/bundle.rs`：rules-v2 bundle 加载器（`Bundle`/`BundleFile`/`load_bundle`/`load_directory`）。
+>   校验三条契约：manifest 列出的文件必须都在、不得夹带未列出的文件、`game.json` 的 `game_id` 必须与 manifest 一致；
+>   `manifest.json`/`game.json` 是 bundle 配置，不得出现在 `files` 里。加载与编译分离：装出来的
+>   `Sources { files, game, manifest }` 直接喂 `lower`。这条路径阶段 5 保留（替代被删的 `rulec` 加载器）。
+> - `RulesIr::empty()` 与 `RulesIr::game_id()`；`RulesIr::new` 收为 `pub(crate)`（arena 只能在降级过程中正确构造）。
+> - `crates/game` 现在同时嵌入两套语料：旧的 `FIRST_PARTY_FILES`（`rules/eu4`，112 文件）与新的
+>   `FIRST_PARTY_V2_FILES`（`rules/eu4-v2`，88 文件 + `game.json` + `manifest.json`，均为 `include_bytes!`，
+>   无生成器）。新入口 `first_party_ir() -> Result<Arc<RulesIr>, RulesError>`（`OnceLock` 缓存，返回 `Arc`
+>   而不是像 `first_party_rules()` 那样深拷贝——IR 是 1.2k schema / 9.7k field 的 arena）。阶段 5 删掉旧的一半。
+> - `crates/engine`：`AnalysisHost` 与 `AnalysisSnapshot` 各增一个 `ir: Arc<RulesIr>` 字段（两个结构体只
+>   derive `Clone, Debug`，加字段安全；`Arrow` 身份与 `rules` 同等对待，克隆/快照必须共享同一个 handle）。
+>   新增 `AnalysisHost::with_ir(rules, profile, ir)`、`set_ir`（handle 变了才 `advance_revision`，避免缓存
+>   比规则活得久）、`ir()`，以及 `AnalysisSnapshot::ir()`；`with_profile` 默认装 `RulesIr::empty()`，
+>   所以生产接线之前一切照旧。
+> - 验证：本增量没有任何模块读 IR，故 golden 必须逐字节不变（`cargo test --workspace` 全绿即证明）；
+>   另加 bundle 单测、`game` 的「嵌入式 bundle 与文件系统 bundle 编译出同一 arena」测试
+>   （比较 schema/field/matcher/files 数量 + 驻留字符串全集）、engine 的 handle 共享与 revision 测试。
+> - 实测成本（dev profile，本机）：旧 `first_party_rules()` **39.8ms** / 8,463 条规则；新 `first_party_ir()`
+>   **226ms** / 1,224 schema / 9,673 field / 3,894 matcher；缓存命中 41ns。迁移期两者并存 ≈ 266ms 启动开销；
+>   阶段 5 之后 IR 单独 226ms，比今天的 40ms 慢——**退出标准 4（加载时间不劣于切换前）有风险**，需要在
+>   阶段 4/5 收口：`lower` 现在先跑一遍 `compile::check` 再重新解析所有 mini-syntax 字符串，最自然的优化是
+>   让检查过程把解析结果交给降级（一趟），或者对已检查过的嵌入式 bundle 跳过进程启动时的 §10.1 复检
+>   （把检查固定在 bake 期）。
+> - 两个必须在第一个消费方之前定掉的决定：
+>   1. **指纹/缓存要覆盖 IR**。`engine/src/fingerprint.rs` 只哈希 `snapshot.rules().rule_hash()`，磁盘
+>      index cache 也只存 `game_id` + `rule_hash`。一旦某个模块的产出（def/ref 采集、诊断）取决于 IR，
+>      改 `rules/eu4-v2` 就会出现「旧缓存仍然有效」的错误复用。方案二选一：给 `RulesIr` 做结构化
+>      canonical hash（照 `canonical.rs` 的样子），或让 bundle 加载器把源字节哈希带进 `GameConfig`/`RulesIr`。
+>   2. **`subtypes_of` 需要 workspace 事实**（`SymbolFacts`），否则 `ref<>`/`def<>` 型 `when` 一律判否。
+>      hir 层必须提供实现，这决定了 subtype 判定的落点。
+> - 生产接线（`pdc` 的 `try_new_with_rules` 与 `run_stdio_*` 变体装 `game::eu4::first_party_ir()`）与第一个
+>   消费方一起落地，本增量刻意不接，以保证「零行为变化」这个检查点是干净的。
+> - 消费方须知（阶段 3 备注里已记，这里再点名，因为它直接决定 hir 怎么改）：一个 `FieldId` 可能同时属于
+>   多个 schema（field arena 按「结构 + 来源」驻留），所以不能假设 field → 唯一 schema；`body: "self"`
+>   要用 `child(field, current)` 以当前 schema 解开。
+> - 下一个增量：`crates/hir/src/scope.rs`（1,031 行、8 个 `&RuleSet` 参数；全仓 `parent_path` 327 处），
+>   把 `(context, parent_path)` 换成沿 `SchemaId` 行走，然后跑 golden 并逐条归类变化。
 
 ### 阶段 5：切换
 
