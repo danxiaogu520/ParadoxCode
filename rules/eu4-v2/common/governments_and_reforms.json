@@ -110,16 +110,6 @@
           "key": "ref<government_reform>",
           "override": true,
           "when": null
-        },
-        {
-          "card": "0..1",
-          "key": "ref<government_reform>",
-          "map": {
-            "body": "government_body__government_reform",
-            "key": "def<government_reform>"
-          },
-          "override": true,
-          "when": null
         }
       ]
     },
@@ -1864,12 +1854,9 @@
     "government_reform_body__assimilation_cultures": {
       "patterns": [
         {
+          "body": "government_reform_body__assimilation_cultures__culture_group",
           "card": "0..*",
           "key": "ref<culture_group>",
-          "map": {
-            "body": "government_reform_body__assimilation_cultures__culture_group",
-            "key": "def<culture_group>"
-          },
           "scope": {
             "set": {
               "root": "country",

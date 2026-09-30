@@ -14608,12 +14608,9 @@
           "when": null
         },
         {
+          "body": "diplomacy_history_body__subject_type",
           "card": "0..*",
           "key": "ref<subject_type>",
-          "map": {
-            "body": "diplomacy_history_body__subject_type",
-            "key": "def<subject_type>"
-          },
           "override": true,
           "when": null
         },

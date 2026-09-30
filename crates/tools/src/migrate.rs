@@ -832,16 +832,62 @@ impl<'model> Cvt<'model> {
             );
             return None;
         }
+        // A `{type: X}` node key is a definition site of X only when the
+        // profile collects X's definitions from the documents this context
+        // describes. `common/governments` naming a reform is a use, not a
+        // second definition file.
+        match self.context_definition_path(context, base) {
+            Some(true) => {}
+            Some(false) => {
+                self.count("magic keys kept as ref patterns");
+                self.manual(
+                    "magic-segments",
+                    format!(
+                        "context `{context}`: key `ref<{canonical}>` kept as a reference pattern — \
+                         the profile defines `{base}` in another directory"
+                    ),
+                );
+                return None;
+            }
+            None => {
+                self.manual(
+                    "magic-segments",
+                    format!(
+                        "context `{context}`: key `ref<{canonical}>` converted to \
+                         `map {{key: \"def<{canonical}>\", …}}` — verify this is the real \
+                         definition site (no file path to compare)"
+                    ),
+                );
+            }
+        }
         self.count("magic keys converted to def maps");
         self.tree_defs.insert(base.to_owned());
-        self.manual(
-            "magic-segments",
-            format!(
-                "context `{context}`: key `ref<{canonical}>` converted to \
-                 `map {{key: \"def<{canonical}>\", …}}` — verify this is the real definition site"
-            ),
-        );
         Some((format!("def<{canonical}>"), Some(canonical)))
+    }
+
+    /// Whether definitions of `type_name` come from the directory `context`
+    /// describes.
+    ///
+    /// `None` means the comparison is not possible (one of the two has no
+    /// profile path), so the caller keeps its previous behaviour but asks for
+    /// a manual look.
+    fn context_definition_path(&self, context: &str, type_name: &str) -> Option<bool> {
+        let context_name = context.strip_prefix("root:")?;
+        let path_of = |name: &str| {
+            let descriptor = self.model.semantic.type_descriptors.get(name)?;
+            let path = descriptor
+                .path
+                .as_deref()
+                .unwrap_or_default()
+                .trim_end_matches('/');
+            if path.is_empty() {
+                return None;
+            }
+            Some(path.strip_prefix("game/").unwrap_or(path).to_owned())
+        };
+        let context_path = path_of(context_name)?;
+        let type_path = path_of(type_name)?;
+        Some(context_path == type_path || context_path.starts_with(&format!("{type_path}/")))
     }
 
     /// The `body`/`map` target of a block-valued row.
@@ -1024,6 +1070,30 @@ impl<'model> Cvt<'model> {
         self.file(owner)
             .schemas
             .insert(name.to_owned(), SchemaSpec::Block(block));
+    }
+
+    /// The definition kind a conditional definition refines: the profile
+    /// `definitions` rule whose path selects the same documents.
+    fn conditional_base_kind(
+        &self,
+        rule: &rules::ProfileConditionalDefinitionRule,
+    ) -> Option<String> {
+        let pattern = rule.path.pattern.trim_end_matches('/');
+        if pattern.is_empty() {
+            return None;
+        }
+        self.model
+            .profile
+            .definitions
+            .iter()
+            .find(|definition| {
+                let candidate = definition.path.pattern.trim_end_matches('/');
+                !candidate.is_empty()
+                    && (candidate == pattern
+                        || candidate.ends_with(pattern)
+                        || pattern.ends_with(candidate))
+            })
+            .map(|definition| definition.kind.clone())
     }
 
     /// Two legacy rows can describe the same position once their child
@@ -1495,9 +1565,20 @@ impl<'model> Cvt<'model> {
             }
         }
         // `conditional_definitions` → subtype `when` predicates (§4).
+        //
+        // The legacy rule does not replace a definition: it pushes a *second*
+        // definition of its own kind for the same property, gated on nested
+        // fields. In rules-v2 that is a subtype of the type the profile
+        // already collects at that path, granted by a `when` predicate.
         for rule in &self.model.profile.conditional_definitions {
             let canonical = self.norm.type_name(&rule.kind);
-            let base = canonical.split('.').next().unwrap_or(&canonical).to_owned();
+            let base = self
+                .conditional_base_kind(rule)
+                .map(|kind| {
+                    let kind = self.norm.type_name(&kind);
+                    kind.split('.').next().unwrap_or(&kind).to_owned()
+                })
+                .unwrap_or_else(|| canonical.split('.').next().unwrap_or(&canonical).to_owned());
             let entry = types.entry(base).or_default();
             let subtype = canonical
                 .split_once('.')
@@ -1514,14 +1595,6 @@ impl<'model> Cvt<'model> {
                     ]))),
                     trait_impls: BTreeMap::new(),
                 },
-            );
-            self.manual(
-                "subtype-when",
-                format!(
-                    "conditional definition `{}` → subtype `when: {{\"{}\": \"'{}'\", \"{}\": null}}` \
-                     — verify the predicate reads the right fields",
-                    rule.kind, rule.required_field, rule.required_value, rule.absent_field
-                ),
             );
         }
         // Localisation / sprite bindings → `Localised` / `HasIcon` impls.
@@ -2286,21 +2359,27 @@ fn render_json(file: &RuleFile) -> String {
 }
 
 fn prune(value: serde_json::Value) -> serde_json::Value {
-    prune_inner(value, false)
+    prune_inner(value, false, false)
 }
 
-fn prune_inner(value: serde_json::Value, in_enums: bool) -> serde_json::Value {
+/// `keep_nulls` marks the inside of a `params` / `when` object, where a `null`
+/// member is a statement ("no default" / "the field must be absent") rather
+/// than an omitted value.
+fn prune_inner(value: serde_json::Value, in_enums: bool, keep_nulls: bool) -> serde_json::Value {
     match value {
         serde_json::Value::Object(map) => {
             let mut out = serde_json::Map::new();
             for (key, entry) in map {
-                // `null` values carry meaning inside trait parameters and
-                // subtype predicates ("no default" / "field must be absent").
-                if entry.is_null() && key != "params" && key != "when" {
+                // A `null` value carries meaning inside trait parameters and
+                // subtype predicates, both as the container's own value
+                // (`"when": null` = no predicate) and as a member of the
+                // container (`{"legacy_equivalent": null}` = absent field).
+                let container = key == "params" || key == "when";
+                if entry.is_null() && !container && !keep_nulls {
                     continue;
                 }
                 let child_in_enums = in_enums || key == "enums";
-                let pruned = prune_inner(entry, child_in_enums);
+                let pruned = prune_inner(entry, child_in_enums, container || keep_nulls);
                 let empty_array = pruned.as_array().is_some_and(Vec::is_empty);
                 let empty_object = pruned.as_object().is_some_and(serde_json::Map::is_empty);
                 if empty_array && key != "from" && !in_enums {
@@ -2316,7 +2395,7 @@ fn prune_inner(value: serde_json::Value, in_enums: bool) -> serde_json::Value {
         serde_json::Value::Array(items) => serde_json::Value::Array(
             items
                 .into_iter()
-                .map(|item| prune_inner(item, in_enums))
+                .map(|item| prune_inner(item, in_enums, keep_nulls))
                 .collect(),
         ),
         other => other,

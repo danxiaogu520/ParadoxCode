@@ -177,7 +177,7 @@
       "parser": "script",
       "path": "common/cultures",
       "resolution": "merge",
-      "root": "open_script_file"
+      "root": "common_cultures_file"
     },
     "eu4_path_common_custom_country_colors": {
       "ext": "txt",
@@ -721,7 +721,7 @@
       "parser": "script",
       "path": "common/subject_types",
       "resolution": "merge",
-      "root": "open_script_file"
+      "root": "common_subject_types_file"
     },
     "eu4_path_common_technologies": {
       "ext": "txt",
@@ -764,7 +764,7 @@
       "parser": "script",
       "path": "common/tradegoods",
       "resolution": "merge",
-      "root": "open_script_file"
+      "root": "common_tradegoods_file"
     },
     "eu4_path_common_tradenodes": {
       "ext": "txt",
@@ -1283,6 +1283,16 @@
         }
       ]
     },
+    "common_cultures_file": {
+      "patterns": [
+        {
+          "body": "culture_group_body",
+          "card": "0..1",
+          "key": "def<culture_group>",
+          "when": null
+        }
+      ]
+    },
     "common_custom_ideas_file": {
       "patterns": [
         {
@@ -1507,6 +1517,12 @@
           "body": "government_attributes_body",
           "card": "0..1",
           "key": "def<government_attributes>",
+          "when": null
+        },
+        {
+          "body": "government_reform_body",
+          "card": "0..1",
+          "key": "def<government_reform>",
           "when": null
         }
       ]
@@ -1909,6 +1925,16 @@
         }
       ]
     },
+    "common_subject_types_file": {
+      "patterns": [
+        {
+          "body": "subject_type_body",
+          "card": "0..1",
+          "key": "def<subject_type>",
+          "when": null
+        }
+      ]
+    },
     "common_technologies_file": {
       "fields": {
         "ahead_of_time": {
@@ -1955,6 +1981,16 @@
           "body": "trade_company_investment_body",
           "card": "0..1",
           "key": "def<trade_company_investment>",
+          "when": null
+        }
+      ]
+    },
+    "common_tradegoods_file": {
+      "patterns": [
+        {
+          "body": "trade_good_body",
+          "card": "0..1",
+          "key": "def<trade_good>",
           "when": null
         }
       ]

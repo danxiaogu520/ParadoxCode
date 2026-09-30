@@ -14,12 +14,9 @@
     "prices_body": {
       "patterns": [
         {
+          "body": "prices_body__trade_good",
           "card": "1..*",
           "key": "ref<trade_good>",
-          "map": {
-            "body": "prices_body__trade_good",
-            "key": "def<trade_good>"
-          },
           "when": null
         }
       ]
