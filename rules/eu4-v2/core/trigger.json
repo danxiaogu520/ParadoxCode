@@ -2670,7 +2670,7 @@
             ]
           },
           "severity": "warning",
-          "value": "enum<government_attributes> | scalar",
+          "value": "ref<government_attributes> | scalar",
           "when": null
         },
         "has_government_attribute_short_desc": {
@@ -2681,7 +2681,7 @@
               "country"
             ]
           },
-          "value": "enum<government_attributes>",
+          "value": "ref<government_attributes>",
           "when": null
         },
         "has_government_mechanic": {
@@ -12348,7 +12348,7 @@
             ]
           },
           "severity": "warning",
-          "value": "enum<government_attributes> | scalar",
+          "value": "ref<government_attributes> | scalar",
           "when": null
         },
         "has_government_attribute_short_desc": {
@@ -12359,7 +12359,7 @@
               "country"
             ]
           },
-          "value": "enum<government_attributes>",
+          "value": "ref<government_attributes>",
           "when": null
         },
         "has_government_mechanic": {

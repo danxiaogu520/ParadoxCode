@@ -194,11 +194,25 @@ impl<'model> Cvt<'model> {
         enum_names.extend(model.profile.enum_extra_members.keys().cloned());
         enum_names.sort();
         enum_names.dedup();
-        let norm = Norm {
+        let mut def_types: BTreeSet<String> =
+            model.semantic.type_descriptors.keys().cloned().collect();
+        def_types.extend(
+            model
+                .profile
+                .definitions
+                .iter()
+                .map(|rule| rule.kind.clone()),
+        );
+        let mut norm = Norm {
             aliases: model.profile.member_kind_aliases.clone(),
             scope_aliases: model.profile.scope_member_aliases.clone(),
             enum_names,
+            type_names: BTreeSet::new(),
         };
+        norm.type_names = def_types
+            .iter()
+            .map(|name| norm.type_name(name))
+            .collect();
         let mut converter = Self {
             model,
             norm,
@@ -214,21 +228,13 @@ impl<'model> Cvt<'model> {
             manual: BTreeMap::new(),
             counters: BTreeMap::new(),
             on_action_scopes: BTreeMap::new(),
-            def_types: BTreeSet::new(),
+            def_types,
             tree_defs: BTreeSet::new(),
             game_json: serde_json::Value::Null,
             manifest_files: Vec::new(),
             target_game_version: String::new(),
         };
         converter.load_rows(source)?;
-        converter.def_types = model.semantic.type_descriptors.keys().cloned().collect();
-        converter.def_types.extend(
-            model
-                .profile
-                .definitions
-                .iter()
-                .map(|rule| rule.kind.clone()),
-        );
         Ok(converter)
     }
 

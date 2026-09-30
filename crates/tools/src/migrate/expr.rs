@@ -18,6 +18,10 @@ pub struct Norm {
     pub scope_aliases: BTreeMap<String, String>,
     /// Names of all legacy static enums (for `enum<…>` spelling checks).
     pub enum_names: Vec<String>,
+    /// Names of every symbol type that has a definition site. A reference
+    /// spelled `enum:` that names one of these is a symbol reference, not an
+    /// enum member.
+    pub type_names: std::collections::BTreeSet<String>,
 }
 
 impl Norm {
@@ -63,6 +67,26 @@ impl Norm {
             .cloned()
             .unwrap_or_else(|| name.to_owned())
     }
+
+    /// Renders an `enum:` reference.
+    ///
+    /// Legacy rules use `enum:` for anything with a fixed member list, but a
+    /// few names are symbol types with definition sites rather than enums
+    /// (`government_attributes` is defined in `common/government_reforms`).
+    /// Those become symbol references; anything else stays an enum, which the
+    /// caller either declares or reports as a stub.
+    #[must_use]
+    pub fn enum_or_ref(&self, name: &str) -> String {
+        let canonical = self.enum_name(name);
+        if self.enum_names.iter().any(|known| known == &canonical) {
+            return format!("enum<{canonical}>");
+        }
+        let as_type = self.type_name(name);
+        if self.type_names.contains(&as_type) {
+            return format!("ref<{as_type}>");
+        }
+        format!("enum<{canonical}>")
+    }
 }
 
 /// Renders a value matcher as a type expression.
@@ -82,7 +106,7 @@ pub fn value_expr(value: &ValueMatcher, norm: &Norm) -> String {
         ),
         ValueMatcher::Date => "date".to_owned(),
         ValueMatcher::Type(name) => format!("ref<{}>", norm.type_name(name)),
-        ValueMatcher::Enum(name) => format!("enum<{}>", norm.enum_name(name)),
+        ValueMatcher::Enum(name) => norm.enum_or_ref(name),
         ValueMatcher::Scope(scope) => format!(
             "scope<{}>",
             scope
@@ -112,7 +136,7 @@ pub fn key_expr(key: &KeyMatcher, norm: &Norm) -> String {
     match key {
         KeyMatcher::Exact(spelling) => literal(spelling),
         KeyMatcher::Type(name) => format!("ref<{}>", norm.type_name(name)),
-        KeyMatcher::Enum(name) => format!("enum<{}>", norm.enum_name(name)),
+        KeyMatcher::Enum(name) => norm.enum_or_ref(name),
         KeyMatcher::Dynamic(name) => format!("def<{}>", norm.type_name(name)),
         KeyMatcher::AnyScalar => "scalar".to_owned(),
         KeyMatcher::Int { min, max } => {
