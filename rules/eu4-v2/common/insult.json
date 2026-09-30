@@ -1,0 +1,21 @@
+{
+  "schemas": {
+    "insult_body": {
+      "fields": {
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    }
+  }
+}

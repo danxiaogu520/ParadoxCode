@@ -1,0 +1,50 @@
+{
+  "schemas": {
+    "defender_faith_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "defender_faith_body__ai_will_do",
+          "card": "1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "when": null
+        },
+        "level": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        },
+        "range_from": {
+          "value": "int",
+          "when": null
+        },
+        "range_to": {
+          "value": "int",
+          "when": null
+        },
+        "same_faith_modifier": {
+          "body": "modifier",
+          "when": null
+        }
+      }
+    },
+    "defender_faith_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    }
+  }
+}

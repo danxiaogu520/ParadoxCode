@@ -1,0 +1,38 @@
+{
+  "schemas": {
+    "ai_personality_body": {
+      "fields": {
+        "chance": {
+          "body": "ai_personality_body__chance",
+          "card": "1",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "icon": {
+          "card": "1",
+          "value": "int[1..6]",
+          "when": null
+        }
+      }
+    },
+    "ai_personality_body__chance": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    }
+  }
+}

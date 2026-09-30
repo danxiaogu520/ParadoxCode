@@ -1,0 +1,102 @@
+{
+  "schemas": {
+    "advisor_type_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "advisor_type_body__ai_will_do",
+          "card": "1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "allow_only_female": {
+          "value": "'yes'",
+          "when": null
+        },
+        "allow_only_male": {
+          "value": "'yes'",
+          "when": null
+        },
+        "allow_only_owner_religion": {
+          "value": "'yes'",
+          "when": null
+        },
+        "chance": {
+          "body": "advisor_type_body__chance",
+          "card": "1",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "monarch_power": {
+          "card": "1",
+          "value": "enum<power_categories>",
+          "when": null
+        },
+        "skill_scaled_modifier": {
+          "body": "advisor_type_body__skill_scaled_modifier",
+          "card": "0..*",
+          "doc": "Modifier scales by level of advisor, applies if trigger is true",
+          "when": null
+        }
+      }
+    },
+    "advisor_type_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "advisor_type_body__chance": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "advisor_type_body__skill_scaled_modifier": {
+      "fields": {
+        "modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "this": "province"
+            }
+          },
+          "when": null
+        }
+      }
+    }
+  }
+}

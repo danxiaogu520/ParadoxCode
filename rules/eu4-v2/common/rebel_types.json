@@ -1,0 +1,263 @@
+{
+  "schemas": {
+    "rebel_type_body": {
+      "fields": {
+        "area": {
+          "card": "1",
+          "value": "enum<rebel_areas>",
+          "when": null
+        },
+        "artillery": {
+          "card": "1",
+          "value": "float[0.0..1.0]",
+          "when": null
+        },
+        "can_enforce_trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "root = country negotiating, from = rebels",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "can_negotiate_trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "root = country negotiating, from = rebels",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "cavalry": {
+          "card": "1",
+          "value": "float[0.0..1.0]",
+          "when": null
+        },
+        "color": {
+          "card": "1",
+          "list": "int[0..]",
+          "when": null
+        },
+        "defect_delay": {
+          "doc": "Held provinces will auto-defect after 18 months, regardless of accept/enforce demands.",
+          "value": "int",
+          "when": null
+        },
+        "defection": {
+          "card": "1",
+          "value": "enum<rebel_defection>",
+          "when": null
+        },
+        "demands_description": {
+          "card": "1",
+          "doc": "Localisation for their demands",
+          "value": "loc",
+          "when": null
+        },
+        "demands_enforced_effect": {
+          "body": "effect",
+          "card": "1",
+          "doc": "root = country negotiating, from = rebels",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "disband_on_leader_death": {
+          "value": "bool",
+          "when": null
+        },
+        "dynasty": {
+          "value": "bool",
+          "when": null
+        },
+        "general": {
+          "card": "1",
+          "value": "bool",
+          "when": null
+        },
+        "gfx_type": {
+          "card": "1",
+          "value": "enum<rebel_gfx_type>",
+          "when": null
+        },
+        "government": {
+          "value": "enum<rebel_governments>",
+          "when": null
+        },
+        "handle_action_build_core": {
+          "value": "bool",
+          "when": null
+        },
+        "handle_action_change_culture": {
+          "value": "bool",
+          "when": null
+        },
+        "handle_action_negotiate": {
+          "card": "1",
+          "value": "bool",
+          "when": null
+        },
+        "handle_action_send_missionary": {
+          "value": "bool",
+          "when": null
+        },
+        "handle_action_stability": {
+          "card": "1",
+          "value": "bool",
+          "when": null
+        },
+        "has_reform": {
+          "value": "ref<government_reform>",
+          "when": null
+        },
+        "independence": {
+          "card": "1",
+          "value": "enum<rebel_independence>",
+          "when": null
+        },
+        "infantry": {
+          "card": "1",
+          "value": "float[0.0..1.0]",
+          "when": null
+        },
+        "morale": {
+          "card": "1",
+          "value": "float",
+          "when": null
+        },
+        "movement_evaluation": {
+          "body": "rebel_type_body__movement_evaluation",
+          "card": "1",
+          "doc": "This is checked for EACH province in the Area of Operations",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "reinforcing": {
+          "card": "1",
+          "doc": "Will reinforce (double rate in rebel controlled provinces)",
+          "value": "bool",
+          "when": null
+        },
+        "religion": {
+          "value": "ref<religion>",
+          "when": null
+        },
+        "resilient": {
+          "card": "1",
+          "value": "bool",
+          "when": null
+        },
+        "revolutionary": {
+          "value": "bool",
+          "when": null
+        },
+        "siege_won_effect": {
+          "body": "effect",
+          "card": "1",
+          "doc": "root = province, from = owner",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "siege_won_trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "root = province, from = owner",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "smart": {
+          "card": "1",
+          "doc": "Do assault forts, tactically withdraw from battle, etc.",
+          "value": "bool",
+          "when": null
+        },
+        "spawn_chance": {
+          "body": "rebel_type_body__spawn_chance",
+          "card": "1",
+          "doc": "The rebel type with the highest modifier for this province gets picked",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "unit_transfer": {
+          "card": "1",
+          "value": "bool",
+          "when": null
+        },
+        "will_relocate": {
+          "card": "1",
+          "doc": "Units will relocate if they have sieged all provinces nearby and has to move over sea.",
+          "value": "bool",
+          "when": null
+        }
+      }
+    },
+    "rebel_type_body__color": {
+      "items": "int[0..]"
+    },
+    "rebel_type_body__movement_evaluation": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "rebel_type_body__spawn_chance": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    }
+  }
+}

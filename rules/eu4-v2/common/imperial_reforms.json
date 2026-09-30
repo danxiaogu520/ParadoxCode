@@ -1,0 +1,201 @@
+{
+  "mixins": {
+    "keys__type_imperial_reform": {
+      "fields": {
+        "elector": {
+          "value": "scalar",
+          "when": null
+        },
+        "elector_per_prince": {
+          "value": "scalar",
+          "when": null
+        },
+        "emperor": {
+          "value": "scalar",
+          "when": null
+        },
+        "emperor_per_prince": {
+          "value": "scalar",
+          "when": null
+        },
+        "empire": {
+          "card": "1",
+          "value": "'hre' | 'celestial_empire'",
+          "when": null
+        },
+        "member": {
+          "value": "scalar",
+          "when": null
+        },
+        "province": {
+          "value": "scalar",
+          "when": null
+        }
+      }
+    }
+  },
+  "schemas": {
+    "imperial_reform_body": {
+      "fields": {
+        "ai_acceptance_centralize": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "ai_acceptance_decentralize": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "all": {
+          "body": "modifier",
+          "override": true,
+          "scope": {
+            "push": "country"
+          },
+          "when": null
+        },
+        "disabled_by": {
+          "override": true,
+          "value": "ref<imperial_reform.hre> | ref<imperial_reform.china>",
+          "when": null
+        },
+        "disables_hre_badboy_points": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "discounted_from_foreign_overlord_check": {
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "elector": {
+          "body": "modifier",
+          "override": true,
+          "when": null
+        },
+        "elector_per_prince": {
+          "body": "modifier",
+          "override": true,
+          "when": null
+        },
+        "emperor": {
+          "body": "modifier",
+          "override": true,
+          "when": null
+        },
+        "emperor_per_prince": {
+          "body": "modifier",
+          "override": true,
+          "when": null
+        },
+        "empire": {
+          "card": "1",
+          "override": true,
+          "value": "'hre' | 'celestial_empire'",
+          "when": null
+        },
+        "gui_container": {
+          "override": true,
+          "value": "'mainline' | 'left_branch' | 'right_branch' | 'nodlc'",
+          "when": null
+        },
+        "member": {
+          "body": "modifier",
+          "override": true,
+          "when": null
+        },
+        "off_effect": {
+          "body": "effect",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "on_effect": {
+          "body": "effect",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "override": true,
+          "when": null
+        },
+        "province": {
+          "body": "modifier",
+          "override": true,
+          "scope": {
+            "push": "province"
+          },
+          "when": null
+        },
+        "required_reform": {
+          "override": true,
+          "value": "ref<imperial_reform.hre> | ref<imperial_reform.china>",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "doc": "Whether the reform can be enacted",
+          "override": true,
+          "when": null
+        },
+        "war": {
+          "doc": "Special AI check for a reform that may cause a war",
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__type_imperial_reform"
+      ]
+    },
+    "imperial_reform_type_body": {
+      "fields": {
+        "elector": {
+          "value": "scalar",
+          "when": null
+        },
+        "elector_per_prince": {
+          "value": "scalar",
+          "when": null
+        },
+        "emperor": {
+          "value": "scalar",
+          "when": null
+        },
+        "emperor_per_prince": {
+          "value": "scalar",
+          "when": null
+        },
+        "empire": {
+          "card": "1",
+          "value": "'hre' | 'celestial_empire'",
+          "when": null
+        },
+        "member": {
+          "value": "scalar",
+          "when": null
+        },
+        "province": {
+          "value": "scalar",
+          "when": null
+        }
+      }
+    }
+  }
+}

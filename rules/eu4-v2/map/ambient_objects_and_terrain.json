@@ -1,0 +1,182 @@
+{
+  "schemas": {
+    "ambient_object_basis_body": {
+      "fields": {
+        "always_visible": {
+          "value": "'yes'",
+          "when": null
+        },
+        "object": {
+          "body": "ambient_object_basis_body__object",
+          "card": "1..*",
+          "when": null
+        },
+        "scale": {
+          "value": "float",
+          "when": null
+        },
+        "time_duration": {
+          "value": "float",
+          "when": null
+        },
+        "type": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "use_animation": {
+          "card": "1",
+          "value": "bool",
+          "when": null
+        },
+        "visible_in_all_map_modes": {
+          "value": "'yes'",
+          "when": null
+        }
+      }
+    },
+    "ambient_object_basis_body__object": {
+      "fields": {
+        "hidden_on_start": {
+          "card": "1",
+          "value": "bool",
+          "when": null
+        },
+        "name": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "position": {
+          "card": "1",
+          "list": "float",
+          "when": null
+        },
+        "rotation": {
+          "card": "1",
+          "list": "float",
+          "when": null
+        }
+      }
+    },
+    "ambient_object_basis_body__object__position": {
+      "items": "float"
+    },
+    "ambient_object_basis_body__object__rotation": {
+      "items": "float"
+    },
+    "graphical_terrain_body": {
+      "fields": {
+        "color": {
+          "card": "1",
+          "list": "int",
+          "when": null
+        },
+        "type": {
+          "card": "1",
+          "value": "ref<terrain>",
+          "when": null
+        }
+      }
+    },
+    "graphical_terrain_body__color": {
+      "items": "int"
+    },
+    "terrain_body": {
+      "fields": {
+        "color": {
+          "list": "int[0..]",
+          "when": null
+        },
+        "combat_width": {
+          "doc": "Multiplier to increase or decrease combat width in this terrain",
+          "value": "float",
+          "when": null
+        },
+        "cs_only_local_development_cost": {
+          "value": "float",
+          "when": null
+        },
+        "defence": {
+          "doc": "Addition to defence roll in combat in this terrain",
+          "value": "int",
+          "when": null
+        },
+        "inland_sea": {
+          "value": "'yes'",
+          "when": null
+        },
+        "is_water": {
+          "value": "'yes'",
+          "when": null
+        },
+        "movement_cost": {
+          "doc": "Multiplier to movement time into/out of province with terrain",
+          "value": "float",
+          "when": null
+        },
+        "nation_designer_cost_multiplier": {
+          "doc": "Extra cost multiplier when picked in the Nation Designer",
+          "value": "float",
+          "when": null
+        },
+        "sound_type": {
+          "value": "enum<terrain_sound_types>",
+          "when": null
+        },
+        "terrain_override": {
+          "list": "ref<province_id>",
+          "when": null
+        },
+        "type": {
+          "doc": "Types are used by the game to apply certain bonuses/maluses on movement/combat etc.",
+          "value": "enum<terrain_types>",
+          "when": null
+        }
+      },
+      "patterns": [
+        {
+          "body": "terrain_body__empty",
+          "card": "0..*",
+          "key": "scalar",
+          "when": null
+        }
+      ]
+    },
+    "terrain_body__color": {
+      "items": "int[0..]"
+    },
+    "terrain_body__empty": {},
+    "terrain_body__terrain_override": {
+      "items": "ref<province_id>"
+    },
+    "trade_winds_body": {
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "province id = rotation in degrees, 0 is pointing right, then ccw",
+          "key": "ref<province_id>",
+          "value": "int",
+          "when": null
+        }
+      ]
+    },
+    "tree_terrain_body": {
+      "fields": {
+        "color": {
+          "card": "1",
+          "list": "int",
+          "when": null
+        },
+        "terrain": {
+          "card": "1",
+          "value": "ref<terrain>",
+          "when": null
+        }
+      }
+    },
+    "tree_terrain_body__color": {
+      "items": "int"
+    }
+  }
+}

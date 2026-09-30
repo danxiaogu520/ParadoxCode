@@ -1,0 +1,62 @@
+{
+  "schemas": {
+    "federation_advancements_body": {
+      "fields": {
+        "ai_chance": {
+          "body": "federation_advancements_body__ai_chance",
+          "card": "1",
+          "doc": "AI weighting block for options: factor = base relative weight.",
+          "when": null
+        },
+        "can_pick": {
+          "body": "trigger",
+          "card": "1",
+          "when": null
+        },
+        "effect": {
+          "body": "federation_advancements_body__effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "when": null
+        },
+        "gfx": {
+          "card": "1",
+          "value": "ref<sprite>",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "federation_advancements_body__ai_chance": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "federation_advancements_body__effect": {
+      "fields": {
+        "custom_tooltip": {
+          "override": true,
+          "value": "scalar",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__effect"
+      ]
+    }
+  }
+}

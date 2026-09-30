@@ -1,0 +1,36 @@
+{
+  "schemas": {
+    "imperial_incident_body": {
+      "fields": {
+        "can_stop": {
+          "body": "trigger",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "default_option": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "event": {
+          "card": "1",
+          "value": "ref<event.country>",
+          "when": null
+        }
+      },
+      "patterns": [
+        {
+          "body": "imperial_incident_option",
+          "card": "0..3",
+          "key": "scalar",
+          "when": null
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,218 @@
+{
+  "schemas": {
+    "technology_body": {
+      "fields": {
+        "administrative_efficiency": {
+          "value": "float",
+          "when": null
+        },
+        "allow_client_states": {
+          "value": "'yes'",
+          "when": null
+        },
+        "allowed_idea_groups": {
+          "value": "int",
+          "when": null
+        },
+        "artillery_fire": {
+          "value": "float",
+          "when": null
+        },
+        "artillery_shock": {
+          "value": "float",
+          "when": null
+        },
+        "cavalry_fire": {
+          "value": "float",
+          "when": null
+        },
+        "cavalry_shock": {
+          "value": "float",
+          "when": null
+        },
+        "combat_width": {
+          "value": "int",
+          "when": null
+        },
+        "development_cost_modifier": {
+          "doc": "Modifiers base cost of developing by X amount, replaces development_efficiency",
+          "value": "float",
+          "when": null
+        },
+        "enable": {
+          "card": "0..*",
+          "value": "ref<unit_type>",
+          "when": null
+        },
+        "expects_institution": {
+          "body": "technology_body__expects_institution",
+          "when": null
+        },
+        "global_colonial_growth": {
+          "value": "int",
+          "when": null
+        },
+        "governing_capacity": {
+          "value": "int",
+          "when": null
+        },
+        "infantry_fire": {
+          "value": "float",
+          "when": null
+        },
+        "infantry_shock": {
+          "value": "float",
+          "when": null
+        },
+        "land_morale": {
+          "value": "float",
+          "when": null
+        },
+        "maneuver_value": {
+          "value": "float",
+          "when": null
+        },
+        "may_agitate_for_liberty": {
+          "value": "'yes'",
+          "when": null
+        },
+        "may_build_flagships": {
+          "card": "0..*",
+          "value": "'yes'",
+          "when": null
+        },
+        "may_corrupt_officials": {
+          "value": "'yes'",
+          "when": null
+        },
+        "may_drill": {
+          "card": "0..*",
+          "value": "'yes'",
+          "when": null
+        },
+        "may_fabricate_claims": {
+          "value": "'yes'",
+          "when": null
+        },
+        "may_force_march": {
+          "value": "'yes'",
+          "when": null
+        },
+        "may_infiltrate_administration": {
+          "value": "'yes'",
+          "when": null
+        },
+        "may_sabotage_recruitment": {
+          "value": "'yes'",
+          "when": null
+        },
+        "may_sabotage_reputation": {
+          "value": "'yes'",
+          "when": null
+        },
+        "may_slander_merchants": {
+          "value": "'yes'",
+          "when": null
+        },
+        "may_sow_discontent": {
+          "value": "'yes'",
+          "when": null
+        },
+        "may_steal_maps": {
+          "value": "'yes'",
+          "when": null
+        },
+        "may_study_technology": {
+          "value": "'yes'",
+          "when": null
+        },
+        "may_support_rebels": {
+          "value": "'yes'",
+          "when": null
+        },
+        "merchants": {
+          "value": "'yes'",
+          "when": null
+        },
+        "military_tactics": {
+          "value": "float",
+          "when": null
+        },
+        "naval_engagement_width": {
+          "card": "0..*",
+          "value": "int",
+          "when": null
+        },
+        "naval_maintenance": {
+          "value": "float",
+          "when": null
+        },
+        "naval_morale": {
+          "value": "float",
+          "when": null
+        },
+        "num_accepted_cultures": {
+          "value": "int",
+          "when": null
+        },
+        "production_efficiency": {
+          "value": "float",
+          "when": null
+        },
+        "range": {
+          "value": "int",
+          "when": null
+        },
+        "reduced_naval_attrition": {
+          "value": "'yes'",
+          "when": null
+        },
+        "sprite_level": {
+          "value": "int",
+          "when": null
+        },
+        "supply_limit": {
+          "value": "float",
+          "when": null
+        },
+        "trade_efficiency": {
+          "value": "float",
+          "when": null
+        },
+        "trade_range": {
+          "value": "int",
+          "when": null
+        },
+        "year": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        }
+      },
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "ref<building>",
+          "value": "'yes'",
+          "when": null
+        },
+        {
+          "card": "0..*",
+          "key": "ref<government_reform>",
+          "value": "'yes'",
+          "when": null
+        }
+      ]
+    },
+    "technology_body__expects_institution": {
+      "patterns": [
+        {
+          "card": "1..*",
+          "key": "ref<institution>",
+          "value": "float",
+          "when": null
+        }
+      ]
+    }
+  }
+}

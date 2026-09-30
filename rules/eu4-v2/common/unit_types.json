@@ -1,0 +1,130 @@
+{
+  "mixins": {
+    "keys__type_unit_type": {
+      "fields": {
+        "type": {
+          "card": "1",
+          "value": "enum<land_unit_types> | enum<naval_unit_types>",
+          "when": null
+        }
+      }
+    }
+  },
+  "schemas": {
+    "unit_type_body": {
+      "fields": {
+        "base_cannons": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "blockade": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "defensive_fire": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "defensive_morale": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "defensive_shock": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "hull_size": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "maneuver": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "manpower": {
+          "doc": "Changes the manpower cost to recruit, 1 is 1000 manpower",
+          "override": true,
+          "value": "float",
+          "when": null
+        },
+        "offensive_fire": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "offensive_morale": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "offensive_shock": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "sail_speed": {
+          "override": true,
+          "value": "float",
+          "when": null
+        },
+        "sailors": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "sprite_level": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "trade_power": {
+          "override": true,
+          "value": "float",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "type": {
+          "card": "1",
+          "override": true,
+          "value": "enum<unit_types>",
+          "when": null
+        },
+        "unit_type": {
+          "override": true,
+          "value": "ref<technology_group>",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__type_unit_type"
+      ]
+    },
+    "unit_type_type_body": {
+      "fields": {
+        "type": {
+          "card": "1",
+          "value": "enum<land_unit_types> | enum<naval_unit_types>",
+          "when": null
+        }
+      }
+    }
+  }
+}

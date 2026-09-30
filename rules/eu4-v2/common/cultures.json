@@ -1,0 +1,130 @@
+{
+  "schemas": {
+    "culture_group_body": {
+      "fields": {
+        "country": {
+          "body": "modifier",
+          "doc": "All countries with primary culture in this culture group will get the following modifiers, stacks with specific tulture modifiers",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "dynasty_names": {
+          "list": "scalar",
+          "when": null
+        },
+        "female_names": {
+          "list": "scalar",
+          "when": null
+        },
+        "graphical_culture": {
+          "value": "enum<graphical_cultures>",
+          "when": null
+        },
+        "male_names": {
+          "list": "scalar",
+          "when": null
+        },
+        "province": {
+          "body": "modifier",
+          "doc": "All provinces with a culture in this culture group will get the following modifiers, stacks with specific culture modifiers",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "second_graphical_culture": {
+          "doc": "muslimgfx (fallback if the first does not exist)",
+          "value": "enum<graphical_cultures>",
+          "when": null
+        }
+      },
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "ref<culture>",
+          "map": {
+            "body": "culture_group_body__culture",
+            "key": "def<culture>"
+          },
+          "when": null
+        }
+      ]
+    },
+    "culture_group_body__culture": {
+      "fields": {
+        "country": {
+          "body": "modifier",
+          "doc": "All countries with this primary culture will get the following modifiers, stacks with culture group modifiers",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "dynasty_names": {
+          "list": "scalar",
+          "when": null
+        },
+        "female_names": {
+          "list": "scalar",
+          "when": null
+        },
+        "graphical_culture": {
+          "value": "enum<graphical_cultures>",
+          "when": null
+        },
+        "male_names": {
+          "list": "scalar",
+          "when": null
+        },
+        "primary": {
+          "value": "enum<country_tags>",
+          "when": null
+        },
+        "province": {
+          "body": "modifier",
+          "doc": "All provinces of this culture will get the following modifiers, stacks with culture group modifiers",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "second_graphical_culture": {
+          "value": "enum<graphical_cultures>",
+          "when": null
+        }
+      }
+    },
+    "culture_group_body__culture__dynasty_names": {
+      "items": "scalar"
+    },
+    "culture_group_body__culture__female_names": {
+      "items": "scalar"
+    },
+    "culture_group_body__culture__male_names": {
+      "items": "scalar"
+    },
+    "culture_group_body__dynasty_names": {
+      "items": "scalar"
+    },
+    "culture_group_body__female_names": {
+      "items": "scalar"
+    },
+    "culture_group_body__male_names": {
+      "items": "scalar"
+    }
+  }
+}

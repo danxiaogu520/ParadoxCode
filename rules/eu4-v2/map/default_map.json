@@ -1,0 +1,178 @@
+{
+  "schemas": {
+    "default_map_body": {
+      "fields": {
+        "adjacencies": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "ambient_object": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "area": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "canal_definition": {
+          "body": "default_map_body__canal_definition",
+          "card": "0..*",
+          "when": null
+        },
+        "climate": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "continent": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "definitions": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "force_coastal": {
+          "card": "1",
+          "list": "ref<province_id>",
+          "when": null
+        },
+        "height": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "heightmap": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "lakes": {
+          "card": "1",
+          "list": "ref<province_id>",
+          "when": null
+        },
+        "max_provinces": {
+          "card": "1",
+          "doc": "There is an unknown minimum number required due to a paradox bug. If a custom map is crashing try a higher number.",
+          "value": "int[2300..]",
+          "when": null
+        },
+        "only_used_for_random": {
+          "card": "1",
+          "list": "ref<province_id>",
+          "when": null
+        },
+        "positions": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "provincegroup": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "provinces": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "region": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "rivers": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "sea_starts": {
+          "card": "1",
+          "list": "ref<province_id>",
+          "when": null
+        },
+        "seasons": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "superregion": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "terrain": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "terrain_definition": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "trade_winds": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "tree": {
+          "card": "1",
+          "list": "int[0..]",
+          "when": null
+        },
+        "tree_definition": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "width": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "default_map_body__canal_definition": {
+      "fields": {
+        "name": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "x": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "y": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "default_map_body__force_coastal": {
+      "items": "ref<province_id>"
+    },
+    "default_map_body__lakes": {
+      "items": "ref<province_id>"
+    },
+    "default_map_body__only_used_for_random": {
+      "items": "ref<province_id>"
+    },
+    "default_map_body__sea_starts": {
+      "items": "ref<province_id>"
+    },
+    "default_map_body__tree": {
+      "items": "int[0..]"
+    }
+  }
+}

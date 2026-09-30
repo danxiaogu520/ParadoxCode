@@ -1,0 +1,109 @@
+{
+  "mixins": {
+    "keys__type_area": {},
+    "keys__type_province_group": {}
+  },
+  "schemas": {
+    "area_body": {
+      "fields": {
+        "color": {
+          "list": "int[0..]",
+          "override": true,
+          "when": null
+        }
+      },
+      "include": [
+        "keys__type_area"
+      ],
+      "items": "ref<province_id>"
+    },
+    "area_body__color": {
+      "items": "int[0..]"
+    },
+    "area_type_body": {
+      "items": "scalar"
+    },
+    "continent_body": {
+      "items": "ref<province_id>"
+    },
+    "mapclimate_body": {
+      "fields": {
+        "equator_y_on_province_image": {
+          "card": "1",
+          "value": "ref<province_id>",
+          "when": null
+        }
+      },
+      "patterns": [
+        {
+          "card": "10..10",
+          "key": "ref<climate>",
+          "list": "ref<province_id>",
+          "when": null
+        }
+      ]
+    },
+    "mapclimate_body__climate": {
+      "items": "ref<province_id>"
+    },
+    "province_group_body": {
+      "include": [
+        "keys__type_province_group"
+      ],
+      "items": "ref<province_id>"
+    },
+    "province_group_type_body": {
+      "items": "scalar"
+    },
+    "province_id_body": {
+      "fields": {
+        "height": {
+          "card": "1",
+          "list": "float",
+          "when": null
+        },
+        "position": {
+          "card": "1",
+          "list": "float",
+          "when": null
+        },
+        "rotation": {
+          "card": "1",
+          "list": "float",
+          "when": null
+        }
+      }
+    },
+    "province_id_body__height": {
+      "items": "float"
+    },
+    "province_id_body__position": {
+      "items": "float"
+    },
+    "province_id_body__rotation": {
+      "items": "float"
+    },
+    "region_body": {
+      "fields": {
+        "areas": {
+          "list": "ref<area.used>",
+          "when": null
+        },
+        "monsoon": {
+          "card": "0..*",
+          "list": "scalar",
+          "when": null
+        }
+      }
+    },
+    "region_body__areas": {
+      "items": "ref<area.used>"
+    },
+    "region_body__monsoon": {
+      "items": "scalar"
+    },
+    "superregion_body": {
+      "items": "'restrict_charter' | ref<region>"
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "schemas": {
+    "hegemon_body": {
+      "fields": {
+        "allow": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "push": "country"
+          },
+          "when": null
+        },
+        "base": {
+          "body": "modifier",
+          "card": "1",
+          "scope": {
+            "push": "country"
+          },
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "When Hegemony is proclaimed",
+          "when": null
+        },
+        "max": {
+          "body": "modifier",
+          "card": "1",
+          "scope": {
+            "push": "country"
+          },
+          "when": null
+        },
+        "removed_effect": {
+          "body": "effect",
+          "doc": "When Hegemony is lost",
+          "when": null
+        },
+        "scale": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "At max 100% tickup.",
+          "scope": {
+            "push": "country"
+          },
+          "when": null
+        }
+      }
+    }
+  }
+}

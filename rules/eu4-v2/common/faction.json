@@ -1,0 +1,54 @@
+{
+  "schemas": {
+    "faction_body": {
+      "fields": {
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "when": null
+        },
+        "always": {
+          "card": "1",
+          "value": "'yes'",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        },
+        "monarch_power": {
+          "card": "1",
+          "value": "enum<power_categories>",
+          "when": null
+        },
+        "triggered_faction_name": {
+          "body": "faction_body__triggered_faction_name",
+          "when": null
+        }
+      }
+    },
+    "faction_body__triggered_faction_name": {
+      "fields": {
+        "name": {
+          "card": "1",
+          "value": "loc",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    }
+  }
+}

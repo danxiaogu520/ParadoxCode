@@ -1,0 +1,49 @@
+{
+  "schemas": {
+    "professionalism_modifier_body": {
+      "fields": {
+        "army_professionalism": {
+          "card": "1",
+          "value": "float[0.0..1.0]",
+          "when": null
+        },
+        "hidden": {
+          "value": "'yes'",
+          "when": null
+        },
+        "marker_sprite": {
+          "card": "1",
+          "value": "ref<sprite>",
+          "when": null
+        },
+        "may_build_supply_depot": {
+          "value": "'yes'",
+          "when": null
+        },
+        "may_refill_garrison": {
+          "value": "'yes'",
+          "when": null
+        },
+        "may_return_manpower_on_disband": {
+          "value": "'yes'",
+          "when": null
+        },
+        "reserves_organisation": {
+          "value": "'yes'",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "when": null
+        },
+        "unit_sprite_start": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        }
+      }
+    }
+  }
+}

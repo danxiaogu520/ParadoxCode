@@ -1,0 +1,48 @@
+{
+  "schemas": {
+    "alerts_body": {
+      "fields": {
+        "alerts": {
+          "body": "alerts_definitions",
+          "doc": "Named alert definitions and their default severity.",
+          "when": null
+        },
+        "icon": {
+          "body": "alerts_body__icon",
+          "doc": "Alert icon assignments by severity level.",
+          "when": null
+        },
+        "sound": {
+          "body": "alerts_sound",
+          "doc": "Alert sound assignments by severity level.",
+          "when": null
+        }
+      }
+    },
+    "alerts_body__icon": {
+      "fields": {
+        "HIGH": {
+          "doc": "Sprite shown for high-severity alerts.",
+          "override": true,
+          "value": "ref<sprite>",
+          "when": null
+        },
+        "LOW": {
+          "doc": "Sprite shown for low-severity alerts.",
+          "override": true,
+          "value": "ref<sprite>",
+          "when": null
+        },
+        "MEDIUM": {
+          "doc": "Sprite shown for medium-severity alerts.",
+          "override": true,
+          "value": "ref<sprite>",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__alerts_icon"
+      ]
+    }
+  }
+}

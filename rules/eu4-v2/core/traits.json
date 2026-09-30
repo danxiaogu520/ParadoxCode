@@ -1,0 +1,40 @@
+{
+  "traits": {
+    "Callable": {
+      "capabilities": [
+        "replacement",
+        "condition",
+        "dynamic_key",
+        "opaque_text"
+      ],
+      "params": {
+        "body": "schema"
+      }
+    },
+    "HasIcon": {
+      "bindings": {
+        "icon": {
+          "sprite": "{sprite}"
+        }
+      },
+      "params": {
+        "sprite": "GFX_$"
+      }
+    },
+    "Localised": {
+      "bindings": {
+        "desc": {
+          "loc": "{desc}"
+        },
+        "name": {
+          "loc": "{name}",
+          "required": true
+        }
+      },
+      "params": {
+        "name": "$"
+      }
+    },
+    "ModifierSource": {}
+  }
+}

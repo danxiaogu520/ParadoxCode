@@ -9,28 +9,32 @@
       "type": "object",
       "additionalProperties": {
         "$ref": "#/$defs/EnumSpec"
-      }
+      },
+      "default": {}
     },
     "files": {
       "description": "Path-selection rules: logical path → parser / root schema.",
       "type": "object",
       "additionalProperties": {
         "$ref": "#/$defs/FileRule"
-      }
+      },
+      "default": {}
     },
     "mixins": {
       "description": "Pure structural field bundles, expanded at compile time.",
       "type": "object",
       "additionalProperties": {
         "$ref": "#/$defs/MixinSpec"
-      }
+      },
+      "default": {}
     },
     "schemas": {
       "description": "Block descriptions, keyed by schema name (formal parameters may be\nspelled in the key: `\"on_action_body<S>\"`).",
       "type": "object",
       "additionalProperties": {
         "$ref": "#/$defs/SchemaSpec"
-      }
+      },
+      "default": {}
     },
     "scopes": {
       "description": "Scope types, registers, links, and compatibility overrides.",
@@ -41,21 +45,24 @@
         {
           "type": "null"
         }
-      ]
+      ],
+      "default": null
     },
     "traits": {
       "description": "Capabilities, bindings, and constraints, expanded at compile time.",
       "type": "object",
       "additionalProperties": {
         "$ref": "#/$defs/TraitSpec"
-      }
+      },
+      "default": {}
     },
     "types": {
       "description": "Symbol namespaces: resolution / subtypes / open / builtin / impl.",
       "type": "object",
       "additionalProperties": {
         "$ref": "#/$defs/TypeSpec"
-      }
+      },
+      "default": {}
     }
   },
   "additionalProperties": false,
@@ -100,7 +107,8 @@
           "type": "object",
           "additionalProperties": {
             "$ref": "#/$defs/FieldOverloads"
-          }
+          },
+          "default": {}
         },
         "include": {
           "description": "Mixin names, expanded at compile time.",
@@ -120,12 +128,12 @@
         },
         "open": {
           "description": "Whether undeclared keys are allowed; defaults to false.",
-          "type": "boolean",
-          "default": false
+          "type": "boolean"
         },
         "patterns": {
           "description": "Non-exact keys, tried in written order.",
           "type": "array",
+          "default": [],
           "items": {
             "$ref": "#/$defs/FieldSpec"
           }
@@ -373,7 +381,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "default": null
         },
         "def": {
           "description": "Defines a symbol instance at this position.",
@@ -384,7 +393,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "default": null
         },
         "deprecated": {
           "description": "Whether the field is deprecated.",
@@ -427,7 +437,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "default": null
         },
         "override": {
           "description": "Explicitly overrides a mixin-declared field of the same key.",
@@ -446,7 +457,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "default": null
         },
         "severity": {
           "description": "Diagnostic severity for violations of this field.",
@@ -457,7 +469,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "default": null
         },
         "unless": {
           "description": "Only applies to instances outside this subtype.",
@@ -515,7 +528,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "default": null
         },
         "path": {
           "description": "Logical directory prefix (the legacy `game/` prefix is not spelled).",
@@ -530,7 +544,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "default": null
         },
         "root": {
           "description": "Root structure: a schema name, or a field spec with `def` describing a\nwhole-file symbol instance. Parsers without script structure\n(`localisation`, `asset`) may omit it.",
@@ -541,7 +556,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "default": null
         },
         "strict": {
           "description": "When true, `path` does not recurse into subdirectories.",
@@ -625,7 +641,8 @@
           "type": "object",
           "additionalProperties": {
             "$ref": "#/$defs/FieldOverloads"
-          }
+          },
+          "default": {}
         }
       },
       "additionalProperties": false
@@ -752,6 +769,7 @@
         "compat": {
           "description": "Compatibility overrides (\"actual accepted where expected is required\").",
           "type": "array",
+          "default": [],
           "items": {
             "$ref": "#/$defs/CompatSpec"
           }
@@ -761,14 +779,16 @@
           "type": "object",
           "additionalProperties": {
             "$ref": "#/$defs/LinkSpec"
-          }
+          },
+          "default": {}
         },
         "registers": {
           "description": "Scope registers (`root`, `this`, `prev`, `from`, …).",
           "type": "object",
           "additionalProperties": {
             "$ref": "#/$defs/RegisterSpec"
-          }
+          },
+          "default": {}
         },
         "types": {
           "description": "Scope type names. `any` is reserved and not listed here.",
@@ -865,7 +885,8 @@
           "type": "object",
           "additionalProperties": {
             "$ref": "#/$defs/ImplSpec"
-          }
+          },
+          "default": {}
         },
         "when": {
           "description": "Instance-body predicate granting this subtype.",
@@ -876,7 +897,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "default": null
         }
       },
       "additionalProperties": false
@@ -890,7 +912,8 @@
           "type": "object",
           "additionalProperties": {
             "$ref": "#/$defs/BindingSpec"
-          }
+          },
+          "default": {}
         },
         "capabilities": {
           "description": "Capabilities the runtime interprets for this trait.",
@@ -923,7 +946,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "default": null
         }
       },
       "additionalProperties": false
@@ -963,7 +987,8 @@
           "type": "object",
           "additionalProperties": {
             "$ref": "#/$defs/ImplSpec"
-          }
+          },
+          "default": {}
         },
         "open": {
           "description": "Open world: any name may exist; `ref` never reports undefined names.",
@@ -982,14 +1007,16 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "default": null
         },
         "subtypes": {
           "description": "Named subtypes of this type.",
           "type": "object",
           "additionalProperties": {
             "$ref": "#/$defs/SubtypeSpec"
-          }
+          },
+          "default": {}
         }
       },
       "additionalProperties": false

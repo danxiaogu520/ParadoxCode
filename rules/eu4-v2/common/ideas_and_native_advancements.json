@@ -1,0 +1,323 @@
+{
+  "mixins": {
+    "keys__type_idea_group": {
+      "fields": {
+        "category": {
+          "value": "scalar",
+          "when": null
+        },
+        "free": {
+          "value": "'yes'",
+          "when": null
+        }
+      }
+    }
+  },
+  "schemas": {
+    "customideas_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "customideas_body__ai_will_do",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "when": null
+        },
+        "auto_explore_adjacent_to_colony": {
+          "value": "'yes'",
+          "when": null
+        },
+        "category": {
+          "value": "enum<power_categories>",
+          "when": null
+        },
+        "cb_on_primitives": {
+          "value": "'yes'",
+          "when": null
+        },
+        "chance": {
+          "body": "customideas_body__chance",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "default": {
+          "value": "int",
+          "when": null
+        },
+        "enabled": {
+          "body": "trigger",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "extra_manpower_at_religious_war": {
+          "value": "'yes'",
+          "when": null
+        },
+        "idea_claim_colonies": {
+          "value": "'yes'",
+          "when": null
+        },
+        "important": {
+          "value": "'yes'",
+          "when": null
+        },
+        "level_cost_1": {
+          "value": "int",
+          "when": null
+        },
+        "level_cost_10": {
+          "value": "int",
+          "when": null
+        },
+        "level_cost_2": {
+          "value": "int",
+          "when": null
+        },
+        "level_cost_3": {
+          "value": "int",
+          "when": null
+        },
+        "level_cost_4": {
+          "value": "int",
+          "when": null
+        },
+        "level_cost_5": {
+          "value": "int",
+          "when": null
+        },
+        "level_cost_6": {
+          "value": "int",
+          "when": null
+        },
+        "level_cost_7": {
+          "value": "int",
+          "when": null
+        },
+        "level_cost_8": {
+          "value": "int",
+          "when": null
+        },
+        "level_cost_9": {
+          "value": "int",
+          "when": null
+        },
+        "max_level": {
+          "value": "int",
+          "when": null
+        },
+        "may_establish_frontier": {
+          "value": "'yes'",
+          "when": null
+        },
+        "may_explore": {
+          "value": "'yes'",
+          "when": null
+        },
+        "may_not_reduce_inflation": {
+          "value": "'yes'",
+          "when": null
+        },
+        "may_perform_slave_raid": {
+          "value": "'yes'",
+          "when": null
+        },
+        "no_religion_penalty": {
+          "value": "'yes'",
+          "when": null
+        },
+        "reduced_stab_impacts": {
+          "value": "'yes'",
+          "when": null
+        }
+      }
+    },
+    "customideas_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "customideas_body__chance": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "value": "float",
+          "when": null
+        },
+        "modifier": {
+          "body": "customideas_body__chance__modifier",
+          "card": "0..*",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        }
+      }
+    },
+    "customideas_body__chance__modifier": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__trigger"
+      ]
+    },
+    "idea_group_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "idea_group_body__ai_will_do",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "override": true,
+          "when": null
+        },
+        "bonus": {
+          "body": "idea_group_body__bonus",
+          "card": "1",
+          "override": true,
+          "when": null
+        },
+        "category": {
+          "override": true,
+          "value": "enum<power_categories>",
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "override": true,
+          "when": null
+        },
+        "free": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "important": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "removed_effect": {
+          "body": "effect",
+          "override": true,
+          "when": null
+        },
+        "start": {
+          "body": "modifier",
+          "override": true,
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      },
+      "include": [
+        "keys__type_idea_group"
+      ],
+      "patterns": [
+        {
+          "card": "0..7",
+          "key": "ref<idea>",
+          "map": {
+            "body": "idea_group_body__idea",
+            "key": "def<idea>"
+          },
+          "override": true,
+          "when": null
+        }
+      ]
+    },
+    "idea_group_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "idea_group_body__bonus": {
+      "fields": {
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "override": true,
+          "when": null
+        },
+        "removed_effect": {
+          "body": "effect",
+          "override": true,
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier"
+      ]
+    },
+    "idea_group_body__idea": {
+      "fields": {
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "override": true,
+          "when": null
+        },
+        "removed_effect": {
+          "body": "effect",
+          "override": true,
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier"
+      ]
+    },
+    "idea_group_type_body": {
+      "fields": {
+        "category": {
+          "value": "scalar",
+          "when": null
+        },
+        "free": {
+          "value": "'yes'",
+          "when": null
+        }
+      }
+    }
+  }
+}

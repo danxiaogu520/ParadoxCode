@@ -1,0 +1,64 @@
+{
+  "schemas": {
+    "technology_group_body": {
+      "fields": {
+        "adm_tech": {
+          "value": "scalar",
+          "when": null
+        },
+        "dip_tech": {
+          "value": "scalar",
+          "when": null
+        },
+        "is_primitive": {
+          "value": "'yes'",
+          "when": null
+        },
+        "mil_tech": {
+          "value": "scalar",
+          "when": null
+        },
+        "nation_designer_cost": {
+          "body": "technology_group_body__nation_designer_cost",
+          "when": null
+        },
+        "nation_designer_trigger": {
+          "body": "trigger",
+          "when": null
+        },
+        "nation_designer_unit_type": {
+          "value": "ref<technology_group>",
+          "when": null
+        },
+        "start_cost_modifier": {
+          "value": "float",
+          "when": null
+        },
+        "start_level": {
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "technology_group_body__nation_designer_cost": {
+      "fields": {
+        "trigger": {
+          "body": "trigger",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "value": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        }
+      }
+    }
+  }
+}

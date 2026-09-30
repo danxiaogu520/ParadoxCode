@@ -1,0 +1,24 @@
+{
+  "schemas": {
+    "luck_body": {
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Country-priority blocks in historial_lucky.txt contain trigger clauses; the entry key is the candidate country's tag and the trigger is evaluated in that country's scope.",
+          "key": "ref<country_tag>",
+          "map": {
+            "body": "trigger",
+            "key": "def<country_tag>"
+          },
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      ]
+    }
+  }
+}

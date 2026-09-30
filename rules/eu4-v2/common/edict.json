@@ -1,0 +1,113 @@
+{
+  "schemas": {
+    "edict_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "edict_body__ai_will_do",
+          "card": "1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "allow": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "color": {
+          "card": "1",
+          "list": "int[0..255]",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        },
+        "notify_trigger": {
+          "body": "trigger",
+          "doc": "If true an alert will appear, ROOT is the country, FROM are the provinces owned by ROOT in the area",
+          "scope": {
+            "set": {
+              "from": "province",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "on_state_edict_enacted": {
+          "body": "effect",
+          "doc": "triggers an effect when the state edict is added",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "on_state_edict_revoked": {
+          "body": "effect",
+          "doc": "triggers an effect when the state edict is revoked",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "years_to_notify": {
+          "doc": "How many years the edict needs to be active to show an alert",
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "edict_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "edict_body__color": {
+      "items": "int[0..255]"
+    }
+  }
+}

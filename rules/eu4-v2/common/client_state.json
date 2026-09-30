@@ -1,0 +1,40 @@
+{
+  "schemas": {
+    "client_state_body": {
+      "fields": {
+        "name": {
+          "body": "client_state_body__name",
+          "card": "1..*",
+          "when": null
+        },
+        "region": {
+          "card": "1",
+          "value": "ref<region>",
+          "when": null
+        }
+      }
+    },
+    "client_state_body__name": {
+      "fields": {
+        "name": {
+          "card": "1",
+          "value": "loc",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        }
+      }
+    }
+  }
+}

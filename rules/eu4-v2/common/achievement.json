@@ -1,0 +1,60 @@
+{
+  "schemas": {
+    "achievement_body": {
+      "fields": {
+        "happened": {
+          "body": "trigger",
+          "card": "1",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "id": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "localization": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "possible": {
+          "body": "trigger",
+          "card": "1",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "provinces_to_highlight": {
+          "body": "trigger",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "visible": {
+          "body": "trigger",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    }
+  }
+}

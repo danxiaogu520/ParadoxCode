@@ -1,0 +1,55 @@
+{
+  "schemas": {
+    "fervor_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "fervor_body__ai_will_do",
+          "card": "1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "cost": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "effect": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Block of effects executed by the containing entry.",
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "when": null
+        }
+      }
+    },
+    "fervor_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    }
+  }
+}

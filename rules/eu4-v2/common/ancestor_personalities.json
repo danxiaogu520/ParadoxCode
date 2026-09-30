@@ -1,0 +1,220 @@
+{
+  "schemas": {
+    "ancestor_personalities_body": {
+      "fields": {
+        "ai_pick_ancestor": {
+          "body": "ancestor_personalities_body__ai_pick_ancestor",
+          "doc": "Each level of skill is worth 50.",
+          "when": null
+        },
+        "alliance_acceptance": {
+          "value": "int",
+          "when": null
+        },
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "when": null
+        },
+        "building_budget_multiplier": {
+          "value": "float",
+          "when": null
+        },
+        "chance": {
+          "body": "modifier_rule",
+          "when": null
+        },
+        "consort_allow": {
+          "body": "ancestor_personalities_body__consort_allow",
+          "when": null
+        },
+        "custom_ai_explanation": {
+          "value": "scalar",
+          "when": null
+        },
+        "different_religion_war_multiplier": {
+          "value": "float",
+          "when": null
+        },
+        "easy_war_chance_multiplier": {
+          "value": "float",
+          "when": null
+        },
+        "enemy_strength_multiplier": {
+          "value": "float",
+          "when": null
+        },
+        "fair_fights": {
+          "value": "bool",
+          "when": null
+        },
+        "gift_chance": {
+          "value": "int",
+          "when": null
+        },
+        "heathen_ally_acceptance": {
+          "value": "int",
+          "when": null
+        },
+        "heir_allow": {
+          "body": "ancestor_personalities_body__heir_allow",
+          "when": null
+        },
+        "heretic_ally_acceptance": {
+          "value": "int",
+          "when": null
+        },
+        "knowledge_sharing": {
+          "value": "bool",
+          "when": null
+        },
+        "nation_designer_cost": {
+          "value": "int",
+          "when": null
+        },
+        "other_ai_help_us_multiplier": {
+          "value": "int",
+          "when": null
+        },
+        "other_ai_peace_term_bonus": {
+          "value": "int",
+          "when": null
+        },
+        "other_ai_war_chance_multiplier": {
+          "value": "float",
+          "when": null
+        },
+        "peace_desire": {
+          "value": "int",
+          "when": null
+        },
+        "random_insults": {
+          "value": "bool",
+          "when": null
+        },
+        "razing": {
+          "value": "bool",
+          "when": null
+        },
+        "ruler_allow": {
+          "body": "ancestor_personalities_body__ruler_allow",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "wants_avoid_debase": {
+          "value": "bool",
+          "when": null
+        },
+        "wants_avoid_loans": {
+          "value": "bool",
+          "when": null
+        },
+        "wants_colonies": {
+          "value": "bool",
+          "when": null
+        },
+        "wants_condottieri": {
+          "value": "bool",
+          "when": null
+        },
+        "wants_ecumenical_council": {
+          "value": "bool",
+          "when": null
+        },
+        "wants_excommunicate": {
+          "value": "bool",
+          "when": null
+        },
+        "wants_explorers": {
+          "value": "bool",
+          "when": null
+        },
+        "wants_gold": {
+          "value": "bool",
+          "when": null
+        },
+        "wants_heathen_land": {
+          "value": "'yes'",
+          "when": null
+        },
+        "wants_heretic_land": {
+          "value": "'yes'",
+          "when": null
+        },
+        "wants_land": {
+          "value": "'yes'",
+          "when": null
+        },
+        "war_chance_multiplier": {
+          "value": "float",
+          "when": null
+        },
+        "war_priority": {
+          "body": "modifier_rule",
+          "when": null
+        }
+      }
+    },
+    "ancestor_personalities_body__ai_pick_ancestor": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "int",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "ancestor_personalities_body__consort_allow": {
+      "fields": {
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "when": null
+        },
+        "chance": {
+          "body": "modifier_rule",
+          "card": "1",
+          "when": null
+        }
+      }
+    },
+    "ancestor_personalities_body__heir_allow": {
+      "fields": {
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "when": null
+        },
+        "chance": {
+          "body": "modifier_rule",
+          "card": "1",
+          "when": null
+        }
+      }
+    },
+    "ancestor_personalities_body__ruler_allow": {
+      "fields": {
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "when": null
+        },
+        "chance": {
+          "body": "modifier_rule",
+          "card": "1",
+          "when": null
+        }
+      }
+    }
+  }
+}

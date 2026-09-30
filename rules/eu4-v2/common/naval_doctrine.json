@@ -1,0 +1,44 @@
+{
+  "schemas": {
+    "naval_doctrine_body": {
+      "fields": {
+        "button_gfx": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "can_select": {
+          "body": "trigger",
+          "card": "1",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "cost": {
+          "doc": "money cost per each sailor employed in the whole navy",
+          "value": "float",
+          "when": null
+        },
+        "country_modifier": {
+          "body": "modifier",
+          "card": "1",
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "when": null
+        },
+        "removed_effect": {
+          "body": "effect",
+          "when": null
+        }
+      }
+    }
+  }
+}

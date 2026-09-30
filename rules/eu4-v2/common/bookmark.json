@@ -1,0 +1,41 @@
+{
+  "schemas": {
+    "bookmark_body": {
+      "fields": {
+        "center": {
+          "value": "ref<province_id>",
+          "when": null
+        },
+        "country": {
+          "card": "0..12",
+          "value": "enum<country_tags>",
+          "when": null
+        },
+        "date": {
+          "card": "1",
+          "value": "date",
+          "when": null
+        },
+        "default": {
+          "value": "'yes'",
+          "when": null
+        },
+        "desc": {
+          "card": "1",
+          "value": "loc",
+          "when": null
+        },
+        "easy_country": {
+          "card": "0..12",
+          "value": "enum<country_tags>",
+          "when": null
+        },
+        "name": {
+          "card": "1",
+          "value": "loc",
+          "when": null
+        }
+      }
+    }
+  }
+}

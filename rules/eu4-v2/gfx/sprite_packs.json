@@ -1,0 +1,109 @@
+{
+  "schemas": {
+    "sprite_pack_body": {
+      "fields": {
+        "available_for_custom_nation": {
+          "value": "bool",
+          "when": null
+        },
+        "continents": {
+          "list": "ref<continent>",
+          "when": null
+        },
+        "country_trigger": {
+          "body": "trigger",
+          "card": "1",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "graphical_cultures": {
+          "list": "enum<graphical_cultures>",
+          "when": null
+        },
+        "sprite_artillery": {
+          "body": "sprite_pack_body__sprite_artillery",
+          "when": null
+        },
+        "sprite_cavalry": {
+          "body": "sprite_pack_body__sprite_cavalry",
+          "when": null
+        },
+        "sprite_infantry": {
+          "body": "sprite_pack_body__sprite_infantry",
+          "when": null
+        }
+      }
+    },
+    "sprite_pack_body__continents": {
+      "items": "ref<continent>"
+    },
+    "sprite_pack_body__graphical_cultures": {
+      "items": "enum<graphical_cultures>"
+    },
+    "sprite_pack_body__sprite_artillery": {
+      "fields": {
+        "0": {
+          "value": "scalar | enum<builtin_dlc>",
+          "when": null
+        },
+        "1": {
+          "value": "scalar | enum<builtin_dlc>",
+          "when": null
+        },
+        "2": {
+          "value": "scalar | enum<builtin_dlc>",
+          "when": null
+        },
+        "3": {
+          "value": "scalar | enum<builtin_dlc>",
+          "when": null
+        }
+      }
+    },
+    "sprite_pack_body__sprite_cavalry": {
+      "fields": {
+        "0": {
+          "value": "scalar | enum<builtin_dlc>",
+          "when": null
+        },
+        "1": {
+          "value": "scalar | enum<builtin_dlc>",
+          "when": null
+        },
+        "2": {
+          "value": "scalar | enum<builtin_dlc>",
+          "when": null
+        },
+        "3": {
+          "value": "scalar | enum<builtin_dlc>",
+          "when": null
+        }
+      }
+    },
+    "sprite_pack_body__sprite_infantry": {
+      "fields": {
+        "0": {
+          "value": "scalar | enum<builtin_dlc>",
+          "when": null
+        },
+        "1": {
+          "value": "scalar | enum<builtin_dlc>",
+          "when": null
+        },
+        "2": {
+          "value": "scalar | enum<builtin_dlc>",
+          "when": null
+        },
+        "3": {
+          "value": "scalar | enum<builtin_dlc>",
+          "when": null
+        }
+      }
+    }
+  }
+}

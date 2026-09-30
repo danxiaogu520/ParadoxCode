@@ -1,0 +1,16 @@
+{
+  "schemas": {
+    "dynasty_colors_body": {
+      "fields": {
+        "color": {
+          "card": "1..*",
+          "list": "int[0..255]",
+          "when": null
+        }
+      }
+    },
+    "dynasty_colors_body__color": {
+      "items": "int[0..255]"
+    }
+  }
+}

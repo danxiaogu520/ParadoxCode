@@ -1,0 +1,184 @@
+{
+  "schemas": {
+    "mission_series_body": {
+      "fields": {
+        "ai": {
+          "doc": "Whether the AI will claim missions in this series. Series-level only.",
+          "value": "bool",
+          "when": null
+        },
+        "generic": {
+          "doc": "if a mission without generic = yes wants this slot then it overrides this.",
+          "value": "bool",
+          "when": null
+        },
+        "has_country_shield": {
+          "value": "bool",
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "These are triggers for the entire series",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "potential_on_load": {
+          "body": "trigger",
+          "when": null
+        },
+        "slot": {
+          "card": "1",
+          "doc": "Mission column; by default columns 1 (leftmost) to 5 (rightmost), extendable via countrymissionsview.gui.",
+          "value": "int",
+          "when": null
+        }
+      },
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "ref<mission>",
+          "map": {
+            "body": "mission_series_body__mission",
+            "key": "def<mission>"
+          },
+          "when": null
+        }
+      ]
+    },
+    "mission_series_body__mission": {
+      "fields": {
+        "ai_weight": {
+          "body": "mission_series_body__mission__ai_weight",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "completed_by": {
+          "value": "date",
+          "when": null
+        },
+        "effect": [
+          {
+            "body": "effect",
+            "card": "1",
+            "doc": "This is what you get after you finished your mission.",
+            "scope": {
+              "set": {
+                "root": "country",
+                "this": "country"
+              }
+            },
+            "when": null
+          },
+          {
+            "doc": "Quoted Script form of a mission completion effect.",
+            "scope": {
+              "set": {
+                "root": "country",
+                "this": "country"
+              }
+            },
+            "value": "quoted<effect>",
+            "when": null
+          }
+        ],
+        "icon": {
+          "card": "1",
+          "value": "ref<sprite>",
+          "when": null
+        },
+        "position": {
+          "value": "int",
+          "when": null
+        },
+        "provinces_to_highlight": {
+          "body": "trigger",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "required_missions": {
+          "list": "ref<mission>",
+          "when": null
+        },
+        "trigger": [
+          {
+            "body": "mission_series_body__mission__trigger",
+            "card": "1",
+            "doc": "What you need to complete the mission, displayed for mission tooltip",
+            "scope": {
+              "set": {
+                "root": "country",
+                "this": "country"
+              }
+            },
+            "when": null
+          },
+          {
+            "doc": "Quoted Script form of a mission completion trigger.",
+            "scope": {
+              "set": {
+                "root": "country",
+                "this": "country"
+              }
+            },
+            "value": "quoted<trigger>",
+            "when": null
+          }
+        ]
+      }
+    },
+    "mission_series_body__mission__ai_weight": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "mission_series_body__mission__required_missions": {
+      "items": "ref<mission>"
+    },
+    "mission_series_body__mission__trigger": {
+      "fields": {
+        "has_completed_idea_group_of_category": {
+          "body": "mission_series_body__mission__trigger__has_completed_idea_group_of_category",
+          "override": true,
+          "when": null
+        }
+      },
+      "include": [
+        "keys__trigger"
+      ]
+    },
+    "mission_series_body__mission__trigger__has_completed_idea_group_of_category": {
+      "fields": {
+        "mil_ideas": {
+          "card": "1",
+          "value": "'yes'",
+          "when": null
+        }
+      }
+    }
+  }
+}

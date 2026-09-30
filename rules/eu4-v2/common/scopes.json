@@ -1,0 +1,266 @@
+{
+  "schemas": {
+    "scopes_body": {
+      "fields": {
+        "Advisor": {
+          "body": "scopes_body__advisor",
+          "card": "1",
+          "when": null
+        },
+        "Consort": {
+          "body": "scopes_body__consort",
+          "card": "1",
+          "when": null
+        },
+        "Country": {
+          "body": "scopes_body__country",
+          "card": "1",
+          "when": null
+        },
+        "Culture": {
+          "body": "scopes_body__culture",
+          "card": "1",
+          "when": null
+        },
+        "Heir": {
+          "body": "scopes_body__heir",
+          "card": "1",
+          "when": null
+        },
+        "Leader": {
+          "body": "scopes_body__leader",
+          "card": "1",
+          "when": null
+        },
+        "Mercenary Company": {
+          "body": "scopes_body__mercenary_company",
+          "card": "1",
+          "when": null
+        },
+        "Monarch": {
+          "body": "scopes_body__monarch",
+          "card": "1",
+          "when": null
+        },
+        "Province": {
+          "body": "scopes_body__province",
+          "card": "1",
+          "when": null
+        },
+        "Rebel Faction": {
+          "body": "scopes_body__rebel_faction",
+          "card": "1",
+          "when": null
+        },
+        "Religion": {
+          "body": "scopes_body__religion",
+          "card": "1",
+          "when": null
+        },
+        "Trade Company": {
+          "body": "scopes_body__trade_company",
+          "card": "1",
+          "when": null
+        },
+        "Trade Node": {
+          "body": "scopes_body__trade_node",
+          "card": "1",
+          "when": null
+        },
+        "Unit": {
+          "body": "scopes_body__unit",
+          "card": "1",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__advisor": {
+      "fields": {
+        "aliases": {
+          "card": "1",
+          "list": "'advisor'",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__advisor__aliases": {
+      "items": "'advisor'"
+    },
+    "scopes_body__consort": {
+      "fields": {
+        "aliases": {
+          "card": "1",
+          "list": "'consort'",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__consort__aliases": {
+      "items": "'consort'"
+    },
+    "scopes_body__country": {
+      "fields": {
+        "aliases": {
+          "card": "1",
+          "list": "'country'",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__country__aliases": {
+      "items": "'country'"
+    },
+    "scopes_body__culture": {
+      "fields": {
+        "aliases": {
+          "card": "1",
+          "list": "'culture'",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__culture__aliases": {
+      "items": "'culture'"
+    },
+    "scopes_body__heir": {
+      "fields": {
+        "aliases": {
+          "card": "1",
+          "list": "'heir'",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__heir__aliases": {
+      "items": "'heir'"
+    },
+    "scopes_body__leader": {
+      "fields": {
+        "aliases": {
+          "card": "1",
+          "list": "'leader'",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__leader__aliases": {
+      "items": "'leader'"
+    },
+    "scopes_body__mercenary_company": {
+      "fields": {
+        "aliases": {
+          "card": "1",
+          "list": "'mercenary_company'",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__mercenary_company__aliases": {
+      "items": "'mercenary_company'"
+    },
+    "scopes_body__monarch": {
+      "fields": {
+        "aliases": {
+          "card": "1",
+          "list": "'monarch'",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__monarch__aliases": {
+      "items": "'monarch'"
+    },
+    "scopes_body__province": {
+      "fields": {
+        "aliases": {
+          "card": "1",
+          "list": "'province'",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__province__aliases": {
+      "items": "'province'"
+    },
+    "scopes_body__rebel_faction": {
+      "fields": {
+        "aliases": {
+          "body": "scopes_body__rebel_faction__aliases",
+          "card": "1",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__rebel_faction__aliases": {
+      "fields": {
+        "rebel_faction": {
+          "card": "1",
+          "value": "'rebelfaction'",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__religion": {
+      "fields": {
+        "aliases": {
+          "card": "1",
+          "list": "'religion'",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__religion__aliases": {
+      "items": "'religion'"
+    },
+    "scopes_body__trade_company": {
+      "fields": {
+        "aliases": {
+          "card": "1",
+          "list": "'trade_company'",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__trade_company__aliases": {
+      "items": "'trade_company'"
+    },
+    "scopes_body__trade_node": {
+      "fields": {
+        "aliases": {
+          "body": "scopes_body__trade_node__aliases",
+          "card": "1",
+          "when": null
+        },
+        "is_subscope_of": {
+          "card": "1",
+          "list": "'province'",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__trade_node__aliases": {
+      "fields": {
+        "trade_node": {
+          "card": "1",
+          "value": "'tradenode'",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__trade_node__is_subscope_of": {
+      "items": "'province'"
+    },
+    "scopes_body__unit": {
+      "fields": {
+        "aliases": {
+          "card": "1",
+          "list": "'unit'",
+          "when": null
+        }
+      }
+    },
+    "scopes_body__unit__aliases": {
+      "items": "'unit'"
+    }
+  }
+}

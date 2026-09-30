@@ -1,0 +1,780 @@
+{
+  "mixins": {
+    "keys__type_great_project": {
+      "fields": {
+        "type": {
+          "card": "1",
+          "value": "'monument' | 'canal'",
+          "when": null
+        }
+      }
+    }
+  },
+  "schemas": {
+    "great_project_body": {
+      "fields": {
+        "build_cost": {
+          "card": "1",
+          "doc": "how much to build one",
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "build_trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "can we build it?",
+          "override": true,
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "can_be_moved": {
+          "card": "1",
+          "doc": "can we move it?",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "can_upgrade_trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "can our country upgrade it?",
+          "override": true,
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "can_use_modifiers_trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "can our country use it?",
+          "override": true,
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "date": {
+          "card": "1",
+          "doc": "date built in real life (so anything built during game time will be there if you start a game after that date)",
+          "override": true,
+          "value": "scalar",
+          "when": null
+        },
+        "keep_trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "can our country keep it or is it destroyed when we get hold of it?",
+          "override": true,
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "move_days_per_unit_distance": {
+          "doc": "time to move the project one unit of distance, in days",
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "on_built": {
+          "body": "great_project_body__on_built",
+          "doc": "what to do when it's built",
+          "override": true,
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "on_destroyed": {
+          "body": "great_project_body__on_destroyed",
+          "doc": "what to do when it's destroyed",
+          "override": true,
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "start": {
+          "card": "1",
+          "doc": "province it starts in",
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "starting_tier": {
+          "card": "1",
+          "doc": "tier that the project starts at when first placed in the game (be that at game start or when built by a country as the game progresses)",
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "tier_0": {
+          "body": "great_project_body__tier_0",
+          "card": "1",
+          "doc": "tier data",
+          "override": true,
+          "when": null
+        },
+        "tier_1": {
+          "body": "great_project_body__tier_1",
+          "card": "1",
+          "doc": "tier data",
+          "override": true,
+          "when": null
+        },
+        "tier_2": {
+          "body": "great_project_body__tier_2",
+          "card": "1",
+          "doc": "tier data",
+          "override": true,
+          "when": null
+        },
+        "tier_3": {
+          "body": "great_project_body__tier_3",
+          "card": "1",
+          "doc": "tier data",
+          "override": true,
+          "when": null
+        },
+        "time": {
+          "body": "great_project_body__time",
+          "card": "1",
+          "doc": "time to build",
+          "override": true,
+          "when": null
+        },
+        "type": {
+          "card": "1",
+          "doc": "project type",
+          "override": true,
+          "value": "'monument' | 'canal'",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__type_great_project"
+      ]
+    },
+    "great_project_body__on_built": {
+      "fields": {
+        "add_canal": {
+          "override": true,
+          "value": "ref<great_project.canal>",
+          "when": null
+        },
+        "show_ambient_object": {
+          "card": "0..2",
+          "override": true,
+          "value": "ref<great_project> | ref<ambient_object>",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__effect"
+      ]
+    },
+    "great_project_body__on_destroyed": {
+      "fields": {
+        "hide_ambient_object": {
+          "card": "0..2",
+          "override": true,
+          "value": "ref<great_project> | ref<ambient_object>",
+          "when": null
+        },
+        "remove_canal": {
+          "override": true,
+          "value": "ref<great_project.canal>",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__effect"
+      ]
+    },
+    "great_project_body__tier_0": {
+      "fields": {
+        "area_modifier": {
+          "body": "modifier",
+          "doc": "what modifiers are added to the provinces in the map area when we have this project here on this tier",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "conditional_modifier": {
+          "body": "great_project_body__tier_0__conditional_modifier",
+          "card": "0..*",
+          "doc": "Modifier that are applied if the specified conditions are true.",
+          "when": null
+        },
+        "cost_to_upgrade": {
+          "body": "great_project_body__tier_0__cost_to_upgrade",
+          "card": "1",
+          "doc": "cost to upgrade to this level (0 for tier 0)",
+          "when": null
+        },
+        "country_modifiers": {
+          "body": "modifier",
+          "doc": "what modifiers are added to the country when we have this project here on this tier",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "on_upgraded": {
+          "body": "great_project_body__tier_0__on_upgraded",
+          "doc": "Effects to run when the project is upgraded to tier 0",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "province_modifiers": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "what modifiers are added to the province when we have this project here on this tier",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "region_modifier": {
+          "body": "modifier",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "upgrade_time": {
+          "body": "great_project_body__tier_0__upgrade_time",
+          "card": "1",
+          "doc": "time to upgrade to this level (0 for tier 0)",
+          "when": null
+        }
+      }
+    },
+    "great_project_body__tier_0__conditional_modifier": {
+      "fields": {
+        "is_bad": {
+          "doc": "Specifies whether the tooltip should list it as positive or not",
+          "value": "bool",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        },
+        "tooltip_potential": {
+          "body": "trigger",
+          "doc": "If true will show the conditional modifier, will be hidden otherwise",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "when": null
+        }
+      }
+    },
+    "great_project_body__tier_0__cost_to_upgrade": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "great_project_body__tier_0__on_upgraded": {
+      "fields": {
+        "add_canal": {
+          "override": true,
+          "value": "ref<great_project.canal>",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__effect"
+      ]
+    },
+    "great_project_body__tier_0__upgrade_time": {
+      "fields": {
+        "months": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "great_project_body__tier_1": {
+      "fields": {
+        "area_modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "what modifiers are added to the provinces in the map area when we have this project here on this tier",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "conditional_modifier": {
+          "body": "great_project_body__tier_1__conditional_modifier",
+          "card": "0..*",
+          "doc": "Modifier that are applied if the specified conditions are true.",
+          "when": null
+        },
+        "cost_to_upgrade": {
+          "body": "great_project_body__tier_1__cost_to_upgrade",
+          "card": "1",
+          "doc": "cost to upgrade to this level (0 for tier 0)",
+          "when": null
+        },
+        "country_modifiers": {
+          "body": "modifier",
+          "doc": "what modifiers are added to the country when we have this project here on this tier",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "on_upgraded": {
+          "body": "great_project_body__tier_1__on_upgraded",
+          "doc": "Effects to run when the project is upgraded to tier 1",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "province_modifiers": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "what modifiers are added to the province when we have this project here on this tier",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "region_modifier": {
+          "body": "modifier",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "upgrade_time": {
+          "body": "great_project_body__tier_1__upgrade_time",
+          "card": "1",
+          "doc": "time to upgrade to this level (0 for tier 0)",
+          "when": null
+        }
+      }
+    },
+    "great_project_body__tier_1__conditional_modifier": {
+      "fields": {
+        "is_bad": {
+          "doc": "Specifies whether the tooltip should list it as positive or not",
+          "value": "bool",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        },
+        "tooltip_potential": {
+          "body": "trigger",
+          "doc": "If true will show the conditional modifier, will be hidden otherwise",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "when": null
+        }
+      }
+    },
+    "great_project_body__tier_1__cost_to_upgrade": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "great_project_body__tier_1__on_upgraded": {
+      "fields": {
+        "add_canal": {
+          "override": true,
+          "value": "ref<great_project.canal>",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__effect"
+      ]
+    },
+    "great_project_body__tier_1__upgrade_time": {
+      "fields": {
+        "months": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "great_project_body__tier_2": {
+      "fields": {
+        "area_modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "what modifiers are added to the provinces in the map area when we have this project here on this tier",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "conditional_modifier": {
+          "body": "great_project_body__tier_2__conditional_modifier",
+          "card": "0..*",
+          "doc": "Modifier that are applied if the specified conditions are true.",
+          "when": null
+        },
+        "cost_to_upgrade": {
+          "body": "great_project_body__tier_2__cost_to_upgrade",
+          "card": "1",
+          "doc": "cost to upgrade to this level (0 for tier 0)",
+          "when": null
+        },
+        "country_modifiers": {
+          "body": "modifier",
+          "doc": "what modifiers are added to the country when we have this project here on this tier",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "on_upgraded": {
+          "body": "great_project_body__tier_2__on_upgraded",
+          "doc": "Effects to run when the project is upgraded to tier 2",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "province_modifiers": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "what modifiers are added to the province when we have this project here on this tier",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "region_modifier": {
+          "body": "modifier",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "upgrade_time": {
+          "body": "great_project_body__tier_2__upgrade_time",
+          "card": "1",
+          "doc": "time to upgrade to this level (0 for tier 0)",
+          "when": null
+        }
+      }
+    },
+    "great_project_body__tier_2__conditional_modifier": {
+      "fields": {
+        "is_bad": {
+          "doc": "Specifies whether the tooltip should list it as positive or not",
+          "value": "bool",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        },
+        "tooltip_potential": {
+          "body": "trigger",
+          "doc": "If true will show the conditional modifier, will be hidden otherwise",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "when": null
+        }
+      }
+    },
+    "great_project_body__tier_2__cost_to_upgrade": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "great_project_body__tier_2__on_upgraded": {
+      "fields": {
+        "add_canal": {
+          "override": true,
+          "value": "ref<great_project.canal>",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__effect"
+      ]
+    },
+    "great_project_body__tier_2__upgrade_time": {
+      "fields": {
+        "months": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "great_project_body__tier_3": {
+      "fields": {
+        "area_modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "what modifiers are added to the provinces in the map area when we have this project here on this tier",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "conditional_modifier": {
+          "body": "great_project_body__tier_3__conditional_modifier",
+          "card": "0..*",
+          "doc": "Modifier that are applied if the specified conditions are true.",
+          "when": null
+        },
+        "cost_to_upgrade": {
+          "body": "great_project_body__tier_3__cost_to_upgrade",
+          "card": "1",
+          "doc": "cost to upgrade to this level (0 for tier 0)",
+          "when": null
+        },
+        "country_modifiers": {
+          "body": "modifier",
+          "doc": "what modifiers are added to the country when we have this project here on this tier",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "on_upgraded": {
+          "body": "great_project_body__tier_3__on_upgraded",
+          "doc": "Effects to run when the project is upgraded to tier 3",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "province_modifiers": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "what modifiers are added to the province when we have this project here on this tier",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "region_modifier": {
+          "body": "modifier",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "upgrade_time": {
+          "body": "great_project_body__tier_3__upgrade_time",
+          "card": "1",
+          "doc": "time to upgrade to this level (0 for tier 0)",
+          "when": null
+        }
+      }
+    },
+    "great_project_body__tier_3__conditional_modifier": {
+      "fields": {
+        "is_bad": {
+          "doc": "Specifies whether the tooltip should list it as positive or not",
+          "value": "bool",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        },
+        "tooltip_potential": {
+          "body": "trigger",
+          "doc": "If true will show the conditional modifier, will be hidden otherwise",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "when": null
+        }
+      }
+    },
+    "great_project_body__tier_3__cost_to_upgrade": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "great_project_body__tier_3__on_upgraded": {
+      "fields": {
+        "add_canal": {
+          "override": true,
+          "value": "ref<great_project.canal>",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__effect"
+      ]
+    },
+    "great_project_body__tier_3__upgrade_time": {
+      "fields": {
+        "months": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "great_project_body__time": {
+      "fields": {
+        "months": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "great_project_type_body": {
+      "fields": {
+        "type": {
+          "card": "1",
+          "value": "'monument' | 'canal'",
+          "when": null
+        }
+      }
+    }
+  }
+}

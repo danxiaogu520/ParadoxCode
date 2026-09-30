@@ -1,0 +1,2212 @@
+{
+  "mixins": {
+    "keys__type_government": {
+      "fields": {
+        "basic_reform": {
+          "value": "scalar",
+          "when": null
+        }
+      }
+    },
+    "keys__type_government_mechanic_power": {
+      "fields": {
+        "base_monthly_growth": {
+          "card": "1",
+          "value": "float",
+          "when": null
+        },
+        "development_scaled_monthly_growth": {
+          "card": "1",
+          "value": "float",
+          "when": null
+        }
+      }
+    },
+    "keys__type_government_name": {
+      "fields": {
+        "government_reform": {
+          "value": "scalar",
+          "when": null
+        }
+      }
+    },
+    "keys__type_government_reform": {
+      "fields": {
+        "basic_reform": {
+          "value": "'yes'",
+          "when": null
+        },
+        "legacy_government": {
+          "value": "'yes' | 'no'",
+          "when": null
+        }
+      }
+    }
+  },
+  "schemas": {
+    "government_body": {
+      "fields": {
+        "all_mechanics": {
+          "body": "government_body__all_mechanics",
+          "override": true,
+          "when": null
+        },
+        "basic_reform": {
+          "override": true,
+          "value": "ref<government_reform.basic>",
+          "when": null
+        },
+        "color": {
+          "list": "int[0..]",
+          "override": true,
+          "when": null
+        },
+        "exclusive_reforms": {
+          "card": "0..*",
+          "doc": "Each group of exclusive reforms are mutually exclusive to each other",
+          "list": "ref<government_reform.new>",
+          "override": true,
+          "when": null
+        },
+        "legacy_government": {
+          "list": "ref<government_reform.legacy> | enum<hardcoded_legacygovernments>",
+          "override": true,
+          "when": null
+        },
+        "native_council": {
+          "body": "government_body__native_council",
+          "override": true,
+          "when": null
+        },
+        "reform_levels": {
+          "body": "government_body__empty",
+          "override": true,
+          "when": null
+        },
+        "tribal_democracy": {
+          "body": "government_body__tribal_democracy",
+          "override": true,
+          "when": null
+        }
+      },
+      "include": [
+        "keys__type_government"
+      ],
+      "patterns": [
+        {
+          "body": "government_body__government_reform",
+          "key": "ref<government_reform>",
+          "override": true,
+          "when": null
+        },
+        {
+          "key": "ref<government_reform>",
+          "map": {
+            "body": "government_body__government_reform",
+            "key": "def<government_reform>"
+          },
+          "override": true,
+          "when": null
+        }
+      ]
+    },
+    "government_body__all_mechanics": {
+      "fields": {
+        "government": {
+          "card": "1",
+          "value": "ref<government>",
+          "when": null
+        },
+        "legacy_government": [
+          {
+            "card": "1",
+            "value": "ref<government_reform.legacy>",
+            "when": null
+          },
+          {
+            "card": "0..*",
+            "value": "enum<hardcoded_legacygovernments>",
+            "when": null
+          }
+        ]
+      }
+    },
+    "government_body__color": {
+      "items": "int[0..]"
+    },
+    "government_body__empty": {},
+    "government_body__exclusive_reforms": {
+      "items": "ref<government_reform.new>"
+    },
+    "government_body__government_reform": {
+      "fields": {
+        "government": {
+          "card": "1",
+          "override": true,
+          "value": "ref<government>",
+          "when": null
+        },
+        "legacy_government": {
+          "card": "1",
+          "override": true,
+          "value": "ref<government_reform.legacy>",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__type_government_reform"
+      ],
+      "items": "enum<hardcoded_legacygovernments>"
+    },
+    "government_body__legacy_government": {
+      "items": "ref<government_reform.legacy> | enum<hardcoded_legacygovernments>"
+    },
+    "government_body__native_council": {
+      "fields": {
+        "government": {
+          "card": "1",
+          "value": "ref<government>",
+          "when": null
+        },
+        "legacy_government": [
+          {
+            "card": "1",
+            "value": "ref<government_reform.legacy>",
+            "when": null
+          },
+          {
+            "card": "0..*",
+            "value": "enum<hardcoded_legacygovernments>",
+            "when": null
+          }
+        ]
+      }
+    },
+    "government_body__tribal_democracy": {
+      "fields": {
+        "government": {
+          "card": "1",
+          "value": "ref<government>",
+          "when": null
+        },
+        "legacy_government": [
+          {
+            "card": "1",
+            "value": "ref<government_reform.legacy>",
+            "when": null
+          },
+          {
+            "card": "0..*",
+            "value": "enum<hardcoded_legacygovernments>",
+            "when": null
+          }
+        ]
+      }
+    },
+    "government_mechanic_body": {
+      "fields": {
+        "alert_icon_gfx": {
+          "doc": "GFX icon strip the alert icon to use for this mechanic is in",
+          "value": "ref<sprite>",
+          "when": null
+        },
+        "alert_icon_index": {
+          "doc": "the index of the icon for this mechanic in the strip of alert_icon_gfx",
+          "value": "int[1..]",
+          "when": null
+        },
+        "available": {
+          "body": "trigger",
+          "doc": "criteria for the mechanic to be available, regardless of what is here one must have a government reform with the mechanic in its government_mechanic = { } block.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "interactions": {
+          "body": "government_mechanic_body__interactions",
+          "when": null
+        },
+        "powers": {
+          "body": "government_mechanic_body__powers",
+          "when": null
+        }
+      }
+    },
+    "government_mechanic_body__interactions": {
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "ref<government_mechanic_interaction>",
+          "map": {
+            "body": "government_mechanic_body__interactions__government_mechanic_interaction",
+            "key": "def<government_mechanic_interaction>"
+          },
+          "when": null
+        }
+      ]
+    },
+    "government_mechanic_body__interactions__government_mechanic_interaction": {
+      "fields": {
+        "ai_chance": {
+          "body": "government_mechanic_body__interactions__government_mechanic_interaction__ai_chance",
+          "doc": "AI weighting block for options: factor = base relative weight.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "center": {
+          "value": "bool",
+          "when": null
+        },
+        "cooldown_desc": {
+          "doc": "defines the string to use for the name of the cooldown. If not specified, it will use the name of the interaction.",
+          "value": "loc",
+          "when": null
+        },
+        "cooldown_token": {
+          "doc": "Token to use on cooldown, can be re-used across actions to make them all be put on cooldown when any is used",
+          "value": "def<cooldown_token> | ref<cooldown_token>",
+          "when": null
+        },
+        "cooldown_years": {
+          "value": "int",
+          "when": null
+        },
+        "cost": {
+          "value": "int",
+          "when": null
+        },
+        "cost_type": {
+          "doc": "Must be one of the costs defined in its powers",
+          "value": "ref<government_mechanic_power>",
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "card": "1",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "gui": {
+          "value": "scalar",
+          "when": null
+        },
+        "icon": {
+          "value": "ref<sprite>",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "government_mechanic_body__interactions__government_mechanic_interaction__ai_chance": {
+      "fields": {
+        "factor": {
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float[0.0..10000.0]",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "government_mechanic_body__powers": {
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "ref<government_mechanic_power>",
+          "map": {
+            "body": "government_mechanic_body__powers__government_mechanic_power",
+            "key": "def<government_mechanic_power>"
+          },
+          "when": null
+        }
+      ]
+    },
+    "government_mechanic_body__powers__government_mechanic_power": {
+      "fields": {
+        "base_monthly_growth": {
+          "doc": "How much it grows by each month",
+          "override": true,
+          "value": "float",
+          "when": null
+        },
+        "default": {
+          "doc": "default power when resetting",
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "development_scale_cap": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "development_scaled_capped_monthly_growth": {
+          "override": true,
+          "value": "float",
+          "when": null
+        },
+        "development_scaled_monthly_growth": {
+          "override": true,
+          "value": "float",
+          "when": null
+        },
+        "gui": {
+          "doc": "link to the gui that will be used to display this power. By default, it will be government_shared_power if it's not a power only associated with one action, or if it is a unique power for one interaction, this will be ignored and the bar from the interaction's gui will be used. New versions of this will need to contain the same elements so they can be filled in.",
+          "override": true,
+          "value": "scalar",
+          "when": null
+        },
+        "increases_with_global": {
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "is_good": {
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "max": {
+          "card": "1",
+          "doc": "Maximum value the bar can go",
+          "override": true,
+          "value": "int[1..]",
+          "when": null
+        },
+        "min": {
+          "doc": "Minimum value the bar can go",
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "monarch_power": {
+          "doc": "Category of monarch power used for this mechanic",
+          "override": true,
+          "value": "enum<power_categories>",
+          "when": null
+        },
+        "on_max_reached": {
+          "body": "effect",
+          "override": true,
+          "when": null
+        },
+        "on_min_reached": {
+          "body": "effect",
+          "override": true,
+          "when": null
+        },
+        "range_modifier": {
+          "body": "government_mechanic_body__powers__government_mechanic_power__range_modifier",
+          "card": "0..*",
+          "doc": "Optional country modifier that does not scale, but is applied fully when in range",
+          "override": true,
+          "when": null
+        },
+        "reset_on_new_ruler": {
+          "doc": "Resets back to value defined in default (or 0 if not defined) when your ruler dies",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "reverse_scaled_modifier": {
+          "body": "government_mechanic_body__powers__government_mechanic_power__reverse_scaled_modifier",
+          "card": "0..*",
+          "override": true,
+          "when": null
+        },
+        "scaled_modifier": {
+          "body": "government_mechanic_body__powers__government_mechanic_power__scaled_modifier",
+          "card": "0..*",
+          "override": true,
+          "when": null
+        },
+        "show_before_interactions": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__type_government_mechanic_power"
+      ]
+    },
+    "government_mechanic_body__powers__government_mechanic_power__range_modifier": {
+      "fields": {
+        "end_value": {
+          "doc": "Default is 100, must be bigger or equal to start_value",
+          "value": "int",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        },
+        "start_value": {
+          "doc": "Default is 0, must be lower or equal to end_value",
+          "value": "int",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "when": null
+        }
+      }
+    },
+    "government_mechanic_body__powers__government_mechanic_power__reverse_scaled_modifier": {
+      "fields": {
+        "end_value": {
+          "doc": "Default is 100",
+          "value": "int",
+          "when": null
+        },
+        "extend_beyond_value": {
+          "doc": "Default is 'yes'",
+          "value": "bool",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        },
+        "start_value": {
+          "doc": "Default is 0",
+          "value": "int",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "when": null
+        }
+      }
+    },
+    "government_mechanic_body__powers__government_mechanic_power__scaled_modifier": {
+      "fields": {
+        "end_value": {
+          "doc": "Optional, default is 100. Determines to which value modifier should still be applying/scaling. I.e. if set to 90, it will scale to 100% for anything above 90. If set to a value lower than start_value it will work like a reverse_scaled_modifier",
+          "value": "int",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        },
+        "start_value": {
+          "doc": "Default is 0, Determines from which value modifier should start applying. I.e. if set to 5, it will scale to 0% for anything below 5. If set to a value higher than end_value it will work like a reverse_scaled_modifier",
+          "value": "int",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "when": null
+        }
+      }
+    },
+    "government_mechanic_power_type_body": {
+      "fields": {
+        "base_monthly_growth": {
+          "card": "1",
+          "value": "float",
+          "when": null
+        },
+        "development_scaled_monthly_growth": {
+          "card": "1",
+          "value": "float",
+          "when": null
+        }
+      }
+    },
+    "government_name_body": {
+      "fields": {
+        "consort_female": {
+          "body": "government_name_body__consort_female",
+          "override": true,
+          "when": null
+        },
+        "consort_male": {
+          "body": "government_name_body__consort_male",
+          "override": true,
+          "when": null
+        },
+        "government_reform": {
+          "override": true,
+          "value": "ref<government_reform.basic>",
+          "when": null
+        },
+        "heir_female": {
+          "body": "government_name_body__heir_female",
+          "override": true,
+          "when": null
+        },
+        "heir_male": {
+          "body": "government_name_body__heir_male",
+          "override": true,
+          "when": null
+        },
+        "rank": {
+          "body": "government_name_body__rank",
+          "card": "1",
+          "override": true,
+          "when": null
+        },
+        "ruler_female": [
+          {
+            "body": "government_name_body__ruler_female",
+            "card": "1",
+            "override": true,
+            "when": null
+          },
+          {
+            "body": "government_name_body__ruler_female",
+            "override": true,
+            "when": null
+          }
+        ],
+        "ruler_male": [
+          {
+            "body": "government_name_body__ruler_male",
+            "card": "1",
+            "override": true,
+            "when": null
+          },
+          {
+            "body": "government_name_body__ruler_male",
+            "override": true,
+            "when": null
+          }
+        ],
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      },
+      "include": [
+        "keys__type_government_name"
+      ]
+    },
+    "government_name_body__consort_female": {
+      "patterns": [
+        {
+          "card": "1..10",
+          "key": "scalar",
+          "value": "loc",
+          "when": null
+        },
+        {
+          "card": "0..10",
+          "key": "scalar",
+          "value": "loc",
+          "when": null
+        }
+      ]
+    },
+    "government_name_body__consort_male": {
+      "patterns": [
+        {
+          "card": "1..10",
+          "key": "scalar",
+          "value": "loc",
+          "when": null
+        },
+        {
+          "card": "0..10",
+          "key": "scalar",
+          "value": "loc",
+          "when": null
+        }
+      ]
+    },
+    "government_name_body__heir_female": {
+      "patterns": [
+        {
+          "card": "1..10",
+          "key": "scalar",
+          "value": "loc",
+          "when": null
+        },
+        {
+          "card": "0..10",
+          "key": "scalar",
+          "value": "loc",
+          "when": null
+        }
+      ]
+    },
+    "government_name_body__heir_male": {
+      "patterns": [
+        {
+          "card": "1..10",
+          "key": "scalar",
+          "value": "loc",
+          "when": null
+        },
+        {
+          "card": "0..10",
+          "key": "scalar",
+          "value": "loc",
+          "when": null
+        }
+      ]
+    },
+    "government_name_body__rank": {
+      "patterns": [
+        {
+          "card": "1..10",
+          "key": "scalar",
+          "value": "loc",
+          "when": null
+        },
+        {
+          "card": "0..10",
+          "key": "scalar",
+          "value": "loc",
+          "when": null
+        }
+      ]
+    },
+    "government_name_body__ruler_female": {
+      "patterns": [
+        {
+          "card": "1..10",
+          "key": "scalar",
+          "value": "loc",
+          "when": null
+        },
+        {
+          "card": "0..10",
+          "key": "scalar",
+          "value": "loc",
+          "when": null
+        }
+      ]
+    },
+    "government_name_body__ruler_male": {
+      "patterns": [
+        {
+          "card": "1..10",
+          "key": "scalar",
+          "value": "loc",
+          "when": null
+        },
+        {
+          "card": "0..10",
+          "key": "scalar",
+          "value": "loc",
+          "when": null
+        }
+      ]
+    },
+    "government_name_type_body": {
+      "fields": {
+        "government_reform": {
+          "value": "scalar",
+          "when": null
+        }
+      }
+    },
+    "government_ranks_body": {
+      "patterns": [
+        {
+          "body": "modifier",
+          "card": "0..10",
+          "key": "int[1..10]",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      ]
+    },
+    "government_reform_body": {
+      "fields": {
+        "admirals_become_rulers": {
+          "card": "1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "ai": {
+          "body": "government_reform_body__ai",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "allow_banners": {
+          "card": "1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "allow_carolean": {
+          "card": "1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "allow_cawa": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "allow_convert": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "allow_draft_transport_ships": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "allow_force_tributary": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "allow_migration": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "allow_normal_conversion": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "allow_vassal_alliance": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "allow_vassal_war": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "assimilation_cultures": [
+          {
+            "body": "government_reform_body__assimilation_cultures",
+            "card": "1",
+            "override": true,
+            "when": null
+          },
+          {
+            "body": "government_reform_body__assimilation_cultures",
+            "override": true,
+            "when": null
+          }
+        ],
+        "basic_reform": {
+          "doc": "invisible/does not take up a slot",
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "block_cultural_union": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "boost_income": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "can_change_primary_culture": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "can_customise_heir": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "can_form_trade_league": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "can_inherit_personal_unions": {
+          "card": "1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "can_remove_idea_group": {
+          "card": "1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "can_use_trade_post": {
+          "card": "1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "claim_states": {
+          "card": "1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "conditional": {
+          "body": "government_reform_body__conditional",
+          "card": "0..*",
+          "override": true,
+          "when": null
+        },
+        "custom_attributes": {
+          "body": "government_reform_body__custom_attributes",
+          "override": true,
+          "when": null
+        },
+        "dictatorship": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "different_religion_acceptance": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "int",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "int",
+            "when": null
+          }
+        ],
+        "different_religion_group_acceptance": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "int",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "int",
+            "when": null
+          }
+        ],
+        "disallowed_trade_goods": [
+          {
+            "card": "1",
+            "list": "ref<trade_good>",
+            "override": true,
+            "when": null
+          },
+          {
+            "list": "ref<trade_good>",
+            "override": true,
+            "when": null
+          }
+        ],
+        "duration": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "int",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "int",
+            "when": null
+          }
+        ],
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "election_on_death": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "factions": [
+          {
+            "body": "government_reform_body__empty",
+            "card": "1",
+            "override": true,
+            "when": null
+          },
+          {
+            "list": "ref<faction>",
+            "override": true,
+            "when": null
+          }
+        ],
+        "factions_frame": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "int",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "'2' | '9'",
+            "when": null
+          }
+        ],
+        "fixed_rank": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "int",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "int",
+            "when": null
+          }
+        ],
+        "force_admiral_leader": {
+          "card": "1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "force_conversion_gives_global_holy_war_released_modifier": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "force_general_leader": {
+          "card": "1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "foreign_slave_rulers": {
+          "card": "1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "free_city": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "free_concentrate_development": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "generals_become_rulers": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "government_abilities": {
+          "list": "ref<government_mechanic>",
+          "override": true,
+          "when": null
+        },
+        "has_cultural_union": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "has_devotion": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "has_harem": {
+          "card": "1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "has_janissaries": {
+          "card": "1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "has_meritocracy": {
+          "card": "1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "has_parliament": {
+          "card": "1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "has_pashas": {
+          "card": "1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "has_term_election": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "heir": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "heirs_can_be_generals": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "icon": {
+          "override": true,
+          "severity": "info",
+          "value": "scalar",
+          "when": null
+        },
+        "is_elective": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "is_eligible_for_hre_emperor": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "is_trading_city": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "legacy_equivalent": {
+          "override": true,
+          "value": "ref<government_reform.legacy> | enum<hardcoded_legacygovernments>",
+          "when": null
+        },
+        "legacy_government": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "lock_level_when_selected": {
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "maintain_dynasty": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "mercs_do_not_cost_army_professionalism": {
+          "card": "1",
+          "override": true,
+          "value": "bool",
+          "when": null
+        },
+        "min_autonomy": {
+          "card": "1",
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "modifiers": {
+          "body": "modifier",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "monarchy": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "monastic": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "nation_designer_cost": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "int",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "int",
+            "when": null
+          }
+        ],
+        "nation_designer_trigger": [
+          {
+            "body": "government_reform_body__empty",
+            "card": "1",
+            "override": true,
+            "when": null
+          },
+          {
+            "body": "trigger",
+            "override": true,
+            "scope": {
+              "set": {
+                "root": "country",
+                "this": "country"
+              }
+            },
+            "when": null
+          }
+        ],
+        "native_mechanic": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "nomad": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "papacy": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "post_removed_effect": {
+          "body": "effect",
+          "override": true,
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "queen": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "raze_province": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "religion": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "removed_effect": {
+          "body": "effect",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "replacement_on_independence_war": {
+          "override": true,
+          "value": "ref<government_reform.new>",
+          "when": null
+        },
+        "republic": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "republican_name": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "revolutionary": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "revolutionary_client_state": [
+          {
+            "card": "1",
+            "doc": "Used By Revolutionary Client State",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "doc": "Used By Revolutionary Client State",
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "royal_marriage": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "rulers_can_be_generals": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "start_territory_to_estates": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "float",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "float",
+            "when": null
+          }
+        ],
+        "states_general_mechanic": {
+          "body": "government_reform_body__empty",
+          "card": "1",
+          "override": true,
+          "when": null
+        },
+        "trade_city_reform": {
+          "card": "1",
+          "override": true,
+          "value": "''",
+          "when": null
+        },
+        "tribal": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "trigger": {
+          "body": "trigger",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "uses_revolutionary_zeal": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "valid_for_nation_designer": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ],
+        "valid_for_new_country": [
+          {
+            "card": "1",
+            "override": true,
+            "value": "bool",
+            "when": null
+          },
+          {
+            "override": true,
+            "value": "bool",
+            "when": null
+          }
+        ]
+      },
+      "include": [
+        "keys__type_government_reform"
+      ]
+    },
+    "government_reform_body__ai": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "government_reform_body__assimilation_cultures": {
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "ref<culture_group>",
+          "map": {
+            "body": "government_reform_body__assimilation_cultures__culture_group",
+            "key": "def<culture_group>"
+          },
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      ]
+    },
+    "government_reform_body__assimilation_cultures__culture_group": {
+      "fields": {
+        "effect": {
+          "body": "effect",
+          "doc": "Run when the culture fully assimilated",
+          "override": true,
+          "when": null
+        },
+        "removed_effect": {
+          "body": "effect",
+          "doc": "Run when the culture is no longer fully assimilated",
+          "override": true,
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier"
+      ]
+    },
+    "government_reform_body__conditional": {
+      "fields": {
+        "allow": {
+          "body": "government_reform_body__conditional__allow",
+          "card": "1",
+          "doc": "Trigger conditions checked when using the entry.",
+          "when": null
+        },
+        "allow_banners": {
+          "value": "bool",
+          "when": null
+        },
+        "allow_carolean": {
+          "value": "bool",
+          "when": null
+        },
+        "allow_cawa": {
+          "value": "bool",
+          "when": null
+        },
+        "allow_draft_transport_ships": {
+          "value": "bool",
+          "when": null
+        },
+        "allow_migration": {
+          "value": "bool",
+          "when": null
+        },
+        "can_form_trade_league": {
+          "value": "bool",
+          "when": null
+        },
+        "can_use_trade_post": {
+          "value": "bool",
+          "when": null
+        },
+        "claim_states": {
+          "value": "bool",
+          "when": null
+        },
+        "custom_attributes": {
+          "body": "government_reform_body__conditional__custom_attributes",
+          "when": null
+        },
+        "duration": {
+          "value": "int",
+          "when": null
+        },
+        "election_on_death": {
+          "value": "bool",
+          "when": null
+        },
+        "factions": {
+          "list": "ref<faction>",
+          "when": null
+        },
+        "foreign_slave_rulers": {
+          "value": "bool",
+          "when": null
+        },
+        "government_abilities": {
+          "list": "ref<government_mechanic>",
+          "when": null
+        },
+        "has_devotion": {
+          "value": "bool",
+          "when": null
+        },
+        "has_harem": {
+          "value": "bool",
+          "when": null
+        },
+        "has_janissaries": {
+          "value": "bool",
+          "when": null
+        },
+        "has_meritocracy": {
+          "value": "bool",
+          "when": null
+        },
+        "has_parliament": {
+          "value": "bool",
+          "when": null
+        },
+        "has_pashas": {
+          "value": "bool",
+          "when": null
+        },
+        "has_term_election": {
+          "value": "bool",
+          "when": null
+        },
+        "heir": {
+          "value": "bool",
+          "when": null
+        },
+        "is_elective": {
+          "value": "bool",
+          "when": null
+        },
+        "is_eligible_for_hre_emperor": {
+          "value": "'no'",
+          "when": null
+        },
+        "queen": {
+          "value": "bool",
+          "when": null
+        },
+        "raze_province": {
+          "value": "bool",
+          "when": null
+        },
+        "states_general_mechanic": {
+          "body": "government_reform_body__conditional__states_general_mechanic",
+          "when": null
+        },
+        "trade_city_reform": {
+          "value": "ref<government_reform>",
+          "when": null
+        }
+      }
+    },
+    "government_reform_body__conditional__allow": {
+      "fields": {
+        "NOT": {
+          "body": "government_reform_body__conditional__allow__not",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "NOT"
+          },
+          "when": null
+        },
+        "OR": {
+          "body": "government_reform_body__conditional__allow__or",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "OR"
+          },
+          "when": null
+        },
+        "has_dlc": {
+          "card": "0..*",
+          "value": "enum<DLCs>",
+          "when": null
+        }
+      }
+    },
+    "government_reform_body__conditional__allow__not": {
+      "fields": {
+        "OR": {
+          "body": "government_reform_body__conditional__allow__not__or",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "OR"
+          },
+          "when": null
+        },
+        "has_dlc": {
+          "card": "0..*",
+          "value": "enum<DLCs>",
+          "when": null
+        }
+      }
+    },
+    "government_reform_body__conditional__allow__not__or": {
+      "fields": {
+        "has_dlc": {
+          "card": "0..*",
+          "value": "enum<DLCs>",
+          "when": null
+        }
+      }
+    },
+    "government_reform_body__conditional__allow__or": {
+      "fields": {
+        "has_dlc": {
+          "card": "0..*",
+          "value": "enum<DLCs>",
+          "when": null
+        }
+      }
+    },
+    "government_reform_body__conditional__custom_attributes": {
+      "fields": {
+        "admirals_become_rulers": {
+          "value": "bool",
+          "when": null
+        },
+        "better_purbias_interaction": {
+          "value": "bool",
+          "when": null
+        },
+        "block_cultural_union": {
+          "value": "bool",
+          "when": null
+        },
+        "can_remove_idea_group": {
+          "value": "bool",
+          "when": null
+        },
+        "cannot_become_dictatorship": {
+          "value": "bool",
+          "when": null
+        },
+        "election_on_death": {
+          "value": "bool",
+          "when": null
+        },
+        "enables_aristocratic_idea_group": {
+          "value": "bool",
+          "when": null
+        },
+        "enables_nepotism": {
+          "value": "bool",
+          "when": null
+        },
+        "enables_plutocratic_idea_group": {
+          "value": "bool",
+          "when": null
+        },
+        "force_admiral_leader": {
+          "value": "bool",
+          "when": null
+        },
+        "force_general_leader": {
+          "value": "bool",
+          "when": null
+        },
+        "gives_war_against_the_world_tooltip_dummy": {
+          "value": "'yes'",
+          "when": null
+        },
+        "is_merchant_republic": {
+          "value": "bool",
+          "when": null
+        },
+        "locked_government_type": {
+          "value": "bool",
+          "when": null
+        },
+        "lottery_election": {
+          "value": "bool",
+          "when": null
+        },
+        "maratha_general_interaction": {
+          "value": "bool",
+          "when": null
+        },
+        "mercs_do_not_cost_army_professionalism": {
+          "value": "bool",
+          "when": null
+        }
+      },
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "def<custom_attribute>",
+          "value": "bool",
+          "when": null
+        }
+      ]
+    },
+    "government_reform_body__conditional__factions": {
+      "items": "ref<faction>"
+    },
+    "government_reform_body__conditional__government_abilities": {
+      "items": "ref<government_mechanic>"
+    },
+    "government_reform_body__conditional__states_general_mechanic": {
+      "patterns": [
+        {
+          "card": "2..2",
+          "key": "ref<states_general_faction>",
+          "map": {
+            "body": "modifier",
+            "key": "def<states_general_faction>"
+          },
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      ]
+    },
+    "government_reform_body__custom_attributes": {
+      "fields": {
+        "admirals_become_rulers": {
+          "value": "bool",
+          "when": null
+        },
+        "better_purbias_interaction": {
+          "value": "bool",
+          "when": null
+        },
+        "block_cultural_union": {
+          "value": "bool",
+          "when": null
+        },
+        "can_remove_idea_group": {
+          "value": "bool",
+          "when": null
+        },
+        "cannot_become_dictatorship": {
+          "value": "bool",
+          "when": null
+        },
+        "election_on_death": {
+          "value": "bool",
+          "when": null
+        },
+        "enables_aristocratic_idea_group": {
+          "value": "bool",
+          "when": null
+        },
+        "enables_nepotism": {
+          "value": "bool",
+          "when": null
+        },
+        "enables_plutocratic_idea_group": {
+          "value": "bool",
+          "when": null
+        },
+        "force_admiral_leader": {
+          "value": "bool",
+          "when": null
+        },
+        "force_general_leader": {
+          "value": "bool",
+          "when": null
+        },
+        "gives_war_against_the_world_tooltip_dummy": {
+          "value": "'yes'",
+          "when": null
+        },
+        "is_merchant_republic": {
+          "value": "bool",
+          "when": null
+        },
+        "locked_government_type": {
+          "value": "bool",
+          "when": null
+        },
+        "lottery_election": {
+          "value": "bool",
+          "when": null
+        },
+        "maratha_general_interaction": {
+          "value": "bool",
+          "when": null
+        },
+        "mercs_do_not_cost_army_professionalism": {
+          "value": "bool",
+          "when": null
+        }
+      },
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "def<custom_attribute>",
+          "value": "bool",
+          "when": null
+        }
+      ]
+    },
+    "government_reform_body__disallowed_trade_goods": {
+      "items": "ref<trade_good>"
+    },
+    "government_reform_body__empty": {},
+    "government_reform_body__factions": {
+      "items": "ref<faction>"
+    },
+    "government_reform_body__government_abilities": {
+      "items": "ref<government_mechanic>"
+    },
+    "government_reform_type_body": {
+      "fields": {
+        "basic_reform": {
+          "value": "'yes'",
+          "when": null
+        },
+        "legacy_government": {
+          "value": "'yes' | 'no'",
+          "when": null
+        }
+      }
+    },
+    "government_type_body": {
+      "fields": {
+        "basic_reform": {
+          "value": "scalar",
+          "when": null
+        }
+      }
+    }
+  }
+}

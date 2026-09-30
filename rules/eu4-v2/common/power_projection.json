@@ -1,0 +1,28 @@
+{
+  "schemas": {
+    "power_projection_body": {
+      "fields": {
+        "decay": {
+          "value": "bool",
+          "when": null
+        },
+        "max": {
+          "value": "float",
+          "when": null
+        },
+        "min": {
+          "value": "float",
+          "when": null
+        },
+        "power": {
+          "value": "float",
+          "when": null
+        },
+        "yearly_decay": {
+          "value": "float",
+          "when": null
+        }
+      }
+    }
+  }
+}

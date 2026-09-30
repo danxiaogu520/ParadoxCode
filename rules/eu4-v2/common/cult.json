@@ -1,0 +1,72 @@
+{
+  "schemas": {
+    "cult_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "cult_body__ai_will_do",
+          "card": "1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "allow": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "removed_effect": {
+          "body": "effect",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "sprite": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "cult_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    }
+  }
+}

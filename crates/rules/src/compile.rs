@@ -1222,7 +1222,10 @@ impl<'a> Checker<'a> {
             .map(|(name, _)| (name.clone(), 0u64))
             .collect();
         for _ in 0..32 {
-            let mut next = counts.clone();
+            // Each round recomputes every callee as the sum over its call
+            // sites from the previous round (a fixpoint, not an accumulation).
+            let mut next: BTreeMap<String, u64> =
+                counts.keys().map(|name| (name.clone(), 0u64)).collect();
             for call in &self.calls {
                 if !counts.contains_key(&call.callee) {
                     continue;

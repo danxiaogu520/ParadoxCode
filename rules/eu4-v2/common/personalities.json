@@ -1,0 +1,172 @@
+{
+  "schemas": {
+    "leader_personality_body": {
+      "fields": {
+        "allow": {
+          "body": "leader_personality_body__allow",
+          "card": "1",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "leader_personality_body__allow": {
+      "fields": {
+        "is_admiral": {
+          "override": true,
+          "value": "bool",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__trigger"
+      ]
+    },
+    "ruler_personality_body": {
+      "fields": {
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "chance": {
+          "body": "modifier_rule",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "consort_allow": {
+          "body": "ruler_personality_body__consort_allow",
+          "when": null
+        },
+        "custom_ai_explanation": {
+          "value": "loc",
+          "when": null
+        },
+        "heir_allow": {
+          "body": "ruler_personality_body__heir_allow",
+          "when": null
+        },
+        "immortal": {
+          "value": "'1'",
+          "when": null
+        },
+        "nation_designer_cost": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "ruler_allow": {
+          "body": "ruler_personality_body__ruler_allow",
+          "when": null
+        },
+        "static": {
+          "doc": "Makes nation_designer_cost not scale with age etc.",
+          "value": "'yes'",
+          "when": null
+        },
+        "war_priority": {
+          "body": "modifier_rule",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "ruler_personality_body__consort_allow": {
+      "fields": {
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "chance": {
+          "body": "modifier_rule",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "ruler_personality_body__heir_allow": {
+      "fields": {
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "chance": {
+          "body": "modifier_rule",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "ruler_personality_body__ruler_allow": {
+      "fields": {
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "chance": {
+          "body": "modifier_rule",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    }
+  }
+}

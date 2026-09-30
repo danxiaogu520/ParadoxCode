@@ -1,0 +1,22 @@
+{
+  "mixins": {
+    "keys__type_sprite": {
+      "fields": {
+        "severity": {
+          "value": "'warning'",
+          "when": null
+        }
+      }
+    }
+  },
+  "schemas": {
+    "sprite_type_body": {
+      "fields": {
+        "severity": {
+          "value": "'warning'",
+          "when": null
+        }
+      }
+    }
+  }
+}

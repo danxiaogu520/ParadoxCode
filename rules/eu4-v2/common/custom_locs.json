@@ -1,0 +1,40 @@
+{
+  "schemas": {
+    "defined_text_body": {
+      "fields": {
+        "name": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "random": {
+          "control": {
+            "kind": "chance"
+          },
+          "doc": "Appears to default to yes.",
+          "value": "'no'",
+          "when": null
+        },
+        "text": {
+          "body": "defined_text_body__text",
+          "card": "1..*",
+          "when": null
+        }
+      }
+    },
+    "defined_text_body__text": {
+      "fields": {
+        "localisation_key": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "when": null
+        }
+      }
+    }
+  }
+}

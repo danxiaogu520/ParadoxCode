@@ -14,12 +14,12 @@
 use std::collections::BTreeMap;
 
 use schemars::JsonSchema;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// One rules source file: any subset of the seven top-level sections. The
 /// compiler merges same-named sections across files into one namespace per
 /// section and rejects duplicate names.
-#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RuleFile {
     /// Path-selection rules: logical path → parser / root schema.
@@ -48,7 +48,7 @@ pub struct RuleFile {
 
 /// One `files` entry: which documents a rule selects and how their root
 /// structure is described.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct FileRule {
     /// Logical directory prefix (the legacy `game/` prefix is not spelled).
@@ -76,7 +76,7 @@ pub struct FileRule {
 }
 
 /// The document parser selected by a [`FileRule`].
-#[derive(Clone, Copy, Debug, Deserialize, Eq, JsonSchema, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum SourceParser {
     /// Paradox script.
@@ -90,7 +90,7 @@ pub enum SourceParser {
 }
 
 /// The definition-priority policy selected by a [`FileRule`].
-#[derive(Clone, Copy, Debug, Deserialize, Eq, JsonSchema, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum SourceFileResolution {
     /// Later paths shadow earlier ones per file path (default).
@@ -103,7 +103,7 @@ pub enum SourceFileResolution {
 
 /// A [`FileRule`]'s root structure: either a schema name, or one field spec
 /// carrying `def` for the whole-file-instance case.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum RootSpec {
     /// The name of the root schema.
@@ -115,7 +115,7 @@ pub enum RootSpec {
 
 /// A schema: a full block description, or one of the two schema-level
 /// shorthands (`{"map": …}`, `{"list": …}`).
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum SchemaSpec {
     /// Full block description.
@@ -133,7 +133,7 @@ pub enum SchemaSpec {
 }
 
 /// The full description of one block.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct BlockSchema {
     /// Mixin names, expanded at compile time.
@@ -149,12 +149,12 @@ pub struct BlockSchema {
     #[serde(default)]
     pub items: Option<String>,
     /// Whether undeclared keys are allowed; defaults to false.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub open: bool,
 }
 
 /// One exact key's field spec, or several shape overloads of it.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum FieldOverloads {
     /// A single field spec.
@@ -166,7 +166,7 @@ pub enum FieldOverloads {
 /// One field specification (an element of `patterns`, a value of `fields`, or
 /// the `root` instance form). Exactly one of `value` / `body` / `list` / `map`
 /// must be present (checked by the compiler).
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct FieldSpec {
     /// Key type expression; only meaningful inside `patterns`.
@@ -217,7 +217,7 @@ pub struct FieldSpec {
 }
 
 /// A homogeneous map block: same key and value shapes for every entry.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct MapSpec {
     /// Key type expression (often `def<…>` or `enum<…>`).
@@ -231,7 +231,7 @@ pub struct MapSpec {
 }
 
 /// A mixin: a pure structural field bundle.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct MixinSpec {
     /// Field specs contributed to every including schema.
@@ -240,7 +240,7 @@ pub struct MixinSpec {
 }
 
 /// The scope effect of a field: only the object form exists.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScopeEffect {
     /// Scopes the field is valid in (empty = any).
@@ -255,7 +255,7 @@ pub struct ScopeEffect {
 }
 
 /// Defines a symbol instance at the field's position.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct DefSpec {
     /// Type name, optionally with the subtype granted at this position
@@ -275,12 +275,12 @@ pub struct DefSpec {
 
 /// A subtype condition: a conjunction of "field → type expression", where a
 /// `null` expression means the field must be absent.
-#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(transparent)]
 pub struct SubtypeCond(pub BTreeMap<String, Option<String>>);
 
 /// A control-flow primitive attached to a field.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ControlSpec {
     /// Which primitive this field implements.
@@ -300,7 +300,7 @@ pub struct ControlSpec {
 }
 
 /// The closed set of control-flow primitives.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, JsonSchema, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ControlKind {
     /// Head of an if-chain (`if`).
@@ -324,7 +324,7 @@ pub enum ControlKind {
 }
 
 /// Diagnostic severity for a field's violations.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, JsonSchema, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {
     /// Errors (the default).
@@ -346,7 +346,7 @@ impl std::fmt::Display for Severity {
 }
 
 /// One symbol namespace.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TypeSpec {
     /// Conflict behavior; defaults to `independent`.
@@ -367,7 +367,7 @@ pub struct TypeSpec {
 }
 
 /// The conflict behavior of a symbol type.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, JsonSchema, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum TypeResolution {
     /// Later definitions shadow earlier ones; same-name collisions warn.
@@ -377,7 +377,7 @@ pub enum TypeResolution {
 }
 
 /// One named subtype.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SubtypeSpec {
     /// Instance-body predicate granting this subtype.
@@ -390,12 +390,12 @@ pub struct SubtypeSpec {
 
 /// Arguments of one trait implementation: parameter name → value (a `$…`
 /// instance-name template or a schema name, per the trait's contract).
-#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(transparent)]
 pub struct ImplSpec(pub BTreeMap<String, String>);
 
 /// One trait: capabilities, bindings, and constraints.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TraitSpec {
     /// Parameters with defaults (`"$"` = the instance name) or no default.
@@ -414,7 +414,7 @@ pub struct TraitSpec {
 
 /// One trait binding: how a trait parameter maps to a localisation key or a
 /// sprite name.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct BindingSpec {
     /// Localisation-key template (`"{name}"` references a trait parameter).
@@ -429,7 +429,7 @@ pub struct BindingSpec {
 }
 
 /// Requirements of a trait.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RequiresSpec {
     /// Mixin that must be included by the schemas defining the impl'ing type.
@@ -438,7 +438,7 @@ pub struct RequiresSpec {
 }
 
 /// One enum: plain members, or a table with attribute columns.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum EnumSpec {
     /// Shorthand: members without columns.
@@ -454,7 +454,7 @@ pub enum EnumSpec {
 }
 
 /// The scope model.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScopesSpec {
     /// Scope type names. `any` is reserved and not listed here.
@@ -473,7 +473,7 @@ pub struct ScopesSpec {
 }
 
 /// One scope register.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RegisterSpec {
     /// Whether the register chains (`prev_prev`, `fromfrom`, …).
@@ -482,7 +482,7 @@ pub struct RegisterSpec {
 }
 
 /// One scope link.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LinkSpec {
     /// Scopes the link may start from (`"any"` allowed).
@@ -492,7 +492,7 @@ pub struct LinkSpec {
 }
 
 /// One compatibility override between scope types.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CompatSpec {
     /// The scope type actually produced.

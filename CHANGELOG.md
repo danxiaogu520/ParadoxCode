@@ -9,6 +9,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Phase 2 of the rules redesign lands as `rules-migrate` (in `crates/tools`,
+  deleted after the switch): the one-shot conversion of the legacy rules
+  corpus into a rules-v2 source tree. It nests the flat `parent_path` rows
+  into schemas, folds `alternative_id` bundles into overloads/unions, renders
+  matchers as type expressions (normalising `member_kind_aliases`), dedupes
+  the 1,227 repeated rows, folds `root:on_action` into the `on_actions` enum
+  plus the parameterised `on_action_body<S>`, folds the pure scope-switch
+  rows into `scopes.links`, and relocates the profile tables per §4 of
+  `docs/rules-redesign.md`. Output goes to `rules/eu4-v2/` (staging for the
+  one-cut switch) and is deterministic: repeated runs are byte-identical.
+  `rulec check rules/eu4-v2` passes with 0 errors; the generated
+  `docs/rules-migrate-report.md` carries the row-count coverage (8,463 rows
+  fully reconciled) and the manual checklist for the human refinement pass.
 - The rules-v2 language front end lands, specified by the new
   `docs/rules-language.md`: the type-expression mini-syntax parser
   (`rules::expr`), the JSON source model with a `schemars`-generated JSON
@@ -35,8 +48,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `paradoxcode.localisation.autoOpen` (`needsTranscode` / `always` / `off`, default
   `needsTranscode`), selecting when an eligible file is moved onto its decoded twin.
 
+### Fixed
+
+- `rulec`'s instantiation-cap check computes a fixpoint over call sites; the
+  previous loop added one call site's domain on every iteration, so any
+  parameterised schema with a domain of three or more saturated at the cap
+  and reported a false `ParameterError`.
+
 ### Changed
 
+- The rules source types (`rules::source`) serialise as well as parse (used
+  by `rules-migrate`), so `rules/rules-language.schema.json` is regenerated —
+  `schemars` now emits `default` values for defaulted fields.
 - Localisation hover previews render as a markdown table instead of bullet
   lines. Columns adapt — a Field column appears only when labelled binding
   fields contribute rows — and cells escape pipes and newlines so values

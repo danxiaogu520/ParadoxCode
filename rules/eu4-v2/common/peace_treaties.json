@@ -1,0 +1,197 @@
+{
+  "schemas": {
+    "peace_treaty_body": {
+      "fields": {
+        "ae_base": {
+          "doc": "Base factor for aggressive expansion. Scales with war score cost.",
+          "value": "float",
+          "when": null
+        },
+        "ai_weight": {
+          "body": "peace_treaty_body__ai_weight",
+          "card": "1",
+          "doc": "Defaults to always evaluate to 0. Mandatory to have entry called \"ai_value\". Its value at the end of the ai_weight scope is what will be used",
+          "when": null
+        },
+        "applies_to_war_target": {
+          "doc": "If set to \"yes\", the peace treaty option will only be to the target of the war, not the war leader",
+          "value": "bool",
+          "when": null
+        },
+        "category": {
+          "doc": "Any number between 0 and 6. Represents the tab under which it will be listed. 6 corresponds to \"treaties\". This value currently defaults to 6.",
+          "value": "int[0..6]",
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "card": "1",
+          "doc": "Defaults to empty effect (which makes error log entry but is safe)",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "is_allowed": {
+          "body": "trigger",
+          "doc": "Defaults to equivalent of \"always = yes\"",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "is_make_subject": {
+          "doc": "This will make the treaty mutually exclusive with other treaties that makes the giver a subject, or that explicitly frees the giver from their current overlord.",
+          "value": "bool",
+          "when": null
+        },
+        "is_visible": {
+          "body": "trigger",
+          "doc": "Defaults to equivalent of \"always = yes\"",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "power_cost_base": {
+          "doc": "Base factor for diplomatic power cost when treaty is not allowed by casus belli. Scales with war score cost.",
+          "value": "float",
+          "when": null
+        },
+        "power_projection": [
+          {
+            "card": "1",
+            "value": "'no'",
+            "when": null
+          },
+          {
+            "doc": "\"power_projection\" will only be applied if giver is your rival.",
+            "value": "ref<power_projection>",
+            "when": null
+          }
+        ],
+        "prestige_base": {
+          "doc": "Base factor for prestige gain and loss. Scales with war score cost.",
+          "value": "float",
+          "when": null
+        },
+        "requires_demand_independence": {
+          "doc": "Whether this can be demanded by the former subject in an independence war without also demanding independence.",
+          "value": "bool",
+          "when": null
+        },
+        "requires_is_allowed": {
+          "doc": "If set to \"yes\", treaty will only be visible when explicitly allowed by casus belli. If not, it will be available but cost diplomatic power.",
+          "value": "bool",
+          "when": null
+        },
+        "warscore_cap": {
+          "doc": "Warscore cost will never go above this value. Only enabled if non-negative. This value defaults to -1.",
+          "value": "int[-1..200]",
+          "when": null
+        },
+        "warscore_cost": {
+          "body": "peace_treaty_body__warscore_cost",
+          "card": "1",
+          "doc": "Which of the giver's provinces' war score costs are included and by how much. All entries default to 0. Any combination of entries can be used. Try negative values at your own risk.",
+          "when": null
+        }
+      }
+    },
+    "peace_treaty_body__ai_weight": {
+      "fields": {
+        "export_to_variable": {
+          "body": "peace_treaty_body__ai_weight__export_to_variable",
+          "card": "1",
+          "when": null
+        },
+        "limit": {
+          "body": "trigger",
+          "control": {
+            "kind": "guard"
+          },
+          "doc": "if limit evaluates false, ai_weight will evaluate to 0 regardless",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "peace_treaty_body__ai_weight__export_to_variable": {
+      "fields": {
+        "value": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "variable_name": {
+          "card": "1",
+          "doc": "Mandatory to have entry called \"ai_value\". Its value at the end of the ai_weight scope is what will be used",
+          "value": "'ai_value'",
+          "when": null
+        }
+      }
+    },
+    "peace_treaty_body__warscore_cost": {
+      "fields": {
+        "all_provinces": {
+          "doc": "All the giver's provinces",
+          "value": "float[0.0..]",
+          "when": null
+        },
+        "cancelled_subject": {
+          "doc": "This one should not be relevant here since Giver can't be a cancelled subject. Including anyway for completeness",
+          "value": "float[0.0..]",
+          "when": null
+        },
+        "concede_colonial_region": {
+          "doc": "This one should not be relevant here since Giver can't be a cancelled subject. Including anyway for completeness",
+          "value": "float[0.0..]",
+          "when": null
+        },
+        "conquered": {
+          "doc": "Provinces that are selected by a Demand Province treaty",
+          "value": "float[0.0..]",
+          "when": null
+        },
+        "no_provinces": {
+          "doc": "This is just a constant. Equivalent to a single province with with war score cost 1",
+          "value": "float[0.0..]",
+          "when": null
+        },
+        "owner_keeps": {
+          "doc": "The provinces that are not of any of the types below",
+          "value": "float[0.0..]",
+          "when": null
+        },
+        "released_nation": {
+          "doc": "Provinces that will become a part of a selected released-to-be nation",
+          "value": "float[0.0..]",
+          "when": null
+        },
+        "returned_core": {
+          "doc": "Provinces that are selected by a Return Core treaty",
+          "value": "float[0.0..]",
+          "when": null
+        }
+      }
+    }
+  }
+}

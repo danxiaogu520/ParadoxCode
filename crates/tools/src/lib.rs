@@ -8,4 +8,5 @@
 pub mod check;
 pub mod cli;
 pub mod gates;
+pub mod migrate;
 pub mod release;

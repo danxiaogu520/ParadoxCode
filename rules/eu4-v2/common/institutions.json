@@ -1,0 +1,196 @@
+{
+  "schemas": {
+    "institution_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "institution_body__ai_will_do",
+          "card": "1",
+          "doc": "Cost of embracing institution must be lower than this factor * last month's regular income, and higher if loans are needed. (Or it has a more than long term goal...)",
+          "when": null
+        },
+        "bonus": {
+          "body": "modifier",
+          "card": "1",
+          "when": null
+        },
+        "can_embrace": {
+          "body": "trigger",
+          "card": "1",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "can_start": {
+          "body": "trigger",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "Effect that runs when the country embraces it",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "embracement_speed": {
+          "body": "institution_body__embracement_speed",
+          "card": "1",
+          "doc": "any_friendly_coast_border_province is a special scope made for institution spread. It checks for adjacent provinces or provinces one seazone away. Friendly is defined as at positive relations or owned by the same country that owns the province.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "historical_start_date": {
+          "value": "date",
+          "when": null
+        },
+        "historical_start_province": {
+          "value": "ref<province_id>",
+          "when": null
+        },
+        "history": {
+          "body": "trigger",
+          "card": "1",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "on_start": {
+          "value": "ref<event.country>",
+          "when": null
+        },
+        "start_chance": {
+          "value": "int[0..100]",
+          "when": null
+        },
+        "trade_company_efficiency": {
+          "value": "float",
+          "when": null
+        }
+      }
+    },
+    "institution_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "institution_body__embracement_speed": {
+      "fields": {
+        "modifier": {
+          "body": "institution_body__embracement_speed__modifier",
+          "card": "1..*",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        }
+      }
+    },
+    "institution_body__embracement_speed__modifier": {
+      "fields": {
+        "custom_trigger_tooltip": {
+          "body": "institution_body__embracement_speed__modifier__custom_trigger_tooltip",
+          "override": true,
+          "when": null
+        },
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        },
+        "force_potential": {
+          "doc": "Hide the this modifier when potential is false",
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "potential": {
+          "body": "institution_body__embracement_speed__modifier__potential",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "override": true,
+          "when": null
+        },
+        "scale": {
+          "doc": "if a modifier is scaled, it is multiplied with development in the province.",
+          "override": true,
+          "value": "bool",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__trigger"
+      ]
+    },
+    "institution_body__embracement_speed__modifier__custom_trigger_tooltip": {
+      "fields": {
+        "any_friendly_coast_border_province": {
+          "body": "trigger",
+          "doc": "any_friendly_coast_border_province is a special scope made for institution spread. It checks for adjacent provinces or provinces one seazone away. Friendly is defined as at positive relations or owned by the same country that owns the province.",
+          "override": true,
+          "scope": {
+            "push": "province"
+          },
+          "when": null
+        },
+        "tooltip": {
+          "card": "1",
+          "control": {
+            "kind": "display_only"
+          },
+          "override": true,
+          "value": "loc",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__trigger"
+      ]
+    },
+    "institution_body__embracement_speed__modifier__potential": {
+      "fields": {
+        "any_friendly_coast_border_province": {
+          "body": "trigger",
+          "doc": "any_friendly_coast_border_province is a special scope made for institution spread. It checks for adjacent provinces or provinces one seazone away. Friendly is defined as at positive relations or owned by the same country that owns the province.",
+          "override": true,
+          "scope": {
+            "push": "province"
+          },
+          "when": null
+        }
+      },
+      "include": [
+        "keys__trigger"
+      ]
+    }
+  }
+}

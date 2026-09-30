@@ -1,0 +1,203 @@
+{
+  "schemas": {
+    "custom_button_body": {
+      "fields": {
+        "effect": {
+          "body": "effect",
+          "card": "1",
+          "doc": "The code that runs when the button is clicked",
+          "when": null
+        },
+        "frame": {
+          "body": "custom_button_body__frame",
+          "card": "0..*",
+          "doc": "Which frame file to use",
+          "when": null
+        },
+        "name": {
+          "card": "1",
+          "doc": "Must match a scripted guiButtonType in a .gui file",
+          "value": "scalar",
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "If true, the button will be shown in the interface",
+          "when": null
+        },
+        "tooltip": {
+          "card": "1",
+          "control": {
+            "kind": "display_only"
+          },
+          "doc": "Tooltip to display while hovering this button. Not required, but highly recommended.",
+          "severity": "warning",
+          "value": "scalar",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "If true, the button will be clickable",
+          "when": null
+        }
+      }
+    },
+    "custom_button_body__frame": {
+      "fields": {
+        "number": {
+          "card": "1",
+          "doc": "Which frame of the frame file to use",
+          "value": "int",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "When to use the specified frame",
+          "when": null
+        }
+      }
+    },
+    "custom_icon_body": {
+      "fields": {
+        "frame": {
+          "body": "custom_icon_body__frame",
+          "card": "0..*",
+          "doc": "Which frame file to use",
+          "when": null
+        },
+        "frame_variable": {
+          "doc": "Use the value of a variable to determine the icon frame",
+          "value": "scalar",
+          "when": null
+        },
+        "name": {
+          "card": "1",
+          "doc": "Must match a scripted iconType in a .gui file",
+          "value": "scalar",
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "If true, the icon will be shown in the interface",
+          "when": null
+        },
+        "tooltip": {
+          "control": {
+            "kind": "display_only"
+          },
+          "doc": "Tooltip to display while hovering this icon. Optional.",
+          "value": "loc",
+          "when": null
+        }
+      }
+    },
+    "custom_icon_body__frame": {
+      "fields": {
+        "number": {
+          "card": "1",
+          "doc": "Which frame of the frame file to use",
+          "value": "int",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "When to use the specified frame",
+          "when": null
+        }
+      }
+    },
+    "custom_shield_body": {
+      "fields": {
+        "effect": {
+          "body": "effect",
+          "card": "1",
+          "doc": "The code that runs when clicked",
+          "when": null
+        },
+        "global_event_target": {
+          "card": "1",
+          "doc": "Global event target name",
+          "value": "ref<global_event_target>",
+          "when": null
+        },
+        "name": {
+          "card": "1",
+          "doc": "Must match a scripted guiButtonType in a .gui file",
+          "value": "scalar",
+          "when": null
+        },
+        "open_country": {
+          "card": "1",
+          "doc": "If clicking opens the country view",
+          "value": "bool",
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "If true, the shield will be visible",
+          "when": null
+        },
+        "tooltip": {
+          "control": {
+            "kind": "display_only"
+          },
+          "doc": "Tooltip to display while hovering this shield. Optional.",
+          "value": "loc",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "If true, the shield is clickable",
+          "when": null
+        }
+      }
+    },
+    "custom_text_box_body": {
+      "fields": {
+        "name": {
+          "card": "1",
+          "doc": "Must match a scripted instantTextBoxType in a .gui file",
+          "value": "scalar",
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "If true, the text box will be shown",
+          "when": null
+        },
+        "tooltip": {
+          "control": {
+            "kind": "display_only"
+          },
+          "doc": "Tooltip to display while hovering this text. Optional.",
+          "value": "loc",
+          "when": null
+        }
+      }
+    },
+    "custom_window_body": {
+      "fields": {
+        "name": {
+          "card": "1",
+          "doc": "Must match a scripted windowType in a .gui file",
+          "value": "scalar",
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Determines when the window is visible, and will affect every other gui object inside it, not running their potentials if the window isn't visible.",
+          "when": null
+        }
+      }
+    }
+  }
+}

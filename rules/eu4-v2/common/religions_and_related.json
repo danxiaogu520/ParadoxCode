@@ -1,0 +1,1778 @@
+{
+  "mixins": {
+    "keys__type_aspects_and_blessings": {
+      "fields": {
+        "is_blessing": {
+          "value": "'yes' | 'no'",
+          "when": null
+        }
+      }
+    },
+    "keys__type_religion": {
+      "fields": {
+        "harmonized_modifier": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        }
+      }
+    },
+    "keys__type_religion_group": {
+      "fields": {
+        "harmonized_modifier": {
+          "value": "scalar",
+          "when": null
+        }
+      }
+    },
+    "keys__type_religion_propagation": {
+      "fields": {
+        "trading_policy": {
+          "value": "'yes'",
+          "when": null
+        }
+      }
+    }
+  },
+  "schemas": {
+    "aspects_and_blessings_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "aspects_and_blessings_body__ai_will_do",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "cost": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "is_blessing": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "monarch_power": {
+          "override": true,
+          "value": "'adm' | 'dip' | 'mil'",
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "sprite": {
+          "override": true,
+          "value": "ref<sprite> | 'GFX_diplomats_of_the_reformation_aspect' | 'GFX_expel_heretics_aspect' | 'GFX_icons_of_the_church_icon' | 'GFX_innovativeness_aspect'",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      },
+      "include": [
+        "keys__type_aspects_and_blessings"
+      ]
+    },
+    "aspects_and_blessings_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "aspects_and_blessings_type_body": {
+      "fields": {
+        "is_blessing": {
+          "value": "'yes' | 'no'",
+          "when": null
+        }
+      }
+    },
+    "personal_deity_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "personal_deity_body__ai_will_do",
+          "card": "1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "doc": "Whether the deity is visible to be picked",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "removed_effect": {
+          "body": "effect",
+          "when": null
+        },
+        "sprite": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "doc": "Requirements for picking the deity",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "personal_deity_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "religion_group_body": {
+      "fields": {
+        "ai_will_propagate_through_trade": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "can_form_personal_unions": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "center_of_religion": {
+          "override": true,
+          "value": "ref<province_id>",
+          "when": null
+        },
+        "crusade_name": {
+          "card": "1",
+          "override": true,
+          "value": "loc",
+          "when": null
+        },
+        "defender_of_faith": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "flag_emblem_index_range": {
+          "list": "int",
+          "override": true,
+          "when": null
+        },
+        "flags_with_emblem_percentage": {
+          "doc": "Flag emblem values - Used for Dynamic Setup of Random Nations. Emblem texture: game/gfx/interface/client_state_symbols_large.dds Can be overridden per religion.",
+          "override": true,
+          "value": "int[0..100]",
+          "when": null
+        },
+        "harmonized_modifier": {
+          "override": true,
+          "value": "ref<event_modifier>",
+          "when": null
+        },
+        "religious_schools": {
+          "body": "religion_group_body__religious_schools",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      },
+      "include": [
+        "keys__type_religion_group"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "ref<religion>",
+          "map": {
+            "body": "religion_group_body__religion",
+            "key": "def<religion>"
+          },
+          "override": true,
+          "when": null
+        }
+      ]
+    },
+    "religion_group_body__flag_emblem_index_range": {
+      "items": "int"
+    },
+    "religion_group_body__religion": {
+      "fields": {
+        "allow_female_defenders_of_the_faith": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "allowed_center_conversion": {
+          "list": "ref<religion>",
+          "override": true,
+          "when": null
+        },
+        "allowed_conversion": {
+          "list": "ref<religion>",
+          "override": true,
+          "when": null
+        },
+        "ancestors": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "aspects": {
+          "list": "ref<aspects_and_blessings.church_aspect>",
+          "override": true,
+          "when": null
+        },
+        "aspects_name": {
+          "override": true,
+          "value": "scalar",
+          "when": null
+        },
+        "authority": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "blessings": {
+          "list": "ref<aspects_and_blessings.blessing>",
+          "override": true,
+          "when": null
+        },
+        "can_have_secondary_religion": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "celebrate": {
+          "body": "religion_group_body__religion__celebrate",
+          "override": true,
+          "when": null
+        },
+        "color": {
+          "card": "1",
+          "list": "int[0..] | float[0.0..1.0]",
+          "override": true,
+          "when": null
+        },
+        "country": {
+          "body": "modifier",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "country_as_secondary": {
+          "body": "modifier",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "date": {
+          "override": true,
+          "value": "date",
+          "when": null
+        },
+        "declare_war_in_regency": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "doom": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "fervor": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "fetishist_cult": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "flag_emblem_index_range": {
+          "list": "int",
+          "override": true,
+          "when": null
+        },
+        "flags_with_emblem_percentage": {
+          "override": true,
+          "value": "int[0..100]",
+          "when": null
+        },
+        "gurus": {
+          "body": "religion_group_body__religion__gurus",
+          "override": true,
+          "when": null
+        },
+        "harmonized_modifier": {
+          "override": true,
+          "value": "ref<event_modifier>",
+          "when": null
+        },
+        "has_patriarchs": {
+          "doc": "Uses patriarch authority",
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "heretic": {
+          "card": "1",
+          "list": "loc",
+          "override": true,
+          "when": null
+        },
+        "holy_sites": {
+          "list": "ref<province_id>",
+          "override": true,
+          "when": null
+        },
+        "hre_heretic_religion": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "hre_religion": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "icon": {
+          "card": "1",
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "misguided_heretic": {
+          "doc": "Other christians hate them less",
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "on_convert": {
+          "body": "effect",
+          "override": true,
+          "when": null
+        },
+        "orthodox_icons": {
+          "body": "religion_group_body__religion__orthodox_icons",
+          "override": true,
+          "when": null
+        },
+        "papacy": {
+          "body": "religion_group_body__religion__papacy",
+          "override": true,
+          "when": null
+        },
+        "personal_deity": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "province": {
+          "body": "modifier",
+          "override": true,
+          "when": null
+        },
+        "reform_tooltip": {
+          "override": true,
+          "value": "loc",
+          "when": null
+        },
+        "religious_reforms": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "require_reformed_for_institution_development": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "uses_anglican_power": {
+          "doc": "Uses church power/aspect mechanics",
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "uses_church_power": {
+          "doc": "Uses church power/aspect mechanics",
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "uses_harmony": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "uses_hussite_power": {
+          "doc": "Uses church power/aspect mechanics",
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "uses_isolationism": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "uses_judaism_power": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "uses_karma": {
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "uses_piety": {
+          "doc": "Uses piety mechanics",
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        },
+        "will_get_center": {
+          "body": "trigger",
+          "doc": "Refered to even for initial CoR Spawn",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      },
+      "include": [
+        "keys__type_religion"
+      ]
+    },
+    "religion_group_body__religion__allowed_center_conversion": {
+      "items": "ref<religion>"
+    },
+    "religion_group_body__religion__allowed_conversion": {
+      "items": "ref<religion>"
+    },
+    "religion_group_body__religion__aspects": {
+      "items": "ref<aspects_and_blessings.church_aspect>"
+    },
+    "religion_group_body__religion__blessings": {
+      "items": "ref<aspects_and_blessings.blessing>"
+    },
+    "religion_group_body__religion__celebrate": {
+      "fields": {
+        "ai_will_do": {
+          "body": "religion_group_body__religion__celebrate__ai_will_do",
+          "card": "1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "allow": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "cost": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "card": "1",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__celebrate__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "religion_group_body__religion__color": {
+      "items": "int[0..] | float[0.0..1.0]"
+    },
+    "religion_group_body__religion__flag_emblem_index_range": {
+      "items": "int"
+    },
+    "religion_group_body__religion__gurus": {
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "ref<guru>",
+          "map": {
+            "body": "religion_group_body__religion__gurus__guru",
+            "key": "def<guru>"
+          },
+          "when": null
+        }
+      ]
+    },
+    "religion_group_body__religion__gurus__guru": {
+      "fields": {
+        "chance": {
+          "body": "religion_group_body__religion__gurus__guru__chance",
+          "card": "1",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "when": null
+        },
+        "teachings": {
+          "body": "religion_group_body__religion__gurus__guru__teachings",
+          "card": "1",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__gurus__guru__chance": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "value": "int",
+          "when": null
+        },
+        "modifier": {
+          "body": "religion_group_body__religion__gurus__guru__chance__modifier",
+          "card": "0..*",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__gurus__guru__chance__modifier": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__trigger"
+      ]
+    },
+    "religion_group_body__religion__gurus__guru__teachings": {
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "ref<guru_teaching>",
+          "map": {
+            "body": "religion_group_body__religion__gurus__guru__teachings__guru_teaching",
+            "key": "def<guru_teaching>"
+          },
+          "when": null
+        }
+      ]
+    },
+    "religion_group_body__religion__gurus__guru__teachings__guru_teaching": {
+      "fields": {
+        "cost": {
+          "card": "1",
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "type": {
+          "override": true,
+          "value": "'ADM' | 'DIP' | 'MIL'",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier"
+      ]
+    },
+    "religion_group_body__religion__heretic": {
+      "items": "loc"
+    },
+    "religion_group_body__religion__holy_sites": {
+      "items": "ref<province_id>"
+    },
+    "religion_group_body__religion__orthodox_icons": {
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "ref<orthodox_icon>",
+          "map": {
+            "body": "religion_group_body__religion__orthodox_icons__orthodox_icon",
+            "key": "def<orthodox_icon>"
+          },
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      ]
+    },
+    "religion_group_body__religion__orthodox_icons__orthodox_icon": {
+      "fields": {
+        "ai_will_do": {
+          "body": "religion_group_body__religion__orthodox_icons__orthodox_icon__ai_will_do",
+          "card": "1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "override": true,
+          "when": null
+        },
+        "allow": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Trigger conditions checked when using the entry.",
+          "override": true,
+          "when": null
+        },
+        "visible": {
+          "body": "trigger",
+          "card": "1",
+          "override": true,
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier"
+      ]
+    },
+    "religion_group_body__religion__orthodox_icons__orthodox_icon__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "religion_group_body__religion__papacy": {
+      "fields": {
+        "bless_monarch": {
+          "body": "religion_group_body__religion__papacy__bless_monarch",
+          "when": null
+        },
+        "concessions": {
+          "body": "religion_group_body__religion__papacy__concessions",
+          "when": null
+        },
+        "concilatory": {
+          "body": "modifier",
+          "when": null
+        },
+        "election_cost": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "forgiveness_for_usury": {
+          "body": "religion_group_body__religion__papacy__forgiveness_for_usury",
+          "when": null
+        },
+        "harsh": {
+          "body": "modifier",
+          "when": null
+        },
+        "indulgence_for_sins": {
+          "body": "religion_group_body__religion__papacy__indulgence_for_sins",
+          "when": null
+        },
+        "investigate_heresy": {
+          "body": "religion_group_body__religion__papacy__investigate_heresy",
+          "when": null
+        },
+        "levy_church_tax": {
+          "body": "religion_group_body__religion__papacy__levy_church_tax",
+          "when": null
+        },
+        "local_saint": {
+          "body": "religion_group_body__religion__papacy__local_saint",
+          "when": null
+        },
+        "neutral": {
+          "body": "modifier",
+          "when": null
+        },
+        "papal_tag": {
+          "card": "1",
+          "value": "enum<country_tags>",
+          "when": null
+        },
+        "proclaim_holy_war": {
+          "body": "religion_group_body__religion__papacy__proclaim_holy_war",
+          "when": null
+        },
+        "sanction_commercial_monopoly": {
+          "body": "religion_group_body__religion__papacy__sanction_commercial_monopoly",
+          "when": null
+        },
+        "seat_of_papacy": {
+          "card": "1",
+          "value": "ref<province_id>",
+          "when": null
+        },
+        "send_papal_legate": {
+          "body": "religion_group_body__religion__papacy__send_papal_legate",
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__papacy__bless_monarch": {
+      "fields": {
+        "ai_will_do": {
+          "body": "religion_group_body__religion__papacy__bless_monarch__ai_will_do",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "cost": {
+          "value": "int",
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__papacy__bless_monarch__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "religion_group_body__religion__papacy__concessions": {
+      "fields": {
+        "first_concession": {
+          "body": "religion_group_body__religion__papacy__concessions__first_concession",
+          "when": null
+        },
+        "fourth_concession": {
+          "body": "religion_group_body__religion__papacy__concessions__fourth_concession",
+          "when": null
+        },
+        "second_concession": {
+          "body": "religion_group_body__religion__papacy__concessions__second_concession",
+          "when": null
+        },
+        "third_concession": {
+          "body": "religion_group_body__religion__papacy__concessions__third_concession",
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__papacy__concessions__first_concession": {
+      "fields": {
+        "concilatory": {
+          "body": "modifier",
+          "when": null
+        },
+        "harsh": {
+          "body": "modifier",
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__papacy__concessions__fourth_concession": {
+      "fields": {
+        "concilatory": {
+          "body": "modifier",
+          "when": null
+        },
+        "harsh": {
+          "body": "modifier",
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__papacy__concessions__second_concession": {
+      "fields": {
+        "concilatory": {
+          "body": "modifier",
+          "when": null
+        },
+        "harsh": {
+          "body": "modifier",
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__papacy__concessions__third_concession": {
+      "fields": {
+        "concilatory": {
+          "body": "modifier",
+          "when": null
+        },
+        "harsh": {
+          "body": "modifier",
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__papacy__forgiveness_for_usury": {
+      "fields": {
+        "ai_will_do": {
+          "body": "religion_group_body__religion__papacy__forgiveness_for_usury__ai_will_do",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "cost": {
+          "value": "int",
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__papacy__forgiveness_for_usury__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "religion_group_body__religion__papacy__indulgence_for_sins": {
+      "fields": {
+        "ai_will_do": {
+          "body": "religion_group_body__religion__papacy__indulgence_for_sins__ai_will_do",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "cost": {
+          "value": "int",
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__papacy__indulgence_for_sins__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "religion_group_body__religion__papacy__investigate_heresy": {
+      "fields": {
+        "ai_will_do": {
+          "body": "religion_group_body__religion__papacy__investigate_heresy__ai_will_do",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "curia_treasury_cost": {
+          "value": "int",
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__papacy__investigate_heresy__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "religion_group_body__religion__papacy__levy_church_tax": {
+      "fields": {
+        "ai_will_do": {
+          "body": "religion_group_body__religion__papacy__levy_church_tax__ai_will_do",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "cost": {
+          "value": "int",
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__papacy__levy_church_tax__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "religion_group_body__religion__papacy__local_saint": {
+      "fields": {
+        "ai_will_do": {
+          "body": "religion_group_body__religion__papacy__local_saint__ai_will_do",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "cost": {
+          "value": "int",
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__papacy__local_saint__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "religion_group_body__religion__papacy__proclaim_holy_war": {
+      "fields": {
+        "ai_will_do": {
+          "body": "religion_group_body__religion__papacy__proclaim_holy_war__ai_will_do",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "cost": {
+          "value": "int",
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__papacy__proclaim_holy_war__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "religion_group_body__religion__papacy__sanction_commercial_monopoly": {
+      "fields": {
+        "ai_will_do": {
+          "body": "religion_group_body__religion__papacy__sanction_commercial_monopoly__ai_will_do",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "cost": {
+          "value": "int",
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__papacy__sanction_commercial_monopoly__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "religion_group_body__religion__papacy__send_papal_legate": {
+      "fields": {
+        "ai_will_do": {
+          "body": "religion_group_body__religion__papacy__send_papal_legate__ai_will_do",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "cost": {
+          "value": "int",
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "religion_group_body__religion__papacy__send_papal_legate__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "religion_group_body__religious_schools": {
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "ref<religious_school>",
+          "map": {
+            "body": "religion_group_body__religious_schools__religious_school",
+            "key": "def<religious_school>"
+          },
+          "when": null
+        }
+      ]
+    },
+    "religion_group_body__religious_schools__religious_school": {
+      "fields": {
+        "can_invite_scholar": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "THIS = Nation wanting to invite the scholar, FROM = Nation that follows that school",
+          "override": true,
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "invite_scholar_modifier_display": {
+          "card": "1",
+          "doc": "If you don't set this it will expand on_invite_scholar effect which might be super big",
+          "override": true,
+          "value": "ref<static_modifier>",
+          "when": null
+        },
+        "on_invite_scholar": {
+          "body": "effect",
+          "card": "1",
+          "doc": "THIS = Nation wanting to invite the scholar, FORM = Nation that sends scholar",
+          "override": true,
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "picture": {
+          "card": "1",
+          "override": true,
+          "value": "ref<sprite>",
+          "when": null
+        },
+        "potential_invite_scholar": {
+          "body": "trigger",
+          "card": "1",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier"
+      ]
+    },
+    "religion_group_type_body": {
+      "fields": {
+        "harmonized_modifier": {
+          "value": "scalar",
+          "when": null
+        }
+      }
+    },
+    "religion_propagation_body": {
+      "fields": {
+        "base_conversion_speed": {
+          "card": "1",
+          "override": true,
+          "value": "float",
+          "when": null
+        },
+        "map_icon": {
+          "card": "1",
+          "override": true,
+          "value": "ref<sprite>",
+          "when": null
+        },
+        "max_distance": {
+          "doc": "From Center of Reformation center province (default is NDefines::NReligion::MAX_RELIGIOUS_CENTER_SPREAD_DISTANCE).",
+          "override": true,
+          "value": "float",
+          "when": null
+        },
+        "religion": {
+          "override": true,
+          "value": "ref<religion>",
+          "when": null
+        },
+        "target_province_weights": {
+          "body": "religion_propagation_body__target_province_weights",
+          "card": "1",
+          "override": true,
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "trading_policy": {
+          "doc": "Religion is taken from country using the trading policy. max_distance is not used.",
+          "override": true,
+          "value": "'yes'",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__type_religion_propagation"
+      ]
+    },
+    "religion_propagation_body__target_province_weights": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "religion_propagation_type_body": {
+      "fields": {
+        "trading_policy": {
+          "value": "'yes'",
+          "when": null
+        }
+      }
+    },
+    "religion_type_body": {
+      "fields": {
+        "harmonized_modifier": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        }
+      }
+    },
+    "religious_reform_group_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "religious_reform_group_body__ai_will_do",
+          "card": "1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "can_buy_idea": {
+          "body": "trigger",
+          "card": "1",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      },
+      "patterns": [
+        {
+          "card": "5..5",
+          "key": "ref<religious_reform>",
+          "map": {
+            "body": "modifier",
+            "key": "def<religious_reform>"
+          },
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      ]
+    },
+    "religious_reform_group_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    }
+  }
+}

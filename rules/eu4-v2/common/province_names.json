@@ -1,0 +1,23 @@
+{
+  "schemas": {
+    "province_names_body": {
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "ref<province_id>",
+          "value": "scalar",
+          "when": null
+        },
+        {
+          "card": "0..*",
+          "key": "ref<province_id>",
+          "list": "scalar",
+          "when": null
+        }
+      ]
+    },
+    "province_names_body__province_id": {
+      "items": "scalar"
+    }
+  }
+}

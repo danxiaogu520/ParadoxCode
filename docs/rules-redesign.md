@@ -553,9 +553,16 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 
 - `docs/rules-language.md` 规范；`source` 源类型 + 生成的 JSON Schema；类型表达式解析器（附解析错误的定位测试）；编译器语义检查（2.10 列表，逐条有单测）。本阶段不接 runtime。
 
-### 阶段 2：转换脚本
+### 阶段 2：转换脚本 — **自动部分已完成**（2026-09-30）
 
-- 一次性工具 `crates/tools` 下的 `rules-migrate`（切换后删除），读旧 manifest，按领域输出新源。
+> 实施备注：
+> - 工具为 `crates/tools` 下的 `rules-migrate`（`cargo run -p tools --bin rules-migrate`，切换后删除），读 `rules/eu4`（旧 manifest），写 `rules/eu4-v2/`（新源暂存区，阶段 5 切换时改名顶替）与 `docs/rules-migrate-report.md`（覆盖率 + 人工清单）。可重复运行、输出确定（重复运行逐字节一致，实测）。
+> - 验收：`rulec check rules/eu4-v2` **0 error**（329 条 `UnusedDefinition` warning 属迁移期正常）；行数对平：8,463 = 1,227 去重 + 6,907 进字段 + 149 进 items + 127 折叠进 `scopes.links` + 10 折叠为寄存器位移 + 8 进 on_action 折叠 + 35 孤儿行（进人工清单）。
+> - on_action 折叠按设计产出 `on_actions` enum（`scope` 列）+ `on_action_body<S>`，但**丢弃了 `from` 列**：（scope, from）组合共 65 个，会打爆 §10.1 检查 4 的 64 实例上限；`starts_with`（`on_harmonized_*`）落为一条模板 pattern，body 参数待人工定夺。
+> - `ModifierSource` trait 暂不带 `requires: {include: "modifier_block"}`：`semantic_context_inheritance` 的 type:X→modifier 是"实例体自带 modifier 字段"而非"含 `modifier` 子块"，两种形态并存，requires 形态留人工收口（连同 trait impl 一起）。
+> - 修了两处 phase 1 的实现缺陷：`compile::check_instantiation_cap` 的迭代计数原为逐轮累加、域 ≥3 必然打到上限，改为不动点重算；`source` 源类型补 `Serialize`（转换器序列化输出用），JSON Schema 工件随之重新生成（schemars 现在能写出 `default` 值）。
+> - 人工清单按类别落在 `docs/rules-migrate-report.md`：38 个魔法段位置的 def/ref 判定、`strip_prefix` 模板、typed-prefix 算子过滤、`when` 谓词、trait impl（含子类型折叠）、文件类目扩展名/排除前缀、孤儿结构位置等。
+
 - **自动部分**：`parent_path` 扁平行 → 嵌套 schema；alternative → 重载/union；matcher → 表达式字符串；去重（1,227 条）；on_action 折叠为 enum + 参数化 schema；纯链接行折叠进 `scopes.links`；profile 各表按第 4 节搬迁；`member_kind_aliases` 归一。
 - **人工部分**：324 处魔法段的真实结构、subtype 的 `when`、trait impl、`control` mixin、mixin 抽取。
 - 自动部分必须**可重复运行、结果确定**：人工精修开始前如果 main 上的 `rules/eu4` 有改动，重跑即可；人工精修开始后冻结 main 上的 `rules/eu4`（如有紧急修改，在两边手工同步）。

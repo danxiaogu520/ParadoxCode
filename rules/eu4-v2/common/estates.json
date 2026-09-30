@@ -1,0 +1,664 @@
+{
+  "schemas": {
+    "estate_agenda_body": {
+      "fields": {
+        "can_select": {
+          "body": "trigger",
+          "doc": "Conditions for whether the agenda can be offered to you",
+          "when": null
+        },
+        "fail_if": {
+          "body": "trigger",
+          "doc": "Conditions for when the agenda should be auto-failed",
+          "when": null
+        },
+        "failing_effect": {
+          "body": "effect",
+          "doc": "Effects executed when the agenda is failed (i.e. when fail_if is true or time runs out)",
+          "when": null
+        },
+        "immediate_effect": {
+          "body": "effect",
+          "doc": "Effects executed when the agenda is accepted by the country",
+          "when": null
+        },
+        "invalid_trigger": {
+          "body": "trigger",
+          "doc": "Conditions for when the agenda should end without it counting as a fail (executing on_invalid rather than failing_effect). Happens by default it the estate giving the agenda is removed.",
+          "when": null
+        },
+        "max_days_active": {
+          "doc": "Lets you override the default of 20 years for an agenda",
+          "value": "int",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "doc": "Country modifier granted while the agenda is active",
+          "when": null
+        },
+        "on_invalid": {
+          "body": "effect",
+          "doc": "Effects executed when the country no longer has that estate or the invalid_trigger is true. Useful for clearing flags, modifiers etc.",
+          "when": null
+        },
+        "pre_effect": {
+          "body": "effect",
+          "doc": "Effects executed to set up the task (set flags and targets), before it is shown to the player.",
+          "when": null
+        },
+        "provinces_to_highlight": {
+          "body": "trigger",
+          "doc": "Conditions for provinces to be highlighted by the agenda. Root = country, this = province.",
+          "scope": {
+            "push": "province"
+          },
+          "when": null
+        },
+        "selection_weight": {
+          "body": "estate_agenda_body__selection_weight",
+          "doc": "Determines how likely (compared to the estate's other agendas) this agenda is to be selected. Initial factor will ignore numbers below 1, use a modifier for that!",
+          "when": null
+        },
+        "task_completed_effect": {
+          "body": "effect",
+          "doc": "Effects executed when the agenda is successfully completed",
+          "when": null
+        },
+        "task_requirements": {
+          "body": "trigger",
+          "doc": "Conditions for completing the task successfully",
+          "when": null
+        }
+      }
+    },
+    "estate_agenda_body__selection_weight": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float[1.0..]",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "estate_body": {
+      "fields": {
+        "agendas": {
+          "list": "ref<estate_agenda>",
+          "when": null
+        },
+        "base_influence": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "color": {
+          "card": "1",
+          "list": "int[0..]",
+          "when": null
+        },
+        "contributes_to_curia_treasury": {
+          "value": "'yes'",
+          "when": null
+        },
+        "country_modifier_angry": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "These scale with loyalty & power",
+          "when": null
+        },
+        "country_modifier_happy": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "These scale with loyalty & power",
+          "when": null
+        },
+        "country_modifier_neutral": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "These scale with loyalty & power",
+          "when": null
+        },
+        "custom_desc": {
+          "body": "estate_body__custom_desc",
+          "card": "0..*",
+          "when": null
+        },
+        "custom_name": {
+          "body": "estate_body__custom_name",
+          "card": "0..*",
+          "doc": "Alternative naming of estates",
+          "when": null
+        },
+        "icon": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "independence_government": {
+          "doc": "Used for when declaring independence",
+          "value": "ref<government>",
+          "when": null
+        },
+        "independence_tech_group": {
+          "value": "ref<technology_group>",
+          "when": null
+        },
+        "independence_trigger": {
+          "body": "trigger",
+          "doc": "Used for when declaring independence",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "influence_from_dev_modifier": {
+          "value": "float",
+          "when": null
+        },
+        "influence_modifier": {
+          "body": "estate_body__influence_modifier",
+          "card": "0..*",
+          "when": null
+        },
+        "land_ownership_modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "These scale with loyalty & power",
+          "when": null
+        },
+        "loyalty_modifier": {
+          "body": "estate_body__loyalty_modifier",
+          "card": "0..*",
+          "when": null
+        },
+        "other_religion_group_only": {
+          "value": "'yes'",
+          "when": null
+        },
+        "privileges": {
+          "list": "ref<estate_privilege>",
+          "when": null
+        },
+        "province_independence_weight": {
+          "body": "estate_body__province_independence_weight",
+          "card": "1",
+          "doc": "For each province bordering another country, the neighboring provinces with the highest weights are added, until (share of land ownership * total development) is reached. From all these tries (It will do 32 of the highest weight border provinces at most), the result with the highest total sum of weights is then selected and these provinces then become the new country.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "starting_reform": {
+          "value": "ref<government_reform>",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "If true, country will get estate",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "estate_body__agendas": {
+      "items": "ref<estate_agenda>"
+    },
+    "estate_body__color": {
+      "items": "int[0..]"
+    },
+    "estate_body__custom_desc": {
+      "fields": {
+        "desc": {
+          "card": "1",
+          "value": "loc",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "estate_body__custom_name": {
+      "fields": {
+        "desc": {
+          "card": "1",
+          "value": "loc",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "estate_body__influence_modifier": {
+      "fields": {
+        "desc": {
+          "card": "1",
+          "value": "loc",
+          "when": null
+        },
+        "influence": {
+          "card": "1",
+          "value": "int[-100..100]",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "estate_body__loyalty_modifier": {
+      "fields": {
+        "desc": {
+          "card": "1",
+          "value": "loc",
+          "when": null
+        },
+        "loyalty": {
+          "card": "1",
+          "value": "int[-100..100]",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "estate_body__privileges": {
+      "items": "ref<estate_privilege>"
+    },
+    "estate_body__province_independence_weight": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "estate_crown_land_bonus_body": {
+      "fields": {
+        "key": {
+          "card": "1",
+          "value": "loc",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "scope": {
+            "push": "country"
+          },
+          "when": null
+        },
+        "range_from": {
+          "card": "1",
+          "value": "float",
+          "when": null
+        },
+        "range_to": {
+          "card": "1",
+          "value": "float",
+          "when": null
+        }
+      }
+    },
+    "estate_interaction_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "estate_interaction_body__ai_will_do",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "push": "country"
+          },
+          "when": null
+        },
+        "cooldown_months": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "card": "1",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "push": "country"
+          },
+          "when": null
+        },
+        "key": {
+          "card": "1",
+          "value": "loc",
+          "when": null
+        },
+        "random_seed": {
+          "card": "1",
+          "value": "'crown_land_share' | 'random'",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "push": "country"
+          },
+          "when": null
+        }
+      }
+    },
+    "estate_interaction_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "estate_privilege_body": {
+      "fields": {
+        "additional_description": {
+          "doc": "You can put static modifier names here as well as normal localisation keys",
+          "list": "'cossacks_regiment' | 'rajput_regiment' | scalar",
+          "when": null
+        },
+        "ai_will_do": {
+          "body": "estate_privilege_body__ai_will_do",
+          "card": "1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "when": null
+        },
+        "benefits": {
+          "body": "modifier",
+          "doc": "Positive modifiers granted while the privilege is active (creates different tooltip to penalties)",
+          "when": null
+        },
+        "can_revoke": [
+          {
+            "doc": "Conditions for whether it is possible for the country to revoke this privilege",
+            "value": "bool",
+            "when": null
+          },
+          {
+            "body": "trigger",
+            "doc": "Conditions for whether the country can revoke the privilege",
+            "when": null
+          }
+        ],
+        "can_select": {
+          "body": "trigger",
+          "doc": "Conditions for whether the country is allowed to select the privilege (with conditions for why not displayed)",
+          "when": null
+        },
+        "check_valid_when_tag_switching": {
+          "doc": "Defaults to yes",
+          "value": "'no'",
+          "when": null
+        },
+        "conditional_modifier": {
+          "body": "estate_privilege_body__conditional_modifier",
+          "card": "0..*",
+          "doc": "Modifier that are applied if the specified conditions are true.",
+          "when": null
+        },
+        "cooldown_years": {
+          "doc": "Time limit before which the privilege cannot be revoked",
+          "value": "int",
+          "when": null
+        },
+        "icon": {
+          "card": "1",
+          "value": "scalar",
+          "when": null
+        },
+        "influence": {
+          "value": "float[-0.95..0.95]",
+          "when": null
+        },
+        "influence_scaled_conditional_modifier": {
+          "body": "estate_privilege_body__influence_scaled_conditional_modifier",
+          "card": "0..*",
+          "doc": "Modifier that are applied if the specified conditions are true. At 100% Influence you gain 100% of the modifier.",
+          "when": null
+        },
+        "is_valid": {
+          "body": "trigger",
+          "doc": "Conditions for whether it is possible for the country to have this privilege (it will not display on the list if they are false, and will be revoked if it has already been granted)",
+          "when": null
+        },
+        "land_share": {
+          "value": "int",
+          "when": null
+        },
+        "loyalty": {
+          "value": "float[-0.95..0.95]",
+          "when": null
+        },
+        "loyalty_scaled_conditional_modifier": {
+          "body": "estate_privilege_body__loyalty_scaled_conditional_modifier",
+          "card": "0..*",
+          "doc": "Modifier that is applied if specified conditions are true, with its effect scaling on the loyalty of the estate",
+          "when": null
+        },
+        "max_absolutism": {
+          "value": "int",
+          "when": null
+        },
+        "mechanics": {
+          "body": "estate_privilege_body__empty",
+          "doc": "Special mechanics the privilege enables",
+          "when": null
+        },
+        "modifier_by_land_ownership": {
+          "body": "modifier",
+          "doc": "Multiplies the modifier by the % of land owned by the estate.",
+          "when": null
+        },
+        "on_cooldown_expires": {
+          "body": "effect",
+          "doc": "Effect executed once the specified cooldown_years timer has run down",
+          "when": null
+        },
+        "on_granted": {
+          "body": "effect",
+          "doc": "Effects executed immediately upon the privilege being taken",
+          "when": null
+        },
+        "on_granted_province": {
+          "body": "effect",
+          "doc": "Effects executed immediately upon the privilege being taken",
+          "scope": {
+            "set": {
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "on_invalid": {
+          "body": "effect",
+          "doc": "Effects executed upon the privilege being removed due to invalidity (is_valid becomes false or the estate is removed)",
+          "when": null
+        },
+        "on_invalid_province": {
+          "body": "effect",
+          "doc": "Effects executed upon the privilege being removed due to invalidity (is_valid becomes false or the estate is removed)",
+          "scope": {
+            "set": {
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "on_revoked": {
+          "body": "effect",
+          "doc": "Effects executed upon the privilege being revoked by the country",
+          "when": null
+        },
+        "on_revoked_province": {
+          "body": "effect",
+          "doc": "Effects executed upon the privilege being revoked by the country",
+          "scope": {
+            "set": {
+              "this": "province"
+            }
+          },
+          "when": null
+        },
+        "penalties": {
+          "body": "modifier",
+          "doc": "Negative modifiers granted while the privilege is active (creates different tooltip to benefits)",
+          "when": null
+        }
+      }
+    },
+    "estate_privilege_body__additional_description": {
+      "items": "'cossacks_regiment' | 'rajput_regiment' | scalar"
+    },
+    "estate_privilege_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "estate_privilege_body__conditional_modifier": {
+      "fields": {
+        "is_bad": {
+          "doc": "Specifies whether the tooltip should list it as positive or not",
+          "value": "bool",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "0..*",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "when": null
+        }
+      }
+    },
+    "estate_privilege_body__empty": {},
+    "estate_privilege_body__influence_scaled_conditional_modifier": {
+      "fields": {
+        "is_bad": {
+          "doc": "Specifies whether the tooltip should list it as positive or not",
+          "value": "bool",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "doc": "Conditions under which this modifier will be active, if empty it will be always",
+          "when": null
+        }
+      }
+    },
+    "estate_privilege_body__loyalty_scaled_conditional_modifier": {
+      "fields": {
+        "is_bad": {
+          "doc": "Specifies whether the tooltip should list it as positive or not",
+          "value": "bool",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "when": null
+        }
+      }
+    },
+    "estate_privilege_body__mechanics": {
+      "items": "'enables_cossack_regiments' | 'enables_rajput_regiments' | 'exempt_from_seize_land' | 'can_veto_heirs' | 'vassal_liberty_affected_by_loyalty' | 'can_give_agendas_without_interaction' | 'no_estate_crownland_loss_from_developing'"
+    }
+  }
+}

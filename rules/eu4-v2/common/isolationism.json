@@ -1,0 +1,24 @@
+{
+  "schemas": {
+    "isolationism_body": {
+      "fields": {
+        "isolation_value": {
+          "card": "1",
+          "value": "int[0..]",
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        },
+        "potential": {
+          "body": "trigger",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "when": null
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "schemas": {
+    "ai_army_body": {
+      "fields": {
+        "active": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "The \"active\" trigger (I.e. the trigger that decides what attitude is currently active) is evaluated when any of the following happens: * A war begins or ends. * A country gains or loses a province. * A year without wars or province changes passes.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      },
+      "patterns": [
+        {
+          "body": "ai_army_body__enum_ai_army_eval",
+          "card": "1..*",
+          "doc": "Modifies the province score by adding or multiplying it with the factor. The factor is modified further by optional modifier blocks, which modify multiplicatively.",
+          "key": "enum<ai_army_eval>",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "when": null
+        }
+      ]
+    },
+    "ai_army_body__enum_ai_army_eval": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "value": "float",
+          "when": null
+        },
+        "modifier": {
+          "body": "ai_army_body__enum_ai_army_eval__modifier",
+          "card": "0..*",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        }
+      }
+    },
+    "ai_army_body__enum_ai_army_eval__modifier": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__trigger"
+      ]
+    }
+  }
+}

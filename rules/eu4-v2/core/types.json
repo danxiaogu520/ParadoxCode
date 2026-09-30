@@ -1,0 +1,1115 @@
+{
+  "types": {
+    "achievement": {},
+    "advisor_id": {},
+    "advisor_type": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        },
+        "ModifierSource": {}
+      }
+    },
+    "ai_army": {},
+    "ai_personality": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    },
+    "alerts": {},
+    "ambient_object": {},
+    "ambient_object_basis": {},
+    "ancestor_personalities": {
+      "impl": {
+        "Localised": {
+          "desc": "desc_$",
+          "name": "$"
+        },
+        "ModifierSource": {}
+      }
+    },
+    "ancestor_personality": {},
+    "area": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      },
+      "subtypes": {
+        "used": {
+          "when": null
+        }
+      }
+    },
+    "aspects_and_blessings": {
+      "impl": {
+        "HasIcon": {
+          "sprite": "GFX_$"
+        },
+        "Localised": {
+          "desc": "desc_$",
+          "name": "$"
+        }
+      },
+      "subtypes": {
+        "blessing": {
+          "when": null
+        },
+        "church_aspect": {
+          "when": null
+        }
+      }
+    },
+    "bitmap_font": {
+      "resolution": "replace"
+    },
+    "bookmark": {},
+    "building": {
+      "impl": {
+        "HasIcon": {
+          "sprite": "GFX_$"
+        },
+        "Localised": {
+          "name": "building_$"
+        }
+      }
+    },
+    "casus_belli": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    },
+    "center_of_revolution_conversion": {},
+    "client_state": {},
+    "climate": {
+      "impl": {
+        "Localised": {
+          "desc": "desc_$",
+          "name": "$"
+        }
+      }
+    },
+    "colonial_region": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "consort_flag": {
+      "builtin": [
+        "accepted_help_from_spouses_family",
+        "adm_child",
+        "akkodha",
+        "alfonsos_successor",
+        "appointed_by_overlord",
+        "approached_by_consorts_foreign_family",
+        "approached_by_leading_families_of_the_realm",
+        "asked_foreign_in_laws_for_help",
+        "azt_made_montezuma_general",
+        "azt_montezuma",
+        "bad_bad_pope",
+        "bloody_mary",
+        "bonaparte_flag",
+        "boy_child",
+        "calvinist_advisor_at_court",
+        "can_get_lawgiver_personality",
+        "catholic_advisor_at_court",
+        "christian_tutors",
+        "cities_offered_to_help",
+        "civil_war_exempt",
+        "considered_golden_liberty",
+        "consort_adm_advisor",
+        "consort_dip_advisor",
+        "consort_had_affection_of_ruler",
+        "consort_mil_advisor",
+        "cromwell_flag",
+        "CSU_pachakuti_upgrades_flag",
+        "culture_question",
+        "death_of_valide_sultan",
+        "denied_secularists",
+        "dip_child",
+        "divorce_100",
+        "divorce_25",
+        "divorce_50",
+        "divorce_75",
+        "dmitry_shemiaka_in_power",
+        "elective_monarchy_heir_converted",
+        "elective_monarchy_heir_refused_converted",
+        "faith_question",
+        "female_cousin",
+        "free_thinker_swap_no",
+        "gaining_tolerance",
+        "getting_well_connected",
+        "girl_child",
+        "had_10_years_anniversary",
+        "had_20_years_anniversary",
+        "had_ancestor_deified",
+        "had_promising_janissary",
+        "had_tapa",
+        "has_henry_vii",
+        "has_ivan_the_terrible",
+        "has_lowborn_consort",
+        "has_proclaimed_archking_title",
+        "has_vasily_ii",
+        "heir_catholic",
+        "heir_framed_for_plot",
+        "heir_plotting",
+        "heir_went_on_grand_tour",
+        "helped_rival",
+        "helped_spouses_family",
+        "henry_vi_lancaster",
+        "high_adm",
+        "high_dip",
+        "high_mil",
+        "historical_pirate",
+        "hoarse_ruler",
+        "hussite_heretic",
+        "hussite_king",
+        "INC_destroyed_history_flag",
+        "INC_suffered_for_parent_death",
+        "inti_aucachics",
+        "inti_heir_matched",
+        "inti_itu_celebrated",
+        "inti_nobles_alarmed",
+        "inti_raymi_in_lifetime",
+        "inti_turned_down_royal_guard",
+        "invited_lama",
+        "is_charles_of_burg_flag",
+        "joan_trastamara_flag",
+        "kateregga_seized_power",
+        "leader_has_been_pushed_out",
+        "litter_attacked",
+        "mal_had_pretender_rebels_in_life",
+        "male_cousin",
+        "marriage_length",
+        "mary_is_heir",
+        "mca_zaque_fought",
+        "mca_zipa_fought",
+        "mil_child",
+        "minorities_denied_representation",
+        "mlc_death_or_raja_ibrahim",
+        "mng_militry_incompetence",
+        "monarchistic_heir",
+        "ned_orangist_ruler_flag",
+        "no_pork_for_cairo",
+        "pali_law_collection",
+        "paranoid_regent",
+        "paranoid_regent_investigation",
+        "pariccaga_flag",
+        "per_abbas_lives_flag",
+        "performed_hajj_already_flag",
+        "personal_catholic_sympathies",
+        "peter_the_great",
+        "province_defected_to_tribe",
+        "pru_sanssouci_builder_flag",
+        "quotas_discussed",
+        "refused_papacy",
+        "refused_to_help_consort_regents_family",
+        "refused_to_help_spouses_family",
+        "republic_revolution",
+        "returned_from_sancaga_sikma_province",
+        "robespierre_flag",
+        "ruler_cant_trigger_this_event_flag",
+        "ruler_made_hangeul_alphabet_decision",
+        "said_no_to_islamic_titles",
+        "sancaga_cikma",
+        "savonarola_flag",
+        "sce_sacagawea_flag",
+        "scholar_alchemy",
+        "scholar_better_boats",
+        "scholar_better_guns",
+        "scholar_cartograph",
+        "scholar_international_law",
+        "scholar_mediocrity",
+        "scholar_new_law_collection",
+        "scholar_theology",
+        "son_askia_the_great",
+        "stall_flood_events2_flag",
+        "stall_flood_events_flag",
+        "stroganovs_asked",
+        "suggested_ruler_flag",
+        "suk_monarch_flag",
+        "talented_daughter_happened",
+        "temple_expansion",
+        "tengri_confucian_heir_education",
+        "tengri_exchanged_ideas",
+        "tengri_muslim_ruler_questioned",
+        "tengri_rich_merchant_arrived",
+        "theocratic_heir",
+        "trading_grain_exports_flag",
+        "troublesome_theologian_1",
+        "troublesome_theologian_2",
+        "tur_janissaries_demanded_more_privileges",
+        "turned_down_marriage_offer_for_love",
+        "upset_by_tragically_killed_cousin",
+        "vizier_plotted",
+        "well_advised_tutored",
+        "well_advised_tutored_heir",
+        "widow_widower",
+        "zan_muhammad_and_suleiman"
+      ]
+    },
+    "continent": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "cooldown_token": {},
+    "country_color_file": {},
+    "country_file": {},
+    "country_flag": {},
+    "country_history": {},
+    "country_tag": {},
+    "cult": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        },
+        "ModifierSource": {}
+      }
+    },
+    "culture": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "culture_group": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "custom_attribute": {},
+    "custom_button": {},
+    "custom_country_colors": {},
+    "custom_gui": {},
+    "custom_icon": {},
+    "custom_shield": {},
+    "custom_text_box": {},
+    "custom_window": {},
+    "customideas": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        },
+        "ModifierSource": {}
+      }
+    },
+    "decision": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$_title"
+        }
+      },
+      "resolution": "replace"
+    },
+    "decree": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    },
+    "default_map": {},
+    "defender_faith": {
+      "impl": {
+        "Localised": {
+          "desc": "$_DESC",
+          "name": "$"
+        }
+      }
+    },
+    "defined_text": {},
+    "diplomacy_history": {},
+    "diplomatic_action": {},
+    "disaster": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "dynasty_colors": {},
+    "dynasty_name": {
+      "open": true
+    },
+    "edict": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "estate": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "estate_agenda": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    },
+    "estate_crown_land_bonus": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "estate_interaction": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "estate_modifier": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "estate_privilege": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    },
+    "event": {
+      "resolution": "replace",
+      "subtypes": {
+        "country": {
+          "when": null
+        },
+        "mercenary_company": {
+          "when": null
+        },
+        "province": {
+          "when": null
+        },
+        "unit": {
+          "when": null
+        }
+      }
+    },
+    "event_modifier": {
+      "impl": {
+        "Localised": {
+          "desc": "desc_$",
+          "name": "$"
+        },
+        "ModifierSource": {}
+      }
+    },
+    "event_target": {
+      "open": true
+    },
+    "exiled_consort": {},
+    "exiled_heir": {},
+    "exiled_ruler": {},
+    "faction": {
+      "impl": {
+        "Localised": {
+          "desc": "$_FACTION_DESC",
+          "name": "$"
+        }
+      }
+    },
+    "federation_advancements": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "fervor": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "flagship_modification": {},
+    "game_age": {
+      "impl": {
+        "HasIcon": {
+          "sprite": "GFX_$"
+        },
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    },
+    "game_age_ability": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "global_event_target": {
+      "open": true
+    },
+    "global_flag": {
+      "builtin": [
+        "baiame_story_flag",
+        "conquest_story_flag",
+        "dharma_story_flag",
+        "djunkgao_story_flag",
+        "enable_stop_shadow_kingdom",
+        "islamic_story_flag",
+        "la_pleiade",
+        "rainbow_story_flag",
+        "spirits_story_flag",
+        "wagyl_story_flag"
+      ]
+    },
+    "golden_bull": {
+      "impl": {
+        "HasIcon": {
+          "sprite": "GFX_$"
+        },
+        "Localised": {
+          "desc": "$_DESC",
+          "name": "$"
+        }
+      }
+    },
+    "government": {
+      "impl": {
+        "Localised": {
+          "name": "$_name"
+        }
+      },
+      "subtypes": {
+        "normal": {
+          "when": null
+        }
+      }
+    },
+    "government_attributes": {},
+    "government_mechanic": {
+      "impl": {
+        "Localised": {
+          "name": "ability_$"
+        }
+      }
+    },
+    "government_mechanic_interaction": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    },
+    "government_mechanic_power": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "government_name": {},
+    "government_ranks": {
+      "impl": {
+        "ModifierSource": {}
+      }
+    },
+    "government_reform": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      },
+      "subtypes": {
+        "basic": {
+          "when": null
+        },
+        "legacy": {
+          "when": null
+        },
+        "new": {
+          "when": null
+        }
+      }
+    },
+    "graphical_cultures": {},
+    "graphical_terrain": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "great_project": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      },
+      "subtypes": {
+        "canal": {
+          "when": null
+        }
+      }
+    },
+    "guru": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "guru_teaching": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "hardcoded_legacy_government": {
+      "subtypes": {
+        "hardcoded_legacy_government": {
+          "when": {
+            "legacy_government": "'yes'"
+          }
+        }
+      }
+    },
+    "hegemon": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "heir_flag": {},
+    "holy_order": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    },
+    "idea": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      },
+      "resolution": "replace"
+    },
+    "idea_group": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      },
+      "resolution": "replace",
+      "subtypes": {
+        "country_idea": {
+          "when": null
+        },
+        "selectable": {
+          "when": null
+        }
+      }
+    },
+    "imperial_incident": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "imperial_reform": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$_title"
+        }
+      },
+      "subtypes": {
+        "china": {
+          "when": null
+        },
+        "hre": {
+          "when": null
+        }
+      }
+    },
+    "incident": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$_title"
+        }
+      }
+    },
+    "institution": {
+      "impl": {
+        "Localised": {
+          "desc": "desc_$",
+          "name": "$"
+        }
+      }
+    },
+    "insult": {},
+    "isolationism": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    },
+    "leader_personality": {
+      "impl": {
+        "Localised": {
+          "desc": "desc_$",
+          "name": "$"
+        },
+        "ModifierSource": {}
+      }
+    },
+    "luck": {},
+    "mapclimate": {},
+    "mercenary_company": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "mission": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$_title"
+        }
+      },
+      "resolution": "replace"
+    },
+    "mission_series": {
+      "resolution": "replace"
+    },
+    "named_unrest": {
+      "open": true
+    },
+    "natives": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "naval_doctrine": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    },
+    "new_diplomatic_action": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc"
+        }
+      }
+    },
+    "object": {
+      "resolution": "replace"
+    },
+    "on_action": {},
+    "opinion_modifier": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "orthodox_icon": {
+      "impl": {
+        "Localised": {
+          "desc": "desc_$",
+          "name": "$"
+        }
+      }
+    },
+    "packentity": {},
+    "packorder": {},
+    "papal_policy": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "parliament_bribe": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "parliament_issue": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "peace_options": {},
+    "peace_treaty": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    },
+    "personal_deity": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        },
+        "ModifierSource": {}
+      }
+    },
+    "policy": {
+      "impl": {
+        "Localised": {
+          "desc": "desc_$",
+          "name": "$"
+        },
+        "ModifierSource": {}
+      }
+    },
+    "power_projection": {},
+    "prices": {},
+    "professionalism_modifier": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        },
+        "ModifierSource": {}
+      }
+    },
+    "province_flag": {
+      "builtin": [
+        "gained_manpower_flag",
+        "heretic_fanatics_encouraged",
+        "rus_manu",
+        "sun_permanently_destroyed_el_escorial",
+        "tur_marked"
+      ]
+    },
+    "province_group": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      },
+      "subtypes": {
+        "used": {
+          "when": null
+        }
+      }
+    },
+    "province_history": {},
+    "province_id": {
+      "impl": {
+        "Localised": {
+          "name": "PROV$"
+        }
+      }
+    },
+    "province_names": {},
+    "province_triggered_modifier": {
+      "impl": {
+        "Localised": {
+          "desc": "desc_$",
+          "name": "$"
+        },
+        "ModifierSource": {}
+      }
+    },
+    "rebel_demand_loc": {},
+    "rebel_type": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$_name"
+        }
+      }
+    },
+    "region": {
+      "impl": {
+        "Localised": {
+          "name": "$_name"
+        }
+      }
+    },
+    "region_colors": {},
+    "religion": {
+      "impl": {
+        "Localised": {
+          "desc": "$_religion_desc",
+          "name": "$"
+        }
+      }
+    },
+    "religion_group": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "religion_propagation": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "religious_reform": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    },
+    "religious_reform_group": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "religious_school": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    },
+    "revolt_trigger": {},
+    "ruler_flag": {},
+    "ruler_personality": {
+      "impl": {
+        "Localised": {
+          "desc": "desc_$",
+          "name": "$"
+        },
+        "ModifierSource": {}
+      }
+    },
+    "saved_name": {
+      "open": true
+    },
+    "scope_field": {},
+    "scripted_effect": {
+      "impl": {
+        "Callable": {
+          "body": "effect"
+        }
+      },
+      "resolution": "replace"
+    },
+    "scripted_function": {},
+    "scripted_trigger": {
+      "impl": {
+        "Callable": {
+          "body": "trigger"
+        }
+      },
+      "resolution": "replace"
+    },
+    "sprite": {
+      "resolution": "replace"
+    },
+    "sprite_pack": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "states_general_faction": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "static_modifier": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        },
+        "ModifierSource": {}
+      },
+      "resolution": "replace"
+    },
+    "subject_type": {
+      "impl": {
+        "Localised": {
+          "name": "$_title"
+        }
+      }
+    },
+    "subject_type_upgrade": {},
+    "subject_upgrades": {},
+    "superregion": {
+      "impl": {
+        "Localised": {
+          "name": "$_name"
+        }
+      }
+    },
+    "tech_ahead_of_time": {},
+    "technology": {},
+    "technology_file": {},
+    "technology_group": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    },
+    "terrain": {
+      "impl": {
+        "ModifierSource": {}
+      }
+    },
+    "timed_modifier": {},
+    "trade_center": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    },
+    "trade_company": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "trade_company_investment": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    },
+    "trade_good": {
+      "impl": {
+        "Localised": {
+          "desc": "$DESC",
+          "name": "$"
+        }
+      },
+      "subtypes": {
+        "latent": {
+          "when": null
+        }
+      }
+    },
+    "trade_node": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "trade_node_name": {
+      "impl": {
+        "Localised": {
+          "name": "$"
+        }
+      }
+    },
+    "trade_winds": {},
+    "tradegood": {},
+    "trading_policy": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        },
+        "ModifierSource": {}
+      }
+    },
+    "tree_terrain": {},
+    "triggered_modifier": {
+      "impl": {
+        "Localised": {
+          "desc": "desc_$",
+          "name": "$"
+        },
+        "ModifierSource": {}
+      }
+    },
+    "unit_type": {
+      "impl": {
+        "Localised": {
+          "desc": "$DESCR",
+          "name": "$"
+        }
+      }
+    },
+    "units_display": {},
+    "variable": {},
+    "war_history": {},
+    "wargoal_type": {
+      "impl": {
+        "Localised": {
+          "desc": "$_desc",
+          "name": "$"
+        }
+      }
+    }
+  }
+}

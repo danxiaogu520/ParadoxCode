@@ -1,0 +1,15 @@
+{
+  "schemas": {
+    "units_display_body": {
+      "patterns": [
+        {
+          "body": "units_display_entry",
+          "card": "0..*",
+          "doc": "Unit display definitions are keyed by unit type.",
+          "key": "scalar",
+          "when": null
+        }
+      ]
+    }
+  }
+}

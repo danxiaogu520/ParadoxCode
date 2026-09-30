@@ -1,0 +1,72 @@
+{
+  "mixins": {
+    "keys__type_opinion_modifier": {
+      "fields": {
+        "opinion": {
+          "card": "1",
+          "value": "int[-9999..-1] | int[0..9999]",
+          "when": null
+        }
+      }
+    }
+  },
+  "schemas": {
+    "opinion_modifier_body": {
+      "fields": {
+        "max": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "max_in_other_direction": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "max_vassal": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "min": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "months": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "opinion": {
+          "card": "1",
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "yearly_decay": {
+          "override": true,
+          "value": "float",
+          "when": null
+        },
+        "years": {
+          "override": true,
+          "value": "int",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__type_opinion_modifier"
+      ]
+    },
+    "opinion_modifier_type_body": {
+      "fields": {
+        "opinion": {
+          "card": "1",
+          "value": "int[-9999..-1] | int[0..9999]",
+          "when": null
+        }
+      }
+    }
+  }
+}

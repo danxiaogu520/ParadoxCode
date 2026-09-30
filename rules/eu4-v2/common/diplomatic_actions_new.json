@@ -1,0 +1,362 @@
+{
+  "mixins": {
+    "keys__type_new_diplomatic_action": {
+      "fields": {
+        "require_acceptance": {
+          "card": "1",
+          "value": "'yes'",
+          "when": null
+        }
+      }
+    }
+  },
+  "schemas": {
+    "new_diplomatic_action_body": {
+      "fields": {
+        "ai_acceptance": {
+          "body": "new_diplomatic_action_body__ai_acceptance",
+          "doc": "This works similarly to variable_arithmetic_trigger, but does not support triggers generally. Instead, \"limit\" will be evaluated first and the rest ignored if it isn't passed.",
+          "override": true,
+          "when": null
+        },
+        "ai_will_do": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "override": true,
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "alert_index": {
+          "override": true,
+          "value": "int",
+          "when": null
+        },
+        "alert_tooltip": {
+          "override": true,
+          "value": "loc",
+          "when": null
+        },
+        "category": {
+          "card": "0..*",
+          "override": true,
+          "value": "scalar | enum<diplomatic_actions_new>",
+          "when": null
+        },
+        "is_allowed": {
+          "body": "trigger",
+          "card": "1",
+          "override": true,
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "is_visible": {
+          "body": "trigger",
+          "card": "1",
+          "override": true,
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "on_accept": [
+          {
+            "body": "effect",
+            "card": "1",
+            "override": true,
+            "scope": {
+              "set": {
+                "from": "country",
+                "root": "country",
+                "this": "country"
+              }
+            },
+            "when": null
+          },
+          {
+            "body": "effect",
+            "override": true,
+            "scope": {
+              "set": {
+                "from": "country",
+                "root": "country",
+                "this": "country"
+              }
+            },
+            "when": null
+          }
+        ],
+        "on_decline": {
+          "body": "effect",
+          "override": true,
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "require_acceptance": {
+          "doc": "Can the other side decline? defaults to no",
+          "override": true,
+          "value": "bool",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__type_new_diplomatic_action"
+      ]
+    },
+    "new_diplomatic_action_body__ai_acceptance": {
+      "fields": {
+        "add_entry": {
+          "body": "new_diplomatic_action_body__ai_acceptance__add_entry",
+          "card": "1..*",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        }
+      }
+    },
+    "new_diplomatic_action_body__ai_acceptance__add_entry": {
+      "fields": {
+        "change_variable": {
+          "body": "new_diplomatic_action_body__ai_acceptance__add_entry__change_variable",
+          "card": "0..*",
+          "when": null
+        },
+        "check_variable": {
+          "body": "new_diplomatic_action_body__ai_acceptance__add_entry__check_variable",
+          "card": "0..*",
+          "when": null
+        },
+        "divide_variable": {
+          "body": "new_diplomatic_action_body__ai_acceptance__add_entry__divide_variable",
+          "card": "0..*",
+          "when": null
+        },
+        "export_to_variable": {
+          "body": "new_diplomatic_action_body__ai_acceptance__add_entry__export_to_variable",
+          "card": "0..*",
+          "when": null
+        },
+        "is_variable_equal": {
+          "body": "new_diplomatic_action_body__ai_acceptance__add_entry__is_variable_equal",
+          "card": "0..*",
+          "when": null
+        },
+        "limit": {
+          "body": "trigger",
+          "control": {
+            "kind": "guard"
+          },
+          "when": null
+        },
+        "multiply_variable": {
+          "body": "new_diplomatic_action_body__ai_acceptance__add_entry__multiply_variable",
+          "card": "0..*",
+          "when": null
+        },
+        "name": {
+          "card": "1",
+          "value": "loc",
+          "when": null
+        },
+        "set_variable": {
+          "body": "new_diplomatic_action_body__ai_acceptance__add_entry__set_variable",
+          "card": "0..*",
+          "when": null
+        },
+        "subtract_variable": {
+          "body": "new_diplomatic_action_body__ai_acceptance__add_entry__subtract_variable",
+          "card": "0..*",
+          "when": null
+        }
+      }
+    },
+    "new_diplomatic_action_body__ai_acceptance__add_entry__change_variable": {
+      "fields": {
+        "ai_value": {
+          "card": "1",
+          "value": "float",
+          "when": null
+        },
+        "value": {
+          "card": "1",
+          "value": "float",
+          "when": null
+        },
+        "which": {
+          "card": "1",
+          "value": "'ai_value'",
+          "when": null
+        }
+      }
+    },
+    "new_diplomatic_action_body__ai_acceptance__add_entry__check_variable": {
+      "fields": {
+        "ai_value": {
+          "card": "1",
+          "value": "float",
+          "when": null
+        },
+        "cardinality": {
+          "card": "1",
+          "value": "'2..2'",
+          "when": null
+        },
+        "which": {
+          "card": "1",
+          "value": "'ai_value' | ref<variable>",
+          "when": null
+        }
+      }
+    },
+    "new_diplomatic_action_body__ai_acceptance__add_entry__divide_variable": {
+      "fields": {
+        "ai_value": {
+          "card": "1",
+          "value": "float",
+          "when": null
+        },
+        "value": {
+          "card": "1",
+          "value": "float",
+          "when": null
+        },
+        "which": {
+          "card": "1",
+          "value": "'ai_value'",
+          "when": null
+        }
+      }
+    },
+    "new_diplomatic_action_body__ai_acceptance__add_entry__export_to_variable": {
+      "fields": {
+        "value": {
+          "card": "1",
+          "doc": "Seeds `ai_value` with a constant before the arithmetic; vanilla AI acceptance writes `value = 1` here.",
+          "value": "enum<export_to_variable_data> | 'trigger_value:{ref<scripted_trigger>}' | int",
+          "when": null
+        },
+        "who": {
+          "value": "scope<country>",
+          "when": null
+        },
+        "with": {
+          "value": "scope<country>",
+          "when": null
+        }
+      },
+      "patterns": [
+        {
+          "card": "1",
+          "key": "enum<which_varname>",
+          "value": "'ai_value'",
+          "when": null
+        }
+      ]
+    },
+    "new_diplomatic_action_body__ai_acceptance__add_entry__is_variable_equal": {
+      "fields": {
+        "cardinality": {
+          "card": "1",
+          "value": "'2..2'",
+          "when": null
+        },
+        "which": {
+          "card": "1",
+          "value": "'ai_value' | ref<variable>",
+          "when": null
+        }
+      }
+    },
+    "new_diplomatic_action_body__ai_acceptance__add_entry__multiply_variable": {
+      "fields": {
+        "ai_value": {
+          "value": "float",
+          "when": null
+        },
+        "value": {
+          "card": "1",
+          "value": "float",
+          "when": null
+        },
+        "which": {
+          "card": "1",
+          "value": "'ai_value'",
+          "when": null
+        }
+      }
+    },
+    "new_diplomatic_action_body__ai_acceptance__add_entry__set_variable": {
+      "fields": {
+        "ai_value": {
+          "card": "1",
+          "value": "float",
+          "when": null
+        },
+        "value": {
+          "card": "1",
+          "value": "float",
+          "when": null
+        },
+        "which": {
+          "card": "1",
+          "value": "'ai_value'",
+          "when": null
+        }
+      }
+    },
+    "new_diplomatic_action_body__ai_acceptance__add_entry__subtract_variable": {
+      "fields": {
+        "ai_value": {
+          "value": "float",
+          "when": null
+        },
+        "value": {
+          "card": "1",
+          "value": "float",
+          "when": null
+        },
+        "which": {
+          "card": "1",
+          "value": "'ai_value'",
+          "when": null
+        }
+      }
+    },
+    "new_diplomatic_action_type_body": {
+      "fields": {
+        "require_acceptance": {
+          "card": "1",
+          "value": "'yes'",
+          "when": null
+        }
+      }
+    }
+  }
+}

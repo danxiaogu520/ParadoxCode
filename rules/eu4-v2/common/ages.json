@@ -1,0 +1,165 @@
+{
+  "schemas": {
+    "game_age_body": {
+      "fields": {
+        "abilities": {
+          "body": "game_age_body__abilities",
+          "card": "1",
+          "when": null
+        },
+        "absolutism": {
+          "body": "game_age_body__absolutism",
+          "when": null
+        },
+        "can_start": {
+          "body": "trigger",
+          "card": "1",
+          "when": null
+        },
+        "objectives": {
+          "body": "game_age_body__empty",
+          "card": "1",
+          "when": null
+        },
+        "papacy": {
+          "value": "float",
+          "when": null
+        },
+        "religious_conflicts": {
+          "value": "'yes'",
+          "when": null
+        },
+        "start": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "game_age_body__abilities": {
+      "patterns": [
+        {
+          "card": "1..*",
+          "key": "ref<game_age_ability>",
+          "map": {
+            "body": "game_age_body__abilities__game_age_ability",
+            "key": "def<game_age_ability>"
+          },
+          "when": null
+        }
+      ]
+    },
+    "game_age_body__abilities__game_age_ability": {
+      "fields": {
+        "ai_will_do": {
+          "body": "game_age_body__abilities__game_age_ability__ai_will_do",
+          "card": "1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "allow": {
+          "body": "trigger",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "effect": {
+          "body": "effect",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "when": null
+        },
+        "modifier": {
+          "body": "modifier",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "when": null
+        }
+      }
+    },
+    "game_age_body__abilities__game_age_ability__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float",
+          "when": null
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "game_age_body__absolutism": {
+      "fields": {
+        "automatic_seat_in_parliament": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "debase_currency": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "decrease_autonomy_command": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "execute_rebel_acceptance_command": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "harsh_treatment": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "increase_autonomy_command": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "manual_seat_in_parliament": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "stability": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "strengthen_government": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        },
+        "war_exhaustion": {
+          "card": "1",
+          "value": "int",
+          "when": null
+        }
+      }
+    },
+    "game_age_body__empty": {}
+  }
+}
