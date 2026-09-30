@@ -1,6 +1,6 @@
 # 规则系统重构：设计方案
 
-> 状态：**设计已定稿；阶段 0（清理）已完成**（2026-09-29，分支 `refactor/rules-drop-records`），阶段 1 起待实施。第 3 节列出全部已定决策；第 8 节只剩实施期间凭数据收口的细节，不阻塞开工。
+> 状态：**设计已定稿；阶段 0–3 已完成**，阶段 4 起待实施。阶段 0 于 2026-09-29 合入 main（分支 `refactor/rules-drop-records`）；阶段 1、2、3 在长期分支 `feat/rules-v2`（2026-09-30 / 10-01）。第 3 节列出全部已定决策；第 8 节只剩实施期间凭数据收口的细节，不阻塞开工。
 > 前提：项目处于 0.x，**允许破坏性修改，不考虑历史兼容**；规则源格式**继续使用 JSON**。
 > 统计口径：2026-09-29，`rules/eu4`（`source_format_version` 10）与 `crates/*`。
 
@@ -596,7 +596,7 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 4. 清理常量与双重编码字段（`strict_min`、`deprecated`、`required` vs `min_occurs`、`any_scalar` 两种写法、float 边界字符串、`Unit`/`unit`、显式默认值）；修 `lexicon.json:32`；更新 README 统计。
 5. **建立基线工具**（本阶段最重要的交付）：在 `scripts/sweep.mjs` 旁增加基线导出，对原版全量输出——每文件的诊断（code、range、message）、每类型的定义数与引用数、golden 文件上若干固定位置的补全候选。基线含授权数据，只存本地、不进仓库（与现有 sweep 约束一致）。
 
-### 阶段 1：语言前端（长期分支 `feat/rules-v2`）
+### 阶段 1：语言前端（长期分支 `feat/rules-v2`）— **已完成**（2026-09-30）
 
 - `docs/rules-language.md` 规范；`source` 源类型 + 生成的 JSON Schema；类型表达式解析器（附解析错误的定位测试）；编译器语义检查（2.10 列表，逐条有单测）。本阶段不接 runtime。
 
