@@ -273,7 +273,23 @@ mod tests {
             aliases: BTreeMap::from([("country_tags".to_owned(), "country_tag".to_owned())]),
             scope_aliases: BTreeMap::from([("owner".to_owned(), "country".to_owned())]),
             enum_names: vec!["country_tags".to_owned()],
+            type_names: std::collections::BTreeSet::from([
+                "country_tag".to_owned(),
+                "government_attributes".to_owned(),
+            ]),
         }
+    }
+
+    /// An `enum:` spelling that names a symbol type with definition sites is a
+    /// reference; a real static enum keeps its `enum<>` form.
+    #[test]
+    fn enum_or_ref_prefers_a_static_enum_over_a_type() {
+        let norm = norm();
+        assert_eq!(
+            norm.enum_or_ref("government_attributes"),
+            "ref<government_attributes>"
+        );
+        assert_eq!(norm.enum_or_ref("country_tags"), "enum<country_tags>");
     }
 
     #[test]

@@ -593,11 +593,24 @@
       ]
     },
     "ImplSpec": {
-      "description": "Arguments of one trait implementation: parameter name → value (a `$…`\ninstance-name template or a schema name, per the trait's contract).",
+      "description": "Arguments of one trait implementation: binding (or parameter) name → value.\n\n`Localised` and `HasIcon` take one [`BindingSpec`] per binding they\ncontribute, because the binding set is per-type data rather than a fixed\ntrait shape; the other built-ins take plain strings (`Callable`'s `body`).",
       "type": "object",
       "additionalProperties": {
-        "type": "string"
+        "$ref": "#/$defs/ImplValue"
       }
+    },
+    "ImplValue": {
+      "description": "One trait-implementation argument.",
+      "anyOf": [
+        {
+          "description": "A plain argument value (`Callable`'s `body` schema name).",
+          "type": "string"
+        },
+        {
+          "description": "One localisation or sprite binding contributed by the impl.",
+          "$ref": "#/$defs/BindingSpec"
+        }
+      ]
     },
     "LinkSpec": {
       "description": "One scope link.",

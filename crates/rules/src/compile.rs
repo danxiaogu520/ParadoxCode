@@ -12,8 +12,8 @@ use std::fmt;
 
 use crate::expr::{self, Expr, Param, Primary, Segment};
 use crate::source::{
-    EnumSpec, ExtSpec, FieldOverloads, FieldSpec, MapSpec, MixinSpec, RootSpec, RuleFile,
-    SchemaSpec, Severity, SourceParser, TraitSpec, TypeSpec,
+    EnumSpec, ExtSpec, FieldOverloads, FieldSpec, ImplSpec, ImplValue, MapSpec, MixinSpec,
+    RootSpec, RuleFile, SchemaSpec, Severity, SourceParser, TraitSpec, TypeSpec,
 };
 
 /// One compile diagnostic: provenance plus the finding.
@@ -412,6 +412,67 @@ impl<'a> Checker<'a> {
         self.diagnostics.extend(diagnostics);
     }
 
+    /// Records the trait references of one `impl` map and validates each
+    /// binding argument: exactly one of `loc` / `sprite`, matching the trait
+    /// (a `Localised` binding is a localisation key, a `HasIcon` binding is a
+    /// sprite).
+    fn collect_trait_impls(&mut self, at: &At, impls: &'a BTreeMap<String, ImplSpec>) {
+        for (trait_name, spec) in impls {
+            let impl_at = at.child("impl").child(trait_name);
+            self.references.push(Reference {
+                kind: RefKind::Trait,
+                name: trait_name.clone(),
+                subtype: None,
+                owner: None,
+                at: impl_at.clone(),
+            });
+            for (binding_name, value) in &spec.0 {
+                let binding_at = impl_at.child(binding_name);
+                let ImplValue::Binding(binding) = value else {
+                    if let ImplValue::Text(text) = value {
+                        self.forbid_params(&binding_at, text, "a trait argument");
+                    }
+                    continue;
+                };
+                if binding.loc.is_some() == binding.sprite.is_some() {
+                    report(&mut self.diagnostics, 
+                        &binding_at,
+                        DiagnosticCode::Parse,
+                        Severity::Error,
+                        format!(
+                            "trait binding `{binding_name}` must declare exactly one of \
+                             `loc` / `sprite`"
+                        ),
+                    );
+                }
+                if trait_name == "Localised" && binding.sprite.is_some() {
+                    report(&mut self.diagnostics, 
+                        &binding_at,
+                        DiagnosticCode::Parse,
+                        Severity::Error,
+                        format!(
+                            "trait binding `{binding_name}` is a `Localised` binding; spell it \
+                             with `loc`"
+                        ),
+                    );
+                }
+                if trait_name == "HasIcon" && binding.loc.is_some() {
+                    report(&mut self.diagnostics, 
+                        &binding_at,
+                        DiagnosticCode::Parse,
+                        Severity::Error,
+                        format!(
+                            "trait binding `{binding_name}` is a `HasIcon` binding; spell it \
+                             with `sprite`"
+                        ),
+                    );
+                }
+                // `loc` / `sprite` are instance-name templates (`$` is the
+                // placeholder), not type expressions, so `$name` is legal.
+            }
+        }
+    }
+
     fn collect(&mut self) {
         self.collect_scopes();
         for (file_name, file) in self.sources {
@@ -691,27 +752,11 @@ impl<'a> Checker<'a> {
             for builtin in spec.builtin.iter().flatten() {
                 self.forbid_params(&at.child("builtin"), builtin, "a builtin member");
             }
-            for trait_name in spec.trait_impls.keys() {
-                self.references.push(Reference {
-                    kind: RefKind::Trait,
-                    name: trait_name.clone(),
-                    subtype: None,
-                    owner: None,
-                    at: at.child("impl"),
-                });
-            }
+            self.collect_trait_impls(&at, &spec.trait_impls);
             for (subtype_name, subtype) in &spec.subtypes {
                 let subtype_at = at.child("subtypes").child(subtype_name);
                 self.forbid_params(&subtype_at, subtype_name, "a subtype name");
-                for trait_name in subtype.trait_impls.keys() {
-                    self.references.push(Reference {
-                        kind: RefKind::Trait,
-                        name: trait_name.clone(),
-                        subtype: None,
-                        owner: None,
-                        at: subtype_at.child("impl"),
-                    });
-                }
+                self.collect_trait_impls(&subtype_at, &subtype.trait_impls);
                 if let Some(when) = &subtype.when {
                     for (field, value) in &when.0 {
                         self.forbid_params(&subtype_at.child("when"), field, "a when field name");
@@ -776,14 +821,6 @@ impl<'a> Checker<'a> {
                              `loc` / `sprite`"
                         ),
                     );
-                }
-                for (key, value) in [
-                    ("loc", binding.loc.as_deref()),
-                    ("sprite", binding.sprite.as_deref()),
-                ] {
-                    if let Some(value) = value {
-                        self.forbid_params(&binding_at.child(key), value, "a binding template");
-                    }
                 }
             }
         }
@@ -1656,38 +1693,51 @@ impl<'a> Checker<'a> {
     /// Checks 7 and 8: trait requirements and duplicate impls.
     fn check_traits(&mut self) {
         for (type_name, type_def) in &self.types {
-            let mut impl_counts: BTreeMap<String, usize> = BTreeMap::new();
-            let mut impl_ats: BTreeMap<String, At> = BTreeMap::new();
-            for trait_name in type_def.value.trait_impls.keys() {
-                *impl_counts.entry(trait_name.clone()).or_default() += 1;
-                impl_ats
-                    .entry(trait_name.clone())
-                    .or_insert_with(|| type_def.at.child("impl"));
+            // A trait may be implemented at the type level and again per
+            // subtype (§7.3). What must not happen twice is one *binding*: the
+            // type-level template and a subtype template for the same name
+            // would both claim to generate the key.
+            let mut bindings: BTreeMap<(String, String), ()> = BTreeMap::new();
+            for (trait_name, impls) in &type_def.value.trait_impls {
+                for binding in impls.0.keys() {
+                    bindings.insert((trait_name.clone(), binding.clone()), ());
+                }
             }
             for (subtype_name, subtype) in &type_def.value.subtypes {
-                for trait_name in subtype.trait_impls.keys() {
-                    *impl_counts.entry(trait_name.clone()).or_default() += 1;
-                    impl_ats.entry(trait_name.clone()).or_insert_with(|| {
-                        type_def
-                            .at
-                            .child("subtypes")
-                            .child(subtype_name)
-                            .child("impl")
-                    });
+                for (trait_name, impls) in &subtype.trait_impls {
+                    for binding in impls.0.keys() {
+                        if bindings
+                            .contains_key(&(trait_name.clone(), binding.clone()))
+                        {
+                            report(&mut self.diagnostics, 
+                                &type_def
+                                    .at
+                                    .child("subtypes")
+                                    .child(subtype_name)
+                                    .child("impl")
+                                    .child(trait_name)
+                                    .child(binding),
+                                DiagnosticCode::DuplicateTraitImpl,
+                                Severity::Error,
+                                format!(
+                                    "type `{type_name}` contributes binding `{binding}` of trait \
+                                     `{trait_name}` twice (type-level and subtype `{subtype_name}`)"
+                                ),
+                            );
+                        }
+                    }
                 }
             }
-            for (trait_name, count) in impl_counts {
-                if count > 1 {
-                    report(&mut self.diagnostics, 
-                        &impl_ats[&trait_name],
-                        DiagnosticCode::DuplicateTraitImpl,
-                        Severity::Error,
-                        format!("type `{type_name}` impls trait `{trait_name}` {count} times"),
-                    );
-                }
+            for trait_name in type_def.value.trait_impls.keys().chain(
+                type_def
+                    .value
+                    .subtypes
+                    .values()
+                    .flat_map(|subtype| subtype.trait_impls.keys()),
+            ) {
                 let Some(required) = self
                     .traits
-                    .get(&trait_name)
+                    .get(trait_name)
                     .and_then(|trait_def| trait_def.value.requires.as_ref())
                     .and_then(|requires| requires.include.clone())
                 else {
@@ -2884,8 +2934,10 @@ mod tests {
                 "event_body": { "fields": { "id": { "value": "scalar" } } }
               },
               "types": { "event": {
-                "impl": { "Localised": {} },
-                "subtypes": { "country": { "impl": { "Localised": {} } } }
+                "impl": { "Localised": { "name": { "loc": "$" } } },
+                "subtypes": { "country": { "impl": { "Localised": {
+                  "name": { "loc": "$_country" }
+                } } } }
               }},
               "traits": { "Localised": {} }
             }"#,

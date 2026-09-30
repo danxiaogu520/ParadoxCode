@@ -20,10 +20,10 @@ use std::path::{Path, PathBuf};
 
 use rules::rulec;
 use rules::source::{
-    BlockSchema, CompatSpec, ControlKind, ControlSpec, DefSpec, EnumSpec, ExtSpec, FieldOverloads,
-    FieldSpec, FileRule, ImplSpec, LinkSpec, MapSpec, MixinSpec, RegisterSpec, RootSpec, RuleFile,
-    SchemaSpec, ScopeEffect, ScopesSpec, Severity, SourceFileResolution, SubtypeCond, SubtypeSpec,
-    TraitSpec, TypeSpec, TypeResolution,
+    BindingSpec, BlockSchema, CompatSpec, ControlKind, ControlSpec, DefSpec, EnumSpec, ExtSpec,
+    FieldOverloads, FieldSpec, FileRule, ImplSpec, ImplValue, LinkSpec, MapSpec, MixinSpec,
+    RegisterSpec, RootSpec, RuleFile, SchemaSpec, ScopeEffect, ScopesSpec, Severity,
+    SourceFileResolution, SubtypeCond, SubtypeSpec, TraitSpec, TypeSpec, TypeResolution,
 };
 use rules::{KeyMatcher, RuleShape, RulesModel, SemanticRule, ValueMatcher};
 
@@ -1464,24 +1464,15 @@ impl<'model> Cvt<'model> {
 
     fn convert_traits(&mut self) {
         let mut traits: BTreeMap<String, TraitSpec> = BTreeMap::new();
+        // `Localised` / `HasIcon` declare no bindings of their own: the impl
+        // enumerates them, because the binding set is per-type data (§7.3).
         traits.insert(
             "Localised".to_owned(),
-            serde_json::from_value(serde_json::json!({
-                "params": {"name": "$", "desc": null},
-                "bindings": {
-                    "name": {"loc": "{name}", "required": true},
-                    "desc": {"loc": "{desc}"}
-                }
-            }))
-            .expect("trait deserializes"),
+            serde_json::from_value(serde_json::json!({})).expect("trait deserializes"),
         );
         traits.insert(
             "HasIcon".to_owned(),
-            serde_json::from_value(serde_json::json!({
-                "params": {"sprite": "GFX_$"},
-                "bindings": {"icon": {"sprite": "{sprite}"}}
-            }))
-            .expect("trait deserializes"),
+            serde_json::from_value(serde_json::json!({})).expect("trait deserializes"),
         );
         traits.insert(
             "ModifierSource".to_owned(),
@@ -1497,20 +1488,6 @@ impl<'model> Cvt<'model> {
             .expect("trait deserializes"),
         );
         self.file("core/traits.json").traits = traits;
-        self.manual(
-            "trait-impl",
-            "`ModifierSource` is emitted without the design's `requires: {include: \
-             \"modifier_block\"}` because `semantic_context_inheritance` types carry modifier \
-             fields in the body itself, not in a `modifier` sub-block — settle the final trait \
-             contract in the manual pass"
-                .to_owned(),
-        );
-        self.manual(
-            "trait-impl",
-            "`Callable` capabilities include `opaque_text` (the legacy usage flags set it); \
-             the design example lists three capabilities"
-                .to_owned(),
-        );
     }
 
     fn convert_types(&mut self) {
@@ -1598,77 +1575,84 @@ impl<'model> Cvt<'model> {
             );
         }
         // Localisation / sprite bindings → `Localised` / `HasIcon` impls.
+        //
+        // Each impl enumerates its own bindings (D19/Option A). A binding gated
+        // on a structural field becomes a subtype impl whose `when` predicate
+        // reads that field; a binding gated on the instance-name prefix has no
+        // expression form and is recorded in the coverage table instead.
         for (binding_type, bindings) in group_bindings(&self.model.semantic.localisation_bindings) {
             let canonical = self.norm.type_name(&binding_type);
             let base = canonical.split('.').next().unwrap_or(&canonical).to_owned();
             let entry = types.entry(base.clone()).or_default();
-            let mut args: BTreeMap<String, String> = BTreeMap::new();
-            let mut subtype_args: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
+            let mut args: BTreeMap<String, ImplValue> = BTreeMap::new();
+            let mut subtype_args: BTreeMap<String, BTreeMap<String, ImplValue>> = BTreeMap::new();
+            let mut subtype_when: BTreeMap<String, SubtypeCond> = BTreeMap::new();
             for binding in bindings {
-                let param = match binding.name.as_str() {
-                    "name" => Some("name"),
-                    "desc" | "description" => Some("desc"),
-                    _ => None,
-                };
-                let Some(param) = param else {
-                    self.manual(
-                        "trait-impl",
-                        format!(
-                            "localisation binding `{}/{}` has no `Localised` parameter — \
-                             extend the trait or fold it by hand",
-                            binding_type, binding.name
-                        ),
-                    );
-                    continue;
-                };
                 let Some(key) = &binding.key else {
-                    self.manual(
-                        "trait-impl",
-                        format!(
-                            "localisation binding `{}/{}` is field-sourced (`field`), which the \
-                             trait-argument form cannot express",
-                            binding_type, binding.name
-                        ),
-                    );
+                    self.count("field-sourced bindings dropped");
                     continue;
                 };
-                if binding.condition.is_some() {
-                    self.manual(
-                        "trait-impl",
-                        format!(
-                            "localisation binding `{}/{}` carries a structural `condition` \
-                             (key_prefix) that trait arguments cannot express",
-                            binding_type, binding.name
-                        ),
-                    );
-                }
-                let target = match &binding.subtype {
-                    Some(subtype) => {
-                        self.note_type_use(&base, Some(subtype));
-                        subtype_args.entry(subtype.clone()).or_default()
+                let spec = ImplValue::Binding(BindingSpec {
+                    loc: Some(key.clone()),
+                    sprite: None,
+                    required: binding.required.then_some(true),
+                });
+                let subtype = match (&binding.subtype, &binding.condition) {
+                    (Some(_), Some(condition)) if condition.key_prefix.is_some() => {
+                        self.count("name-prefix-conditioned bindings dropped");
+                        continue;
                     }
-                    None => &mut args,
+                    (Some(subtype), Some(condition)) => match &condition.field {
+                        Some(field) => {
+                            let value = condition
+                                .value
+                                .as_deref()
+                                .map_or_else(|| "scalar".to_owned(), expr::literal);
+                            subtype_when
+                                .entry(subtype.clone())
+                                .or_default()
+                                .0
+                                .insert(field.clone(), Some(value));
+                            Some(subtype.clone())
+                        }
+                        None => None,
+                    },
+                    (Some(subtype), None) => Some(subtype.clone()),
+                    (None, _) => None,
                 };
-                target.insert(param.to_owned(), key.clone());
-            }
-            if !subtype_args.is_empty() {
-                self.manual(
-                    "trait-impl",
-                    format!(
-                        "`{binding_type}`: subtype-scoped `Localised` bindings folded into one \
-                         type-level impl (a type may impl one trait only once) — restore the \
-                         subtype split in the manual pass if the trait model grows per-subtype \
-                         arguments"
-                    ),
-                );
-                for (_subtype, extra) in subtype_args {
-                    for (param, value) in extra {
-                        args.entry(param).or_insert(value);
+                match subtype {
+                    Some(subtype) => {
+                        self.note_type_use(&base, Some(&subtype));
+                        subtype_args
+                            .entry(subtype)
+                            .or_default()
+                            .insert(binding.name.clone(), spec);
+                    }
+                    None => {
+                        args.insert(binding.name.clone(), spec);
                     }
                 }
+            }
+            for (subtype, when) in subtype_when {
+                entry
+                    .subtypes
+                    .entry(subtype)
+                    .or_default()
+                    .when
+                    .get_or_insert(when);
             }
             if !args.is_empty() {
-                entry.trait_impls.insert("Localised".to_owned(), ImplSpec(args));
+                entry
+                    .trait_impls
+                    .insert("Localised".to_owned(), ImplSpec(args));
+            }
+            for (subtype, impls) in subtype_args {
+                entry
+                    .subtypes
+                    .entry(subtype)
+                    .or_default()
+                    .trait_impls
+                    .insert("Localised".to_owned(), ImplSpec(impls));
             }
         }
         for (binding_type, bindings) in group_bindings(&self.model.semantic.sprite_bindings) {
@@ -1677,20 +1661,28 @@ impl<'model> Cvt<'model> {
             let entry = types.entry(base).or_default();
             for binding in bindings {
                 let Some(key) = &binding.key else {
-                    self.manual(
-                        "trait-impl",
-                        format!(
-                            "sprite binding `{}/{}` is field-sourced (`field`), which the \
-                             trait-argument form cannot express",
-                            binding_type, binding.name
-                        ),
-                    );
+                    self.count("field-sourced bindings dropped");
                     continue;
                 };
-                entry
-                    .trait_impls
-                    .entry("HasIcon".to_owned())
-                    .or_insert_with(|| ImplSpec(BTreeMap::from([("sprite".to_owned(), key.clone())])));
+                let spec = ImplValue::Binding(BindingSpec {
+                    loc: None,
+                    sprite: Some(key.clone()),
+                    required: binding.required.then_some(true),
+                });
+                let impls = match &binding.subtype {
+                    Some(subtype) => entry
+                        .subtypes
+                        .entry(subtype.clone())
+                        .or_default()
+                        .trait_impls
+                        .entry("HasIcon".to_owned())
+                        .or_default(),
+                    None => entry
+                        .trait_impls
+                        .entry("HasIcon".to_owned())
+                        .or_default(),
+                };
+                impls.0.insert(binding.name.clone(), spec);
             }
         }
         // `dynamic_definition` types → `Callable`.
@@ -1707,7 +1699,7 @@ impl<'model> Cvt<'model> {
                         "Callable".to_owned(),
                         ImplSpec(BTreeMap::from([(
                             "body".to_owned(),
-                            self.root_schema_name(&dynamic.body_context),
+                            ImplValue::Text(self.root_schema_name(&dynamic.body_context)),
                         )])),
                     );
             }

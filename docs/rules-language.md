@@ -432,30 +432,55 @@ changing Rust, because the runtime must understand its semantics:
 
 ```jsonc
 "traits": {
-  "Localised":      { "params": { "name": "$", "desc": null },
-                      "bindings": { "name": { "loc": "{name}", "required": true }, "desc": { "loc": "{desc}" } } },
-  "HasIcon":        { "params": { "sprite": "GFX_$" }, "bindings": { "icon": { "sprite": "{sprite}" } } },
-  "ModifierSource": { "requires": { "include": "modifier_block" } },
-  "Callable":       { "params": { "body": "schema" }, "capabilities": ["replacement", "condition", "dynamic_key"] }
+  "Localised":      {},                                   // bindings come from the impl
+  "HasIcon":        {},                                   // bindings come from the impl
+  "ModifierSource": {},
+  "Callable":       { "params": { "body": "schema" },
+                      "capabilities": ["replacement", "condition", "dynamic_key", "opaque_text"] }
 },
 "types": {
-  "decision":        { "impl": { "Localised": { "name": "$_title", "desc": "$_desc" } } },
-  "building":        { "impl": { "Localised": { "name": "building_$" }, "HasIcon": {}, "ModifierSource": {} } },
+  "decision": { "impl": { "Localised": {
+    "name": { "loc": "$_title", "required": true },
+    "desc": { "loc": "$_desc" }
+  } } },
+  "idea_group": {
+    "impl": { "Localised": { "name": { "loc": "$", "required": true },
+                             "bonus": { "loc": "$_bonus", "required": true } } },
+    "subtypes": { "country_idea": {
+      "when": { "free": "'yes'" },
+      "impl": { "Localised": { "start": { "loc": "$_start", "required": true } } }
+    } }
+  },
+  "building":        { "impl": { "Localised": { "name": { "loc": "building_$", "required": true } },
+                                 "HasIcon": { "icon": { "sprite": "GFX_$", "required": true } },
+                                 "ModifierSource": {} } },
   "scripted_effect": { "impl": { "Callable": { "body": "effect" } }, "resolution": "replace" }
 }
 ```
 
-- In trait arguments, `$` is the **instance-name placeholder**. This is a
-  different syntax from the type-expression `$param`: trait arguments are not
+- `Localised` and `HasIcon` take **one binding per impl argument**: the argument
+  name is the binding's name (the hover row label and part of its stable
+  identity), and the value declares the template plus whether the bound symbol
+  must resolve. The binding set is per-type data, so the trait itself declares
+  no bindings; the impl enumerates them (D19: 188 legacy binding rows across 96
+  types and 38 binding names). `Localised` bindings use `loc`, `HasIcon`
+  bindings use `sprite`; declaring both, or the wrong one for the trait, is an
+  error.
+- In binding templates, `$` is the **instance-name placeholder**. This is a
+  different syntax from the type-expression `$param`: binding templates are not
   type expressions.
 - `impl` may be written inside a `subtype`, taking effect only for that subtype
-  (replacing the `subtype`/`condition` of the old bindings).
+  (replacing the `subtype`/`condition` of the old bindings). A subtype impl
+  *adds* bindings; contributing a binding name that the type-level impl already
+  declares is an error (§10, check 8).
 - `Localised`/`HasIcon` replace `bindings/localisation.json` and
   `bindings/sprite.json`; `Callable` replaces `dynamic_definition` and
   `token_definitions` (its `$param$` arguments are handled uniformly by
   `Callable`); `ModifierSource` replaces the 22 `type:X → [modifier]` rows of
   profile `semantic_context_inheritance` and makes `ref<impl ModifierSource>`
-  usable.
+  usable. `ModifierSource` declares no `requires`: the legacy
+  `semantic_context_inheritance` types carry their modifier fields directly in
+  the body, not behind a `modifier` sub-block.
 
 **Trait vs mixin.** Define something as a trait only if at least one holds:
 (a) the engine/IDE handles it uniformly (hover, localisation checks, call
@@ -601,9 +626,9 @@ trigger conditions are exhaustive with respect to the check's scope.
    `requires` conditions (for example `{ "include": "modifier_block" }`) MUST
    hold on the schema used at the type's `def` position; if they do not, it is
    an error.
-8. **Duplicate trait impl.** A type — type-level together with all
-   subtype-level impls — may impl a given trait only once. A duplicate is an
-   error.
+8. **Duplicate trait binding.** A type may implement a trait at its own level
+   and again per subtype (§7.3), but a binding name may be contributed only
+   once: a subtype impl redeclaring a type-level binding is an error.
 
 ### 10.2 JSON Schema
 
@@ -640,4 +665,4 @@ metadata; provenance is derived, never authored.
 | `SubtypeWhenDependency` | error | A field read by a `when` predicate carries `when`/`unless` (check 5) |
 | `ScopeReferenceError` | error | A links/compat/scope-effect value or `set` key is not a declared scope type, `any`, or register; or a link `from` is empty (check 6) |
 | `UnsatisfiedTraitRequirement` | error | A trait's `requires` does not hold at the type's `def` position (check 7) |
-| `DuplicateTraitImpl` | error | The same type impls one trait more than once (check 8) |
+| `DuplicateTraitImpl` | error | A type-level impl and a subtype impl of one trait contribute the same binding name (check 8) |

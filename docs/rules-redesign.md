@@ -324,25 +324,39 @@ include 冲突（两个 mixin 或 mixin 与本体声明同一键）为编译错�
 
 ```jsonc
 "traits": {
-  "Localised":      { "params": { "name": "$", "desc": null },
-                      "bindings": { "name": { "loc": "{name}", "required": true }, "desc": { "loc": "{desc}" } } },
-  "HasIcon":        { "params": { "sprite": "GFX_$" }, "bindings": { "icon": { "sprite": "{sprite}" } } },
-  "ModifierSource": { "requires": { "include": "modifier_block" } },
-  "Callable":       { "params": { "body": "schema" }, "capabilities": ["replacement", "condition", "dynamic_key"] }
+  "Localised":      {},                                   // binding 集合由 impl 给出
+  "HasIcon":        {},                                   // binding 集合由 impl 给出
+  "ModifierSource": {},
+  "Callable":       { "params": { "body": "schema" },
+                      "capabilities": ["replacement", "condition", "dynamic_key", "opaque_text"] }
 },
 "types": {
-  "decision":        { "impl": { "Localised": { "name": "$_title", "desc": "$_desc" } } },
-  "building":        { "impl": { "Localised": { "name": "building_$" }, "HasIcon": {}, "ModifierSource": {} } },
+  "decision": { "impl": { "Localised": {
+    "name": { "loc": "$_title", "required": true },
+    "desc": { "loc": "$_desc" }
+  } } },
+  "idea_group": {
+    "impl": { "Localised": { "name": { "loc": "$", "required": true },
+                             "bonus": { "loc": "$_bonus", "required": true } } },
+    "subtypes": { "country_idea": {
+      "when": { "free": "'yes'" },
+      "impl": { "Localised": { "start": { "loc": "$_start", "required": true } } }
+    } }
+  },
+  "building":        { "impl": { "Localised": { "name": { "loc": "building_$", "required": true } },
+                                 "HasIcon": { "icon": { "sprite": "GFX_$", "required": true } },
+                                 "ModifierSource": {} } },
   "scripted_effect": { "impl": { "Callable": { "body": "effect" } }, "resolution": "replace" }
 }
 ```
 
-- trait 参数里的 `$` 是**实例名占位符**，与类型表达式的 `$形参` 不在同一语法中（trait 参数不是类型表达式）。
-- `impl` 可写在 subtype 内，只对该 subtype 生效（取代 binding 的 `subtype`/`condition`）。
-- `Localised`/`HasIcon` 取代 `bindings/localisation.json` 与 `bindings/sprite.json`；`Callable` 取代 `dynamic_definition` 与 `token_definitions`（`$param$` 参数由 Callable 统一处理）；`ModifierSource` 取代 profile `semantic_context_inheritance` 中 22 条 `type:X → [modifier]`，并使 `ref<impl ModifierSource>` 可用。
+- `Localised`/`HasIcon` 的 **impl 逐条枚举 binding**：实参名即 binding 名（hover 行标签与稳定身份的一部分），实参值给出 `loc`/`sprite` 模板与 `required`。binding 集合是**每类型的数据**，故 trait 本身不声明 binding。D19 变更说明：① 语料用例 188 条 binding、96 个类型、38 个 binding 名；② IR 退化形态——单态化时展开为每类型（含子类型）的 `(name, 模板, required)` 扁平行，runtime 无动态派发；③ 对 64 实例上限无影响（trait impl 不是参数化 schema 实例）；④ 规范 diff 见 `docs/rules-language.md` §7.3。
+- binding 模板里的 `$` 是**实例名占位符**，与类型表达式的 `$形参` 不在同一语法中（binding 模板不是类型表达式）。
+- `impl` 可写在 subtype 内，只对该 subtype 生效（取代 binding 的 `subtype`/`condition`）；subtype impl **追加** binding，重复声明同名 binding 是错误。
+- `Localised`/`HasIcon` 取代 `bindings/localisation.json` 与 `bindings/sprite.json`；`Callable` 取代 `dynamic_definition` 与 `token_definitions`（`$param$` 参数由 Callable 统一处理），其 capability 集合是 legacy usage flags 的并集（含 `opaque_text`）；`ModifierSource` 取代 profile `semantic_context_inheritance` 中 22 条 `type:X → [modifier]`，并使 `ref<impl ModifierSource>` 可用——这些类型的 modifier 字段直接写在实例体里，因此不带 `requires`。
 
 **判定规则**：只有满足以下之一才定义为 trait，否则用 mixin——(a) 引擎/IDE 会统一处理它（hover、本地化检查、调用参数推导）；(b) 它出现在类型约束中。
-**防过度设计约束**：无 trait 继承链；同一类型对同一 trait 只能 impl 一次；全部编译期展开成扁平数据，runtime 无动态派发。
+**防过度设计约束**：无 trait 继承链；同一作用域对同一 trait 只能 impl 一次、同一 binding 名只能贡献一次；全部编译期展开成扁平数据，runtime 无动态派发。
 
 ### 2.8 Scopes
 
@@ -419,7 +433,7 @@ trigger/effect 中的作用域切换块不再逐条手写，由一个 pattern �
 
 ### 2.10 语言基础设施
 
-- **编译期语义检查**：未定义/未引用的 schema、type、enum、mixin；include 冲突；不可达重载；参数化实例数超限；subtype `when` 依赖违规；作用域链接 `from` 不匹配；trait 未满足 `requires`；同一 trait 重复 impl。
+- **编译期语义检查**：未定义/未引用的 schema、type、enum、mixin；include 冲突；不可达重载；参数化实例数超限；subtype `when` 依赖违规；作用域链接 `from` 不匹配；trait 未满足 `requires`；同一 binding 重复贡献。
 - **JSON Schema**：由 Rust 源类型生成（schemars），供编辑器补全与校验；类型表达式在 JSON Schema 中只做 `pattern` 粗校验，精确校验靠 `rulec`（接受的代价）。
 - **工具**：`rulec fmt`（规范化格式、省略默认值、字段排序）、`rulec check`（只做语义检查，编辑器可调用）。
 - **语言规范**：`docs/rules-language.md`，本节内容的正式版。

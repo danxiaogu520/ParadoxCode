@@ -422,11 +422,44 @@ pub struct SubtypeSpec {
     pub trait_impls: BTreeMap<String, ImplSpec>,
 }
 
-/// Arguments of one trait implementation: parameter name → value (a `$…`
-/// instance-name template or a schema name, per the trait's contract).
+/// Arguments of one trait implementation: binding (or parameter) name → value.
+///
+/// `Localised` and `HasIcon` take one [`BindingSpec`] per binding they
+/// contribute, because the binding set is per-type data rather than a fixed
+/// trait shape; the other built-ins take plain strings (`Callable`'s `body`).
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(transparent)]
-pub struct ImplSpec(pub BTreeMap<String, String>);
+pub struct ImplSpec(pub BTreeMap<String, ImplValue>);
+
+/// One trait-implementation argument.
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ImplValue {
+    /// A plain argument value (`Callable`'s `body` schema name).
+    Text(String),
+    /// One localisation or sprite binding contributed by the impl.
+    Binding(BindingSpec),
+}
+
+impl ImplValue {
+    /// The binding form, when this argument declares one.
+    #[must_use]
+    pub fn binding(&self) -> Option<&BindingSpec> {
+        match self {
+            Self::Binding(spec) => Some(spec),
+            Self::Text(_) => None,
+        }
+    }
+
+    /// The plain-text form, when this argument is one.
+    #[must_use]
+    pub fn text(&self) -> Option<&str> {
+        match self {
+            Self::Text(text) => Some(text),
+            Self::Binding(_) => None,
+        }
+    }
+}
 
 /// One trait: capabilities, bindings, and constraints.
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -584,14 +617,14 @@ mod tests {
           }
         },
         "decision": {
-          "impl": { "Localised": { "name": "$_title", "desc": "$_desc" } }
+          "impl": { "Localised": {
+            "name": { "loc": "$_title", "required": true },
+            "desc": { "loc": "$_desc" }
+          } }
         }
       },
       "traits": {
-        "Localised": {
-          "params": { "name": "$", "desc": null },
-          "bindings": { "name": { "loc": "{name}", "required": true }, "desc": { "loc": "{desc}" } }
-        },
+        "Localised": {},
         "ModifierSource": { "requires": { "include": "modifier_block" } },
         "Callable": { "params": { "body": "schema" }, "capabilities": ["replacement", "condition"] }
       },
@@ -709,17 +742,18 @@ mod tests {
                 Some("'yes'".to_owned()),
             )])))
         );
-        assert_eq!(
-            file.types["decision"].trait_impls["Localised"].0["name"],
-            "$_title"
-        );
-        assert_eq!(
-            file.traits["Localised"].params,
-            BTreeMap::from([
-                ("name".to_owned(), Some("$".to_owned())),
-                ("desc".to_owned(), None),
-            ])
-        );
+        // D19/Option A: a `Localised` impl enumerates its own bindings.
+        let name = file.types["decision"].trait_impls["Localised"].0["name"]
+            .binding()
+            .expect("a binding argument");
+        assert_eq!(name.loc.as_deref(), Some("$_title"));
+        assert_eq!(name.required, Some(true));
+        let desc = file.types["decision"].trait_impls["Localised"].0["desc"]
+            .binding()
+            .expect("a binding argument");
+        assert_eq!(desc.loc.as_deref(), Some("$_desc"));
+        assert_eq!(desc.required, None);
+        assert!(file.traits["Localised"].bindings.is_empty());
         assert_eq!(
             file.traits["ModifierSource"].requires.as_ref().map(|r| r.include.as_deref()),
             Some(Some("modifier_block"))

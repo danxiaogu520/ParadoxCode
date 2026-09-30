@@ -11,31 +11,8 @@
         "body": "schema"
       }
     },
-    "HasIcon": {
-      "bindings": {
-        "icon": {
-          "sprite": "{sprite}"
-        }
-      },
-      "params": {
-        "sprite": "GFX_$"
-      }
-    },
-    "Localised": {
-      "bindings": {
-        "desc": {
-          "loc": "{desc}"
-        },
-        "name": {
-          "loc": "{name}",
-          "required": true
-        }
-      },
-      "params": {
-        "desc": null,
-        "name": "$"
-      }
-    },
+    "HasIcon": {},
+    "Localised": {},
     "ModifierSource": {}
   }
 }

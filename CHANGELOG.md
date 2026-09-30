@@ -40,6 +40,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   overload upper-bound disagreement) and `rules/eu4-v2/` is regenerated from
   the deterministic converter: 0 errors, 340 warnings, and the manual checklist
   drops from 119 to 109 items.
+- The `Localised` / `HasIcon` trait model carries the whole legacy binding
+  corpus: an impl now enumerates its bindings, each with its own
+  localisation/sprite template and `required` flag, instead of the two fixed
+  `name`/`desc` parameters (`crates/rules/src/source.rs::ImplValue`). A legacy
+  binding gated on a structural field becomes a subtype impl whose `when`
+  predicate reads that field, so `imperial_reform`'s member/emperor/elector
+  families and `religion`'s harmonized bindings are back. The D19 change note
+  is in `docs/rules-redesign.md` §2.7; 60 checklist items close with it.
 - Hover localisation previews keep up to 1000 characters (was 240), covering
   the longest vanilla event and description texts.
 - New `pdc/transcodeDecode` and `pdc/transcodeEncode` requests expose the transparent-
