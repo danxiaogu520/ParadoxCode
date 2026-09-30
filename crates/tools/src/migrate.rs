@@ -663,14 +663,12 @@ impl<'model> Cvt<'model> {
             deprecated: if row.deprecated { Some(true) } else { None },
         };
         if matches!(row.value, ValueMatcher::TypedPrefix { .. }) {
-            self.manual(
-                "expressions",
-                format!(
-                    "context `{context}` position `{}`: typed-prefix operand filter dropped \
-                     (`'prefix:{{ref<scripted_trigger>}}'`)",
-                    path.join("/")
-                ),
-            );
+            // §2.2 maps `prefix<name>` to the template
+            // `'prefix:{ref<scripted_trigger>}'`. The legacy
+            // `numeric_or_bool` operand filter was enforced by the analysis
+            // layer over the resolved alias row and has no expression form;
+            // it is a recorded coverage loss, not an item for the manual pass.
+            self.count("typed-prefix operand filters dropped");
         }
         if matches!(row.value, ValueMatcher::Opaque(_)) {
             self.manual(
@@ -1263,13 +1261,9 @@ impl<'model> Cvt<'model> {
                 body: Some("on_action_body<country>".to_owned()),
                 ..empty_spec()
             });
-            self.manual(
-                "on-action",
-                format!(
-                    "`starts_with = \"{prefix}\"` on-actions become one template pattern with \
-                     `on_action_body<country>` — decide the real body parameter"
-                ),
-            );
+            // Every `on_harmonized_*` action is country-scoped in the legacy
+            // root-scope table, so the templated body parameter is `country`.
+            self.count("starts_with on-actions folded into one pattern");
         }
         self.place_schema(
             "on_actions_file",
@@ -1326,13 +1320,13 @@ impl<'model> Cvt<'model> {
                 rows,
             },
         );
-        self.manual(
-            "on-action",
-            "the legacy per-action `FROM` scopes are not carried into the `on_actions` enum \
-             (the (scope, from) combinations would exceed the 64-instance cap on \
-             `on_action_body<S>`) — decide whether the body should parameterise on `from` too"
-                .to_owned(),
-        );
+        // The `from` column stays dropped (the coverage counter above records
+        // every affected row): carrying it would add a second parameter to
+        // `on_action_body`, and the cap check sizes parameters by their
+        // declared domain, not by the combinations the corpus uses, so the
+        // `scope_type` domain squared exceeds the 64-instance cap. The loss is
+        // that a body cannot bind the FROM register; §6 of the redesign notes
+        // it under the phase-2 record.
     }
 
     fn convert_scopes(&mut self) {
