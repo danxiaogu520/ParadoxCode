@@ -556,6 +556,8 @@ pub struct Field {
 
 `Matcher` 是 2.2 表达式的降级结果：`Scalar | Literal | Template | Int | Float | Bool | Date | Loc | Path | Ref{type, subtype, trait} | Def{..} | Enum{id, rows: Option<BitSet>} | Scope | Link | Quoted | Opaque | Union(Box<[MatcherId]>)`。
 
+**已实现**（阶段 3，`crates/rules/src/ir.rs` + `lower.rs`）。实际形态与本节草图的逐条差异（traits arena、`Field.gate` 的类型、`FileRule.root` 三态、`fields` 返回 `Vec`）见 §6 阶段 3 的实施备注。
+
 ### 5.2 查询 API
 
 消费方持有 `SchemaId` 而不是 `(context, parent_path)`：
@@ -620,7 +622,56 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 - 自动部分必须**可重复运行、结果确定**：人工精修开始前如果 main 上的 `rules/eu4` 有改动，重跑即可；人工精修开始后冻结 main 上的 `rules/eu4`（如有紧急修改，在两边手工同步）。
 - 验收：输出通过 `rulec check`；报告自动覆盖率（按行数）与人工清单。**已满足**：`rulec check rules/eu4-v2` 0 error（273 条迁移期 `UnusedDefinition` warning）、8,463 行对平、人工清单为空、`rules-migrate` 重复运行逐字节一致。
 
-### 阶段 3：IR 与查询 API
+### 阶段 3：IR 与查询 API — **已完成**（2026-10-01）
+
+> 实施备注：
+> - 代码落在 `crates/rules/src/ir.rs`（arena + 查询 API）与 `crates/rules/src/lower.rs`（降级）。
+>   入口是 `lower::lower(sources, GameConfig) -> Result<RulesIr, LowerError>`：先跑 `compile::check`，
+>   只要有 error 就拒绝产出 IR（阶段 5 退出标准 6「拒绝烘焙」的落点）。
+> - 与 §5.1 草图的差异（阶段 4 消费方必须知道）：
+>   1. 草图没有 traits arena，但 `Callable.capabilities`、trait 的 `requires`、以及
+>      `Localised`/`HasIcon` 的 impl 参数必须有去处，故 `RulesIr` 增加 `traits: Vec<TraitInfo>`
+>      （params / bindings / requires_include / capabilities）。
+>   2. `Field.gate` 是 `Option<Gate>`（`When(subtype)` / `Unless(subtype)`）而不是 `SubtypeCond`：
+>      门控说的是「实例是否带某 subtype」，不是字段谓词；`SubtypeCond` 只出现在
+>      `Schema.subtype_gates` 与 `TypeInfo.subtypes[].when` 上（二者语义一致，都是字段谓词）。
+>   3. `RulesIr::fields` 返回确定性排序的 `Vec<FieldId>`（不是迭代器），补全可直接做成员判断。
+>   4. `subtypes_of(schema, body)` 只用 IR 内可判定的 matcher；符号型 matcher（`ref<>` / `def<>` /
+>      `ref<impl T>`）要 workspace 事实，走 `subtypes_of_with(schema, body, &impl SymbolFacts)`；
+>      默认的 `NoSymbolFacts` 一律判否——宁可少给 subtype，不多给。
+>   5. `FileRule.root` 是三态 `RootRule`：`Schema(id)` / `Instance { def, body }`（整文件一个实例）/
+>      `Opaque`（`localisation`、`asset`、`syntax-only` 不建模结构），取代草图里的裸 `SchemaId`。
+> - `Symbol` 分两类：**身份**（schema / type / enum / trait / scope / register / 字段键 / 形参 / 类别名）
+>   一律 ASCII 小写驻留，因为语言各处大小写不敏感，查询侧不需要再折叠；**文本**（字面量、模板文本、
+>   `doc`、binding 模板）原样驻留，因为拼写本身是数据。`Interner` 同时提供两种查找。
+> - 两个 arena 都做驻留去重，且都用「结构指纹 + 来源」当键：
+>   matcher 按结构指纹去重（float 取位模式）；**field 连 provenance 一起进指纹**，所以同一个 mixin
+>   贡献给上百个 schema 时只存一份，而两个 schema 各自手写的同形字段不会被合并（不会丢来源）。
+>   语料实测：1,224 schema / 9,673 field / 3,894 matcher（源语言自身 6,080 条 field spec + mixin 展开）；
+>   未做 field 驻留前是 93,378 field——mixin「编译期展开」的乘法代价，阶段 5 的 `mem_probe` 依赖这一步。
+> - matcher 是 arena 里的一条记录，`Schema.exact: FxHashMap<Symbol, Box<[FieldId]>>` 的键是折叠后的
+>   小写键；`lookup` 先给同 shape 的 exact 重载（按书写序），再给 `patterns`（按书写序）。
+> - 单态化：语料只有 `on_action_body<S>` 一个参数化 schema。`on_actions_file` 的两条 pattern 里，
+>   `enum<on_actions>` + `$key.scope` 按 `scope` 列分成 4 组（country 174 / province 81 / unit 2 /
+>   mercenary_company 1），每组产出一条 key matcher 带该组行集的 pattern，并单态化出
+>   `on_action_body<country|province|unit|mercenary_company>` 四个实例；第二条
+>   `'on_harmonized_{scalar}'` 落成模板 pattern，复用 `on_action_body<country>`。实例键是
+>   `(base name, 实参元组)`，`Schema.arguments` 保留实参。真的出现未绑实参时用保留名 `$unbound`
+>   占位（合法语料里不该出现，语料测试断言它从未被驻留）。
+> - `body: "self"` 保持 `FieldValue::SelfBlock`（arena 没有自环），由 `child(field, current)` 解开；
+>   字段级 `map` / `list` 生成保留名 `$map` / `$list` 的合成 schema（`$` 不是合法标识符字符，
+>   不可能与声明名撞车），schema 级 `{ "map": … }` / `{ "list": … }` 简写就地展开。
+> - `files` 按入口名排序后用 `max_by_key(specificity)` 选类目，复刻旧 `Model::classify`（同分取靠后的）；
+>   旧语料 124/124 条 `case_sensitive` 为 false、唯一一处 `path_suffix` 已被迁移折成 `path` + `file`，
+>   所以 IR 的 `FileMatcher` 固定 `case_sensitive: false` / `path_suffix: None`，`strict` 只作为
+>   扫描事实保留、不参与匹配。同分序要在阶段 5 的 sweep 对比里复核。
+> - 单测：`lower::tests` 用一份 events + on_action + decisions 的样板覆盖 def 收集（含 `map` 键上的
+>   def、`field:id` 名字来源、mixin 字段的 provenance）、subtype 判定（`when` 命中/落空、`unless`
+>   门控过滤补全）、查询 API 的 shape 分派（同键多 shape 重载、pattern 只答自己描述的 shape、
+>   键大小写不敏感）、单态化（分组行集、`$S` 代入、`ref | '0'` union）、`link` pattern（`SelfBlock`、
+>   scope link 的 `from`/`to`、模板 link 的空洞）；另有 `the_first_party_corpus_lowers` 全量降级
+>   `rules/eu4-v2`，断言 137 条 files、on_action 四组行数分布、100 条 scope link、4 个 event subtype、
+>   无 `$unbound` 实例（语料不在仓库时自动跳过）。
 
 - 实现第 5 节 IR、编译降级与查询 API；以 events + on_action + decisions 为样板写 IR 级单测（def 收集、subtype 判定、单态化、`link` pattern）。
 

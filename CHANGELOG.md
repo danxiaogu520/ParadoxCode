@@ -9,6 +9,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Phase 3 of the rules redesign lands the runtime IR and its lowering.
+  `rules::ir` is the closed arena of §5 — `RulesIr` over `files` / `schemas` /
+  `fields` / `matchers` / `types` / `traits` / `enums` / `scopes` / `strings` /
+  `provenance` / `game`, with the `root_schema` / `lookup` / `child` /
+  `fields` / `subtypes_of` query API — and `rules::lower` compiles merged rule
+  sources into it, running the compile-time semantic checks first and refusing
+  to lower while any of them is an error. Lowering expands `include` mixins,
+  monomorphises each parameterised schema per argument tuple (an `enum<E>` key
+  feeding `$key.<column>` into the payload splits into one pattern per
+  attribute-column group, each carrying its group's row set), and interns both
+  the matcher and the field arena — the field fingerprint includes provenance,
+  so one mixin contributing to a hundred schemas is stored once while two
+  independently spelled fields keep their own origin. IR-level tests cover def
+  collection (including a `def` on a `map` key and mixin provenance), subtype
+  predicates, monomorphisation and the `link` pattern; a corpus test lowers
+  `rules/eu4-v2` whole (1,224 schemas, 9,673 fields, 3,894 matchers) and pins
+  the `on_actions` group distribution. Nothing consumes the IR yet: the switch
+  is still the one cut.
 - Phase 2 of the rules redesign lands as `rules-migrate` (in `crates/tools`,
   deleted after the switch): the one-shot conversion of the legacy rules
   corpus into a rules-v2 source tree. It nests the flat `parent_path` rows
