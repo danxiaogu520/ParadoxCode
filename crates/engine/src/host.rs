@@ -5,6 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use rules::ir::RulesIr;
 use rules::{GameProfile, ParserKind, RuleSet};
 use text::{AbsPath, LogicalPath, TextRange};
 
@@ -37,6 +38,10 @@ use vfs::{
 pub struct AnalysisHost {
     revision: u64,
     rules: Arc<RuleSet>,
+    /// The rules-v2 IR, shared with every clone. It is empty until the
+    /// composition root installs one; consumers move onto it module by module
+    /// (`docs/rules-redesign.md` §6 phase 4).
+    ir: Arc<RulesIr>,
     profile: Arc<GameProfile>,
     roots: Arc<[SourceRoot]>,
     workspace_root: Option<AbsPath>,
@@ -94,9 +99,20 @@ impl AnalysisHost {
     /// Creates an empty host with explicit game-specific profile data.
     #[must_use]
     pub fn with_profile(rules: RuleSet, profile: GameProfile) -> Self {
+        Self::with_ir(rules, profile, Arc::new(RulesIr::empty()))
+    }
+
+    /// Creates an empty host with explicit game-specific profile data and the
+    /// rules-v2 IR that consumers are migrating onto.
+    ///
+    /// The IR is shared, not copied: it is one interned arena per kind and
+    /// callers hand the same handle to every host of a session.
+    #[must_use]
+    pub fn with_ir(rules: RuleSet, profile: GameProfile, ir: Arc<RulesIr>) -> Self {
         Self {
             revision: 0,
             rules: Arc::new(rules),
+            ir,
             profile: Arc::new(profile),
             roots: Arc::from([]),
             workspace_root: None,
@@ -124,6 +140,24 @@ impl AnalysisHost {
             texture_catalog_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             reference_sources: Arc::default(),
             revision_watch: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+        }
+    }
+
+    /// Returns the rules-v2 IR this host was built with.
+    ///
+    /// [`RulesIr::empty`] until the composition root installs one.
+    #[must_use]
+    pub fn ir(&self) -> &RulesIr {
+        &self.ir
+    }
+
+    /// Installs the rules-v2 IR, advancing the revision when it actually
+    /// changes so cached analyses cannot outlive the rules they were built
+    /// against.
+    pub fn set_ir(&mut self, ir: Arc<RulesIr>) {
+        if !Arc::ptr_eq(&self.ir, &ir) {
+            self.ir = ir;
+            self.advance_revision();
         }
     }
 
@@ -1400,6 +1434,7 @@ impl AnalysisHost {
         AnalysisSnapshot {
             revision: self.revision,
             rules: Arc::clone(&self.rules),
+            ir: Arc::clone(&self.ir),
             profile: Arc::clone(&self.profile),
             roots: Arc::clone(&self.roots),
             workspace_root: self.workspace_root.clone(),

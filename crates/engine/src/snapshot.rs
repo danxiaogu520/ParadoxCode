@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use rules::ir::RulesIr;
 use rules::{FileResolutionPolicy, GameProfile, RuleSet};
 use text::{AbsPath, LogicalPath, TextRange};
 
@@ -28,6 +29,7 @@ pub fn localisation_preview_target_language(preferred: &[String]) -> &str {
 pub struct AnalysisSnapshot {
     pub(crate) revision: u64,
     pub(crate) rules: Arc<RuleSet>,
+    pub(crate) ir: Arc<RulesIr>,
     pub(crate) profile: Arc<GameProfile>,
     pub(crate) roots: Arc<[SourceRoot]>,
     pub(crate) workspace_root: Option<AbsPath>,
@@ -67,6 +69,16 @@ impl AnalysisSnapshot {
     #[must_use]
     pub fn rules(&self) -> &RuleSet {
         &self.rules
+    }
+
+    /// Returns the immutable rules-v2 IR used for this snapshot.
+    ///
+    /// Consumers migrate onto this module by module
+    /// (`docs/rules-redesign.md` §6 phase 4); it is empty until the
+    /// composition root installs one.
+    #[must_use]
+    pub fn ir(&self) -> &RulesIr {
+        &self.ir
     }
 
     /// Texture-catalog invalidation generation captured by this snapshot.

@@ -1054,6 +1054,35 @@ impl RulesIr {
         }
     }
 
+    /// An empty rule set: the state a host starts in before a bundle is
+    /// installed. Every arena is empty, so a lookup finds nothing rather than
+    /// panicking.
+    #[must_use]
+    pub fn empty() -> Self {
+        let mut strings = Interner::default();
+        let game_id = strings.intern_folded("");
+        Self::new(
+            game_id,
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            ScopeModel::default(),
+            strings,
+            Vec::new(),
+            GameConfig::default(),
+        )
+    }
+
+    /// The game identity this rule set was compiled for.
+    #[must_use]
+    pub fn game_id(&self) -> &str {
+        self.strings.resolve(self.game_id)
+    }
+
     /// The interner behind every symbol in this rule set.
     #[must_use]
     pub const fn strings(&self) -> &Interner {

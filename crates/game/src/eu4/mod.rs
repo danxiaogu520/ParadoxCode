@@ -9,6 +9,10 @@ pub mod mission;
 use std::sync::OnceLock;
 
 use crate::{GameInstallDescriptor, PlatformExecutablePaths};
+use std::sync::Arc;
+
+use rules::bundle::{Bundle, BundleFile, load_bundle};
+use rules::ir::RulesIr;
 use rules::rulec::{SourceBundle, SourceFile, load_source_bundle};
 use rules::{
     FileCategory, FileMatcher, FileResolutionPolicy, GameProfile, ParserKind, RuleSet, RulesModel,
@@ -558,8 +562,375 @@ const FIRST_PARTY_SOURCE: SourceBundle<'static> = SourceBundle {
     files: FIRST_PARTY_FILES,
 };
 
+/// The embedded rules-v2 source bundle (`docs/rules-redesign.md` §6).
+///
+/// The migration compiles both models from their own corpora: `FIRST_PARTY_FILES`
+/// keeps serving the consumers that have not moved onto `RulesIr` yet, and this
+/// bundle feeds them as they do. Phase 5 deletes the legacy half.
+const FIRST_PARTY_V2_FILES: &[BundleFile<'static>] = &[
+    BundleFile {
+        path: "common/achievement.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/achievement.json"),
+    },
+    BundleFile {
+        path: "common/advisortypes.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/advisortypes.json"),
+    },
+    BundleFile {
+        path: "common/ages.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/ages.json"),
+    },
+    BundleFile {
+        path: "common/ai_army.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/ai_army.json"),
+    },
+    BundleFile {
+        path: "common/ai_personalities.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/ai_personalities.json"),
+    },
+    BundleFile {
+        path: "common/alerts.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/alerts.json"),
+    },
+    BundleFile {
+        path: "common/ancestor_personalities.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/ancestor_personalities.json"),
+    },
+    BundleFile {
+        path: "common/bookmark.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/bookmark.json"),
+    },
+    BundleFile {
+        path: "common/buildings.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/buildings.json"),
+    },
+    BundleFile {
+        path: "common/casus_belli_and_war_goals.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/casus_belli_and_war_goals.json"),
+    },
+    BundleFile {
+        path: "common/center_of_revolution.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/center_of_revolution.json"),
+    },
+    BundleFile {
+        path: "common/client_state.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/client_state.json"),
+    },
+    BundleFile {
+        path: "common/colonial_region.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/colonial_region.json"),
+    },
+    BundleFile {
+        path: "common/countries_consolidated.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/countries_consolidated.json"),
+    },
+    BundleFile {
+        path: "common/cult.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/cult.json"),
+    },
+    BundleFile {
+        path: "common/cultures.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/cultures.json"),
+    },
+    BundleFile {
+        path: "common/custom_gui.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/custom_gui.json"),
+    },
+    BundleFile {
+        path: "common/custom_locs.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/custom_locs.json"),
+    },
+    BundleFile {
+        path: "common/decree.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/decree.json"),
+    },
+    BundleFile {
+        path: "common/defender_of_faith.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/defender_of_faith.json"),
+    },
+    BundleFile {
+        path: "common/diplomatic_actions.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/diplomatic_actions.json"),
+    },
+    BundleFile {
+        path: "common/diplomatic_actions_new.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/diplomatic_actions_new.json"),
+    },
+    BundleFile {
+        path: "common/disasters.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/disasters.json"),
+    },
+    BundleFile {
+        path: "common/dynasty_colors.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/dynasty_colors.json"),
+    },
+    BundleFile {
+        path: "common/edict.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/edict.json"),
+    },
+    BundleFile {
+        path: "common/estates.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/estates.json"),
+    },
+    BundleFile {
+        path: "common/faction.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/faction.json"),
+    },
+    BundleFile {
+        path: "common/federation_advancements.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/federation_advancements.json"),
+    },
+    BundleFile {
+        path: "common/fervor.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/fervor.json"),
+    },
+    BundleFile {
+        path: "common/flagship_modification.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/flagship_modification.json"),
+    },
+    BundleFile {
+        path: "common/golden_bull.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/golden_bull.json"),
+    },
+    BundleFile {
+        path: "common/governments_and_reforms.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/governments_and_reforms.json"),
+    },
+    BundleFile {
+        path: "common/greatprojects.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/greatprojects.json"),
+    },
+    BundleFile {
+        path: "common/hegemon.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/hegemon.json"),
+    },
+    BundleFile {
+        path: "common/historial_lucky.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/historial_lucky.json"),
+    },
+    BundleFile {
+        path: "common/holy_order.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/holy_order.json"),
+    },
+    BundleFile {
+        path: "common/ideas_and_native_advancements.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/ideas_and_native_advancements.json"),
+    },
+    BundleFile {
+        path: "common/imperial_incident.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/imperial_incident.json"),
+    },
+    BundleFile {
+        path: "common/imperial_reforms.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/imperial_reforms.json"),
+    },
+    BundleFile {
+        path: "common/incidents.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/incidents.json"),
+    },
+    BundleFile {
+        path: "common/institutions.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/institutions.json"),
+    },
+    BundleFile {
+        path: "common/insult.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/insult.json"),
+    },
+    BundleFile {
+        path: "common/isolationism.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/isolationism.json"),
+    },
+    BundleFile {
+        path: "common/localisation.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/localisation.json"),
+    },
+    BundleFile {
+        path: "common/mercenary_company.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/mercenary_company.json"),
+    },
+    BundleFile {
+        path: "common/modifiers_consolidated.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/modifiers_consolidated.json"),
+    },
+    BundleFile {
+        path: "common/natives.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/natives.json"),
+    },
+    BundleFile {
+        path: "common/naval_doctrine.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/naval_doctrine.json"),
+    },
+    BundleFile {
+        path: "common/opinion_modifiers.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/opinion_modifiers.json"),
+    },
+    BundleFile {
+        path: "common/parliaments.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/parliaments.json"),
+    },
+    BundleFile {
+        path: "common/peace_treaties.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/peace_treaties.json"),
+    },
+    BundleFile {
+        path: "common/personalities.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/personalities.json"),
+    },
+    BundleFile {
+        path: "common/policy.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/policy.json"),
+    },
+    BundleFile {
+        path: "common/power_projection.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/power_projection.json"),
+    },
+    BundleFile {
+        path: "common/power_projection_modifier.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/power_projection_modifier.json"),
+    },
+    BundleFile {
+        path: "common/professionalism_modifier.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/professionalism_modifier.json"),
+    },
+    BundleFile {
+        path: "common/province_names.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/province_names.json"),
+    },
+    BundleFile {
+        path: "common/rebel_types.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/rebel_types.json"),
+    },
+    BundleFile {
+        path: "common/region_colors.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/region_colors.json"),
+    },
+    BundleFile {
+        path: "common/religions_and_related.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/religions_and_related.json"),
+    },
+    BundleFile {
+        path: "common/scopes.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/scopes.json"),
+    },
+    BundleFile {
+        path: "common/scripted_functions.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/scripted_functions.json"),
+    },
+    BundleFile {
+        path: "common/subject_types.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/subject_types.json"),
+    },
+    BundleFile {
+        path: "common/technologies.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/technologies.json"),
+    },
+    BundleFile {
+        path: "common/technology_groups.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/technology_groups.json"),
+    },
+    BundleFile {
+        path: "common/trade_consolidated.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/trade_consolidated.json"),
+    },
+    BundleFile {
+        path: "common/unit_types.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/unit_types.json"),
+    },
+    BundleFile {
+        path: "common/units_display.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/common/units_display.json"),
+    },
+    BundleFile {
+        path: "core/effect.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/core/effect.json"),
+    },
+    BundleFile {
+        path: "core/files.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/core/files.json"),
+    },
+    BundleFile {
+        path: "core/modifier.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/core/modifier.json"),
+    },
+    BundleFile {
+        path: "core/scopes.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/core/scopes.json"),
+    },
+    BundleFile {
+        path: "core/special.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/core/special.json"),
+    },
+    BundleFile {
+        path: "core/traits.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/core/traits.json"),
+    },
+    BundleFile {
+        path: "core/trigger.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/core/trigger.json"),
+    },
+    BundleFile {
+        path: "core/types.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/core/types.json"),
+    },
+    BundleFile {
+        path: "decisions.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/decisions.json"),
+    },
+    BundleFile {
+        path: "events.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/events.json"),
+    },
+    BundleFile {
+        path: "gfx/sprite_packs.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/gfx/sprite_packs.json"),
+    },
+    BundleFile {
+        path: "gfx/sprite_packsorder.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/gfx/sprite_packsorder.json"),
+    },
+    BundleFile {
+        path: "history.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/history.json"),
+    },
+    BundleFile {
+        path: "interface/gfx.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/interface/gfx.json"),
+    },
+    BundleFile {
+        path: "interface/sprites.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/interface/sprites.json"),
+    },
+    BundleFile {
+        path: "map/ambient_objects_and_terrain.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/map/ambient_objects_and_terrain.json"),
+    },
+    BundleFile {
+        path: "map/areas_regions_etc.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/map/areas_regions_etc.json"),
+    },
+    BundleFile {
+        path: "map/default_map.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/map/default_map.json"),
+    },
+    BundleFile {
+        path: "missions.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/missions.json"),
+    },
+    BundleFile {
+        path: "values/enums.json",
+        bytes: include_bytes!("../../../../rules/eu4-v2/values/enums.json"),
+    },
+];
+
+const FIRST_PARTY_V2_SOURCE: Bundle<'static> = Bundle {
+    manifest: include_bytes!("../../../../rules/eu4-v2/manifest.json"),
+    game: include_bytes!("../../../../rules/eu4-v2/game.json"),
+    files: FIRST_PARTY_V2_FILES,
+};
+
 static FIRST_PARTY_PROFILE: OnceLock<GameProfile> = OnceLock::new();
 static FIRST_PARTY_RULES: OnceLock<Result<RuleSet, String>> = OnceLock::new();
+static FIRST_PARTY_IR: OnceLock<Result<Arc<RulesIr>, String>> = OnceLock::new();
 
 /// Stable identity stored by EU4 rule artifacts and selected by the server.
 pub const GAME_ID: &str = "eu4";
@@ -632,6 +1003,37 @@ fn source_rules_cached() -> Result<&'static RuleSet, rules::RulesError> {
         Ok(rules) => Ok(rules),
         Err(error) => Err(rules::RulesError::Source(error.clone())),
     }
+}
+
+/// Loads the first-party EU4 rules into the rules-v2 runtime IR.
+///
+/// The migration compiles both models from their own corpora; this is the one
+/// consumers move onto. The IR is one arena per kind with interned strings, so
+/// callers share a single handle instead of cloning it.
+///
+/// # Errors
+///
+/// Returns [`rules::RulesError`] when the embedded bundle or the lowering
+/// refuses.
+pub fn first_party_ir() -> Result<Arc<RulesIr>, rules::RulesError> {
+    match FIRST_PARTY_IR.get_or_init(|| source_ir().map_err(|error| error.to_string())) {
+        Ok(ir) => Ok(Arc::clone(ir)),
+        Err(error) => Err(rules::RulesError::Source(error.clone())),
+    }
+}
+
+fn source_ir() -> Result<Arc<RulesIr>, rules::RulesError> {
+    let sources = load_bundle(FIRST_PARTY_V2_SOURCE)
+        .map_err(|error| rules::RulesError::Source(error.to_string()))?;
+    let ir = rules::lower::lower(&sources.files, sources.game)
+        .map_err(|error| rules::RulesError::Source(error.to_string()))?;
+    if ir.game_id() != GAME_ID {
+        return Err(rules::RulesError::GameMismatch {
+            expected: GAME_ID.to_owned(),
+            actual: ir.game_id().to_owned(),
+        });
+    }
+    Ok(Arc::new(ir))
 }
 
 /// The built-in EU4 profile.
@@ -764,7 +1166,7 @@ pub fn bootstrap_rules() -> RuleSet {
 mod tests {
     use std::path::Path;
 
-    use super::{Eu4Profile, GAME_ID, bootstrap_rules, first_party_rules, profile};
+    use super::{Eu4Profile, GAME_ID, bootstrap_rules, first_party_ir, first_party_rules, profile};
     use rules::{RuleSet, SourceEncoding};
     use text::LogicalPath;
 
@@ -917,6 +1319,33 @@ mod tests {
             rules.model().semantic.sprite_bindings.len(),
             4,
             "embedded source must carry the complete first-party type sprite map"
+        );
+    }
+
+    #[test]
+    fn embedded_v2_source_matches_the_filesystem_bundle() {
+        let ir = first_party_ir().expect("embedded EU4 rules-v2 source");
+        let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let sources = rules::bundle::load_directory(&repository_root.join("rules/eu4-v2"))
+            .expect("filesystem EU4 rules-v2 source");
+        let from_disk = rules::lower::lower(&sources.files, sources.game)
+            .expect("the filesystem bundle lowers");
+        assert_eq!(ir.game_id(), GAME_ID);
+        assert_eq!(
+            ir.schemas.len(),
+            from_disk.schemas.len(),
+            "the embedded bundle compiles to the same schema arena"
+        );
+        assert_eq!(ir.fields.len(), from_disk.fields.len());
+        assert_eq!(ir.matchers.len(), from_disk.matchers.len());
+        assert_eq!(ir.files.len(), from_disk.files.len());
+        let embedded: std::collections::BTreeSet<&str> =
+            ir.strings().iter().map(|(_, text)| text).collect();
+        let on_disk: std::collections::BTreeSet<&str> =
+            from_disk.strings().iter().map(|(_, text)| text).collect();
+        assert_eq!(
+            embedded, on_disk,
+            "the embedded bundle interns what the filesystem one does"
         );
     }
 

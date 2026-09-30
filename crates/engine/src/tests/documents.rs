@@ -1,6 +1,45 @@
+use rules::ir::RulesIr;
 use text::AbsPath;
 
 use super::*;
+
+#[test]
+fn the_rules_v2_ir_is_shared_and_revisioned() {
+    let mut host = AnalysisHost::new(RuleSet::empty());
+    assert_eq!(
+        host.ir().schemas.len(),
+        0,
+        "a host with no installed bundle starts on an empty IR"
+    );
+
+    let ir = Arc::new(RulesIr::empty());
+    host.set_ir(Arc::clone(&ir));
+    let snapshot = host.snapshot();
+    assert!(
+        Arc::ptr_eq(&snapshot.ir, &ir),
+        "the snapshot shares the handle"
+    );
+
+    let via_constructor =
+        AnalysisHost::with_ir(RuleSet::empty(), Default::default(), Arc::clone(&ir));
+    assert!(
+        std::ptr::eq(via_constructor.snapshot().ir(), ir.as_ref()),
+        "`with_ir` installs the handle it was given"
+    );
+
+    let revision = host.snapshot().revision();
+    host.set_ir(Arc::clone(&ir));
+    assert_eq!(
+        host.snapshot().revision(),
+        revision,
+        "re-installing the same handle invalidates nothing"
+    );
+    host.set_ir(Arc::new(RulesIr::empty()));
+    assert!(
+        host.snapshot().revision() > revision,
+        "a different handle invalidates cached analyses"
+    );
+}
 
 #[test]
 fn targeted_disk_changes_replace_one_shard_without_overwriting_an_overlay() {
@@ -431,6 +470,7 @@ fn snapshots_share_immutable_state_and_preserve_old_revisions() {
     let second = host.snapshot();
 
     assert!(Arc::ptr_eq(&first.rules, &second.rules));
+    assert!(Arc::ptr_eq(&first.ir, &second.ir));
     assert!(Arc::ptr_eq(&first.profile, &second.profile));
     assert!(Arc::ptr_eq(&first.roots, &second.roots));
     assert!(Arc::ptr_eq(&first.documents, &second.documents));
