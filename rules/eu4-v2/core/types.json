@@ -1577,7 +1577,6 @@
     "saved_name": {
       "open": true
     },
-    "scope_field": {},
     "scripted_effect": {
       "impl": {
         "Callable": {

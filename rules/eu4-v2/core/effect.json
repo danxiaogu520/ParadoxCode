@@ -13747,12 +13747,6 @@
           "when": null
         },
         {
-          "body": "self",
-          "card": "1",
-          "key": "enum<scripted_effect_params_dollar>",
-          "when": null
-        },
-        {
           "body": "effect__area_used",
           "card": "1",
           "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
@@ -17997,16 +17991,7 @@
         }
       }
     },
-    "effect__scripted_effect": {
-      "patterns": [
-        {
-          "card": "0..*",
-          "key": "enum<scripted_effect_params>",
-          "value": "scalar | ref<scope_field>",
-          "when": null
-        }
-      ]
-    },
+    "effect__scripted_effect": {},
     "effect__set_ai_attitude": {
       "fields": {
         "attitude": {

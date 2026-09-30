@@ -120,6 +120,25 @@ pub enum Argument {
     Path(Vec<Segment>),
     /// `impl ModifierSource`: the name of a trait.
     Trait(String),
+    /// `estate strip_prefix estate_`: a path whose member name loses an affix
+    /// before it is substituted (the legacy template `strip_prefix`).
+    Stripped {
+        /// The dotted path.
+        segments: Vec<Segment>,
+        /// Affix removed from the resolved member name.
+        strip_prefix: String,
+    },
+}
+
+impl Argument {
+    /// The dotted path, for both path-carrying forms.
+    #[must_use]
+    pub fn segments(&self) -> Option<&[Segment]> {
+        match self {
+            Self::Path(segments) | Self::Stripped { segments, .. } => Some(segments),
+            Self::Trait(_) => None,
+        }
+    }
 }
 
 /// One dot-separated segment of an [`Argument::Path`].
@@ -443,6 +462,22 @@ impl<'source> Cursor<'source> {
             self.bump();
             segments.push(self.parse_segment()?);
         }
+        // `arg = name ["." name] | "impl" name | name "strip_prefix" name`
+        self.skip_whitespace();
+        if self.peek().is_some_and(|found| found.is_ascii_alphabetic() || found == '_') {
+            let marker = self.read_ident()?;
+            if marker == "strip_prefix" {
+                let strip_prefix = self.read_ident()?;
+                return Ok(Argument::Stripped {
+                    segments,
+                    strip_prefix,
+                });
+            }
+            return Err(self.error(
+                self.position,
+                format!("expected `strip_prefix`, found `{marker}`"),
+            ));
+        }
         Ok(Argument::Path(segments))
     }
 
@@ -559,6 +594,30 @@ mod tests {
         assert_eq!(one("loc"), Primary::Scalar { kind: ScalarKind::Loc, range: None });
         assert_eq!(one("link"), Primary::Scalar { kind: ScalarKind::Link, range: None });
         assert_eq!(one("opaque"), Primary::Scalar { kind: ScalarKind::Opaque, range: None });
+    }
+
+    /// The legacy template parameter's `strip_prefix` is spelled on the hole.
+    #[test]
+    fn template_holes_may_strip_a_member_affix() {
+        assert_eq!(
+            one("ref<estate strip_prefix estate_>"),
+            Primary::Ref(Argument::Stripped {
+                segments: vec![Segment::Name("estate".to_owned())],
+                strip_prefix: "estate_".to_owned(),
+            })
+        );
+        assert_eq!(
+            one("'{ref<estate strip_prefix estate_>}_loyalty_modifier'"),
+            Primary::Literal(vec![
+                LiteralPart::Hole(Expr {
+                    alternatives: vec![Primary::Ref(Argument::Stripped {
+                        segments: vec![Segment::Name("estate".to_owned())],
+                        strip_prefix: "estate_".to_owned(),
+                    })],
+                }),
+                LiteralPart::Text("_loyalty_modifier".to_owned()),
+            ])
+        );
     }
 
     #[test]

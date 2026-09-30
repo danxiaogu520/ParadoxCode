@@ -1149,7 +1149,8 @@ impl<'a> Checker<'a> {
         for alternative in &parsed.alternatives {
             match alternative {
                 Primary::Ref(argument) | Primary::Def(argument) => match argument {
-                    expr::Argument::Path(segments) => {
+                    expr::Argument::Path(segments)
+                    | expr::Argument::Stripped { segments, .. } => {
                         let names = segments
                             .iter()
                             .filter_map(|segment| match segment {
@@ -1995,10 +1996,12 @@ impl RefKind {
 /// The first named segment of a constructor argument.
 fn first_name(argument: &expr::Argument) -> Option<String> {
     match argument {
-        expr::Argument::Path(segments) => segments.iter().find_map(|segment| match segment {
-            Segment::Name(name) => Some(name.clone()),
-            Segment::Param(_) => None,
-        }),
+        expr::Argument::Path(segments) | expr::Argument::Stripped { segments, .. } => segments
+            .iter()
+            .find_map(|segment| match segment {
+                Segment::Name(name) => Some(name.clone()),
+                Segment::Param(_) => None,
+            }),
         expr::Argument::Trait(name) => Some(name.clone()),
     }
 }
@@ -2014,7 +2017,7 @@ fn expr_params(parsed: &Expr) -> Vec<Param> {
                 | Primary::Enum(argument)
                 | Primary::Scope(argument)
                 | Primary::Quoted(argument) => {
-                    if let expr::Argument::Path(segments) = argument {
+                    if let Some(segments) = argument.segments() {
                         for segment in segments {
                             if let Segment::Param(param) = segment {
                                 out.push(param.clone());

@@ -19607,7 +19607,7 @@
         {
           "card": "0..*",
           "doc": "Modifies the influence of the specified estate.",
-          "key": "'{ref<estate>}_influence_modifier'",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
           "scope": {
             "in": [
               "country"
@@ -19619,7 +19619,7 @@
         {
           "card": "0..*",
           "doc": "Modifies the loyalty of the specified estate.",
-          "key": "'{ref<estate>}_loyalty_modifier'",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
           "scope": {
             "in": [
               "country"
@@ -19631,7 +19631,7 @@
         {
           "card": "0..*",
           "doc": "Adds to the number of privilege slots of the specified estate.",
-          "key": "'{ref<estate>}_privilege_slots'",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
           "scope": {
             "in": [
               "country"

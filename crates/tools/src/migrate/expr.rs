@@ -148,9 +148,17 @@ pub fn key_expr(key: &KeyMatcher, norm: &Norm) -> String {
             parameter,
             suffix,
         } => {
+            // The legacy template parameter may strip an affix from the
+            // resolved member name (`estate_burghers` → `burghers`); the
+            // grammar spells that as the `strip_prefix` clause on the hole.
+            let strip = parameter
+                .strip_prefix
+                .as_deref()
+                .filter(|prefix| !prefix.is_empty())
+                .map_or_else(String::new, |prefix| format!(" strip_prefix {prefix}"));
             let hole = match (parameter.type_domain(), parameter.enum_domain()) {
-                (Some(name), _) => format!("ref<{}>", norm.type_name(name)),
-                (None, Some(name)) => format!("enum<{}>", norm.enum_name(name)),
+                (Some(name), _) => format!("ref<{}{strip}>", norm.type_name(name)),
+                (None, Some(name)) => format!("enum<{}{strip}>", norm.enum_name(name)),
                 (None, None) => "scalar".to_owned(),
             };
             format!(
@@ -161,18 +169,6 @@ pub fn key_expr(key: &KeyMatcher, norm: &Norm) -> String {
             )
         }
     }
-}
-
-/// Whether the key matcher carries a `strip_prefix` template parameter that
-/// the expression grammar cannot spell (reported as manual work).
-#[must_use]
-pub fn key_needs_manual(key: &KeyMatcher) -> Option<String> {
-    if let KeyMatcher::Template { parameter, .. } = key
-        && parameter.strip_prefix.as_deref().is_some_and(|prefix| !prefix.is_empty())
-    {
-        return parameter.strip_prefix.clone();
-    }
-    None
 }
 
 /// The `parent_path` segment spelling used by the legacy importer for one key

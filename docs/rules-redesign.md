@@ -105,6 +105,7 @@ prim      = "scalar" | "int" | "float" | "bool" | "date" | "loc" | "link" | "opa
 range     = "[" [ number ] ".." [ number ] "]" ;
 ctor      = "ref" | "def" | "enum" | "scope" | "quoted" ;
 arg       = name [ "." name ]            (* ref<event.country>：类型.subtype *)
+          | name "strip_prefix" name     (* ref<estate strip_prefix estate_>：去掉词缀 *)
           | "impl" name                  (* ref<impl ModifierSource> *)
           | param ;
 literal   = "'" { char | "{" expr "}" } "'" ;   (* 无洞即常量；有洞即模板 *)

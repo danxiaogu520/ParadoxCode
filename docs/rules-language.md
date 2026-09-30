@@ -72,6 +72,7 @@ prim      = "scalar" | "int" | "float" | "bool" | "date" | "loc" | "link" | "opa
 range     = "[" [ number ] ".." [ number ] "]" ;
 ctor      = "ref" | "def" | "enum" | "scope" | "quoted" ;
 arg       = name [ "." name ]            (* ref<event.country>：类型.subtype *)
+          | name "strip_prefix" name     (* ref<estate strip_prefix estate_>：去掉词缀 *)
           | "impl" name                  (* ref<impl ModifierSource> *)
           | param ;
 literal   = "'" { char | "{" expr "}" } "'" ;   (* 无洞即常量；有洞即模板 *)
@@ -102,9 +103,13 @@ described in §6*. The remaining lexical rules are normative:
   a complete expression followed by `}`. Every other character, including `}`,
   is literal text. Literals nest: a hole may contain another quoted literal. A
   literal with no hole is a constant; a literal with holes is a template.
-- The `arg` of a constructor (between `<` and `>`) is `seg ["." seg]` or
-  `"impl" Ident`, where `seg = Ident | "$" Ident ["." Ident]`. `$name.column`
-  reads a column of a parameter (§6).
+- The `arg` of a constructor (between `<` and `>`) is `seg ["." seg]`,
+  `seg "strip_prefix" Ident`, or `"impl" Ident`, where
+  `seg = Ident | "$" Ident ["." Ident]`. `$name.column` reads a column of a
+  parameter (§6). `strip_prefix` names the affix removed from the resolved
+  member name before substitution; the affix must be an identifier
+  (`ref<estate strip_prefix estate_>`), which is the legacy template
+  parameter's `strip_prefix`.
 - A bare `param` (`$name[.column]`) is a legal alternative on its own.
 - Union has the lowest precedence and is tried in written order. An empty
   branch is a parse error.
@@ -121,6 +126,7 @@ described in §6*. The remaining lexical rules are normative:
 | `scalar` | Any scalar | `AnyScalar` |
 | `'yes'` | Constant | `Exact` |
 | `'monthly_{ref<government_mechanic_power>}'` | Template | `Template`, `TypedPrefix` (`'trigger_value:{ref<scripted_trigger>}'`) |
+| `'{ref<estate strip_prefix estate_>}_loyalty_modifier'` | Template whose hole strips an affix from the member name (`estate_burghers` → `burghers`); the clause is the legacy template parameter's `strip_prefix` | `Template` with a `strip_prefix` parameter |
 | `int[1..10]` `float[0..]` `bool` `date` | Scalar types; bounds are always numbers | `Int`/`Float`/`Bool`/`Date` |
 | `loc` | Localisation key | `Localisation` |
 | `path` `path<gfx>` | File path; `<…>` is a path category | `Filepath`/`TexturePath` |

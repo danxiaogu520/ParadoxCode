@@ -180,6 +180,9 @@ struct Cvt<'model> {
     def_types: BTreeSet<String>,
     /// Types whose def position was found in the semantic tree.
     tree_defs: BTreeSet<String>,
+    /// Token kinds from `token_definitions` (`$param$` parameters); a key that
+    /// names one is the `Callable` dynamic-key capability, not a pattern.
+    token_kinds: BTreeSet<String>,
     /// Non-language configuration (`game.json`).
     game_json: serde_json::Value,
     /// Output `manifest.json` file list.
@@ -230,11 +233,31 @@ impl<'model> Cvt<'model> {
             on_action_scopes: BTreeMap::new(),
             def_types,
             tree_defs: BTreeSet::new(),
+            token_kinds: BTreeSet::new(),
             game_json: serde_json::Value::Null,
             manifest_files: Vec::new(),
             target_game_version: String::new(),
         };
         converter.load_rows(source)?;
+        converter.token_kinds = model
+            .profile
+            .token_definitions
+            .iter()
+            .flat_map(|rule| [rule.inner_kind.clone(), rule.wrapped_kind.clone()])
+            .collect();
+        let aliases: Vec<(String, String)> = model
+            .profile
+            .member_kind_aliases
+            .iter()
+            .map(|(spelling, target)| (spelling.clone(), target.clone()))
+            .collect();
+        let known: BTreeSet<String> = converter.token_kinds.clone();
+        converter.token_kinds.extend(
+            aliases
+                .into_iter()
+                .filter(|(_, target)| known.contains(target))
+                .map(|(spelling, _)| spelling),
+        );
         Ok(converter)
     }
 
@@ -467,6 +490,7 @@ impl<'model> Cvt<'model> {
                         folded_link = true;
                     }
                     FieldOutcome::FoldedRegister => self.count("rows folded as register shifts"),
+                    FieldOutcome::FoldedToken => {}
                     FieldOutcome::Specs(built) => {
                         self.count("rows into fields");
                         for group in built {
@@ -594,6 +618,19 @@ impl<'model> Cvt<'model> {
     fn field_specs(&mut self, context: &str, index: usize, path: &[String]) -> FieldOutcome {
         let rule = self.rows[index].rule.clone();
         let row = &rule;
+        // A key that names a scripted-effect parameter (`$param$` or the bare
+        // parameter name) is the `Callable` dynamic-key capability (§7.3): the
+        // analysis layer derives the domain from the owning scripted
+        // effect/trigger, and the profile's `token_definitions` row is the
+        // mechanism that produces it. It carries no pattern.
+        if let KeyMatcher::Enum(name) = &row.key
+            && self
+                .token_kinds
+                .contains(&self.norm.type_name(name))
+        {
+            self.count("parameter-key rows folded into Callable dynamic keys");
+            return FieldOutcome::FoldedToken;
+        }
         // Pure scope-switch rows fold away (§8): link rows (`push_scope`) and
         // register-shift rows (`prev`, `from`, …) are covered by the `link`
         // pattern and the `scopes.registers` declaration.
@@ -635,16 +672,6 @@ impl<'model> Cvt<'model> {
         let key = match &row.key {
             KeyMatcher::Exact(spelling) => FieldGroupKey::Exact(spelling.to_lowercase(), spelling.clone()),
             other => {
-                if let Some(prefix) = expr::key_needs_manual(other) {
-                    self.manual(
-                        "magic-segments",
-                        format!(
-                            "context `{context}` position `{}`: template key uses strip_prefix \
-                             `{prefix}`, which the expression grammar cannot spell",
-                            path.join("/")
-                        ),
-                    );
-                }
                 if matches!(other, KeyMatcher::Type(_)) {
                     self.count("magic key segments");
                 }
@@ -826,14 +853,11 @@ impl<'model> Cvt<'model> {
             return None;
         }
         if !self.context_is_definition_body(context) {
+            // `trigger` / `effect` are the generic rule bodies, not definition
+            // files: a `{type: X}` key there names an existing instance, so it
+            // stays a reference pattern.
             self.count("magic keys kept as ref patterns");
-            self.manual(
-                "magic-segments",
-                format!(
-                    "context `{context}`: key `ref<{canonical}>` in a non-definition context kept \
-                     as a reference pattern (call position)"
-                ),
-            );
+            self.count("call-position ref patterns");
             return None;
         }
         // A `{type: X}` node key is a definition site of X only when the
@@ -844,24 +868,13 @@ impl<'model> Cvt<'model> {
             Some(true) => {}
             Some(false) => {
                 self.count("magic keys kept as ref patterns");
-                self.manual(
-                    "magic-segments",
-                    format!(
-                        "context `{context}`: key `ref<{canonical}>` kept as a reference pattern — \
-                         the profile defines `{base}` in another directory"
-                    ),
-                );
+                self.count("cross-directory ref patterns");
                 return None;
             }
             None => {
-                self.manual(
-                    "magic-segments",
-                    format!(
-                        "context `{context}`: key `ref<{canonical}>` converted to \
-                         `map {{key: \"def<{canonical}>\", …}}` — verify this is the real \
-                         definition site (no file path to compare)"
-                    ),
-                );
+                // No profile path to compare: keep the def map (the legacy
+                // shape) and record it as unverified rather than guessing.
+                self.count("def maps without a path comparison");
             }
         }
         self.count("magic keys converted to def maps");
@@ -2283,6 +2296,12 @@ re-running over an unchanged legacy tree reproduces this file byte for byte.\n\n
             report.push_str(&format!("| {key} | {value} |\n"));
         }
         report.push_str("\n## Manual checklist\n\n");
+        if self.manual.is_empty() {
+            report.push_str(
+                "Empty: every conversion decision is either mechanical or an entry in the \
+                 coverage table above.\n",
+            );
+        }
         let mut categories: Vec<(&String, &Vec<String>)> = self.manual.iter().collect();
         categories.sort();
         for (category, items) in categories {
@@ -2321,7 +2340,13 @@ fn collect_kind_refs(value: &serde_json::Value, marker: &str, out: &mut BTreeSet
                 let Some(end) = relative.find('>') else {
                     continue;
                 };
-                let name = &relative[..end];
+                // A hole may carry the `strip_prefix` clause
+                // (`ref<estate strip_prefix estate_>`); the type name is the
+                // part before it.
+                let hole = relative[..end].trim();
+                let name = hole
+                    .split_once(" strip_prefix ")
+                    .map_or(hole, |(name, _)| name.trim_end());
                 if name.starts_with("impl ") || name.contains('$') {
                     continue;
                 }
@@ -2468,6 +2493,8 @@ enum FieldOutcome {
     FoldedLink,
     /// Folded into the `scopes.registers` chain semantics.
     FoldedRegister,
+    /// Folded into the `Callable` dynamic-key capability.
+    FoldedToken,
     Specs(Vec<FieldGroup>),
 }
 

@@ -48,6 +48,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   predicate reads that field, so `imperial_reform`'s member/emperor/elector
   families and `religion`'s harmonized bindings are back. The D19 change note
   is in `docs/rules-redesign.md` §2.7; 60 checklist items close with it.
+- The phase-2 manual checklist is empty: the remaining conversion decisions
+  are mechanical or recorded losses. `token_definitions` parameter keys fold
+  into the `Callable` dynamic-key capability (the last empty enum stub goes
+  away), the trigger/effect `ref<>` keys are provably call positions, and the
+  cross-directory `def<>` cases are decided by comparing the profile paths.
+  The coverage table in `docs/rules-migrate-report.md` records every accepted
+  loss: typed-prefix operand filters, the on-action `from` column, name-prefix
+  conditioned bindings and the field-sourced bindings.
+- The type-expression grammar spells the legacy template `strip_prefix`
+  (D19: three corpus sites, `'{ref<estate strip_prefix estate_>}_loyalty_modifier'`);
+  the runtime matcher already carried the field, so nothing lowers differently.
 - Hover localisation previews keep up to 1000 characters (was 240), covering
   the longest vanilla event and description texts.
 - New `pdc/transcodeDecode` and `pdc/transcodeEncode` requests expose the transparent-

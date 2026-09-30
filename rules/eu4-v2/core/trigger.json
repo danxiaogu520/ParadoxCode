@@ -19365,12 +19365,6 @@
           "when": null
         },
         {
-          "body": "self",
-          "card": "1",
-          "key": "enum<scripted_effect_params_dollar>",
-          "when": null
-        },
-        {
           "card": "1",
           "doc": "Returns true if the country has hired an advisor of the specified type which has at least level X.",
           "key": "ref<advisor_type>",
@@ -21111,16 +21105,7 @@
         }
       }
     },
-    "trigger__scripted_trigger": {
-      "patterns": [
-        {
-          "card": "1..*",
-          "key": "enum<scripted_effect_params>",
-          "value": "scalar | ref<scope_field>",
-          "when": null
-        }
-      ]
-    },
+    "trigger__scripted_trigger": {},
     "trigger__subsidised_percent_amount": {
       "fields": {
         "value": {
