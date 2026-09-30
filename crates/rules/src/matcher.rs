@@ -398,7 +398,7 @@ impl ValueMatcher {
 }
 
 /// Tests whether a scalar is a campaign date such as `1444.11.11`, `1444.11`, or `1444`.
-fn is_eu4_date(value: &str) -> bool {
+pub(crate) fn is_eu4_date(value: &str) -> bool {
     let mut parts = value.split('.');
     let Some(year) = parts.next() else {
         return false;

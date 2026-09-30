@@ -155,20 +155,25 @@ fn join_pointer(base: &str, segment: &str) -> String {
 
 /// A schema reference spelled as a `body` string.
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct SchemaRef {
+pub(crate) struct SchemaRef {
     /// Schema name, or `"self"` for the enclosing schema.
-    name: String,
+    pub(crate) name: String,
     /// Actual arguments at the call site.
-    args: Vec<Actual>,
+    pub(crate) args: Vec<Actual>,
 }
 
 /// One actual argument of a schema call.
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum Actual {
+pub(crate) enum Actual {
     /// A concrete name.
     Name(String),
     /// `$name` or `$name.column`.
-    Param { name: String, column: Option<String> },
+    Param {
+        /// The formal parameter name.
+        name: String,
+        /// The attribute column read from a matched enum row.
+        column: Option<String>,
+    },
 }
 
 /// Where a definition lives and what it is called.
@@ -1994,7 +1999,7 @@ impl RefKind {
 }
 
 /// The first named segment of a constructor argument.
-fn first_name(argument: &expr::Argument) -> Option<String> {
+pub(crate) fn first_name(argument: &expr::Argument) -> Option<String> {
     match argument {
         expr::Argument::Path(segments) | expr::Argument::Stripped { segments, .. } => segments
             .iter()
@@ -2059,7 +2064,7 @@ fn union_shape(parsed: &Expr) -> Result<(), &'static str> {
 }
 
 /// The `enum<E>` name of a map/pattern key expression, when it is one.
-fn enum_name(raw: &str) -> Option<String> {
+pub(crate) fn enum_name(raw: &str) -> Option<String> {
     let parsed = expr::parse(raw).ok()?;
     for alternative in &parsed.alternatives {
         if let Primary::Enum(argument) = alternative {
@@ -2089,7 +2094,7 @@ fn first_param(raw: &str) -> Option<String> {
 }
 
 /// Parses `Name`, `Name<F1,F2>`.
-fn parse_schema_key(raw: &str) -> Result<(String, Vec<String>), String> {
+pub(crate) fn parse_schema_key(raw: &str) -> Result<(String, Vec<String>), String> {
     let raw = raw.trim();
     let Some(open) = raw.find('<') else {
         if is_ident(raw) {
@@ -2119,7 +2124,7 @@ fn parse_schema_key(raw: &str) -> Result<(String, Vec<String>), String> {
 }
 
 /// Parses `self`, `Name`, or `Name<arg, arg>`.
-fn parse_schema_ref(raw: &str) -> Result<SchemaRef, String> {
+pub(crate) fn parse_schema_ref(raw: &str) -> Result<SchemaRef, String> {
     let raw = raw.trim();
     if raw == "self" {
         return Ok(SchemaRef {
@@ -2176,7 +2181,7 @@ fn parse_schema_ref(raw: &str) -> Result<SchemaRef, String> {
 }
 
 /// Parses `1`, `0..1`, `1..*`, `2..5`.
-fn parse_card(raw: &str) -> Result<(u32, Option<u32>), String> {
+pub(crate) fn parse_card(raw: &str) -> Result<(u32, Option<u32>), String> {
     let raw = raw.trim();
     let (lower, upper) = raw.split_once("..").unwrap_or((raw, raw));
     let lower = lower.trim();
@@ -2194,7 +2199,7 @@ fn parse_card(raw: &str) -> Result<(u32, Option<u32>), String> {
 }
 
 /// Parses `key`, `field:<name>`, `file`.
-fn parse_def_name(raw: &str) -> Result<(), String> {
+pub(crate) fn parse_def_name(raw: &str) -> Result<(), String> {
     let raw = raw.trim();
     if raw == "key" || raw == "file" {
         return Ok(());
@@ -2208,7 +2213,7 @@ fn parse_def_name(raw: &str) -> Result<(), String> {
 }
 
 /// Parses `T` or `T.subtype`.
-fn parse_def_type(raw: &str) -> Result<(String, Option<String>), String> {
+pub(crate) fn parse_def_type(raw: &str) -> Result<(String, Option<String>), String> {
     let raw = raw.trim();
     match raw.split_once('.') {
         Some((type_name, subtype)) if is_ident(type_name.trim()) && is_ident(subtype.trim()) => {
@@ -2220,7 +2225,7 @@ fn parse_def_type(raw: &str) -> Result<(String, Option<String>), String> {
 }
 
 /// Parses `scope_type` or `scope_type?`.
-fn parse_column(raw: &str) -> Result<(String, bool), String> {
+pub(crate) fn parse_column(raw: &str) -> Result<(String, bool), String> {
     let raw = raw.trim();
     let (kind, optional) = match raw.strip_suffix('?') {
         Some(kind) => (kind.trim(), true),

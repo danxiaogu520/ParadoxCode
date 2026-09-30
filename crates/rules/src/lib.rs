@@ -12,6 +12,8 @@ pub mod rulec;
 /// wired to the legacy runtime model yet; the switch happens in one cut.
 pub mod compile;
 pub mod expr;
+pub mod ir;
+pub mod lower;
 pub mod source;
 
 mod canonical;

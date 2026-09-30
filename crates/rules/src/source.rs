@@ -334,7 +334,7 @@ pub struct ControlSpec {
 }
 
 /// The closed set of control-flow primitives.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ControlKind {
     /// Head of an if-chain (`if`).
@@ -358,7 +358,7 @@ pub enum ControlKind {
 }
 
 /// Diagnostic severity for a field's violations.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {
     /// Errors (the default).
