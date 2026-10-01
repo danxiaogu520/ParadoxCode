@@ -45,9 +45,18 @@ fn main() {
         .expect("canonicalize root");
     let started = Instant::now();
 
-    let rules = game::eu4::first_party_rules().expect("rules");
-    let profile = game::eu4::profile();
-    let mut host = AnalysisHost::with_profile(rules, profile);
+    let ir_started = Instant::now();
+    let ir = game::eu4::first_party_ir().expect("rules IR");
+    println!(
+        "rules IR: {:.1}ms; {} schemas / {} fields / {} matchers",
+        ir_started.elapsed().as_secs_f64() * 1000.0,
+        ir.schemas.len(),
+        ir.fields.len(),
+        ir.matchers.len()
+    );
+    let rules = rules::RuleSet::from_ir_catalog(&ir);
+    let profile = ir.game.profile.clone();
+    let mut host = AnalysisHost::with_ir(rules, profile, Arc::clone(&ir));
     // Mirrors the LSP: the Project takes root id u32::MAX and the vanilla
     // index cache installs its own root at id 0 before the first scan.
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -284,59 +293,21 @@ fn main() {
         );
     }
 
-    // Rules database: SemanticRule structs plus their (un-interned) strings,
-    // and the raw normalized records that hover-only fallback keys consume.
+    // Runtime IR: shared arenas and interned strings. Nested vectors/map
+    // allocations are excluded from this lower-bound estimate.
     {
-        let rules = snapshot.rules();
-        let mut rule_entries = 0usize;
-        let mut rule_string_bytes = 0usize;
-        let mut rule_vec_elements = 0usize;
-        fn add_str(total: &mut usize, value: &str) {
-            *total += value.len() + 16;
-        }
-        for rule in rules.semantic_rules() {
-            rule_entries += 1;
-            add_str(&mut rule_string_bytes, &rule.id);
-            add_str(&mut rule_string_bytes, &rule.context);
-            for segment in &rule.parent_path {
-                add_str(&mut rule_string_bytes, segment);
-                rule_vec_elements += 1;
-            }
-            if let rules::KeyMatcher::Exact(key) | rules::KeyMatcher::Enum(key) = &rule.key {
-                add_str(&mut rule_string_bytes, key);
-            }
-            if let Some(operator) = &rule.operator {
-                add_str(&mut rule_string_bytes, operator);
-            }
-            if let Some(child) = &rule.child_context {
-                add_str(&mut rule_string_bytes, child);
-            }
-            if let Some(alternative) = &rule.alternative_id {
-                add_str(&mut rule_string_bytes, alternative);
-            }
-            for line in &rule.documentation {
-                add_str(&mut rule_string_bytes, line);
-                rule_vec_elements += 1;
-            }
-            for scope in &rule.allowed_scopes {
-                add_str(&mut rule_string_bytes, scope);
-                rule_vec_elements += 1;
-            }
-            if let Some(push) = &rule.push_scope {
-                add_str(&mut rule_string_bytes, push);
-            }
-            for (register, scope) in &rule.replace_scope {
-                add_str(&mut rule_string_bytes, register);
-                add_str(&mut rule_string_bytes, scope);
-                rule_vec_elements += 2;
-            }
-        }
+        let ir = snapshot.ir();
+        let arena_bytes = ir.schemas.len() * size_of::<rules::ir::Schema>()
+            + ir.fields.len() * size_of::<rules::ir::Field>()
+            + ir.matchers.len() * size_of::<rules::ir::Matcher>()
+            + ir.types.len() * size_of::<rules::ir::TypeInfo>()
+            + ir.traits.len() * size_of::<rules::ir::TraitInfo>();
+        let string_bytes: usize = ir.strings().iter().map(|(_, value)| value.len()).sum();
         println!(
-            "semantic rules: {rule_entries} x {}B = {:.0} MiB structs; strings {:.0} MiB; vec headers ~{:.0} MiB",
-            std::mem::size_of::<rules::SemanticRule>(),
-            mib((rule_entries * std::mem::size_of::<rules::SemanticRule>()) as f64),
-            mib(rule_string_bytes as f64),
-            mib((rule_vec_elements * std::mem::size_of::<String>()) as f64),
+            "rules IR: arenas ≥{:.2} MiB; interned strings {:.2} MiB; fingerprint {}",
+            mib(arena_bytes as f64),
+            mib(string_bytes as f64),
+            snapshot.ir_fingerprint(),
         );
     }
 
@@ -370,11 +341,12 @@ fn main() {
         let parsed = Arc::new(parser::parse(format, &source));
         parse_ns += started.elapsed().as_nanos();
         let started = std::time::Instant::now();
-        let hir = hir::lower_with_profile(
-            (*parsed).clone(),
+        let hir = hir::lower_shared_with_ir(
+            Arc::clone(&parsed),
             logical,
             snapshot.rules(),
             snapshot.game_profile(),
+            snapshot.ir(),
         );
         lower_ns += started.elapsed().as_nanos();
         phase_files += 1;

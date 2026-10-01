@@ -113,7 +113,7 @@
     "decision_file": {
       "fields": {
         "country_decisions": {
-          "body": "decision_file__empty",
+          "body": "decision_file__country_decisions",
           "card": "0..1",
           "doc": "Wrapper block containing all country decision instances.",
           "when": null

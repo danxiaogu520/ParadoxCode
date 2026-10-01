@@ -587,7 +587,8 @@ pub fn compile(source: &Path, manifest_output: &Path) -> Result<ArtifactManifest
 /// infinity, which would silently weaken a bound into a one-sided one.
 fn validate_value_matcher(rule: &crate::SemanticRule) -> Result<(), CompileError> {
     if let crate::ValueMatcher::Float { min, max } = &rule.value
-        && (min.is_some_and(|bound| !bound.is_finite()) || max.is_some_and(|bound| !bound.is_finite()))
+        && (min.is_some_and(|bound| !bound.is_finite())
+            || max.is_some_and(|bound| !bound.is_finite()))
     {
         return Err(CompileError::Validation(format!(
             "semantic rule {} has a non-finite float bound",

@@ -1514,17 +1514,46 @@ fn resolve_dynamic_definition_uncached(
     owner_kind: &str,
     owner_name: &str,
 ) -> Option<ResolvedDynamicDefinition> {
-    let body_context = snapshot
-        .rules()
-        .model()
-        .semantic
-        .type_descriptors
-        .iter()
-        .find(|(kind, _)| kind.eq_ignore_ascii_case(owner_kind))
-        .and_then(|(_, descriptor)| descriptor.dynamic_definition.as_ref())
-        .filter(|descriptor| descriptor.enabled)?
-        .body_context
-        .clone();
+    let body_context = if !snapshot.ir().schemas.is_empty() {
+        let ir = snapshot.ir();
+        let ty = ir.type_info(ir.type_by_name(owner_kind)?);
+        ty.trait_impls
+            .iter()
+            .filter(|implementation| {
+                ir.trait_info(implementation.trait_id)
+                    .capabilities
+                    .iter()
+                    .any(|capability| ir.strings.resolve(*capability) == "replacement")
+            })
+            .find_map(|implementation| {
+                implementation
+                    .arguments
+                    .iter()
+                    .find_map(|(name, argument)| {
+                        if ir.strings.resolve(*name) != "body" {
+                            return None;
+                        }
+                        match argument {
+                            rules::ir::TraitArgument::Text(body) => {
+                                Some(ir.strings.resolve(*body).to_owned())
+                            }
+                            _ => None,
+                        }
+                    })
+            })?
+    } else {
+        snapshot
+            .rules()
+            .model()
+            .semantic
+            .type_descriptors
+            .iter()
+            .find(|(kind, _)| kind.eq_ignore_ascii_case(owner_kind))
+            .and_then(|(_, descriptor)| descriptor.dynamic_definition.as_ref())
+            .filter(|descriptor| descriptor.enabled)?
+            .body_context
+            .clone()
+    };
     let mut overlay_candidates = Vec::new();
     for document in snapshot
         .documents()
@@ -2396,6 +2425,17 @@ pub(crate) fn localisation_key_index(snapshot: &AnalysisSnapshot) -> Arc<Localis
 }
 
 pub(crate) fn dynamic_definition_type(snapshot: &AnalysisSnapshot, type_name: &str) -> bool {
+    if !snapshot.ir().schemas.is_empty() {
+        let ir = snapshot.ir();
+        return ir.type_by_name(type_name).is_some_and(|id| {
+            ir.type_info(id).trait_impls.iter().any(|implementation| {
+                ir.trait_info(implementation.trait_id)
+                    .capabilities
+                    .iter()
+                    .any(|capability| ir.strings.resolve(*capability) == "replacement")
+            })
+        });
+    }
     snapshot
         .rules()
         .dynamic_definition_context(type_name)

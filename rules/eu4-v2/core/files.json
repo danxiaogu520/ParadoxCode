@@ -950,7 +950,7 @@
       "parser": "script",
       "path": "interface",
       "resolution": "merge",
-      "root": "sprite_file"
+      "root": "open_script_file"
     },
     "eu4_path_map": {
       "exclude": [
@@ -999,6 +999,13 @@
         },
         "when": null
       }
+    },
+    "files_interface_gfx": {
+      "ext": "gfx",
+      "parser": "script",
+      "path": "interface",
+      "resolution": "replace-by-path",
+      "root": "sprite_file"
     },
     "files_map_ambient_object_txt": {
       "file": "ambient_object.txt",
@@ -1214,7 +1221,7 @@
       "fields": {
         "bookmark": {
           "body": "bookmark_body",
-          "card": "0..1",
+          "card": "0..*",
           "def": {
             "name": "field:name",
             "type": "bookmark"
@@ -1357,7 +1364,7 @@
       "fields": {
         "bonus": {
           "body": "estate_crown_land_bonus_body",
-          "card": "0..1",
+          "card": "0..*",
           "def": {
             "name": "field:key",
             "type": "estate_crown_land_bonus"
@@ -1366,7 +1373,7 @@
         },
         "interaction": {
           "body": "estate_interaction_body",
-          "card": "0..1",
+          "card": "0..*",
           "def": {
             "name": "field:key",
             "type": "estate_interaction"
@@ -1939,7 +1946,7 @@
       "fields": {
         "ahead_of_time": {
           "body": "tech_ahead_of_time_body",
-          "card": "0..1",
+          "card": "0..*",
           "def": {
             "type": "tech_ahead_of_time"
           },
@@ -1947,7 +1954,7 @@
         },
         "technology": {
           "body": "technology_body",
-          "card": "0..1",
+          "card": "0..*",
           "def": {
             "type": "technology"
           },
@@ -2098,6 +2105,16 @@
         }
       ]
     },
+    "decision_file__country_decisions": {
+      "patterns": [
+        {
+          "body": "decision_body",
+          "card": "0..1",
+          "key": "def<decision>",
+          "when": null
+        }
+      ]
+    },
     "estate_modifier_body": {},
     "game_age_ability_body": {},
     "gfx_sprite_packs_file": {
@@ -2141,7 +2158,7 @@
       "fields": {
         "bitmapfont": {
           "body": "bitmap_font_body",
-          "card": "0..1",
+          "card": "0..*",
           "def": {
             "name": "field:name",
             "type": "bitmap_font"
@@ -2154,7 +2171,7 @@
       "fields": {
         "bitmapfont": {
           "body": "bitmap_font_body",
-          "card": "0..1",
+          "card": "0..*",
           "def": {
             "name": "field:name",
             "type": "bitmap_font"
@@ -2167,7 +2184,7 @@
       "fields": {
         "LineChartType": {
           "body": "object_body",
-          "card": "0..1",
+          "card": "0..*",
           "def": {
             "name": "field:name",
             "type": "object"
@@ -2176,7 +2193,7 @@
         },
         "PieChartType": {
           "body": "object_body",
-          "card": "0..1",
+          "card": "0..*",
           "def": {
             "name": "field:name",
             "type": "object"
@@ -2185,7 +2202,7 @@
         },
         "animatedmaptext": {
           "body": "object_body",
-          "card": "0..1",
+          "card": "0..*",
           "def": {
             "name": "field:name",
             "type": "object"
@@ -2194,7 +2211,7 @@
         },
         "arrowType": {
           "body": "object_body",
-          "card": "0..1",
+          "card": "0..*",
           "def": {
             "name": "field:name",
             "type": "object"
@@ -2203,7 +2220,7 @@
         },
         "pdxmesh": {
           "body": "object_body",
-          "card": "0..1",
+          "card": "0..*",
           "def": {
             "name": "field:name",
             "type": "object"
@@ -2212,7 +2229,7 @@
         },
         "pdxparticle": {
           "body": "object_body",
-          "card": "0..1",
+          "card": "0..*",
           "def": {
             "name": "field:name",
             "type": "object"
@@ -2221,7 +2238,7 @@
         },
         "tradeRouteType": {
           "body": "object_body",
-          "card": "0..1",
+          "card": "0..*",
           "def": {
             "name": "field:name",
             "type": "object"
@@ -2365,6 +2382,64 @@
     "religious_reform_body": {},
     "religious_school_body": {},
     "revolt_trigger_body": {},
+    "sprite_file__spriteTypes": {
+      "fields": {
+        "corneredTileSpriteType": {
+          "body": "sprite_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "sprite"
+          },
+          "when": null
+        },
+        "frameAnimatedSpriteType": {
+          "body": "sprite_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "sprite"
+          },
+          "when": null
+        },
+        "maskedShieldType": {
+          "body": "sprite_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "sprite"
+          },
+          "when": null
+        },
+        "progressbartype": {
+          "body": "sprite_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "sprite"
+          },
+          "when": null
+        },
+        "spriteType": {
+          "body": "sprite_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "sprite"
+          },
+          "when": null
+        },
+        "textSpriteType": {
+          "body": "sprite_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "sprite"
+          },
+          "when": null
+        }
+      }
+    },
     "states_general_faction_body": {},
     "tech_ahead_of_time_body": {},
     "technology_file_body": {},

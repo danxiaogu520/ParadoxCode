@@ -283,12 +283,9 @@
       ],
       "patterns": [
         {
+          "body": "idea_group_body__idea",
           "card": "0..7",
-          "key": "ref<idea>",
-          "map": {
-            "body": "idea_group_body__idea",
-            "key": "def<idea>"
-          },
+          "key": "def<idea>",
           "override": true,
           "when": null
         }

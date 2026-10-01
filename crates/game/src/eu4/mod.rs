@@ -1022,6 +1022,12 @@ pub fn first_party_ir() -> Result<Arc<RulesIr>, rules::RulesError> {
     }
 }
 
+/// The file-scanning catalog for the active IR. No legacy semantic source is loaded.
+pub fn runtime_rules() -> Result<RuleSet, rules::RulesError> {
+    let ir = first_party_ir()?;
+    Ok(RuleSet::from_ir_catalog(&ir))
+}
+
 fn source_ir() -> Result<Arc<RulesIr>, rules::RulesError> {
     let sources = load_bundle(FIRST_PARTY_V2_SOURCE)
         .map_err(|error| rules::RulesError::Source(error.to_string()))?;

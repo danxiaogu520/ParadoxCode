@@ -236,39 +236,62 @@ pub(crate) fn analyze_input_with_cancellation(
     }
     let resolution = DirectResolutionContext::new(snapshot);
     let mut diagnostics = DiagnosticCollector::new(syntax_diagnostics(input));
-    // Definition-site dynamic analyses run first: they warm the per-revision
-    // caches the call-site checks consult.
-    diagnostics
-        .values
-        .extend(dynamic_cycles::dynamic_cycle_diagnostics(
+    let ir_schema_path = crate::ir_semantic::has_ir_schema(snapshot, input);
+    if ir_schema_path {
+        diagnostics
+            .values
+            .extend(dynamic_cycles::dynamic_cycle_diagnostics(
+                snapshot,
+                input,
+                cancellation,
+            )?);
+        diagnostics.values.extend(crate::ir_semantic::diagnostics(
             snapshot,
             input,
             cancellation,
         )?);
-    diagnostics
-        .values
-        .extend(dynamic_contracts::dynamic_contract_diagnostics(
-            snapshot,
-            input,
-            cancellation,
-        )?);
-    diagnostics
-        .values
-        .extend(dynamic_contracts::dynamic_call_site_diagnostics(
-            snapshot,
-            input,
-            cancellation,
-        )?);
-    diagnostics
-        .values
-        .extend(crate::modifier_scope::modifier_scope_diagnostics(
-            snapshot,
-            input,
-            cancellation,
-        )?);
-    diagnostics
-        .values
-        .extend(semantic_rule_diagnostics(snapshot, input, cancellation)?);
+        diagnostics
+            .values
+            .extend(crate::ir_queries::modifier_scope_diagnostics(
+                snapshot,
+                input,
+                cancellation,
+            )?);
+    } else {
+        // Empty Rules IR remains on the legacy validator during the migration. Once a file has
+        // schema facts, all rule semantics come from those facts and the compiled IR.
+        diagnostics
+            .values
+            .extend(dynamic_cycles::dynamic_cycle_diagnostics(
+                snapshot,
+                input,
+                cancellation,
+            )?);
+        diagnostics
+            .values
+            .extend(dynamic_contracts::dynamic_contract_diagnostics(
+                snapshot,
+                input,
+                cancellation,
+            )?);
+        diagnostics
+            .values
+            .extend(dynamic_contracts::dynamic_call_site_diagnostics(
+                snapshot,
+                input,
+                cancellation,
+            )?);
+        diagnostics
+            .values
+            .extend(crate::modifier_scope::modifier_scope_diagnostics(
+                snapshot,
+                input,
+                cancellation,
+            )?);
+        diagnostics
+            .values
+            .extend(semantic_rule_diagnostics(snapshot, input, cancellation)?);
+    }
     diagnostics
         .values
         .extend(crate::transcode::transcode_diagnostics(
@@ -294,7 +317,8 @@ pub(crate) fn analyze_input_with_cancellation(
     }
     for property in properties(input) {
         cancellation.checkpoint()?;
-        if property.key.eq_ignore_ascii_case("scope")
+        if !ir_schema_path
+            && property.key.eq_ignore_ascii_case("scope")
             && let Some((value, range)) = property.value.as_ref()
             && !value.contains('$')
             && !scope_member(
@@ -401,23 +425,46 @@ pub(crate) fn analyze_input_with_cancellation(
                     && builtin_rule_has_key(snapshot, "trigger", &reference.name))
                     || (reference.kind.eq_ignore_ascii_case("scripted_effect")
                         && builtin_rule_has_key(snapshot, "effect", &reference.name)) => {}
+            Resolution::Missing
+                if ir_schema_path
+                    && snapshot
+                        .ir()
+                        .type_by_name(&reference.kind)
+                        .is_some_and(|type_id| {
+                            let ty = snapshot.ir().type_info(type_id);
+                            ty.open
+                                || ty.builtin.iter().any(|member| {
+                                    snapshot
+                                        .ir()
+                                        .strings()
+                                        .resolve(*member)
+                                        .eq_ignore_ascii_case(&reference.name)
+                                })
+                        }) => {}
             Resolution::Missing => {
-                diagnostics.push(Diagnostic::new(
-                    DiagnosticCode::InvalidValue,
-                    DiagnosticCode::InvalidValue.severity(),
-                    reference.range,
-                    format!(
-                        "unknown {} `{}`{}",
-                        reference.kind,
-                        reference.name,
-                        did_you_mean(best_suggestion(
-                            &reference.name,
-                            effective_workspace_member_names(snapshot, &reference.kind)
-                                .iter()
-                                .map(String::as_str)
-                        ))
-                    ),
-                ));
+                let ir_already_explains_value = ir_schema_path
+                    && diagnostics.values.iter().any(|diagnostic| {
+                        diagnostic.code == DiagnosticCode::InvalidValue
+                            && diagnostic.range == reference.range
+                    });
+                if !ir_already_explains_value {
+                    diagnostics.push(Diagnostic::new(
+                        DiagnosticCode::InvalidValue,
+                        DiagnosticCode::InvalidValue.severity(),
+                        reference.range,
+                        format!(
+                            "unknown {} `{}`{}",
+                            reference.kind,
+                            reference.name,
+                            did_you_mean(best_suggestion(
+                                &reference.name,
+                                effective_workspace_member_names(snapshot, &reference.kind)
+                                    .iter()
+                                    .map(String::as_str)
+                            ))
+                        ),
+                    ));
+                }
             }
             Resolution::Unique(_) => {}
         }
@@ -431,7 +478,18 @@ pub(crate) fn analyze_input_with_cancellation(
         // (later definition wins). The index also harvests member definitions
         // named after structural keys (`maneuver`, `graphical_culture`, event
         // flags) that repeat legally in every instance; those never conflict.
-        if !game::eu4::resolved_symbol_kind(&definition.kind) {
+        let resolves_by_name = if ir_schema_path {
+            snapshot
+                .ir()
+                .type_by_name(&definition.kind)
+                .is_some_and(|type_id| {
+                    snapshot.ir().type_info(type_id).resolution
+                        == rules::ir::TypeResolution::Replace
+                })
+        } else {
+            game::eu4::resolved_symbol_kind(&definition.kind)
+        };
+        if !resolves_by_name {
             continue;
         }
         let ordered = resolution.ordered_candidates(&definition.kind, &definition.name);
@@ -754,6 +812,7 @@ fn semantic_diagnostic(
         context: Some(rule.context.clone()),
         source_file: Some(rule.source_file.clone()),
         source_line: Some(rule.line),
+        source_pointer: None,
     })
 }
 
@@ -1194,6 +1253,7 @@ fn validate_semantic_container(
                     context: Some(applicable[0].context.clone()),
                     source_file: Some(applicable[0].source_file.clone()),
                     source_line: Some(applicable[0].line),
+                    source_pointer: None,
                 });
                 if diagnostic_code == DiagnosticCode::InvalidValue
                     && let Some(expected) =

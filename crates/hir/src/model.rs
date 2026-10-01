@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use parser::{CstKind, CstNode, ParsedFile};
+use rules::ir::{FieldId, SchemaId, SubtypeSet};
 use text::{TextRange, TextSize};
 
 /// A conservative semantic scope value.
@@ -100,6 +101,32 @@ pub struct ScopeFact {
     pub transition: Option<ScopeState>,
 }
 
+/// A schema active over one block (or the complete document root).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SchemaFact {
+    /// Block value range, or whole-file range for the root schema.
+    pub range: TextRange,
+    /// Compiled schema selected by Rules IR.
+    pub schema: SchemaId,
+    /// Subtypes proved for this block's owning symbol instance.
+    pub subtypes: SubtypeSet,
+    /// Scope and register state at this block.
+    pub state: ScopeState,
+}
+
+/// The Rules IR field candidates selected for one property key.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FieldFact {
+    /// Exact property key range.
+    pub range: TextRange,
+    /// Parent schema used for lookup.
+    pub schema: SchemaId,
+    /// Applicable field overloads or pattern candidates.
+    pub fields: Vec<FieldId>,
+    /// Subtypes proved at the property.
+    pub subtypes: SubtypeSet,
+}
+
 /// One scalar value attached directly to a property.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HirScalar {
@@ -156,6 +183,8 @@ pub struct DefinitionAttributes {
     pub definition_range: TextRange,
     /// Direct body property keys in source order, as written.
     pub attribute_keys: Vec<Arc<str>>,
+    /// Proven subtypes of this symbol instance when lowered from Rules IR.
+    pub subtypes: Vec<Arc<str>>,
 }
 
 /// One profile-interpreted symbol definition.
@@ -182,6 +211,8 @@ pub struct HirReference {
     pub range: TextRange,
     /// Interpretation layer that emitted this reference.
     pub origin: HirReferenceOrigin,
+    /// Required subtype when the target is a qualified Rules IR type reference.
+    pub subtype: Option<Arc<str>>,
 }
 
 /// One parser recovery node retained instead of being silently discarded.
@@ -374,15 +405,31 @@ pub struct HirFile {
     pub(super) definitions: Vec<HirDefinition>,
     pub(super) references: Vec<HirReference>,
     pub(super) scope_facts: Vec<ScopeFact>,
+    pub(super) schema_facts: Vec<SchemaFact>,
+    pub(super) field_facts: Vec<FieldFact>,
     pub(super) unknown_constructs: Vec<HirUnknownConstruct>,
     pub(super) parameter_conditionals: Vec<HirParameterConditional>,
     pub(super) parameter_definitions: Vec<HirParameterDefinition>,
     pub(super) parameter_references: Vec<HirParameterReference>,
     pub(super) dynamic_templates: Vec<Template>,
     pub(super) definition_attributes: Vec<DefinitionAttributes>,
+    pub(super) uses_ir: bool,
+    pub(super) binding_references: Vec<HirReference>,
+    pub(super) runtime_parameter_guards: Vec<(TextRange, Option<TextRange>)>,
 }
 
 impl HirFile {
+    /// Whether this file was lowered through the compiled Rules IR path.
+    #[must_use]
+    pub const fn uses_ir(&self) -> bool {
+        self.uses_ir
+    }
+
+    /// Complete trait binding references for hover, including optional mappings.
+    #[must_use]
+    pub fn binding_references_for_hover(&self) -> &[HirReference] {
+        &self.binding_references
+    }
     /// Returns the source syntax handle.
     #[must_use]
     pub fn syntax(&self) -> &ParsedFile {
@@ -435,6 +482,36 @@ impl HirFile {
     #[must_use]
     pub fn scope_facts(&self) -> &[ScopeFact] {
         &self.scope_facts
+    }
+
+    /// Returns all compiled schema facts in source order.
+    #[must_use]
+    pub fn schema_facts(&self) -> &[SchemaFact] {
+        &self.schema_facts
+    }
+
+    /// Finds the most deeply nested schema fact containing `position`.
+    #[must_use]
+    pub fn schema_at(&self, position: TextSize) -> Option<&SchemaFact> {
+        self.schema_facts
+            .iter()
+            .filter(|fact| fact.range.start() <= position && position <= fact.range.end())
+            .min_by_key(|fact| fact.range.len())
+    }
+
+    /// Returns field facts, including keys mapped from quoted scripts.
+    #[must_use]
+    pub fn field_facts(&self) -> &[FieldFact] {
+        &self.field_facts
+    }
+
+    /// Finds Rules IR field candidates for an exact property key range.
+    #[must_use]
+    pub fn field_fact_at(&self, range: TextRange) -> Option<&FieldFact> {
+        self.field_facts
+            .binary_search_by_key(&range, |fact| fact.range)
+            .ok()
+            .map(|index| &self.field_facts[index])
     }
 
     /// Finds a cached scope fact in logarithmic time by exact key range and context.
@@ -585,6 +662,16 @@ impl HirFile {
     /// A value used by the branch's `limit` remains required because the game must evaluate that
     /// condition before it can choose the branch.
     fn parameter_reference_is_runtime_guarded(&self, reference: &HirParameterReference) -> bool {
+        if self.uses_ir {
+            return self.runtime_parameter_guards.iter().any(|(branch, guard)| {
+                branch.start() <= reference.range.start()
+                    && reference.range.end() <= branch.end()
+                    && guard.is_none_or(|guard| {
+                        !(guard.start() <= reference.range.start()
+                            && reference.range.end() <= guard.end())
+                    })
+            });
+        }
         fn containing_properties<'a>(
             node: CstNode<'a>,
             range: TextRange,

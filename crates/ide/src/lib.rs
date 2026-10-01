@@ -11,6 +11,8 @@ mod dynamic_rules;
 mod hover;
 mod hover_card;
 mod inlay;
+mod ir_queries;
+mod ir_semantic;
 mod lints;
 mod localisation;
 mod messages;
@@ -54,6 +56,11 @@ pub use resolution::localisation_values_by_key;
 pub use semantic_tokens::{
     semantic_tokens, semantic_tokens_in_range_with_cancellation, semantic_tokens_with_cancellation,
 };
+/// Describes a compiled matcher for the protocol rule browser.
+pub fn ir_matcher_description(ir: &rules::ir::RulesIr, matcher: rules::ir::MatcherId) -> String {
+    ir_semantic::describe(ir, matcher)
+}
+
 pub use types::{
     AnalysisResult, CancellationToken, Cancelled, CompletionItem, CompletionKind, CompletionResult,
     Diagnostic, DiagnosticCertainty, DiagnosticCode, DiagnosticProvenance, DiagnosticTag,

@@ -625,6 +625,8 @@ struct CardAnchor<'a> {
     /// declares one (events name themselves through `id`; missions are their
     /// own key).
     name_field: Option<&'a str>,
+    /// Instance name supplied directly by IR definition facts.
+    name: Option<&'a str>,
     /// Full range of the anchored top-level block.
     block_range: TextRange,
 }
@@ -644,8 +646,23 @@ fn cardable_definition<'a>(
 /// Finds the cardable top-level block whose key token contains `position`.
 fn card_anchor_at(input: &ParsedInput, position: TextSize) -> Option<CardAnchor<'_>> {
     let hir = input.hir.as_deref()?;
-    let path = input.path.as_ref()?;
     let profile = input.profile.as_ref();
+    if hir.uses_ir() {
+        let property = hir
+            .properties()
+            .iter()
+            .find(|property| property.top_level && contains(property.key_range, position))?;
+        let definition = hir.definitions().iter().find(|definition| {
+            definition.range == property.range && profile.hover_card(&definition.kind).is_some()
+        })?;
+        return Some(CardAnchor {
+            kind: &definition.kind,
+            name_field: None,
+            name: Some(&definition.name),
+            block_range: definition.range,
+        });
+    }
+    let path = input.path.as_ref()?;
     for property in hir
         .properties()
         .iter()
@@ -658,6 +675,7 @@ fn card_anchor_at(input: &ParsedInput, position: TextSize) -> Option<CardAnchor<
         return Some(CardAnchor {
             kind,
             name_field,
+            name: None,
             block_range: property.range,
         });
     }
@@ -669,8 +687,24 @@ fn card_anchor_at(input: &ParsedInput, position: TextSize) -> Option<CardAnchor<
 /// else the first block whose range contains it.
 fn card_anchor_for_selection(input: &ParsedInput, selection: TextSize) -> Option<CardAnchor<'_>> {
     let hir = input.hir.as_deref()?;
-    let path = input.path.as_ref()?;
     let profile = input.profile.as_ref();
+    if hir.uses_ir() {
+        let definition = hir
+            .definitions()
+            .iter()
+            .filter(|definition| {
+                contains(definition.range, selection)
+                    && profile.hover_card(&definition.kind).is_some()
+            })
+            .min_by_key(|definition| definition.range.len())?;
+        return Some(CardAnchor {
+            kind: &definition.kind,
+            name_field: None,
+            name: Some(&definition.name),
+            block_range: definition.range,
+        });
+    }
+    let path = input.path.as_ref()?;
     let properties = hir.properties();
     let mut by_range = None;
     for property in properties.iter().filter(|property| property.top_level) {
@@ -692,6 +726,7 @@ fn card_anchor_for_selection(input: &ParsedInput, selection: TextSize) -> Option
         let anchor = || CardAnchor {
             kind,
             name_field,
+            name: None,
             block_range: property.range,
         };
         if name_value_range.is_some_and(|range| contains(range, selection)) {
@@ -784,16 +819,56 @@ fn event_card_for_anchor(
             .and_then(|property| property.scalar.as_ref())
             .map(|scalar| scalar.value.clone())
     };
-    let Some(id) = anchor.name_field.and_then(child_scalar) else {
+    let Some(id) = anchor
+        .name
+        .map(str::to_owned)
+        .or_else(|| anchor.name_field.and_then(child_scalar))
+    else {
         return Ok(None);
     };
     // Only fields the rule set types as localisation keys are read as such:
     // a field whose typing disappears from the rules stops resolving here the
     // same moment validation stops checking it.
-    let field_semantics = spec
-        .context
-        .as_deref()
-        .map(|context| crate::semantic::construct_field_semantics(snapshot, context));
+    let field_semantics = if hir.uses_ir() {
+        let ir = snapshot.ir();
+        fn typed(ir: &rules::ir::RulesIr, matcher: rules::ir::MatcherId, kind: &str) -> bool {
+            match ir.matcher(matcher) {
+                rules::ir::Matcher::Loc => kind == "localisation",
+                rules::ir::Matcher::Ref(rules::ir::RefTarget::Type { type_id, .. }) => {
+                    ir.strings.resolve(ir.type_info(*type_id).name) == kind
+                }
+                rules::ir::Matcher::Union(items) => items.iter().any(|id| typed(ir, *id, kind)),
+                _ => false,
+            }
+        }
+        let mut semantics = crate::semantic::ConstructFieldSemantics {
+            localisation_fields: Vec::new(),
+            sprite_fields: Vec::new(),
+        };
+        for property in properties.iter().filter(|property| {
+            property.path.len() == 2 && within(anchor.block_range, property.range)
+        }) {
+            let Some(fact) = hir.field_fact_at(property.key_range) else {
+                continue;
+            };
+            for id in &fact.fields {
+                let rules::ir::FieldValue::Scalar(matcher) = ir.field(*id).value else {
+                    continue;
+                };
+                if typed(ir, matcher, "localisation") {
+                    semantics.localisation_fields.push(property.key.clone());
+                }
+                if typed(ir, matcher, "sprite") {
+                    semantics.sprite_fields.push(property.key.clone());
+                }
+            }
+        }
+        Some(semantics)
+    } else {
+        spec.context
+            .as_deref()
+            .map(|context| crate::semantic::construct_field_semantics(snapshot, context))
+    };
     let localisation_value = |field: &str| -> Option<String> {
         field_semantics
             .as_ref()

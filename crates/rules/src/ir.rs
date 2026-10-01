@@ -23,6 +23,7 @@
 use std::fmt;
 
 use rustc_hash::FxHashMap;
+use sha2::{Digest, Sha256};
 use text::LogicalPath;
 
 use crate::matcher::{FileMatcher, is_eu4_date};
@@ -885,6 +886,13 @@ pub trait SymbolFacts {
         false
     }
 
+    /// Whether this instance carries a particular declared subtype.
+    /// A missing subtype fact is conservative: membership alone grants none.
+    fn type_subtype_member(&self, type_id: TypeId, subtype: Symbol, name: &str) -> bool {
+        let _ = (type_id, subtype, name);
+        false
+    }
+
     /// Whether `name` is a known instance of some type implementing `trait_id`.
     fn trait_impl_member(&self, trait_id: TraitId, name: &str) -> bool {
         let _ = (trait_id, name);
@@ -981,7 +989,66 @@ impl fmt::Debug for Candidates<'_> {
     }
 }
 
+fn hash_bytes(hasher: &mut Sha256, bytes: &[u8]) {
+    hasher.update((bytes.len() as u64).to_le_bytes());
+    hasher.update(bytes);
+}
+
+fn hash_debug(hasher: &mut Sha256, value: &impl fmt::Debug) {
+    hash_bytes(hasher, format!("{value:?}").as_bytes());
+}
+
 impl RulesIr {
+    /// Returns a stable SHA-256 fingerprint of the compiled rules-v2 content.
+    ///
+    /// Arena order is preserved where it is semantically observable. The
+    /// schema exact-key lookup map is sorted by resolved key because its hash
+    /// iteration order is an implementation detail. The digest includes the
+    /// interned text table and game profile, so an empty IR and any populated
+    /// IR have distinct identities and strings cannot alias by symbol index.
+    /// Arena fields remain publicly mutable for compiler tooling, so this
+    /// method computes the digest from the current content on each call.
+    #[must_use]
+    pub fn fingerprint(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"paradoxcode/rules-v2-ir/v1\0");
+        hash_debug(&mut hasher, &self.game_id);
+        for (symbol, text) in self.strings.iter() {
+            hash_debug(&mut hasher, &(symbol, text));
+        }
+        hash_debug(&mut hasher, &self.files);
+        hash_debug(&mut hasher, &self.fields);
+        hash_debug(&mut hasher, &self.matchers);
+        hash_debug(&mut hasher, &self.types);
+        hash_debug(&mut hasher, &self.traits);
+        hash_debug(&mut hasher, &self.enums);
+        hash_debug(&mut hasher, &self.scopes);
+        hash_debug(&mut hasher, &self.provenance);
+        for schema in &self.schemas {
+            hash_debug(&mut hasher, &schema.name);
+            hash_debug(&mut hasher, &schema.arguments);
+            let mut exact = schema
+                .exact
+                .iter()
+                .map(|(key, fields)| (self.strings.resolve(*key), fields))
+                .collect::<Vec<_>>();
+            exact.sort_by(|left, right| left.0.cmp(right.0));
+            hash_debug(&mut hasher, &exact);
+            hash_debug(&mut hasher, &schema.patterns);
+            hash_debug(&mut hasher, &schema.items);
+            hash_debug(&mut hasher, &schema.open);
+            hash_debug(&mut hasher, &schema.subtype_gates);
+        }
+        let profile =
+            serde_json::to_vec(&self.game.profile).expect("game profiles are serializable");
+        hash_bytes(&mut hasher, &profile);
+        hasher
+            .finalize()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect()
+    }
+
     /// Assembles a rule set from already-lowered parts and builds its name
     /// indexes.
     ///
@@ -1392,7 +1459,23 @@ impl RulesIr {
             }
             Matcher::Date => is_eu4_date(value),
             Matcher::Ref(target) => match target {
-                RefTarget::Type { type_id, .. } => facts.type_member(*type_id, value),
+                RefTarget::Type {
+                    type_id,
+                    subtype,
+                    strip_prefix,
+                } => {
+                    let restored;
+                    let name = if let Some(prefix) = strip_prefix {
+                        restored = format!("{}{value}", self.strings.resolve(*prefix));
+                        restored.as_str()
+                    } else {
+                        value
+                    };
+                    subtype.map_or_else(
+                        || facts.type_member(*type_id, name),
+                        |subtype| facts.type_subtype_member(*type_id, subtype, name),
+                    )
+                }
                 RefTarget::Trait(trait_id) => facts.trait_impl_member(*trait_id, value),
             },
             Matcher::Def { type_id, .. } => facts.type_member(*type_id, value),
@@ -1418,6 +1501,15 @@ impl RulesIr {
         rows.is_none_or(|rows| rows.contains(index))
     }
 
+    /// Whether an actual scope satisfies an expected scope, including declared overrides.
+    #[must_use]
+    pub fn scopes_compatible(&self, actual: Symbol, expected: Symbol) -> bool {
+        actual == expected
+            || self.strings.resolve(actual) == "any"
+            || self.strings.resolve(expected) == "any"
+            || self.scopes.compat.contains(&(actual, expected))
+    }
+
     /// Whether a scope expression matches the named scope type.
     ///
     /// Decidable from the IR when the value is the scope type itself or a
@@ -1433,11 +1525,16 @@ impl RulesIr {
             return self.scopes.types.contains(&symbol)
                 || self.scopes.link(&self.strings, symbol).is_some();
         }
-        if expected == Some(symbol) {
+        if expected.is_some_and(|expected| self.scopes_compatible(symbol, expected)) {
             return true;
         }
         if let Some(link) = self.scopes.link(&self.strings, symbol) {
-            return link.to.type_name() == expected;
+            return match link.to {
+                ScopeRef::Any => true,
+                ScopeRef::Type(actual) => {
+                    expected.is_some_and(|expected| self.scopes_compatible(actual, expected))
+                }
+            };
         }
         false
     }
@@ -1501,5 +1598,32 @@ mod tests {
         assert!(set.contains(70));
         assert_eq!(set.len(), 2);
         assert_eq!(set.iter().collect::<Vec<_>>(), vec![0, 70]);
+    }
+
+    #[test]
+    fn fingerprint_is_stable_and_distinguishes_empty_from_compiled_ir() {
+        let empty = RulesIr::empty();
+        assert_eq!(empty.fingerprint(), RulesIr::empty().fingerprint());
+
+        let source = r#"{"files":{"sample":{"path":"common/sample","root":"sample"}},"schemas":{"sample":{"fields":{"alpha":{"value":"scalar","card":"0..1"},"omega":{"value":"scalar","card":"0..1"}}}}}"#;
+        let files = vec![(
+            "sample.json".to_owned(),
+            serde_json::from_str(source).expect("rule source parses"),
+        )];
+        let compiled = crate::lower::lower(&files, GameConfig::default()).expect("lowers");
+        assert_ne!(empty.fingerprint(), compiled.fingerprint());
+        assert_eq!(compiled.fingerprint(), compiled.clone().fingerprint());
+
+        let mut reordered = compiled.clone();
+        let schema = &mut reordered.schemas[0];
+        let mut entries = schema
+            .exact
+            .iter()
+            .map(|(key, fields)| (*key, fields.clone()))
+            .collect::<Vec<_>>();
+        entries.reverse();
+        schema.exact = FxHashMap::default();
+        schema.exact.extend(entries);
+        assert_eq!(compiled.fingerprint(), reordered.fingerprint());
     }
 }

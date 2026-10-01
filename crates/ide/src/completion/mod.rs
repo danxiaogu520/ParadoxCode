@@ -8,6 +8,7 @@ use text::{TextRange, TextSize};
 mod candidates;
 mod context;
 mod dynamic_constraints;
+mod ir;
 mod support;
 
 pub(crate) use candidates::*;
@@ -54,6 +55,12 @@ pub fn complete_with_cancellation(
         return Ok(CompletionResult {
             revision: snapshot.revision(),
             items: Vec::new(),
+        });
+    }
+    if let Some(items) = ir::try_ir_completion(snapshot, &input, position, cancellation)? {
+        return Ok(CompletionResult {
+            revision: snapshot.revision(),
+            items,
         });
     }
     if let Some(items) = dynamic_parameter_completion(snapshot, &input, position, cancellation)? {
@@ -276,6 +283,19 @@ pub fn completion(
 /// re-running the completion query. Items without `resolve_data` resolve to themselves.
 #[must_use]
 pub fn completion_resolve(snapshot: &AnalysisSnapshot, item: &CompletionItem) -> CompletionItem {
+    if let Some(index) = item
+        .resolve_data
+        .as_deref()
+        .and_then(|data| data.strip_prefix("ir-field:"))
+        .and_then(|index| index.parse::<usize>().ok())
+        && let Some(field) = snapshot.ir().fields.get(index)
+    {
+        let mut resolved = item.clone();
+        if let Some(doc) = field.doc {
+            resolved.documentation = Some(snapshot.ir().strings().resolve(doc).to_owned());
+        }
+        return resolved;
+    }
     let Some(id) = item
         .resolve_data
         .as_deref()

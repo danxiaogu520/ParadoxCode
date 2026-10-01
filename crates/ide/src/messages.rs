@@ -120,10 +120,9 @@ pub(crate) fn value_description(snapshot: &AnalysisSnapshot, matcher: &ValueMatc
             "a whole number{}",
             numeric_bounds(min.as_ref(), max.as_ref()).phrase_suffix()
         ),
-        ValueMatcher::Float { min, max } => format!(
-            "a number{}",
-            numeric_bounds(*min, *max).phrase_suffix()
-        ),
+        ValueMatcher::Float { min, max } => {
+            format!("a number{}", numeric_bounds(*min, *max).phrase_suffix())
+        }
         ValueMatcher::Date => "a date, such as 1444.11.11".to_owned(),
         ValueMatcher::Type(kind) => format!("{} `{kind}` name", article_for(kind)),
         ValueMatcher::Enum(name) => enum_members(snapshot, name).map_or_else(
@@ -161,10 +160,9 @@ pub(crate) fn value_plural(snapshot: &AnalysisSnapshot, matcher: &ValueMatcher) 
             "whole numbers{}",
             numeric_bounds(min.as_ref(), max.as_ref()).phrase_suffix()
         ),
-        ValueMatcher::Float { min, max } => format!(
-            "numbers{}",
-            numeric_bounds(*min, *max).phrase_suffix()
-        ),
+        ValueMatcher::Float { min, max } => {
+            format!("numbers{}", numeric_bounds(*min, *max).phrase_suffix())
+        }
         ValueMatcher::Date => "dates".to_owned(),
         ValueMatcher::Type(kind) => format!("`{kind}` names"),
         ValueMatcher::Enum(name) => enum_members(snapshot, name).map_or_else(

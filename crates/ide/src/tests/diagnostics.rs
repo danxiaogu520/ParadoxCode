@@ -25,6 +25,7 @@ fn diagnostic_ids_are_pascal_case_and_metadata_is_structured() {
         context: Some("effect".to_owned()),
         source_file: Some("fixture.json".to_owned()),
         source_line: Some(7),
+        source_pointer: None,
     });
     assert_eq!(diagnostic.severity, Severity::Error);
     assert_eq!(diagnostic.certainty, DiagnosticCertainty::Contextual);

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use engine::{AnalysisSnapshot, DocumentId, DocumentSource, ParsedSource, SourceFileId};
 use hir::HirFile;
-use hir::lower_with_profile;
+use hir::lower_shared_with_ir_and_facts;
 use parser::{CstKind, CstNode, FileFormat, ParsedFile, QuotedScript, parse};
 use rules::{GameProfile, ParserKind};
 use text::{LogicalPath, TextRange, TextSize};
@@ -66,7 +66,19 @@ pub(crate) fn input_for_document(
     let parsed = match parsed {
         ParsedSource::Text(parsed) => ParsedContent::Text(Arc::clone(parsed)),
     };
-    let hir = document.hir_handle();
+    let hir = if !snapshot.ir().schemas.is_empty() {
+        let ParsedContent::Text(parsed) = &parsed;
+        path.as_ref().map(|path| {
+            lower_for_snapshot(
+                snapshot,
+                Arc::clone(parsed),
+                path,
+                Some(&format!("ir-hir:{}", id.as_str())),
+            )
+        })
+    } else {
+        document.hir_handle()
+    };
     let profile = snapshot.game_profile_handle();
     Some(ParsedInput {
         document: Some(id.clone()),
@@ -94,18 +106,23 @@ pub(crate) fn input_for_source_file(
             format: parsed.format(),
             source: state.source_handle(),
             parsed: ParsedContent::Text(Arc::clone(parsed)),
-            hir: state.hir_handle(),
+            hir: if snapshot.ir().schemas.is_empty() {
+                state.hir_handle()
+            } else {
+                Some(lower_for_snapshot(
+                    snapshot,
+                    Arc::clone(parsed),
+                    &file.logical_path,
+                    Some(&format!("ir-hir:file:{}", id.get())),
+                ))
+            },
             profile: snapshot.game_profile_handle(),
         });
     }
     // The scan may evict CST/HIR frontends after background validation to
     // bound resident memory; the source text stays in the file state, so the
     // tree is reparsed transiently for this one query.
-    let format = match snapshot.rules().classify(&file.logical_path)?.parser {
-        ParserKind::Script => FileFormat::Script,
-        ParserKind::Localisation => FileFormat::Localisation,
-        ParserKind::Asset | ParserKind::SyntaxOnly => return None,
-    };
+    let format = format_for_path(snapshot, &file.logical_path)?;
     let source = state.source_handle();
     // Consult the persistent parse cache before reparsing: entries are
     // validated against the live source hash, and loading beats reparsing
@@ -115,12 +132,12 @@ pub(crate) fn input_for_source_file(
         .parse_cache()
         .and_then(|cache| cache.load(file, format, &source))
         .map_or_else(|| Arc::new(parse(format, &source)), Arc::new);
-    let hir = Arc::new(lower_with_profile(
-        (*parsed).clone(),
+    let hir = lower_for_snapshot(
+        snapshot,
+        Arc::clone(&parsed),
         &file.logical_path,
-        snapshot.rules(),
-        snapshot.game_profile(),
-    ));
+        Some(&format!("ir-hir:file:{}", id.get())),
+    );
     Some(ParsedInput {
         document: None,
         file: Some(id),
@@ -138,18 +155,16 @@ pub(crate) fn input_for_text(
     path: &LogicalPath,
     text: &str,
 ) -> Option<ParsedInput> {
-    let format = match snapshot.rules().classify(path)?.parser {
-        ParserKind::Script => FileFormat::Script,
-        ParserKind::Localisation => FileFormat::Localisation,
-        ParserKind::Asset | ParserKind::SyntaxOnly => return None,
-    };
+    let format = format_for_path(snapshot, path)?;
     let source = Arc::<str>::from(text);
     let parsed = Arc::new(parse(format, &source));
-    let hir = Arc::new(lower_with_profile(
-        (*parsed).clone(),
+    let hir = Arc::new(lower_shared_with_ir_and_facts(
+        Arc::clone(&parsed),
         path,
         snapshot.rules(),
         snapshot.game_profile(),
+        snapshot.ir(),
+        &crate::ir_queries::SnapshotSymbolFacts { snapshot },
     ));
     let file = snapshot
         .source_files()
@@ -166,6 +181,53 @@ pub(crate) fn input_for_text(
         hir: Some(hir),
         profile: snapshot.game_profile_handle(),
     })
+}
+
+fn lower_for_snapshot(
+    snapshot: &AnalysisSnapshot,
+    syntax: Arc<ParsedFile>,
+    path: &LogicalPath,
+    cache_key: Option<&str>,
+) -> Arc<HirFile> {
+    if let Some(key) = cache_key
+        && let Some(cached) = snapshot
+            .query_cache()
+            .get::<HirFile>(snapshot.revision(), key)
+    {
+        return cached;
+    }
+    let hir = Arc::new(lower_shared_with_ir_and_facts(
+        syntax,
+        path,
+        snapshot.rules(),
+        snapshot.game_profile(),
+        snapshot.ir(),
+        &crate::ir_queries::SnapshotSymbolFacts { snapshot },
+    ));
+    if let Some(key) = cache_key {
+        snapshot.query_cache().insert(
+            snapshot.revision(),
+            engine::CacheDomain::Documents,
+            key.to_owned(),
+            Arc::clone(&hir),
+        );
+    }
+    hir
+}
+
+fn format_for_path(snapshot: &AnalysisSnapshot, path: &LogicalPath) -> Option<FileFormat> {
+    if !snapshot.ir().files.is_empty() {
+        return match snapshot.ir().file_rule(path)?.1.parser {
+            rules::ir::DocumentParser::Script => Some(FileFormat::Script),
+            rules::ir::DocumentParser::Localisation => Some(FileFormat::Localisation),
+            _ => None,
+        };
+    }
+    match snapshot.rules().classify(path)?.parser {
+        ParserKind::Script => Some(FileFormat::Script),
+        ParserKind::Localisation => Some(FileFormat::Localisation),
+        _ => None,
+    }
 }
 
 pub(crate) fn logical_path(snapshot: &AnalysisSnapshot, path: &Path) -> Option<LogicalPath> {

@@ -9,7 +9,11 @@ use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use index::WorkspaceIndex;
-use index::{build_file_state, position_ranges_for_state};
+use index::{
+    IndexSymbolFacts, build_file_state, build_file_state_with_ir,
+    build_file_state_with_ir_and_facts, empty_file_state, position_ranges_for_state,
+};
+use rules::ir::RulesIr;
 use rules::{GameProfile, RuleSet};
 use sha2::{Digest, Sha256};
 use vfs::scan::{collect_whitelisted_files, read_source_file_cancellable, stable_file_id};
@@ -27,6 +31,7 @@ pub(super) fn refresh_cancellable(
     cache: &IndexCache,
     rules: &RuleSet,
     profile: &GameProfile,
+    ir: &RulesIr,
     cancellation: &WorkspaceScanToken,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
 ) -> Result<IndexCache, IndexCacheError> {
@@ -41,6 +46,16 @@ pub(super) fn refresh_cancellable(
             cached: cache.metadata.rule_hash.clone(),
             active: rules.rule_hash().to_hex(),
         });
+    }
+    let active_ir_hash = ir.fingerprint();
+    if cache.metadata.ir_hash != active_ir_hash {
+        return Err(IndexCacheError::IrHashMismatch {
+            cached: cache.metadata.ir_hash.clone(),
+            active: active_ir_hash,
+        });
+    }
+    if !ir.files.is_empty() {
+        return refresh_with_ir_full(cache, rules, profile, ir, cancellation, progress);
     }
     let mut report = WorkspaceScanReport::default();
     let limits = WorkspaceScanLimits::default();
@@ -230,6 +245,7 @@ pub(super) fn refresh_cancellable(
         schema_version: CURRENT_CACHE_SCHEMA_VERSION,
         game_id: cache.metadata.game_id.clone(),
         rule_hash: cache.metadata.rule_hash.clone(),
+        ir_hash: cache.metadata.ir_hash.clone(),
         source_identity: cache.metadata.source_identity.clone(),
         source_fingerprint,
         created_unix_seconds,
@@ -247,6 +263,200 @@ pub(super) fn refresh_cancellable(
         reference_source: None,
         file_fingerprints,
         file_metadata_fingerprints,
+    })
+}
+
+/// IR schema lowering depends on cross-file facts. Rebuild the full cache in two passes so
+/// unchanged files cannot retain references or subtype decisions from an earlier workspace.
+fn refresh_with_ir_full(
+    cache: &IndexCache,
+    rules: &RuleSet,
+    profile: &GameProfile,
+    ir: &RulesIr,
+    cancellation: &WorkspaceScanToken,
+    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+) -> Result<IndexCache, IndexCacheError> {
+    let limits = WorkspaceScanLimits::default();
+    let filters = WorkspaceScanFilters::default();
+    let mut report = WorkspaceScanReport::default();
+    let mut walked = Vec::new();
+    collect_whitelisted_files(
+        &cache.root.path,
+        profile,
+        &filters,
+        limits,
+        &mut report,
+        &mut walked,
+        cancellation,
+    )
+    .map_err(map_workspace_error)?;
+    let mut items = walked
+        .into_iter()
+        .map(|(logical, physical)| {
+            (
+                SourceFileId::new(stable_file_id(cache.root.id, &logical)),
+                logical,
+                physical,
+            )
+        })
+        .collect::<Vec<_>>();
+    items.sort_by_key(|(id, _, _)| *id);
+    let mut files = BTreeMap::new();
+    let mut sources = BTreeMap::<SourceFileId, String>::new();
+    let mut initial = BTreeMap::new();
+    let mut fingerprints = BTreeMap::new();
+    let mut metadata_fingerprints = BTreeMap::new();
+    let total = items.len();
+    let mut hasher = Sha256::new();
+    hasher.update(b"paradoxcode/vanilla-source/v2\0");
+    for (ordinal, (id, logical, physical)) in items.iter().enumerate() {
+        cancellation.checkpoint().map_err(map_workspace_error)?;
+        let Some((_, rule)) = ir.file_rule(logical) else {
+            continue;
+        };
+        let category_id = ir.strings.resolve(rule.name).to_owned();
+        let resolution = match rule.resolution {
+            rules::ir::FileResolution::ReplaceByPath => {
+                rules::FileResolutionPolicy::ReplaceByRelativePath
+            }
+            rules::ir::FileResolution::Merge => rules::FileResolutionPolicy::Merge,
+            rules::ir::FileResolution::ReplaceDirectory => {
+                rules::FileResolutionPolicy::ReplaceDirectory
+            }
+        };
+        let source_file = SourceFile {
+            id: *id,
+            root_id: cache.root.id,
+            physical_path: physical.clone(),
+            logical_path: logical.clone(),
+            category_id: Some(category_id),
+            resolution,
+        };
+        if matches!(rule.parser, rules::ir::DocumentParser::Asset) {
+            let digest = content_fingerprint("");
+            put_fingerprint_field(&mut hasher, logical.as_str().as_bytes());
+            put_fingerprint_field(&mut hasher, digest.as_bytes());
+            files.insert(*id, source_file.clone());
+            sources.insert(*id, String::new());
+            fingerprints.insert(*id, digest);
+            metadata_fingerprints.insert(*id, source_metadata_fingerprint(physical));
+            initial.insert(*id, empty_file_state(&source_file, 0));
+            if let Some(progress) = progress {
+                progress(ordinal.saturating_add(1), total);
+            }
+            continue;
+        }
+        let Some(source) = read_source_file_cancellable(
+            physical,
+            limits,
+            &mut report,
+            cancellation,
+            profile.source_encoding,
+        )
+        .map_err(map_workspace_error)?
+        else {
+            continue;
+        };
+        let digest = content_fingerprint(&source);
+        put_fingerprint_field(&mut hasher, logical.as_str().as_bytes());
+        put_fingerprint_field(&mut hasher, digest.as_bytes());
+        let metadata = source_metadata_fingerprint(physical);
+        let state =
+            build_file_state_with_ir(&source_file, source.clone(), 0, rules, profile, ir, None);
+        files.insert(*id, source_file);
+        sources.insert(*id, source);
+        fingerprints.insert(*id, digest);
+        metadata_fingerprints.insert(*id, metadata);
+        initial.insert(*id, state);
+        if let Some(progress) = progress {
+            progress(ordinal.saturating_add(1), total);
+        }
+    }
+    if files.len() > MAX_CACHE_FILES {
+        return Err(IndexCacheError::LimitExceeded("file", MAX_CACHE_FILES));
+    }
+    let candidate = WorkspaceIndex::from_shards(initial.values().map(|state| state.shard_handle()));
+    let facts = IndexSymbolFacts::new(ir, &candidate, &[]);
+    let mut final_states = BTreeMap::new();
+    for (id, source_file) in &files {
+        cancellation.checkpoint().map_err(map_workspace_error)?;
+        let source = sources.get(id).cloned().unwrap_or_default();
+        let state = build_file_state_with_ir_and_facts(
+            source_file,
+            source,
+            0,
+            rules,
+            profile,
+            ir,
+            &facts,
+            None,
+        );
+        final_states.insert(*id, state.cache_only());
+    }
+    let shards = final_states
+        .values()
+        .map(|state| state.shard_handle())
+        .collect::<Vec<_>>();
+    validate_cache_limits(
+        shards.iter().map(|shard| shard.definitions.len()).sum(),
+        shards.iter().map(|shard| shard.references.len()).sum(),
+        shards
+            .iter()
+            .map(|shard| shard.dynamic_definitions.len())
+            .sum(),
+        shards
+            .iter()
+            .flat_map(|shard| shard.dynamic_definitions.iter())
+            .map(|summary| summary.parameters.len())
+            .sum(),
+    )?;
+    let mut index = WorkspaceIndex::from_shards(shards);
+    let mut positions = index::PositionMap::new();
+    let mut previews = index::LocalisationPreviewMap::new();
+    for (id, state) in &final_states {
+        positions.extend(
+            position_ranges_for_state(state)
+                .into_iter()
+                .map(|(range, position)| ((*id, range), position)),
+        );
+        if let Some(entries) = state.cached_localisation_previews() {
+            previews.replace_file(
+                *id,
+                entries
+                    .iter()
+                    .map(|(range, preview)| (*range, preview.clone())),
+            );
+        }
+    }
+    index.replace_all_position_ranges(positions);
+    let source_fingerprint = hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let created_unix_seconds = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| IndexCacheError::InvalidData(error.to_string()))?
+        .as_secs();
+    let metadata = IndexCacheMetadata {
+        schema_version: CURRENT_CACHE_SCHEMA_VERSION,
+        game_id: cache.metadata.game_id.clone(),
+        rule_hash: cache.metadata.rule_hash.clone(),
+        ir_hash: cache.metadata.ir_hash.clone(),
+        source_identity: cache.metadata.source_identity.clone(),
+        source_fingerprint,
+        created_unix_seconds,
+        indexed_files: files.len(),
+    };
+    Ok(IndexCache {
+        metadata,
+        root: cache.root.clone(),
+        source_files: files,
+        index,
+        localisation_previews: previews,
+        reference_source: None,
+        file_fingerprints: fingerprints,
+        file_metadata_fingerprints: metadata_fingerprints,
     })
 }
 

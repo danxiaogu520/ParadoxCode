@@ -32,6 +32,7 @@ use vfs::{DocumentId, DocumentSource, SourceFile};
 pub fn workspace_context_fingerprint(snapshot: &AnalysisSnapshot) -> u64 {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     snapshot.rules().rule_hash().to_hex().hash(&mut hasher);
+    snapshot.ir_fingerprint().hash(&mut hasher);
     // The host pins its profile Arc for the whole session, so the allocation
     // address identifies the profile object without ABA risk.
     format!("{:p}", Arc::as_ptr(&snapshot.game_profile_handle())).hash(&mut hasher);

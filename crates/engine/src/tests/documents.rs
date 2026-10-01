@@ -42,6 +42,155 @@ fn the_rules_v2_ir_is_shared_and_revisioned() {
 }
 
 #[test]
+fn overlay_definition_open_and_close_relower_other_overlay_references() {
+    let root = temp_root("overlay-ir-facts");
+    let scripted = root.join("common/scripted_effects");
+    let events = root.join("events");
+    std::fs::create_dir_all(&scripted).expect("scripted effects directory");
+    std::fs::create_dir_all(&events).expect("events directory");
+    std::fs::write(
+        scripted.join("defs.txt"),
+        "temporary_effect = { add_treasury = 1 }\n",
+    )
+    .expect("write disk definition");
+    let definition_path = AbsPath::normalize(&scripted.join("defs.txt"));
+    let caller_path = AbsPath::normalize(&events.join("caller.txt"));
+    let mut host = AnalysisHost::with_ir(
+        game::eu4::first_party_rules().expect("legacy rules"),
+        game::eu4::profile(),
+        game::eu4::first_party_ir().expect("compiled IR"),
+    );
+    host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Project,
+            AbsPath::normalize(&root),
+        ),
+    ]));
+    host.refresh_source_roots().expect("scan disk candidate");
+    let caller_id = DocumentId::new("file:///overlay/events/caller.txt");
+    let definition_id = DocumentId::new("file:///overlay/common/scripted_effects/defs.txt");
+    host.open_document(
+        caller_id.clone(),
+        1,
+        "country_event = { immediate = { temporary_effect = { } } }\n".to_owned(),
+        Some(caller_path),
+    )
+    .expect("open caller overlay");
+    assert!(
+        host.snapshot()
+            .document(&caller_id)
+            .and_then(|document| document.hir())
+            .is_some_and(|hir| hir.references().iter().any(|reference| {
+                reference.kind.as_ref() == "scripted_effect" && reference.name == "temporary_effect"
+            })),
+        "disk definition should provide the initial workspace fact"
+    );
+
+    host.open_document(
+        definition_id.clone(),
+        1,
+        "temporary_effect = { add_treasury = 1 }\n".to_owned(),
+        Some(definition_path),
+    )
+    .expect("open definition overlay");
+    assert!(
+        host.snapshot()
+            .document(&caller_id)
+            .and_then(|document| document.hir())
+            .is_some_and(|hir| hir.references().iter().any(|reference| {
+                reference.kind.as_ref() == "scripted_effect" && reference.name == "temporary_effect"
+            })),
+        "opening a definition overlay should re-lower already-open caller HIR"
+    );
+
+    host.apply_document_changes(
+        &definition_id,
+        2,
+        &[super::TextChange {
+            range: None,
+            text: "renamed_effect = { add_treasury = 1 }\n".to_owned(),
+        }],
+    )
+    .expect("rename definition overlay");
+    assert!(
+        !host
+            .snapshot()
+            .document(&caller_id)
+            .and_then(|document| document.hir())
+            .is_some_and(|hir| hir.references().iter().any(|reference| {
+                reference.kind.as_ref() == "scripted_effect" && reference.name == "temporary_effect"
+            })),
+        "editing a definition overlay should remove its prior fact from caller HIR"
+    );
+
+    host.apply_document_changes(
+        &definition_id,
+        3,
+        &[super::TextChange {
+            range: None,
+            text: "temporary_effect = { add_treasury = 1 }\n".to_owned(),
+        }],
+    )
+    .expect("restore definition name");
+    assert!(
+        host.snapshot()
+            .document(&caller_id)
+            .and_then(|document| document.hir())
+            .is_some_and(|hir| hir.references().iter().any(|reference| {
+                reference.kind.as_ref() == "scripted_effect" && reference.name == "temporary_effect"
+            })),
+        "restoring the overlay definition should restore the workspace fact"
+    );
+
+    host.close_document(&definition_id)
+        .expect("close definition overlay");
+    assert!(
+        host.snapshot()
+            .document(&caller_id)
+            .and_then(|document| document.hir())
+            .is_some_and(|hir| hir.references().iter().any(|reference| {
+                reference.kind.as_ref() == "scripted_effect" && reference.name == "temporary_effect"
+            })),
+        "closing the overlay should restore the shadowed disk definition fact"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn installing_ir_after_scan_finds_previously_unclassified_disk_files() {
+    let root = temp_root("set-ir-reclassify");
+    std::fs::create_dir_all(root.join("events")).expect("events directory");
+    std::fs::write(
+        root.join("events/test.txt"),
+        "country_event = { id = set_ir.1 }\n",
+    )
+    .expect("event source");
+    let mut host = AnalysisHost::with_profile(RuleSet::empty(), game::eu4::profile());
+    host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Project,
+            AbsPath::normalize(&root),
+        ),
+    ]));
+    host.refresh_source_roots()
+        .expect("initial empty-rules scan");
+    assert!(host.snapshot().source_files().is_empty());
+
+    host.set_ir(game::eu4::first_party_ir().expect("compiled IR"));
+    let snapshot = host.snapshot();
+    assert!(
+        snapshot
+            .source_files()
+            .values()
+            .any(|file| file.logical_path.as_str() == "events/test.txt")
+    );
+    assert_eq!(snapshot.scan_report().indexed_files, 1);
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn targeted_disk_changes_replace_one_shard_without_overwriting_an_overlay() {
     let root = temp_root("targeted-disk");
     let events = root.join("events");

@@ -124,6 +124,30 @@ fn semantic_data_with_cancellation_uncached(
         collect_quoted_semantics(snapshot, input, &mut data, cancellation)?;
         return Ok(data);
     };
+    if hir.uses_ir() {
+        for definition in hir.definitions() {
+            cancellation.checkpoint()?;
+            data.definitions.push(make_definition(
+                input,
+                &definition.kind,
+                definition.name.clone(),
+                definition.range,
+                definition.selection_range,
+            ));
+        }
+        for reference in hir.references() {
+            cancellation.checkpoint()?;
+            data.references.push(ReferenceInternal {
+                kind: reference.kind.to_string(),
+                name: reference.name.clone(),
+                range: reference.range,
+                document: input.document.clone(),
+                file: input.file,
+                path: input.path.clone(),
+            });
+        }
+        return Ok(data);
+    }
     // The inactive-range set is only consulted for first-party semantic references; skip building
     // it entirely when this file has none, keeping semantic_data O(references + definitions).
     let has_semantic_references = hir.references().iter().any(|reference| {
@@ -1388,7 +1412,7 @@ pub(crate) fn indexed_reference(
     file_id: SourceFileId,
     reference: &Reference,
 ) -> Option<ReferenceInternal> {
-    if dynamic_definition_type(snapshot, &reference.kind) {
+    if snapshot.ir().schemas.is_empty() && dynamic_definition_type(snapshot, &reference.kind) {
         if !workspace_member(snapshot, &reference.kind, &reference.name) {
             return None;
         }

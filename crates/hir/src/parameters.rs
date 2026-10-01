@@ -17,11 +17,15 @@ pub(super) fn lower_parameters(
     logical_path: Option<&LogicalPath>,
     rules: &RuleSet,
     profile: Option<&GameProfile>,
+    ir_definitions: Option<&[super::HirDefinition]>,
 ) -> (Vec<HirParameterDefinition>, Vec<HirParameterReference>) {
     let Some(logical_path) = logical_path else {
         return (Vec::new(), Vec::new());
     };
-    let dynamic_path = dynamic_definition_path_context(rules, Some(logical_path)).is_some();
+    let dynamic_path = ir_definitions.map_or_else(
+        || dynamic_definition_path_context(rules, Some(logical_path)).is_some(),
+        |definitions| !definitions.is_empty(),
+    );
     let token_rules = profile
         .into_iter()
         .flat_map(|profile| profile.token_definitions.iter())
@@ -64,6 +68,13 @@ pub(super) fn lower_parameters(
                 let Some(owner_range) = owning_top_level_range(properties, range) else {
                     continue;
                 };
+                if ir_definitions.is_some_and(|definitions| {
+                    !definitions
+                        .iter()
+                        .any(|definition| definition.range == owner_range)
+                }) {
+                    continue;
+                }
                 references.push(HirParameterReference {
                     name: name.clone(),
                     range,
@@ -86,6 +97,13 @@ pub(super) fn lower_parameters(
         let Some(owner_range) = owning_top_level_range(properties, conditional.range) else {
             continue;
         };
+        if ir_definitions.is_some_and(|definitions| {
+            !definitions
+                .iter()
+                .any(|definition| definition.range == owner_range)
+        }) {
+            continue;
+        }
         references.push(HirParameterReference {
             name: conditional.name.clone(),
             range: conditional.condition_range,

@@ -2252,7 +2252,17 @@ mod tests {
         .expect("game.json parses");
         let ir = lower(&sources, GameConfig { profile }).expect("rules/eu4-v2 lowers");
 
-        assert_eq!(ir.files.len(), 137, "every `files` entry survives");
+        assert_eq!(
+            ir.files.len(),
+            138,
+            "every `files` entry survives, including the dedicated .gfx rule"
+        );
+        let (_, gfx) = ir
+            .file_rule(&LogicalPath::parse("interface/test.gfx").unwrap())
+            .expect("interface .gfx files are classified");
+        assert!(
+            matches!(gfx.root, RootRule::Schema(schema) if ir.strings().resolve(ir.schema(schema).name) == "sprite_file")
+        );
         assert!(ir.schemas.len() > 1_000, "{} schemas", ir.schemas.len());
         assert!(
             (5_000..12_000).contains(&ir.fields.len()),

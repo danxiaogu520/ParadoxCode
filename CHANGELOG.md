@@ -9,20 +9,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Phase 4 of the rules redesign starts by putting the IR into the runtime
-  without changing any behaviour. A new `rules::bundle` loader reads a
-  rules-v2 bundle and enforces the manifest contract (every declared file is
-  present, nothing undeclared is, `game.json` is configuration rather than a
-  source, and its identity agrees with the manifest); the EU4 crate embeds
-  `rules/eu4-v2` alongside the legacy corpus and exposes `first_party_ir()`;
-  and `AnalysisHost`/`AnalysisSnapshot` carry an `Arc<RulesIr>`
-  (`with_ir`/`set_ir`/`ir()`, defaulting to an empty arena, with `set_ir`
-  advancing the revision so cached analyses cannot outlive the rules they were
-  built against). Nothing reads the IR yet, so every golden file is
-  byte-identical. The cost is now measured: compiling the legacy model takes
-  39.8ms and lowering the IR 226ms, so closing that gap (one check-and-lower
-  pass, or checking only at bake time) and covering the IR in the analysis
-  fingerprint are part of the remaining phase-4 work.
+- Phase 4 of the rules redesign moves production HIR, IDE and LSP consumers
+  onto the compiled rules-v2 IR. Schema facts drive scopes, definitions and
+  references, subtype restrictions, diagnostics, completion, hover and
+  navigation, including Callable parameters and quoted scripts. Workspace
+  scans and cache rebuilds collect definitions before resolving dynamic calls;
+  IR fingerprints invalidate analysis and SQLite caches (schema 17), which now
+  retain subtype facts. The runtime catalog bridge contains no legacy semantic
+  rules. Migration fixes make alias invocations optional and remove an extra
+  map layer from 13 nested definition patterns, reconnect sprite/decision
+  wrappers and preserve `.gfx` file selection. Pattern quotas count each actual
+  key; control chains, branch bodies and scope values follow IR declarations.
+  New integration and cache regressions cover the production path; legacy source/code deletion and the
+  full licensed-corpus/performance exit checks remain in phase 5.
 - Phase 3 of the rules redesign lands the runtime IR and its lowering.
   `rules::ir` is the closed arena of §5 — `RulesIr` over `files` / `schemas` /
   `fields` / `matchers` / `types` / `traits` / `enums` / `scopes` / `strings` /

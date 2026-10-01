@@ -578,8 +578,7 @@ pub struct CompatSpec {
 #[must_use]
 pub fn json_schema_pretty() -> String {
     let schema = schemars::schema_for!(RuleFile);
-    serde_json::to_string_pretty(&schema).expect("schema serializes")
-        + "\n"
+    serde_json::to_string_pretty(&schema).expect("schema serializes") + "\n"
 }
 
 #[cfg(test)]
@@ -650,11 +649,11 @@ mod tests {
     }"#;
 
     #[test]
-    fn design_examples_deserialize() {        let file: RuleFile = serde_json::from_str(EVENTS).expect("deserializes");
+    fn design_examples_deserialize() {
+        let file: RuleFile = serde_json::from_str(EVENTS).expect("deserializes");
         assert_eq!(file.files.len(), 2);
         assert_eq!(
-            file.files["events"].parser,
-            None,
+            file.files["events"].parser, None,
             "parser defaults are not spelled"
         );
         assert_eq!(
@@ -734,7 +733,10 @@ mod tests {
     #[test]
     fn types_and_traits_parse() {
         let file: RuleFile = serde_json::from_str(EVENTS).expect("deserializes");
-        assert_eq!(file.types["event"].resolution, Some(TypeResolution::Replace));
+        assert_eq!(
+            file.types["event"].resolution,
+            Some(TypeResolution::Replace)
+        );
         assert_eq!(
             file.types["event"].subtypes["triggered"].when,
             Some(SubtypeCond(BTreeMap::from([(
@@ -755,7 +757,10 @@ mod tests {
         assert_eq!(desc.required, None);
         assert!(file.traits["Localised"].bindings.is_empty());
         assert_eq!(
-            file.traits["ModifierSource"].requires.as_ref().map(|r| r.include.as_deref()),
+            file.traits["ModifierSource"]
+                .requires
+                .as_ref()
+                .map(|r| r.include.as_deref()),
             Some(Some("modifier_block"))
         );
     }
@@ -798,12 +803,11 @@ mod tests {
         )
         .expect("deserializes");
         assert_eq!(spec.kind, ControlKind::Branch);
-        let spec: ControlSpec =
-            serde_json::from_str(r#"{ "kind": "switch", "on": "on_trigger" }"#)
-                .expect("deserializes");
-        assert_eq!(spec.kind, ControlKind::Switch);
-        let spec: ControlSpec = serde_json::from_str(r#"{ "kind": "display_only" }"#)
+        let spec: ControlSpec = serde_json::from_str(r#"{ "kind": "switch", "on": "on_trigger" }"#)
             .expect("deserializes");
+        assert_eq!(spec.kind, ControlKind::Switch);
+        let spec: ControlSpec =
+            serde_json::from_str(r#"{ "kind": "display_only" }"#).expect("deserializes");
         assert_eq!(spec.kind, ControlKind::DisplayOnly);
     }
 
@@ -828,7 +832,9 @@ mod tests {
         let rendered = json_schema_pretty();
         let value: serde_json::Value = serde_json::from_str(&rendered).expect("valid JSON");
         assert_eq!(value["title"], "RuleFile");
-        for section in ["files", "schemas", "mixins", "types", "traits", "enums", "scopes"] {
+        for section in [
+            "files", "schemas", "mixins", "types", "traits", "enums", "scopes",
+        ] {
             assert!(
                 value["properties"][section].is_object(),
                 "`{section}` is described: {rendered}"

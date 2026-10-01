@@ -383,6 +383,8 @@ pub struct DiagnosticProvenance {
     pub context: Option<String>,
     pub source_file: Option<String>,
     pub source_line: Option<u32>,
+    /// JSON pointer of a compiled IR declaration.
+    pub source_pointer: Option<String>,
 }
 
 /// A safe, editor-neutral source edit suggested by a diagnostic.
@@ -457,6 +459,7 @@ impl DiagnosticProvenance {
             context: None,
             source_file: None,
             source_line: None,
+            source_pointer: None,
         }
     }
 }

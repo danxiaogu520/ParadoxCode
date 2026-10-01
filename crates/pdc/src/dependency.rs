@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use engine::{AnalysisHost, IndexCache, WorkspaceChange, WorkspaceScanLimits, WorkspaceScanToken};
+use rules::ir::RulesIr;
 use rules::{GameProfile, RuleSet};
 
 use crate::workspace::DependencyIndexCache;
@@ -24,8 +25,10 @@ pub(crate) type DependencySetupOutcome =
 pub(crate) fn run_dependency_cache_loads(
     configs: Vec<DependencyIndexCache>,
     rules: RuleSet,
+    ir: Arc<RulesIr>,
     profile: GameProfile,
     current_rule_hash: String,
+    current_ir_hash: String,
     scan_limits: WorkspaceScanLimits,
     preferred_localisation_languages: &[String],
     log: Option<&(dyn Fn(&str) + Sync)>,
@@ -58,8 +61,10 @@ pub(crate) fn run_dependency_cache_loads(
             let next = Arc::clone(&next);
             let results = Arc::clone(&results);
             let worker_rules = rules.clone();
+            let worker_ir = Arc::clone(&ir);
             let worker_profile = profile.clone();
             let worker_rule_hash = current_rule_hash.clone();
+            let worker_ir_hash = current_ir_hash.clone();
             let worker_scan_limits = scan_limits;
             scope.spawn(move || {
                 loop {
@@ -70,8 +75,10 @@ pub(crate) fn run_dependency_cache_loads(
                     let result = run_dependency_cache_load(
                         config,
                         worker_rules.clone(),
+                        Arc::clone(&worker_ir),
                         worker_profile.clone(),
                         worker_rule_hash.clone(),
+                        worker_ir_hash.clone(),
                         worker_scan_limits,
                         preferred_localisation_languages,
                         log,
@@ -102,14 +109,16 @@ pub(crate) fn run_dependency_cache_loads(
 /// A usable cache is loaded for installation and refreshed against the dependency directory so
 /// symbol changes are picked up without a full reindex. A missing, corrupt, or
 /// schema-incompatible cache is rebuilt from the configured dependency directory in place. A
-/// rules-hash mismatch triggers a regeneration attempt; if that fails the stale cache is still
-/// returned so the dependency keeps its symbols, mirroring the Vanilla cache policy.
+/// rules or rules-v2 IR mismatch triggers regeneration. If the IR changed and regeneration fails,
+/// the stale cache is rejected because its semantic shards were produced by a different analyzer.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run_dependency_cache_load(
     config: &DependencyIndexCache,
     rules: RuleSet,
+    ir: Arc<RulesIr>,
     profile: GameProfile,
     current_rule_hash: String,
+    current_ir_hash: String,
     scan_limits: WorkspaceScanLimits,
     preferred_localisation_languages: &[String],
     log: Option<&(dyn Fn(&str) + Sync)>,
@@ -164,6 +173,7 @@ pub(crate) fn run_dependency_cache_load(
                 return build_dependency_cache(
                     config,
                     &rules,
+                    &ir,
                     &profile,
                     scan_limits,
                     log,
@@ -192,14 +202,16 @@ pub(crate) fn run_dependency_cache_load(
                 loaded.index().position_ranges().len(),
             ));
         }
-        if loaded.metadata().rule_hash == current_rule_hash {
+        if loaded.metadata().rule_hash == current_rule_hash
+            && loaded.metadata().ir_hash == current_ir_hash
+        {
             if let Some(log) = log {
                 log(&format!(
                     "Dependency cache phase: active rules hash matches for {}; refreshing fingerprints",
                     config.root.path.display()
                 ));
             }
-            // The rules still match, so only the source files may have moved on: refresh the cache
+            // Both rule identities still match, so only the source files may have moved on: refresh the cache
             // against the dependency directory (a fingerprint diff, not a reparse). A failed
             // refresh — moved or unavailable source, cancellation — degrades to the cached
             // symbols, and a save failure keeps the refreshed cache in memory with a warning.
@@ -210,7 +222,13 @@ pub(crate) fn run_dependency_cache_load(
                     config.root.path.display()
                 ));
             }
-            return match loaded.refresh_cancellable(&rules, &profile, cancellation, progress) {
+            return match loaded.refresh_with_ir_cancellable(
+                &rules,
+                &profile,
+                &ir,
+                cancellation,
+                progress,
+            ) {
                 Ok(refreshed) => {
                     if let Some(log) = log {
                         log(&format!(
@@ -248,9 +266,12 @@ pub(crate) fn run_dependency_cache_load(
             };
         }
         let stale_hash = loaded.metadata().rule_hash.clone();
+        let stale_ir_hash = loaded.metadata().ir_hash.clone();
+        let ir_mismatch = stale_ir_hash != current_ir_hash;
+        let incompatible_legacy_hash = !ir.files.is_empty() && stale_hash != current_rule_hash;
         if let Some(log) = log {
             log(&format!(
-                "Dependency cache {} is stale (rules hash {stale_hash} != {current_rule_hash}); regenerating from {}",
+                "Dependency cache {} is stale (rules hash {stale_hash} != {current_rule_hash}, IR fingerprint {stale_ir_hash} != {current_ir_hash}); regenerating from {}",
                 config.index_path.display(),
                 config.root.path.display()
             ));
@@ -258,6 +279,7 @@ pub(crate) fn run_dependency_cache_load(
         let rebuilt = build_dependency_cache(
             config,
             &rules,
+            &ir,
             &profile,
             scan_limits,
             log,
@@ -273,6 +295,9 @@ pub(crate) fn run_dependency_cache_load(
                     config.root.path.display(),
                     config.index_path.display()
                 ),
+            )),
+            Err(error) if ir_mismatch || incompatible_legacy_hash => Err(format!(
+                "{error}; refusing to install the dependency cache because its rule identity is stale (cached legacy hash {stale_hash}, active {current_rule_hash}; cached rules-v2 IR fingerprint {stale_ir_hash}, active {current_ir_hash})"
             )),
             Err(error) => Ok((
                 loaded,
@@ -296,6 +321,7 @@ pub(crate) fn run_dependency_cache_load(
 fn build_dependency_cache(
     config: &DependencyIndexCache,
     rules: &RuleSet,
+    ir: &Arc<RulesIr>,
     profile: &GameProfile,
     scan_limits: WorkspaceScanLimits,
     log: Option<&(dyn Fn(&str) + Sync)>,
@@ -312,7 +338,7 @@ fn build_dependency_cache(
             config.root.path.display()
         ));
     }
-    let mut host = AnalysisHost::with_profile(rules.clone(), profile.clone());
+    let mut host = AnalysisHost::with_ir(rules.clone(), profile.clone(), Arc::clone(ir));
     host.set_scan_limits(scan_limits);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![config.root.clone()]));
     let scan_started = std::time::Instant::now();
@@ -409,8 +435,10 @@ mod tests {
         let results = run_dependency_cache_loads(
             configs,
             rules.clone(),
+            Arc::new(RulesIr::empty()),
             profile(),
             rules.rule_hash().to_hex(),
+            RulesIr::empty().fingerprint(),
             engine::WorkspaceScanLimits::default(),
             &[],
             None,
@@ -438,5 +466,58 @@ mod tests {
                 config.root.path.display()
             );
         }
+    }
+
+    #[test]
+    fn changed_ir_rejects_stale_dependency_cache_when_rebuild_fails() {
+        let container = tempdir().expect("temporary dependency container");
+        let source = container.path().join("dependency");
+        fs::create_dir_all(source.join("events")).expect("dependency directory");
+        fs::write(
+            source.join("events/events.txt"),
+            "country_event = { id = stale.1 }\n",
+        )
+        .expect("dependency source");
+        let source = dunce::canonicalize(source).expect("canonical dependency root");
+        let root = SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::Dependency,
+            AbsPath::normalize(&source),
+        );
+        let index_path = container.path().join("dependency.pdcindex");
+        let rules = first_party_rules().expect("embedded rules");
+        let profile = profile();
+        let empty_ir = Arc::new(RulesIr::empty());
+        let mut stale_host = AnalysisHost::with_ir(rules.clone(), profile.clone(), empty_ir);
+        stale_host.apply_change(WorkspaceChange::SetSourceRoots(vec![root.clone()]));
+        stale_host
+            .refresh_source_roots()
+            .expect("scan stale dependency");
+        IndexCache::from_snapshot(&stale_host.snapshot())
+            .expect("build stale cache")
+            .save(&index_path)
+            .expect("save stale cache");
+        drop(stale_host);
+        fs::remove_dir_all(&source).expect("remove dependency so rebuild fails");
+
+        let ir = game::eu4::first_party_ir().expect("embedded rules-v2 IR");
+        let result = run_dependency_cache_load(
+            &DependencyIndexCache { root, index_path },
+            rules.clone(),
+            Arc::clone(&ir),
+            profile,
+            rules.rule_hash().to_hex(),
+            ir.fingerprint(),
+            WorkspaceScanLimits::default(),
+            &[],
+            None,
+            None,
+            &WorkspaceScanToken::new(),
+        );
+        let error = result.expect_err("stale IR cache must not be returned");
+        assert!(
+            error.contains("refusing to install the dependency cache"),
+            "IR mismatch is explicit: {error}"
+        );
     }
 }

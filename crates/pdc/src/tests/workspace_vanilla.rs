@@ -799,7 +799,13 @@ fn stale_vanilla_cache_reports_regeneration_failure_explicitly() {
         json!({"jsonrpc":"2.0","method":"exit"}),
     ]);
     let mut output = Vec::new();
-    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    let mut server = crate::LspServer::try_new_with_ir(
+        InitializeOptions,
+        game::eu4::first_party_rules().expect("embedded rules"),
+        game::eu4::profile(),
+        game::eu4::first_party_ir().expect("embedded rules IR"),
+    )
+    .expect("embedded rules and IR");
     server
         .run_transport(Cursor::new(input), &mut output)
         .expect("transport");
@@ -813,8 +819,16 @@ fn stale_vanilla_cache_reports_regeneration_failure_explicitly() {
         .as_str()
         .expect("warning message");
     assert!(
-        message.contains("regeneration") && message.contains("using the existing cache"),
-        "the failure must be explicit and keep the stale cache fallback: {message}"
+        message.contains("regeneration") && message.contains("refusing to install"),
+        "the failed IR-mismatch rebuild must refuse the stale cache: {message}"
+    );
+    assert!(
+        server
+            .snapshot()
+            .source_roots()
+            .iter()
+            .all(|root| root.kind != SourceRootKind::Vanilla),
+        "a cache with a mismatched rules-v2 IR must not be installed after rebuild failure"
     );
     fs::remove_dir_all(container).expect("cleanup");
 }
@@ -868,8 +882,10 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
         IndexCacheLoadRequest {
             path: &explicit,
             rules: rules.clone(),
+            ir: std::sync::Arc::new(rules::ir::RulesIr::empty()),
             profile: game::eu4::profile(),
             current_rule_hash: rules.rule_hash().to_hex(),
+            current_ir_hash: rules::ir::RulesIr::empty().fingerprint(),
             auto_vanilla: Some(&automatic),
             log: None,
             progress: None,
@@ -893,8 +909,10 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
         IndexCacheLoadRequest {
             path: &explicit,
             rules: rules.clone(),
+            ir: std::sync::Arc::new(rules::ir::RulesIr::empty()),
             profile: game::eu4::profile(),
             current_rule_hash: rules.rule_hash().to_hex(),
+            current_ir_hash: rules::ir::RulesIr::empty().fingerprint(),
             auto_vanilla: Some(&automatic),
             log: None,
             progress: None,
@@ -999,8 +1017,10 @@ fn unavailable_user_level_cache_rebuild_records_the_resolved_source() {
         IndexCacheLoadRequest {
             path: &cache_path,
             rules: rules.clone(),
+            ir: std::sync::Arc::new(rules::ir::RulesIr::empty()),
             profile: game::eu4::profile(),
             current_rule_hash: rules.rule_hash().to_hex(),
+            current_ir_hash: rules::ir::RulesIr::empty().fingerprint(),
             auto_vanilla: Some(&automatic),
             log: None,
             progress: None,
@@ -1034,8 +1054,10 @@ fn unavailable_user_level_cache_rebuild_records_the_resolved_source() {
         IndexCacheLoadRequest {
             path: &cache_path,
             rules: rules.clone(),
+            ir: std::sync::Arc::new(rules::ir::RulesIr::empty()),
             profile: game::eu4::profile(),
             current_rule_hash: rules.rule_hash().to_hex(),
+            current_ir_hash: rules::ir::RulesIr::empty().fingerprint(),
             auto_vanilla: Some(&automatic),
             log: None,
             progress: None,

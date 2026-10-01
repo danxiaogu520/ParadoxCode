@@ -115,7 +115,9 @@ pub fn check(sources: &[(String, RuleFile)]) -> Vec<Diagnostic> {
     checker.check_card_disagreement();
     checker.check_undefined_references();
     checker.check_unused_definitions();
-    let Checker { mut diagnostics, .. } = checker;
+    let Checker {
+        mut diagnostics, ..
+    } = checker;
     diagnostics.sort_by(|left, right| {
         (&left.file, &left.pointer, left.code, &left.message).cmp(&(
             &right.file,
@@ -299,7 +301,8 @@ impl<'a> Checker<'a> {
         match expr::parse(raw) {
             Ok(parsed) => {
                 if let Err(mixed) = union_shape(&parsed) {
-                    report_parse(&mut self.diagnostics, 
+                    report_parse(
+                        &mut self.diagnostics,
                         at,
                         None,
                         format!(
@@ -320,7 +323,12 @@ impl<'a> Checker<'a> {
                 Some(parsed)
             }
             Err(failure) => {
-                report_parse(&mut self.diagnostics, at, Some(failure.column), failure.message);
+                report_parse(
+                    &mut self.diagnostics,
+                    at,
+                    Some(failure.column),
+                    failure.message,
+                );
                 None
             }
         }
@@ -354,7 +362,8 @@ impl<'a> Checker<'a> {
     /// legal in type expressions and schema arguments.
     fn forbid_params(&mut self, at: &At, raw: &str, what: &str) {
         if let Some(name) = first_param(raw) {
-            report(&mut self.diagnostics, 
+            report(
+                &mut self.diagnostics,
                 at,
                 DiagnosticCode::ParameterError,
                 Severity::Error,
@@ -440,7 +449,8 @@ impl<'a> Checker<'a> {
                     continue;
                 };
                 if binding.loc.is_some() == binding.sprite.is_some() {
-                    report(&mut self.diagnostics, 
+                    report(
+                        &mut self.diagnostics,
                         &binding_at,
                         DiagnosticCode::Parse,
                         Severity::Error,
@@ -451,7 +461,8 @@ impl<'a> Checker<'a> {
                     );
                 }
                 if trait_name == "Localised" && binding.sprite.is_some() {
-                    report(&mut self.diagnostics, 
+                    report(
+                        &mut self.diagnostics,
                         &binding_at,
                         DiagnosticCode::Parse,
                         Severity::Error,
@@ -462,7 +473,8 @@ impl<'a> Checker<'a> {
                     );
                 }
                 if trait_name == "HasIcon" && binding.loc.is_some() {
-                    report(&mut self.diagnostics, 
+                    report(
+                        &mut self.diagnostics,
                         &binding_at,
                         DiagnosticCode::Parse,
                         Severity::Error,
@@ -500,7 +512,8 @@ impl<'a> Checker<'a> {
                 let at = base.child("types").index(index);
                 self.forbid_params(&at, name, "a scope type name");
                 if name == "any" {
-                    report(&mut self.diagnostics, 
+                    report(
+                        &mut self.diagnostics,
                         &at,
                         DiagnosticCode::ScopeReferenceError,
                         Severity::Error,
@@ -508,7 +521,8 @@ impl<'a> Checker<'a> {
                     );
                 }
                 if !self.scope_types.insert(name.clone()) {
-                    report(&mut self.diagnostics, 
+                    report(
+                        &mut self.diagnostics,
                         &at,
                         DiagnosticCode::DuplicateName,
                         Severity::Error,
@@ -520,7 +534,8 @@ impl<'a> Checker<'a> {
                 let at = base.child("registers").child(name);
                 self.forbid_params(&at, name, "a register name");
                 if !register_names.insert(name.clone()) {
-                    report(&mut self.diagnostics, 
+                    report(
+                        &mut self.diagnostics,
                         &at,
                         DiagnosticCode::DuplicateName,
                         Severity::Error,
@@ -534,7 +549,8 @@ impl<'a> Checker<'a> {
                 let at = base.child("links").child(name);
                 self.forbid_params(&at, name, "a link name");
                 if !link_names.insert(name.clone()) {
-                    report(&mut self.diagnostics, 
+                    report(
+                        &mut self.diagnostics,
                         &at,
                         DiagnosticCode::DuplicateName,
                         Severity::Error,
@@ -543,10 +559,16 @@ impl<'a> Checker<'a> {
                 }
                 match expr::parse_template(name) {
                     Ok(_) => {}
-                    Err(failure) => report_parse(&mut self.diagnostics, &at, Some(failure.column), failure.message),
+                    Err(failure) => report_parse(
+                        &mut self.diagnostics,
+                        &at,
+                        Some(failure.column),
+                        failure.message,
+                    ),
                 }
                 if link.from.is_empty() {
-                    report(&mut self.diagnostics, 
+                    report(
+                        &mut self.diagnostics,
                         &at,
                         DiagnosticCode::ScopeReferenceError,
                         Severity::Error,
@@ -587,7 +609,11 @@ impl<'a> Checker<'a> {
                 self.forbid_params(&at.child("file"), name, "a files file name");
             }
             for (index, prefix) in rule.exclude.iter().enumerate() {
-                self.forbid_params(&at.child("exclude").index(index), prefix, "a files exclusion");
+                self.forbid_params(
+                    &at.child("exclude").index(index),
+                    prefix,
+                    "a files exclusion",
+                );
             }
             // D14: a `script` entry without a root would silently validate
             // nothing, which the no-guessing rule forbids; `localisation` and
@@ -645,7 +671,8 @@ impl<'a> Checker<'a> {
                 patterns: &[],
             };
             if self.schemas.contains_key(&name) {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &at,
                     DiagnosticCode::DuplicateName,
                     Severity::Error,
@@ -688,9 +715,14 @@ impl<'a> Checker<'a> {
                         );
                     }
                     if let Some(value) = &map.value
-                        && let Some(parsed) = self.expr(&at.child("map").child("value"), value, &ctx)
+                        && let Some(parsed) =
+                            self.expr(&at.child("map").child("value"), value, &ctx)
                     {
-                        self.collect_refs_from_expr(&at.child("map").child("value"), &parsed, owner);
+                        self.collect_refs_from_expr(
+                            &at.child("map").child("value"),
+                            &parsed,
+                            owner,
+                        );
                     }
                     if let Some(body) = &map.body {
                         self.collect_body_ref(
@@ -716,7 +748,8 @@ impl<'a> Checker<'a> {
             };
             self.forbid_params(&at, name, "a mixin name");
             if self.mixins.contains_key(name) {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &at,
                     DiagnosticCode::DuplicateName,
                     Severity::Error,
@@ -740,7 +773,8 @@ impl<'a> Checker<'a> {
             };
             self.forbid_params(&at, name, "a type name");
             if self.types.contains_key(name) {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &at,
                     DiagnosticCode::DuplicateName,
                     Severity::Error,
@@ -767,8 +801,7 @@ impl<'a> Checker<'a> {
                         self.forbid_params(&subtype_at.child("when"), field, "a when field name");
                         let value_at = subtype_at.child("when").child(field);
                         if let Some(value) = value
-                            && let Some(parsed) =
-                                self.expr(&value_at, value, &ParamCtx::closed())
+                            && let Some(parsed) = self.expr(&value_at, value, &ParamCtx::closed())
                         {
                             self.collect_refs_from_expr(&value_at, &parsed, None);
                         }
@@ -790,7 +823,8 @@ impl<'a> Checker<'a> {
             };
             self.forbid_params(&at, name, "a trait name");
             if self.traits.contains_key(name) {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &at,
                     DiagnosticCode::DuplicateName,
                     Severity::Error,
@@ -805,19 +839,21 @@ impl<'a> Checker<'a> {
                 },
             );
             if let Some(requires) = &spec.requires
-                && let Some(include) = &requires.include {
-                    self.references.push(Reference {
-                        kind: RefKind::Mixin,
-                        name: include.clone(),
-                        subtype: None,
-                        owner: None,
-                        at: at.child("requires").child("include"),
-                    });
-                }
+                && let Some(include) = &requires.include
+            {
+                self.references.push(Reference {
+                    kind: RefKind::Mixin,
+                    name: include.clone(),
+                    subtype: None,
+                    owner: None,
+                    at: at.child("requires").child("include"),
+                });
+            }
             for (binding_name, binding) in &spec.bindings {
                 let binding_at = at.child("bindings").child(binding_name);
                 if binding.loc.is_some() == binding.sprite.is_some() {
-                    report(&mut self.diagnostics, 
+                    report(
+                        &mut self.diagnostics,
                         &binding_at,
                         DiagnosticCode::Parse,
                         Severity::Error,
@@ -837,7 +873,8 @@ impl<'a> Checker<'a> {
             };
             self.forbid_params(&at, name, "an enum name");
             if self.enums.contains_key(name) {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &at,
                     DiagnosticCode::DuplicateName,
                     Severity::Error,
@@ -859,19 +896,27 @@ impl<'a> Checker<'a> {
                 }
                 EnumSpec::Table { columns, rows } => {
                     for (column, kind) in columns {
-                        self.forbid_params(&at.child("columns").child(column), column, "a column name");
+                        self.forbid_params(
+                            &at.child("columns").child(column),
+                            column,
+                            "a column name",
+                        );
                         match parse_column(kind) {
                             Ok((parsed, optional)) => {
                                 if parsed != "scope_type" {
-                                    report_parse(&mut self.diagnostics, 
+                                    report_parse(
+                                        &mut self.diagnostics,
                                         &at.child("columns").child(column),
                                         None,
-                                        format!("unknown column kind `{parsed}` (expected `scope_type`)"),
+                                        format!(
+                                            "unknown column kind `{parsed}` (expected `scope_type`)"
+                                        ),
                                     );
                                 }
                                 let _ = optional;
                             }
-                            Err(failure) => report_parse(&mut self.diagnostics, 
+                            Err(failure) => report_parse(
+                                &mut self.diagnostics,
                                 &at.child("columns").child(column),
                                 None,
                                 failure,
@@ -919,14 +964,22 @@ impl<'a> Checker<'a> {
                     );
                 }
             } else {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &pattern_at,
                     DiagnosticCode::Parse,
                     Severity::Error,
                     "a pattern must declare a `key` type expression".to_owned(),
                 );
             }
-            self.collect_field_payload(&pattern_at, name, formals, true, pattern.key.as_deref(), pattern);
+            self.collect_field_payload(
+                &pattern_at,
+                name,
+                formals,
+                true,
+                pattern.key.as_deref(),
+                pattern,
+            );
         }
         if let Some(items) = &block.items
             && let Some(parsed) = self.expr(&at.child("items"), items, &ParamCtx::closed())
@@ -974,9 +1027,10 @@ impl<'a> Checker<'a> {
         let ctx = ParamCtx { formals, in_map };
         let owner = (!schema.is_empty()).then_some(schema);
         if let Some(key) = &field.key
-            && let Some(parsed) = self.expr(&at.child("key"), key, &ctx) {
-                self.collect_enum_ref(&at.child("key"), &parsed, owner);
-            }
+            && let Some(parsed) = self.expr(&at.child("key"), key, &ctx)
+        {
+            self.collect_enum_ref(&at.child("key"), &parsed, owner);
+        }
         let mut payload_count = 0usize;
         if let Some(value) = &field.value {
             payload_count += 1;
@@ -1026,7 +1080,8 @@ impl<'a> Checker<'a> {
             }
         }
         if payload_count > 1 {
-            report(&mut self.diagnostics, 
+            report(
+                &mut self.diagnostics,
                 at,
                 DiagnosticCode::Parse,
                 Severity::Error,
@@ -1050,8 +1105,16 @@ impl<'a> Checker<'a> {
                 self.forbid_params(&scope_at.child("push"), push, "a scope effect");
             }
             for (register, target) in &scope.set.clone().unwrap_or_default() {
-                self.forbid_params(&scope_at.child("set").child(register), register, "a scope effect");
-                self.forbid_params(&scope_at.child("set").child(register), target, "a scope effect");
+                self.forbid_params(
+                    &scope_at.child("set").child(register),
+                    register,
+                    "a scope effect",
+                );
+                self.forbid_params(
+                    &scope_at.child("set").child(register),
+                    target,
+                    "a scope effect",
+                );
             }
         }
         if let Some(def) = &field.def {
@@ -1090,7 +1153,8 @@ impl<'a> Checker<'a> {
         for (cond, label) in [(&field.when, "when"), (&field.unless, "unless")] {
             if let Some(subtype) = cond {
                 self.forbid_params(&at.child(label), subtype, "a subtype gate");
-                self.subtype_gates.push((schema.to_owned(), subtype.clone(), at.child(label)));
+                self.subtype_gates
+                    .push((schema.to_owned(), subtype.clone(), at.child(label)));
             }
         }
     }
@@ -1126,7 +1190,6 @@ impl<'a> Checker<'a> {
         }
     }
 
-
     /// Collects `def<T>` shorthand positions of one expression (§4.2): the
     /// instance body is the enclosing field's `body`, when there is one.
     fn collect_def_shorthand(&mut self, at: &At, parsed: &Expr, body: Option<&str>) {
@@ -1154,8 +1217,7 @@ impl<'a> Checker<'a> {
         for alternative in &parsed.alternatives {
             match alternative {
                 Primary::Ref(argument) | Primary::Def(argument) => match argument {
-                    expr::Argument::Path(segments)
-                    | expr::Argument::Stripped { segments, .. } => {
+                    expr::Argument::Path(segments) | expr::Argument::Stripped { segments, .. } => {
                         let names = segments
                             .iter()
                             .filter_map(|segment| match segment {
@@ -1250,7 +1312,10 @@ impl<'a> Checker<'a> {
             for mixin_name in schema.include {
                 if let Some(mixin) = self.mixins.get(mixin_name) {
                     for key in mixin.value.fields.keys() {
-                        owners.entry(key.clone()).or_default().push(mixin_name.clone());
+                        owners
+                            .entry(key.clone())
+                            .or_default()
+                            .push(mixin_name.clone());
                     }
                 }
             }
@@ -1261,7 +1326,8 @@ impl<'a> Checker<'a> {
                 let mixins_only = sources.iter().filter(|source| !source.is_empty()).count();
                 let body = sources.iter().any(|source| source.is_empty());
                 if mixins_only > 1 {
-                    report(&mut self.diagnostics, 
+                    report(
+                        &mut self.diagnostics,
                         &schema.at.child("include"),
                         DiagnosticCode::IncludeConflict,
                         Severity::Error,
@@ -1270,7 +1336,8 @@ impl<'a> Checker<'a> {
                     continue;
                 }
                 if mixins_only == 1 && body && !self.body_overrides(schema, &key) {
-                    report(&mut self.diagnostics, 
+                    report(
+                        &mut self.diagnostics,
                         &schema.at.child("fields").child(&key),
                         DiagnosticCode::IncludeConflict,
                         Severity::Error,
@@ -1285,11 +1352,15 @@ impl<'a> Checker<'a> {
     }
 
     fn body_overrides(&self, schema: &SchemaDef<'_>, key: &str) -> bool {
-        schema.fields.get(key).is_some_and(|overloads| match overloads {
-            FieldOverloads::One(field) => field.override_field == Some(true),
-            FieldOverloads::Many(fields) => fields.iter().any(|field| field.override_field == Some(true),
-            ),
-        })
+        schema
+            .fields
+            .get(key)
+            .is_some_and(|overloads| match overloads {
+                FieldOverloads::One(field) => field.override_field == Some(true),
+                FieldOverloads::Many(fields) => fields
+                    .iter()
+                    .any(|field| field.override_field == Some(true)),
+            })
     }
 
     /// Check 3: unreachable overloads and covered patterns.
@@ -1307,12 +1378,9 @@ impl<'a> Checker<'a> {
                 for later in 1..list.len() {
                     for earlier in 0..later {
                         if field_structure_eq(&list[earlier], &list[later]) {
-                            report(&mut self.diagnostics, 
-                                &schema
-                                    .at
-                                    .child("fields")
-                                    .child(key)
-                                    .index(later),
+                            report(
+                                &mut self.diagnostics,
+                                &schema.at.child("fields").child(key).index(later),
                                 DiagnosticCode::UnreachableOverload,
                                 Severity::Error,
                                 format!(
@@ -1327,7 +1395,8 @@ impl<'a> Checker<'a> {
             for later in 1..schema.patterns.len() {
                 for earlier in 0..later {
                     if field_structure_eq(&schema.patterns[earlier], &schema.patterns[later]) {
-                        report(&mut self.diagnostics, 
+                        report(
+                            &mut self.diagnostics,
                             &schema.at.child("patterns").index(later),
                             DiagnosticCode::UnreachableOverload,
                             Severity::Error,
@@ -1343,7 +1412,10 @@ impl<'a> Checker<'a> {
     /// Check 4: parameter position, one level, and the instantiation cap.
     fn check_parameters(&mut self) {
         for use_site in &self.params {
-            let known = use_site.formals.iter().any(|formal| formal == &use_site.name);
+            let known = use_site
+                .formals
+                .iter()
+                .any(|formal| formal == &use_site.name);
             let key_binding = use_site.name == "key" && use_site.in_map;
             if !known && !key_binding {
                 let reason = if use_site.name == "key" {
@@ -1354,7 +1426,8 @@ impl<'a> Checker<'a> {
                         use_site.name, use_site.what
                     )
                 };
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &use_site.at,
                     DiagnosticCode::ParameterError,
                     Severity::Error,
@@ -1403,7 +1476,8 @@ impl<'a> Checker<'a> {
                     continue;
                 };
                 let at = schema.at.clone();
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &at,
                     DiagnosticCode::ParameterError,
                     Severity::Error,
@@ -1481,7 +1555,8 @@ impl<'a> Checker<'a> {
                 continue;
             };
             let Some(site) = fields.get(field_name) else {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     at,
                     DiagnosticCode::UndefinedReference,
                     Severity::Error,
@@ -1493,7 +1568,8 @@ impl<'a> Checker<'a> {
                 continue;
             };
             if site.conditional {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     at,
                     DiagnosticCode::SubtypeWhenDependency,
                     Severity::Error,
@@ -1584,7 +1660,8 @@ impl<'a> Checker<'a> {
                     let link_at = at.child("links").child(name);
                     for scope in &link.from {
                         if !scope_names(scope) {
-                            report(&mut self.diagnostics, 
+                            report(
+                                &mut self.diagnostics,
                                 &link_at,
                                 DiagnosticCode::ScopeReferenceError,
                                 Severity::Error,
@@ -1593,7 +1670,8 @@ impl<'a> Checker<'a> {
                         }
                     }
                     if !scope_names(&link.to) {
-                        report(&mut self.diagnostics, 
+                        report(
+                            &mut self.diagnostics,
                             &link_at,
                             DiagnosticCode::ScopeReferenceError,
                             Severity::Error,
@@ -1605,7 +1683,8 @@ impl<'a> Checker<'a> {
                     let compat_at = at.child("compat").index(index);
                     for name in [&compat.actual, &compat.expected] {
                         if !scope_names(name) {
-                            report(&mut self.diagnostics, 
+                            report(
+                                &mut self.diagnostics,
                                 &compat_at,
                                 DiagnosticCode::ScopeReferenceError,
                                 Severity::Error,
@@ -1654,7 +1733,8 @@ impl<'a> Checker<'a> {
                 continue;
             }
             if !scope_names(name) {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &scope_at.child("in").index(index),
                     DiagnosticCode::ScopeReferenceError,
                     Severity::Error,
@@ -1666,7 +1746,8 @@ impl<'a> Checker<'a> {
             && first_param(push).is_none()
             && !scope_names(push)
         {
-            report(&mut self.diagnostics, 
+            report(
+                &mut self.diagnostics,
                 &scope_at.child("push"),
                 DiagnosticCode::ScopeReferenceError,
                 Severity::Error,
@@ -1678,7 +1759,8 @@ impl<'a> Checker<'a> {
                 continue;
             }
             if !self.registers.contains(register) {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &scope_at.child("set").child(register),
                     DiagnosticCode::ScopeReferenceError,
                     Severity::Error,
@@ -1686,7 +1768,8 @@ impl<'a> Checker<'a> {
                 );
             }
             if !scope_names(target) {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &scope_at.child("set").child(register),
                     DiagnosticCode::ScopeReferenceError,
                     Severity::Error,
@@ -1712,10 +1795,9 @@ impl<'a> Checker<'a> {
             for (subtype_name, subtype) in &type_def.value.subtypes {
                 for (trait_name, impls) in &subtype.trait_impls {
                     for binding in impls.0.keys() {
-                        if bindings
-                            .contains_key(&(trait_name.clone(), binding.clone()))
-                        {
-                            report(&mut self.diagnostics, 
+                        if bindings.contains_key(&(trait_name.clone(), binding.clone())) {
+                            report(
+                                &mut self.diagnostics,
                                 &type_def
                                     .at
                                     .child("subtypes")
@@ -1820,11 +1902,16 @@ impl<'a> Checker<'a> {
                 RefKind::Trait => !self.traits.contains_key(&reference.name),
             };
             if missing {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &reference.at,
                     DiagnosticCode::UndefinedReference,
                     Severity::Error,
-                    format!("{} `{}` is not defined", reference.kind.label(), reference.name),
+                    format!(
+                        "{} `{}` is not defined",
+                        reference.kind.label(),
+                        reference.name
+                    ),
                 );
                 continue;
             }
@@ -1832,11 +1919,15 @@ impl<'a> Checker<'a> {
                 && let Some(type_def) = self.types.get(&reference.name)
                 && !type_def.value.subtypes.contains_key(subtype)
             {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &reference.at,
                     DiagnosticCode::UndefinedReference,
                     Severity::Error,
-                    format!("subtype `{subtype}` is not defined on type `{}`", reference.name),
+                    format!(
+                        "subtype `{subtype}` is not defined on type `{}`",
+                        reference.name
+                    ),
                 );
             }
         }
@@ -1908,7 +1999,8 @@ impl<'a> Checker<'a> {
 
         for (name, schema) in &self.schemas {
             if !used_schemas.contains(name) {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &schema.at,
                     DiagnosticCode::UnusedDefinition,
                     Severity::Warning,
@@ -1918,7 +2010,8 @@ impl<'a> Checker<'a> {
         }
         for (name, mixin) in &self.mixins {
             if !used_mixins.contains(name) {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &mixin.at,
                     DiagnosticCode::UnusedDefinition,
                     Severity::Warning,
@@ -1928,7 +2021,8 @@ impl<'a> Checker<'a> {
         }
         for (name, type_def) in &self.types {
             if !used_types.contains(name) {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &type_def.at,
                     DiagnosticCode::UnusedDefinition,
                     Severity::Warning,
@@ -1938,7 +2032,8 @@ impl<'a> Checker<'a> {
         }
         for (name, enum_def) in &self.enums {
             if !used_enums.contains(name) {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &enum_def.at,
                     DiagnosticCode::UnusedDefinition,
                     Severity::Warning,
@@ -1948,7 +2043,8 @@ impl<'a> Checker<'a> {
         }
         for (name, trait_def) in &self.traits {
             if !used_traits.contains(name) {
-                report(&mut self.diagnostics, 
+                report(
+                    &mut self.diagnostics,
                     &trait_def.at,
                     DiagnosticCode::UnusedDefinition,
                     Severity::Warning,
@@ -2001,12 +2097,12 @@ impl RefKind {
 /// The first named segment of a constructor argument.
 pub(crate) fn first_name(argument: &expr::Argument) -> Option<String> {
     match argument {
-        expr::Argument::Path(segments) | expr::Argument::Stripped { segments, .. } => segments
-            .iter()
-            .find_map(|segment| match segment {
+        expr::Argument::Path(segments) | expr::Argument::Stripped { segments, .. } => {
+            segments.iter().find_map(|segment| match segment {
                 Segment::Name(name) => Some(name.clone()),
                 Segment::Param(_) => None,
-            }),
+            })
+        }
         expr::Argument::Trait(name) => Some(name.clone()),
     }
 }
@@ -2142,7 +2238,9 @@ pub(crate) fn parse_schema_ref(raw: &str) -> Result<SchemaRef, String> {
         return Err(format!("`{raw}` is not a schema reference"));
     };
     if !raw.ends_with('>') {
-        return Err(format!("schema reference `{raw}` is missing its closing `>`"));
+        return Err(format!(
+            "schema reference `{raw}` is missing its closing `>`"
+        ));
     }
     let name = raw[..open].trim();
     if !is_ident(name) {
@@ -2186,14 +2284,22 @@ pub(crate) fn parse_card(raw: &str) -> Result<(u32, Option<u32>), String> {
     let (lower, upper) = raw.split_once("..").unwrap_or((raw, raw));
     let lower = lower.trim();
     let upper = upper.trim();
-    let min = lower.parse::<u32>().map_err(|_| format!("`{raw}` is not a card"))?;
+    let min = lower
+        .parse::<u32>()
+        .map_err(|_| format!("`{raw}` is not a card"))?;
     let max = if upper == "*" {
         None
     } else {
-        Some(upper.parse::<u32>().map_err(|_| format!("`{raw}` is not a card"))?)
+        Some(
+            upper
+                .parse::<u32>()
+                .map_err(|_| format!("`{raw}` is not a card"))?,
+        )
     };
     if max.is_some_and(|max| max < min) {
-        return Err(format!("card `{raw}` has a lower bound above its upper bound"));
+        return Err(format!(
+            "card `{raw}` has a lower bound above its upper bound"
+        ));
     }
     Ok((min, max))
 }
@@ -2304,7 +2410,12 @@ fn report(
 }
 
 /// Records one mini-syntax parse error.
-fn report_parse(diagnostics: &mut Vec<Diagnostic>, at: &At, column: Option<usize>, message: String) {
+fn report_parse(
+    diagnostics: &mut Vec<Diagnostic>,
+    at: &At,
+    column: Option<usize>,
+    message: String,
+) {
     diagnostics.push(Diagnostic {
         severity: Severity::Error,
         code: DiagnosticCode::Parse,
@@ -2353,7 +2464,6 @@ fn lint_field_cards(
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -2598,8 +2708,14 @@ mod tests {
     #[test]
     fn duplicate_names_are_rejected() {
         let diagnostics = run(&[
-            ("one.json", r#"{ "schemas": { "s": { "fields": { "a": { "value": "bool" } } } } }"#),
-            ("two.json", r#"{ "schemas": { "s": { "fields": { "b": { "value": "bool" } } } } }"#),
+            (
+                "one.json",
+                r#"{ "schemas": { "s": { "fields": { "a": { "value": "bool" } } } } }"#,
+            ),
+            (
+                "two.json",
+                r#"{ "schemas": { "s": { "fields": { "b": { "value": "bool" } } } } }"#,
+            ),
         ]);
         assert_eq!(errors(&diagnostics), vec![DiagnosticCode::DuplicateName]);
     }

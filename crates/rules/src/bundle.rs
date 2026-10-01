@@ -7,8 +7,9 @@
 //! is present, nothing undeclared is, the game identity agrees — is enforced
 //! in one place.
 //!
-//! The bundle does not compile anything: [`load_bundle`] hands back parsed
-//! [`RuleFile`]s and the [`GameConfig`] for `crate::lower::lower`.
+//! The bundle does not compile anything: [`load_bundle`](crate::bundle::load_bundle)
+//! hands back parsed [`RuleFile`](crate::source::RuleFile)s and the
+//! [`GameConfig`](crate::ir::GameConfig) for `crate::lower::lower`.
 
 use std::fmt;
 use std::path::{Path, PathBuf};

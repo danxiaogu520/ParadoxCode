@@ -557,6 +557,10 @@ pub(crate) fn typed_name_localisation_previews(
 /// type. Types without declared bindings can still carry schema-typed
 /// localisation fields whose in-range references drive the preview.
 pub(crate) fn kind_is_localisation_displayable(snapshot: &AnalysisSnapshot, kind: &str) -> bool {
+    if !snapshot.ir().schemas.is_empty() {
+        return snapshot.ir().type_by_name(kind).is_some();
+    }
+
     snapshot
         .rules()
         .model()
@@ -564,6 +568,26 @@ pub(crate) fn kind_is_localisation_displayable(snapshot: &AnalysisSnapshot, kind
         .type_descriptors
         .keys()
         .any(|type_name| type_name.eq_ignore_ascii_case(kind))
+}
+
+/// Base bindings and bindings granted by the resolved instance's subtypes.
+fn applicable_trait_impls<'a>(
+    snapshot: &'a AnalysisSnapshot,
+    type_id: rules::ir::TypeId,
+    name: &str,
+) -> Vec<&'a rules::ir::TraitImpl> {
+    use rules::ir::SymbolFacts;
+    let info = snapshot.ir().type_info(type_id);
+    let facts = crate::ir_queries::SnapshotSymbolFacts { snapshot };
+    info.trait_impls
+        .iter()
+        .chain(
+            info.subtypes
+                .iter()
+                .filter(|subtype| facts.type_subtype_member(type_id, subtype.name, name))
+                .flat_map(|subtype| subtype.trait_impls.iter()),
+        )
+        .collect()
 }
 
 /// Appends every generated-key row (self bindings and template bindings alike)
@@ -576,6 +600,30 @@ fn collect_generated_preview_rows(
     seen: &mut BTreeSet<String>,
     cancellation: &CancellationToken,
 ) -> Result<(), Cancelled> {
+    if !snapshot.ir().schemas.is_empty() {
+        let ir = snapshot.ir();
+        if let Some(type_id) = ir.type_by_name(kind) {
+            for implementation in applicable_trait_impls(snapshot, type_id, symbol_name) {
+                for (label, argument) in &implementation.arguments {
+                    if let rules::ir::TraitArgument::Binding(binding) = argument
+                        && let Some(template) = binding.loc
+                    {
+                        cancellation.checkpoint()?;
+                        let name = ir.strings.resolve(template).replace('$', symbol_name);
+                        let previews =
+                            localisation_previews_for_name(snapshot, &name, cancellation)?;
+                        push_preview_rows(
+                            rows,
+                            seen,
+                            Some(ir.strings.resolve(*label).to_owned()),
+                            &previews,
+                        );
+                    }
+                }
+            }
+        }
+        return Ok(());
+    }
     for binding in snapshot
         .rules()
         .model()
@@ -636,6 +684,29 @@ fn generated_key_field<'a>(
     symbol_name: &str,
     key: &str,
 ) -> Option<&'a str> {
+    if !snapshot.ir().schemas.is_empty() {
+        let ir = snapshot.ir();
+        return ir.type_by_name(kind).and_then(|id| {
+            applicable_trait_impls(snapshot, id, symbol_name)
+                .into_iter()
+                .find_map(|implementation| {
+                    implementation
+                        .arguments
+                        .iter()
+                        .find_map(|(label, argument)| {
+                            let rules::ir::TraitArgument::Binding(binding) = argument else {
+                                return None;
+                            };
+                            let template = binding.loc?;
+                            ir.strings
+                                .resolve(template)
+                                .replace('$', symbol_name)
+                                .eq_ignore_ascii_case(key)
+                                .then(|| ir.strings.resolve(*label))
+                        })
+                })
+        });
+    }
     snapshot
         .rules()
         .model()

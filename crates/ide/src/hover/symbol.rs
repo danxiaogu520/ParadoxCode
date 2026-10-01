@@ -81,7 +81,9 @@ pub(crate) fn hover_for_symbol(
             }
             if let Some(summary) = dynamic_definition_summary(snapshot, kind, name) {
                 let mut signature = dynamic_signature_hover(snapshot, &summary);
-                if crate::semantic::dynamic_definition_type(snapshot, kind) {
+                if snapshot.ir().schemas.is_empty()
+                    && crate::semantic::dynamic_definition_type(snapshot, kind)
+                {
                     signature.push('\n');
                     signature.push_str(&crate::dynamic_contracts::contract_hover_line(
                         snapshot, kind, name,

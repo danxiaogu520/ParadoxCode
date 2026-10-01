@@ -1836,14 +1836,14 @@ impl LspServer {
             let cancellation = IndexSetupCancellation::new();
             let sender = event_sender.clone();
             let worker_cancellation = cancellation.clone();
-            let rules = self.host.snapshot().rules().clone();
-            let profile = self.host.snapshot().game_profile().clone();
-            let scan_limits = self.host.snapshot().scan_limits();
-            let preferred_localisation_languages = self
-                .host
-                .snapshot()
-                .preferred_localisation_languages()
-                .to_vec();
+            let snapshot = self.host.snapshot();
+            let rules = snapshot.rules().clone();
+            let ir = snapshot.ir_handle();
+            let current_ir_hash = snapshot.ir_fingerprint().to_owned();
+            let profile = snapshot.game_profile().clone();
+            let scan_limits = snapshot.scan_limits();
+            let preferred_localisation_languages =
+                snapshot.preferred_localisation_languages().to_vec();
             let current_rule_hash = rules.rule_hash().to_hex();
             let progress_token = format!("pdc-vanilla-{}", progress_nonce());
             let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
@@ -1894,8 +1894,10 @@ impl LspServer {
                 let result = run_index_cache_load(IndexCacheLoadRequest {
                     path: &path,
                     rules,
+                    ir,
                     profile,
                     current_rule_hash,
+                    current_ir_hash,
                     auto_vanilla: auto_vanilla.as_ref(),
                     log: Some(log_ref),
                     progress: progress
@@ -1917,9 +1919,11 @@ impl LspServer {
             )?;
             let cancellation = IndexSetupCancellation::new();
             let sender = event_sender.clone();
-            let rules = self.host.snapshot().rules().clone();
-            let profile = self.host.snapshot().game_profile().clone();
-            let scan_limits = self.host.snapshot().scan_limits();
+            let snapshot = self.host.snapshot();
+            let rules = snapshot.rules().clone();
+            let ir = snapshot.ir_handle();
+            let profile = snapshot.game_profile().clone();
+            let scan_limits = snapshot.scan_limits();
             let worker_cancellation = cancellation.clone();
             let progress_token = format!("pdc-vanilla-{}", progress_nonce());
             let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
@@ -1967,6 +1971,7 @@ impl LspServer {
                 let result = crate::vanilla::run_auto_vanilla_setup_with_options_and_limits(
                     &configuration,
                     rules,
+                    ir,
                     profile,
                     Some(log_ref),
                     progress
@@ -2002,14 +2007,14 @@ impl LspServer {
             let cancellation = WorkspaceScanToken::new();
             let sender = event_sender.clone();
             let worker_cancellation = cancellation.clone();
-            let rules = self.host.snapshot().rules().clone();
-            let profile = self.host.snapshot().game_profile().clone();
-            let scan_limits = self.host.snapshot().scan_limits();
-            let preferred_localisation_languages = self
-                .host
-                .snapshot()
-                .preferred_localisation_languages()
-                .to_vec();
+            let snapshot = self.host.snapshot();
+            let rules = snapshot.rules().clone();
+            let ir = snapshot.ir_handle();
+            let current_ir_hash = snapshot.ir_fingerprint().to_owned();
+            let profile = snapshot.game_profile().clone();
+            let scan_limits = snapshot.scan_limits();
+            let preferred_localisation_languages =
+                snapshot.preferred_localisation_languages().to_vec();
             let current_rule_hash = rules.rule_hash().to_hex();
             let progress_token = format!("pdc-dependency-{}", progress_nonce());
             let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
@@ -2053,8 +2058,10 @@ impl LspServer {
                 let results = crate::dependency::run_dependency_cache_loads(
                     dependency_caches,
                     rules,
+                    ir,
                     profile,
                     current_rule_hash,
+                    current_ir_hash,
                     scan_limits,
                     &preferred_localisation_languages,
                     Some(&log),

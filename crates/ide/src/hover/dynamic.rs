@@ -89,6 +89,52 @@ pub(crate) fn dynamic_invocation_parameter_hover(
     Ok(Some(model))
 }
 
+/// Callable argument keys are tied to the IR reference selected at the call.
+pub(crate) fn ir_invocation_parameter_hover(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: TextSize,
+) -> Option<HoverModel> {
+    let hir = input.hir.as_deref()?;
+    let argument = hir
+        .properties()
+        .iter()
+        .find(|property| contains(property.key_range, position))?;
+    let invocation = hir
+        .properties()
+        .iter()
+        .filter(|property| {
+            property.range.start() < argument.range.start()
+                && property.range.end() >= argument.range.end()
+                && property.path.len() + 1 == argument.path.len()
+        })
+        .min_by_key(|property| property.range.len())?;
+    let reference = hir
+        .references()
+        .iter()
+        .find(|reference| reference.range == invocation.key_range)?;
+    let summary =
+        crate::semantic::dynamic_definition_summary(snapshot, &reference.kind, &reference.name)?;
+    let parameter = summary
+        .parameters
+        .iter()
+        .find(|parameter| parameter.name.eq_ignore_ascii_case(&argument.key))?;
+    let mut model = HoverModel::new(format!(
+        "### parameter {} of scripted {}",
+        code_span(&parameter.name),
+        code_span(&summary.name)
+    ));
+    model.push_section(format!(
+        "- Presence: `{}`",
+        if parameter.required {
+            "required"
+        } else {
+            "optional"
+        }
+    ));
+    Some(model)
+}
+
 /// Shared contract lines for a dynamic parameter at its definition site:
 /// resolves the row by kind (or name alone when the caller does not know the
 /// kind) and replays the parameter's usage-site rows under an any-scope,
@@ -217,20 +263,23 @@ pub(crate) fn dynamic_signature_hover(
         0 => format!("`{} = yes`", summary.name),
         _ => "named parameter block".to_owned(),
     };
+    let required_presence = |parameter: &engine::DynamicParameterSignature| {
+        if snapshot.ir().schemas.is_empty() {
+            crate::dynamic_rules::parameter_effectively_required(snapshot, summary, parameter)
+        } else {
+            parameter.required
+        }
+    };
     let required = summary
         .parameters
         .iter()
-        .filter(|parameter| {
-            crate::dynamic_rules::parameter_effectively_required(snapshot, summary, parameter)
-        })
+        .filter(|parameter| required_presence(parameter))
         .map(|parameter| format!("`{}`", parameter.name))
         .collect::<Vec<_>>();
     let optional = summary
         .parameters
         .iter()
-        .filter(|parameter| {
-            !crate::dynamic_rules::parameter_effectively_required(snapshot, summary, parameter)
-        })
+        .filter(|parameter| !required_presence(parameter))
         .map(|parameter| format!("`{}`", parameter.name))
         .collect::<Vec<_>>();
     let mut lines = vec![format!("- Invocation: {invocation}")];

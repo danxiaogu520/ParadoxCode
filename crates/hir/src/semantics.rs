@@ -442,6 +442,7 @@ pub(super) fn lower_semantics(
                                 .iter()
                                 .map(|&child| vfs::intern_shard_string(&properties[child].key))
                                 .collect(),
+                            subtypes: Vec::new(),
                         });
                     }
                     definitions.push(definition);
@@ -583,6 +584,7 @@ pub(super) fn lower_semantics(
             name: value.value.clone(),
             range: value.range,
             origin: HirReferenceOrigin::Category,
+            subtype: None,
         }));
     }
     (definitions, references, definition_attributes)
@@ -936,6 +938,7 @@ fn dynamic_definition_references(
                 name: property.key.clone(),
                 range: property.key_range,
                 origin: HirReferenceOrigin::DynamicDefinition,
+                subtype: None,
             });
         }
     }
@@ -1062,6 +1065,7 @@ fn semantic_localisation_reference(
         name: scalar.value.clone(),
         range: scalar.range,
         origin: HirReferenceOrigin::Semantic,
+        subtype: None,
     })
 }
 
@@ -1159,6 +1163,7 @@ fn semantic_typed_references(
                 name: scalar.value.clone(),
                 range: scalar.range,
                 origin: HirReferenceOrigin::SemanticTyped,
+                subtype: None,
             });
         }
     }
@@ -1371,6 +1376,7 @@ fn derived_symbol_references(
                         name: key.replace('$', &name),
                         range,
                         origin: family.origin,
+                        subtype: None,
                     });
                     continue;
                 }
@@ -1408,6 +1414,7 @@ fn derived_symbol_references(
                     name: field_value.value.clone(),
                     range: field_value.range,
                     origin: family.origin,
+                    subtype: None,
                 });
             }
         }
@@ -1622,6 +1629,7 @@ fn reference_from_property(
         name: scalar.value.clone(),
         range: scalar.range,
         origin: HirReferenceOrigin::Profile,
+        subtype: None,
     })
 }
 

@@ -634,34 +634,20 @@
           "card": "0..1",
           "when": null
         },
-        "bitmapfonts": [
-          {
-            "body": "sprite_file__empty",
-            "card": "0..1",
-            "doc": "Wrapper block containing bitmap font definitions.",
-            "when": null
-          },
-          {
-            "body": "interface_file__bitmapfonts",
-            "card": "0..1",
-            "when": null
-          }
-        ],
-        "objectTypes": [
-          {
-            "body": "sprite_file__empty",
-            "card": "0..1",
-            "doc": "Wrapper block containing engine object definitions (pdxmesh, arrows, particles, map text, charts).",
-            "when": null
-          },
-          {
-            "body": "interface_file__objectTypes",
-            "card": "0..1",
-            "when": null
-          }
-        ],
+        "bitmapfonts": {
+          "body": "interface_file__bitmapfonts",
+          "card": "0..1",
+          "doc": "Wrapper block containing bitmap font definitions.",
+          "when": null
+        },
+        "objectTypes": {
+          "body": "interface_file__objectTypes",
+          "card": "0..1",
+          "doc": "Wrapper block containing engine object definitions (pdxmesh, arrows, particles, map text, charts).",
+          "when": null
+        },
         "spriteTypes": {
-          "body": "sprite_file__empty",
+          "body": "sprite_file__spriteTypes",
           "card": "0..1",
           "doc": "Wrapper block containing all sprite definitions (spriteType, textSpriteType, progress bars, shields, animated sprites).",
           "when": null

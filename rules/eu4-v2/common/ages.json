@@ -42,12 +42,9 @@
     "game_age_body__abilities": {
       "patterns": [
         {
+          "body": "game_age_body__abilities__game_age_ability",
           "card": "1..*",
-          "key": "ref<game_age_ability>",
-          "map": {
-            "body": "game_age_body__abilities__game_age_ability",
-            "key": "def<game_age_ability>"
-          },
+          "key": "def<game_age_ability>",
           "when": null
         }
       ]

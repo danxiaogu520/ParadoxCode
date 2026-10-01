@@ -23,7 +23,7 @@ use rules::source::{
     BindingSpec, BlockSchema, CompatSpec, ControlKind, ControlSpec, DefSpec, EnumSpec, ExtSpec,
     FieldOverloads, FieldSpec, FileRule, ImplSpec, ImplValue, LinkSpec, MapSpec, MixinSpec,
     RegisterSpec, RootSpec, RuleFile, SchemaSpec, ScopeEffect, ScopesSpec, Severity,
-    SourceFileResolution, SubtypeCond, SubtypeSpec, TraitSpec, TypeSpec, TypeResolution,
+    SourceFileResolution, SubtypeCond, SubtypeSpec, TraitSpec, TypeResolution, TypeSpec,
 };
 use rules::{KeyMatcher, RuleShape, RulesModel, SemanticRule, ValueMatcher};
 
@@ -212,10 +212,7 @@ impl<'model> Cvt<'model> {
             enum_names,
             type_names: BTreeSet::new(),
         };
-        norm.type_names = def_types
-            .iter()
-            .map(|name| norm.type_name(name))
-            .collect();
+        norm.type_names = def_types.iter().map(|name| norm.type_name(name)).collect();
         let mut converter = Self {
             model,
             norm,
@@ -320,7 +317,10 @@ impl<'model> Cvt<'model> {
     }
 
     fn manual(&mut self, category: &str, item: String) {
-        self.manual.entry(category.to_owned()).or_default().push(item);
+        self.manual
+            .entry(category.to_owned())
+            .or_default()
+            .push(item);
     }
 
     // ------------------------------------------------------------- conversion
@@ -407,7 +407,9 @@ impl<'model> Cvt<'model> {
             }
             let parent = parent_key(key);
             let segment = last_segment(key);
-            let known = declared.get(&parent).is_some_and(|set| set.contains(segment));
+            let known = declared
+                .get(&parent)
+                .is_some_and(|set| set.contains(segment));
             if known {
                 continue;
             }
@@ -494,7 +496,10 @@ impl<'model> Cvt<'model> {
                     FieldOutcome::Specs(built) => {
                         self.count("rows into fields");
                         for group in built {
-                            match groups.iter_mut().find(|existing| existing.mergeable(&group)) {
+                            match groups
+                                .iter_mut()
+                                .find(|existing| existing.mergeable(&group))
+                            {
                                 Some(existing) => existing.merge(group),
                                 None => groups.push(group),
                             }
@@ -624,9 +629,7 @@ impl<'model> Cvt<'model> {
         // effect/trigger, and the profile's `token_definitions` row is the
         // mechanism that produces it. It carries no pattern.
         if let KeyMatcher::Enum(name) = &row.key
-            && self
-                .token_kinds
-                .contains(&self.norm.type_name(name))
+            && self.token_kinds.contains(&self.norm.type_name(name))
         {
             self.count("parameter-key rows folded into Callable dynamic keys");
             return FieldOutcome::FoldedToken;
@@ -636,8 +639,10 @@ impl<'model> Cvt<'model> {
         // pattern and the `scopes.registers` declaration.
         if matches!(row.shape, RuleShape::Node)
             && row.child_context.as_deref() == Some(context)
-            && self.count_children(context, &pos_key(&join_key(path, &expr::key_segment(&row.key))))
-                == 0
+            && self.count_children(
+                context,
+                &pos_key(&join_key(path, &expr::key_segment(&row.key))),
+            ) == 0
             && let KeyMatcher::Exact(name) = &row.key
         {
             let register_shift =
@@ -645,7 +650,9 @@ impl<'model> Cvt<'model> {
             if row.push_scope.is_some() {
                 let link = self.links.entry(name.clone()).or_default();
                 link.count += 1;
-                link.to = self.norm.scope_name(row.push_scope.as_deref().unwrap_or("any"));
+                link.to = self
+                    .norm
+                    .scope_name(row.push_scope.as_deref().unwrap_or("any"));
                 let from: BTreeSet<String> = row
                     .allowed_scopes
                     .iter()
@@ -669,8 +676,10 @@ impl<'model> Cvt<'model> {
             RuleShape::ValueClause => SpecClass::Clause,
             RuleShape::Leaf | RuleShape::LeafValue => SpecClass::Scalar,
         };
-        let key = match &row.key {
-            KeyMatcher::Exact(spelling) => FieldGroupKey::Exact(spelling.to_lowercase(), spelling.clone()),
+        let mut key = match &row.key {
+            KeyMatcher::Exact(spelling) => {
+                FieldGroupKey::Exact(spelling.to_lowercase(), spelling.clone())
+            }
             other => {
                 if matches!(other, KeyMatcher::Type(_)) {
                     self.count("magic key segments");
@@ -715,7 +724,10 @@ impl<'model> Cvt<'model> {
         match class {
             SpecClass::Scalar | SpecClass::Quoted => {
                 let value = if class == SpecClass::Quoted {
-                    let target = row.child_context.clone().unwrap_or_else(|| context.to_owned());
+                    let target = row
+                        .child_context
+                        .clone()
+                        .unwrap_or_else(|| context.to_owned());
                     format!("quoted<{}>", self.root_schema_name(&target))
                 } else {
                     expr::value_expr(&row.value, &self.norm)
@@ -741,12 +753,12 @@ impl<'model> Cvt<'model> {
                         BodyRef::Schema(name) => name.clone(),
                         BodyRef::SelfBlock => "self".to_owned(),
                     };
+                    // This row is already the named instance entry. A map
+                    // payload would introduce an extra block and move the
+                    // definition one level below its actual source key.
+                    key = FieldGroupKey::Pattern(map_key);
                     specs.push(self.spec_with(key.clone(), attrs.clone(), |spec| {
-                        spec.map = Some(MapSpec {
-                            key: map_key,
-                            value: None,
-                            body: Some(body_name),
-                        });
+                        spec.body = Some(body_name);
                     }));
                 } else {
                     let body_name = match &body {
@@ -817,7 +829,12 @@ impl<'model> Cvt<'model> {
         }])
     }
 
-    fn spec_with(&self, key: FieldGroupKey, attrs: FieldAttrs, fill: impl FnOnce(&mut FieldSpec)) -> FieldSpec {
+    fn spec_with(
+        &self,
+        key: FieldGroupKey,
+        attrs: FieldAttrs,
+        fill: impl FnOnce(&mut FieldSpec),
+    ) -> FieldSpec {
         let mut spec = empty_spec();
         if let FieldGroupKey::Pattern(rendered) = key {
             spec.key = Some(rendered);
@@ -921,10 +938,11 @@ impl<'model> Cvt<'model> {
         if let KeyMatcher::Type(name) = &row.key {
             let canonical = self.norm.type_name(name);
             let (base, _subtype) = split_subtype(&canonical);
-            if self.context_is_definition_body(context) && self.def_types.contains(base) {
-                if let Some(mixin) = self.type_supplement_mixin(base) {
-                    includes.push(mixin);
-                }
+            if self.context_is_definition_body(context)
+                && self.def_types.contains(base)
+                && let Some(mixin) = self.type_supplement_mixin(base)
+            {
+                includes.push(mixin);
             }
         }
         match (child_rows > 0, cc.as_deref()) {
@@ -1061,7 +1079,24 @@ impl<'model> Cvt<'model> {
         };
         for (key, overloads) in block.fields {
             match existing.fields.get_mut(&key) {
-                Some(current) => merge_overloads(current, &overloads),
+                Some(current) => {
+                    // Wrapper rows often had no explicit child context. The
+                    // descriptor supplies the actual definition tree; replace
+                    // its empty placeholder while preserving the row metadata.
+                    if let (FieldOverloads::One(old), FieldOverloads::One(new)) =
+                        (&mut *current, &overloads)
+                        && old
+                            .body
+                            .as_ref()
+                            .is_some_and(|body| body.ends_with("__empty"))
+                        && new.body.is_some()
+                    {
+                        old.body.clone_from(&new.body);
+                        old.def.clone_from(&new.def);
+                    } else {
+                        merge_overloads(current, &overloads);
+                    }
+                }
                 None => {
                     existing.fields.insert(key, overloads);
                 }
@@ -1186,7 +1221,10 @@ impl<'model> Cvt<'model> {
         let mut groups: BTreeMap<String, Vec<usize>> = BTreeMap::new();
         self.count_n("rows into on_action fold", rows.len());
         for index in rows {
-            groups.entry(fold_key(&self.rows[index].rule)).or_default().push(index);
+            groups
+                .entry(fold_key(&self.rows[index].rule))
+                .or_default()
+                .push(index);
         }
         let mut body_fields: BTreeMap<String, FieldOverloads> = BTreeMap::new();
         for (key, members) in &groups {
@@ -1196,9 +1234,10 @@ impl<'model> Cvt<'model> {
             let representative = members[0];
             let row = self.rows[representative].rule.clone();
             let path = path_of(&row);
-            if path.first().is_some_and(|segment| {
-                segment == "events" || segment == "random_events"
-            }) {
+            if path
+                .first()
+                .is_some_and(|segment| segment == "events" || segment == "random_events")
+            {
                 // Covered by the design's `events` / `random_events` fields.
                 continue;
             }
@@ -1461,7 +1500,7 @@ impl<'model> Cvt<'model> {
             if name == "on_actions" {
                 continue;
             }
-            if !enums.contains_key(&name) {
+            if let std::collections::btree_map::Entry::Vacant(entry) = enums.entry(name.clone()) {
                 self.manual(
                     "enums",
                     format!(
@@ -1469,7 +1508,7 @@ impl<'model> Cvt<'model> {
                          for it — emitted as an empty stub"
                     ),
                 );
-                enums.insert(name, EnumSpec::Members(Vec::new()));
+                entry.insert(EnumSpec::Members(Vec::new()));
             }
         }
         self.file("values/enums.json").enums = enums;
@@ -1489,8 +1528,7 @@ impl<'model> Cvt<'model> {
         );
         traits.insert(
             "ModifierSource".to_owned(),
-            serde_json::from_value(serde_json::json!({}))
-                .expect("trait deserializes"),
+            serde_json::from_value(serde_json::json!({})).expect("trait deserializes"),
         );
         traits.insert(
             "Callable".to_owned(),
@@ -1548,9 +1586,7 @@ impl<'model> Cvt<'model> {
             }
             if let Some(subtypes) = self.type_subtypes.get(&name) {
                 for subtype in subtypes {
-                    spec.subtypes
-                        .entry(subtype.clone())
-                        .or_insert_with(SubtypeSpec::default);
+                    spec.subtypes.entry(subtype.clone()).or_default();
                 }
             }
         }
@@ -1690,10 +1726,7 @@ impl<'model> Cvt<'model> {
                         .trait_impls
                         .entry("HasIcon".to_owned())
                         .or_default(),
-                    None => entry
-                        .trait_impls
-                        .entry("HasIcon".to_owned())
-                        .or_default(),
+                    None => entry.trait_impls.entry("HasIcon".to_owned()).or_default(),
                 };
                 impls.0.insert(binding.name.clone(), spec);
             }
@@ -1704,17 +1737,13 @@ impl<'model> Cvt<'model> {
                 && dynamic.enabled
             {
                 let canonical = self.norm.type_name(name);
-                types
-                    .entry(canonical)
-                    .or_default()
-                    .trait_impls
-                    .insert(
-                        "Callable".to_owned(),
-                        ImplSpec(BTreeMap::from([(
-                            "body".to_owned(),
-                            ImplValue::Text(self.root_schema_name(&dynamic.body_context)),
-                        )])),
-                    );
+                types.entry(canonical).or_default().trait_impls.insert(
+                    "Callable".to_owned(),
+                    ImplSpec(BTreeMap::from([(
+                        "body".to_owned(),
+                        ImplValue::Text(self.root_schema_name(&dynamic.body_context)),
+                    )])),
+                );
             }
         }
         // `semantic_context_inheritance` → `ModifierSource` on `type:` rows.
@@ -1744,7 +1773,11 @@ impl<'model> Cvt<'model> {
         let mut entry_key: BTreeMap<(String, Option<String>), String> = BTreeMap::new();
         for category in &self.model.file_categories {
             let matcher = &category.matcher;
-            let (path, file) = match (&matcher.path_exact, &matcher.path_prefix, &matcher.path_suffix) {
+            let (path, file) = match (
+                &matcher.path_exact,
+                &matcher.path_prefix,
+                &matcher.path_suffix,
+            ) {
                 (Some(exact), _, _) => {
                     let (dir, name) = exact.rsplit_once('/').unwrap_or(("", exact));
                     (dir.to_owned(), Some(name.to_owned()))
@@ -1821,34 +1854,63 @@ impl<'model> Cvt<'model> {
                 .to_owned();
             let file = descriptor.path_file.clone();
             let key = (path.clone(), file.clone());
-            let entry_name = entry_key.get(&key).cloned().unwrap_or_else(|| {
-                let generated = sanitize(&format!(
-                    "files_{}{}",
-                    path.replace('/', "_"),
-                    file.as_deref()
-                        .map(|name| format!("_{name}"))
-                        .unwrap_or_default()
-                ));
-                entry_key.insert(key, generated.clone());
-                entries.insert(
-                    generated.clone(),
-                    FileRule {
-                        path,
-                        ext: descriptor
+            let compatible_extension = |entry: &FileRule| {
+                descriptor
+                    .path_extension
+                    .as_ref()
+                    .is_none_or(|extension| match &entry.ext {
+                        Some(ExtSpec::One(existing)) => existing.eq_ignore_ascii_case(extension),
+                        Some(ExtSpec::Many(existing)) => existing
+                            .iter()
+                            .any(|existing| existing.eq_ignore_ascii_case(extension)),
+                        None => extension.eq_ignore_ascii_case("txt"),
+                    })
+            };
+            let entry_name = entry_key
+                .get(&key)
+                .filter(|name| compatible_extension(&entries[*name]))
+                .cloned()
+                .or_else(|| {
+                    entries
+                        .iter()
+                        .find(|(_, entry)| {
+                            entry.path == path && entry.file == file && compatible_extension(entry)
+                        })
+                        .map(|(name, _)| name.clone())
+                })
+                .unwrap_or_else(|| {
+                    let generated = sanitize(&format!(
+                        "files_{}{}{}",
+                        path.replace('/', "_"),
+                        file.as_deref()
+                            .map(|name| format!("_{name}"))
+                            .unwrap_or_default(),
+                        descriptor
                             .path_extension
-                            .clone()
-                            .map(ExtSpec::One),
-                        file,
-                        strict: descriptor.path_strict.then_some(true),
-                        exclude: Vec::new(),
-                        parser: Some(rules::source::SourceParser::Script),
-                        resolution: SourceFileResolution::ReplaceByPath,
-                        root: None,
-                    },
-                );
-                generated
-            });
-            entry_types.entry(entry_name).or_default().push(name.clone());
+                            .as_deref()
+                            .map(|extension| format!("_{extension}"))
+                            .unwrap_or_default()
+                    ));
+                    entry_key.insert(key, generated.clone());
+                    entries.insert(
+                        generated.clone(),
+                        FileRule {
+                            path,
+                            ext: descriptor.path_extension.clone().map(ExtSpec::One),
+                            file,
+                            strict: descriptor.path_strict.then_some(true),
+                            exclude: Vec::new(),
+                            parser: Some(rules::source::SourceParser::Script),
+                            resolution: SourceFileResolution::ReplaceByPath,
+                            root: None,
+                        },
+                    );
+                    generated
+                });
+            entry_types
+                .entry(entry_name)
+                .or_default()
+                .push(name.clone());
         }
         // Root schemas per entry.
         let mut roots: BTreeMap<String, String> = BTreeMap::new();
@@ -1868,7 +1930,10 @@ impl<'model> Cvt<'model> {
                     strip_prefix: def_name.strip_prefix,
                     strip_suffix: def_name.strip_suffix,
                 };
-                if self.tree_defs.contains(canonical.split('.').next().unwrap_or(&canonical)) {
+                if self
+                    .tree_defs
+                    .contains(canonical.split('.').next().unwrap_or(&canonical))
+                {
                     continue;
                 }
                 if let Some(entries_context) = &descriptor.root_entries {
@@ -1880,7 +1945,9 @@ impl<'model> Cvt<'model> {
                     if self.schema_file.contains_key(&root_name) {
                         roots.insert(entry_name.clone(), root_name.clone());
                     }
-                    continue;
+                    if descriptor.skip_root_paths.is_empty() {
+                        continue;
+                    }
                 }
                 if descriptor.type_per_file {
                     let mut spec = empty_spec();
@@ -1891,7 +1958,8 @@ impl<'model> Cvt<'model> {
                         strip_suffix: def.strip_suffix.clone(),
                     });
                     spec.body = Some(body_name.clone());
-                    if let Some(scope) = self.type_root_scope_effect(&canonical.split('.').next().unwrap_or(&canonical).to_owned())
+                    if let Some(scope) = self
+                        .type_root_scope_effect(canonical.split('.').next().unwrap_or(&canonical))
                     {
                         spec.scope = Some(scope);
                     }
@@ -1911,7 +1979,11 @@ impl<'model> Cvt<'model> {
                 let placement = descriptor
                     .skip_root_paths
                     .iter()
-                    .filter(|path| !path.iter().any(|segment| segment.eq_ignore_ascii_case("any")))
+                    .filter(|path| {
+                        !path
+                            .iter()
+                            .any(|segment| segment.eq_ignore_ascii_case("any"))
+                    })
                     .cloned()
                     .collect::<Vec<_>>();
                 let filter = descriptor.type_key_filter.clone();
@@ -1923,7 +1995,10 @@ impl<'model> Cvt<'model> {
                             let mut spec = empty_spec();
                             spec.def = Some(def.clone());
                             spec.body = Some(body_name.clone());
-                            block.fields.insert(key, FieldOverloads::One(Box::new(spec)));
+                            spec.card = "0..*".to_owned();
+                            block
+                                .fields
+                                .insert(key, FieldOverloads::One(Box::new(spec)));
                         }
                     }
                     (true, _) => {
@@ -1943,6 +2018,7 @@ impl<'model> Cvt<'model> {
                                         let mut spec = empty_spec();
                                         spec.def = Some(def.clone());
                                         spec.body = Some(body_name.clone());
+                                        spec.card = "0..*".to_owned();
                                         wrapper_block
                                             .fields
                                             .insert(key, FieldOverloads::One(Box::new(spec)));
@@ -1985,10 +2061,9 @@ impl<'model> Cvt<'model> {
                             }
                             let mut spec = empty_spec();
                             spec.body = Some(names[0].clone());
-                            block.fields.insert(
-                                wrapper[0].clone(),
-                                FieldOverloads::One(Box::new(spec)),
-                            );
+                            block
+                                .fields
+                                .insert(wrapper[0].clone(), FieldOverloads::One(Box::new(spec)));
                         }
                     }
                 }
@@ -2042,7 +2117,10 @@ impl<'model> Cvt<'model> {
                     strip_suffix: def_name.strip_suffix.clone(),
                 });
                 spec.body = Some(body_name.clone());
-                if let Some(scope) = root_scopes.get(type_name).and_then(|scopes| scopes.get(key)) {
+                if let Some(scope) = root_scopes
+                    .get(type_name)
+                    .and_then(|scopes| scopes.get(key))
+                {
                     let mut set = BTreeMap::new();
                     set.insert("root".to_owned(), self.norm.scope_name(&scope.root));
                     set.insert("this".to_owned(), self.norm.scope_name(&scope.this));
@@ -2096,11 +2174,8 @@ impl<'model> Cvt<'model> {
         for name in redundant {
             files_section.remove(&name);
         }
-        let parser_of = |entry: &FileRule| {
-            entry
-                .parser
-                .unwrap_or(rules::source::SourceParser::Script)
-        };
+        let parser_of =
+            |entry: &FileRule| entry.parser.unwrap_or(rules::source::SourceParser::Script);
         for entry in files_section.values_mut() {
             if parser_of(entry) == rules::source::SourceParser::Script && entry.root.is_none() {
                 entry.root = Some(RootSpec::Schema("open_script_file".to_owned()));
@@ -2108,8 +2183,10 @@ impl<'model> Cvt<'model> {
             }
         }
         if needs_open_root {
-            let mut block = BlockSchema::default();
-            block.open = true;
+            let block = BlockSchema {
+                open: true,
+                ..BlockSchema::default()
+            };
             self.place_schema("open_script_file", "core/files.json", block);
         }
     }
@@ -2128,7 +2205,9 @@ impl<'model> Cvt<'model> {
         let name = self.root_schema_name(&root_context);
         if !self.schema_file.contains_key(&name) {
             let mut block = BlockSchema::default();
-            if let Some(mixin) = self.type_supplement_mixin(canonical.split('.').next().unwrap_or(canonical)) {
+            if let Some(mixin) =
+                self.type_supplement_mixin(canonical.split('.').next().unwrap_or(canonical))
+            {
                 block.include.push(mixin);
             }
             self.place_schema(&name, "core/files.json", block);
@@ -2206,9 +2285,7 @@ impl<'model> Cvt<'model> {
             for context in &set {
                 self.flatten_root_fields(context, &mut fields);
             }
-            self.file(&owner)
-                .mixins
-                .insert(name, MixinSpec { fields });
+            self.file(&owner).mixins.insert(name, MixinSpec { fields });
         }
     }
 
@@ -2221,7 +2298,12 @@ impl<'model> Cvt<'model> {
             if !seen.insert(current.clone()) {
                 continue;
             }
-            if let Some(inherited) = self.model.profile.semantic_context_inheritance.get(&current) {
+            if let Some(inherited) = self
+                .model
+                .profile
+                .semantic_context_inheritance
+                .get(&current)
+            {
                 for target in inherited {
                     stack.push(target.clone());
                 }
@@ -2287,8 +2369,10 @@ impl<'model> Cvt<'model> {
     fn render_report(&self) -> String {
         let mut report = String::new();
         report.push_str("# rules-v2 migration report\n\n");
-        report.push_str("Generated by `cargo run -p tools --bin rules-migrate`. Deterministic: \
-re-running over an unchanged legacy tree reproduces this file byte for byte.\n\n");
+        report.push_str(
+            "Generated by `cargo run -p tools --bin rules-migrate`. Deterministic: \
+re-running over an unchanged legacy tree reproduces this file byte for byte.\n\n",
+        );
         report.push_str("## Coverage\n\n| counter | rows |\n|---|---:|\n");
         let mut counters: Vec<(&String, &usize)> = self.counters.iter().collect();
         counters.sort();
@@ -2472,14 +2556,13 @@ fn def_name_of(descriptor: &rules::TypeDescriptor, profile: &rules::GameProfile)
         None
     };
     let mut strip_suffix = descriptor.name_strip_suffix.clone();
-    if strip_suffix.is_none() {
-        if let Some(rule) = profile
+    if strip_suffix.is_none()
+        && let Some(rule) = profile
             .member_name_suffixes
             .iter()
             .find(|rule| rule.kinds.iter().any(|kind| kind == &descriptor.name))
-        {
-            strip_suffix = Some(rule.suffix.clone());
-        }
+    {
+        strip_suffix = Some(rule.suffix.clone());
     }
     DefName {
         name,
@@ -2561,8 +2644,8 @@ fn order_patterns(patterns: &mut [FieldSpec]) {
     patterns.sort_by_key(|pattern| {
         let rank = match pattern.key.as_deref() {
             None => 5,
-            Some(key) if key == "link" => 6,
-            Some(key) if key == "scalar" => 5,
+            Some("link") => 6,
+            Some("scalar") => 5,
             Some(key) if key.starts_with("def<") => 4,
             Some(key) if key.starts_with("int") || key == "date" => 3,
             Some(key) if key.starts_with("ref<") || key.starts_with("enum<") => 1,
@@ -2652,7 +2735,14 @@ fn merge_overloads(existing: &mut FieldOverloads, incoming: &FieldOverloads) {
 }
 
 fn card_of(rule: &SemanticRule) -> String {
-    let min = rule.min_occurs.unwrap_or(0);
+    // An alias row describes an invocation vocabulary, not a requirement to
+    // invoke every command in its enclosing block. This is the legacy
+    // semantic_rule_is_alias_definition minimum-cardinality contract.
+    let min = if rule.alternative_id.as_deref() == Some(rule.id.as_str()) {
+        0
+    } else {
+        rule.min_occurs.unwrap_or(0)
+    };
     match (min, rule.max_occurs) {
         // D14: `card` is mandatory, so the former implicit `0..1` default is
         // written out like every other value.
@@ -2721,7 +2811,13 @@ fn control_of(rule: &SemanticRule) -> Option<ControlSpec> {
 fn dedup_key(rule: &SemanticRule) -> String {
     let mut value = serde_json::to_value(rule).expect("rule serializes");
     if let Some(object) = value.as_object_mut() {
-        for key in ["id", "alternative_id", "source_file", "line", "documentation"] {
+        for key in [
+            "id",
+            "alternative_id",
+            "source_file",
+            "line",
+            "documentation",
+        ] {
             object.remove(key);
         }
     }
@@ -2732,7 +2828,13 @@ fn dedup_key(rule: &SemanticRule) -> String {
 fn fold_key(rule: &SemanticRule) -> String {
     let mut value = serde_json::to_value(rule).expect("rule serializes");
     if let Some(object) = value.as_object_mut() {
-        for key in ["id", "alternative_id", "source_file", "line", "documentation"] {
+        for key in [
+            "id",
+            "alternative_id",
+            "source_file",
+            "line",
+            "documentation",
+        ] {
             object.remove(key);
         }
         if let Some(ValueMatcher::Type(name)) = Some(&rule.value)
@@ -2803,5 +2905,70 @@ fn fragment_out_path(fragment: &str) -> String {
             .strip_prefix("semantic/definitions/")
             .unwrap_or(other)
             .to_owned(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invocation_cardinality_and_nested_definitions_preserve_legacy_contracts() {
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4");
+        let (_, model) = rulec::load_source(&source).expect("legacy corpus");
+        let mut converter = Cvt::new(&model, &source).expect("converter");
+        converter.convert_all();
+        let SchemaSpec::Block(missions) =
+            &converter.files["missions.json"].schemas["mission_series_body"]
+        else {
+            panic!("mission schema")
+        };
+        let entry = missions
+            .patterns
+            .iter()
+            .find(|field| field.key.as_deref() == Some("def<mission>"))
+            .expect("mission declares its own key");
+        assert_eq!(entry.body.as_deref(), Some("mission_series_body__mission"));
+        assert!(
+            entry.map.is_none(),
+            "definition must not introduce an extra block"
+        );
+        assert_eq!(
+            converter.files["core/files.json"].files["files_interface_gfx"].root,
+            Some(RootSpec::Schema("sprite_file".to_owned()))
+        );
+        let SchemaSpec::Block(sprite_file) =
+            &converter.files["interface/gfx.json"].schemas["sprite_file"]
+        else {
+            panic!("sprite file schema")
+        };
+        let FieldOverloads::One(sprite_types) = &sprite_file.fields["spriteTypes"] else {
+            panic!("single sprite wrapper")
+        };
+        let sprite_container = sprite_types.body.as_ref().expect("sprite container");
+        let owner = &converter.schema_file[sprite_container];
+        let SchemaSpec::Block(sprite_container) = &converter.files[owner].schemas[sprite_container]
+        else {
+            panic!("sprite container schema")
+        };
+        let FieldOverloads::One(sprite) = &sprite_container.fields["spriteType"] else {
+            panic!("single sprite definition")
+        };
+        assert_eq!(
+            sprite.def.as_ref().expect("sprite definition").type_name,
+            "sprite"
+        );
+        assert_eq!(sprite.body.as_deref(), Some("sprite_body"));
+        let SchemaSpec::Block(effect) = &converter.files["core/effect.json"].schemas["effect"]
+        else {
+            panic!("effect schema")
+        };
+        let FieldOverloads::One(prestige) = &effect.fields["add_prestige"] else {
+            panic!("single prestige field")
+        };
+        assert_eq!(
+            prestige.card, "0..1",
+            "invocation vocabulary remains optional"
+        );
     }
 }

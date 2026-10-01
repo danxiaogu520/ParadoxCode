@@ -48,9 +48,7 @@ pub enum Primary {
     /// `quoted<trigger>`: a quoted script parsed with the named schema.
     Quoted(Argument),
     /// `path` or `path<gfx>`: a file-path scalar, optionally a path category.
-    Path {
-        category: Option<String>,
-    },
+    Path { category: Option<String> },
     /// `'yes'` (constant) or `'monthly_{ref<power>}'` (template).
     Literal(Vec<LiteralPart>),
     /// `$S` or `$key.scope`: a parameter of the enclosing parameterized schema.
@@ -226,7 +224,10 @@ struct Cursor<'source> {
 
 impl<'source> Cursor<'source> {
     fn new(source: &'source str) -> Self {
-        Self { source, position: 0 }
+        Self {
+            source,
+            position: 0,
+        }
     }
 
     fn is_at_end(&self) -> bool {
@@ -268,8 +269,10 @@ impl<'source> Cursor<'source> {
                 self.position,
                 format!("expected `{expected}`, found `{found}`"),
             )),
-            None => Err(self
-                .error(self.position, format!("expected `{expected}`, found end of input"))),
+            None => Err(self.error(
+                self.position,
+                format!("expected `{expected}`, found end of input"),
+            )),
         }
     }
 
@@ -281,10 +284,7 @@ impl<'source> Cursor<'source> {
                 self.bump();
             }
             Some(found) => {
-                return Err(self.error(
-                    start,
-                    format!("expected an identifier, found `{found}`"),
-                ));
+                return Err(self.error(start, format!("expected an identifier, found `{found}`")));
             }
             None => {
                 return Err(self.error(start, "expected an identifier, found end of input"));
@@ -350,10 +350,7 @@ impl<'source> Cursor<'source> {
                             _ => Primary::Quoted(argument),
                         })
                     }
-                    _ => Err(self.error(
-                        start,
-                        format!("unknown type expression `{keyword}`"),
-                    )),
+                    _ => Err(self.error(start, format!("unknown type expression `{keyword}`"))),
                 }
             }
             Some(found) => Err(self.error(
@@ -394,10 +391,16 @@ impl<'source> Cursor<'source> {
         {
             return Err(self.error(
                 range_offset,
-                format!("range lower bound {} exceeds upper bound {}", lower.0, upper.0),
+                format!(
+                    "range lower bound {} exceeds upper bound {}",
+                    lower.0, upper.0
+                ),
             ));
         }
-        Ok(Some(Range { min: min.map(|(number, _)| number), max: max.map(|(number, _)| number) }))
+        Ok(Some(Range {
+            min: min.map(|(number, _)| number),
+            max: max.map(|(number, _)| number),
+        }))
     }
 
     fn expect_dots(&mut self) -> Result<(), ParseError> {
@@ -464,7 +467,10 @@ impl<'source> Cursor<'source> {
         }
         // `arg = name ["." name] | "impl" name | name "strip_prefix" name`
         self.skip_whitespace();
-        if self.peek().is_some_and(|found| found.is_ascii_alphabetic() || found == '_') {
+        if self
+            .peek()
+            .is_some_and(|found| found.is_ascii_alphabetic() || found == '_')
+        {
             let marker = self.read_ident()?;
             if marker == "strip_prefix" {
                 let strip_prefix = self.read_ident()?;
@@ -575,7 +581,11 @@ mod tests {
 
     fn one(source: &str) -> Primary {
         let expression = alts(source);
-        assert_eq!(expression.alternatives.len(), 1, "{source} is one alternative");
+        assert_eq!(
+            expression.alternatives.len(),
+            1,
+            "{source} is one alternative"
+        );
         expression.alternatives.into_iter().next().expect("one")
     }
 
@@ -587,13 +597,46 @@ mod tests {
     fn scalar_primaries_parse() {
         assert_eq!(
             one("scalar"),
-            Primary::Scalar { kind: ScalarKind::Scalar, range: None }
+            Primary::Scalar {
+                kind: ScalarKind::Scalar,
+                range: None
+            }
         );
-        assert_eq!(one("bool"), Primary::Scalar { kind: ScalarKind::Bool, range: None });
-        assert_eq!(one("date"), Primary::Scalar { kind: ScalarKind::Date, range: None });
-        assert_eq!(one("loc"), Primary::Scalar { kind: ScalarKind::Loc, range: None });
-        assert_eq!(one("link"), Primary::Scalar { kind: ScalarKind::Link, range: None });
-        assert_eq!(one("opaque"), Primary::Scalar { kind: ScalarKind::Opaque, range: None });
+        assert_eq!(
+            one("bool"),
+            Primary::Scalar {
+                kind: ScalarKind::Bool,
+                range: None
+            }
+        );
+        assert_eq!(
+            one("date"),
+            Primary::Scalar {
+                kind: ScalarKind::Date,
+                range: None
+            }
+        );
+        assert_eq!(
+            one("loc"),
+            Primary::Scalar {
+                kind: ScalarKind::Loc,
+                range: None
+            }
+        );
+        assert_eq!(
+            one("link"),
+            Primary::Scalar {
+                kind: ScalarKind::Link,
+                range: None
+            }
+        );
+        assert_eq!(
+            one("opaque"),
+            Primary::Scalar {
+                kind: ScalarKind::Opaque,
+                range: None
+            }
+        );
     }
 
     /// The legacy template parameter's `strip_prefix` is spelled on the hole.
@@ -626,28 +669,40 @@ mod tests {
             one("int[1..10]"),
             Primary::Scalar {
                 kind: ScalarKind::Int,
-                range: Some(Range { min: Some(Number(1.0)), max: Some(Number(10.0)) }),
+                range: Some(Range {
+                    min: Some(Number(1.0)),
+                    max: Some(Number(10.0))
+                }),
             }
         );
         assert_eq!(
             one("float[0..]"),
             Primary::Scalar {
                 kind: ScalarKind::Float,
-                range: Some(Range { min: Some(Number(0.0)), max: None }),
+                range: Some(Range {
+                    min: Some(Number(0.0)),
+                    max: None
+                }),
             }
         );
         assert_eq!(
             one("int[..5]"),
             Primary::Scalar {
                 kind: ScalarKind::Int,
-                range: Some(Range { min: None, max: Some(Number(5.0)) }),
+                range: Some(Range {
+                    min: None,
+                    max: Some(Number(5.0))
+                }),
             }
         );
         assert_eq!(
             one("int[-6..-1]"),
             Primary::Scalar {
                 kind: ScalarKind::Int,
-                range: Some(Range { min: Some(Number(-6.0)), max: Some(Number(-1.0)) }),
+                range: Some(Range {
+                    min: Some(Number(-6.0)),
+                    max: Some(Number(-1.0))
+                }),
             }
         );
     }
@@ -669,7 +724,10 @@ mod tests {
             one("ref<event.$S>"),
             Primary::Ref(Argument::Path(vec![
                 Segment::Name("event".to_owned()),
-                Segment::Param(Param { name: "S".to_owned(), column: None }),
+                Segment::Param(Param {
+                    name: "S".to_owned(),
+                    column: None
+                }),
             ]))
         );
         assert_eq!(
@@ -678,11 +736,15 @@ mod tests {
         );
         assert_eq!(
             one("def<country_flag>"),
-            Primary::Def(Argument::Path(vec![Segment::Name("country_flag".to_owned())]))
+            Primary::Def(Argument::Path(vec![Segment::Name(
+                "country_flag".to_owned()
+            )]))
         );
         assert_eq!(
             one("enum<country_tags>"),
-            Primary::Enum(Argument::Path(vec![Segment::Name("country_tags".to_owned())]))
+            Primary::Enum(Argument::Path(vec![Segment::Name(
+                "country_tags".to_owned()
+            )]))
         );
         assert_eq!(
             one("scope<any>"),
@@ -699,7 +761,9 @@ mod tests {
         assert_eq!(one("path"), Primary::Path { category: None });
         assert_eq!(
             one("path<gfx>"),
-            Primary::Path { category: Some("gfx".to_owned()) }
+            Primary::Path {
+                category: Some("gfx".to_owned())
+            }
         );
     }
 
@@ -725,17 +789,26 @@ mod tests {
     fn parameters_parse_with_columns() {
         assert_eq!(
             one("$S"),
-            Primary::Param(Param { name: "S".to_owned(), column: None })
+            Primary::Param(Param {
+                name: "S".to_owned(),
+                column: None
+            })
         );
         assert_eq!(
             one("$key.scope"),
-            Primary::Param(Param { name: "key".to_owned(), column: Some("scope".to_owned()) })
+            Primary::Param(Param {
+                name: "key".to_owned(),
+                column: Some("scope".to_owned())
+            })
         );
     }
 
     #[test]
     fn literals_split_into_text_and_holes() {
-        assert_eq!(one("'yes'"), Primary::Literal(vec![LiteralPart::Text("yes".to_owned())]));
+        assert_eq!(
+            one("'yes'"),
+            Primary::Literal(vec![LiteralPart::Text("yes".to_owned())])
+        );
         assert_eq!(one("''"), Primary::Literal(Vec::new()));
         assert_eq!(
             one("'monthly_{ref<government_mechanic_power>}'"),
@@ -780,7 +853,10 @@ mod tests {
         assert_eq!(expression.alternatives.len(), 3);
         assert_eq!(
             expression.alternatives[0],
-            Primary::Scalar { kind: ScalarKind::Scalar, range: None }
+            Primary::Scalar {
+                kind: ScalarKind::Scalar,
+                range: None
+            }
         );
         assert_eq!(
             expression.alternatives[1],
@@ -799,11 +875,17 @@ mod tests {
     fn errors_report_expression_columns() {
         let failure = error("it");
         assert_eq!(failure.column, 1);
-        assert!(failure.message.contains("unknown type expression `it`"), "{failure}");
+        assert!(
+            failure.message.contains("unknown type expression `it`"),
+            "{failure}"
+        );
 
         let failure = error("scalar | | bool");
         assert_eq!(failure.column, 10);
-        assert!(failure.message.contains("expected a type expression"), "{failure}");
+        assert!(
+            failure.message.contains("expected a type expression"),
+            "{failure}"
+        );
 
         let failure = error("ref<event");
         assert_eq!(failure.column, 10);
@@ -811,14 +893,22 @@ mod tests {
 
         let failure = error("int[1..10] oops");
         assert_eq!(failure.column, 12);
-        assert!(failure.message.contains("unexpected trailing input"), "{failure}");
+        assert!(
+            failure.message.contains("unexpected trailing input"),
+            "{failure}"
+        );
     }
 
     #[test]
     fn range_misuse_reports_columns() {
         let failure = error("bool[0..1]");
         assert_eq!(failure.column, 5);
-        assert!(failure.message.contains("only allowed on `int` and `float`"), "{failure}");
+        assert!(
+            failure
+                .message
+                .contains("only allowed on `int` and `float`"),
+            "{failure}"
+        );
 
         let failure = error("int[1.5..2]");
         assert_eq!(failure.column, 5);
@@ -837,7 +927,10 @@ mod tests {
     fn literal_errors_report_the_opening_quote() {
         let failure = error("'unterminated");
         assert_eq!(failure.column, 1);
-        assert!(failure.message.contains("unterminated literal"), "{failure}");
+        assert!(
+            failure.message.contains("unterminated literal"),
+            "{failure}"
+        );
 
         let failure = error("'bad \\q'");
         assert_eq!(failure.column, 6);
@@ -845,7 +938,10 @@ mod tests {
 
         let failure = error("'empty_{}'");
         assert_eq!(failure.column, 9);
-        assert!(failure.message.contains("expected a type expression"), "{failure}");
+        assert!(
+            failure.message.contains("expected a type expression"),
+            "{failure}"
+        );
 
         let failure = error("'unclosed_{ref<x>'");
         assert_eq!(failure.column, 18);
@@ -856,11 +952,17 @@ mod tests {
     fn parameter_errors_report_columns() {
         let failure = error("$");
         assert_eq!(failure.column, 2);
-        assert!(failure.message.contains("expected an identifier"), "{failure}");
+        assert!(
+            failure.message.contains("expected an identifier"),
+            "{failure}"
+        );
 
         let failure = error("$key.");
         assert_eq!(failure.column, 6);
-        assert!(failure.message.contains("expected an identifier"), "{failure}");
+        assert!(
+            failure.message.contains("expected an identifier"),
+            "{failure}"
+        );
     }
 
     #[test]

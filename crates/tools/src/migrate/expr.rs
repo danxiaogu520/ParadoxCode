@@ -96,14 +96,14 @@ pub fn value_expr(value: &ValueMatcher, norm: &Norm) -> String {
         ValueMatcher::AnyScalar => "scalar".to_owned(),
         ValueMatcher::Exact(spelling) => literal(spelling),
         ValueMatcher::Bool => "bool".to_owned(),
-        ValueMatcher::Int { min, max } => {
-            range("int", min.map(|v| v.to_string()), max.map(|v| v.to_string()))
-        }
-        ValueMatcher::Float { min, max } => range(
-            "float",
-            min.map(float_spelling),
-            max.map(float_spelling),
+        ValueMatcher::Int { min, max } => range(
+            "int",
+            min.map(|v| v.to_string()),
+            max.map(|v| v.to_string()),
         ),
+        ValueMatcher::Float { min, max } => {
+            range("float", min.map(float_spelling), max.map(float_spelling))
+        }
         ValueMatcher::Date => "date".to_owned(),
         ValueMatcher::Type(name) => format!("ref<{}>", norm.type_name(name)),
         ValueMatcher::Enum(name) => norm.enum_or_ref(name),
@@ -139,9 +139,11 @@ pub fn key_expr(key: &KeyMatcher, norm: &Norm) -> String {
         KeyMatcher::Enum(name) => norm.enum_or_ref(name),
         KeyMatcher::Dynamic(name) => format!("def<{}>", norm.type_name(name)),
         KeyMatcher::AnyScalar => "scalar".to_owned(),
-        KeyMatcher::Int { min, max } => {
-            range("int", min.map(|v| v.to_string()), max.map(|v| v.to_string()))
-        }
+        KeyMatcher::Int { min, max } => range(
+            "int",
+            min.map(|v| v.to_string()),
+            max.map(|v| v.to_string()),
+        ),
         KeyMatcher::Date => "date".to_owned(),
         KeyMatcher::Template {
             prefix,
@@ -332,8 +334,17 @@ mod tests {
 
     #[test]
     fn key_segments_spell_like_the_legacy_parent_paths() {
-        assert_eq!(key_segment(&KeyMatcher::Type("religious_school".to_owned())), "<religious_school>");
-        assert_eq!(key_segment(&KeyMatcher::Enum("country_tags".to_owned())), "enum[country_tags]");
-        assert_eq!(key_segment(&KeyMatcher::Exact("Religious_Schools".to_owned())), "religious_schools");
+        assert_eq!(
+            key_segment(&KeyMatcher::Type("religious_school".to_owned())),
+            "<religious_school>"
+        );
+        assert_eq!(
+            key_segment(&KeyMatcher::Enum("country_tags".to_owned())),
+            "enum[country_tags]"
+        );
+        assert_eq!(
+            key_segment(&KeyMatcher::Exact("Religious_Schools".to_owned())),
+            "religious_schools"
+        );
     }
 }

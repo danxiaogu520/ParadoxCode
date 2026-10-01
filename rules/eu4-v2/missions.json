@@ -45,12 +45,9 @@
       },
       "patterns": [
         {
+          "body": "mission_series_body__mission",
           "card": "0..*",
-          "key": "ref<mission>",
-          "map": {
-            "body": "mission_series_body__mission",
-            "key": "def<mission>"
-          },
+          "key": "def<mission>",
           "when": null
         }
       ]

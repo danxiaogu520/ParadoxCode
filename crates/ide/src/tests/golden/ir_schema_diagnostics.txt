@@ -1,0 +1,4 @@
+Cardinality Error 16..16 `option` must occur at least 1 time
+InvalidValue Error 54..59 expected yes or no
+UnknownKey Error 61..68 unknown key `mystery`
+MissingLimit Warning 90..92 `if` requires a `limit` block

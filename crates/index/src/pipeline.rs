@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use parser::{CstKind, CstNode, FileFormat, ParsedFile, parse};
+use rules::ir::{DocumentParser, RulesIr, SymbolFacts};
 use rules::{GameProfile, ParserKind, RuleSet};
 use text::{AbsPath, LineIndex, LogicalPath, PositionRange, TextRange};
 
@@ -14,13 +15,157 @@ use crate::index::{
     Definition, DynamicDefinitionSummary, DynamicParameterSignature, FileIndexShard, Reference,
 };
 use crate::{record_pipeline_lower, record_pipeline_parse};
-use hir::{HirFile, lower_shared, lower_shared_with_profile};
+use hir::{
+    HirFile, lower_shared, lower_shared_with_ir, lower_shared_with_ir_and_facts,
+    lower_shared_with_profile,
+};
 use vfs::ParseCache;
 use vfs::read_source_file_cancellable;
 use vfs::{
     DocumentId, DocumentSource, SourceFile, SourceFileId, SourceRoot, WorkspaceError,
     WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
 };
+
+/// IR workspace predicates backed by a candidate index and uncommitted overlays.
+/// This deliberately owns no IDE state, so disk scans and cache rebuilds can use it.
+pub struct IndexSymbolFacts<'a> {
+    ir: &'a RulesIr,
+    index: &'a crate::WorkspaceIndex,
+    overlays: &'a [Arc<HirFile>],
+    excluded_file_ids: Option<&'a BTreeSet<SourceFileId>>,
+}
+
+impl<'a> IndexSymbolFacts<'a> {
+    #[must_use]
+    pub fn new(
+        ir: &'a RulesIr,
+        index: &'a crate::WorkspaceIndex,
+        overlays: &'a [Arc<HirFile>],
+    ) -> Self {
+        Self {
+            ir,
+            index,
+            overlays,
+            excluded_file_ids: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_overlay_files(
+        ir: &'a RulesIr,
+        index: &'a crate::WorkspaceIndex,
+        overlays: &'a [Arc<HirFile>],
+        excluded_file_ids: &'a BTreeSet<SourceFileId>,
+    ) -> Self {
+        Self {
+            ir,
+            index,
+            overlays,
+            excluded_file_ids: Some(excluded_file_ids),
+        }
+    }
+
+    fn has_member(&self, kind: &str, name: &str) -> bool {
+        self.index
+            .definitions_with_state(kind, name)
+            .iter()
+            .any(|(definition, active)| {
+                *active
+                    && self
+                        .excluded_file_ids
+                        .is_none_or(|files| !files.contains(&definition.file_id))
+            })
+            || self.overlays.iter().any(|hir| {
+                hir.definitions().iter().any(|definition| {
+                    definition.kind.eq_ignore_ascii_case(kind)
+                        && definition.name.eq_ignore_ascii_case(name)
+                })
+            })
+    }
+
+    fn has_subtype(&self, kind: &str, instance: &str, subtype: &str) -> bool {
+        self.index
+            .definitions_with_state(kind, instance)
+            .into_iter()
+            .filter(|(definition, active)| {
+                *active
+                    && self
+                        .excluded_file_ids
+                        .is_none_or(|files| !files.contains(&definition.file_id))
+            })
+            .any(|(definition, _)| {
+                self.index
+                    .shards
+                    .get(&definition.file_id)
+                    .is_some_and(|shard| {
+                        shard.definition_attributes.iter().any(|attrs| {
+                            attrs.definition_range == definition.range
+                                && attrs.kind.eq_ignore_ascii_case(kind)
+                                && attrs.name.eq_ignore_ascii_case(instance)
+                                && attrs
+                                    .subtypes
+                                    .iter()
+                                    .any(|candidate| candidate.eq_ignore_ascii_case(subtype))
+                        })
+                    })
+            })
+            || self.overlays.iter().any(|hir| {
+                hir.definition_attributes().iter().any(|attrs| {
+                    attrs.kind.eq_ignore_ascii_case(kind)
+                        && attrs.name.eq_ignore_ascii_case(instance)
+                        && attrs
+                            .subtypes
+                            .iter()
+                            .any(|candidate| candidate.eq_ignore_ascii_case(subtype))
+                })
+            })
+    }
+}
+
+impl rules::ir::SymbolFacts for IndexSymbolFacts<'_> {
+    fn type_member(&self, type_id: rules::ir::TypeId, name: &str) -> bool {
+        let ty = self.ir.type_info(type_id);
+        let kind = self.ir.strings.resolve(ty.name);
+        ty.open
+            || ty
+                .builtin
+                .iter()
+                .any(|member| self.ir.strings.resolve(*member).eq_ignore_ascii_case(name))
+            || self.has_member(kind, name)
+    }
+
+    fn type_subtype_member(
+        &self,
+        type_id: rules::ir::TypeId,
+        subtype: rules::ir::Symbol,
+        name: &str,
+    ) -> bool {
+        self.has_subtype(
+            self.ir.strings.resolve(self.ir.type_info(type_id).name),
+            name,
+            self.ir.strings.resolve(subtype),
+        )
+    }
+
+    fn trait_impl_member(&self, trait_id: rules::ir::TraitId, name: &str) -> bool {
+        self.ir.types.iter().any(|ty| {
+            let kind = self.ir.strings.resolve(ty.name);
+            let type_member = self.has_member(kind, name);
+            type_member
+                && ty
+                    .trait_impls
+                    .iter()
+                    .any(|implementation| implementation.trait_id == trait_id)
+                || ty.subtypes.iter().any(|subtype| {
+                    self.has_subtype(kind, name, self.ir.strings.resolve(subtype.name))
+                        && subtype
+                            .trait_impls
+                            .iter()
+                            .any(|implementation| implementation.trait_id == trait_id)
+                })
+        })
+    }
+}
 
 pub fn parse_source(
     parser: &ParserKind,
@@ -29,9 +174,19 @@ pub fn parse_source(
     rules: &RuleSet,
     profile: &GameProfile,
 ) -> (Option<ParsedSource>, Option<Arc<HirFile>>) {
-    parse_source_with_cache(parser, source, logical_path, rules, profile, None)
+    parse_source_with_cache(
+        parser,
+        source,
+        logical_path,
+        rules,
+        profile,
+        None,
+        None,
+        None,
+    )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn parse_source_with_cache(
     parser: &ParserKind,
     source: &str,
@@ -39,6 +194,8 @@ fn parse_source_with_cache(
     rules: &RuleSet,
     profile: &GameProfile,
     cache: Option<(&SourceFile, &ParseCache)>,
+    ir: Option<&RulesIr>,
+    facts: Option<&dyn SymbolFacts>,
 ) -> (Option<ParsedSource>, Option<Arc<HirFile>>) {
     match parser {
         ParserKind::Script => {
@@ -46,7 +203,20 @@ fn parse_source_with_cache(
             record_pipeline_lower();
             let hir = Arc::new(logical_path.map_or_else(
                 || lower_shared(Arc::clone(&parsed), rules),
-                |path| lower_shared_with_profile(Arc::clone(&parsed), path, rules, profile),
+                |path| match ir {
+                    Some(ir) => match facts {
+                        Some(facts) => lower_shared_with_ir_and_facts(
+                            Arc::clone(&parsed),
+                            path,
+                            rules,
+                            profile,
+                            ir,
+                            facts,
+                        ),
+                        None => lower_shared_with_ir(Arc::clone(&parsed), path, rules, profile, ir),
+                    },
+                    None => lower_shared_with_profile(Arc::clone(&parsed), path, rules, profile),
+                },
             ));
             (Some(ParsedSource::Text(parsed)), Some(hir))
         }
@@ -55,7 +225,20 @@ fn parse_source_with_cache(
             record_pipeline_lower();
             let hir = Arc::new(logical_path.map_or_else(
                 || lower_shared(Arc::clone(&parsed), rules),
-                |path| lower_shared_with_profile(Arc::clone(&parsed), path, rules, profile),
+                |path| match ir {
+                    Some(ir) => match facts {
+                        Some(facts) => lower_shared_with_ir_and_facts(
+                            Arc::clone(&parsed),
+                            path,
+                            rules,
+                            profile,
+                            ir,
+                            facts,
+                        ),
+                        None => lower_shared_with_ir(Arc::clone(&parsed), path, rules, profile, ir),
+                    },
+                    None => lower_shared_with_profile(Arc::clone(&parsed), path, rules, profile),
+                },
             ));
             (Some(ParsedSource::Text(parsed)), Some(hir))
         }
@@ -84,6 +267,7 @@ fn cached_or_parse(
 }
 
 fn parser_for_document(
+    ir: Option<&RulesIr>,
     rules: &RuleSet,
     profile: &GameProfile,
     roots: &[SourceRoot],
@@ -112,7 +296,15 @@ fn parser_for_document(
     {
         return None;
     }
-    if let Some(category) = logical.as_ref().and_then(|path| rules.classify(path)) {
+    if let Some(category) = logical
+        .as_ref()
+        .and_then(|path| ir.and_then(|ir| ir.file_rule(path).map(|(_, rule)| rule)))
+    {
+        return Some((parser_kind(category.parser), logical));
+    }
+    if ir.is_none_or(|ir| ir.files.is_empty())
+        && let Some(category) = logical.as_ref().and_then(|path| rules.classify(path))
+    {
         return Some((category.parser.clone(), logical));
     }
     let extension = path
@@ -138,9 +330,53 @@ pub fn prepare_document_snapshot(
     rules: &RuleSet,
     profile: &GameProfile,
     roots: &[SourceRoot],
+    document: DocumentSnapshot,
+) -> DocumentSnapshot {
+    prepare_document_snapshot_impl(rules, profile, None, None, roots, document)
+}
+
+/// Prepares a document using the active schema arena.
+pub fn prepare_document_snapshot_with_ir(
+    rules: &RuleSet,
+    profile: &GameProfile,
+    ir: &RulesIr,
+    roots: &[SourceRoot],
+    document: DocumentSnapshot,
+) -> DocumentSnapshot {
+    prepare_document_snapshot_impl(rules, profile, Some(ir), None, roots, document)
+}
+
+/// Prepares a document using schema IR and candidate workspace symbol facts.
+pub fn prepare_document_snapshot_with_ir_and_facts(
+    rules: &RuleSet,
+    profile: &GameProfile,
+    ir: &RulesIr,
+    facts: &dyn SymbolFacts,
+    roots: &[SourceRoot],
+    document: DocumentSnapshot,
+) -> DocumentSnapshot {
+    prepare_document_snapshot_impl(rules, profile, Some(ir), Some(facts), roots, document)
+}
+
+fn parser_kind(parser: DocumentParser) -> ParserKind {
+    match parser {
+        DocumentParser::Script => ParserKind::Script,
+        DocumentParser::Localisation => ParserKind::Localisation,
+        DocumentParser::Asset => ParserKind::Asset,
+        DocumentParser::SyntaxOnly => ParserKind::SyntaxOnly,
+    }
+}
+
+fn prepare_document_snapshot_impl(
+    rules: &RuleSet,
+    profile: &GameProfile,
+    ir: Option<&RulesIr>,
+    facts: Option<&dyn SymbolFacts>,
+    roots: &[SourceRoot],
     mut document: DocumentSnapshot,
 ) -> DocumentSnapshot {
     let (parsed, hir) = parser_for_document(
+        ir,
         rules,
         profile,
         roots,
@@ -148,12 +384,15 @@ pub fn prepare_document_snapshot(
         document.path.as_deref(),
     )
     .map_or((None, None), |(parser, logical_path)| {
-        parse_source(
+        parse_source_with_cache(
             &parser,
             &document.text,
             logical_path.as_ref(),
             rules,
             profile,
+            None,
+            ir,
+            facts,
         )
     });
     document.parsed = parsed;
@@ -211,6 +450,7 @@ pub struct SourceLoadContext<'a> {
     pub previous_states: &'a BTreeMap<SourceFileId, Arc<FileState>>,
     pub rules: &'a RuleSet,
     pub profile: &'a GameProfile,
+    pub ir: Option<&'a RulesIr>,
     pub parse_cache: Option<&'a ParseCache>,
     pub cancellation: &'a WorkspaceScanToken,
     pub progress: Option<&'a (dyn Fn(usize, usize) + Sync)>,
@@ -349,13 +589,15 @@ fn load_source_file_job(
             return Arc::new(previous.cache_only_from_existing());
         }
         let file_revision = previous.map_or(0, |state| state.revision().saturating_add(1));
-        let state = build_file_state_with_cache(
+        let state = build_file_state_impl(
             &job.file,
             text,
             file_revision,
             context.rules,
             context.profile,
             context.parse_cache,
+            context.ir,
+            None,
         );
         if job.retain_frontend {
             Arc::new(state)
@@ -409,7 +651,85 @@ pub fn build_file_state_with_cache(
     profile: &GameProfile,
     parse_cache: Option<&ParseCache>,
 ) -> FileState {
-    let Some(category) = rules.classify(&file.logical_path) else {
+    build_file_state_impl(
+        file,
+        source,
+        revision,
+        rules,
+        profile,
+        parse_cache,
+        None,
+        None,
+    )
+}
+
+/// Materializes schema-driven HIR and its index shard.
+pub fn build_file_state_with_ir(
+    file: &SourceFile,
+    source: String,
+    revision: u64,
+    rules: &RuleSet,
+    profile: &GameProfile,
+    ir: &RulesIr,
+    parse_cache: Option<&ParseCache>,
+) -> FileState {
+    build_file_state_impl(
+        file,
+        source,
+        revision,
+        rules,
+        profile,
+        parse_cache,
+        Some(ir),
+        None,
+    )
+}
+
+/// Materializes an IR-driven file state using candidate workspace symbol facts.
+#[allow(clippy::too_many_arguments)]
+pub fn build_file_state_with_ir_and_facts(
+    file: &SourceFile,
+    source: String,
+    revision: u64,
+    rules: &RuleSet,
+    profile: &GameProfile,
+    ir: &RulesIr,
+    facts: &dyn SymbolFacts,
+    parse_cache: Option<&ParseCache>,
+) -> FileState {
+    build_file_state_impl(
+        file,
+        source,
+        revision,
+        rules,
+        profile,
+        parse_cache,
+        Some(ir),
+        Some(facts),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_file_state_impl(
+    file: &SourceFile,
+    source: String,
+    revision: u64,
+    rules: &RuleSet,
+    profile: &GameProfile,
+    parse_cache: Option<&ParseCache>,
+    ir: Option<&RulesIr>,
+    facts: Option<&dyn SymbolFacts>,
+) -> FileState {
+    let parser = if let Some(ir) = ir.filter(|ir| !ir.files.is_empty()) {
+        ir.file_rule(&file.logical_path)
+            .map(|(_, rule)| rule)
+            .map(|category| parser_kind(category.parser))
+    } else {
+        rules
+            .classify(&file.logical_path)
+            .map(|category| category.parser.clone())
+    };
+    let Some(parser) = parser else {
         return FileState {
             revision,
             source: Arc::from(source),
@@ -428,12 +748,14 @@ pub fn build_file_state_with_cache(
         };
     };
     let (parsed, hir) = parse_source_with_cache(
-        &category.parser,
+        &parser,
         &source,
         Some(&file.logical_path),
         rules,
         profile,
         parse_cache.map(|cache| (file, cache)),
+        ir,
+        facts,
     );
     let shard = match (parsed.as_ref(), hir.as_deref()) {
         (Some(ParsedSource::Text(parsed)), Some(hir)) => shard_for_source(file, parsed, hir, rules),
@@ -542,7 +864,9 @@ fn shard_from_parsed(
     let mut definitions = Vec::new();
     let mut references = Vec::new();
     collect_hir_semantics(file, hir, &mut definitions, &mut references);
-    collect_semantic_type_members(file, parsed, rules, &mut definitions);
+    if !hir.uses_ir() {
+        collect_semantic_type_members(file, parsed, rules, &mut definitions);
+    }
     // Shards stay resident in the workspace index; exact-fit the vectors so
     // growth doubling does not leave ~2x slack per file.
     definitions.shrink_to_fit();
@@ -566,6 +890,18 @@ fn shard_from_parsed(
 /// index interprets them as reachability patterns.
 fn collect_flag_writes(hir: &HirFile, rules: &RuleSet) -> Vec<crate::index::FlagWrite> {
     let mut writes = Vec::new();
+    if hir.uses_ir() {
+        for definition in hir.definitions() {
+            if definition.range == definition.selection_range {
+                writes.push(crate::index::FlagWrite {
+                    kind: definition.kind.clone(),
+                    name: vfs::intern_shard_string(&definition.name),
+                    range: definition.selection_range,
+                });
+            }
+        }
+        return writes;
+    }
     for property in hir.properties() {
         let Some(kind) = rules.dynamic_write_kind(&property.key) else {
             continue;
@@ -588,14 +924,19 @@ fn collect_flag_writes(hir: &HirFile, rules: &RuleSet) -> Vec<crate::index::Flag
 fn collect_dynamic_definitions(hir: &HirFile, rules: &RuleSet) -> Vec<DynamicDefinitionSummary> {
     let mut summaries = Vec::new();
     for definition in hir.definitions() {
-        let enabled = rules
-            .model()
-            .semantic
-            .type_descriptors
-            .iter()
-            .find(|(kind, _)| kind.eq_ignore_ascii_case(&definition.kind))
-            .and_then(|(_, descriptor)| descriptor.dynamic_definition.as_ref())
-            .is_some_and(|descriptor| descriptor.enabled);
+        let enabled = if hir.uses_ir() {
+            hir.dynamic_template(&definition.kind, &definition.name, definition.range)
+                .is_some()
+        } else {
+            rules
+                .model()
+                .semantic
+                .type_descriptors
+                .iter()
+                .find(|(kind, _)| kind.eq_ignore_ascii_case(&definition.kind))
+                .and_then(|(_, descriptor)| descriptor.dynamic_definition.as_ref())
+                .is_some_and(|descriptor| descriptor.enabled)
+        };
         if !enabled {
             continue;
         }
@@ -1023,6 +1364,7 @@ mod tests {
             previous_states: &NO_STATES,
             rules,
             profile,
+            ir: None,
             parse_cache: None,
             cancellation,
             progress: None,

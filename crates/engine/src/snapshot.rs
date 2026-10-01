@@ -9,7 +9,7 @@ use rules::{FileResolutionPolicy, GameProfile, RuleSet};
 use text::{AbsPath, LogicalPath, TextRange};
 
 use crate::query_cache::SnapshotQueryCache;
-use index::prepare_document_snapshot;
+use index::prepare_document_snapshot_with_ir;
 use index::{DocumentSnapshot, FileState, PreparedDocument};
 use index::{LocalisationPreviewMap, Reference, WorkspaceIndex};
 use vfs::scan::root_priority;
@@ -30,6 +30,7 @@ pub struct AnalysisSnapshot {
     pub(crate) revision: u64,
     pub(crate) rules: Arc<RuleSet>,
     pub(crate) ir: Arc<RulesIr>,
+    pub(crate) ir_fingerprint: Arc<str>,
     pub(crate) profile: Arc<GameProfile>,
     pub(crate) roots: Arc<[SourceRoot]>,
     pub(crate) workspace_root: Option<AbsPath>,
@@ -79,6 +80,18 @@ impl AnalysisSnapshot {
     #[must_use]
     pub fn ir(&self) -> &RulesIr {
         &self.ir
+    }
+
+    /// Shared immutable arena for background index workers.
+    #[must_use]
+    pub fn ir_handle(&self) -> Arc<RulesIr> {
+        Arc::clone(&self.ir)
+    }
+
+    /// Stable content identity of this snapshot's immutable arena.
+    #[must_use]
+    pub fn ir_fingerprint(&self) -> &str {
+        &self.ir_fingerprint
     }
 
     /// Texture-catalog invalidation generation captured by this snapshot.
@@ -161,9 +174,10 @@ impl AnalysisSnapshot {
             return None;
         }
         Some(PreparedDocument {
-            document: prepare_document_snapshot(
+            document: prepare_document_snapshot_with_ir(
                 self.rules.as_ref(),
                 self.profile.as_ref(),
+                self.ir.as_ref(),
                 &self.roots,
                 document.clone(),
             ),

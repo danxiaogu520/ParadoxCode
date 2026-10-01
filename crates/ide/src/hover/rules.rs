@@ -25,6 +25,9 @@ pub(crate) fn semantic_rule_hover_at(
     word: &str,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverModel>, Cancelled> {
+    if input.hir.as_deref().is_some_and(hir::HirFile::uses_ir) {
+        return ir_field_hover(snapshot, input, position, word, true, cancellation);
+    }
     let Some(context) =
         semantic_completion_context_with_cancellation(snapshot, input, position, cancellation)?
     else {
@@ -75,6 +78,9 @@ pub(crate) fn semantic_value_hover_at(
     word: &str,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverModel>, Cancelled> {
+    if input.hir.as_deref().is_some_and(hir::HirFile::uses_ir) {
+        return ir_field_hover(snapshot, input, position, word, false, cancellation);
+    }
     let Some(context) =
         semantic_completion_context_with_cancellation(snapshot, input, position, cancellation)?
     else {
@@ -715,9 +721,7 @@ pub(crate) fn semantic_value_hover_label(matcher: &ValueMatcher) -> String {
         ValueMatcher::Exact(value) => format!("exact `{value}`"),
         ValueMatcher::Bool => "bool (`yes` / `no`)".to_owned(),
         ValueMatcher::Int { min, max } => semantic_numeric_hover_label("integer", *min, *max),
-        ValueMatcher::Float { min, max } => {
-            semantic_numeric_hover_label("float", *min, *max)
-        }
+        ValueMatcher::Float { min, max } => semantic_numeric_hover_label("float", *min, *max),
         ValueMatcher::Date => "date (`YYYY.MM.DD`)".to_owned(),
         ValueMatcher::Type(value) => format!("symbol type `{value}`"),
         ValueMatcher::Enum(value) => format!("enum `{value}`"),
@@ -922,4 +926,78 @@ pub(crate) fn semantic_pattern_rule_hint(
         "- matched by first-party rules as {}",
         families.into_iter().collect::<Vec<_>>().join(" / ")
     ))
+}
+
+fn ir_field_hover(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: TextSize,
+    word: &str,
+    key: bool,
+    cancellation: &CancellationToken,
+) -> Result<Option<HoverModel>, Cancelled> {
+    let Some(hir) = input.hir.as_deref() else {
+        return Ok(None);
+    };
+    let fact = if key {
+        // Quoted-script key facts already carry ranges mapped into the
+        // containing document, even though the outer property list is flat.
+        hir.field_facts()
+            .iter()
+            .find(|fact| contains(fact.range, position))
+    } else {
+        hir.properties()
+            .iter()
+            .find(|property| {
+                property
+                    .scalar
+                    .as_ref()
+                    .is_some_and(|scalar| contains(scalar.range, position))
+            })
+            .and_then(|property| hir.field_fact_at(property.key_range))
+    };
+    let Some(fact) = fact else {
+        return Ok(None);
+    };
+    let ir = snapshot.ir();
+    if fact.fields.is_empty() {
+        return Ok(None);
+    }
+    let mut model = HoverModel::new(format!("### {}", code_span(word)));
+    for id in &fact.fields {
+        cancellation.checkpoint()?;
+        let field = ir.field(*id);
+        let value = match field.value {
+            rules::ir::FieldValue::Scalar(matcher) => crate::ir_semantic::describe(ir, matcher),
+            rules::ir::FieldValue::Block(schema) | rules::ir::FieldValue::Quoted(schema) => {
+                format!("a `{}` block", ir.strings.resolve(ir.schema(schema).name))
+            }
+            rules::ir::FieldValue::SelfBlock => format!(
+                "a `{}` block",
+                ir.strings.resolve(ir.schema(fact.schema).name)
+            ),
+        };
+        model.push_section(format!(
+            "- Value: {value}\n- Occurrences: {}..{}",
+            field.card.min,
+            field
+                .card
+                .max
+                .map_or_else(|| "*".to_owned(), |max| max.to_string())
+        ));
+        if let Some(doc) = field.doc {
+            model.push_section(ir.strings.resolve(doc).to_owned());
+        }
+        if field.deprecated {
+            model.push_section("Deprecated".to_owned());
+        }
+        if let Some(origin) = ir.provenance_of(*id) {
+            model.push_section(format!(
+                "Source: `{}` `{}`",
+                ir.strings.resolve(origin.file),
+                ir.strings.resolve(origin.pointer)
+            ));
+        }
+    }
+    Ok(Some(model))
 }

@@ -28,7 +28,7 @@ fn main() -> Result<(), pdc::LspError> {
     );
     eprintln!("paradoxcode: {loading_message}");
     startup_messages.push(loading_message);
-    let rules = match pdc::first_party_rules() {
+    let rules = match pdc::runtime_rules() {
         Ok(rules) => {
             let ready_message = format!(
                 "first-party rules ready in {:.1} ms (hash {})",

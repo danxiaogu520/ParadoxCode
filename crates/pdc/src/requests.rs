@@ -649,6 +649,81 @@ impl SnapshotRequestContext {
         let scope_query = scope.map(str::to_ascii_lowercase);
         let mut entries = Vec::new();
         let mut truncated = false;
+        let ir = self.snapshot.ir();
+        if !ir.schemas.is_empty() {
+            for schema in &ir.schemas {
+                let context = ir.strings.resolve(schema.name);
+                if context_query
+                    .as_deref()
+                    .is_some_and(|query| !context.starts_with(query))
+                {
+                    continue;
+                }
+                let Some(schema_id) = ir
+                    .schema_instances(context)
+                    .find(|id| std::ptr::eq(ir.schema(*id), schema))
+                else {
+                    continue;
+                };
+                let mut fields = schema
+                    .exact
+                    .values()
+                    .flatten()
+                    .copied()
+                    .chain(schema.patterns.iter().copied())
+                    .collect::<Vec<_>>();
+                fields.sort_by_key(|field| field.index());
+                fields.dedup();
+                for field_id in fields {
+                    let field = ir.field(field_id);
+                    let label = ide::ir_matcher_description(ir, field.key);
+                    if key_query
+                        .as_deref()
+                        .is_some_and(|query| !label.to_ascii_lowercase().contains(query))
+                    {
+                        continue;
+                    }
+                    let allowed = field
+                        .scope
+                        .as_ref()
+                        .map(|scope| {
+                            scope
+                                .scopes_in
+                                .iter()
+                                .map(|name| ir.strings.resolve(*name))
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+                    if scope_query.as_deref().is_some_and(|query| {
+                        !allowed.is_empty()
+                            && !allowed.iter().any(|allowed| allowed.contains(query))
+                    }) {
+                        continue;
+                    }
+                    if entries.len() == limit {
+                        truncated = true;
+                        break;
+                    }
+                    let source = ir.provenance_of(field_id).map(|source| serde_json::json!({"file":ir.strings.resolve(source.file),"pointer":ir.strings.resolve(source.pointer)}));
+                    entries.push(serde_json::json!({
+                        "id": format!("ir:{}:{}", schema_id.index(), field_id.index()),
+                        "context": context, "schema": schema_id.index(), "field":field_id.index(),
+                        "key":label, "shape": ir.shape(field_id).map(|shape| format!("{shape:?}").to_ascii_lowercase()),
+                        "allowedScopes":allowed, "pushScope": field.scope.as_ref().and_then(|scope| scope.push).map(|name| ir.strings.resolve(name)),
+                        "deprecated":field.deprecated, "card":{"min":field.card.min,"max":field.card.max},
+                        "subtypeGate":field.gate.map(|gate| match gate {
+                            rules::ir::Gate::When(name) => serde_json::json!({"when":ir.strings.resolve(name)}),
+                            rules::ir::Gate::Unless(name) => serde_json::json!({"unless":ir.strings.resolve(name)}),
+                        }),
+                        "documentation":field.doc.map(|doc| ir.strings.resolve(doc).chars().take(MAX_RULE_DOCUMENTATION_CHARS).collect::<String>()),"source":source
+                    }));
+                }
+                if truncated {
+                    break;
+                }
+            }
+            return Ok(serde_json::json!({"rules":entries,"truncated":truncated}));
+        }
         for rule in self.snapshot.rules().semantic_rules() {
             if let Some(query) = context_query.as_deref()
                 && !rule.context.to_ascii_lowercase().starts_with(query)
@@ -931,6 +1006,7 @@ impl SnapshotRequestContext {
         Ok(serde_json::json!({
             "gameId": self.snapshot.game_profile().game_id,
             "ruleHash": self.snapshot.rules().rule_hash().to_hex(),
+            "irHash": self.snapshot.ir_fingerprint(),
             "revision": self.snapshot.revision(),
             "roots": roots,
             "fileCounts": {

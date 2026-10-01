@@ -155,6 +155,7 @@ fn write_cache(
             definition_range_start INTEGER NOT NULL,
             definition_range_end INTEGER NOT NULL,
             attribute_keys TEXT NOT NULL,
+            subtypes TEXT NOT NULL,
             PRIMARY KEY(file_id, ordinal)
         );
         CREATE TABLE symbol_references(
@@ -191,6 +192,7 @@ fn write_cache(
         ),
         ("game_id", cache.metadata.game_id.clone().into_bytes()),
         ("rule_hash", cache.metadata.rule_hash.clone().into_bytes()),
+        ("ir_hash", cache.metadata.ir_hash.clone().into_bytes()),
         (
             "source_identity",
             cache.metadata.source_identity.clone().into_bytes(),
@@ -249,8 +251,8 @@ fn write_cache(
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     )?;
     let mut insert_definition_attributes = transaction.prepare(
-        "INSERT INTO definition_attributes(file_id, ordinal, kind, name, definition_range_start, definition_range_end, attribute_keys)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT INTO definition_attributes(file_id, ordinal, kind, name, definition_range_start, definition_range_end, attribute_keys, subtypes)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
     )?;
     let mut insert_dynamic_parameter = transaction.prepare(
         "INSERT INTO dynamic_parameters(file_id, dynamic_ordinal, ordinal, name, required)
@@ -348,6 +350,25 @@ fn write_cache(
             let keys_payload = serde_json::to_string(&keys).map_err(|_| {
                 IndexCacheError::InvalidData("attribute keys are not encodable".into())
             })?;
+            let subtypes: Vec<&str> = attributes
+                .subtypes
+                .iter()
+                .map(|subtype| subtype.as_ref())
+                .collect();
+            if subtypes.iter().enumerate().any(|(index, subtype)| {
+                subtype.is_empty()
+                    || subtypes[..index]
+                        .iter()
+                        .any(|candidate| candidate.eq_ignore_ascii_case(subtype))
+            }) {
+                return Err(IndexCacheError::InvalidData(format!(
+                    "attribute summary {} `{}` contains an empty or duplicate subtype",
+                    attributes.kind, attributes.name
+                )));
+            }
+            let subtypes_payload = serde_json::to_string(&subtypes).map_err(|_| {
+                IndexCacheError::InvalidData("attribute subtypes are not encodable".into())
+            })?;
             insert_definition_attributes.execute(params![
                 encode_file_id(*id),
                 i64::try_from(ordinal).unwrap_or(i64::MAX),
@@ -356,6 +377,7 @@ fn write_cache(
                 i64::from(attributes.definition_range.start()),
                 i64::from(attributes.definition_range.end()),
                 keys_payload,
+                subtypes_payload,
             ])?;
         }
         for (dynamic_ordinal, summary) in shard.dynamic_definitions.iter().enumerate() {

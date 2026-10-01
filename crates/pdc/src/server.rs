@@ -830,6 +830,43 @@ impl LspServer {
         })
     }
 
+    /// Creates a server whose semantic consumers use the compiled schema arena.
+    pub fn try_new_with_ir(
+        options: InitializeOptions,
+        rules: RuleSet,
+        profile: GameProfile,
+        ir: Arc<rules::ir::RulesIr>,
+    ) -> Result<Self, LspError> {
+        if !ir.game_id().is_empty() && ir.game_id() != profile.game_id {
+            return Err(LspError::Protocol(format!(
+                "IR game {} does not match profile {}",
+                ir.game_id(),
+                profile.game_id
+            )));
+        }
+        let mut server = Self::try_new_with_rules(options, rules, profile)?;
+        server.host.set_ir(ir);
+        Ok(server)
+    }
+
+    pub(crate) fn try_new_production(
+        options: InitializeOptions,
+        rules: RuleSet,
+        profile: GameProfile,
+    ) -> Result<Self, LspError> {
+        if profile.game_id == game::eu4::GAME_ID {
+            let ir = game::eu4::first_party_ir()?;
+            Self::try_new_with_ir(
+                options,
+                RuleSet::from_ir_catalog(&ir),
+                ir.game.profile.clone(),
+                ir,
+            )
+        } else {
+            Self::try_new_with_rules(options, rules, profile)
+        }
+    }
+
     /// Adds process-start diagnostics that will be replayed through the LSP log channel when the
     /// first client initialize request arrives. Stdio startup diagnostics are still emitted by
     /// the composition root, because no LSP client is available before `initialize`.
@@ -1055,7 +1092,7 @@ impl LspServer {
         let stdin = io::stdin();
         let stdout = io::stdout();
         let mut server =
-            Self::try_new_with_rules(options, rules, profile)?.with_startup_log(startup_log);
+            Self::try_new_production(options, rules, profile)?.with_startup_log(startup_log);
         server.run_transport(stdin, stdout.lock())
     }
 
@@ -1087,7 +1124,7 @@ impl LspServer {
         let stdin = io::stdin();
         let stdout = io::stdout();
         let mut server =
-            Self::try_new_with_rules(options, rules, profile)?.with_auto_vanilla(auto_vanilla);
+            Self::try_new_production(options, rules, profile)?.with_auto_vanilla(auto_vanilla);
         server.startup_log = startup_log;
         server.run_transport(stdin, stdout.lock())
     }

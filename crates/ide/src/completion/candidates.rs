@@ -153,11 +153,7 @@ fn add_typed_prefix_value_items(
                 resolve_data: None,
             },
             query_prefix,
-            CompletionRankContext::new(
-                schema_tier,
-                CompletionSpecificity::Value,
-                deprecated,
-            ),
+            CompletionRankContext::new(schema_tier, CompletionSpecificity::Value, deprecated),
         );
     }
 }
@@ -307,7 +303,11 @@ fn rule_rank_context(
     candidate: &SemanticCompletionRule<'_, '_>,
     specificity: CompletionSpecificity,
 ) -> CompletionRankContext {
-    CompletionRankContext::new(candidate.schema_tier, specificity, candidate.rule.deprecated)
+    CompletionRankContext::new(
+        candidate.schema_tier,
+        specificity,
+        candidate.rule.deprecated,
+    )
 }
 
 pub(crate) fn semantic_rules_for_completion<'rule, 'path>(
@@ -2106,11 +2106,7 @@ fn add_enum_member_completion_ranked(
             prefix,
             deprecated,
             kind: CompletionKind::EnumMember,
-            rank: CompletionRankContext::new(
-                schema_tier,
-                CompletionSpecificity::Enum,
-                deprecated,
-            ),
+            rank: CompletionRankContext::new(schema_tier, CompletionSpecificity::Enum, deprecated),
         },
     );
 }
@@ -2136,12 +2132,8 @@ fn add_scope_completion_ranked(
             prefix,
             deprecated,
             kind: CompletionKind::Scope,
-            rank: CompletionRankContext::new(
-                schema_tier,
-                CompletionSpecificity::Scope,
-                deprecated,
-            )
-            .with_scope_distance(label.matches('.').count().min(99) as u8),
+            rank: CompletionRankContext::new(schema_tier, CompletionSpecificity::Scope, deprecated)
+                .with_scope_distance(label.matches('.').count().min(99) as u8),
         },
     );
 }
@@ -2206,11 +2198,7 @@ fn add_localisation_value_completion_ranked(
             resolve_data: None,
         },
         prefix,
-        CompletionRankContext::new(
-            schema_tier,
-            CompletionSpecificity::Localisation,
-            deprecated,
-        ),
+        CompletionRankContext::new(schema_tier, CompletionSpecificity::Localisation, deprecated),
     );
 }
 

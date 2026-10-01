@@ -98,7 +98,10 @@ fn run_check(arguments: &[String]) -> ExitCode {
             diagnostic.message
         );
     }
-    let identity = match (&manifest_identity.game_id, &manifest_identity.target_game_version) {
+    let identity = match (
+        &manifest_identity.game_id,
+        &manifest_identity.target_game_version,
+    ) {
         (Some(game), Some(version)) => format!(" ({game} {version})"),
         (Some(game), None) => format!(" ({game})"),
         (None, Some(version)) => format!(" ({version})"),
@@ -140,8 +143,8 @@ fn load_sources(source_dir: &Path) -> Result<(Vec<(String, RuleFile)>, SourceMan
         let path = source_dir.join(name);
         let text = std::fs::read_to_string(&path)
             .map_err(|error| format!("{}: {error}", path.display()))?;
-        let file: RuleFile = serde_json::from_str(&text)
-            .map_err(|error| format!("{}: {error}", path.display()))?;
+        let file: RuleFile =
+            serde_json::from_str(&text).map_err(|error| format!("{}: {error}", path.display()))?;
         sources.push((name.clone(), file));
     }
     Ok((sources, manifest))

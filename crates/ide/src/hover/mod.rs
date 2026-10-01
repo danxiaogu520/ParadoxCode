@@ -68,19 +68,25 @@ pub fn hover_with_cancellation(
         // Presence uses the invocation-form model (activation scoping) when the
         // owning definition resolves with a template, so the definition-site
         // hover agrees with the completion snippet's tabstops.
-        let optional = match (owner_kind, owner_name) {
-            (Some(kind), Some(name)) => {
-                dynamic::parameter_presence_required(snapshot, kind, name, &definition.name)
-                    .map(|required| !required)
-                    .unwrap_or_else(|| {
-                        input.hir.as_deref().is_some_and(|hir| {
-                            !hir.parameter_is_required(definition.owner_range, &definition.name)
-                        })
-                    })
-            }
-            _ => input.hir.as_deref().is_some_and(|hir| {
+        let optional = if input.hir.as_deref().is_some_and(hir::HirFile::uses_ir) {
+            input.hir.as_deref().is_some_and(|hir| {
                 !hir.parameter_is_required(definition.owner_range, &definition.name)
-            }),
+            })
+        } else {
+            match (owner_kind, owner_name) {
+                (Some(kind), Some(name)) => {
+                    dynamic::parameter_presence_required(snapshot, kind, name, &definition.name)
+                        .map(|required| !required)
+                        .unwrap_or_else(|| {
+                            input.hir.as_deref().is_some_and(|hir| {
+                                !hir.parameter_is_required(definition.owner_range, &definition.name)
+                            })
+                        })
+                }
+                _ => input.hir.as_deref().is_some_and(|hir| {
+                    !hir.parameter_is_required(definition.owner_range, &definition.name)
+                }),
+            }
         };
         let syntax = match reference.kind {
             hir::HirParameterReferenceKind::Substitution => "substitution",
@@ -100,7 +106,8 @@ pub fn hover_with_cancellation(
                 "required/inferred"
             },
         );
-        if let Some(owner) = owner_name
+        if !input.hir.as_deref().is_some_and(hir::HirFile::uses_ir)
+            && let Some(owner) = owner_name
             && let Some(contract) =
                 dynamic::dynamic_parameter_contract_lines(snapshot, None, owner, &definition.name)
         {
@@ -196,9 +203,12 @@ pub fn hover_with_cancellation(
         ));
     }
     cancellation.checkpoint()?;
-    if let Some(model) =
+    let parameter_hover = if input.hir.as_deref().is_some_and(hir::HirFile::uses_ir) {
+        dynamic::ir_invocation_parameter_hover(snapshot, &input, position)
+    } else {
         dynamic::dynamic_invocation_parameter_hover(snapshot, &input, position, cancellation)?
-    {
+    };
+    if let Some(model) = parameter_hover {
         return Ok(Some(model.into_hover_with_range(range)));
     }
     if let Some(model) =
@@ -211,7 +221,9 @@ pub fn hover_with_cancellation(
     {
         return Ok(Some(model.into_hover_with_range(range)));
     }
-    if is_property_key_at(&input, position) {
+    if !input.hir.as_deref().is_some_and(hir::HirFile::uses_ir)
+        && is_property_key_at(&input, position)
+    {
         if known_keys(snapshot)
             .iter()
             .any(|key| key.eq_ignore_ascii_case(&word))

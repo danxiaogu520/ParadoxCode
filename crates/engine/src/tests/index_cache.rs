@@ -127,6 +127,114 @@ fn vanilla_cache_preserves_dynamic_definition_references_without_hir() {
 }
 
 #[test]
+fn ir_workspace_scan_resolves_cross_file_dynamic_calls_from_candidate_definitions() {
+    let root = temp_root("ir-cross-file-ref");
+    let project = root.join("project");
+    fs::create_dir_all(project.join("common/scripted_effects")).expect("definitions directory");
+    fs::create_dir_all(project.join("events")).expect("events directory");
+    fs::write(
+        project.join("common/scripted_effects/defs.txt"),
+        "indexed_effect = { add_treasury = 1 }\n",
+    )
+    .expect("write dynamic definition");
+    fs::write(
+        project.join("events/use.txt"),
+        "country_event = { immediate = { indexed_effect = { } } }\n",
+    )
+    .expect("write dynamic call");
+
+    let rules = game::eu4::first_party_rules().expect("first-party legacy rules");
+    let ir = game::eu4::first_party_ir().expect("first-party rules IR");
+    let mut host = AnalysisHost::with_ir(rules, game::eu4::profile(), ir);
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Project,
+        AbsPath::normalize(&fs::canonicalize(&project).expect("canonical project root")),
+    )]));
+    host.refresh_source_roots()
+        .expect("scan with two-pass IR lowering");
+    let snapshot = host.snapshot();
+    assert!(
+        snapshot
+            .index()
+            .definitions_with_state("scripted_effect", "indexed_effect")
+            .iter()
+            .any(|(_, active)| *active),
+        "shards={:?}",
+        snapshot
+            .index()
+            .shards
+            .iter()
+            .map(|(id, shard)| (
+                *id,
+                shard
+                    .definitions
+                    .iter()
+                    .map(|d| (d.kind.as_ref(), d.name.as_ref(), d.active))
+                    .collect::<Vec<_>>()
+            ))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        snapshot.index().references_iter().any(|(_, reference)| {
+            reference.kind.as_ref() == "scripted_effect"
+                && reference.name.as_ref() == "indexed_effect"
+        }),
+        "second-pass HIR should resolve the call against first-pass definitions; refs={:?}",
+        snapshot
+            .index()
+            .references_iter()
+            .map(|(_, reference)| (reference.kind.as_ref(), reference.name.as_ref()))
+            .collect::<Vec<_>>()
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn ir_cache_refresh_relower_unchanged_references_after_definition_appears() {
+    let root = temp_root("ir-cache-cross-file-ref");
+    let project = root.join("project");
+    fs::create_dir_all(project.join("common/scripted_effects")).expect("definitions directory");
+    fs::create_dir_all(project.join("events")).expect("events directory");
+    fs::write(
+        project.join("events/use.txt"),
+        "country_event = { immediate = { newly_added_effect = { } } }\n",
+    )
+    .expect("write call before definition");
+    let rules = game::eu4::first_party_rules().expect("first-party legacy rules");
+    let ir = game::eu4::first_party_ir().expect("first-party rules IR");
+    let mut host = AnalysisHost::with_ir(rules.clone(), game::eu4::profile(), ir.clone());
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Project,
+        AbsPath::normalize(&fs::canonicalize(&project).expect("canonical project root")),
+    )]));
+    host.refresh_source_roots().expect("initial scan");
+    let cache = IndexCache::from_snapshot(&host.snapshot()).expect("cache before definition");
+    assert!(!cache.index().references_iter().any(|(_, reference)| {
+        reference.kind.as_ref() == "scripted_effect"
+            && reference.name.as_ref() == "newly_added_effect"
+    }));
+
+    fs::write(
+        project.join("common/scripted_effects/new.txt"),
+        "newly_added_effect = { add_treasury = 1 }\n",
+    )
+    .expect("write new definition");
+    let refreshed = cache
+        .refresh_with_ir(&rules, &game::eu4::profile(), &ir)
+        .expect("refresh rebuilds cross-file facts");
+    assert!(
+        refreshed.index().references_iter().any(|(_, reference)| {
+            reference.kind.as_ref() == "scripted_effect"
+                && reference.name.as_ref() == "newly_added_effect"
+        }),
+        "unchanged call file must be re-lowered after workspace definitions change"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn definition_attribute_summaries_survive_live_and_cached_indexing() {
     let root = temp_root("attr-cache");
     let vanilla = root.join("vanilla");

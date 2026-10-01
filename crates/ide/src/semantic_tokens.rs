@@ -71,6 +71,27 @@ pub fn semantic_tokens_in_range_with_cancellation(
         cancellation,
         range,
     )?;
+    if let Some(hir) = input.hir.as_deref().filter(|hir| hir.uses_ir()) {
+        for token in &mut tokens {
+            if let Some(fact) = hir.field_fact_at(token.range) {
+                let ir = snapshot.ir();
+                token.token_type = if fact.fields.iter().any(|id| ir.field(*id).control.is_some()) {
+                    SemanticTokenType::Keyword
+                } else if !fact.fields.is_empty() {
+                    SemanticTokenType::Function
+                } else {
+                    SemanticTokenType::Property
+                };
+            }
+            if hir
+                .definitions()
+                .iter()
+                .any(|definition| definition.selection_range == token.range)
+            {
+                token.definition = true;
+            }
+        }
+    }
     Ok(tokens)
 }
 
@@ -96,23 +117,34 @@ pub(crate) fn static_semantic_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<
         .iter()
         .map(|key| key.to_ascii_lowercase())
         .collect::<BTreeSet<_>>();
-    for rule in &snapshot.rules().model().semantic.rules {
-        if let KeyMatcher::Exact(key) = &rule.key {
-            keys.insert(key.to_ascii_lowercase());
+    if !snapshot.ir().schemas.is_empty() {
+        for schema in &snapshot.ir().schemas {
+            keys.extend(
+                schema
+                    .exact
+                    .keys()
+                    .map(|key| snapshot.ir().strings.resolve(*key).to_owned()),
+            );
         }
+    } else {
+        for rule in &snapshot.rules().model().semantic.rules {
+            if let KeyMatcher::Exact(key) = &rule.key {
+                keys.insert(key.to_ascii_lowercase());
+            }
+        }
+        // Root entry keys (`country_event`, every on_action name) select type instances rather
+        // than matching an exact rule key, but they are script keys all the same.
+        keys.extend(
+            snapshot
+                .rules()
+                .model()
+                .semantic
+                .type_root_keys
+                .values()
+                .flatten()
+                .map(|key| key.to_ascii_lowercase()),
+        );
     }
-    // Root entry keys (`country_event`, every on_action name) select type instances rather
-    // than matching an exact rule key, but they are script keys all the same.
-    keys.extend(
-        snapshot
-            .rules()
-            .model()
-            .semantic
-            .type_root_keys
-            .values()
-            .flatten()
-            .map(|key| key.to_ascii_lowercase()),
-    );
     let keys = Arc::new(keys);
     snapshot.query_cache().insert(
         revision,
@@ -128,20 +160,35 @@ fn semantic_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
     // Completion classifies workspace-defined dynamic definitions as callable functions. Reuse the
     // same effective (overlay-aware and source-priority-aware) member view for source coloring so
     // a definition does not switch back to the generic property color after insertion.
-    let dynamic_types = snapshot
-        .rules()
-        .model()
-        .semantic
-        .type_descriptors
-        .iter()
-        .filter_map(|(type_name, descriptor)| {
-            descriptor
-                .dynamic_definition
-                .as_ref()
-                .filter(|dynamic_descriptor| dynamic_descriptor.enabled)
-                .map(|_| type_name.clone())
-        })
-        .collect::<Vec<_>>();
+    let dynamic_types = if !snapshot.ir().schemas.is_empty() {
+        snapshot
+            .ir()
+            .types
+            .iter()
+            .filter(|info| {
+                crate::semantic::dynamic_definition_type(
+                    snapshot,
+                    snapshot.ir().strings.resolve(info.name),
+                )
+            })
+            .map(|info| snapshot.ir().strings.resolve(info.name).to_owned())
+            .collect::<Vec<_>>()
+    } else {
+        snapshot
+            .rules()
+            .model()
+            .semantic
+            .type_descriptors
+            .iter()
+            .filter_map(|(type_name, descriptor)| {
+                descriptor
+                    .dynamic_definition
+                    .as_ref()
+                    .filter(|dynamic_descriptor| dynamic_descriptor.enabled)
+                    .map(|_| type_name.clone())
+            })
+            .collect::<Vec<_>>()
+    };
     for type_name in dynamic_types {
         keys.extend(
             effective_workspace_member_names(snapshot, &type_name)

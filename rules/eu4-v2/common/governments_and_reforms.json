@@ -247,12 +247,9 @@
     "government_mechanic_body__interactions": {
       "patterns": [
         {
+          "body": "government_mechanic_body__interactions__government_mechanic_interaction",
           "card": "0..*",
-          "key": "ref<government_mechanic_interaction>",
-          "map": {
-            "body": "government_mechanic_body__interactions__government_mechanic_interaction",
-            "key": "def<government_mechanic_interaction>"
-          },
+          "key": "def<government_mechanic_interaction>",
           "when": null
         }
       ]
@@ -357,12 +354,9 @@
     "government_mechanic_body__powers": {
       "patterns": [
         {
+          "body": "government_mechanic_body__powers__government_mechanic_power",
           "card": "0..*",
-          "key": "ref<government_mechanic_power>",
-          "map": {
-            "body": "government_mechanic_body__powers__government_mechanic_power",
-            "key": "def<government_mechanic_power>"
-          },
+          "key": "def<government_mechanic_power>",
           "when": null
         }
       ]
@@ -2207,12 +2201,9 @@
     "government_reform_body__conditional__states_general_mechanic": {
       "patterns": [
         {
+          "body": "modifier",
           "card": "2..2",
-          "key": "ref<states_general_faction>",
-          "map": {
-            "body": "modifier",
-            "key": "def<states_general_faction>"
-          },
+          "key": "def<states_general_faction>",
           "scope": {
             "set": {
               "root": "country",

@@ -296,12 +296,9 @@
       ],
       "patterns": [
         {
+          "body": "religion_group_body__religion",
           "card": "0..*",
-          "key": "ref<religion>",
-          "map": {
-            "body": "religion_group_body__religion",
-            "key": "def<religion>"
-          },
+          "key": "def<religion>",
           "override": true,
           "when": null
         }
@@ -710,12 +707,9 @@
     "religion_group_body__religion__gurus": {
       "patterns": [
         {
+          "body": "religion_group_body__religion__gurus__guru",
           "card": "0..*",
-          "key": "ref<guru>",
-          "map": {
-            "body": "religion_group_body__religion__gurus__guru",
-            "key": "def<guru>"
-          },
+          "key": "def<guru>",
           "when": null
         }
       ]
@@ -785,12 +779,9 @@
     "religion_group_body__religion__gurus__guru__teachings": {
       "patterns": [
         {
+          "body": "religion_group_body__religion__gurus__guru__teachings__guru_teaching",
           "card": "0..*",
-          "key": "ref<guru_teaching>",
-          "map": {
-            "body": "religion_group_body__religion__gurus__guru__teachings__guru_teaching",
-            "key": "def<guru_teaching>"
-          },
+          "key": "def<guru_teaching>",
           "when": null
         }
       ]
@@ -823,12 +814,9 @@
     "religion_group_body__religion__orthodox_icons": {
       "patterns": [
         {
+          "body": "religion_group_body__religion__orthodox_icons__orthodox_icon",
           "card": "0..*",
-          "key": "ref<orthodox_icon>",
-          "map": {
-            "body": "religion_group_body__religion__orthodox_icons__orthodox_icon",
-            "key": "def<orthodox_icon>"
-          },
+          "key": "def<orthodox_icon>",
           "scope": {
             "set": {
               "root": "country",
@@ -1686,12 +1674,9 @@
     "religion_group_body__religious_schools": {
       "patterns": [
         {
+          "body": "religion_group_body__religious_schools__religious_school",
           "card": "0..*",
-          "key": "ref<religious_school>",
-          "map": {
-            "body": "religion_group_body__religious_schools__religious_school",
-            "key": "def<religious_school>"
-          },
+          "key": "def<religious_school>",
           "when": null
         }
       ]
@@ -1889,12 +1874,9 @@
       },
       "patterns": [
         {
+          "body": "modifier",
           "card": "5..5",
-          "key": "ref<religious_reform>",
-          "map": {
-            "body": "modifier",
-            "key": "def<religious_reform>"
-          },
+          "key": "def<religious_reform>",
           "scope": {
             "set": {
               "root": "country",

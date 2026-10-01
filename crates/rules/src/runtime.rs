@@ -138,6 +138,41 @@ impl RuleSet {
         }
     }
 
+    /// File catalog bridge used while the legacy container is retired.
+    /// Semantic consumers read `RulesIr`; this contains no flattened rules.
+    #[must_use]
+    pub fn from_ir_catalog(ir: &crate::ir::RulesIr) -> Self {
+        use crate::ir::{DocumentParser, FileResolution};
+        Self::from_model(crate::RulesModel {
+            game_id: ir.game_id().to_owned(),
+            profile: ir.game.profile.clone(),
+            file_categories: ir
+                .files
+                .iter()
+                .map(|file| crate::FileCategory {
+                    id: ir.strings.resolve(file.name).to_owned(),
+                    matcher: file.matcher.clone(),
+                    parser: match file.parser {
+                        DocumentParser::Script => crate::ParserKind::Script,
+                        DocumentParser::Localisation => crate::ParserKind::Localisation,
+                        DocumentParser::Asset => crate::ParserKind::Asset,
+                        DocumentParser::SyntaxOnly => crate::ParserKind::SyntaxOnly,
+                    },
+                    resolution: match file.resolution {
+                        FileResolution::ReplaceByPath => {
+                            crate::FileResolutionPolicy::ReplaceByRelativePath
+                        }
+                        FileResolution::Merge => crate::FileResolutionPolicy::Merge,
+                        FileResolution::ReplaceDirectory => {
+                            crate::FileResolutionPolicy::ReplaceDirectory
+                        }
+                    },
+                })
+                .collect(),
+            ..crate::RulesModel::default()
+        })
+    }
+
     /// Builds a runtime rule set and computes its canonical logical hash.
     #[must_use]
     pub fn from_model(mut model: RulesModel) -> Self {

@@ -16,16 +16,49 @@ pub(super) fn lower_dynamic_templates(
     references: &[HirParameterReference],
     rules: &RuleSet,
 ) -> Vec<Template> {
+    lower_templates(syntax, definitions, conditionals, references, rules, None)
+}
+
+pub(super) fn lower_dynamic_templates_ir(
+    syntax: &ParsedFile,
+    definitions: &[HirDefinition],
+    conditionals: &[HirParameterConditional],
+    references: &[HirParameterReference],
+    callable_kinds: &std::collections::BTreeSet<String>,
+) -> Vec<Template> {
+    lower_templates(
+        syntax,
+        definitions,
+        conditionals,
+        references,
+        &RuleSet::empty(),
+        Some(callable_kinds),
+    )
+}
+
+fn lower_templates(
+    syntax: &ParsedFile,
+    definitions: &[HirDefinition],
+    conditionals: &[HirParameterConditional],
+    references: &[HirParameterReference],
+    rules: &RuleSet,
+    callable_kinds: Option<&std::collections::BTreeSet<String>>,
+) -> Vec<Template> {
     let mut templates = Vec::new();
     for definition in definitions {
-        let enabled = rules
-            .model()
-            .semantic
-            .type_descriptors
-            .iter()
-            .find(|(kind, _)| kind.eq_ignore_ascii_case(&definition.kind))
-            .and_then(|(_, descriptor)| descriptor.dynamic_definition.as_ref())
-            .is_some_and(|descriptor| descriptor.enabled);
+        let enabled = callable_kinds.map_or_else(
+            || {
+                rules
+                    .model()
+                    .semantic
+                    .type_descriptors
+                    .iter()
+                    .find(|(kind, _)| kind.eq_ignore_ascii_case(&definition.kind))
+                    .and_then(|(_, descriptor)| descriptor.dynamic_definition.as_ref())
+                    .is_some_and(|descriptor| descriptor.enabled)
+            },
+            |kinds| kinds.contains(&definition.kind.to_ascii_lowercase()),
+        );
         if !enabled
             || syntax.errors().iter().any(|error| {
                 error.range.start() >= definition.range.start()
