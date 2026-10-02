@@ -55,6 +55,23 @@ RSS 范围为旧版 1,090.66–1,149.23 MiB，IR 1,062.97–1,081.94 MiB；OS �
 `memory-final/comparison.json`、`rules-loading-final.json` 和 `final/freeze.json`。
 本地语料、缓存和冻结二进制继续保持忽略。
 
+### PR CI 兼容性收尾（2026-10-03）
+
+提交 `9277c8d` 后，PR CI 的 Rust 1.99 Clippy 发现原有 `AtomicUsize::fetch_update`
+已弃用，当时仓库声明的最低 Rust 版本为 1.98。扫描和测试查询的 checkpoint 计数改用同等内存序的
+`compare_exchange_weak` 循环，保留无限预算、耗尽后取消及克隆共享状态的行为。
+这不改变规则源、IR 指纹或脚本语义；既定审查不因此重启。
+
+拼写检查另识别一处纠错测试故意使用的 `country_falg`，按既有测试词白名单记录其意图；
+审计脚本注释改用正常措辞。PR CI 的最终结果以当前提交为准。
+
+用户随后要求降低 Rust 门槛。锁定依赖图的最高声明要求为 1.88，源码使用 let chains 和
+`as_chunks`；最低版本、MSRV CI 和开发文档统一降至 1.88，不更换依赖版本。
+实际安装 Rust 1.88.0 后，`cargo +1.88.0 check --locked --workspace --all-targets --all-features`
+在本地通过。取消查询与扫描原子快照的两项定向回归、审计脚本四项测试和脚本语法检查通过。
+随后使用本地 Rust 1.98.1 重跑全工作区、全目标、全特性 Clippy，`-D warnings` 通过。
+以上是 PR 兼容性收尾，原六项语义与性能验收结论仍对应前文冻结版本；新的 MSRV CI 待远端确认。
+
 ## 放宽校验决策重新审核（2026-10-02）
 
 用户重新明确产品目标：LSP 应帮助作者写出规范且语义明确的代码，游戏能够加载某种写法，

@@ -165,7 +165,7 @@ rules + game -> engine / ide / index
 
 ## Building from source
 
-Prerequisites: **Rust 1.98 or newer** and **Node.js 24 LTS** (for the VS Code extension).
+Prerequisites: **Rust 1.88 or newer** and **Node.js 24 LTS** (for the VS Code extension).
 
 ```bash
 git clone https://github.com/danxiaogu520/ParadoxCode.git

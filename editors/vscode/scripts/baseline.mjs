@@ -509,7 +509,7 @@ function compareCandidates(left, right) {
  * `textDocument/completion` at every fixed probe position, and records the
  * sorted candidate labels plus their kind/detail. Probes sharing a fixture
  * share one didOpen/didClose pair; a drifted fixture line or a failed request
- * is reported as a tool error and skipped, never silently mis-sampled.
+ * is reported as a tool error and skipped rather than sampled incorrectly.
  */
 async function collectGoldenCompletions(client, options, report) {
   const results = [];

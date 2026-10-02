@@ -26,7 +26,7 @@ LSP layer, or editor extensions.
 
 ## Prerequisites
 
-- Rust **1.98 or newer** (see `.github/workflows/ci.yml` for the enforced MSRV).
+- Rust **1.88 or newer** (see `.github/workflows/ci.yml` for the enforced MSRV).
 - Node.js **24 LTS** for the VS Code extension.
 - Git. There are no commit hooks. Run focused checks while developing and the affected local gate
   groups before pushing. CI owns clean-checkout platform, MSRV, dependency-policy, typo, and

@@ -22,6 +22,8 @@ Postumus = "Postumus"
 Tradtion = "Tradtion"
 ba = "ba"
 caf = "caf"
+# Intentional transposition in the localisation suggestion regression.
+falg = "falg"
 globa = "globa"
 histori = "histori"
 hsa = "hsa"

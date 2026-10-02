@@ -49,18 +49,23 @@ impl CancellationToken {
 
     pub(crate) fn checkpoint(&self) -> Result<(), Cancelled> {
         #[cfg(test)]
-        if self
-            .remaining_checkpoints
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
-                if remaining != usize::MAX && remaining > 0 {
-                    Some(remaining - 1)
-                } else {
-                    None
-                }
-            })
-            .is_err_and(|remaining| remaining == 0)
         {
-            self.cancel();
+            // Keep this update compatible with the minimum supported Rust version.
+            let mut remaining = self.remaining_checkpoints.load(Ordering::Acquire);
+            while remaining != usize::MAX && remaining > 0 {
+                match self.remaining_checkpoints.compare_exchange_weak(
+                    remaining,
+                    remaining - 1,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                ) {
+                    Ok(_) => break,
+                    Err(actual) => remaining = actual,
+                }
+            }
+            if remaining == 0 {
+                self.cancel();
+            }
         }
         if self.is_cancelled() {
             Err(Cancelled)

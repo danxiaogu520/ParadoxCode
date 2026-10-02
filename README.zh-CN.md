@@ -108,7 +108,7 @@ rules + game -> engine / ide
 
 ## 从源码构建
 
-前置条件：**Rust 1.98 或更新版本**，以及 **Node.js 24 LTS**（用于 VS Code 扩展工具链）。
+前置条件：**Rust 1.88 或更新版本**，以及 **Node.js 24 LTS**（用于 VS Code 扩展工具链）。
 
 ```bash
 git clone https://github.com/danxiaogu520/ParadoxCode.git
