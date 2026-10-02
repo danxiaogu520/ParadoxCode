@@ -3,7 +3,8 @@ use text::AbsPath;
 
 #[test]
 fn unresolved_symbol_is_diagnosed_without_a_definition() {
-    let (host, id) = snapshot("event = missing.1\n");
+    let (host, id) =
+        snapshot("country_event = { immediate = { country_event = { id = missing.1 } } }\n");
     let diagnostics = diagnostics(&host.snapshot(), &id);
     assert!(
         diagnostics
@@ -27,7 +28,7 @@ fn navigation_and_rename_include_references_inside_quoted_script() {
         "for_variable_amount = { $effect$ }\n",
     )
     .expect("workspace dynamic definition");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -39,8 +40,11 @@ fn navigation_and_rename_include_references_inside_quoted_script() {
     let text = concat!(
         "country_event = { id = quoted_target.1 }\n",
         "country_event = { id = quoted_caller.1 immediate = { ",
-        "for_variable_amount = { variable = count effect = \"event = quoted_target.1\" } } }\n",
+        "for_variable_amount = { variable = count effect = \"country_event = { id = quoted_target.1 }\" } } }\n",
     );
+    // The legacy fixture uses its generic fallback reference. The production
+    // IR fixture uses the game's event command and preserves all navigation assertions.
+    let text = { text.to_owned() };
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open quoted navigation fixture");
     let reference_start =
@@ -107,11 +111,12 @@ fn references_find_quoted_script_symbols_in_unopened_workspace_files() {
     let definition_text = "country_event = { id = quoted_disk.1 }\n";
     let reference_text = concat!(
         "country_event = { id = quoted_disk_caller.1 immediate = { ",
-        "for_variable_amount = { variable = count effect = \"event = quoted_disk.1\" } } }\n",
+        "for_variable_amount = { variable = count effect = \"country_event = { id = quoted_disk.1 }\" } } }\n",
     );
+    let reference_text = { reference_text.to_owned() };
     std::fs::write(&definition_path, definition_text).expect("definition file");
     std::fs::write(&reference_path, reference_text).expect("reference file");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -146,7 +151,7 @@ fn references_find_quoted_script_symbols_in_unopened_workspace_files() {
 
 #[test]
 fn duplicate_definitions_resolve_last_and_warn_at_the_later_definition() {
-    let text = "country_event = { id = duplicate.1 }\ncountry_event = { id = duplicate.1 }\nevent = duplicate.1\n";
+    let text = "country_event = { id = duplicate.1 }\ncountry_event = { id = duplicate.1 }\ncountry_event = { immediate = { country_event = { id = duplicate.1 } } }\n";
     let (host, id) = snapshot(text);
     let snapshot = host.snapshot();
     // The game applies the later of two same-name definitions, so resolution
@@ -163,12 +168,7 @@ fn duplicate_definitions_resolve_last_and_warn_at_the_later_definition() {
     assert_eq!(shadows[0].range.start(), second_name);
     assert!(shadows[0].message.contains("shadows an earlier definition"));
     // Navigation from the reference lands on the later (effective) definition.
-    let reference = u32::try_from(
-        "country_event = { id = duplicate.1 }\ncountry_event = { id = duplicate.1 }\nevent = "
-            .len()
-            + 1,
-    )
-    .expect("reference offset");
+    let reference = u32::try_from(text.rfind("duplicate.1").unwrap() + 1).unwrap();
     let locations = definition(&snapshot, &id, reference);
     assert_eq!(
         locations.len(),
@@ -200,7 +200,7 @@ fn dynamic_calls_resolve_scalar_and_block_forms_with_overlay_priority() {
     let definitions_path = definitions_dir.join("definitions.txt");
     fs::write(&definitions_path, "disk_effect = { add_prestige = 1 }\n").expect("disk definitions");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -271,7 +271,7 @@ fn dynamic_calls_resolve_scalar_and_block_forms_with_overlay_priority() {
             .contains("Required parameters: `amount`")
     );
 
-    let invalid_use_id = DocumentId::new("file:///tmp/invalid-use.txt");
+    let invalid_use_id = DocumentId::new("file:///tmp/events/invalid-use.txt");
     let invalid_use_text = "country_event = { immediate = { overlay_effect = no overlay_effect = yes scalar_effect = 25 pair_effect = yes } }\n";
     host.open_document(invalid_use_id.clone(), 1, invalid_use_text.to_owned(), None)
         .expect("open invalid-value document");
@@ -474,12 +474,13 @@ fn local_parameter_navigation_stays_within_its_scripted_definition() {
 
 #[test]
 fn navigation_and_hover_use_local_event_definition() {
-    let text = "country_event = { id = test.1 }\nevent = test.1\n";
+    let text = "country_event = { id = test.1 }\ncountry_event = { immediate = { country_event = { id = test.1 } } }\n";
     let (host, id) = snapshot(text);
     let snapshot = host.snapshot();
     let symbols = document_symbols(&snapshot, &id);
     assert_eq!(symbols.len(), 1);
-    let definition_location = definition(&snapshot, &id, 40);
+    let reference = u32::try_from(text.rfind("test.1").unwrap() + 1).unwrap();
+    let definition_location = definition(&snapshot, &id, reference);
     assert_eq!(definition_location.len(), 1);
     let definition_name_start =
         u32::try_from(text.find("test.1").expect("definition name")).expect("offset");
@@ -488,8 +489,8 @@ fn navigation_and_hover_use_local_event_definition() {
         TextRange::new(definition_name_start, definition_name_start + 6)
             .expect("definition name range")
     );
-    assert!(hover(&snapshot, &id, 40).is_some());
-    let references = references(&snapshot, &id, 40, true);
+    assert!(hover(&snapshot, &id, reference).is_some());
+    let references = references(&snapshot, &id, reference, true);
     assert_eq!(references.len(), 2);
     assert!(references.iter().any(|location| {
         location.range
@@ -525,7 +526,7 @@ fn navigation_targets_the_name_in_an_indexed_definition() {
     host.refresh_source_roots().expect("scan event definition");
 
     let id = DocumentId::new("file:///tmp/events/use.txt");
-    let use_text = "event = indexed.1\n";
+    let use_text = "country_event = { immediate = { country_event = { id = indexed.1 } } }\n";
     let position =
         u32::try_from(use_text.find("indexed.1").expect("event reference")).expect("offset");
     host.open_document(id.clone(), 1, use_text.to_owned(), None)
@@ -546,7 +547,7 @@ fn navigation_targets_the_name_in_an_indexed_definition() {
 
 #[test]
 fn navigation_targets_event_id_inside_event_call_block() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/event-call.txt");
     let text = concat!(
         "country_event = { id = declared.1 }\n",
@@ -584,7 +585,7 @@ fn navigation_targets_event_id_in_an_indexed_definition_from_a_call_block() {
     let definition_path = events.join("definitions.txt");
     fs::write(&definition_path, definition_text).expect("write event definition");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -653,7 +654,7 @@ fn gfx_sprite_families_and_mesh_font_kinds_are_symbolized() {
     )
     .expect("write chat fonts");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,

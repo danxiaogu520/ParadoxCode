@@ -206,6 +206,7 @@ fn load_connection(
         AbsPath::normalize(&source_root),
     );
     let game_id = metadata_text(connection, "game_id")?;
+    let build_id = metadata_text(connection, "build_id")?;
     let rule_hash = metadata_text(connection, "rule_hash")?;
     let ir_hash = metadata_text(connection, "ir_hash")?;
     let source_identity = metadata_text(connection, "source_identity")?;
@@ -243,6 +244,7 @@ fn load_connection(
         metadata: IndexCacheMetadata {
             schema_version,
             game_id,
+            build_id,
             rule_hash,
             ir_hash,
             source_identity,

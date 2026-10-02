@@ -4,13 +4,11 @@
       "fields": {
         "available_for_custom_nation": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "continents": {
           "card": "0..1",
-          "list": "ref<continent>",
-          "when": null
+          "list": "ref<continent>"
         },
         "country_trigger": {
           "body": "trigger",
@@ -20,28 +18,23 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "graphical_cultures": {
           "card": "0..1",
-          "list": "enum<graphical_cultures>",
-          "when": null
+          "list": "enum<graphical_cultures>"
         },
         "sprite_artillery": {
           "body": "sprite_pack_body__sprite_artillery",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "sprite_cavalry": {
           "body": "sprite_pack_body__sprite_cavalry",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "sprite_infantry": {
           "body": "sprite_pack_body__sprite_infantry",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         }
       }
     },
@@ -55,23 +48,19 @@
       "fields": {
         "0": {
           "card": "0..1",
-          "value": "scalar | enum<builtin_dlc>",
-          "when": null
+          "value": "scalar | enum<builtin_dlc>"
         },
         "1": {
           "card": "0..1",
-          "value": "scalar | enum<builtin_dlc>",
-          "when": null
+          "value": "scalar | enum<builtin_dlc>"
         },
         "2": {
           "card": "0..1",
-          "value": "scalar | enum<builtin_dlc>",
-          "when": null
+          "value": "scalar | enum<builtin_dlc>"
         },
         "3": {
           "card": "0..1",
-          "value": "scalar | enum<builtin_dlc>",
-          "when": null
+          "value": "scalar | enum<builtin_dlc>"
         }
       }
     },
@@ -79,23 +68,19 @@
       "fields": {
         "0": {
           "card": "0..1",
-          "value": "scalar | enum<builtin_dlc>",
-          "when": null
+          "value": "scalar | enum<builtin_dlc>"
         },
         "1": {
           "card": "0..1",
-          "value": "scalar | enum<builtin_dlc>",
-          "when": null
+          "value": "scalar | enum<builtin_dlc>"
         },
         "2": {
           "card": "0..1",
-          "value": "scalar | enum<builtin_dlc>",
-          "when": null
+          "value": "scalar | enum<builtin_dlc>"
         },
         "3": {
           "card": "0..1",
-          "value": "scalar | enum<builtin_dlc>",
-          "when": null
+          "value": "scalar | enum<builtin_dlc>"
         }
       }
     },
@@ -103,23 +88,19 @@
       "fields": {
         "0": {
           "card": "0..1",
-          "value": "scalar | enum<builtin_dlc>",
-          "when": null
+          "value": "scalar | enum<builtin_dlc>"
         },
         "1": {
           "card": "0..1",
-          "value": "scalar | enum<builtin_dlc>",
-          "when": null
+          "value": "scalar | enum<builtin_dlc>"
         },
         "2": {
           "card": "0..1",
-          "value": "scalar | enum<builtin_dlc>",
-          "when": null
+          "value": "scalar | enum<builtin_dlc>"
         },
         "3": {
           "card": "0..1",
-          "value": "scalar | enum<builtin_dlc>",
-          "when": null
+          "value": "scalar | enum<builtin_dlc>"
         }
       }
     }

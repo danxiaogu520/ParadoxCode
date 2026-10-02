@@ -1,77 +1,53 @@
 {
-  "mixins": {
-    "keys__type_opinion_modifier": {
-      "fields": {
-        "opinion": {
-          "card": "1",
-          "value": "int[-9999..-1] | int[0..9999]",
-          "when": null
-        }
-      }
-    }
-  },
   "schemas": {
     "opinion_modifier_body": {
       "fields": {
         "max": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "max_in_other_direction": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "max_vassal": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "min": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "months": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "opinion": {
           "card": "1",
-          "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "yearly_decay": {
           "card": "0..1",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "years": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         }
-      },
-      "include": [
-        "keys__type_opinion_modifier"
-      ]
+      }
     },
     "opinion_modifier_type_body": {
       "fields": {
         "opinion": {
           "card": "1",
-          "value": "int[-9999..-1] | int[0..9999]",
-          "when": null
+          "value": "int[-9999..-1] | int[0..9999]"
         }
       }
     }

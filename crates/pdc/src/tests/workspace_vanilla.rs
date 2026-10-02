@@ -335,7 +335,7 @@ fn editor_options_load_ordered_dependencies_and_keep_them_read_only() {
     )
     .expect("project");
     let reference_path = current.join("events/reference.txt");
-    fs::write(&reference_path, "event = dependency.1\nevent = vanilla.1\n")
+    fs::write(&reference_path, "country_event = { id = caller.1 immediate = { country_event = { id = dependency.1 } } }\ncountry_event = { id = caller.2 immediate = { country_event = { id = vanilla.1 } } }\n")
         .expect("current reference");
 
     let reference_uri = canonical_uri(&reference_path);
@@ -343,9 +343,9 @@ fn editor_options_load_ordered_dependencies_and_keep_them_read_only() {
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{},"initializationOptions":{"modDirectory":"mod","vanillaIndexCache":"cache/vanilla.pdcindex","dependencies":[{"id":"low","path":"dependencies/low"},{"id":"high","path":"dependencies/high"}]}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":reference_uri,"languageId":"eu4","version":1,"text":"event = dependency.1\nevent = vanilla.1\n"}}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":reference_uri},"position":{"line":0,"character":10},"newName":"renamed.1"}}),
-        json!({"jsonrpc":"2.0","id":4,"method":"textDocument/definition","params":{"textDocument":{"uri":reference_uri},"position":{"line":1,"character":8}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":reference_uri,"languageId":"eu4","version":1,"text":"country_event = { id = caller.1 immediate = { country_event = { id = dependency.1 } } }\ncountry_event = { id = caller.2 immediate = { country_event = { id = vanilla.1 } } }\n"}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":reference_uri},"position":{"line":0,"character":70},"newName":"renamed.1"}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"textDocument/definition","params":{"textDocument":{"uri":reference_uri},"position":{"line":1,"character":70}}}),
         json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
     ]);
@@ -536,13 +536,12 @@ fn stale_vanilla_cache_is_regenerated_with_an_explicit_notification() {
         .as_nanos();
     let container = std::env::temp_dir().join(format!("pdc-regen-cache-{nonce}"));
     let cache_path = stale_cache_fixture(&container);
-    let first_party_rules = game::eu4::first_party_rules().expect("embedded rules");
     assert_ne!(
         IndexCache::load(&cache_path)
             .expect("stale cache reload")
             .metadata()
-            .rule_hash,
-        first_party_rules.rule_hash().to_hex()
+            .build_id,
+        engine::ANALYZER_BUILD_ID
     );
 
     let input = frames([
@@ -588,9 +587,9 @@ fn stale_vanilla_cache_is_regenerated_with_an_explicit_notification() {
         IndexCache::load(&cache_path)
             .expect("regenerated cache reload")
             .metadata()
-            .rule_hash,
-        first_party_rules.rule_hash().to_hex(),
-        "the cache file on disk must be replaced with the regenerated hash"
+            .build_id,
+        engine::ANALYZER_BUILD_ID,
+        "the cache file on disk must be replaced with the regenerated analyzer identity"
     );
     assert_eq!(server.snapshot().source_roots().len(), 2);
     fs::remove_dir_all(container).expect("cleanup");
@@ -661,7 +660,7 @@ fn stale_cache_regeneration_reports_work_done_progress() {
             .expect("regenerated cache reload")
             .metadata()
             .rule_hash,
-        game::eu4::first_party_rules()
+        game::eu4::runtime_rules()
             .expect("embedded rules")
             .rule_hash()
             .to_hex()
@@ -715,7 +714,7 @@ fn valid_cache_load_reports_work_done_progress() {
             value["method"] == "window/logMessage"
                 && value["params"]["message"]
                     .as_str()
-                    .is_some_and(|message| message.contains("active rules hash matches"))
+                    .is_some_and(|message| message.contains("analyzer build matches"))
         }),
         "the cache load must explain why a rebuild was not needed"
     );
@@ -801,7 +800,7 @@ fn stale_vanilla_cache_reports_regeneration_failure_explicitly() {
     let mut output = Vec::new();
     let mut server = crate::LspServer::try_new_with_ir(
         InitializeOptions,
-        game::eu4::first_party_rules().expect("embedded rules"),
+        game::eu4::runtime_rules().expect("embedded rules"),
         game::eu4::profile(),
         game::eu4::first_party_ir().expect("embedded rules IR"),
     )
@@ -868,7 +867,7 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
         },
         source_override: None,
     };
-    let rules = game::eu4::first_party_rules().expect("rules");
+    let rules = game::eu4::runtime_rules().expect("rules");
     let explicit = root.join("explicit/vanilla.pdcindex");
     fs::create_dir_all(explicit.parent().expect("cache parent")).expect("cache directory");
     fs::write(&explicit, b"not a vanilla cache").expect("corrupt cache fixture");
@@ -884,8 +883,6 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
             rules: rules.clone(),
             ir: std::sync::Arc::new(rules::ir::RulesIr::empty()),
             profile: game::eu4::profile(),
-            current_rule_hash: rules.rule_hash().to_hex(),
-            current_ir_hash: rules::ir::RulesIr::empty().fingerprint(),
             auto_vanilla: Some(&automatic),
             log: None,
             progress: None,
@@ -911,8 +908,6 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
             rules: rules.clone(),
             ir: std::sync::Arc::new(rules::ir::RulesIr::empty()),
             profile: game::eu4::profile(),
-            current_rule_hash: rules.rule_hash().to_hex(),
-            current_ir_hash: rules::ir::RulesIr::empty().fingerprint(),
             auto_vanilla: Some(&automatic),
             log: None,
             progress: None,
@@ -982,7 +977,7 @@ fn unavailable_configured_cache_is_rebuilt_from_configured_source() {
     let reloaded = IndexCache::load(&cache_path).expect("rebuilt cache loads");
     assert_eq!(
         reloaded.metadata().rule_hash,
-        game::eu4::first_party_rules()
+        game::eu4::runtime_rules()
             .expect("rules")
             .rule_hash()
             .to_hex()
@@ -1012,15 +1007,13 @@ fn unavailable_user_level_cache_rebuild_records_the_resolved_source() {
         roots: vec![root.join("library")],
         include_platform_locations: false,
     };
-    let rules = game::eu4::first_party_rules().expect("rules");
+    let rules = game::eu4::runtime_rules().expect("rules");
     let (cache, message) = run_index_cache_load_with_options(
         IndexCacheLoadRequest {
             path: &cache_path,
             rules: rules.clone(),
             ir: std::sync::Arc::new(rules::ir::RulesIr::empty()),
             profile: game::eu4::profile(),
-            current_rule_hash: rules.rule_hash().to_hex(),
-            current_ir_hash: rules::ir::RulesIr::empty().fingerprint(),
             auto_vanilla: Some(&automatic),
             log: None,
             progress: None,
@@ -1056,8 +1049,6 @@ fn unavailable_user_level_cache_rebuild_records_the_resolved_source() {
             rules: rules.clone(),
             ir: std::sync::Arc::new(rules::ir::RulesIr::empty()),
             profile: game::eu4::profile(),
-            current_rule_hash: rules.rule_hash().to_hex(),
-            current_ir_hash: rules::ir::RulesIr::empty().fingerprint(),
             auto_vanilla: Some(&automatic),
             log: None,
             progress: None,
@@ -1129,7 +1120,7 @@ fn automatic_discovery_resolves_multiple_candidates_deterministically() {
     };
     let (_, message) = run_auto_vanilla_setup_with_options(
         &automatic,
-        game::eu4::first_party_rules().expect("rules"),
+        game::eu4::runtime_rules().expect("rules"),
         game::eu4::profile(),
         None,
         None,
@@ -1192,7 +1183,7 @@ fn automatic_vanilla_setup_builds_cache_and_records_single_attempt() {
     };
     let (cache, message) = run_auto_vanilla_setup_with_options(
         &automatic,
-        game::eu4::first_party_rules().expect("rules"),
+        game::eu4::runtime_rules().expect("rules"),
         game::eu4::profile(),
         None,
         None,
@@ -1211,7 +1202,7 @@ fn automatic_vanilla_setup_builds_cache_and_records_single_attempt() {
 
     let repeated = run_auto_vanilla_setup_with_options(
         &automatic,
-        game::eu4::first_party_rules().expect("rules"),
+        game::eu4::runtime_rules().expect("rules"),
         game::eu4::profile(),
         None,
         None,
@@ -1248,7 +1239,7 @@ fn selected_game_directory_retries_after_failed_automatic_discovery() {
     };
     let (_, message) = run_auto_vanilla_setup_with_options(
         &automatic,
-        game::eu4::first_party_rules().expect("rules"),
+        game::eu4::runtime_rules().expect("rules"),
         game::eu4::profile(),
         None,
         None,
@@ -1388,7 +1379,7 @@ fn unsuccessful_automatic_discovery_is_recorded_and_not_repeated() {
     };
     let first = run_auto_vanilla_setup_with_options(
         &automatic,
-        game::eu4::first_party_rules().expect("rules"),
+        game::eu4::runtime_rules().expect("rules"),
         game::eu4::profile(),
         None,
         None,
@@ -1405,7 +1396,7 @@ fn unsuccessful_automatic_discovery_is_recorded_and_not_repeated() {
 
     let second = run_auto_vanilla_setup_with_options(
         &automatic,
-        game::eu4::first_party_rules().expect("rules"),
+        game::eu4::runtime_rules().expect("rules"),
         game::eu4::profile(),
         None,
         None,
@@ -1517,13 +1508,17 @@ fn existing_dependency_index_cache_is_installed_in_the_background() {
     fs::remove_dir_all(&dependency).expect("make dependency source unavailable after caching");
 
     let reference = workspace.join("events/reference.txt");
-    fs::write(&reference, "event = dep.1\n").expect("workspace reference");
+    fs::write(
+        &reference,
+        "country_event = { id = caller.1 immediate = { country_event = { id = dep.1 } } }\n",
+    )
+    .expect("workspace reference");
     let reference_uri = canonical_uri(&reference);
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":canonical_uri(&workspace),"name":"test"}],"capabilities":{},"initializationOptions":{"modDirectory":".","dependencies":[{"id":"dep-a","path":dependency,"index":cache_path}]}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":reference_uri,"languageId":"eu4","version":1,"text":"event = dep.1\n"}}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{"textDocument":{"uri":reference_uri},"position":{"line":0,"character":8}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":reference_uri,"languageId":"eu4","version":1,"text":"country_event = { id = caller.1 immediate = { country_event = { id = dep.1 } } }\n"}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{"textDocument":{"uri":reference_uri},"position":{"line":0,"character":70}}}),
         json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
     ]);

@@ -1,786 +1,271 @@
 {
   "enums": {
-    "on_actions": {
-      "columns": {
-        "scope": "scope_type?"
-      },
-      "rows": {
-        "consort_on_shipwreck": {
-          "scope": "country"
-        },
-        "heir_on_shipwreck": {
-          "scope": "country"
-        },
-        "monarch_on_shipwreck": {
-          "scope": "country"
-        },
-        "on_abandon_colony": {
-          "scope": "province"
-        },
-        "on_accept_tribute": {
-          "scope": "country"
-        },
-        "on_add_pasha": {
-          "scope": "province"
-        },
-        "on_added_to_trade_company": {
-          "scope": "province"
-        },
-        "on_adm_advisor_hired": {
-          "scope": "country"
-        },
-        "on_adm_development": {
-          "scope": "province"
-        },
-        "on_adm_exploited": {
-          "scope": "province"
-        },
-        "on_adm_tech_taken": {
-          "scope": "country"
-        },
-        "on_admiral_recruited": {
-          "scope": "country"
-        },
-        "on_advisor_hired": {
-          "scope": "country"
-        },
-        "on_alliance_broken": {
-          "scope": "country"
-        },
-        "on_alliance_created": {
-          "scope": "country"
-        },
-        "on_annexed": {
-          "scope": "country"
-        },
-        "on_bankruptcy": {
-          "scope": "country"
-        },
-        "on_banner_raised": {
-          "scope": "province"
-        },
-        "on_barrage": {
-          "scope": "country"
-        },
-        "on_battle_lost_country": {
-          "scope": "country"
-        },
-        "on_battle_lost_province": {
-          "scope": "province"
-        },
-        "on_battle_lost_unit": {
-          "scope": "unit"
-        },
-        "on_battle_won_country": {
-          "scope": "country"
-        },
-        "on_battle_won_province": {
-          "scope": "province"
-        },
-        "on_battle_won_unit": {
-          "scope": "unit"
-        },
-        "on_become_free_city": {
-          "scope": "country"
-        },
-        "on_bi_yearly_pulse": {
-          "scope": "country"
-        },
-        "on_bi_yearly_pulse_2": {
-          "scope": "country"
-        },
-        "on_bi_yearly_pulse_3": {
-          "scope": "country"
-        },
-        "on_bi_yearly_pulse_4": {
-          "scope": "country"
-        },
-        "on_bi_yearly_pulse_5": {
-          "scope": "country"
-        },
-        "on_buy_religious_reform": {
-          "scope": "country"
-        },
-        "on_capital_moved": {
-          "scope": "province"
-        },
-        "on_caravel_raised": {
-          "scope": "province"
-        },
-        "on_carolean_raised": {
-          "scope": "province"
-        },
-        "on_cawa_raised": {
-          "scope": "province"
-        },
-        "on_center_of_trade_downgrade": {
-          "scope": "province"
-        },
-        "on_center_of_trade_upgrade": {
-          "scope": "province"
-        },
-        "on_centralized_state": {
-          "scope": "province"
-        },
-        "on_change_hre_religion": {
-          "scope": "country"
-        },
-        "on_change_revolution_target": {
-          "scope": "country"
-        },
-        "on_chinese_empire_dismantled": {
-          "scope": "country"
-        },
-        "on_circumnavigation": {
-          "scope": "country"
-        },
-        "on_colonial_liberation": {
-          "scope": "country"
-        },
-        "on_colonial_nation_established": {
-          "scope": "country"
-        },
-        "on_colonial_pulse": {
-          "scope": "province"
-        },
-        "on_colonial_reintegration": {
-          "scope": "country"
-        },
-        "on_colonial_type_change": {
-          "scope": "country"
-        },
-        "on_colonist_boosting_colony": {
-          "scope": "province"
-        },
-        "on_colony_established": {
-          "scope": "province"
-        },
-        "on_colony_finished": {
-          "scope": "province"
-        },
-        "on_company_chartered": {
-          "scope": "province"
-        },
-        "on_company_disolved": {
-          "scope": "province"
-        },
-        "on_company_formed": {
-          "scope": "province"
-        },
-        "on_concentrate_development": {
-          "scope": "province"
-        },
-        "on_conquest": {
-          "scope": "province"
-        },
-        "on_conquistador_empty": {
-          "scope": "province"
-        },
-        "on_conquistador_native": {
-          "scope": "province"
-        },
-        "on_conquistador_recruited": {
-          "scope": "country"
-        },
-        "on_consecrate_patriarch": {
-          "scope": "province"
-        },
-        "on_convert_by_trade_policy": {
-          "scope": "province"
-        },
-        "on_core": {
-          "scope": "province"
-        },
-        "on_cossack_raised": {
-          "scope": "province"
-        },
-        "on_country_creation": {
-          "scope": "country"
-        },
-        "on_country_released": {
-          "scope": "country"
-        },
-        "on_create_client_state": {
-          "scope": "country"
-        },
-        "on_create_vassal": {
-          "scope": "country"
-        },
-        "on_culture_demoted": {
-          "scope": "country"
-        },
-        "on_culture_promoted": {
-          "scope": "country"
-        },
-        "on_death_election": {
-          "scope": "country"
-        },
-        "on_death_foreign_slave_ruler": {
-          "scope": "country"
-        },
-        "on_death_has_harem": {
-          "scope": "country"
-        },
-        "on_defender_of_faith_claim": {
-          "scope": "country"
-        },
-        "on_defender_of_faith_loss": {
-          "scope": "country"
-        },
-        "on_dependency_gained": {
-          "scope": "country"
-        },
-        "on_dependency_lost": {
-          "scope": "country"
-        },
-        "on_dip_advisor_hired": {
-          "scope": "country"
-        },
-        "on_dip_development": {
-          "scope": "province"
-        },
-        "on_dip_exploited": {
-          "scope": "province"
-        },
-        "on_dip_tech_taken": {
-          "scope": "country"
-        },
-        "on_diplomatic_annex": {
-          "scope": "country"
-        },
-        "on_dismantle_revolution": {
-          "scope": "country"
-        },
-        "on_embrace_revolution": {
-          "scope": "country"
-        },
-        "on_emperor_elected": {
-          "scope": "country"
-        },
-        "on_enforce_rebel_demands": {
-          "scope": "country"
-        },
-        "on_estate_led_regency": {
-          "scope": "country"
-        },
-        "on_estate_led_regency_surpassed": {
-          "scope": "country"
-        },
-        "on_estate_removed": {
-          "scope": "country"
-        },
-        "on_expanded_infrastructure": {
-          "scope": "province"
-        },
-        "on_expanded_infrastructure_removed": {
-          "scope": "province"
-        },
-        "on_explore_coast": {
-          "scope": "province"
-        },
-        "on_explorer_recruited": {
-          "scope": "country"
-        },
-        "on_extend_regency": {
-          "scope": "country"
-        },
-        "on_extended_regency": {
-          "scope": "country"
-        },
-        "on_federation_leader_change": {
-          "scope": "country"
-        },
-        "on_fetishist_cult_change": {
-          "scope": "country"
-        },
-        "on_five_year_pulse": {
-          "scope": "country"
-        },
-        "on_five_year_pulse_2": {
-          "scope": "country"
-        },
-        "on_five_year_pulse_3": {
-          "scope": "country"
-        },
-        "on_five_year_pulse_4": {
-          "scope": "country"
-        },
-        "on_flagship_captured": {
-          "scope": "country"
-        },
-        "on_flagship_destroyed": {
-          "scope": "country"
-        },
-        "on_force_conversion": {
-          "scope": "country"
-        },
-        "on_four_year_pulse": {
-          "scope": "country"
-        },
-        "on_four_year_pulse_2": {
-          "scope": "country"
-        },
-        "on_four_year_pulse_3": {
-          "scope": "country"
-        },
-        "on_four_year_pulse_4": {
-          "scope": "country"
-        },
-        "on_gain_great_power_status": {
-          "scope": "country"
-        },
-        "on_galleass_raised": {
-          "scope": "province"
-        },
-        "on_galleon_raised": {
-          "scope": "province"
-        },
-        "on_general_recruited": {
-          "scope": "country"
-        },
-        "on_geobukseon_raised": {
-          "scope": "province"
-        },
-        "on_golden_bull_enacted": {
-          "scope": "country"
-        },
-        "on_government_change": {
-          "scope": "country"
-        },
-        "on_grant_estate_land": {
-          "scope": "province"
-        },
-        "on_great_project_constructed": {
-          "scope": "province"
-        },
-        "on_harmonized_buddhism": {
-          "scope": "country"
-        },
-        "on_harmonized_christian": {
-          "scope": "country"
-        },
-        "on_harmonized_dharmic": {
-          "scope": "country"
-        },
-        "on_harmonized_jewish_group": {
-          "scope": "country"
-        },
-        "on_harmonized_mahayana": {
-          "scope": "country"
-        },
-        "on_harmonized_muslim": {
-          "scope": "country"
-        },
-        "on_harmonized_pagan": {
-          "scope": "country"
-        },
-        "on_harmonized_shinto": {
-          "scope": "country"
-        },
-        "on_harmonized_vajrayana": {
-          "scope": "country"
-        },
-        "on_harmonized_zoroastrian_group": {
-          "scope": "country"
-        },
-        "on_heir_death": {
-          "scope": "country"
-        },
-        "on_heir_disinherited": {
-          "scope": "country"
-        },
-        "on_heir_needed_theocracy": {
-          "scope": "country"
-        },
-        "on_holy_order_established": {
-          "scope": "country"
-        },
-        "on_hre_defense": {
-          "scope": "country"
-        },
-        "on_hre_dismantled": {
-          "scope": "country"
-        },
-        "on_hre_member_annexed": {
-          "scope": "country"
-        },
-        "on_hre_member_false_religion": {
-          "scope": "country"
-        },
-        "on_hre_member_true_religion": {
-          "scope": "country"
-        },
-        "on_hre_non_defense": {
-          "scope": "country"
-        },
-        "on_hre_province_reconquest": {
-          "scope": "province"
-        },
-        "on_hre_reform_passed": {
-          "scope": "country"
-        },
-        "on_hre_released_vassal": {
-          "scope": "country"
-        },
-        "on_hre_religion_white_peace": {
-          "scope": "country"
-        },
-        "on_hre_transfered_vassal": {
-          "scope": "country"
-        },
-        "on_hre_wins_defensive_war": {
-          "scope": "country"
-        },
-        "on_hussars_raised": {
-          "scope": "province"
-        },
-        "on_institution_embracement": {
-          "scope": "country"
-        },
-        "on_integrate": {
-          "scope": "country"
-        },
-        "on_janissaries_raised": {
-          "scope": "province"
-        },
-        "on_leader_recruited": {
-          "scope": "country"
-        },
-        "on_loan_repaid": {
-          "scope": "country"
-        },
-        "on_lock_hre_religion": {
-          "scope": "country"
-        },
-        "on_lose_great_power_status": {
-          "scope": "country"
-        },
-        "on_main_war_lost": {
-          "scope": "country"
-        },
-        "on_main_war_won": {
-          "scope": "country"
-        },
-        "on_mamluks_raised": {
-          "scope": "province"
-        },
-        "on_man_of_war_raised": {
-          "scope": "province"
-        },
-        "on_mandate_of_heaven_gained": {
-          "scope": "country"
-        },
-        "on_mandate_of_heaven_lost": {
-          "scope": "country"
-        },
-        "on_mandate_reform_passed": {
-          "scope": "country"
-        },
-        "on_marine_raised": {
-          "scope": "province"
-        },
-        "on_mercenary_recruited": {
-          "scope": "mercenary_company"
-        },
-        "on_mil_advisor_hired": {
-          "scope": "country"
-        },
-        "on_mil_development": {
-          "scope": "province"
-        },
-        "on_mil_exploited": {
-          "scope": "province"
-        },
-        "on_mil_tech_taken": {
-          "scope": "country"
-        },
-        "on_minority_expelled": {
-          "scope": "province"
-        },
-        "on_monarch_death": {
-          "scope": "country"
-        },
-        "on_monthly_pulse": {
-          "scope": "country"
-        },
-        "on_musketeer_raised": {
-          "scope": "province"
-        },
-        "on_national_focus_change": {
-          "scope": "country"
-        },
-        "on_native_change_government": {
-          "scope": "country"
-        },
-        "on_naval_barrage": {
-          "scope": "country"
-        },
-        "on_new_age": {
-          "scope": "country"
-        },
-        "on_new_consort": {
-          "scope": "country"
-        },
-        "on_new_heir": {
-          "scope": "country"
-        },
-        "on_new_monarch": {
-          "scope": "country"
-        },
-        "on_new_term_election": {
-          "scope": "country"
-        },
-        "on_overextension_pulse": {
-          "scope": "country"
-        },
-        "on_overrun": {
-          "scope": "country"
-        },
-        "on_parliament_debate_failed": {
-          "scope": "country"
-        },
-        "on_parliament_debate_reset": {
-          "scope": "country"
-        },
-        "on_parliament_debate_succeeded": {
-          "scope": "country"
-        },
-        "on_parliament_seat_given": {
-          "scope": "province"
-        },
-        "on_parliament_seat_lost": {
-          "scope": "province"
-        },
-        "on_peace_actor": {
-          "scope": "country"
-        },
-        "on_peace_recipient": {
-          "scope": "country"
-        },
-        "on_pillaged_capital": {
-          "scope": "country"
-        },
-        "on_post_adm_advisor_fired": {
-          "scope": "country"
-        },
-        "on_post_dip_advisor_fired": {
-          "scope": "country"
-        },
-        "on_post_mil_advisor_fired": {
-          "scope": "country"
-        },
-        "on_pre_adm_advisor_fired": {
-          "scope": "country"
-        },
-        "on_pre_dip_advisor_fired": {
-          "scope": "country"
-        },
-        "on_pre_mil_advisor_fired": {
-          "scope": "country"
-        },
-        "on_primary_culture_changed": {
-          "scope": "country"
-        },
-        "on_province_culture_changed": {
-          "scope": "province"
-        },
-        "on_province_culture_converted": {
-          "scope": "province"
-        },
-        "on_province_owner_change": {
-          "scope": "province"
-        },
-        "on_province_religion_changed": {
-          "scope": "province"
-        },
-        "on_province_religion_converted": {
-          "scope": "province"
-        },
-        "on_qizilbash_raised": {
-          "scope": "province"
-        },
-        "on_queen_death": {
-          "scope": "country"
-        },
-        "on_raid_coast": {
-          "scope": "country"
-        },
-        "on_rajput_raised": {
-          "scope": "province"
-        },
-        "on_raze": {
-          "scope": "province"
-        },
-        "on_rebels_break_country": {
-          "scope": "country"
-        },
-        "on_reform_changed": {
-          "scope": "province"
-        },
-        "on_reform_enacted": {
-          "scope": "province"
-        },
-        "on_refuse_tribute": {
-          "scope": "country"
-        },
-        "on_regent": {
-          "scope": "country"
-        },
-        "on_regiment_recruited": {
-          "scope": "province"
-        },
-        "on_released_hre_member": {
-          "scope": "country"
-        },
-        "on_religion_change": {
-          "scope": "country"
-        },
-        "on_remove_free_city": {
-          "scope": "country"
-        },
-        "on_remove_pasha": {
-          "scope": "province"
-        },
-        "on_removed_from_company": {
-          "scope": "province"
-        },
-        "on_replace_governor": {
-          "scope": "country"
-        },
-        "on_revoke_estate_land": {
-          "scope": "province"
-        },
-        "on_revoke_estate_land_ai": {
-          "scope": "province"
-        },
-        "on_revoke_estate_land_ai_post": {
-          "scope": "province"
-        },
-        "on_revoke_estate_land_post": {
-          "scope": "province"
-        },
-        "on_revolutionary_guard_raised": {
-          "scope": "province"
-        },
-        "on_royal_marriage": {
-          "scope": "country"
-        },
-        "on_royal_marriage_broken": {
-          "scope": "country"
-        },
-        "on_samurai_raised": {
-          "scope": "province"
-        },
-        "on_scorch_earth": {
-          "scope": "country"
-        },
-        "on_secondary_religion_change": {
-          "scope": "country"
-        },
-        "on_select_heir_from_harem": {
-          "scope": "country"
-        },
-        "on_separate_war_lost": {
-          "scope": "country"
-        },
-        "on_separate_war_won": {
-          "scope": "country"
-        },
-        "on_siberian_pulse": {
-          "scope": "province"
-        },
-        "on_siege_lost_country": {
-          "scope": "country"
-        },
-        "on_siege_lost_province": {
-          "scope": "province"
-        },
-        "on_siege_won_country": {
-          "scope": "country"
-        },
-        "on_siege_won_province": {
-          "scope": "province"
-        },
-        "on_slacken_start": {
-          "scope": "country"
-        },
-        "on_slacken_stop": {
-          "scope": "country"
-        },
-        "on_startup": {
-          "scope": "country"
-        },
-        "on_state_edict_enacted": {
-          "scope": "province"
-        },
-        "on_state_edict_revoked": {
-          "scope": "province"
-        },
-        "on_streltsy_raised": {
-          "scope": "province"
-        },
-        "on_successive_emperor": {
-          "scope": "country"
-        },
-        "on_tech_taken": {
-          "scope": "country"
-        },
-        "on_tercio_raised": {
-          "scope": "province"
-        },
-        "on_thri_yearly_pulse": {
-          "scope": "country"
-        },
-        "on_thri_yearly_pulse_2": {
-          "scope": "country"
-        },
-        "on_thri_yearly_pulse_3": {
-          "scope": "country"
-        },
-        "on_thri_yearly_pulse_4": {
-          "scope": "country"
-        },
-        "on_trade_company_investment": {
-          "scope": "province"
-        },
-        "on_trade_good_changed": {
-          "scope": "province"
-        },
-        "on_transfer_development": {
-          "scope": "country"
-        },
-        "on_voc_indiamen_raised": {
-          "scope": "province"
-        },
-        "on_war_ended": {
-          "scope": "country"
-        },
-        "on_war_lost": {
-          "scope": "country"
-        },
-        "on_war_won": {
-          "scope": "country"
-        },
-        "on_weak_heir_claim": {
-          "scope": "country"
-        },
-        "on_yearly_pulse": {
-          "scope": "country"
-        },
-        "on_yearly_pulse_2": {
-          "scope": "country"
-        },
-        "on_yearly_pulse_3": {
-          "scope": "country"
-        },
-        "on_yearly_pulse_4": {
-          "scope": "country"
-        },
-        "on_yearly_pulse_5": {
-          "scope": "country"
-        }
-      }
-    }
+    "on_actions_country": [
+      "consort_on_shipwreck",
+      "heir_on_shipwreck",
+      "monarch_on_shipwreck",
+      "on_accept_tribute",
+      "on_adm_advisor_hired",
+      "on_adm_tech_taken",
+      "on_admiral_recruited",
+      "on_advisor_hired",
+      "on_alliance_broken",
+      "on_alliance_created",
+      "on_annexed",
+      "on_bankruptcy",
+      "on_barrage",
+      "on_battle_lost_country",
+      "on_battle_won_country",
+      "on_become_free_city",
+      "on_bi_yearly_pulse",
+      "on_bi_yearly_pulse_2",
+      "on_bi_yearly_pulse_3",
+      "on_bi_yearly_pulse_4",
+      "on_bi_yearly_pulse_5",
+      "on_buy_religious_reform",
+      "on_change_hre_religion",
+      "on_change_revolution_target",
+      "on_chinese_empire_dismantled",
+      "on_circumnavigation",
+      "on_colonial_liberation",
+      "on_colonial_nation_established",
+      "on_colonial_reintegration",
+      "on_colonial_type_change",
+      "on_conquistador_recruited",
+      "on_country_creation",
+      "on_country_released",
+      "on_create_client_state",
+      "on_create_vassal",
+      "on_culture_demoted",
+      "on_culture_promoted",
+      "on_death_election",
+      "on_death_foreign_slave_ruler",
+      "on_death_has_harem",
+      "on_defender_of_faith_claim",
+      "on_defender_of_faith_loss",
+      "on_dependency_gained",
+      "on_dependency_lost",
+      "on_dip_advisor_hired",
+      "on_dip_tech_taken",
+      "on_diplomatic_annex",
+      "on_dismantle_revolution",
+      "on_embrace_revolution",
+      "on_emperor_elected",
+      "on_enforce_rebel_demands",
+      "on_estate_led_regency",
+      "on_estate_led_regency_surpassed",
+      "on_estate_removed",
+      "on_explorer_recruited",
+      "on_extend_regency",
+      "on_extended_regency",
+      "on_federation_leader_change",
+      "on_fetishist_cult_change",
+      "on_five_year_pulse",
+      "on_five_year_pulse_2",
+      "on_five_year_pulse_3",
+      "on_five_year_pulse_4",
+      "on_flagship_captured",
+      "on_flagship_destroyed",
+      "on_force_conversion",
+      "on_four_year_pulse",
+      "on_four_year_pulse_2",
+      "on_four_year_pulse_3",
+      "on_four_year_pulse_4",
+      "on_gain_great_power_status",
+      "on_general_recruited",
+      "on_golden_bull_enacted",
+      "on_government_change",
+      "on_harmonized_buddhism",
+      "on_harmonized_christian",
+      "on_harmonized_dharmic",
+      "on_harmonized_jewish_group",
+      "on_harmonized_mahayana",
+      "on_harmonized_muslim",
+      "on_harmonized_pagan",
+      "on_harmonized_shinto",
+      "on_harmonized_vajrayana",
+      "on_harmonized_zoroastrian_group",
+      "on_heir_death",
+      "on_heir_disinherited",
+      "on_heir_needed_theocracy",
+      "on_holy_order_established",
+      "on_hre_defense",
+      "on_hre_dismantled",
+      "on_hre_member_annexed",
+      "on_hre_member_false_religion",
+      "on_hre_member_true_religion",
+      "on_hre_non_defense",
+      "on_hre_reform_passed",
+      "on_hre_released_vassal",
+      "on_hre_religion_white_peace",
+      "on_hre_transfered_vassal",
+      "on_hre_wins_defensive_war",
+      "on_institution_embracement",
+      "on_integrate",
+      "on_leader_recruited",
+      "on_loan_repaid",
+      "on_lock_hre_religion",
+      "on_lose_great_power_status",
+      "on_main_war_lost",
+      "on_main_war_won",
+      "on_mandate_of_heaven_gained",
+      "on_mandate_of_heaven_lost",
+      "on_mandate_reform_passed",
+      "on_mil_advisor_hired",
+      "on_mil_tech_taken",
+      "on_monarch_death",
+      "on_monthly_pulse",
+      "on_national_focus_change",
+      "on_native_change_government",
+      "on_naval_barrage",
+      "on_new_age",
+      "on_new_consort",
+      "on_new_heir",
+      "on_new_monarch",
+      "on_new_term_election",
+      "on_overextension_pulse",
+      "on_overrun",
+      "on_parliament_debate_failed",
+      "on_parliament_debate_reset",
+      "on_parliament_debate_succeeded",
+      "on_peace_actor",
+      "on_peace_recipient",
+      "on_pillaged_capital",
+      "on_post_adm_advisor_fired",
+      "on_post_dip_advisor_fired",
+      "on_post_mil_advisor_fired",
+      "on_pre_adm_advisor_fired",
+      "on_pre_dip_advisor_fired",
+      "on_pre_mil_advisor_fired",
+      "on_primary_culture_changed",
+      "on_queen_death",
+      "on_raid_coast",
+      "on_rebels_break_country",
+      "on_refuse_tribute",
+      "on_regent",
+      "on_released_hre_member",
+      "on_religion_change",
+      "on_remove_free_city",
+      "on_replace_governor",
+      "on_royal_marriage",
+      "on_royal_marriage_broken",
+      "on_scorch_earth",
+      "on_secondary_religion_change",
+      "on_select_heir_from_harem",
+      "on_separate_war_lost",
+      "on_separate_war_won",
+      "on_siege_lost_country",
+      "on_siege_won_country",
+      "on_slacken_start",
+      "on_slacken_stop",
+      "on_startup",
+      "on_successive_emperor",
+      "on_tech_taken",
+      "on_thri_yearly_pulse",
+      "on_thri_yearly_pulse_2",
+      "on_thri_yearly_pulse_3",
+      "on_thri_yearly_pulse_4",
+      "on_transfer_development",
+      "on_war_ended",
+      "on_war_lost",
+      "on_war_won",
+      "on_weak_heir_claim",
+      "on_yearly_pulse",
+      "on_yearly_pulse_2",
+      "on_yearly_pulse_3",
+      "on_yearly_pulse_4",
+      "on_yearly_pulse_5"
+    ],
+    "on_actions_mercenary_company": [
+      "on_mercenary_recruited"
+    ],
+    "on_actions_province": [
+      "on_abandon_colony",
+      "on_add_pasha",
+      "on_added_to_trade_company",
+      "on_adm_development",
+      "on_adm_exploited",
+      "on_banner_raised",
+      "on_battle_lost_province",
+      "on_battle_won_province",
+      "on_capital_moved",
+      "on_caravel_raised",
+      "on_carolean_raised",
+      "on_cawa_raised",
+      "on_center_of_trade_downgrade",
+      "on_center_of_trade_upgrade",
+      "on_centralized_state",
+      "on_colonial_pulse",
+      "on_colonist_boosting_colony",
+      "on_colony_established",
+      "on_colony_finished",
+      "on_company_chartered",
+      "on_company_disolved",
+      "on_company_formed",
+      "on_concentrate_development",
+      "on_conquest",
+      "on_conquistador_empty",
+      "on_conquistador_native",
+      "on_consecrate_patriarch",
+      "on_convert_by_trade_policy",
+      "on_core",
+      "on_cossack_raised",
+      "on_dip_development",
+      "on_dip_exploited",
+      "on_expanded_infrastructure",
+      "on_expanded_infrastructure_removed",
+      "on_explore_coast",
+      "on_galleass_raised",
+      "on_galleon_raised",
+      "on_geobukseon_raised",
+      "on_grant_estate_land",
+      "on_great_project_constructed",
+      "on_hre_province_reconquest",
+      "on_hussars_raised",
+      "on_janissaries_raised",
+      "on_mamluks_raised",
+      "on_man_of_war_raised",
+      "on_marine_raised",
+      "on_mil_development",
+      "on_mil_exploited",
+      "on_minority_expelled",
+      "on_musketeer_raised",
+      "on_parliament_seat_given",
+      "on_parliament_seat_lost",
+      "on_province_culture_changed",
+      "on_province_culture_converted",
+      "on_province_owner_change",
+      "on_province_religion_changed",
+      "on_province_religion_converted",
+      "on_qizilbash_raised",
+      "on_rajput_raised",
+      "on_raze",
+      "on_reform_changed",
+      "on_reform_enacted",
+      "on_regiment_recruited",
+      "on_remove_pasha",
+      "on_removed_from_company",
+      "on_revoke_estate_land",
+      "on_revoke_estate_land_ai",
+      "on_revoke_estate_land_ai_post",
+      "on_revoke_estate_land_post",
+      "on_revolutionary_guard_raised",
+      "on_samurai_raised",
+      "on_siberian_pulse",
+      "on_siege_lost_province",
+      "on_siege_won_province",
+      "on_state_edict_enacted",
+      "on_state_edict_revoked",
+      "on_streltsy_raised",
+      "on_tercio_raised",
+      "on_trade_company_investment",
+      "on_trade_good_changed",
+      "on_voc_indiamen_raised"
+    ],
+    "on_actions_unit": [
+      "on_battle_lost_unit",
+      "on_battle_won_unit"
+    ]
   },
   "files": {
     "on_actions": {
@@ -790,30 +275,6 @@
       "root": "on_actions_file"
     }
   },
-  "mixins": {
-    "keys__type_event": {
-      "fields": {
-        "hidden": {
-          "card": "0..1",
-          "doc": "If yes, the event runs in the background without popping up for the player.",
-          "value": "'yes'",
-          "when": null
-        },
-        "is_triggered_only": {
-          "card": "0..1",
-          "doc": "If yes, the event has no MTTH and only occurs when triggered from another source (an event or an on_action pulse).",
-          "value": "'yes'",
-          "when": null
-        },
-        "mean_time_to_happen": {
-          "body": "event_type_body__empty",
-          "card": "0..1",
-          "doc": "How frequently the event fires when triggers are met; the base is defined in days or months and adjusted by modifier blocks.",
-          "when": null
-        }
-      }
-    }
-  },
   "schemas": {
     "event_body": {
       "fields": {
@@ -821,160 +282,132 @@
           "body": "effect",
           "card": "0..1",
           "doc": "Effects executed after an option has been chosen, without repeating them in every option.",
-          "override": true,
-          "when": null
+          "override": true
         },
         "desc": [
           {
             "card": "0..*",
             "doc": "Localisation key or trigger-conditional desc block for the event description.",
             "override": true,
-            "value": "scalar | loc",
-            "when": null
+            "value": "scalar | loc"
           },
           {
             "body": "event_body__desc",
             "card": "0..*",
             "doc": "Localisation key or trigger-conditional desc block for the event description.",
-            "override": true,
-            "when": null
+            "override": true
           }
         ],
         "fire_only_once": {
           "card": "0..1",
           "doc": "If yes, after this event fires it will never fire again for any country, even when triggered directly in code.",
           "override": true,
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "goto": {
           "card": "0..1",
           "doc": "Scope-based event camera target.\nHighlights and refocuses the camera to the given province when the option is taken.",
           "override": true,
-          "value": "scope<any> | ref<province_id> | ref<event_target> | ref<global_event_target> | 'root' | 'from' | ref<estate>",
-          "when": null
+          "value": "scope<any> | ref<province_id> | ref<event_target> | ref<global_event_target> | 'root' | 'from' | ref<estate>"
         },
         "hidden": {
           "card": "0..1",
           "doc": "If yes, the event runs in the background without popping up for the player.",
-          "override": true,
           "severity": "warning",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "id": {
           "card": "1",
           "doc": "Unique non-negative integer event id; must not be replicated in any other event file.",
           "override": true,
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "immediate": {
           "body": "effect",
           "card": "0..1",
           "doc": "Effects executed immediately on the event firing, before any option is chosen.",
-          "override": true,
-          "when": null
+          "override": true
         },
         "is_mtth_scaled_to_size": {
           "card": "0..1",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "is_triggered_only": [
           {
             "card": "0..1",
             "doc": "If yes, the event has no MTTH and only occurs when triggered from another source (an event or an on_action pulse).",
-            "override": true,
-            "value": "bool",
-            "when": null
+            "value": "bool"
           },
           {
             "card": "0..1",
             "doc": "If yes, the event has no MTTH and only occurs when triggered from another source (an event or an on_action pulse).",
-            "override": true,
             "severity": "warning",
-            "value": "'yes'",
-            "when": null
+            "value": "'yes'"
           }
         ],
         "major": {
           "card": "0..1",
           "doc": "If yes, every country will be notified which options are selected.",
           "override": true,
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "major_trigger": {
           "body": "trigger",
           "card": "0..1",
           "doc": "Only displays the event to country validating the trigger",
-          "override": true,
-          "when": null
+          "override": true
         },
         "mean_time_to_happen": {
           "body": "event_body__mean_time_to_happen",
           "card": "0..1",
-          "doc": "How frequently the event fires when triggers are met; the base is defined in days or months and adjusted by modifier blocks.",
-          "override": true,
-          "when": null
+          "doc": "How frequently the event fires when triggers are met; the base is defined in days or months and adjusted by modifier blocks."
         },
         "option": {
           "body": "event_body__option",
           "card": "1..*",
           "doc": "A selectable choice; points to its localisation text and holds effects, availability triggers, ai_chance, highlight and goto.",
-          "override": true,
-          "when": null
+          "override": true
         },
         "picture": [
           {
             "card": "0..*",
             "doc": "Event picture name, defined in interface/eventpictures.gfx.",
             "override": true,
-            "value": "ref<sprite> | enum<dlc_event_pictures> | 'none'",
-            "when": null
+            "value": "ref<sprite> | enum<dlc_event_pictures> | 'none'"
           },
           {
             "body": "event_body__picture",
             "card": "0..*",
             "doc": "Event picture name, defined in interface/eventpictures.gfx.",
-            "override": true,
-            "when": null
+            "override": true
           }
         ],
         "title": {
           "card": "0..1",
           "doc": "Localisation key for the event title.",
           "override": true,
-          "value": "scalar | loc",
-          "when": null
+          "value": "scalar | loc"
         },
         "trigger": {
           "body": "trigger",
           "card": "0..1",
           "doc": "Conditions that must all be true for the event (or, inside an option, for that option) to be available.",
-          "override": true,
-          "when": null
+          "override": true
         }
-      },
-      "include": [
-        "keys__type_event"
-      ]
+      }
     },
     "event_body__desc": {
       "fields": {
         "desc": {
           "card": "1",
           "doc": "Localisation key or trigger-conditional desc block for the event description.",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "trigger": {
           "body": "trigger",
           "card": "1",
-          "doc": "Conditions that must all be true for the event (or, inside an option, for that option) to be available.",
-          "when": null
+          "doc": "Conditions that must all be true for the event (or, inside an option, for that option) to be available."
         }
       }
     },
@@ -984,8 +417,7 @@
           "card": "0..1",
           "doc": "Base mean time to happen in days (months = <int> is the alternative).",
           "override": true,
-          "value": "'1'",
-          "when": null
+          "value": "int[1..]"
         }
       },
       "include": [
@@ -996,8 +428,7 @@
           "card": "0..1",
           "key": "enum<days_months_years>",
           "override": true,
-          "value": "int | '1'",
-          "when": null
+          "value": "int | '1'"
         }
       ]
     },
@@ -1007,56 +438,203 @@
           "body": "event_body__option__ai_chance",
           "card": "0..1",
           "doc": "Relative weight for the AI choosing this option; factors are relative, by convention specified out of 100.",
-          "override": true,
-          "when": null
+          "override": true
+        },
+        "else": {
+          "body": "effect",
+          "card": "0..*",
+          "control": {
+            "kind": "branch_continue"
+          },
+          "doc": "Follows if/else_if; executes when no previous branch ran.",
+          "override": true
         },
         "goto": {
           "card": "0..1",
           "doc": "Scope-based event option camera target.\nHighlights and refocuses the camera to the given province when the option is taken.",
           "override": true,
-          "value": "scope<any> | ref<province_id> | ref<event_target> | 'root' | 'from' | ref<estate>",
-          "when": null
+          "value": "scope<any> | ref<province_id> | ref<event_target> | 'root' | 'from' | ref<estate>"
+        },
+        "hidden_effect": {
+          "body": "effect",
+          "card": "0..*",
+          "control": {
+            "kind": "transparent"
+          },
+          "doc": "Hides the enclosed effects from appearing as tooltips",
+          "override": true
         },
         "highlight": {
           "card": "0..1",
           "doc": "Adds a highlight to the option (a status effect shown in the option tooltip).",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "name": [
           {
             "card": "0..1",
             "doc": "Localisation key for the option text.",
             "override": true,
-            "value": "scalar",
-            "when": null
+            "value": "scalar"
           },
           {
             "card": "0..1",
             "doc": "Localisation key for the option text.",
             "override": true,
             "severity": "warning",
-            "value": "loc",
-            "when": null
+            "value": "loc"
           }
         ],
         "required_personality": {
           "card": "0..*",
           "override": true,
-          "value": "ref<ruler_personality>",
-          "when": null
+          "value": "ref<ruler_personality>"
+        },
+        "scope_field": {
+          "body": "effect",
+          "card": "0..*",
+          "override": true
+        },
+        "this": {
+          "body": "effect",
+          "card": "0..*",
+          "doc": "Switches the block's scope to the current scope; block contents are effects.",
+          "override": true
         },
         "trigger": {
           "body": "trigger",
           "card": "0..1",
           "doc": "Conditions that must all be true for the event (or, inside an option, for that option) to be available.",
-          "override": true,
-          "when": null
+          "override": true
         }
       },
       "include": [
         "keys__effect"
+      ],
+      "patterns": [
+        {
+          "body": "effect",
+          "card": "0..*",
+          "doc": "Refers to the country tags listed /Europa Universalis IV/common/country_tags",
+          "key": "ref<country_tag>",
+          "scope": {
+            "push": "country"
+          }
+        },
+        {
+          "body": "effect__area_used",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<area.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect__colonial_region",
+          "card": "0..*",
+          "doc": "Refers to any colonial region found in /Europa Universalis IV/common/colonial_regions/",
+          "key": "ref<colonial_region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect__continent",
+          "card": "0..*",
+          "doc": "Refers to any continent found in /Europa Universalis IV/map/continent.txt",
+          "key": "ref<continent>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect__province_group_used",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<province_group.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<province_id>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Spawns the defined rebel type in the current province scope. Rebel types found in /Europa Universalis IV/common/rebel_types/*.txt.",
+          "key": "ref<rebel_type>",
+          "scope": {
+            "in": [
+              "province"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "effect__region",
+          "card": "0..*",
+          "doc": "Refers to any region found in /Europa Universalis IV/map/region.txt",
+          "key": "ref<region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "key": "ref<scripted_effect>",
+          "value": "'yes'"
+        },
+        {
+          "body": "effect__scripted_effect",
+          "card": "0..*",
+          "doc": "The scripted effect will draw the value of the right clause via $left_clause$.",
+          "key": "ref<scripted_effect>"
+        },
+        {
+          "body": "effect__superregion",
+          "card": "0..*",
+          "doc": "Refers to any superregion found in /Europa Universalis IV/map/superregion.txt",
+          "key": "ref<superregion>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect__trade_company",
+          "card": "0..*",
+          "doc": "Refers to any trade company found in /Europa Universalis IV/common/trade_companies/",
+          "key": "ref<trade_company>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect",
+          "card": "0..*",
+          "doc": "Scopes to the province, which is also a trade node (defined in common/tradenodes)",
+          "key": "ref<trade_node>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "In country scope, spawns a specific unit (e.g. \"british_redcoat\") for the current scope in the defined province scope. In province scope, spawns a specific unit in the current province scope for the defined country scope. Units can be found in /Europa Universalis IV/common/units/*.txt.",
+          "key": "ref<unit_type>",
+          "value": "scope<province> | ref<province_id> | scope<country> | ref<country_tag>"
+        },
+        {
+          "body": "effect",
+          "card": "0..*",
+          "key": "link"
+        }
       ]
     },
     "event_body__option__ai_chance": {
@@ -1065,8 +643,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float[0.0..10000.0]",
-          "when": null
+          "value": "float[0.0..10000.0]"
         }
       },
       "include": [
@@ -1078,14 +655,12 @@
         "picture": {
           "card": "1",
           "doc": "Event picture name, defined in interface/eventpictures.gfx.",
-          "value": "scalar",
-          "when": null
+          "value": "ref<sprite> | enum<dlc_event_pictures> | 'none'"
         },
         "trigger": {
           "body": "trigger",
           "card": "1",
-          "doc": "Conditions that must all be true for the event (or, inside an option, for that option) to be available.",
-          "when": null
+          "doc": "Conditions that must all be true for the event (or, inside an option, for that option) to be available."
         }
       }
     },
@@ -1093,7 +668,7 @@
       "fields": {
         "country_event": {
           "body": "event_body",
-          "card": "0..1",
+          "card": "0..*",
           "def": {
             "name": "field:id",
             "type": "event.country"
@@ -1103,24 +678,21 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "namespace": {
-          "card": "0..1",
+          "card": "0..*",
           "doc": "Event id namespace; declared at most once per file.",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "normal_or_historical_nations": {
           "card": "0..1",
           "doc": "Restrict events to normal or historical nations.",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "province_event": {
           "body": "event_body",
-          "card": "0..1",
+          "card": "0..*",
           "def": {
             "name": "field:id",
             "type": "event.province"
@@ -1130,8 +702,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -1141,20 +712,17 @@
         "hidden": {
           "card": "0..1",
           "doc": "If yes, the event runs in the background without popping up for the player.",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "is_triggered_only": {
           "card": "0..1",
           "doc": "If yes, the event has no MTTH and only occurs when triggered from another source (an event or an on_action pulse).",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "mean_time_to_happen": {
           "body": "event_type_body__empty",
           "card": "0..1",
-          "doc": "How frequently the event fires when triggers are met; the base is defined in days or months and adjusted by modifier blocks.",
-          "when": null
+          "doc": "How frequently the event fires when triggers are met; the base is defined in days or months and adjusted by modifier blocks."
         }
       }
     },
@@ -1163,37 +731,2551 @@
       "fields": {
         "clr_ruler_flag": {
           "card": "0..1",
-          "value": "'marriage_length'",
-          "when": null
+          "override": true,
+          "value": "'marriage_length'"
+        },
+        "else": {
+          "body": "effect",
+          "card": "0..*",
+          "control": {
+            "kind": "branch_continue"
+          },
+          "doc": "Follows if/else_if; executes when no previous branch ran.",
+          "override": true
         },
         "events": {
           "card": "0..*",
-          "list": "ref<event.$S>",
-          "when": null
+          "list": "ref<event.$S>"
+        },
+        "hidden_effect": {
+          "body": "effect",
+          "card": "0..*",
+          "control": {
+            "kind": "transparent"
+          },
+          "doc": "Hides the enclosed effects from appearing as tooltips",
+          "override": true
         },
         "random_events": {
           "card": "0..1",
           "map": {
             "key": "int",
             "value": "ref<event.$S> | '0'"
-          },
-          "when": null
+          }
+        },
+        "scope_field": {
+          "body": "effect",
+          "card": "0..*",
+          "override": true
+        },
+        "this": {
+          "body": "effect",
+          "card": "0..*",
+          "doc": "Switches the block's scope to the current scope; block contents are effects.",
+          "override": true
         }
-      }
-    },
-    "on_actions_file": {
+      },
+      "include": [
+        "keys__effect"
+      ],
       "patterns": [
         {
-          "body": "on_action_body<$key.scope>",
+          "body": "effect",
+          "card": "0..*",
+          "doc": "Refers to the country tags listed /Europa Universalis IV/common/country_tags",
+          "key": "ref<country_tag>",
+          "scope": {
+            "push": "country"
+          }
+        },
+        {
+          "body": "effect__area_used",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<area.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect__colonial_region",
+          "card": "0..*",
+          "doc": "Refers to any colonial region found in /Europa Universalis IV/common/colonial_regions/",
+          "key": "ref<colonial_region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect__continent",
+          "card": "0..*",
+          "doc": "Refers to any continent found in /Europa Universalis IV/map/continent.txt",
+          "key": "ref<continent>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect__province_group_used",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<province_group.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<province_id>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Spawns the defined rebel type in the current province scope. Rebel types found in /Europa Universalis IV/common/rebel_types/*.txt.",
+          "key": "ref<rebel_type>",
+          "scope": {
+            "in": [
+              "province"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "effect__region",
+          "card": "0..*",
+          "doc": "Refers to any region found in /Europa Universalis IV/map/region.txt",
+          "key": "ref<region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "key": "ref<scripted_effect>",
+          "value": "'yes'"
+        },
+        {
+          "body": "effect__scripted_effect",
+          "card": "0..*",
+          "doc": "The scripted effect will draw the value of the right clause via $left_clause$.",
+          "key": "ref<scripted_effect>"
+        },
+        {
+          "body": "effect__superregion",
+          "card": "0..*",
+          "doc": "Refers to any superregion found in /Europa Universalis IV/map/superregion.txt",
+          "key": "ref<superregion>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect__trade_company",
+          "card": "0..*",
+          "doc": "Refers to any trade company found in /Europa Universalis IV/common/trade_companies/",
+          "key": "ref<trade_company>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect",
+          "card": "0..*",
+          "doc": "Scopes to the province, which is also a trade node (defined in common/tradenodes)",
+          "key": "ref<trade_node>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "In country scope, spawns a specific unit (e.g. \"british_redcoat\") for the current scope in the defined province scope. In province scope, spawns a specific unit in the current province scope for the defined country scope. Units can be found in /Europa Universalis IV/common/units/*.txt.",
+          "key": "ref<unit_type>",
+          "value": "scope<province> | ref<province_id> | scope<country> | ref<country_tag>"
+        },
+        {
+          "body": "effect",
+          "card": "0..*",
+          "key": "link"
+        }
+      ]
+    },
+    "on_actions_file": {
+      "fields": {
+        "monarch_on_shipwreck": {
+          "body": "on_action_body<country>",
           "card": "0..1",
-          "key": "enum<on_actions>",
-          "when": null
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country whose monarch was lost in the shipwreck.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_abandon_colony": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the colony province; FROM is the country abandoning it. This action fires before the colony is abandoned.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_accept_tribute": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country receiving tribute; FROM is its overlord.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_add_pasha": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is one province in the state receiving the pasha.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_added_to_trade_company": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province added to a trade company; FROM is the country doing it.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_adm_advisor_hired": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action executes after on_advisor_hired for an ADM advisor.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_adm_development": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province where administrative development changed.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_adm_exploited": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province whose administrative development was exploited.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_adm_tech_taken": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action executes after on_tech_taken for an ADM technology.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_admiral_recruited": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country recruiting the admiral.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_advisor_hired": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country hiring the advisor.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_alliance_broken": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the original alliance creator; FROM is the alliance accepter.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_alliance_created": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the alliance sender; FROM is the alliance accepter.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_annexed": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the annexed nation; FROM is the nation performing the annexation.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_bankruptcy": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country entering bankruptcy.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_barrage": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country performing the barrage; FROM is the province being barraged.",
+          "scope": {
+            "set": {
+              "from": "province",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_battle_lost_country": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the losing country; FROM is the winning country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_battle_lost_province": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the battle location; FROM is the winning country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_battle_lost_unit": {
+          "body": "on_action_body<unit>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This is the unit-scope on_action for a lost battle.",
+          "scope": {
+            "set": {
+              "root": "unit",
+              "this": "unit"
+            }
+          }
+        },
+        "on_battle_won_country": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the winning country; FROM is the losing country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_battle_won_province": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the battle location; FROM is the losing country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_battle_won_unit": {
+          "body": "on_action_body<unit>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This is the unit-scope on_action for a won battle.",
+          "scope": {
+            "set": {
+              "root": "unit",
+              "this": "unit"
+            }
+          }
+        },
+        "on_capital_moved": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the new capital province; FROM is the old capital province.",
+          "scope": {
+            "set": {
+              "from": "province",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_centralized_state": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province that was centralized.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_change_revolution_target": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS is the new revolution target; FROM is the previous target. Either tag may be absent.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_chinese_empire_dismantled": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the current nation; FROM is the former Emperor when the Chinese Empire is dismantled.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_colonial_liberation": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country involved in colonial liberation.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_colonial_nation_established": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the new colonial nation; FROM is its parent country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_colonial_reintegration": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country involved in colonial reintegration.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_colonial_type_change": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the colony; FROM is its overlord.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_colonist_boosting_colony": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT/THIS is the colony province; FROM is the owner country or a source province for minority expulsion.",
+          "scope": {
+            "set": {
+              "from": "any",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_colony_established": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT/THIS is the newly created colony province; FROM is normally its owner country or a source province for minority expulsion.",
+          "scope": {
+            "set": {
+              "from": "any",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_colony_finished": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province where the colony finished.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_company_chartered": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the trade-company province; FROM is the previous country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_company_disolved": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the trade-company province; FROM is the country performing the change.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_company_formed": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the trade-company province; FROM is the country forming the company.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_conquest": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province taken by a new owner; FROM is the previous owner. The action fires when the takeover occurs.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_conquistador_empty": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_conquistador_native": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_conquistador_recruited": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country recruiting the conquistador.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_consecrate_patriarch": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province being consecrated.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_convert_by_trade_policy": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is the province; FROM is the country propagating the conversion through its trade policy.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_core": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province receiving a core; FROM is the country receiving that core.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_country_released": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is the released country; FROM is the country releasing it.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_create_client_state": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is the new client state; FROM is its parent country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_create_vassal": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the new vassal; FROM is its overlord.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_death_election": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country where a ruler's death triggers an election.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_death_foreign_slave_ruler": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country whose foreign slave ruler died.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_defender_of_faith_loss": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country losing Defender of the Faith status.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_dependency_gained": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the overlord; FROM is the minor country gaining the dependency.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_dependency_lost": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the overlord; FROM is the minor country losing the dependency.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_dip_advisor_hired": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action executes after on_advisor_hired for a DIP advisor.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_dip_development": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province where diplomatic development changed.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_dip_tech_taken": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action executes after on_tech_taken for a DIP technology.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_diplomatic_annex": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "The action runs in the annexing country; ROOT identifies the annexation target.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_dismantle_revolution": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS is the revolutionary country being defeated; FROM is the country enforcing the peace treaty.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_emperor_elected": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the newly elected Emperor; FROM is the previous Emperor.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_enforce_rebel_demands": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action fires when rebel demands are enforced through a Support Rebels war.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_expanded_infrastructure": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province whose infrastructure was expanded; FROM is the country doing it.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_explore_coast": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the discovered province; FROM is the country performing the exploration.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_explorer_recruited": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country recruiting the explorer.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_extend_regency": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country extending its regency.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_five_year_pulse_2": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This is the estates pulse.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_flagship_captured": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country capturing the flagship; FROM is the country losing it.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_flagship_destroyed": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country destroying the flagship; FROM is the country losing it.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_force_conversion": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the converted country; FROM is the country forcing the conversion. This can come from a religious peace or an enforce-religion interaction.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_gain_great_power_status": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country gaining great-power status.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_general_recruited": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country recruiting the general.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_golden_bull_enacted": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is the Curia controller enacting the Golden Bull.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_government_change": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action fires when a non-native country changes government type.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_great_project_constructed": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the great-project province; FROM is its owner. The action fires after construction finishes.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_harmonized_buddhism": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action is used for Theravada harmonization.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_harmonized_pagan": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action is used for pagan harmonization.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_heir_death": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country whose heir died.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_heir_needed_theocracy": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action fires when a theocracy has no heir.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_holy_order_established": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country establishing the holy order; its first province in the state is set.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_hre_defense": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action fires when the Emperor comes to the defense of an HRE member.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_hre_member_annexed": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action fires when an HRE member is annexed by a non-HRE country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_hre_member_false_religion": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action fires when an HRE prince converts to a religion other than the Emperor's.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_hre_member_true_religion": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action fires when an HRE prince converts to the Emperor's religion.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_hre_non_defense": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action fires when the Emperor does not come to the defense of an HRE member.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_hre_province_reconquest": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the HRE province reconquered by an HRE member in a peace treaty.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_hre_released_vassal": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action fires when an HRE member is released from non-HRE vassalage.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_hre_transfered_vassal": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action fires when an HRE member becomes a vassal of the Emperor instead of a non-HRE country.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_hre_wins_defensive_war": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action fires when the Emperor wins an HRE defensive war.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_integrate": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action fires after a nation is integrated following a union.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_janissaries_raised": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is the province where the Janissaries are raised.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_leader_recruited": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country recruiting the leader.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_loan_repaid": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is the country repaying the loan.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_lose_great_power_status": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country losing great-power status.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_main_war_lost": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the losing country; FROM is the winning country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_main_war_won": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the winning country; FROM is the losing country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_mandate_of_heaven_gained": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the new Emperor of China; FROM is the old Emperor.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_mandate_of_heaven_lost": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the old Emperor of China; FROM is the new Emperor.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_mercenary_recruited": {
+          "body": "on_action_body<mercenary_company>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the mercenary company; THIS is the recruiting province; FROM is the recruiting country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "mercenary_company",
+              "this": "province"
+            }
+          }
+        },
+        "on_mil_advisor_hired": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action executes after on_advisor_hired for a MIL advisor.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_mil_development": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province where military development changed.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_mil_tech_taken": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action executes after on_tech_taken for a MIL technology.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_minority_expelled": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT/THIS is the colony receiving the minority; FROM is the home province.",
+          "scope": {
+            "set": {
+              "from": "province",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_monarch_death": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country whose monarch died.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_monthly_pulse": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This is the country-scoped monthly random-events pulse.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_native_change_government": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This action fires when a native changes government after completing all advancement groups.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_naval_barrage": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country performing the naval barrage; FROM is the province being barraged.",
+          "scope": {
+            "set": {
+              "from": "province",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_new_heir": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country receiving the new heir.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_new_monarch": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country with the new monarch; personal-union junior countries may also trigger this action.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_new_term_election": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country holding the new-term election.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_overrun": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the winner; FROM is the loser when a stack is wiped out.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_parliament_debate_failed": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country whose parliament debate failed.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_parliament_debate_reset": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country whose parliament debate was reset.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_parliament_debate_succeeded": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country whose parliament debate succeeded.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_parliament_seat_given": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province receiving a parliament seat.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_parliament_seat_lost": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province losing a parliament seat.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_peace_actor": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country acting in the peace interaction.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_peace_recipient": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country receiving the peace interaction.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_pillaged_capital": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country doing the pillaging; FROM is the country whose capital was pillaged.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_post_adm_advisor_fired": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is the country after its ADM advisor is fired or replaced.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_post_dip_advisor_fired": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is the country after its DIP advisor is fired or replaced.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_post_mil_advisor_fired": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is the country after its MIL advisor is fired or replaced.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_pre_adm_advisor_fired": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is the country before its ADM advisor is removed; define a replacement in the post action instead.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_pre_dip_advisor_fired": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is the country before its DIP advisor is removed.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_pre_mil_advisor_fired": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is the country before its MIL advisor is removed.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_province_culture_changed": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province affected by a general culture conversion through effects.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_province_culture_converted": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province affected by manual culture conversion.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_province_owner_change": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province whose owner changed; FROM is the old owner.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_province_religion_converted": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province whose religion was converted.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_queen_death": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country whose queen died.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_raid_coast": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is the raiding country; FROM is the sea province.",
+          "scope": {
+            "set": {
+              "from": "province",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_rebels_break_country": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is the country broken by rebels.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_refuse_tribute": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country handling the tribute; FROM is its overlord.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_regent": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country with a regent.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_regiment_recruited": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is the recruiting province; FROM is the recruiting country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_released_hre_member": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the HRE prince released by the Emperor.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_religion_change": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country whose religion changed.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_remove_pasha": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "THIS/ROOT is one province in the state losing the pasha.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_removed_from_company": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the trade-company province; FROM is the country doing it.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_replace_governor": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country replacing its governor.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_revoke_estate_land_ai": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province involved in the AI estate-land revocation; gradual revocation and rebel handling are not reliable here.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_royal_marriage": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the marriage sender; FROM is the marriage accepter.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_royal_marriage_broken": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the original marriage creator; FROM is the marriage accepter.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_scorch_earth": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country scorching earth; FROM is the scorched province.",
+          "scope": {
+            "set": {
+              "from": "province",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_secondary_religion_change": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country whose secondary religion changed.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_separate_war_lost": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the losing country; FROM is the winning country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_separate_war_won": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the winning country; FROM is the losing country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_siege_lost_country": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the losing country; FROM is the siege location.",
+          "scope": {
+            "set": {
+              "from": "province",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_siege_lost_province": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the siege location; FROM is the winning country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_siege_won_country": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the winning country; FROM is the siege location.",
+          "scope": {
+            "set": {
+              "from": "province",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_siege_won_province": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the siege location; FROM is the losing country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_startup": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country. Prefer a scripted effect for complex startup logic so the on_action remains easy to overview.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_state_edict_enacted": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is a province of the state where the edict was enacted; FROM is the country that enacted it.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_state_edict_revoked": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is a province of the state where the edict was revoked; FROM is the country that revoked it.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_successive_emperor": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the Emperor from the same dynasty as the previous Emperor.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_tech_taken": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country taking the technology.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_thri_yearly_pulse": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "This is the country-scoped three-year random-events pulse.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_trade_good_changed": {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the province whose trade good changed; FROM is the country triggering the change.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_transfer_development": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country receiving development; FROM is the country it was transferred from. Normal concentration may leave FROM unset.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_war_ended": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the winning country; FROM is the losing country when the war ends.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_war_lost": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the losing country; FROM is the winning country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_war_won": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the winning country; FROM is the losing country.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "on_weak_heir_claim": {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "doc": "ROOT is the country whose heir has a weak claim.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        }
+      },
+      "patterns": [
+        {
+          "body": "on_action_body<country>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "key": "enum<on_actions_country>",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        {
+          "body": "on_action_body<mercenary_company>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "key": "enum<on_actions_mercenary_company>",
+          "scope": {
+            "set": {
+              "root": "mercenary_company",
+              "this": "mercenary_company"
+            }
+          }
+        },
+        {
+          "body": "on_action_body<province>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "key": "enum<on_actions_province>",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        {
+          "body": "on_action_body<unit>",
+          "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
+          "key": "enum<on_actions_unit>",
+          "scope": {
+            "set": {
+              "root": "unit",
+              "this": "unit"
+            }
+          }
         },
         {
           "body": "on_action_body<country>",
           "card": "0..1",
+          "def": {
+            "type": "on_action"
+          },
           "key": "'on_harmonized_{scalar}'",
-          "when": null
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
         }
       ]
     }

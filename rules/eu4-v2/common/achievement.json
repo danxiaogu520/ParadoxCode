@@ -10,18 +10,15 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "id": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "localization": {
           "card": "1",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "possible": {
           "body": "trigger",
@@ -31,8 +28,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "provinces_to_highlight": {
           "body": "trigger",
@@ -42,8 +38,7 @@
               "root": "country",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "visible": {
           "body": "trigger",
@@ -53,8 +48,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     }

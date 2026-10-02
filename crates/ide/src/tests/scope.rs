@@ -3,7 +3,7 @@ use text::AbsPath;
 
 #[test]
 fn eu4_scope_links_switch_effect_context_and_scope() {
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     let id = DocumentId::new("file:///tmp/events/scope.txt");
     host.open_document(
@@ -22,7 +22,7 @@ fn eu4_scope_links_switch_effect_context_and_scope() {
 
 #[test]
 fn unknown_tooltip_and_named_event_target_scopes_stay_conservative() {
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     let id = DocumentId::new("file:///tmp/events/conservative-scopes.txt");
     let text = concat!(
@@ -47,32 +47,32 @@ fn unknown_tooltip_and_named_event_target_scopes_stay_conservative() {
 
 #[test]
 fn eu4_scope_link_chains_are_resolved_segment_by_segment() {
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let host = eu4_host(rules);
     let snapshot = host.snapshot();
-    let mut context = crate::ScopeContext::new(std::sync::Arc::new(game::eu4::profile()));
-    context.root = std::sync::Arc::from("province");
-    context.current = std::sync::Arc::from("province");
 
+    let state = hir::ScopeState {
+        root: hir::ScopeValue::known_single("province"),
+        current: vec![hir::ScopeValue::known_single("province")],
+        from: vec![],
+        previous: vec![],
+    };
+    assert!(hir::is_ir_scope_link(snapshot.ir(), "owner.capital_scope"));
+    let resolved =
+        hir::transition_ir_scope(snapshot.ir(), state.clone(), None, "owner.capital_scope");
     assert_eq!(
-        crate::resolve_scope_expression_context(&snapshot, &context, "owner.capital_scope")
-            .as_ref(),
-        "province"
+        resolved.current.first(),
+        Some(&hir::ScopeValue::known_single("province"))
     );
     assert_eq!(
-        crate::resolve_scope_expression_context(&snapshot, &context, "owner.missing_link").as_ref(),
-        "any"
+        resolved.previous.first(),
+        Some(&hir::ScopeValue::known_single("country"))
     );
-
-    let mut invalid_register_rule = snapshot.rules().model().semantic.rules[0].clone();
-    invalid_register_rule.push_scope = None;
-    invalid_register_rule.replace_scope = vec![
-        ("from_owner".to_owned(), "country".to_owned()),
-        ("previous_owner".to_owned(), "country".to_owned()),
-    ];
-    let unchanged = crate::semantic_child_scope(&snapshot, &context, &invalid_register_rule);
-    assert!(unchanged.from.is_empty());
-    assert!(unchanged.previous.is_empty());
+    assert!(!hir::is_ir_scope_link(snapshot.ir(), "owner.missing_link"));
+    assert_eq!(
+        hir::transition_ir_scope(snapshot.ir(), state.clone(), None, "missing_link"),
+        state
+    );
 }
 
 #[test]
@@ -92,7 +92,7 @@ fn game_age_abilities_defined_in_the_current_file_validate_their_effects() {
     )
     .expect("ability source");
 
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -148,7 +148,7 @@ fn game_age_ability_in_an_initially_empty_index_is_a_definition() {
     let ages = root.join("common/ages");
     fs::create_dir_all(&ages).expect("ages directory");
 
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -186,7 +186,7 @@ fn game_age_ability_in_an_initially_empty_index_is_a_definition() {
 
 #[test]
 fn eu4_common_links_allow_owner_to_push_province_scope_to_country() {
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     let id = DocumentId::new("file:///tmp/events/owner.txt");
     host.open_document(
@@ -210,94 +210,9 @@ fn eu4_common_links_allow_owner_to_push_province_scope_to_country() {
 }
 
 #[test]
-fn eu4_replace_scope_links_populate_from_intrinsics() {
-    use engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
-    use std::fs;
-
-    assert_eq!(
-        crate::repeated_scope_register_depth("prevprev", "prev"),
-        Some(1)
-    );
-    assert_eq!(
-        crate::repeated_scope_register_depth("previous_owner", "previous"),
-        None
-    );
-
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("ide-scope-intrinsics-{nonce}"));
-    let directory = root.join("common/buildings");
-    fs::create_dir_all(&directory).expect("building directory");
-    fs::create_dir_all(root.join("interface")).expect("interface directory");
-    fs::write(
-        root.join("interface/test.gfx"),
-        "spriteTypes = { spriteType = { name = \"GFX_test_building\" texturefile = \"t.dds\" } }\n",
-    )
-    .expect("building sprite");
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
-    let mut host = eu4_host(rules);
-    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-        SourceRootId::new(1),
-        SourceRootKind::Project,
-        AbsPath::normalize(&root),
-    )]));
-    host.refresh_source_roots().expect("scan building sprite");
-
-    let valid_id = DocumentId::new("file:///tmp/from-building.txt");
-    host.open_document(
-        valid_id.clone(),
-        1,
-        "test_building = { on_built = { cossack_infantry = FROM } }\n".to_owned(),
-        Some(AbsPath::normalize(&directory.join("from.txt"))),
-    )
-    .expect("open FROM fixture");
-    assert!(
-        diagnostics(&host.snapshot(), &valid_id)
-            .iter()
-            .all(|item| item.code != DiagnosticCode::InvalidValue)
-    );
-
-    let invalid_id = DocumentId::new("file:///tmp/this-building.txt");
-    host.open_document(
-        invalid_id.clone(),
-        1,
-        "other_building = { on_built = { cossack_infantry = THIS } }\n".to_owned(),
-        Some(AbsPath::normalize(&directory.join("this.txt"))),
-    )
-    .expect("open THIS fixture");
-    assert!(
-        diagnostics(&host.snapshot(), &invalid_id)
-            .iter()
-            .any(|item| item.code == DiagnosticCode::WrongScope)
-    );
-    fs::remove_dir_all(root).expect("cleanup");
-}
-
-#[test]
 fn dynamic_scope_mismatch_surfaces_at_the_call_site() {
     use engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
     use std::fs;
-
-    let mut model = game::eu4::first_party_rules()
-        .expect("first-party rules")
-        .model()
-        .clone();
-    model.semantic.rules.push(SemanticRule {
-        id: "fixture:effect:enter-province".to_owned(),
-        shape: RuleShape::Node,
-        child_context: Some("effect".to_owned()),
-        push_scope: Some("province".to_owned()),
-        ..semantic_rule("effect", "fixture_enter_province")
-    });
-    model.semantic.rules.push(SemanticRule {
-        id: "fixture:effect:country-only".to_owned(),
-        value: ValueMatcher::Bool,
-        allowed_scopes: vec!["country".to_owned()],
-        line: 2,
-        ..semantic_rule("effect", "fixture_country_only")
-    });
 
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -308,10 +223,10 @@ fn dynamic_scope_mismatch_surfaces_at_the_call_site() {
     fs::create_dir_all(&definitions).expect("definition directory");
     fs::write(
         definitions.join("00_scope.txt"),
-        "country_wrapper = { fixture_country_only = yes }\n",
+        "country_wrapper = { add_prestige = 1 }\n",
     )
     .expect("dynamic definition");
-    let mut host = eu4_host(RuleSet::from_model(model));
+    let mut host = eu4_host(game::eu4::bootstrap_rules());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -322,7 +237,7 @@ fn dynamic_scope_mismatch_surfaces_at_the_call_site() {
     let source = concat!(
         "country_event = { immediate = { ",
         "country_wrapper = yes ",
-        "fixture_enter_province = { country_wrapper = yes }",
+        "capital = { country_wrapper = yes }",
         " } }\n",
     );
     host.open_document(id.clone(), 1, source.to_owned(), None)
@@ -355,7 +270,7 @@ fn dynamic_scope_mismatch_surfaces_at_the_call_site() {
         results
             .iter()
             .all(|diagnostic| !(diagnostic.code == DiagnosticCode::WrongScope
-                && diagnostic.message.contains("fixture_country_only"))),
+                && diagnostic.message.contains("add_prestige"))),
         "the expansion walk no longer reports scope findings: {results:?}"
     );
     fs::remove_dir_all(root).expect("cleanup");

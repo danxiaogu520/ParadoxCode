@@ -10,8 +10,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "ai_war_score": {
           "body": "flagship_modification_body__ai_war_score",
@@ -21,19 +20,16 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "base_modification": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "modifier": {
           "body": "flagship_modifier",
           "card": "1",
-          "doc": "Block of modifiers applied while the containing entry is active.",
-          "when": null
+          "doc": "Block of modifiers applied while the containing entry is active."
         },
         "trigger": {
           "body": "trigger",
@@ -44,8 +40,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -55,8 +50,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -69,8 +63,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [

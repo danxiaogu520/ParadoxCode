@@ -5,8 +5,7 @@
         {
           "body": "country_color_file_body__enum_country_tags",
           "card": "0..*",
-          "key": "enum<country_tags>",
-          "when": null
+          "key": "ref<country_tag>"
         }
       ]
     },
@@ -15,20 +14,17 @@
         "color1": {
           "card": "1",
           "doc": "60% of character",
-          "list": "int[0..255]",
-          "when": null
+          "list": "int[0..255]"
         },
         "color2": {
           "card": "1",
           "doc": "30% of character",
-          "list": "int[0..255]",
-          "when": null
+          "list": "int[0..255]"
         },
         "color3": {
           "card": "1",
           "doc": "Up to 10% -> try map color here",
-          "list": "int[0..255]",
-          "when": null
+          "list": "int[0..255]"
         }
       }
     },
@@ -46,102 +42,83 @@
         "all_your_core_are_belong_to_us": {
           "card": "0..1",
           "doc": "Synthetics tag: Excludes them from random countries, makes sure they only can be spawned once",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "army_names": {
           "card": "0..1",
-          "list": "scalar",
-          "when": null
+          "list": "scalar"
         },
         "cannot_form_from_collapse_nation": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "colonial_parent": {
           "card": "0..1",
-          "value": "enum<country_tags>",
-          "when": null
+          "value": "ref<country_tag>"
         },
         "color": {
           "card": "1",
-          "list": "int[0..]",
-          "when": null
+          "list": "int[0..]"
         },
         "fleet_names": {
           "card": "0..1",
-          "list": "scalar",
-          "when": null
+          "list": "scalar"
         },
         "graphical_culture": {
           "card": "1",
-          "value": "enum<graphical_cultures>",
-          "when": null
+          "value": "enum<graphical_cultures>"
         },
         "historical_council": {
           "card": "0..1",
-          "value": "enum<council_positions>",
-          "when": null
+          "value": "enum<council_positions>"
         },
         "historical_idea_groups": {
           "card": "0..1",
-          "list": "ref<idea_group.selectable>",
-          "severity": "warning",
-          "when": null
+          "list": "ref<idea_group>",
+          "severity": "warning"
         },
         "historical_score": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "historical_units": {
           "card": "0..1",
           "list": "ref<unit_type>",
-          "severity": "warning",
-          "when": null
+          "severity": "warning"
         },
         "leader_names": {
           "card": "1",
-          "list": "scalar",
-          "when": null
+          "list": "scalar"
         },
         "monarch_names": {
           "body": "country_file_body__monarch_names",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "preferred_religion": {
           "card": "0..1",
-          "value": "ref<religion>",
-          "when": null
+          "value": "ref<religion>"
         },
         "random_nation_chance": {
           "card": "0..1",
-          "value": "int[0..100]",
-          "when": null
+          "value": "int[0..100]"
         },
         "revolutionary_colors": {
           "card": "0..1",
-          "list": "int[0..16]",
-          "when": null
+          "list": "int[0..16]"
         },
         "right_to_bear_arms": {
           "card": "0..1",
           "doc": "Jan Mayen tag: Excludes them from random countries, makes sure they only can be spawned once",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "ship_names": {
           "card": "0..1",
           "list": "scalar",
-          "severity": "warning",
-          "when": null
+          "severity": "warning"
         },
         "special_unit_culture": {
           "card": "0..1",
-          "value": "'south_east_asian_special'",
-          "when": null
+          "value": "'south_east_asian_special'"
         }
       }
     },
@@ -155,7 +132,7 @@
       "items": "scalar"
     },
     "country_file_body__historical_idea_groups": {
-      "items": "ref<idea_group.selectable>"
+      "items": "ref<idea_group>"
     },
     "country_file_body__historical_units": {
       "items": "ref<unit_type>"
@@ -168,8 +145,7 @@
         {
           "card": "1..*",
           "key": "scalar",
-          "value": "int",
-          "when": null
+          "value": "int"
         }
       ]
     },
@@ -183,24 +159,20 @@
       "fields": {
         "color": {
           "card": "1..*",
-          "list": "int[0..]",
-          "when": null
+          "list": "int[0..]"
         },
         "flag_color": {
           "card": "1..*",
-          "list": "int[0..]",
-          "when": null
+          "list": "int[0..]"
         },
         "num_symbols": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "textures": {
           "body": "custom_country_colors_body__textures",
           "card": "1..*",
-          "doc": "WHEN ADDING NEW, ALWAYS ADD AT THE END",
-          "when": null
+          "doc": "WHEN ADDING NEW, ALWAYS ADD AT THE END"
         }
       }
     },
@@ -214,8 +186,7 @@
       "fields": {
         "texture": {
           "body": "custom_country_colors_body__textures__texture",
-          "card": "1",
-          "when": null
+          "card": "0..*"
         }
       }
     },
@@ -223,23 +194,19 @@
       "fields": {
         "color": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "file": {
           "card": "1",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "noOfFrames": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "size": {
           "body": "custom_country_colors_body__textures__texture__size",
-          "card": "1",
-          "when": null
+          "card": "1"
         }
       }
     },
@@ -247,13 +214,11 @@
       "fields": {
         "x": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "y": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         }
       }
     }

@@ -1,6 +1,6 @@
 {
-  "mixins": {
-    "keys__type_event_modifier": {
+  "schemas": {
+    "event_modifier_body": {
       "fields": {
         "MAY_conditional_loyalty": {
           "card": "0..1",
@@ -10,8 +10,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "accept_vassalization_reasons": {
           "card": "0..1",
@@ -21,8 +20,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "add_tribal_land_cost": {
           "card": "0..1",
@@ -32,8 +30,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "adm_advisor_cost": {
           "card": "0..1",
@@ -43,8 +40,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "adm_tech_cost_modifier": {
           "card": "0..1",
@@ -54,8 +50,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "administrative_efficiency": {
           "card": "0..1",
@@ -65,8 +60,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "admiral_cost": {
           "card": "0..1",
@@ -76,8 +70,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "admiral_skill_gain_modifier": {
           "card": "0..1",
@@ -87,8 +80,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "advisor_cost": {
           "card": "0..1",
@@ -98,8 +90,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "advisor_pool": {
           "card": "0..1",
@@ -109,8 +100,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "ae_impact": {
           "card": "0..1",
@@ -120,8 +110,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "all_estate_influence_modifier": {
           "card": "0..1",
@@ -131,8 +120,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "all_estate_loyalty_equilibrium": {
           "card": "0..1",
@@ -142,8 +130,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "all_estate_possible_privileges": {
           "card": "0..1",
@@ -153,8 +140,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "all_power_cost": {
           "card": "0..1",
@@ -164,8 +150,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allow_client_states": {
           "card": "0..1",
@@ -175,8 +160,7 @@
               "country"
             ]
           },
-          "value": "bool | 'yes'",
-          "when": null
+          "value": "bool | 'yes'"
         },
         "allow_free_estate_privilege_revocation": {
           "card": "0..1",
@@ -186,8 +170,7 @@
               "country"
             ]
           },
-          "value": "bool | 'yes'",
-          "when": null
+          "value": "bool | 'yes'"
         },
         "allow_janissaries_from_own_faith": {
           "card": "0..1",
@@ -197,8 +180,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "allow_mercenaries_to_split": {
           "card": "0..1",
@@ -208,8 +190,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "allow_mercenary_drill": {
           "card": "0..1",
@@ -219,8 +200,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "allowed_caravel_fraction": {
           "card": "0..1",
@@ -230,8 +210,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allowed_cossack_fraction": {
           "card": "0..1",
@@ -241,8 +220,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allowed_galleass_fraction": {
           "card": "0..1",
@@ -252,8 +230,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allowed_galleon_fraction": {
           "card": "0..1",
@@ -263,8 +240,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allowed_geobukseon_fraction": {
           "card": "0..1",
@@ -274,8 +250,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allowed_mamluks_fraction": {
           "card": "0..1",
@@ -285,8 +260,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allowed_man_of_war_fraction": {
           "card": "0..1",
@@ -296,8 +270,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allowed_marine_fraction": {
           "card": "0..1",
@@ -307,8 +280,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allowed_musketeer_fraction": {
           "card": "0..1",
@@ -318,8 +290,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allowed_num_of_buildings": {
           "card": "0..1",
@@ -329,8 +300,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allowed_num_of_manufactories": {
           "card": "0..1",
@@ -340,8 +310,7 @@
               "province"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "allowed_qizilbash_fraction": {
           "card": "0..1",
@@ -351,8 +320,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allowed_rajput_fraction": {
           "card": "0..1",
@@ -362,8 +330,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allowed_rev_guard_fraction": {
           "card": "0..1",
@@ -373,8 +340,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allowed_samurai_fraction": {
           "card": "0..1",
@@ -384,8 +350,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allowed_streltsy_fraction": {
           "card": "0..1",
@@ -395,8 +360,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allowed_tercio_fraction": {
           "card": "0..1",
@@ -406,8 +370,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "allowed_voc_indiamen_fraction": {
           "card": "0..1",
@@ -417,8 +380,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "amount_of_banners": {
           "card": "0..1",
@@ -428,8 +390,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "amount_of_caravel": {
           "card": "0..1",
@@ -439,8 +400,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "amount_of_carolean": {
           "card": "0..1",
@@ -450,8 +410,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "amount_of_cawa": {
           "card": "0..1",
@@ -461,8 +420,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "amount_of_galleass": {
           "card": "0..1",
@@ -472,8 +430,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "amount_of_galleon": {
           "card": "0..1",
@@ -483,8 +440,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "amount_of_geobukseon": {
           "card": "0..1",
@@ -494,8 +450,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "amount_of_hussars": {
           "card": "0..1",
@@ -505,8 +460,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "amount_of_mamluks": {
           "card": "0..1",
@@ -516,8 +470,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "amount_of_man_of_war": {
           "card": "0..1",
@@ -527,8 +480,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "amount_of_musketeers": {
           "card": "0..1",
@@ -538,8 +490,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "amount_of_qizilbash": {
           "card": "0..1",
@@ -549,8 +500,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "amount_of_samurai": {
           "card": "0..1",
@@ -560,8 +510,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "amount_of_streltsy": {
           "card": "0..1",
@@ -571,8 +520,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "amount_of_tercio": {
           "card": "0..1",
@@ -582,8 +530,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "amount_of_voc_indiamen": {
           "card": "0..1",
@@ -593,8 +540,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "annexation_relations_impact": {
           "card": "0..1",
@@ -604,8 +550,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "appoint_cardinal_cost": {
           "card": "0..1",
@@ -615,8 +560,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "army_tradition": {
           "card": "0..1",
@@ -626,8 +570,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "army_tradition_decay": {
           "card": "0..1",
@@ -637,8 +580,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "army_tradition_from_battle": {
           "card": "0..1",
@@ -648,8 +590,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "artillery_barrage_cost": {
           "card": "0..1",
@@ -659,8 +600,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "artillery_cost": {
           "card": "0..1",
@@ -670,8 +610,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "artillery_fire": {
           "card": "0..1",
@@ -681,8 +620,7 @@
               "country"
             ]
           },
-          "value": "float | int | float",
-          "when": null
+          "value": "float | int | float"
         },
         "artillery_level_modifier": {
           "card": "0..1",
@@ -692,8 +630,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "artillery_levels_available_vs_fort": {
           "card": "0..1",
@@ -703,8 +640,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "artillery_power": {
           "card": "0..1",
@@ -714,8 +650,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "artillery_shock": {
           "card": "0..1",
@@ -725,8 +660,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "assault_fort_ability": {
           "card": "0..1",
@@ -736,8 +670,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "assault_fort_cost_modifier": {
           "card": "0..1",
@@ -747,8 +680,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "attack_bonus_in_capital_terrain": {
           "card": "0..1",
@@ -758,8 +690,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "attrition": {
           "card": "0..1",
@@ -769,8 +700,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "auto_explore_adjacent_to_colony": {
           "card": "0..1",
@@ -780,8 +710,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "autonomy_change_time": {
           "card": "0..1",
@@ -791,8 +720,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "available_province_loot": {
           "card": "0..1",
@@ -802,8 +730,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "backrow_artillery_damage": {
           "card": "0..1",
@@ -813,8 +740,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "barrage_cost_in_fleet_modifier": {
           "card": "0..1",
@@ -824,8 +750,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "block_introduce_heir": {
           "card": "0..1",
@@ -835,8 +760,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "block_slave_raid": {
           "card": "0..1",
@@ -846,8 +770,7 @@
               "province"
             ]
           },
-          "value": "bool | 'yes'",
-          "when": null
+          "value": "bool | 'yes'"
         },
         "blockade_efficiency": {
           "card": "0..1",
@@ -857,8 +780,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "blockade_force_required": {
           "card": "0..1",
@@ -868,8 +790,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "blockade_impact_on_siege_in_fleet_modifier": {
           "card": "0..1",
@@ -879,8 +800,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "brahmins_hindu_influence_modifier": {
           "card": "0..1",
@@ -890,8 +810,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "brahmins_hindu_loyalty_modifier": {
           "card": "0..1",
@@ -901,8 +820,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "brahmins_muslim_influence_modifier": {
           "card": "0..1",
@@ -912,8 +830,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "brahmins_muslim_loyalty_modifier": {
           "card": "0..1",
@@ -923,8 +840,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "brahmins_other_influence_modifier": {
           "card": "0..1",
@@ -934,8 +850,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "brahmins_other_loyalty_modifier": {
           "card": "0..1",
@@ -945,8 +860,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "build_cost": {
           "card": "0..1",
@@ -956,8 +870,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "build_time": {
           "card": "0..1",
@@ -967,8 +880,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "can_bypass_forts": {
           "card": "0..1",
@@ -978,8 +890,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "can_chain_claim": {
           "card": "0..1",
@@ -989,8 +900,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "can_claim_states": {
           "card": "0..1",
@@ -1000,8 +910,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_fabricate_for_vassals": {
           "card": "0..1",
@@ -1011,8 +920,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "can_not_build_buildings": {
           "card": "0..1",
@@ -1022,8 +930,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "can_not_build_colonies": {
           "card": "0..1",
@@ -1033,8 +940,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "can_not_build_missionaries": {
           "card": "0..1",
@@ -1044,8 +950,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "can_not_declare_war": {
           "card": "0..1",
@@ -1055,8 +960,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "can_not_send_merchants": {
           "card": "0..1",
@@ -1066,8 +970,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "can_recruit_cawa": {
           "card": "0..1",
@@ -1077,8 +980,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "can_recruit_cossacks": {
           "card": "0..1",
@@ -1088,8 +990,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "can_recruit_hussars": {
           "card": "0..1",
@@ -1099,8 +1000,7 @@
               "country"
             ]
           },
-          "value": "bool | 'yes'",
-          "when": null
+          "value": "bool | 'yes'"
         },
         "can_recruit_janissaries": {
           "card": "0..1",
@@ -1110,8 +1010,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_recruit_rajputs": {
           "card": "0..1",
@@ -1121,8 +1020,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "can_recruit_revolutionary_guards": {
           "card": "0..1",
@@ -1132,8 +1030,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "can_revoke_parliament_seats": {
           "card": "0..1",
@@ -1143,8 +1040,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "can_transfer_vassal_wargoal": {
           "card": "0..1",
@@ -1154,8 +1050,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "can_transport_units": {
           "card": "0..1",
@@ -1165,8 +1060,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "candidate_random_bonus": {
           "card": "0..1",
@@ -1176,8 +1070,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "cannons_for_hunting_pirates_in_fleet": {
           "card": "0..1",
@@ -1187,8 +1080,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "capped_by_forcelimit": {
           "card": "0..1",
@@ -1198,8 +1090,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "capture_ship_chance": {
           "card": "0..1",
@@ -1209,8 +1100,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "caravan_power": {
           "card": "0..1",
@@ -1220,8 +1110,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "cav_to_inf_ratio": {
           "card": "0..1",
@@ -1231,8 +1120,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "cavalry_cost": {
           "card": "0..1",
@@ -1242,8 +1130,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "cavalry_fire": {
           "card": "0..1",
@@ -1253,8 +1140,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "cavalry_flanking": {
           "card": "0..1",
@@ -1264,8 +1150,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "cavalry_power": {
           "card": "0..1",
@@ -1275,8 +1160,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "cavalry_shock": {
           "card": "0..1",
@@ -1286,8 +1170,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "cawa_cost_modifier": {
           "card": "0..1",
@@ -1297,8 +1180,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "cb_on_government_enemies": {
           "card": "0..1",
@@ -1308,8 +1190,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "cb_on_overseas": {
           "card": "0..1",
@@ -1319,8 +1200,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "cb_on_primitives": {
           "card": "0..1",
@@ -1330,8 +1210,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "cb_on_religious_enemies": {
           "card": "0..1",
@@ -1341,8 +1220,7 @@
               "country"
             ]
           },
-          "value": "bool | float",
-          "when": null
+          "value": "bool | float"
         },
         "center_of_trade_upgrade_cost": {
           "card": "0..1",
@@ -1352,8 +1230,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "centralize_state_cost": {
           "card": "0..1",
@@ -1363,8 +1240,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "chance_to_inherit": {
           "card": "0..1",
@@ -1374,8 +1250,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "church_power_modifier": {
           "card": "0..1",
@@ -1385,8 +1260,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "claim_duration": {
           "card": "0..1",
@@ -1396,8 +1270,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "coast_raid_range": {
           "card": "0..1",
@@ -1407,8 +1280,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "colonial_subject_type_upgrade_cost_modifier": {
           "card": "0..1",
@@ -1418,8 +1290,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "colonial_type_change_cost_modifier": {
           "card": "0..1",
@@ -1429,8 +1300,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "colonist_placement_chance": {
           "card": "0..1",
@@ -1440,8 +1310,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "colonists": {
           "card": "0..1",
@@ -1451,8 +1320,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "colony_cost_modifier": {
           "card": "0..1",
@@ -1462,8 +1330,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "colony_development_boost": {
           "card": "0..1",
@@ -1473,8 +1340,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "core_creation": {
           "card": "0..1",
@@ -1484,8 +1350,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "core_decay_on_your_own": {
           "card": "0..1",
@@ -1495,8 +1360,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "country_admin_power": {
           "card": "0..1",
@@ -1506,8 +1370,7 @@
               "country"
             ]
           },
-          "value": "int | float",
-          "when": null
+          "value": "int | float"
         },
         "country_diplomatic_power": {
           "card": "0..1",
@@ -1517,8 +1380,7 @@
               "country"
             ]
           },
-          "value": "int | float",
-          "when": null
+          "value": "int | float"
         },
         "country_military_power": {
           "card": "0..1",
@@ -1528,8 +1390,7 @@
               "country"
             ]
           },
-          "value": "int | float",
-          "when": null
+          "value": "int | float"
         },
         "culture_conversion_cost": {
           "card": "0..1",
@@ -1539,8 +1400,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "culture_conversion_time": {
           "card": "0..1",
@@ -1550,8 +1410,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "curia_powers_cost": {
           "card": "0..1",
@@ -1561,8 +1420,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "curia_treasury_contribution": {
           "card": "0..1",
@@ -1572,8 +1430,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "defensiveness": {
           "card": "0..1",
@@ -1583,8 +1440,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "development_cost": {
           "card": "0..1",
@@ -1594,8 +1450,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "development_cost_in_primary_culture": {
           "card": "0..1",
@@ -1605,8 +1460,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "development_cost_modifier": {
           "card": "0..1",
@@ -1616,8 +1470,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "devotion": {
           "card": "0..1",
@@ -1627,8 +1480,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "dip_advisor_cost": {
           "card": "0..1",
@@ -1638,8 +1490,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "dip_tech_cost_modifier": {
           "card": "0..1",
@@ -1649,8 +1500,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "diplomatic_annexation_cost": {
           "card": "0..1",
@@ -1660,8 +1510,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "diplomatic_reputation": {
           "card": "0..1",
@@ -1671,8 +1520,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "diplomatic_upkeep": {
           "card": "0..1",
@@ -1682,8 +1530,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "diplomats": {
           "card": "0..1",
@@ -1693,8 +1540,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "discipline": {
           "card": "0..1",
@@ -1704,8 +1550,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "discovered_relations_impact": {
           "card": "0..1",
@@ -1715,8 +1560,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "disengagement_chance": {
           "card": "0..1",
@@ -1726,8 +1570,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "drill_decay_modifier": {
           "card": "0..1",
@@ -1737,8 +1580,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "drill_gain_modifier": {
           "card": "0..1",
@@ -1748,8 +1590,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "election_cycle": {
           "card": "0..1",
@@ -1759,8 +1600,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "embargo_efficiency": {
           "card": "0..1",
@@ -1770,8 +1610,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "embracement_cost": {
           "card": "0..1",
@@ -1781,8 +1620,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "enable_forced_march": {
           "card": "0..1",
@@ -1792,8 +1630,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "enemy_core_creation": {
           "card": "0..1",
@@ -1803,8 +1640,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "enforce_religion_cost": {
           "card": "0..1",
@@ -1814,8 +1650,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "engagement_cost": {
           "card": "0..1",
@@ -1825,8 +1660,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "engagement_cost_modifier": {
           "card": "0..1",
@@ -1836,8 +1670,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "envoy_travel_time": {
           "card": "0..1",
@@ -1847,8 +1680,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "establish_order_cost": {
           "card": "0..1",
@@ -1858,8 +1690,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "estate_interaction_cooldown_modifier": {
           "card": "0..1",
@@ -1869,8 +1700,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "expand_administration_cost": {
           "card": "0..1",
@@ -1880,8 +1710,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "expand_infrastructure_cost_modifier": {
           "card": "0..1",
@@ -1891,8 +1720,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "expel_minorities_cost": {
           "card": "0..1",
@@ -1902,8 +1730,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "exploration_mission_range_in_fleet_modifier": {
           "card": "0..1",
@@ -1913,8 +1740,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "extra_manpower_at_religious_war": {
           "card": "0..1",
@@ -1924,8 +1750,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "fabricate_claims_cost": {
           "card": "0..1",
@@ -1935,8 +1760,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "female_advisor_chance": {
           "card": "0..1",
@@ -1946,8 +1770,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "fire_damage": {
           "card": "0..1",
@@ -1957,8 +1780,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "fire_damage_received": {
           "card": "0..1",
@@ -1968,8 +1790,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "flagship_cost": {
           "card": "0..1",
@@ -1979,8 +1800,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "flagship_durability": {
           "card": "0..1",
@@ -1990,8 +1810,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "flagship_landing_penalty": {
           "card": "0..1",
@@ -2001,8 +1820,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "flagship_morale": {
           "card": "0..1",
@@ -2012,8 +1830,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "flagship_naval_engagement_modifier": {
           "card": "0..1",
@@ -2023,8 +1840,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "force_march_free": {
           "card": "0..1",
@@ -2034,8 +1850,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "fort_level": {
           "card": "0..1",
@@ -2045,8 +1860,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "fort_maintenance_modifier": {
           "card": "0..1",
@@ -2056,8 +1870,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "free_adm_policy": {
           "card": "0..1",
@@ -2067,8 +1880,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "free_city_imperial_authority": {
           "card": "0..1",
@@ -2078,8 +1890,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "free_concentrate_development": {
           "card": "0..1",
@@ -2089,8 +1900,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "free_dip_policy": {
           "card": "0..1",
@@ -2100,8 +1910,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "free_land_leader_pool": {
           "card": "0..1",
@@ -2111,8 +1920,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "free_leader_pool": {
           "card": "0..1",
@@ -2122,8 +1930,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "free_maintenance_on_expl_conq": {
           "card": "0..1",
@@ -2133,8 +1940,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "free_mil_policy": {
           "card": "0..1",
@@ -2144,8 +1950,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "free_navy_leader_pool": {
           "card": "0..1",
@@ -2155,8 +1960,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "free_policy": {
           "card": "0..1",
@@ -2166,8 +1970,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "galley_cost": {
           "card": "0..1",
@@ -2177,8 +1980,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "galley_hull_size_modifier": {
           "card": "0..1",
@@ -2188,8 +1990,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "galley_number_of_cannons_modifier": {
           "card": "0..1",
@@ -2199,8 +2000,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "galley_power": {
           "card": "0..1",
@@ -2210,8 +2010,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "garrison_damage": {
           "card": "0..1",
@@ -2221,8 +2020,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "garrison_growth": {
           "card": "0..1",
@@ -2232,8 +2030,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "garrison_size": {
           "card": "0..1",
@@ -2243,8 +2040,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "general_cost": {
           "card": "0..1",
@@ -2254,8 +2050,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_allowed_num_of_buildings": {
           "card": "0..1",
@@ -2265,8 +2060,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "global_allowed_num_of_manufactories": {
           "card": "0..1",
@@ -2276,8 +2070,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "global_attacker_dice_roll_bonus": {
           "card": "0..1",
@@ -2287,8 +2080,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "global_autonomy": {
           "card": "0..1",
@@ -2298,8 +2090,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_colonial_growth": {
           "card": "0..1",
@@ -2309,8 +2100,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_defender_dice_roll_bonus": {
           "card": "0..1",
@@ -2320,8 +2110,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "global_foreign_trade_power": {
           "card": "0..1",
@@ -2331,8 +2120,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_garrison_growth": {
           "card": "0..1",
@@ -2342,8 +2130,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_heathen_missionary_strength": {
           "card": "0..1",
@@ -2353,8 +2140,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_heretic_missionary_strength": {
           "card": "0..1",
@@ -2364,8 +2150,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_institution_spread": {
           "card": "0..1",
@@ -2375,8 +2160,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_manpower": {
           "card": "0..1",
@@ -2386,8 +2170,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_manpower_modifier": {
           "card": "0..1",
@@ -2397,8 +2180,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_missionary_strength": {
           "card": "0..1",
@@ -2408,8 +2190,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_monthly_devastation": {
           "card": "0..1",
@@ -2419,8 +2200,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_naval_barrage_cost": {
           "card": "0..1",
@@ -2430,8 +2210,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_naval_engagement": {
           "card": "0..1",
@@ -2441,8 +2220,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_naval_engagement_modifier": {
           "card": "0..1",
@@ -2452,8 +2230,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_own_trade_power": {
           "card": "0..1",
@@ -2463,8 +2240,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_prosperity_growth": {
           "card": "0..1",
@@ -2474,8 +2250,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_prov_trade_power_modifier": {
           "card": "0..1",
@@ -2485,8 +2260,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_rebel_suppression_efficiency": {
           "card": "0..1",
@@ -2496,8 +2270,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_regiment_cost": {
           "card": "0..1",
@@ -2507,8 +2280,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_regiment_recruit_speed": {
           "card": "0..1",
@@ -2518,8 +2290,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_religious_conversion_resistance": {
           "card": "0..1",
@@ -2529,8 +2300,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_sailors": {
           "card": "0..1",
@@ -2540,8 +2310,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_sailors_modifier": {
           "card": "0..1",
@@ -2551,8 +2320,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_ship_cost": {
           "card": "0..1",
@@ -2562,8 +2330,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_ship_recruit_speed": {
           "card": "0..1",
@@ -2573,8 +2340,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_ship_repair": {
           "card": "0..1",
@@ -2584,8 +2350,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_ship_trade_power": {
           "card": "0..1",
@@ -2595,8 +2360,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_spy_defence": {
           "card": "0..1",
@@ -2606,8 +2370,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_supply_limit_modifier": {
           "card": "0..1",
@@ -2617,8 +2380,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_tariffs": {
           "card": "0..1",
@@ -2628,8 +2390,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_tax_income": {
           "card": "0..1",
@@ -2639,8 +2400,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_tax_modifier": {
           "card": "0..1",
@@ -2650,8 +2410,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_trade_goods_size": {
           "card": "0..1",
@@ -2661,8 +2420,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_trade_goods_size_modifier": {
           "card": "0..1",
@@ -2672,8 +2430,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_trade_power": {
           "card": "0..1",
@@ -2683,8 +2440,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "global_unrest": {
           "card": "0..1",
@@ -2694,8 +2450,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "gold_depletion_chance_modifier": {
           "card": "0..1",
@@ -2705,8 +2460,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "governing_capacity": {
           "card": "0..1",
@@ -2716,8 +2470,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "governing_capacity_modifier": {
           "card": "0..1",
@@ -2727,8 +2480,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "governing_cost": {
           "card": "0..1",
@@ -2738,8 +2490,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "great_project_upgrade_cost": {
           "card": "0..1",
@@ -2749,8 +2500,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "great_project_upgrade_time": {
           "card": "0..1",
@@ -2760,8 +2510,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "harmonization_speed": {
           "card": "0..1",
@@ -2771,8 +2520,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "harsh_treatment_cost": {
           "card": "0..1",
@@ -2782,8 +2530,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "has_banners": {
           "card": "0..1",
@@ -2793,8 +2540,7 @@
               "country"
             ]
           },
-          "value": "bool | 'yes'",
-          "when": null
+          "value": "bool | 'yes'"
         },
         "has_caravel": {
           "card": "0..1",
@@ -2804,8 +2550,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "has_carolean": {
           "card": "0..1",
@@ -2815,8 +2560,7 @@
               "country"
             ]
           },
-          "value": "bool | 'yes'",
-          "when": null
+          "value": "bool | 'yes'"
         },
         "has_galleass": {
           "card": "0..1",
@@ -2826,8 +2570,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "has_galleon": {
           "card": "0..1",
@@ -2837,8 +2580,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "has_geobukseon": {
           "card": "0..1",
@@ -2848,8 +2590,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "has_mamluks": {
           "card": "0..1",
@@ -2859,8 +2600,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "has_man_of_war": {
           "card": "0..1",
@@ -2870,8 +2610,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "has_marines": {
           "card": "0..1",
@@ -2881,8 +2620,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "has_musketeer": {
           "card": "0..1",
@@ -2892,8 +2630,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "has_qizilbash": {
           "card": "0..1",
@@ -2903,8 +2640,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "has_samurai": {
           "card": "0..1",
@@ -2914,8 +2650,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "has_streltsy": {
           "card": "0..1",
@@ -2925,8 +2660,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "has_tercio": {
           "card": "0..1",
@@ -2936,8 +2670,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "has_voc_indiamen": {
           "card": "0..1",
@@ -2947,8 +2680,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "heavy_ship_cost": {
           "card": "0..1",
@@ -2958,8 +2690,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "heavy_ship_hull_size_modifier": {
           "card": "0..1",
@@ -2969,8 +2700,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "heavy_ship_number_of_cannons_modifier": {
           "card": "0..1",
@@ -2980,8 +2710,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "heavy_ship_power": {
           "card": "0..1",
@@ -2991,8 +2720,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "heir_chance": {
           "card": "0..1",
@@ -3002,8 +2730,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "horde_unity": {
           "card": "0..1",
@@ -3013,8 +2740,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "hostile_attrition": {
           "card": "0..1",
@@ -3024,8 +2750,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "hostile_disembark_speed": {
           "card": "0..1",
@@ -3035,8 +2760,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "hostile_fleet_attrition": {
           "card": "0..1",
@@ -3046,8 +2770,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "hull_size": {
           "card": "0..1",
@@ -3057,8 +2780,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "hull_size_modifier": {
           "card": "0..1",
@@ -3068,8 +2790,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "hussars_cost_modifier": {
           "card": "0..1",
@@ -3079,8 +2800,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "idea_claim_colonies": {
           "card": "0..1",
@@ -3090,8 +2810,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "idea_cost": {
           "card": "0..1",
@@ -3101,8 +2820,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "ignore_coring_distance": {
           "card": "0..1",
@@ -3112,8 +2830,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "imperial_authority": {
           "card": "0..1",
@@ -3123,8 +2840,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "imperial_authority_value": {
           "card": "0..1",
@@ -3134,8 +2850,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "imperial_mandate": {
           "card": "0..1",
@@ -3145,8 +2860,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "imperial_mercenary_cost": {
           "card": "0..1",
@@ -3156,8 +2870,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "imperial_reform_catholic_approval": {
           "card": "0..1",
@@ -3167,8 +2880,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "improve_relation_modifier": {
           "card": "0..1",
@@ -3178,8 +2890,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "infantry_cost": {
           "card": "0..1",
@@ -3189,8 +2900,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "infantry_fire": {
           "card": "0..1",
@@ -3200,8 +2910,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "infantry_power": {
           "card": "0..1",
@@ -3211,8 +2920,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "infantry_shock": {
           "card": "0..1",
@@ -3222,8 +2930,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "inflation_action_cost": {
           "card": "0..1",
@@ -3233,8 +2940,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "inflation_reduction": {
           "card": "0..1",
@@ -3244,8 +2950,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "inflation_reduction_local": {
           "card": "0..1",
@@ -3255,8 +2960,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "influence_to_vassal_elevation_cost": {
           "card": "0..1",
@@ -3265,8 +2969,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "innovativeness_gain": {
           "card": "0..1",
@@ -3276,8 +2979,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "institution_growth": {
           "card": "0..1",
@@ -3287,8 +2989,7 @@
               "province"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "institution_spread_from_true_faith": {
           "card": "0..1",
@@ -3298,8 +2999,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "interest": {
           "card": "0..1",
@@ -3309,8 +3009,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "is_banner_modifier": {
           "card": "0..1",
@@ -3320,8 +3019,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_caravel_modifier": {
           "card": "0..1",
@@ -3331,8 +3029,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_carolean_modifier": {
           "card": "0..1",
@@ -3342,8 +3039,7 @@
               "country"
             ]
           },
-          "value": "bool | 'yes'",
-          "when": null
+          "value": "bool | 'yes'"
         },
         "is_cawa_modifier": {
           "card": "0..1",
@@ -3353,8 +3049,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_cossack_modifier": {
           "card": "0..1",
@@ -3364,8 +3059,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_galleass_modifier": {
           "card": "0..1",
@@ -3375,8 +3069,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_galleon_modifier": {
           "card": "0..1",
@@ -3386,8 +3079,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_geobukseon_modifier": {
           "card": "0..1",
@@ -3397,8 +3089,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_hussars_modifier": {
           "card": "0..1",
@@ -3408,8 +3099,7 @@
               "country"
             ]
           },
-          "value": "bool | 'yes'",
-          "when": null
+          "value": "bool | 'yes'"
         },
         "is_imperial_modifier": {
           "card": "0..1",
@@ -3419,8 +3109,7 @@
               "country"
             ]
           },
-          "value": "float | bool",
-          "when": null
+          "value": "float | bool"
         },
         "is_janissary_modifier": {
           "card": "0..1",
@@ -3430,8 +3119,7 @@
               "country"
             ]
           },
-          "value": "'yes' | bool",
-          "when": null
+          "value": "'yes' | bool"
         },
         "is_mamluks_modifier": {
           "card": "0..1",
@@ -3441,8 +3129,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_man_of_war_modifier": {
           "card": "0..1",
@@ -3452,8 +3139,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_marine_modifier": {
           "card": "0..1",
@@ -3463,8 +3149,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_mercenary_modifier": {
           "card": "0..1",
@@ -3474,8 +3159,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_musketeer_modifier": {
           "card": "0..1",
@@ -3485,8 +3169,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_qizilbash_modifier": {
           "card": "0..1",
@@ -3496,8 +3179,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_rajput_modifier": {
           "card": "0..1",
@@ -3507,8 +3189,7 @@
               "country"
             ]
           },
-          "value": "'yes' | bool",
-          "when": null
+          "value": "'yes' | bool"
         },
         "is_revolutionary_guard_modifier": {
           "card": "0..1",
@@ -3518,8 +3199,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_samurai_modifier": {
           "card": "0..1",
@@ -3529,8 +3209,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_streltsy_modifier": {
           "card": "0..1",
@@ -3540,8 +3219,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_tercio_modifier": {
           "card": "0..1",
@@ -3551,8 +3229,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_voc_indiamen_modifier": {
           "card": "0..1",
@@ -3562,8 +3239,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "janissary_cost_modifier": {
           "card": "0..1",
@@ -3573,8 +3249,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "justify_trade_conflict_cost": {
           "card": "0..1",
@@ -3584,8 +3259,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "land_attrition": {
           "card": "0..1",
@@ -3595,8 +3269,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "land_forcelimit": {
           "card": "0..1",
@@ -3606,8 +3279,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "land_forcelimit_modifier": {
           "card": "0..1",
@@ -3617,8 +3289,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "land_maintenance_modifier": {
           "card": "0..1",
@@ -3628,8 +3299,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "land_morale": {
           "card": "0..1",
@@ -3639,8 +3309,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "land_morale_constant": {
           "card": "0..1",
@@ -3650,8 +3319,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "landing_penalty": {
           "card": "0..1",
@@ -3661,8 +3329,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "leader_cost": {
           "card": "0..1",
@@ -3672,8 +3339,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "leader_land_fire": {
           "card": "0..1",
@@ -3683,8 +3349,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "leader_land_manuever": {
           "card": "0..1",
@@ -3694,8 +3359,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "leader_land_shock": {
           "card": "0..1",
@@ -3705,8 +3369,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "leader_naval_fire": {
           "card": "0..1",
@@ -3716,8 +3379,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "leader_naval_manuever": {
           "card": "0..1",
@@ -3727,8 +3389,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "leader_naval_shock": {
           "card": "0..1",
@@ -3738,8 +3399,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "leader_siege": {
           "card": "0..1",
@@ -3749,8 +3409,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "legitimacy": {
           "card": "0..1",
@@ -3760,8 +3419,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "legitimate_subject_elector": {
           "card": "0..1",
@@ -3771,8 +3429,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "liberty_desire": {
           "card": "0..1",
@@ -3782,8 +3439,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "liberty_desire_from_subject_development": {
           "card": "0..1",
@@ -3793,8 +3449,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "light_ship_cost": {
           "card": "0..1",
@@ -3804,8 +3459,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "light_ship_hull_size_modifier": {
           "card": "0..1",
@@ -3815,8 +3469,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "light_ship_number_of_cannons_modifier": {
           "card": "0..1",
@@ -3826,8 +3479,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "light_ship_power": {
           "card": "0..1",
@@ -3837,8 +3489,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_amount_of_banners": {
           "card": "0..1",
@@ -3848,8 +3499,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_amount_of_carolean": {
           "card": "0..1",
@@ -3859,8 +3509,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_amount_of_cawa": {
           "card": "0..1",
@@ -3870,8 +3519,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_amount_of_hussars": {
           "card": "0..1",
@@ -3881,8 +3529,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_assault_fort_ability": {
           "card": "0..1",
@@ -3892,8 +3539,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_assault_fort_cost_modifier": {
           "card": "0..1",
@@ -3903,8 +3549,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_attacker_dice_roll_bonus": {
           "card": "0..1",
@@ -3914,8 +3559,7 @@
               "province"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "local_autonomy": {
           "card": "0..1",
@@ -3925,8 +3569,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_build_cost": {
           "card": "0..1",
@@ -3936,8 +3579,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_build_time": {
           "card": "0..1",
@@ -3947,8 +3589,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_center_of_trade_upgrade_cost": {
           "card": "0..1",
@@ -3958,8 +3599,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_centralize_state_cost": {
           "card": "0..1",
@@ -3969,8 +3609,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_colonial_growth": {
           "card": "0..1",
@@ -3980,8 +3619,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_colonist_placement_chance": {
           "card": "0..1",
@@ -3991,8 +3629,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_colony_cost_modifier": {
           "card": "0..1",
@@ -4002,8 +3639,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_core_creation": {
           "card": "0..1",
@@ -4013,8 +3649,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_culture_conversion_cost": {
           "card": "0..1",
@@ -4024,8 +3659,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_culture_conversion_time": {
           "card": "0..1",
@@ -4035,8 +3669,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_defender_dice_roll_bonus": {
           "card": "0..1",
@@ -4046,8 +3679,7 @@
               "province"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "local_defensiveness": {
           "card": "0..1",
@@ -4057,8 +3689,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_development_cost": {
           "card": "0..1",
@@ -4068,8 +3699,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_development_cost_modifier": {
           "card": "0..1",
@@ -4079,8 +3709,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_fort_maintenance_modifier": {
           "card": "0..1",
@@ -4090,8 +3719,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_friendly_movement_speed": {
           "card": "0..1",
@@ -4101,8 +3729,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_garrison_damage": {
           "card": "0..1",
@@ -4112,8 +3739,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_garrison_size": {
           "card": "0..1",
@@ -4123,8 +3749,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_gold_depletion_chance_modifier": {
           "card": "0..1",
@@ -4134,8 +3759,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_governing_cost": {
           "card": "0..1",
@@ -4145,8 +3769,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_governing_cost_increase": {
           "card": "0..1",
@@ -4156,8 +3779,7 @@
               "province"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "local_great_project_upgrade_cost": {
           "card": "0..1",
@@ -4167,8 +3789,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_great_project_upgrade_time": {
           "card": "0..1",
@@ -4178,8 +3799,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_has_banners": {
           "card": "0..1",
@@ -4189,8 +3809,7 @@
               "province"
             ]
           },
-          "value": "bool | 'yes'",
-          "when": null
+          "value": "bool | 'yes'"
         },
         "local_has_caravel": {
           "card": "0..1",
@@ -4200,8 +3819,7 @@
               "province"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "local_has_carolean": {
           "card": "0..1",
@@ -4211,8 +3829,7 @@
               "province"
             ]
           },
-          "value": "bool | 'yes'",
-          "when": null
+          "value": "bool | 'yes'"
         },
         "local_has_galleass": {
           "card": "0..1",
@@ -4222,8 +3839,7 @@
               "province"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "local_has_galleon": {
           "card": "0..1",
@@ -4233,8 +3849,7 @@
               "province"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "local_has_geobukseon": {
           "card": "0..1",
@@ -4244,8 +3859,7 @@
               "province"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "local_has_mamluks": {
           "card": "0..1",
@@ -4255,8 +3869,7 @@
               "province"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "local_has_man_of_war": {
           "card": "0..1",
@@ -4266,8 +3879,7 @@
               "province"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "local_has_musketeers": {
           "card": "0..1",
@@ -4277,8 +3889,7 @@
               "province"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "local_has_qizilbash": {
           "card": "0..1",
@@ -4288,8 +3899,7 @@
               "province"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "local_has_samurai": {
           "card": "0..1",
@@ -4299,8 +3909,7 @@
               "province"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "local_has_streltsy": {
           "card": "0..1",
@@ -4310,8 +3919,7 @@
               "province"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "local_has_tercio": {
           "card": "0..1",
@@ -4321,8 +3929,7 @@
               "province"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "local_has_voc_indiamen": {
           "card": "0..1",
@@ -4332,8 +3939,7 @@
               "province"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "local_heir_adm": {
           "card": "0..1",
@@ -4343,8 +3949,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "local_heir_dip": {
           "card": "0..1",
@@ -4354,8 +3959,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "local_heir_mil": {
           "card": "0..1",
@@ -4365,8 +3969,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "local_hostile_attrition": {
           "card": "0..1",
@@ -4376,8 +3979,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_hostile_movement_speed": {
           "card": "0..1",
@@ -4387,8 +3989,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_institution_spread": {
           "card": "0..1",
@@ -4398,8 +3999,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_manpower": {
           "card": "0..1",
@@ -4409,8 +4009,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_manpower_modifier": {
           "card": "0..1",
@@ -4420,8 +4019,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_missionary_maintenance_cost": {
           "card": "0..1",
@@ -4431,8 +4029,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_missionary_strength": {
           "card": "0..1",
@@ -4442,8 +4039,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_monthly_devastation": {
           "card": "0..1",
@@ -4453,8 +4049,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_naval_engagement_modifier": {
           "card": "0..1",
@@ -4464,8 +4059,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_own_coast_naval_combat_bonus": {
           "card": "0..1",
@@ -4475,8 +4069,7 @@
               "province"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "local_production_efficiency": {
           "card": "0..1",
@@ -4486,8 +4079,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_prosperity_growth": {
           "card": "0..1",
@@ -4497,8 +4089,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_regiment_cost": {
           "card": "0..1",
@@ -4508,8 +4099,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_religious_conversion_resistance": {
           "card": "0..1",
@@ -4519,8 +4109,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_religious_unity_contribution": {
           "card": "0..1",
@@ -4530,8 +4119,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_sailors": {
           "card": "0..1",
@@ -4541,8 +4129,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_sailors_modifier": {
           "card": "0..1",
@@ -4552,8 +4139,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_ship_cost": {
           "card": "0..1",
@@ -4563,8 +4149,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_ship_repair": {
           "card": "0..1",
@@ -4574,8 +4159,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_state_maintenance_modifier": {
           "card": "0..1",
@@ -4585,8 +4169,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_tax_modifier": {
           "card": "0..1",
@@ -4596,8 +4179,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_tolerance_of_heathens": {
           "card": "0..1",
@@ -4607,8 +4189,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_tolerance_of_heretics": {
           "card": "0..1",
@@ -4618,8 +4199,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_unrest": {
           "card": "0..1",
@@ -4629,8 +4209,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_warscore_cost_modifier": {
           "card": "0..1",
@@ -4640,8 +4219,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "local_years_of_nationalism": {
           "card": "0..1",
@@ -4651,8 +4229,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "loot_amount": {
           "card": "0..1",
@@ -4662,8 +4239,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "loyalty_change_on_revoked": {
           "card": "0..1",
@@ -4673,8 +4249,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "manpower_against_imperial_enemies": {
           "card": "0..1",
@@ -4684,8 +4259,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "manpower_in_accepted_culture_provinces": {
           "card": "0..1",
@@ -4695,8 +4269,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "manpower_in_culture_group_provinces": {
           "card": "0..1",
@@ -4706,8 +4279,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "manpower_in_own_culture_provinces": {
           "card": "0..1",
@@ -4717,8 +4289,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "manpower_in_true_faith_provinces": {
           "card": "0..1",
@@ -4728,8 +4299,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "manpower_recovery_speed": {
           "card": "0..1",
@@ -4739,8 +4309,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "maratha_exclusive_influence_modifier": {
           "card": "0..1",
@@ -4750,8 +4319,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "maratha_exclusive_loyalty_modifier": {
           "card": "0..1",
@@ -4761,8 +4329,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "maratha_muslim_influence_modifier": {
           "card": "0..1",
@@ -4772,8 +4339,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "maratha_muslim_loyalty_modifier": {
           "card": "0..1",
@@ -4783,8 +4349,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "max_absolutism": {
           "card": "0..1",
@@ -4794,8 +4359,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "max_absolutism_effect": {
           "card": "0..1",
@@ -4805,8 +4369,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "max_admiral_fire": {
           "card": "0..1",
@@ -4816,8 +4379,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "max_admiral_maneuver": {
           "card": "0..1",
@@ -4827,8 +4389,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "max_admiral_shock": {
           "card": "0..1",
@@ -4838,8 +4399,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "max_admiral_siege": {
           "card": "0..1",
@@ -4849,8 +4409,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "max_attrition": {
           "card": "0..1",
@@ -4860,8 +4419,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "max_electors": {
           "card": "0..1",
@@ -4871,8 +4429,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "max_flagships": {
           "card": "0..1",
@@ -4882,8 +4439,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "max_free_cities": {
           "card": "0..1",
@@ -4893,8 +4449,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "max_general_fire": {
           "card": "0..1",
@@ -4904,8 +4459,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "max_general_maneuver": {
           "card": "0..1",
@@ -4915,8 +4469,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "max_general_shock": {
           "card": "0..1",
@@ -4926,8 +4479,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "max_general_siege": {
           "card": "0..1",
@@ -4937,8 +4489,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "max_hostile_attrition": {
           "card": "0..1",
@@ -4948,8 +4499,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "max_possible_parliament_seats": {
           "card": "0..1",
@@ -4959,8 +4509,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "max_revolutionary_zeal": {
           "card": "0..1",
@@ -4970,8 +4519,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "max_terms": {
           "card": "0..1",
@@ -4981,8 +4529,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "may_build_supply_depot": {
           "card": "0..1",
@@ -4992,8 +4539,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "may_establish_frontier": {
           "card": "0..1",
@@ -5003,8 +4549,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "may_explore": {
           "card": "0..1",
@@ -5014,8 +4559,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "may_not_convert_territories": {
           "card": "0..1",
@@ -5025,8 +4569,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "may_not_reduce_inflation": {
           "card": "0..1",
@@ -5036,8 +4579,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "may_perform_slave_raid": {
           "card": "0..1",
@@ -5047,8 +4589,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "may_perform_slave_raid_on_same_religion": {
           "card": "0..1",
@@ -5058,8 +4599,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "may_recruit_female_generals": {
           "card": "0..1",
@@ -5069,8 +4609,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "may_refill_garrison": {
           "card": "0..1",
@@ -5080,8 +4619,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "may_return_manpower_on_disband": {
           "card": "0..1",
@@ -5091,8 +4629,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "merc_independent_from_trade_range": {
           "card": "0..1",
@@ -5102,8 +4639,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "merc_leader_army_tradition": {
           "card": "0..1",
@@ -5113,8 +4649,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "merc_maintenance_modifier": {
           "card": "0..1",
@@ -5124,8 +4659,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "mercantilism_cost": {
           "card": "0..1",
@@ -5135,8 +4669,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "mercenary_cost": {
           "card": "0..1",
@@ -5146,8 +4679,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "mercenary_discipline": {
           "card": "0..1",
@@ -5157,8 +4689,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "mercenary_manpower": {
           "card": "0..1",
@@ -5168,8 +4699,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "merchants": {
           "card": "0..1",
@@ -5179,8 +4709,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "meritocracy": {
           "card": "0..1",
@@ -5190,8 +4719,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "migration_cost": {
           "card": "0..1",
@@ -5201,8 +4729,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "mil_advisor_cost": {
           "card": "0..1",
@@ -5212,8 +4739,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "mil_tech_cost_modifier": {
           "card": "0..1",
@@ -5223,8 +4749,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "military_tactics": {
           "card": "0..1",
@@ -5234,8 +4759,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "min_autonomy": {
           "card": "0..1",
@@ -5245,8 +4769,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "min_autonomy_in_territories": {
           "card": "0..1",
@@ -5256,8 +4779,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "min_local_autonomy": {
           "card": "0..1",
@@ -5267,8 +4789,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "missionaries": {
           "card": "0..1",
@@ -5278,8 +4799,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "missionary_maintenance_cost": {
           "card": "0..1",
@@ -5289,8 +4809,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monarch_admin_power": {
           "card": "0..1",
@@ -5300,8 +4819,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monarch_diplomatic_power": {
           "card": "0..1",
@@ -5311,8 +4829,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monarch_lifespan": {
           "card": "0..1",
@@ -5322,8 +4839,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monarch_military_power": {
           "card": "0..1",
@@ -5333,8 +4849,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monarch_power_tribute": {
           "card": "0..1",
@@ -5344,8 +4859,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "monthly_church_power": {
           "card": "0..1",
@@ -5355,8 +4869,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monthly_favor_modifier": {
           "card": "0..1",
@@ -5366,8 +4879,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monthly_federation_favor_growth": {
           "card": "0..1",
@@ -5377,8 +4889,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monthly_fervor_increase": {
           "card": "0..1",
@@ -5388,8 +4899,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monthly_gold_inflation_modifier": {
           "card": "0..1",
@@ -5399,8 +4909,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monthly_heir_claim_increase": {
           "card": "0..1",
@@ -5410,8 +4919,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monthly_heir_claim_increase_modifier": {
           "card": "0..1",
@@ -5421,8 +4929,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monthly_karma": {
           "card": "0..1",
@@ -5432,8 +4939,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monthly_karma_accelerator": {
           "card": "0..1",
@@ -5443,8 +4949,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monthly_piety": {
           "card": "0..1",
@@ -5454,8 +4959,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monthly_piety_accelerator": {
           "card": "0..1",
@@ -5465,8 +4969,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monthly_reform_progress": {
           "card": "0..1",
@@ -5476,8 +4979,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monthly_reform_progress_building": {
           "card": "0..1",
@@ -5487,8 +4989,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monthly_reform_progress_modifier": {
           "card": "0..1",
@@ -5498,8 +4999,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monthly_splendor": {
           "card": "0..1",
@@ -5509,8 +5009,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "monthly_support_heir_gain": {
           "card": "0..1",
@@ -5520,8 +5019,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "morale_damage": {
           "card": "0..1",
@@ -5531,8 +5029,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "morale_damage_received": {
           "card": "0..1",
@@ -5542,8 +5039,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "morale_in_fleet_modifier": {
           "card": "0..1",
@@ -5553,8 +5049,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "move_capital_cost_modifier": {
           "card": "0..1",
@@ -5564,8 +5059,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "movement_speed": {
           "card": "0..1",
@@ -5575,8 +5069,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "movement_speed_in_fleet_modifier": {
           "card": "0..1",
@@ -5586,8 +5079,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "movement_speed_onto_off_boat_modifier": {
           "card": "0..1",
@@ -5597,8 +5089,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "national_focus_years": {
           "card": "0..1",
@@ -5608,8 +5099,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "native_advancement_cost": {
           "card": "0..1",
@@ -5619,8 +5109,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "native_assimilation": {
           "card": "0..1",
@@ -5630,8 +5119,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "native_uprising_chance": {
           "card": "0..1",
@@ -5641,8 +5129,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "naval_attrition": {
           "card": "0..1",
@@ -5652,8 +5139,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "naval_attrition_in_fleet_modifier": {
           "card": "0..1",
@@ -5663,8 +5149,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "naval_forcelimit": {
           "card": "0..1",
@@ -5674,8 +5159,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "naval_forcelimit_modifier": {
           "card": "0..1",
@@ -5685,8 +5169,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "naval_maintenance_flagship_modifier": {
           "card": "0..1",
@@ -5696,8 +5179,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "naval_maintenance_modifier": {
           "card": "0..1",
@@ -5707,8 +5189,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "naval_morale": {
           "card": "0..1",
@@ -5718,8 +5199,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "naval_morale_constant": {
           "card": "0..1",
@@ -5729,8 +5209,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "naval_morale_damage": {
           "card": "0..1",
@@ -5740,8 +5219,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "naval_morale_damage_received": {
           "card": "0..1",
@@ -5751,8 +5229,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "naval_tradition_from_battle": {
           "card": "0..1",
@@ -5762,8 +5239,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "naval_tradition_from_trade": {
           "card": "0..1",
@@ -5773,8 +5249,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "naval_tradition_in_fleet_modifier": {
           "card": "0..1",
@@ -5784,8 +5259,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "navy_tradition": {
           "card": "0..1",
@@ -5795,8 +5269,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "navy_tradition_decay": {
           "card": "0..1",
@@ -5806,8 +5279,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "no_claim_cost_increasement": {
           "card": "0..1",
@@ -5817,8 +5289,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "no_cost_for_reinforcing": {
           "card": "0..1",
@@ -5828,8 +5299,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "no_religion_penalty": {
           "card": "0..1",
@@ -5839,8 +5309,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "no_stability_loss_on_monarch_death": {
           "card": "0..1",
@@ -5850,8 +5319,7 @@
               "country"
             ]
           },
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "nobles_exclusive_influence_modifier": {
           "card": "0..1",
@@ -5861,8 +5329,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "nobles_exclusive_loyalty_modifier": {
           "card": "0..1",
@@ -5872,8 +5339,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "nobles_loyalty_modifier_forts": {
           "card": "0..1",
@@ -5883,8 +5349,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "num_accepted_cultures": {
           "card": "0..1",
@@ -5894,8 +5359,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "num_of_parliament_issues": {
           "card": "0..1",
@@ -5905,8 +5369,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "num_of_pronoiars": {
           "card": "0..1",
@@ -5915,8 +5378,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "number_of_cannons": {
           "card": "0..1",
@@ -5926,8 +5388,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "number_of_cannons_flagship": {
           "card": "0..1",
@@ -5937,8 +5398,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "number_of_cannons_flagship_modifier": {
           "card": "0..1",
@@ -5948,8 +5408,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "number_of_cannons_modifier": {
           "card": "0..1",
@@ -5959,8 +5418,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "overextension_impact_modifier": {
           "card": "0..1",
@@ -5970,8 +5428,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "overlord_naval_forcelimit": {
           "card": "0..1",
@@ -5981,8 +5438,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "overlord_naval_forcelimit_modifier": {
           "card": "0..1",
@@ -5992,8 +5448,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "own_coast_naval_combat_bonus": {
           "card": "0..1",
@@ -6003,8 +5458,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "own_territory_dice_roll_bonus": {
           "card": "0..1",
@@ -6014,8 +5468,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "papal_influence": {
           "card": "0..1",
@@ -6025,8 +5478,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "papal_influence_from_cardinals": {
           "card": "0..1",
@@ -6036,8 +5488,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "parliament_backing_chance": {
           "card": "0..1",
@@ -6047,8 +5498,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "parliament_chance_of_decision": {
           "card": "0..1",
@@ -6058,8 +5508,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "parliament_debate_duration": {
           "card": "0..1",
@@ -6069,8 +5518,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "parliament_effect_duration": {
           "card": "0..1",
@@ -6080,8 +5528,12 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
+        },
+        "picture": {
+          "card": "0..1",
+          "override": true,
+          "value": "scalar"
         },
         "piety_church_loyalty_modifier": {
           "card": "0..1",
@@ -6091,8 +5543,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "piety_dhimmi_loyalty_modifier": {
           "card": "0..1",
@@ -6102,8 +5553,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "placed_merchant_power": {
           "card": "0..1",
@@ -6113,8 +5563,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "placed_merchant_power_modifier": {
           "card": "0..1",
@@ -6124,8 +5573,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "possible_adm_policy": {
           "card": "0..1",
@@ -6135,8 +5583,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "possible_condottieri": {
           "card": "0..1",
@@ -6146,8 +5593,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "possible_dip_policy": {
           "card": "0..1",
@@ -6157,8 +5603,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "possible_mil_policy": {
           "card": "0..1",
@@ -6168,8 +5613,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "possible_policy": {
           "card": "0..1",
@@ -6179,8 +5623,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "power_projection_from_insults": {
           "card": "0..1",
@@ -6190,8 +5633,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "prestige": {
           "card": "0..1",
@@ -6201,8 +5643,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "prestige_decay": {
           "card": "0..1",
@@ -6212,8 +5653,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "prestige_from_battles_in_fleet_modifier": {
           "card": "0..1",
@@ -6223,8 +5663,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "prestige_from_land": {
           "card": "0..1",
@@ -6234,8 +5673,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "prestige_from_naval": {
           "card": "0..1",
@@ -6245,8 +5683,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "prestige_per_development_from_conversion": {
           "card": "0..1",
@@ -6256,8 +5693,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "privateer_efficiency": {
           "card": "0..1",
@@ -6267,8 +5703,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "privateering_efficiency_in_fleet_modifier": {
           "card": "0..1",
@@ -6278,8 +5713,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "production_efficiency": {
           "card": "0..1",
@@ -6289,8 +5723,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "promote_culture_cost": {
           "card": "0..1",
@@ -6300,8 +5733,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "pronoia_amount_check_influence": {
           "card": "0..1",
@@ -6310,8 +5742,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "province_trade_power_modifier": {
           "card": "0..1",
@@ -6321,8 +5752,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "province_trade_power_value": {
           "card": "0..1",
@@ -6332,8 +5762,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "province_warscore_cost": {
           "card": "0..1",
@@ -6343,8 +5772,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "rajput_exclusive_influence_modifier": {
           "card": "0..1",
@@ -6354,8 +5782,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "rajput_exclusive_loyalty_modifier": {
           "card": "0..1",
@@ -6365,8 +5792,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "rajput_muslim_influence_modifier": {
           "card": "0..1",
@@ -6376,8 +5802,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "rajput_muslim_loyalty_modifier": {
           "card": "0..1",
@@ -6387,8 +5812,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "range": {
           "card": "0..1",
@@ -6398,8 +5822,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "raze_power_gain": {
           "card": "0..1",
@@ -6409,8 +5832,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "reasons_to_elect": {
           "card": "0..1",
@@ -6420,8 +5842,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "rebel_support_efficiency": {
           "card": "0..1",
@@ -6431,8 +5852,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "recover_army_morale_speed": {
           "card": "0..1",
@@ -6442,8 +5862,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "recover_navy_morale_speed": {
           "card": "0..1",
@@ -6453,8 +5872,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "reduced_liberty_desire": {
           "card": "0..1",
@@ -6464,8 +5882,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "reduced_liberty_desire_on_other_continent": {
           "card": "0..1",
@@ -6475,8 +5892,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "reduced_liberty_desire_on_same_continent": {
           "card": "0..1",
@@ -6486,8 +5902,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "reduced_stab_impacts": {
           "card": "0..1",
@@ -6497,8 +5912,7 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "reduced_trade_penalty_on_non_main_tradenode": {
           "card": "0..1",
@@ -6508,8 +5922,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "reelection_cost": {
           "card": "0..1",
@@ -6519,8 +5932,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "reform_progress_growth": {
           "card": "0..1",
@@ -6530,8 +5942,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "reform_progress_growth_building": {
           "card": "0..1",
@@ -6541,8 +5952,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "regiment_disembark_speed": {
           "card": "0..1",
@@ -6552,8 +5962,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "regiment_manpower_usage": {
           "card": "0..1",
@@ -6563,8 +5972,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "regiment_recruit_speed": {
           "card": "0..1",
@@ -6574,8 +5982,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "reinforce_cost_modifier": {
           "card": "0..1",
@@ -6585,8 +5992,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "reinforce_speed": {
           "card": "0..1",
@@ -6596,8 +6002,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "relation_with_accepted_culture": {
           "card": "0..1",
@@ -6607,8 +6012,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "relation_with_heathens": {
           "card": "0..1",
@@ -6618,8 +6022,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "relation_with_heretics": {
           "card": "0..1",
@@ -6629,8 +6032,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "relation_with_other_culture": {
           "card": "0..1",
@@ -6640,8 +6042,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "relation_with_same_culture": {
           "card": "0..1",
@@ -6651,8 +6052,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "relation_with_same_culture_group": {
           "card": "0..1",
@@ -6662,8 +6062,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "relation_with_same_religion": {
           "card": "0..1",
@@ -6673,8 +6072,12 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
+        },
+        "religion": {
+          "card": "0..1",
+          "override": true,
+          "value": "'yes'"
         },
         "religious_unity": {
           "card": "0..1",
@@ -6684,8 +6087,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "republican_tradition": {
           "card": "0..1",
@@ -6695,8 +6097,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "reserves_organisation": {
           "card": "0..1",
@@ -6706,8 +6107,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "reverse_relation_with_heathen_religion": {
           "card": "0..1",
@@ -6717,8 +6117,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "reverse_relation_with_heretic_religion": {
           "card": "0..1",
@@ -6728,8 +6127,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "reverse_relation_with_same_religion": {
           "card": "0..1",
@@ -6739,8 +6137,7 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "rival_border_fort_maintenance": {
           "card": "0..1",
@@ -6750,8 +6147,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "rival_change_cost": {
           "card": "0..1",
@@ -6761,8 +6157,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "sailor_maintenance_modifer": {
           "card": "0..1",
@@ -6772,8 +6167,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "sailors_recovery_speed": {
           "card": "0..1",
@@ -6783,8 +6177,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "same_culture_advisor_cost": {
           "card": "0..1",
@@ -6794,8 +6187,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "same_religion_advisor_cost": {
           "card": "0..1",
@@ -6805,8 +6197,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "sea_repair": {
           "card": "0..1",
@@ -6816,8 +6207,13 @@
               "country"
             ]
           },
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
+        },
+        "secondary_religion": {
+          "card": "0..1",
+          "doc": "Event-modifier-only flag: the modifier disappears when the country changes its syncretic religion.",
+          "override": true,
+          "value": "'yes'"
         },
         "settle_cost": {
           "card": "0..1",
@@ -6827,8 +6223,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "ship_durability": {
           "card": "0..1",
@@ -6838,8 +6233,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "ship_power_propagation": {
           "card": "0..1",
@@ -6849,8 +6243,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "ship_recruit_speed": {
           "card": "0..1",
@@ -6860,8 +6253,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "ship_trade_power": {
           "card": "0..1",
@@ -6871,8 +6263,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "ship_trade_power_modifier": {
           "card": "0..1",
@@ -6882,8 +6273,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "shock_damage": {
           "card": "0..1",
@@ -6893,8 +6283,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "shock_damage_received": {
           "card": "0..1",
@@ -6904,8 +6293,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "siege_ability": {
           "card": "0..1",
@@ -6915,8 +6303,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "siege_blockade_progress": {
           "card": "0..1",
@@ -6926,8 +6313,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "special_unit_cost_modifier": {
           "card": "0..1",
@@ -6937,8 +6323,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "special_unit_forcelimit": {
           "card": "0..1",
@@ -6948,8 +6333,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "special_unit_manpower_cost_modifier": {
           "card": "0..1",
@@ -6959,8 +6343,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "spy_action_cost_modifier": {
           "card": "0..1",
@@ -6970,8 +6353,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "spy_offence": {
           "card": "0..1",
@@ -6981,8 +6363,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "stability_cost_modifier": {
           "card": "0..1",
@@ -6992,8 +6373,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "stability_cost_to_declare_war": {
           "card": "0..1",
@@ -7003,8 +6383,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "state_governing_cost": {
           "card": "0..1",
@@ -7014,8 +6393,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "state_governing_cost_increase": {
           "card": "0..1",
@@ -7025,8 +6403,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "state_maintenance_modifier": {
           "card": "0..1",
@@ -7036,8 +6413,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "statewide_governing_cost": {
           "card": "0..1",
@@ -7047,8 +6423,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "sunk_ship_morale_hit_recieved": {
           "card": "0..1",
@@ -7058,8 +6433,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "supply_limit": {
           "card": "0..1",
@@ -7069,8 +6443,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "supply_limit_modifier": {
           "card": "0..1",
@@ -7080,8 +6453,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "tax_income": {
           "card": "0..1",
@@ -7091,8 +6463,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "technology_cost": {
           "card": "0..1",
@@ -7102,8 +6473,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "territories_governing_cost": {
           "card": "0..1",
@@ -7113,8 +6483,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "tolerance_heathen": {
           "card": "0..1",
@@ -7124,8 +6493,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "tolerance_heretic": {
           "card": "0..1",
@@ -7135,8 +6503,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "tolerance_of_heathens_capacity": {
           "card": "0..1",
@@ -7146,8 +6513,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "tolerance_of_heretics_capacity": {
           "card": "0..1",
@@ -7157,8 +6523,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "tolerance_own": {
           "card": "0..1",
@@ -7168,8 +6533,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "trade_company_governing_cost": {
           "card": "0..1",
@@ -7179,8 +6543,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "trade_company_investment_cost": {
           "card": "0..1",
@@ -7190,8 +6553,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "trade_efficiency": {
           "card": "0..1",
@@ -7201,8 +6563,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "trade_goods_size": {
           "card": "0..1",
@@ -7212,8 +6573,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "trade_goods_size_modifier": {
           "card": "0..1",
@@ -7223,8 +6583,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "trade_goods_size_modifier_in_livestock_provinces": {
           "card": "0..1",
@@ -7234,8 +6593,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "trade_power_in_fleet_modifier": {
           "card": "0..1",
@@ -7245,8 +6603,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "trade_range_modifier": {
           "card": "0..1",
@@ -7256,8 +6613,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "trade_steering": {
           "card": "0..1",
@@ -7267,8 +6623,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "trade_value": {
           "card": "0..1",
@@ -7278,8 +6633,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "trade_value_modifier": {
           "card": "0..1",
@@ -7289,8 +6643,7 @@
               "province"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "transfer_trade_power_reasons": {
           "card": "0..1",
@@ -7300,8 +6653,7 @@
               "country"
             ]
           },
-          "value": "float | int",
-          "when": null
+          "value": "float | int"
         },
         "transport_attrition": {
           "card": "0..1",
@@ -7311,8 +6663,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "transport_cost": {
           "card": "0..1",
@@ -7322,8 +6673,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "transport_hull_size_modifier": {
           "card": "0..1",
@@ -7333,8 +6683,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "transport_number_of_cannons_modifier": {
           "card": "0..1",
@@ -7344,8 +6693,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "transport_power": {
           "card": "0..1",
@@ -7355,8 +6703,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "treasure_fleet_income": {
           "card": "0..1",
@@ -7366,8 +6713,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "tribal_development_growth": {
           "card": "0..1",
@@ -7377,8 +6723,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "tributary_conversion_cost_modifier": {
           "card": "0..1",
@@ -7388,8 +6733,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "unjustified_demands": {
           "card": "0..1",
@@ -7399,8 +6743,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "unrest_catholic_provinces": {
           "card": "0..1",
@@ -7410,8 +6753,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "vaisyas_non_muslim_influence_modifier": {
           "card": "0..1",
@@ -7421,8 +6763,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "vaisyas_non_muslim_loyalty_modifier": {
           "card": "0..1",
@@ -7432,8 +6773,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "vassal_forcelimit_bonus": {
           "card": "0..1",
@@ -7443,8 +6783,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "vassal_income": {
           "card": "0..1",
@@ -7454,8 +6793,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "vassal_manpower_bonus": {
           "card": "0..1",
@@ -7465,8 +6803,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "vassal_naval_forcelimit_bonus": {
           "card": "0..1",
@@ -7476,8 +6813,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "vassal_sailors_bonus": {
           "card": "0..1",
@@ -7487,8 +6823,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "war_exhaustion": {
           "card": "0..1",
@@ -7498,8 +6833,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "war_exhaustion_cost": {
           "card": "0..1",
@@ -7509,8 +6843,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "war_taxes_cost_modifier": {
           "card": "0..1",
@@ -7520,8 +6853,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "warscore_cost_vs_other_religion": {
           "card": "0..1",
@@ -7531,8 +6863,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "warscore_from_battles_modifier": {
           "card": "0..1",
@@ -7542,8 +6873,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "yearly_absolutism": {
           "card": "0..1",
@@ -7553,8 +6883,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "yearly_army_professionalism": {
           "card": "0..1",
@@ -7564,8 +6893,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "yearly_authority": {
           "card": "0..1",
@@ -7575,8 +6903,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "yearly_corruption": {
           "card": "0..1",
@@ -7586,8 +6913,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "yearly_doom_reduction": {
           "card": "0..1",
@@ -7597,8 +6923,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "yearly_government_power": {
           "card": "0..1",
@@ -7608,8 +6933,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "yearly_harmony": {
           "card": "0..1",
@@ -7619,8 +6943,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "yearly_innovativeness": {
           "card": "0..1",
@@ -7630,8 +6953,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "yearly_karma_decay": {
           "card": "0..1",
@@ -7641,8 +6963,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "yearly_patriarch_authority": {
           "card": "0..1",
@@ -7652,8 +6973,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "yearly_revolutionary_zeal": {
           "card": "0..1",
@@ -7663,8 +6983,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "years_of_nationalism": {
           "card": "0..1",
@@ -7674,8 +6993,7 @@
               "country"
             ]
           },
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "years_to_integrate_personal_union": {
           "card": "0..1",
@@ -7685,37 +7003,86 @@
               "country"
             ]
           },
-          "value": "int",
-          "when": null
-        }
-      }
-    }
-  },
-  "schemas": {
-    "event_modifier_body": {
-      "fields": {
-        "picture": {
-          "card": "0..1",
-          "override": true,
-          "value": "scalar",
-          "when": null
-        },
-        "religion": {
-          "card": "0..1",
-          "override": true,
-          "value": "'yes'",
-          "when": null
-        },
-        "secondary_religion": {
-          "card": "0..1",
-          "doc": "Event-modifier-only flag: the modifier disappears when the country changes its syncretic religion.",
-          "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "int"
         }
       },
-      "include": [
-        "keys__type_event_modifier"
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
       ]
     },
     "event_modifier_type_body": {
@@ -7723,8 +7090,7 @@
         {
           "card": "0..*",
           "key": "scalar",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         }
       ]
     },
@@ -7733,8 +7099,7 @@
         "hidden": {
           "card": "0..1",
           "doc": "Province modifier will be hidden from view even while active",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "on_activation": {
           "body": "effect",
@@ -7745,8 +7110,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "on_deactivation": {
           "body": "effect",
@@ -7756,13 +7120,11 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "picture": {
           "card": "0..1",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "potential": {
           "body": "trigger",
@@ -7773,8 +7135,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "trigger": {
           "body": "trigger",
@@ -7785,49 +7146,204 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         }
-      }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
     },
     "static_modifier_body": {
       "fields": {
         "expire_message_type": {
           "card": "0..1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "is_scholar_modifier": {
           "card": "0..1",
           "doc": "Tells the AI and will only show the alert if country has none",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "picture": {
           "card": "0..1",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "religion": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "religion_sub_modifier": {
           "card": "0..1",
           "doc": "Will make icon placed next to religion modifier",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         }
-      }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
     },
     "timed_modifier_body": {
       "patterns": [
         {
           "body": "timed_modifier_body__enum_timed_modifier_liberty",
           "card": "1",
-          "key": "enum<timed_modifier_liberty>",
-          "when": null
+          "key": "enum<timed_modifier_liberty>"
         }
       ]
     },
@@ -7835,13 +7351,11 @@
       "fields": {
         "value": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "yearly_decay": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         }
       }
     },
@@ -7849,8 +7363,7 @@
       "fields": {
         "ai_weight": {
           "body": "triggered_modifier_body__ai_weight",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "potential": {
           "body": "trigger",
@@ -7861,8 +7374,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "trigger": {
           "body": "trigger",
@@ -7873,18 +7385,97 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
-      }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
     },
     "triggered_modifier_body__ai_weight": {
       "fields": {
         "factor": {
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
-          "value": "int",
-          "when": null
+          "value": "int"
         }
       }
     }

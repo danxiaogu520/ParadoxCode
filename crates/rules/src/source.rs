@@ -2,7 +2,7 @@
 //!
 //! These types mirror the JSON shape of a rules source file one-to-one,
 //! including the mini-syntax strings (type expressions, schema references,
-//! cards, def names, enum columns): those stay raw here so the compile pass
+//! cards and def names): those stay raw here so the compile pass
 //! can parse them with full provenance (source file + JSON pointer +
 //! expression-internal column) instead of losing position data inside
 //! `Deserialize` errors.
@@ -35,10 +35,10 @@ pub struct RuleFile {
     /// Symbol namespaces: resolution / subtypes / open / builtin / impl.
     #[serde(default)]
     pub types: BTreeMap<String, TypeSpec>,
-    /// Capabilities, bindings, and constraints, expanded at compile time.
+    /// Named trait markers; implementation data is declared on each type.
     #[serde(default)]
     pub traits: BTreeMap<String, TraitSpec>,
-    /// Enums, optionally with attribute columns.
+    /// Enums as literal member lists.
     #[serde(default)]
     pub enums: BTreeMap<String, EnumSpec>,
     /// Scope types, registers, links, and compatibility overrides.
@@ -130,8 +130,6 @@ pub enum SourceFileResolution {
     ReplaceByPath,
     /// All definitions remain visible.
     Merge,
-    /// Later directories shadow earlier ones wholesale.
-    ReplaceDirectory,
 }
 
 /// A [`FileRule`]'s root structure: either a schema name, or one field spec
@@ -181,9 +179,27 @@ pub struct BlockSchema {
     /// Type expression for bare values in this block (list blocks).
     #[serde(default)]
     pub items: Option<String>,
+    /// Alternative combinations of direct-field occurrence bounds. At least
+    /// one complete form must match; ordinary field bounds still apply.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub forms: Vec<BlockForm>,
     /// Whether undeclared keys are allowed; defaults to false.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub open: bool,
+}
+
+/// One legal combination of fields in a block. This describes structural
+/// alternatives without weakening the requirements of every branch.
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct BlockForm {
+    /// Exact field names and their occurrence bounds in this form.
+    #[serde(default)]
+    pub fields: BTreeMap<String, String>,
+    /// Written pattern indices and their total occurrence bounds in this form.
+    /// Exact fields are excluded from pattern counts by normal dispatch.
+    #[serde(default)]
+    pub patterns: BTreeMap<String, String>,
 }
 
 /// One exact key's field spec, or several shape overloads of it.
@@ -227,12 +243,6 @@ pub struct FieldSpec {
     /// Defines a symbol instance at this position.
     #[serde(default)]
     pub def: Option<DefSpec>,
-    /// Only applies to instances of this subtype.
-    #[serde(default)]
-    pub when: Option<String>,
-    /// Only applies to instances outside this subtype.
-    #[serde(default)]
-    pub unless: Option<String>,
     /// Control-flow primitive (field attribute, never a global key name).
     #[serde(default)]
     pub control: Option<ControlSpec>,
@@ -307,12 +317,6 @@ pub struct DefSpec {
     pub strip_suffix: Option<String>,
 }
 
-/// A subtype condition: a conjunction of "field → type expression", where a
-/// `null` expression means the field must be absent.
-#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[serde(transparent)]
-pub struct SubtypeCond(pub BTreeMap<String, Option<String>>);
-
 /// A control-flow primitive attached to a field.
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -331,6 +335,9 @@ pub struct ControlSpec {
     /// Field name whose scalar values are the branch keys of a `switch`.
     #[serde(default)]
     pub on: Option<String>,
+    /// Schema supplying the scalar selector keys and their branch value matchers.
+    #[serde(default)]
+    pub selector_schema: Option<String>,
 }
 
 /// The closed set of control-flow primitives.
@@ -355,6 +362,8 @@ pub enum ControlKind {
     Transparent,
     /// Display only, not executed (`tooltip`).
     DisplayOnly,
+    /// A predicate whose boolean value is its constant result.
+    Constant,
 }
 
 /// Diagnostic severity for a field's violations.
@@ -413,14 +422,7 @@ pub enum TypeResolution {
 /// One named subtype.
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct SubtypeSpec {
-    /// Instance-body predicate granting this subtype.
-    #[serde(default)]
-    pub when: Option<SubtypeCond>,
-    /// Traits implemented only for instances of this subtype.
-    #[serde(default, rename = "impl")]
-    pub trait_impls: BTreeMap<String, ImplSpec>,
-}
+pub struct SubtypeSpec {}
 
 /// Arguments of one trait implementation: binding (or parameter) name → value.
 ///
@@ -461,30 +463,16 @@ impl ImplValue {
     }
 }
 
-/// One trait: capabilities, bindings, and constraints.
+/// One named trait marker; implementation data belongs to the type.
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct TraitSpec {
-    /// Parameters with defaults (`"$"` = the instance name) or no default.
-    #[serde(default)]
-    pub params: BTreeMap<String, Option<String>>,
-    /// Symbol bindings contributed by the trait.
-    #[serde(default)]
-    pub bindings: BTreeMap<String, BindingSpec>,
-    /// Requirements the implementing type must satisfy.
-    #[serde(default)]
-    pub requires: Option<RequiresSpec>,
-    /// Capabilities the runtime interprets for this trait.
-    #[serde(default)]
-    pub capabilities: Option<Vec<String>>,
-}
+pub struct TraitSpec {}
 
-/// One trait binding: how a trait parameter maps to a localisation key or a
-/// sprite name.
+/// One type implementation binding: a localisation-key or sprite-name template.
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct BindingSpec {
-    /// Localisation-key template (`"{name}"` references a trait parameter).
+    /// Localisation-key template (`$` stands for the instance name).
     #[serde(default)]
     pub loc: Option<String>,
     /// Sprite-name template.
@@ -495,29 +483,12 @@ pub struct BindingSpec {
     pub required: Option<bool>,
 }
 
-/// Requirements of a trait.
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct RequiresSpec {
-    /// Mixin that must be included by the schemas defining the impl'ing type.
-    #[serde(default)]
-    pub include: Option<String>,
-}
-
-/// One enum: plain members, or a table with attribute columns.
+/// An enum is a list of literal member names.
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum EnumSpec {
-    /// Shorthand: members without columns.
+    /// Literal members.
     Members(Vec<String>),
-    /// A table with columns and rows.
-    Table {
-        /// Column name → column kind, e.g. `"scope": "scope_type?"`
-        /// (the trailing `?` marks an optional column).
-        columns: BTreeMap<String, String>,
-        /// Row name → column values.
-        rows: BTreeMap<String, BTreeMap<String, String>>,
-    },
 }
 
 /// The scope model.
@@ -543,9 +514,25 @@ pub struct ScopesSpec {
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RegisterSpec {
+    /// Runtime register selected by this declared spelling.
+    pub role: RegisterRole,
     /// Whether the register chains (`prev_prev`, `fromfrom`, …).
     #[serde(default)]
     pub chain: Option<bool>,
+}
+
+/// Game-independent state slots selected by scope register declarations.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RegisterRole {
+    /// Root scope of the invocation.
+    Root,
+    /// Current scope, without pushing a new frame.
+    Current,
+    /// Earlier scope frames, nearest first.
+    Previous,
+    /// Calling event's scope frames, nearest first.
+    From,
 }
 
 /// One scope link.
@@ -586,67 +573,161 @@ mod tests {
     use super::*;
 
     const EVENTS: &str = r#"{
-      "files": {
-        "events": { "path": "events", "ext": "txt", "root": "events_file" },
-        "localisation": { "path": "localisation", "ext": "yml", "parser": "localisation" }
-      },
-      "schemas": {
-        "events_file": { "fields": {
-          "namespace":      { "value": "scalar", "card": "0..*" },
-          "country_event":  { "def": { "type": "event.country",  "name": "field:id" },
-                              "scope": { "set": { "root": "country",  "this": "country" } },
-                              "body": "event_body", "card": "0..*" }
-        }},
-        "on_action_body<S>": { "fields": {
-          "events":        { "list": "ref<event.$S>", "card": "0..*" },
-          "random_events": { "map": { "key": "int", "value": "ref<event.$S> | '0'" }, "card": "0..*" }
-        }},
-        "scripted_effects_file": { "map": { "key": "def<scripted_effect>", "body": "effect" } },
-        "bare_list": { "list": "scalar" }
-      },
-      "mixins": {
-        "gated": { "fields": { "potential": { "body": "trigger", "card": "0..1" } } }
-      },
-      "types": {
-        "event": {
-          "resolution": "replace",
-          "subtypes": {
-            "country": {},
-            "triggered": { "when": { "is_triggered_only": "'yes'" } }
-          }
+  "files": {
+    "events": {
+      "path": "events",
+      "ext": "txt",
+      "root": "events_file"
+    },
+    "localisation": {
+      "path": "localisation",
+      "ext": "yml",
+      "parser": "localisation"
+    }
+  },
+  "schemas": {
+    "events_file": {
+      "fields": {
+        "namespace": {
+          "value": "scalar",
+          "card": "0..*"
         },
-        "decision": {
-          "impl": { "Localised": {
-            "name": { "loc": "$_title", "required": true },
-            "desc": { "loc": "$_desc" }
-          } }
+        "country_event": {
+          "def": {
+            "type": "event.country",
+            "name": "field:id"
+          },
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "body": "event_body",
+          "card": "0..*"
         }
-      },
-      "traits": {
-        "Localised": {},
-        "ModifierSource": { "requires": { "include": "modifier_block" } },
-        "Callable": { "params": { "body": "schema" }, "capabilities": ["replacement", "condition"] }
-      },
-      "enums": {
-        "dlc_event_pictures": ["one", "two"],
-        "on_actions": {
-          "columns": { "scope": "scope_type?", "from": "scope_type?" },
-          "rows": {
-            "on_startup": { "scope": "country" },
-            "on_province_religion_converted": { "scope": "province" }
-          }
-        }
-      },
-      "scopes": {
-        "types": ["country", "province", "unit"],
-        "registers": { "root": {}, "this": {}, "prev": { "chain": true }, "from": { "chain": true } },
-        "links": {
-          "owner": { "from": ["province", "unit"], "to": "country" },
-          "event_target:{ref<event_target>}": { "from": ["any"], "to": "any" }
-        },
-        "compat": [{ "actual": "trade_node", "expected": "province" }]
       }
-    }"#;
+    },
+    "on_action_body<S>": {
+      "fields": {
+        "events": {
+          "list": "ref<event.$S>",
+          "card": "0..*"
+        },
+        "random_events": {
+          "map": {
+            "key": "int",
+            "value": "ref<event.$S> | '0'"
+          },
+          "card": "0..*"
+        }
+      }
+    },
+    "scripted_effects_file": {
+      "map": {
+        "key": "def<scripted_effect>",
+        "body": "effect"
+      }
+    },
+    "bare_list": {
+      "list": "scalar"
+    }
+  },
+  "mixins": {
+    "gated": {
+      "fields": {
+        "potential": {
+          "body": "trigger",
+          "card": "0..1"
+        }
+      }
+    }
+  },
+  "types": {
+    "event": {
+      "resolution": "replace",
+      "subtypes": {
+        "country": {},
+        "triggered": {}
+      }
+    },
+    "decision": {
+      "impl": {
+        "Localised": {
+          "name": {
+            "loc": "$_title",
+            "required": true
+          },
+          "desc": {
+            "loc": "$_desc"
+          }
+        }
+      }
+    }
+  },
+  "traits": {
+    "Localised": {},
+    "ModifierSource": {},
+    "Callable": {}
+  },
+  "enums": {
+    "dlc_event_pictures": [
+      "one",
+      "two"
+    ],
+    "on_actions_country": [
+      "on_startup"
+    ],
+    "on_actions_province": [
+      "on_province_religion_converted"
+    ]
+  },
+  "scopes": {
+    "types": [
+      "country",
+      "province",
+      "unit",
+      "district"
+    ],
+    "registers": {
+      "root": {
+        "role": "root"
+      },
+      "this": {
+        "role": "current"
+      },
+      "prev": {
+        "role": "previous",
+        "chain": true
+      },
+      "from": {
+        "role": "from",
+        "chain": true
+      }
+    },
+    "links": {
+      "owner": {
+        "from": [
+          "province",
+          "unit"
+        ],
+        "to": "country"
+      },
+      "event_target:{ref<event_target>}": {
+        "from": [
+          "any"
+        ],
+        "to": "any"
+      }
+    },
+    "compat": [
+      {
+        "actual": "district",
+        "expected": "province"
+      }
+    ]
+  }
+}"#;
 
     #[test]
     fn design_examples_deserialize() {
@@ -683,8 +764,7 @@ mod tests {
                 card: "0..*".to_owned(),
                 scope: None,
                 def: None,
-                when: None,
-                unless: None,
+
                 control: None,
                 doc: None,
                 severity: None,
@@ -695,24 +775,19 @@ mod tests {
     }
 
     #[test]
-    fn enums_accept_both_forms() {
+    fn enums_accept_literal_members() {
         let file: RuleFile = serde_json::from_str(EVENTS).expect("deserializes");
         assert_eq!(
             file.enums["dlc_event_pictures"],
             EnumSpec::Members(vec!["one".to_owned(), "two".to_owned()])
         );
-        let EnumSpec::Table { columns, rows } = &file.enums["on_actions"] else {
-            panic!("on_actions is a table");
-        };
-        assert_eq!(columns["scope"], "scope_type?");
-        assert_eq!(rows["on_startup"]["scope"], "country");
     }
 
     #[test]
     fn scopes_parse_links_and_compat() {
         let file: RuleFile = serde_json::from_str(EVENTS).expect("deserializes");
         let scopes = file.scopes.expect("scopes section");
-        assert_eq!(scopes.types, ["country", "province", "unit"]);
+        assert_eq!(scopes.types, ["country", "province", "unit", "district"]);
         assert_eq!(scopes.registers["prev"].chain, Some(true));
         assert_eq!(
             scopes.links["owner"],
@@ -724,7 +799,7 @@ mod tests {
         assert_eq!(
             scopes.compat,
             vec![CompatSpec {
-                actual: "trade_node".to_owned(),
+                actual: "district".to_owned(),
                 expected: "province".to_owned(),
             }]
         );
@@ -737,13 +812,7 @@ mod tests {
             file.types["event"].resolution,
             Some(TypeResolution::Replace)
         );
-        assert_eq!(
-            file.types["event"].subtypes["triggered"].when,
-            Some(SubtypeCond(BTreeMap::from([(
-                "is_triggered_only".to_owned(),
-                Some("'yes'".to_owned()),
-            )])))
-        );
+        assert!(file.types["event"].subtypes.contains_key("triggered"));
         // D19/Option A: a `Localised` impl enumerates its own bindings.
         let name = file.types["decision"].trait_impls["Localised"].0["name"]
             .binding()
@@ -755,22 +824,51 @@ mod tests {
             .expect("a binding argument");
         assert_eq!(desc.loc.as_deref(), Some("$_desc"));
         assert_eq!(desc.required, None);
-        assert!(file.traits["Localised"].bindings.is_empty());
-        assert_eq!(
-            file.traits["ModifierSource"]
-                .requires
-                .as_ref()
-                .map(|r| r.include.as_deref()),
-            Some(Some("modifier_block"))
-        );
+        assert!(file.traits.contains_key("Localised"));
     }
 
     #[test]
-    fn when_conditions_accept_null_for_absence() {
-        let cond: SubtypeCond =
-            serde_json::from_str(r#"{ "is_triggered_only": "'yes'", "picture": null }"#)
-                .expect("deserializes");
-        assert_eq!(cond.0.get("picture"), Some(&None));
+    fn condition_syntax_and_subtype_traits_are_rejected() {
+        for key in ["when", "unless"] {
+            let field = format!(r#"{{"value":"bool","card":"0..1","{key}":"enabled"}}"#);
+            let error =
+                serde_json::from_str::<FieldSpec>(&field).expect_err("removed field condition");
+            assert!(error.to_string().contains(key), "{error}");
+        }
+        for subtype in [
+            r#"{"when":{"enabled":"'yes'"}}"#,
+            r#"{"impl":{"Localised":{"name":{"loc":"$"}}}}"#,
+        ] {
+            assert!(
+                serde_json::from_str::<SubtypeSpec>(subtype).is_err(),
+                "{subtype}"
+            );
+        }
+    }
+
+    #[test]
+    fn unused_trait_metadata_enum_tables_and_file_policy_are_rejected() {
+        for metadata in [
+            r#"{"params":{"body":"schema"}}"#,
+            r#"{"bindings":{"name":{"loc":"$"}}}"#,
+            r#"{"requires":{"include":"modifier"}}"#,
+            r#"{"capabilities":["replacement"]}"#,
+        ] {
+            assert!(
+                serde_json::from_str::<TraitSpec>(metadata).is_err(),
+                "{metadata}"
+            );
+        }
+        assert!(
+            serde_json::from_str::<EnumSpec>(
+                r#"{"columns":{"scope":"scope_type"},"rows":{"on_startup":{"scope":"country"}}}"#
+            )
+            .is_err()
+        );
+        assert!(
+            serde_json::from_str::<FileRule>(r#"{"path":"x","resolution":"replace-directory"}"#)
+                .is_err()
+        );
     }
 
     #[test]
@@ -803,9 +901,12 @@ mod tests {
         )
         .expect("deserializes");
         assert_eq!(spec.kind, ControlKind::Branch);
-        let spec: ControlSpec = serde_json::from_str(r#"{ "kind": "switch", "on": "on_trigger" }"#)
-            .expect("deserializes");
+        let spec: ControlSpec = serde_json::from_str(
+            r#"{ "kind": "switch", "on": "on_trigger", "selector_schema": "predicates" }"#,
+        )
+        .expect("deserializes");
         assert_eq!(spec.kind, ControlKind::Switch);
+        assert_eq!(spec.selector_schema.as_deref(), Some("predicates"));
         let spec: ControlSpec =
             serde_json::from_str(r#"{ "kind": "display_only" }"#).expect("deserializes");
         assert_eq!(spec.kind, ControlKind::DisplayOnly);

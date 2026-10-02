@@ -5,56 +5,47 @@
         "can_select": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Conditions for whether the agenda can be offered to you",
-          "when": null
+          "doc": "Conditions for whether the agenda can be offered to you"
         },
         "fail_if": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Conditions for when the agenda should be auto-failed",
-          "when": null
+          "doc": "Conditions for when the agenda should be auto-failed"
         },
         "failing_effect": {
           "body": "effect",
           "card": "0..1",
-          "doc": "Effects executed when the agenda is failed (i.e. when fail_if is true or time runs out)",
-          "when": null
+          "doc": "Effects executed when the agenda is failed (i.e. when fail_if is true or time runs out)"
         },
         "immediate_effect": {
           "body": "effect",
           "card": "0..1",
-          "doc": "Effects executed when the agenda is accepted by the country",
-          "when": null
+          "doc": "Effects executed when the agenda is accepted by the country"
         },
         "invalid_trigger": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Conditions for when the agenda should end without it counting as a fail (executing on_invalid rather than failing_effect). Happens by default it the estate giving the agenda is removed.",
-          "when": null
+          "doc": "Conditions for when the agenda should end without it counting as a fail (executing on_invalid rather than failing_effect). Happens by default it the estate giving the agenda is removed."
         },
         "max_days_active": {
           "card": "0..1",
           "doc": "Lets you override the default of 20 years for an agenda",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "modifier": {
           "body": "modifier",
           "card": "0..1",
-          "doc": "Country modifier granted while the agenda is active",
-          "when": null
+          "doc": "Country modifier granted while the agenda is active"
         },
         "on_invalid": {
           "body": "effect",
           "card": "0..1",
-          "doc": "Effects executed when the country no longer has that estate or the invalid_trigger is true. Useful for clearing flags, modifiers etc.",
-          "when": null
+          "doc": "Effects executed when the country no longer has that estate or the invalid_trigger is true. Useful for clearing flags, modifiers etc."
         },
         "pre_effect": {
           "body": "effect",
           "card": "0..1",
-          "doc": "Effects executed to set up the task (set flags and targets), before it is shown to the player.",
-          "when": null
+          "doc": "Effects executed to set up the task (set flags and targets), before it is shown to the player."
         },
         "provinces_to_highlight": {
           "body": "trigger",
@@ -62,26 +53,22 @@
           "doc": "Conditions for provinces to be highlighted by the agenda. Root = country, this = province.",
           "scope": {
             "push": "province"
-          },
-          "when": null
+          }
         },
         "selection_weight": {
           "body": "estate_agenda_body__selection_weight",
           "card": "0..1",
-          "doc": "Determines how likely (compared to the estate's other agendas) this agenda is to be selected. Initial factor will ignore numbers below 1, use a modifier for that!",
-          "when": null
+          "doc": "Determines how likely (compared to the estate's other agendas) this agenda is to be selected. Initial factor will ignore numbers below 1, use a modifier for that!"
         },
         "task_completed_effect": {
           "body": "effect",
           "card": "0..1",
-          "doc": "Effects executed when the agenda is successfully completed",
-          "when": null
+          "doc": "Effects executed when the agenda is successfully completed"
         },
         "task_requirements": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Conditions for completing the task successfully",
-          "when": null
+          "doc": "Conditions for completing the task successfully"
         }
       }
     },
@@ -91,8 +78,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float[1.0..]",
-          "when": null
+          "value": "float[1.0..]"
         }
       },
       "include": [
@@ -103,68 +89,56 @@
       "fields": {
         "agendas": {
           "card": "0..1",
-          "list": "ref<estate_agenda>",
-          "when": null
+          "list": "ref<estate_agenda>"
         },
         "base_influence": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "color": {
           "card": "1",
-          "list": "int[0..]",
-          "when": null
+          "list": "int[0..]"
         },
         "contributes_to_curia_treasury": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "country_modifier_angry": {
           "body": "modifier",
           "card": "1",
-          "doc": "These scale with loyalty & power",
-          "when": null
+          "doc": "These scale with loyalty & power"
         },
         "country_modifier_happy": {
           "body": "modifier",
           "card": "1",
-          "doc": "These scale with loyalty & power",
-          "when": null
+          "doc": "These scale with loyalty & power"
         },
         "country_modifier_neutral": {
           "body": "modifier",
           "card": "1",
-          "doc": "These scale with loyalty & power",
-          "when": null
+          "doc": "These scale with loyalty & power"
         },
         "custom_desc": {
           "body": "estate_body__custom_desc",
-          "card": "0..*",
-          "when": null
+          "card": "0..*"
         },
         "custom_name": {
           "body": "estate_body__custom_name",
           "card": "0..*",
-          "doc": "Alternative naming of estates",
-          "when": null
+          "doc": "Alternative naming of estates"
         },
         "icon": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "independence_government": {
           "card": "0..1",
           "doc": "Used for when declaring independence",
-          "value": "ref<government>",
-          "when": null
+          "value": "ref<government>"
         },
         "independence_tech_group": {
           "card": "0..1",
-          "value": "ref<technology_group>",
-          "when": null
+          "value": "ref<technology_group>"
         },
         "independence_trigger": {
           "body": "trigger",
@@ -175,39 +149,32 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "influence_from_dev_modifier": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "influence_modifier": {
           "body": "estate_body__influence_modifier",
-          "card": "0..*",
-          "when": null
+          "card": "0..*"
         },
         "land_ownership_modifier": {
           "body": "modifier",
           "card": "1",
-          "doc": "These scale with loyalty & power",
-          "when": null
+          "doc": "These scale with loyalty & power"
         },
         "loyalty_modifier": {
           "body": "estate_body__loyalty_modifier",
-          "card": "0..*",
-          "when": null
+          "card": "0..*"
         },
         "other_religion_group_only": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "privileges": {
           "card": "0..1",
-          "list": "ref<estate_privilege>",
-          "when": null
+          "list": "ref<estate_privilege>"
         },
         "province_independence_weight": {
           "body": "estate_body__province_independence_weight",
@@ -218,13 +185,11 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "starting_reform": {
           "card": "0..1",
-          "value": "ref<government_reform>",
-          "when": null
+          "value": "ref<government_reform>"
         },
         "trigger": {
           "body": "trigger",
@@ -235,8 +200,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -250,8 +214,7 @@
       "fields": {
         "desc": {
           "card": "1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "trigger": {
           "body": "trigger",
@@ -262,8 +225,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -271,8 +233,7 @@
       "fields": {
         "desc": {
           "card": "1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "trigger": {
           "body": "trigger",
@@ -283,8 +244,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -292,13 +252,11 @@
       "fields": {
         "desc": {
           "card": "1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "influence": {
           "card": "1",
-          "value": "int[-100..100]",
-          "when": null
+          "value": "int[-100..100]"
         },
         "trigger": {
           "body": "trigger",
@@ -309,8 +267,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -318,13 +275,11 @@
       "fields": {
         "desc": {
           "card": "1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "loyalty": {
           "card": "1",
-          "value": "int[-100..100]",
-          "when": null
+          "value": "int[-100..100]"
         },
         "trigger": {
           "body": "trigger",
@@ -335,8 +290,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -349,8 +303,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -361,8 +314,7 @@
       "fields": {
         "key": {
           "card": "1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "modifier": {
           "body": "modifier",
@@ -370,18 +322,15 @@
           "doc": "Block of modifiers applied while the containing entry is active.",
           "scope": {
             "push": "country"
-          },
-          "when": null
+          }
         },
         "range_from": {
           "card": "1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "range_to": {
           "card": "1",
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       }
     },
@@ -393,13 +342,11 @@
           "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
           "scope": {
             "push": "country"
-          },
-          "when": null
+          }
         },
         "cooldown_months": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "effect": {
           "body": "effect",
@@ -407,18 +354,15 @@
           "doc": "Block of effects executed by the containing entry.",
           "scope": {
             "push": "country"
-          },
-          "when": null
+          }
         },
         "key": {
           "card": "1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "random_seed": {
           "card": "1",
-          "value": "'crown_land_share' | 'random'",
-          "when": null
+          "value": "'crown_land_share' | 'random'"
         },
         "trigger": {
           "body": "trigger",
@@ -426,8 +370,7 @@
           "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
           "scope": {
             "push": "country"
-          },
-          "when": null
+          }
         }
       }
     },
@@ -437,8 +380,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -450,125 +392,104 @@
         "additional_description": {
           "card": "0..1",
           "doc": "You can put static modifier names here as well as normal localisation keys",
-          "list": "'cossacks_regiment' | 'rajput_regiment' | scalar",
-          "when": null
+          "list": "'cossacks_regiment' | 'rajput_regiment' | scalar"
         },
         "ai_will_do": {
           "body": "estate_privilege_body__ai_will_do",
           "card": "1",
-          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
-          "when": null
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it."
         },
         "benefits": {
           "body": "modifier",
           "card": "0..1",
-          "doc": "Positive modifiers granted while the privilege is active (creates different tooltip to penalties)",
-          "when": null
+          "doc": "Positive modifiers granted while the privilege is active (creates different tooltip to penalties)"
         },
         "can_revoke": [
           {
             "card": "0..1",
             "doc": "Conditions for whether it is possible for the country to revoke this privilege",
-            "value": "bool",
-            "when": null
+            "value": "bool"
           },
           {
             "body": "trigger",
             "card": "0..1",
-            "doc": "Conditions for whether the country can revoke the privilege",
-            "when": null
+            "doc": "Conditions for whether the country can revoke the privilege"
           }
         ],
         "can_select": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Conditions for whether the country is allowed to select the privilege (with conditions for why not displayed)",
-          "when": null
+          "doc": "Conditions for whether the country is allowed to select the privilege (with conditions for why not displayed)"
         },
         "check_valid_when_tag_switching": {
           "card": "0..1",
           "doc": "Defaults to yes",
-          "value": "'no'",
-          "when": null
+          "value": "'no'"
         },
         "conditional_modifier": {
           "body": "estate_privilege_body__conditional_modifier",
           "card": "0..*",
-          "doc": "Modifier that are applied if the specified conditions are true.",
-          "when": null
+          "doc": "Modifier that are applied if the specified conditions are true."
         },
         "cooldown_years": {
           "card": "0..1",
           "doc": "Time limit before which the privilege cannot be revoked",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "icon": {
           "card": "1",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "influence": {
           "card": "0..1",
-          "value": "float[-0.95..0.95]",
-          "when": null
+          "value": "float[-0.95..0.95]"
         },
         "influence_scaled_conditional_modifier": {
           "body": "estate_privilege_body__influence_scaled_conditional_modifier",
           "card": "0..*",
-          "doc": "Modifier that are applied if the specified conditions are true. At 100% Influence you gain 100% of the modifier.",
-          "when": null
+          "doc": "Modifier that are applied if the specified conditions are true. At 100% Influence you gain 100% of the modifier."
         },
         "is_valid": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Conditions for whether it is possible for the country to have this privilege (it will not display on the list if they are false, and will be revoked if it has already been granted)",
-          "when": null
+          "doc": "Conditions for whether it is possible for the country to have this privilege (it will not display on the list if they are false, and will be revoked if it has already been granted)"
         },
         "land_share": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "loyalty": {
           "card": "0..1",
-          "value": "float[-0.95..0.95]",
-          "when": null
+          "value": "float[-0.95..0.95]"
         },
         "loyalty_scaled_conditional_modifier": {
           "body": "estate_privilege_body__loyalty_scaled_conditional_modifier",
           "card": "0..*",
-          "doc": "Modifier that is applied if specified conditions are true, with its effect scaling on the loyalty of the estate",
-          "when": null
+          "doc": "Modifier that is applied if specified conditions are true, with its effect scaling on the loyalty of the estate"
         },
         "max_absolutism": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "mechanics": {
           "body": "estate_privilege_body__empty",
           "card": "0..1",
-          "doc": "Special mechanics the privilege enables",
-          "when": null
+          "doc": "Special mechanics the privilege enables"
         },
         "modifier_by_land_ownership": {
           "body": "modifier",
           "card": "0..1",
-          "doc": "Multiplies the modifier by the % of land owned by the estate.",
-          "when": null
+          "doc": "Multiplies the modifier by the % of land owned by the estate."
         },
         "on_cooldown_expires": {
           "body": "effect",
           "card": "0..1",
-          "doc": "Effect executed once the specified cooldown_years timer has run down",
-          "when": null
+          "doc": "Effect executed once the specified cooldown_years timer has run down"
         },
         "on_granted": {
           "body": "effect",
           "card": "0..1",
-          "doc": "Effects executed immediately upon the privilege being taken",
-          "when": null
+          "doc": "Effects executed immediately upon the privilege being taken"
         },
         "on_granted_province": {
           "body": "effect",
@@ -578,14 +499,12 @@
             "set": {
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "on_invalid": {
           "body": "effect",
           "card": "0..1",
-          "doc": "Effects executed upon the privilege being removed due to invalidity (is_valid becomes false or the estate is removed)",
-          "when": null
+          "doc": "Effects executed upon the privilege being removed due to invalidity (is_valid becomes false or the estate is removed)"
         },
         "on_invalid_province": {
           "body": "effect",
@@ -595,14 +514,12 @@
             "set": {
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "on_revoked": {
           "body": "effect",
           "card": "0..1",
-          "doc": "Effects executed upon the privilege being revoked by the country",
-          "when": null
+          "doc": "Effects executed upon the privilege being revoked by the country"
         },
         "on_revoked_province": {
           "body": "effect",
@@ -612,14 +529,12 @@
             "set": {
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "penalties": {
           "body": "modifier",
           "card": "0..1",
-          "doc": "Negative modifiers granted while the privilege is active (creates different tooltip to benefits)",
-          "when": null
+          "doc": "Negative modifiers granted while the privilege is active (creates different tooltip to benefits)"
         }
       }
     },
@@ -632,8 +547,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -645,20 +559,17 @@
         "is_bad": {
           "card": "0..1",
           "doc": "Specifies whether the tooltip should list it as positive or not",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "modifier": {
           "body": "modifier",
           "card": "0..*",
-          "doc": "Block of modifiers applied while the containing entry is active.",
-          "when": null
+          "doc": "Block of modifiers applied while the containing entry is active."
         },
         "trigger": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
-          "when": null
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply."
         }
       }
     },
@@ -668,20 +579,17 @@
         "is_bad": {
           "card": "0..1",
           "doc": "Specifies whether the tooltip should list it as positive or not",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "modifier": {
           "body": "modifier",
           "card": "1",
-          "doc": "Block of modifiers applied while the containing entry is active.",
-          "when": null
+          "doc": "Block of modifiers applied while the containing entry is active."
         },
         "trigger": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Conditions under which this modifier will be active, if empty it will be always",
-          "when": null
+          "doc": "Conditions under which this modifier will be active, if empty it will be always"
         }
       }
     },
@@ -690,20 +598,17 @@
         "is_bad": {
           "card": "0..1",
           "doc": "Specifies whether the tooltip should list it as positive or not",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "modifier": {
           "body": "modifier",
           "card": "1",
-          "doc": "Block of modifiers applied while the containing entry is active.",
-          "when": null
+          "doc": "Block of modifiers applied while the containing entry is active."
         },
         "trigger": {
           "body": "trigger",
           "card": "1",
-          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
-          "when": null
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply."
         }
       }
     },

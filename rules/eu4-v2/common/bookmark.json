@@ -4,38 +4,31 @@
       "fields": {
         "center": {
           "card": "0..1",
-          "value": "ref<province_id>",
-          "when": null
+          "value": "ref<province_id>"
         },
         "country": {
           "card": "0..12",
-          "value": "enum<country_tags>",
-          "when": null
+          "value": "ref<country_tag>"
         },
         "date": {
           "card": "1",
-          "value": "date",
-          "when": null
+          "value": "date"
         },
         "default": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "desc": {
           "card": "1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "easy_country": {
           "card": "0..12",
-          "value": "enum<country_tags>",
-          "when": null
+          "value": "ref<country_tag>"
         },
         "name": {
           "card": "1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         }
       }
     }

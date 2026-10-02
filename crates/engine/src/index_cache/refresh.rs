@@ -41,17 +41,10 @@ pub(super) fn refresh_cancellable(
             actual: cache.metadata.game_id.clone(),
         });
     }
-    if cache.metadata.rule_hash != rules.rule_hash().to_hex() {
-        return Err(IndexCacheError::RuleHashMismatch {
-            cached: cache.metadata.rule_hash.clone(),
-            active: rules.rule_hash().to_hex(),
-        });
-    }
-    let active_ir_hash = ir.fingerprint();
-    if cache.metadata.ir_hash != active_ir_hash {
-        return Err(IndexCacheError::IrHashMismatch {
-            cached: cache.metadata.ir_hash.clone(),
-            active: active_ir_hash,
+    if cache.metadata.build_id != crate::ANALYZER_BUILD_ID {
+        return Err(IndexCacheError::BuildMismatch {
+            cached: cache.metadata.build_id.clone(),
+            active: crate::ANALYZER_BUILD_ID.to_owned(),
         });
     }
     if !ir.files.is_empty() {
@@ -244,6 +237,7 @@ pub(super) fn refresh_cancellable(
     let metadata = IndexCacheMetadata {
         schema_version: CURRENT_CACHE_SCHEMA_VERSION,
         game_id: cache.metadata.game_id.clone(),
+        build_id: cache.metadata.build_id.clone(),
         rule_hash: cache.metadata.rule_hash.clone(),
         ir_hash: cache.metadata.ir_hash.clone(),
         source_identity: cache.metadata.source_identity.clone(),
@@ -266,8 +260,8 @@ pub(super) fn refresh_cancellable(
     })
 }
 
-/// IR schema lowering depends on cross-file facts. Rebuild the full cache in two passes so
-/// unchanged files cannot retain references or subtype decisions from an earlier workspace.
+/// Rebuild until cross-file symbol facts stabilize, including symbols introduced by Callable
+/// payloads. Unchanged files must not retain references from an earlier candidate index.
 fn refresh_with_ir_full(
     cache: &IndexCache,
     rules: &RuleSet,
@@ -320,9 +314,6 @@ fn refresh_with_ir_full(
                 rules::FileResolutionPolicy::ReplaceByRelativePath
             }
             rules::ir::FileResolution::Merge => rules::FileResolutionPolicy::Merge,
-            rules::ir::FileResolution::ReplaceDirectory => {
-                rules::FileResolutionPolicy::ReplaceDirectory
-            }
         };
         let source_file = SourceFile {
             id: *id,
@@ -367,7 +358,7 @@ fn refresh_with_ir_full(
         sources.insert(*id, source);
         fingerprints.insert(*id, digest);
         metadata_fingerprints.insert(*id, metadata);
-        initial.insert(*id, state);
+        initial.insert(*id, state.cache_only());
         if let Some(progress) = progress {
             progress(ordinal.saturating_add(1), total);
         }
@@ -375,23 +366,42 @@ fn refresh_with_ir_full(
     if files.len() > MAX_CACHE_FILES {
         return Err(IndexCacheError::LimitExceeded("file", MAX_CACHE_FILES));
     }
-    let candidate = WorkspaceIndex::from_shards(initial.values().map(|state| state.shard_handle()));
-    let facts = IndexSymbolFacts::new(ir, &candidate, &[]);
-    let mut final_states = BTreeMap::new();
-    for (id, source_file) in &files {
-        cancellation.checkpoint().map_err(map_workspace_error)?;
-        let source = sources.get(id).cloned().unwrap_or_default();
-        let state = build_file_state_with_ir_and_facts(
-            source_file,
-            source,
-            0,
-            rules,
-            profile,
-            ir,
-            &facts,
-            None,
-        );
-        final_states.insert(*id, state.cache_only());
+    let mut final_states = initial;
+    let mut passes = 0;
+    loop {
+        passes += 1;
+        let candidate =
+            WorkspaceIndex::from_shards(final_states.values().map(|state| state.shard_handle()));
+        let facts = IndexSymbolFacts::new(ir, &candidate, &[]);
+        let mut changed = false;
+        let previous = std::mem::take(&mut final_states);
+        for (id, old) in previous {
+            cancellation.checkpoint().map_err(map_workspace_error)?;
+            let Some(source_file) = files.get(&id) else {
+                continue;
+            };
+            let source = sources.get(&id).cloned().unwrap_or_default();
+            let state = build_file_state_with_ir_and_facts(
+                source_file,
+                source,
+                0,
+                rules,
+                profile,
+                ir,
+                &facts,
+                None,
+            );
+            changed |= !state.shard().same_symbol_facts(old.shard());
+            final_states.insert(id, state.cache_only());
+        }
+        if !changed {
+            break;
+        }
+        if passes >= 32 {
+            return Err(IndexCacheError::InvalidData(
+                "IR symbol facts did not stabilize after 32 passes".into(),
+            ));
+        }
     }
     let shards = final_states
         .values()
@@ -441,6 +451,7 @@ fn refresh_with_ir_full(
     let metadata = IndexCacheMetadata {
         schema_version: CURRENT_CACHE_SCHEMA_VERSION,
         game_id: cache.metadata.game_id.clone(),
+        build_id: cache.metadata.build_id.clone(),
         rule_hash: cache.metadata.rule_hash.clone(),
         ir_hash: cache.metadata.ir_hash.clone(),
         source_identity: cache.metadata.source_identity.clone(),

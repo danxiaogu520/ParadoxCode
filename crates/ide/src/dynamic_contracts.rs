@@ -25,10 +25,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use engine::{AnalysisSnapshot, DocumentSource};
-use hir::{
-    ScopeValue, TemplateFragment, TemplateItem, TemplateProperty, TemplateToken, TemplateValue,
-};
-use rules::{GameProfile, RuleShape};
+use hir::{ScopeValue, TemplateFragment, TemplateItem, TemplateToken, TemplateValue};
+use rules::GameProfile;
 
 use crate::semantic::{
     ResolvedDynamicDefinition, dynamic_definition_type, probe_query_cache,
@@ -179,36 +177,18 @@ pub(crate) fn dynamic_call_site_diagnostics(
             continue;
         }
         let ambient = scopes[0].to_string();
-        let parent_path: Vec<Arc<str>> = fact
-            .parent_path
-            .iter()
-            .map(|segment| Arc::<str>::from(segment.as_str()))
-            .collect();
         let mut dynamic_kind: Option<String> = None;
         let mut builtin = false;
-        for rule in crate::semantic::semantic_rules_for_container_key(
-            snapshot,
-            &fact.context,
-            &parent_path,
-            &property.key,
-        ) {
-            if !crate::semantic::semantic_rule_key_matches(
-                snapshot,
-                rule,
-                &parent_path,
-                &property.key,
-            ) {
-                continue;
-            }
-            match &rule.key {
-                rules::KeyMatcher::Type(kind) | rules::KeyMatcher::Dynamic(kind)
-                    if crate::semantic::dynamic_definition_type(snapshot, kind) =>
+        if hir.uses_ir()
+            && let Some(field_fact) = hir.field_fact_at(property.key_range)
+        {
+            for id in &field_fact.fields {
+                if let Some(kind) =
+                    crate::ir_callable::callable_kind(snapshot.ir(), snapshot.ir().field(*id).key)
                 {
-                    dynamic_kind.get_or_insert_with(|| kind.clone());
-                }
-                _ => {
+                    dynamic_kind = Some(kind);
+                } else {
                     builtin = true;
-                    break;
                 }
             }
         }
@@ -345,42 +325,8 @@ fn dynamic_contract_report(
     Ok(report)
 }
 
-/// The entry constraint contributed by one body statement.
-enum Statement<'rule> {
-    /// Valid wherever any matching rule row accepts the scope.
-    Rows(Vec<&'rule rules::SemanticRule>),
-    /// Valid for exactly the callee contract's scopes.
-    Scopes(Vec<String>),
-    /// A callee with an empty contract: nothing can enter this call chain.
-    Impossible,
-    /// A key that is both a builtin rule and a dynamic definition: either accepts.
-    Any(Vec<Statement<'rule>>),
-}
-
-impl Statement<'_> {
-    fn accepts(&self, profile: &GameProfile, scope: &str) -> bool {
-        match self {
-            Self::Rows(rows) => rows.iter().any(|rule| {
-                rule.allowed_scopes.is_empty()
-                    || rule
-                        .allowed_scopes
-                        .iter()
-                        .any(|expected| profile.scopes_compatible(scope, expected))
-            }),
-            Self::Scopes(scopes) => scopes
-                .iter()
-                .any(|expected| profile.scopes_compatible(scope, expected)),
-            Self::Impossible => false,
-            Self::Any(alternatives) => alternatives
-                .iter()
-                .any(|statement| statement.accepts(profile, scope)),
-        }
-    }
-}
-
 struct ContractInference<'a> {
     snapshot: &'a AnalysisSnapshot,
-    profile: &'a GameProfile,
     /// Memoized contracts keyed by `(kind lower, name lower)`.
     memo: BTreeMap<(String, String), ScopeContract>,
     /// Definitions currently being inferred (cycle guard).
@@ -398,19 +344,21 @@ impl<'a> ContractInference<'a> {
             return cached.clone();
         }
         if !self.visiting.insert(key.clone()) {
-            // Recursive participation is already reported as a definition
-            // cycle; contracts must not stack-overflow on top of it.
             return ScopeContract::Unknown;
         }
         let contract = match resolved.summary.template.as_ref() {
             Some(template) => {
-                let body_context = resolved.body_context.clone();
-                let mut inference = StatementInference::new(self.snapshot, self.profile);
-                inference.walk_items(&template.items, &body_context, self);
-                if inference.dynamic {
+                let contract = self
+                    .snapshot
+                    .ir()
+                    .schema_by_name(&resolved.body_context)
+                    .map_or(ScopeContract::Unknown, |schema| {
+                        self.ir_items(schema, &template.items)
+                    });
+                if template_dispatches(&template.items) {
                     self.dynamic.insert(key.clone());
                 }
-                inference.finish()
+                contract
             }
             None => ScopeContract::Unknown,
         };
@@ -418,42 +366,70 @@ impl<'a> ContractInference<'a> {
         self.memo.insert(key, contract.clone());
         contract
     }
-}
 
-/// Accumulates the constraint of every body statement in one definition.
-struct StatementInference<'a> {
-    snapshot: &'a AnalysisSnapshot,
-    profile: &'a GameProfile,
-    /// Candidate scopes gathered from every constraining statement.
-    candidates: BTreeSet<String>,
-    /// Entry constraint of each body statement, in source order.
-    statements: Vec<Statement<'a>>,
-    /// Set when a `$param$` was used in key position.
-    dynamic: bool,
-}
-
-impl<'a> StatementInference<'a> {
-    fn new(snapshot: &'a AnalysisSnapshot, profile: &'a GameProfile) -> Self {
-        Self {
-            snapshot,
-            profile,
-            candidates: BTreeSet::new(),
-            statements: Vec::new(),
-            dynamic: false,
-        }
+    fn ir_items(&mut self, schema: rules::ir::SchemaId, items: &[TemplateItem]) -> ScopeContract {
+        let contracts = items
+            .iter()
+            .map(|item| self.ir_item(schema, item))
+            .collect::<Vec<_>>();
+        self.combine_ir_contracts(&contracts, false)
     }
 
-    fn finish(self) -> ScopeContract {
-        if self.statements.is_empty() {
+    fn combine_ir_contracts(&self, contracts: &[ScopeContract], union: bool) -> ScopeContract {
+        if contracts.is_empty() {
             return ScopeContract::Unconstrained;
         }
-        let scopes = self
-            .candidates
+        if union
+            && contracts.iter().any(|contract| {
+                matches!(
+                    contract,
+                    ScopeContract::Unconstrained | ScopeContract::Unknown
+                )
+            })
+        {
+            return ScopeContract::Unconstrained;
+        }
+        if !union
+            && contracts.iter().all(|contract| {
+                matches!(
+                    contract,
+                    ScopeContract::Unconstrained | ScopeContract::Unknown
+                )
+            })
+        {
+            return ScopeContract::Unconstrained;
+        }
+        let ir = self.snapshot.ir();
+        let candidates = contracts
             .iter()
-            .filter(|scope| {
-                self.statements
-                    .iter()
-                    .all(|statement| statement.accepts(self.profile, scope))
+            .filter_map(|contract| match contract {
+                ScopeContract::Scopes(scopes) => Some(scopes),
+                _ => None,
+            })
+            .flatten()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let scopes = candidates
+            .iter()
+            .filter(|candidate| {
+                let accepts = |contract: &ScopeContract| match contract {
+                    ScopeContract::Scopes(expected) => expected.iter().any(|expected| {
+                        ir.strings()
+                            .lookup_folded(expected)
+                            .is_some_and(|expected| {
+                                ir.strings()
+                                    .lookup_folded(candidate)
+                                    .is_some_and(|actual| ir.scopes_compatible(actual, expected))
+                            })
+                    }),
+                    ScopeContract::Empty => false,
+                    _ => true,
+                };
+                if union {
+                    contracts.iter().any(accepts)
+                } else {
+                    contracts.iter().all(accepts)
+                }
             })
             .cloned()
             .collect::<Vec<_>>();
@@ -464,220 +440,135 @@ impl<'a> StatementInference<'a> {
         }
     }
 
-    fn walk_items(
-        &mut self,
-        items: &[TemplateItem],
-        context: &str,
-        contracts: &mut ContractInference<'_>,
-    ) {
-        for item in items {
-            match item {
-                TemplateItem::Property(property) => {
-                    self.walk_property(property, context, contracts);
-                }
-                TemplateItem::Conditional(conditional) => {
-                    // A conditional branch is active whenever its parameter is
-                    // supplied, so its statements constrain the contract too.
-                    self.walk_items(&conditional.items, context, contracts);
-                }
-                TemplateItem::BareValue(_) => {}
+    fn ir_item(&mut self, schema: rules::ir::SchemaId, item: &TemplateItem) -> ScopeContract {
+        use rules::ir::{FieldValue, Matcher, Shape};
+        let ir = self.snapshot.ir();
+        let property = match item {
+            TemplateItem::Conditional(conditional) => {
+                return self.ir_items(schema, &conditional.items);
             }
-        }
-    }
-
-    fn walk_property(
-        &mut self,
-        property: &TemplateProperty,
-        context: &str,
-        contracts: &mut ContractInference<'_>,
-    ) {
-        if token_has_parameter(&property.key) {
-            self.dynamic = true;
-            return;
-        }
-        let Some(key) = single_literal(&property.key).map(str::trim) else {
-            return;
+            TemplateItem::BareValue(_) => return ScopeContract::Unconstrained,
+            TemplateItem::Property(property) => property,
         };
-        if key.is_empty() {
-            return;
+        let Some(key) = single_literal(&property.key) else {
+            return ScopeContract::Unconstrained;
+        };
+        let shape = match &property.value {
+            TemplateValue::Block { .. } => Shape::Block,
+            TemplateValue::Scalar(token) if token.quoted => Shape::Quoted,
+            _ => Shape::Scalar,
+        };
+        let mut fields = ir.lookup(schema, key, shape).collect::<Vec<_>>();
+        if shape == Shape::Quoted {
+            fields.extend(ir.lookup(schema, key, Shape::Scalar));
         }
-        let lowered = key.to_ascii_lowercase();
-        if is_dynamic_scope_link(&lowered, context) {
-            // Dynamic scope links re-target a scope the caller decides at
-            // runtime (the event root, the previous scope, the sender, a
-            // saved event target); their bodies constrain that target, not
-            // the definition entry, so they neither constrain nor descend.
-            return;
+        let exact = fields.iter().copied().filter(|id| matches!(ir.matcher(ir.field(*id).key), Matcher::Literal(symbol) if ir.strings().resolve(*symbol).eq_ignore_ascii_case(key))).collect::<Vec<_>>();
+        if !exact.is_empty() {
+            fields = exact;
         }
-        if lowered == "or" {
-            if let TemplateValue::Block { items, .. } = &property.value
-                && let Some(statement) = self.or_statement(items, context, contracts)
-            {
-                self.statements.push(statement);
-            }
-            return;
-        }
-        // Rows matching this statement in the body context; keep only rows of
-        // the statement's own shape so a scalar-only row cannot narrow a block
-        // call and vice versa.
-        let wants_block = matches!(property.value, TemplateValue::Block { .. });
-        let matching: Vec<&'a rules::SemanticRule> =
-            crate::semantic::semantic_rules_for_container_key(self.snapshot, context, &[], key)
-                .into_iter()
-                .filter(|rule| {
-                    crate::semantic::semantic_rule_key_matches(self.snapshot, rule, &[], key)
-                        && rule_has_shape(rule, wants_block)
-                })
-                .collect();
-        // A same-kind dynamic definition call contributes its own contract; a key
-        // that is both builtin and dynamic accepts through either path. Resolving
-        // deep-clones the callee's template, so repeat callees consult the contract
-        // memo before paying for resolution.
-        let callee_contract = dynamic_kind_for_context(self.snapshot, context).and_then(|kind| {
-            let memo_key = (kind.to_ascii_lowercase(), lowered.clone());
-            if let Some(cached) = contracts.memo.get(&memo_key) {
-                return Some(cached.clone());
-            }
-            resolve_dynamic_definition(self.snapshot, &kind, key)
-                .map(|callee| contracts.contract_of(&callee))
+        fields.retain(|id| {
+            crate::ir_semantic::matcher_matches(
+                ir,
+                ir.field(*id).key,
+                key,
+                &crate::ir_semantic::WorkspaceFacts {
+                    snapshot: self.snapshot,
+                },
+            )
         });
-        let mut statement = Vec::with_capacity(2);
-        if matching.iter().all(|rule| !rule.allowed_scopes.is_empty()) && !matching.is_empty() {
-            for rule in &matching {
-                for scope in &rule.allowed_scopes {
-                    self.candidates.insert(scope.to_ascii_lowercase());
+        let mut alternatives = Vec::new();
+        for id in fields {
+            let field = ir.field(id);
+            if let Some(kind) = crate::ir_callable::callable_kind(ir, field.key) {
+                if let Some(resolved) = resolve_dynamic_definition(self.snapshot, &kind, key) {
+                    alternatives.push(self.contract_of(&resolved));
                 }
+                continue;
             }
-            statement.push(Statement::Rows(matching.clone()));
-        }
-        match callee_contract {
-            Some(ScopeContract::Scopes(scopes)) => {
-                for scope in &scopes {
-                    self.candidates.insert(scope.clone());
-                }
-                statement.push(Statement::Scopes(scopes));
-            }
-            Some(ScopeContract::Empty) => statement.push(Statement::Impossible),
-            Some(ScopeContract::Unconstrained | ScopeContract::Unknown) | None => {}
-        }
-        match statement.len() {
-            0 => {}
-            1 => self
-                .statements
-                .push(statement.pop().expect("one statement")),
-            _ => self.statements.push(Statement::Any(statement)),
-        }
-
-        // Descend into same-scope containers so nested statements also
-        // constrain the entry scope. A rule row that pushes or replaces the
-        // scope evaluates its children elsewhere, so it must not contribute.
-        if let TemplateValue::Block { items, .. } = &property.value {
-            let containers: Vec<&rules::SemanticRule> = matching
-                .iter()
-                .copied()
-                .filter(|rule| matches!(rule.shape, RuleShape::Node | RuleShape::QuotedScript))
-                .collect();
-            let descend = !containers.is_empty()
-                && containers.iter().all(|rule| {
-                    rule.push_scope.is_none()
-                        && rule.replace_scope.is_empty()
-                        && rule.child_context.as_deref().is_none_or(|child| {
-                            child.eq_ignore_ascii_case(context)
-                                || child.eq_ignore_ascii_case("trigger")
-                                || child.eq_ignore_ascii_case("effect")
-                        })
-                });
-            if descend {
-                let child_context = containers
+            // Registers and links retarget the body. They constrain their own origin only;
+            // statements inside them do not constrain the definition's entry scope.
+            if matches!(ir.matcher(field.key), Matcher::Link) {
+                if let Some(link) = ir.scopes.links.iter().find(|link| {
+                    crate::ir_semantic::matcher_template_matches(
+                        ir,
+                        &link.pattern,
+                        key.split('.').next().unwrap_or(key),
+                        &crate::ir_semantic::WorkspaceFacts {
+                            snapshot: self.snapshot,
+                        },
+                    )
+                }) && !link
+                    .from
                     .iter()
-                    .find_map(|rule| rule.child_context.as_deref())
-                    .unwrap_or(context)
-                    .to_owned();
-                self.walk_items(items, &child_context, contracts);
-            }
-        }
-    }
-
-    /// Infers every `OR` branch in isolation and unions the results: the
-    /// entry scope only needs one satisfiable branch, so branch contracts
-    /// combine with any-of semantics instead of intersecting.
-    fn or_statement(
-        &mut self,
-        items: &[TemplateItem],
-        context: &str,
-        contracts: &mut ContractInference<'_>,
-    ) -> Option<Statement<'a>> {
-        let mut branches = Vec::new();
-        for item in items {
-            let mut branch = StatementInference::new(self.snapshot, self.profile);
-            branch.walk_items(std::slice::from_ref(item), context, contracts);
-            if branch.dynamic {
-                self.dynamic = true;
-            }
-            match branch.finish() {
-                ScopeContract::Scopes(scopes) => {
-                    for scope in &scopes {
-                        self.candidates.insert(scope.clone());
-                    }
-                    branches.push(Statement::Scopes(scopes));
+                    .any(|scope| matches!(scope, rules::ir::ScopeRef::Any))
+                {
+                    alternatives.push(ScopeContract::Scopes(
+                        link.from
+                            .iter()
+                            .filter_map(|scope| scope.type_name())
+                            .map(|scope| ir.strings().resolve(scope).to_owned())
+                            .collect(),
+                    ));
+                } else {
+                    alternatives.push(ScopeContract::Unconstrained);
                 }
-                ScopeContract::Empty => branches.push(Statement::Impossible),
-                // A branch open to any scope — or one inference could not
-                // resolve — keeps the whole `OR` unconstrained.
-                ScopeContract::Unconstrained | ScopeContract::Unknown => return None,
+                continue;
             }
-        }
-        if branches.is_empty() {
-            return None;
-        }
-        Some(Statement::Any(branches))
-    }
-}
-
-/// True for scope-link keys whose target the caller decides at runtime. Their
-/// bodies constrain that unknown target, never the definition entry. `THIS` is the
-/// exception in trigger context, where it denotes the entry scope itself;
-/// everywhere else a `THIS` block does not run in the entry scope.
-fn is_dynamic_scope_link(lowered: &str, context: &str) -> bool {
-    match lowered {
-        "this" => !context.eq_ignore_ascii_case("trigger"),
-        "root" | "prev" | "from" | "fromfrom" | "fromfromfrom" => true,
-        _ => lowered.starts_with("event_target:"),
-    }
-}
-
-/// Resolves the dynamic-definition kind whose descriptor declares `context` as its
-/// body context (e.g. `effect` -> `scripted_effect`), from rule data only.
-pub(crate) fn dynamic_kind_for_context(
-    snapshot: &AnalysisSnapshot,
-    context: &str,
-) -> Option<String> {
-    snapshot
-        .rules()
-        .model()
-        .semantic
-        .type_descriptors
-        .iter()
-        .find(|(_, descriptor)| {
-            descriptor
-                .dynamic_definition
+            let mut constraints = Vec::new();
+            if let Some(effect) = &field.scope
+                && !effect.scopes_in.is_empty()
+            {
+                constraints.push(ScopeContract::Scopes(
+                    effect
+                        .scopes_in
+                        .iter()
+                        .map(|scope| ir.strings().resolve(*scope).to_owned())
+                        .collect(),
+                ));
+            }
+            if field
+                .scope
                 .as_ref()
-                .is_some_and(|dynamic_descriptor| {
-                    dynamic_descriptor.enabled
-                        && dynamic_descriptor
-                            .body_context
-                            .eq_ignore_ascii_case(context)
-                })
-        })
-        .map(|(kind, _)| kind.clone())
+                .is_none_or(|effect| effect.push.is_none() && effect.set.is_empty())
+            {
+                let child = match field.value {
+                    FieldValue::Block(child) | FieldValue::Quoted(child) => Some(child),
+                    FieldValue::SelfBlock => Some(schema),
+                    _ => None,
+                };
+                if let Some(child) = child
+                    && let TemplateValue::Block { items, .. } = &property.value
+                {
+                    let union = field
+                        .control
+                        .as_ref()
+                        .and_then(|control| control.op)
+                        .is_some_and(|op| ir.strings().resolve(op).eq_ignore_ascii_case("or"));
+                    let children = items
+                        .iter()
+                        .map(|item| self.ir_item(child, item))
+                        .collect::<Vec<_>>();
+                    constraints.push(self.combine_ir_contracts(&children, union));
+                }
+            }
+            alternatives.push(self.combine_ir_contracts(&constraints, false));
+        }
+        self.combine_ir_contracts(&alternatives, true)
+    }
 }
 
-fn rule_has_shape(rule: &rules::SemanticRule, wants_block: bool) -> bool {
-    match rule.shape {
-        RuleShape::Node | RuleShape::QuotedScript => wants_block,
-        RuleShape::Leaf | RuleShape::LeafValue => !wants_block,
-        RuleShape::ValueClause => false,
-    }
+fn template_dispatches(items: &[TemplateItem]) -> bool {
+    items.iter().any(|item| match item {
+        TemplateItem::Conditional(conditional) => template_dispatches(&conditional.items),
+        TemplateItem::Property(property) => {
+            token_has_parameter(&property.key)
+                || match &property.value {
+                    TemplateValue::Block { items, .. } => template_dispatches(items),
+                    _ => false,
+                }
+        }
+        _ => false,
+    })
 }
 
 fn token_has_parameter(token: &TemplateToken) -> bool {
@@ -698,7 +589,6 @@ fn build_contract_report(
     snapshot: &AnalysisSnapshot,
     cancellation: &CancellationToken,
 ) -> Result<DynamicContractReport, Cancelled> {
-    let profile = snapshot.game_profile();
     let mut candidates: Vec<(Arc<str>, String)> = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for definition in snapshot.index().definitions_iter() {
@@ -734,7 +624,6 @@ fn build_contract_report(
     }
     let mut inference = ContractInference {
         snapshot,
-        profile,
         memo: BTreeMap::new(),
         visiting: BTreeSet::new(),
         dynamic: BTreeSet::new(),

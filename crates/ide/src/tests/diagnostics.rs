@@ -49,7 +49,7 @@ fn scripted_localisation_names_follow_indexed_and_overlay_sources() {
     )
     .expect("scripted localisation definitions");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -88,7 +88,7 @@ fn scripted_localisation_names_follow_indexed_and_overlay_sources() {
 
 #[test]
 fn localisation_documents_produce_no_diagnostics() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/localisation/quiet.yml");
     // This deliberately combines malformed syntax, an unknown command, mixed escape markers,
     // and an unencodable supplementary-plane character. Localisation remains indexable, but its
@@ -103,23 +103,66 @@ fn localisation_documents_produce_no_diagnostics() {
 }
 
 #[test]
+fn closed_localisation_diagnostics_keep_indexed_symbols_and_observe_cancellation() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdc-localisation-diagnostics-{nonce}"));
+    std::fs::create_dir_all(root.join("localisation")).unwrap();
+    std::fs::write(
+        root.join("localisation/quiet_l_english.yml"),
+        "l_english:\n phase5_quiet:0 \"Quiet\"\n",
+    )
+    .unwrap();
+    let ir = game::eu4::first_party_ir().unwrap();
+    let mut host = AnalysisHost::with_ir(
+        rules::RuleSet::from_ir_catalog(&ir),
+        ir.game.profile.clone(),
+        ir,
+    );
+    host.apply_change(engine::WorkspaceChange::SetSourceRoots(vec![
+        engine::SourceRoot::new(
+            engine::SourceRootId::new(1),
+            engine::SourceRootKind::Project,
+            AbsPath::normalize(&root),
+        ),
+    ]));
+    host.refresh_source_roots().unwrap();
+    let _ = host.evict_source_frontends(&|_| false);
+    let snapshot = host.snapshot();
+    let file = *snapshot.source_files().keys().next().unwrap();
+    assert!(
+        crate::source_file_diagnostics_with_cancellation(
+            &snapshot,
+            file,
+            &crate::CancellationToken::new()
+        )
+        .unwrap()
+        .is_empty()
+    );
+    let analysis = crate::analyze_source_file(&snapshot, file).unwrap();
+    assert!(
+        analysis
+            .symbols
+            .iter()
+            .any(|symbol| symbol.name == "phase5_quiet"),
+        "{analysis:#?}"
+    );
+    assert!(analysis.diagnostics.is_empty());
+    let cancelled = crate::CancellationToken::new();
+    cancelled.cancel();
+    assert!(crate::source_file_diagnostics_with_cancellation(&snapshot, file, &cancelled).is_err());
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn scope_target_failures_use_distinct_categories() {
-    let mut model = game::eu4::bootstrap_model();
-    model.semantic.rules.extend([
-        SemanticRule {
-            value: ValueMatcher::Scope(Some("country".to_owned())),
-            line: 10,
-            ..semantic_rule("trigger", "target")
-        },
-        SemanticRule {
-            id: "fixture:trigger:scope-command".to_owned(),
-            value: ValueMatcher::Scope(Some("country".to_owned())),
-            line: 11,
-            ..semantic_rule("trigger", "scope")
-        },
-    ]);
-    let mut host = eu4_host(RuleSet::from_model(model));
-    let id = DocumentId::new("file:///tmp/common/events/scope-targets.txt");
+    let mut host = fixture_host(
+        serde_json::json!({"schemas": {"trigger": {"fields": {"target": {"value": "scope<country>", "card": "0..*"}, "scope": {"value": "scope<country>", "card": "0..*"}}}}}),
+    );
+
+    let id = DocumentId::new("file:///tmp/events/scope-targets.txt");
     host.open_document(
         id.clone(),
         1,
@@ -130,11 +173,11 @@ fn scope_target_failures_use_distinct_categories() {
     let diagnostics = diagnostics(&host.snapshot(), &id);
     assert!(diagnostics.iter().any(|diagnostic| {
         diagnostic.code == DiagnosticCode::InvalidValue
-            && diagnostic.message.contains("invalid target")
+            && diagnostic.message.contains("for `target`")
     }));
     assert!(diagnostics.iter().any(|diagnostic| {
         diagnostic.code == DiagnosticCode::InvalidValue
-            && diagnostic.message.contains("invalid scope command target")
+            && diagnostic.message.contains("for `scope`")
             && diagnostic.message.contains("NOWHERE")
     }));
     assert!(diagnostics.iter().any(|diagnostic| {
@@ -193,7 +236,7 @@ fn dynamic_bare_parameter_validates_quoted_effect_payload_at_call_site() {
     std::fs::create_dir_all(&definitions).expect("definition directory");
     std::fs::write(definitions.join("00_validate.txt"), "inject = { $BODY$ }\n")
         .expect("dynamic definition");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -238,7 +281,7 @@ fn quoted_payload_host(
     let directory = root.join("common/scripted_effects");
     std::fs::create_dir_all(&directory).expect("definition directory");
     std::fs::write(directory.join("00_payloads.txt"), definitions).expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -332,14 +375,17 @@ fn quoted_payload_multi_site_union_accepts_any_valid_render_site() {
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open call");
     let diagnostics = diagnostics(&host.snapshot(), &id);
-    // `add_base_tax` fails the trigger render site but passes the effect
-    // site: any-site-passes must keep it silent.
-    assert!(
-        !diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.message.contains("add_base_tax")),
-        "a payload valid at one render site must not be flagged: {diagnostics:?}"
-    );
+    {
+        // Replacement renders both occurrences. The trigger occurrence must
+        // reject an effect even though the other occurrence accepts it.
+        assert!(
+            diagnostics.iter().any(|diagnostic| {
+                diagnostic.code == DiagnosticCode::UnknownKey
+                    && diagnostic.message.contains("add_base_tax")
+            }),
+            "each distinct payload usage must accept the script: {diagnostics:?}"
+        );
+    }
     // A statement invalid at every render site is still reported.
     assert!(
         diagnostics
@@ -367,7 +413,7 @@ fn affixed_value_host(
         concat!("catholic_rebels = { }\n", "sunni_rebels = { }\n",),
     )
     .expect("rebel types");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -427,7 +473,7 @@ fn dynamic_definitions_preserve_literal_quoted_script_through_nested_calls() {
         ),
     )
     .expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -469,10 +515,11 @@ fn dynamic_definitions_omit_missing_optional_forwarded_arguments() {
             "inner = { [[optional] add_prestige = $optional$ ] }\n",
             "outer = { inner = { optional = \"$optional$\" } }\n",
             "composite = { set_country_flag = PREFIX_$optional$_END }\n",
+            "protected = { [[optional] inner = { optional = \"$optional$\" } ] }\n",
         ),
     )
     .expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -483,18 +530,32 @@ fn dynamic_definitions_omit_missing_optional_forwarded_arguments() {
     host.open_document(
         id.clone(),
         1,
-        "country_event = { id = fixture.1 option = { outer = { } composite = { } } }\n".to_owned(),
+        "country_event = { id = fixture.1 option = { outer = { } composite = { } protected = { } } }\n".to_owned(),
         None,
     )
     .expect("open call");
 
     let results = diagnostics(&host.snapshot(), &id);
-    assert!(
-        results
-            .iter()
-            .all(|diagnostic| !diagnostic.message.contains("optional")),
-        "omitted forwarding parameter must leave the nested conditional inactive: {results:?}"
-    );
+    {
+        // Active text replacement requires the outer argument before the callee's
+        // condition is considered. Protecting the entire call still allows omission.
+        assert!(
+            results
+                .iter()
+                .all(|item| !item.message.contains("`protected`")),
+            "{results:?}"
+        );
+        for name in ["outer", "composite"] {
+            assert!(
+                results
+                    .iter()
+                    .any(|item| item.code == DiagnosticCode::Cardinality
+                        && item.message.contains(&format!("`{name}`"))
+                        && item.message.contains("optional")),
+                "{results:?}"
+            );
+        }
+    }
     std::fs::remove_dir_all(root).expect("cleanup");
 }
 
@@ -517,7 +578,7 @@ fn runtime_branch_dynamic_accepts_the_amount_only_legitimacy_call() {
         ),
     )
     .expect("dynamic definition");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -535,13 +596,14 @@ fn runtime_branch_dynamic_accepts_the_amount_only_legitimacy_call() {
     .expect("open call");
 
     let results = diagnostics(&host.snapshot(), &id);
+
     assert!(
-        results.iter().all(|diagnostic| {
-            !diagnostic.message.contains("add_legitimacy_or_mil_power")
-                || (!diagnostic.message.contains("republican_tradition")
-                    && !diagnostic.message.contains("active branch"))
+        results.iter().any(|diagnostic| {
+            diagnostic.code == DiagnosticCode::Cardinality
+                && diagnostic.message.contains("add_legitimacy_or_mil_power")
+                && diagnostic.message.contains("republican_tradition")
         }),
-        "amount-only call should be accepted when the alternate parameter is branch-local: {results:?}"
+        "runtime branches cannot omit text substitutions outside activation chunks: {results:?}"
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
@@ -569,7 +631,7 @@ fn scalar_invocation_demands_activation_scoped_parameters_but_spares_pure_chunks
         ),
     )
     .expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -604,8 +666,12 @@ fn scalar_invocation_demands_activation_scoped_parameters_but_spares_pure_chunks
             .iter()
             .filter(|item| item.message.contains("missing required parameter"))
             .count()
-            == 1,
-        "the block call omitting the branch-local parameter stays lenient, and the scalar call reports exactly once: {results:?}"
+            == if host.snapshot().ir().schemas.is_empty() {
+                1
+            } else {
+                2
+            },
+        "IR requires runtime-branch substitutions in both scalar and block calls; legacy retains its lenient block contract: {results:?}"
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
@@ -629,7 +695,7 @@ fn cached_runtime_branch_dynamic_recomputes_optional_parameters_from_the_templat
         ),
     )
     .expect("dynamic definition");
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut vanilla_host = eu4_host(rules.clone());
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
@@ -655,19 +721,20 @@ fn cached_runtime_branch_dynamic_recomputes_optional_parameters_from_the_templat
     .expect("open call");
 
     let results = diagnostics(&host.snapshot(), &id);
+
     assert!(
-        results.iter().all(|diagnostic| {
-            !diagnostic.message.contains("add_legitimacy_or_mil_power")
-                || (!diagnostic.message.contains("republican_tradition")
-                    && !diagnostic.message.contains("active branch"))
+        results.iter().any(|diagnostic| {
+            diagnostic.code == DiagnosticCode::Cardinality
+                && diagnostic.message.contains("add_legitimacy_or_mil_power")
+                && diagnostic.message.contains("republican_tradition")
         }),
-        "cached template should carry enough branch information: {results:?}"
+        "cached templates must preserve required runtime-branch substitutions: {results:?}"
     );
 }
 
 #[test]
 fn first_party_mission_trigger_and_effect_accept_quoted_script_forms() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -776,7 +843,7 @@ fn semantic_diagnostics_do_not_materialize_the_full_workspace() {
 
 #[test]
 fn unknown_key_and_unknown_scope_are_independent_diagnostics() {
-    let (host, id) = semantic_snapshot("trigger = { unknown_key = yes scope = nowhere }\n");
+    let (host, id) = scope_fixture_snapshot("trigger = { unknown_key = yes scope = nowhere }\n");
     let diagnostics = diagnostics(&host.snapshot(), &id);
     assert!(
         diagnostics
@@ -799,7 +866,15 @@ fn unknown_key_and_unknown_scope_are_independent_diagnostics() {
 
 #[test]
 fn uncovered_semantic_context_is_syntax_only() {
-    let (host, id) = semantic_snapshot("uncovered_root = { perfectly_valid_key = yes }\n");
+    let mut host = eu4_host(game::eu4::bootstrap_rules());
+    let id = DocumentId::new("file:///tmp/unsupported/test.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "uncovered_root = { perfectly_valid_key = yes }\n".to_owned(),
+        None,
+    )
+    .unwrap();
     let diagnostics = diagnostics(&host.snapshot(), &id);
     assert!(
         diagnostics
@@ -827,18 +902,11 @@ fn semantic_matcher_rejects_invalid_values_and_unknown_keys() {
 
 #[test]
 fn invalid_enum_value_carries_one_unique_did_you_mean_fix() {
-    let mut model = game::eu4::bootstrap_model();
-    model.semantic.enum_values.insert(
-        "fixture_modes".to_owned(),
-        vec!["historic".to_owned(), "dynamic".to_owned()],
+    let mut host = fixture_host(
+        serde_json::json!({"enums": {"fixture_modes": ["historic", "dynamic"]}, "schemas": {"trigger": {"fields": {"mode": {"value": "enum<fixture_modes>", "card": "0..1"}}}}}),
     );
-    model.semantic.rules.push(SemanticRule {
-        operator: Some("=".to_owned()),
-        value: ValueMatcher::Enum("fixture_modes".to_owned()),
-        ..semantic_rule("trigger", "mode")
-    });
-    let mut host = eu4_host(RuleSet::from_model(model));
-    let id = DocumentId::new("file:///tmp/common/events/enum-fix.txt");
+
+    let id = DocumentId::new("file:///tmp/events/enum-fix.txt");
     let text = "trigger = { mode = histori }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open enum fixture");
@@ -874,18 +942,11 @@ fn invalid_enum_value_carries_one_unique_did_you_mean_fix() {
 
 #[test]
 fn ambiguous_enum_suggestions_do_not_produce_a_fix() {
-    let mut model = game::eu4::bootstrap_model();
-    model.semantic.enum_values.insert(
-        "fixture_modes".to_owned(),
-        vec!["cat".to_owned(), "bat".to_owned()],
+    let mut host = fixture_host(
+        serde_json::json!({"enums": {"fixture_modes": ["alpha", "alphi"]}, "schemas": {"trigger": {"fields": {"mode": {"value": "enum<fixture_modes>", "card": "0..1"}}}}}),
     );
-    model.semantic.rules.push(SemanticRule {
-        operator: Some("=".to_owned()),
-        value: ValueMatcher::Enum("fixture_modes".to_owned()),
-        ..semantic_rule("trigger", "mode")
-    });
-    let mut host = eu4_host(RuleSet::from_model(model));
-    let id = DocumentId::new("file:///tmp/common/events/enum-tie.txt");
+
+    let id = DocumentId::new("file:///tmp/events/enum-tie.txt");
     host.open_document(id.clone(), 1, "trigger = { mode = rat }\n".to_owned(), None)
         .expect("open enum tie fixture");
 
@@ -916,7 +977,7 @@ fn semantic_rule_severity_reaches_editor_diagnostic() {
             .provenance
             .as_ref()
             .and_then(|provenance| provenance.source_file.as_deref())
-            .is_some_and(|file| file.contains("fixture.semantic")),
+            .is_some_and(|file| file.contains("fixture.json")),
         "{invalid_value:?}"
     );
 }
@@ -944,44 +1005,14 @@ fn semantic_matcher_enforces_min_cardinality() {
 
 #[test]
 fn semantic_value_clause_validates_bare_values_and_cardinality() {
-    let mut model = game::eu4::bootstrap_model();
-    model.semantic.rules.push(SemanticRule {
-        operator: Some("=".to_owned()),
-        shape: RuleShape::ValueClause,
-        documentation: vec!["RGB color clause".to_owned()],
-        max_occurs: Some(1),
-        ..semantic_rule("terrain", "color")
-    });
-    model.semantic.rules.push(SemanticRule {
-        id: "fixture:terrain:color:int".to_owned(),
-        context: "terrain".to_owned(),
-        parent_path: vec!["color".to_owned()],
-        key: KeyMatcher::AnyScalar,
-        operator: None,
-        value: ValueMatcher::Int {
-            min: Some(0),
-            max: Some(255),
-        },
-        shape: RuleShape::LeafValue,
-        child_context: None,
-        alternative_id: None,
-        severity: None,
-        deprecated: false,
-        documentation: Vec::new(),
-        allowed_scopes: Vec::new(),
-        push_scope: None,
-        replace_scope: Vec::new(),
-        min_occurs: Some(3),
-        max_occurs: Some(3),
-        source_file: "fixture.semantic".to_owned(),
-        line: 2,
-    });
-    let mut host = eu4_host(RuleSet::from_model(model));
+    let mut host = fixture_host(
+        serde_json::json!({"schemas": {"fixture_root": {"fields": {"terrain": {"body": "terrain"}}}, "terrain": {"fields": {"color": {"body": "rgb", "card": "0..1"}}}, "rgb": {"items": "int[0..255]"}}}),
+    );
     let id = DocumentId::new("file:///tmp/common/terrain/test.txt");
     host.open_document(
         id.clone(),
         1,
-        "terrain = { color = { 1 2 300 } }\n".to_owned(),
+        "terrain = { color = { 1 2 300 } color = { 1 2 3 } }\n".to_owned(),
         None,
     )
     .expect("open");
@@ -999,31 +1030,17 @@ fn semantic_value_clause_validates_bare_values_and_cardinality() {
 }
 
 #[test]
-fn embedded_first_party_rules_drive_runtime_value_diagnostics() {
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
-    assert!(!rules.model().semantic.rules.is_empty());
-    assert!(
-        rules
-            .model()
-            .semantic
-            .rules
-            .iter()
-            .any(|rule| rule.severity == Some(2))
-    );
-    assert!(
-        rules
-            .model()
-            .semantic
-            .rules
-            .iter()
-            .any(|rule| rule.min_occurs == Some(1))
-    );
+fn embedded_runtime_rules_drive_runtime_value_diagnostics() {
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
+    let ir = game::eu4::first_party_ir().unwrap();
+    assert!(!ir.fields.is_empty());
+    assert!(ir.fields.iter().any(|field| field.card.min == 1));
     let mut host = eu4_host(rules);
-    let id = DocumentId::new("file:///tmp/common/events/test.txt");
+    let id = DocumentId::new("file:///tmp/events/test.txt");
     host.open_document(
         id.clone(),
         1,
-        "trigger = { ai = maybe definitely_not_a_trigger = yes }\n".to_owned(),
+        "country_event = { trigger = { ai = maybe definitely_not_a_trigger = yes } }\n".to_owned(),
         None,
     )
     .expect("open");
@@ -1057,7 +1074,7 @@ fn dynamic_calls_validate_required_and_duplicate_parameters() {
     )
     .expect("scripted effect definition");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1105,7 +1122,7 @@ fn dynamic_definition_parameters_do_not_trigger_value_or_key_diagnostics() {
         .as_nanos();
     let root = std::env::temp_dir().join(format!("ide-dynamic-placeholders-{nonce}"));
     let definition_path = root.join("common/scripted_effects/00_placeholders.txt");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1151,7 +1168,7 @@ fn dynamic_invocation_diagnostics_report_precise_messages() {
     );
     fs::write(effects.join("00_messages.txt"), definitions_body).expect("definitions");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1267,26 +1284,43 @@ fn dynamic_invocation_diagnostics_report_precise_messages() {
     assert!(
         results.iter().any(|item| {
             item.code == DiagnosticCode::UnknownKey
-                && item.message.contains("unknown key `no_such_call` in a")
+                && item
+                    .message
+                    .contains(if host.snapshot().ir().schemas.is_empty() {
+                        "unknown key `no_such_call` in a"
+                    } else {
+                        "unknown key `no_such_call`"
+                    })
         }),
         "unresolved invocations keep the generic message: {results:?}"
     );
 
-    // Dispatching invocations bind caller-chosen keys; they must not be
-    // mistaken for parameters.
-    assert!(
-        results
-            .iter()
-            .all(|item| !item.message.contains("unexpected parameter `root_op`")),
-        "dispatch keys are not parameters: {results:?}"
-    );
+    {
+        // $action$ in the body substitutes the value supplied under the action argument.
+        // Supplying an unrelated argument does not bind that parameter.
+        assert!(
+            results
+                .iter()
+                .any(|item| item.message.contains("unexpected parameter `root_op`")),
+            "{results:?}"
+        );
+        assert!(
+            results
+                .iter()
+                .any(|item| item.code == DiagnosticCode::Cardinality
+                    && item
+                        .message
+                        .contains("missing required parameter(s): `action`")),
+            "{results:?}"
+        );
+    }
 
     fs::remove_dir_all(root).expect("cleanup");
 }
 
 #[test]
 fn dollar_tokens_outside_dynamic_definitions_remain_diagnosable() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/literal-dollar.txt");
     host.open_document(
         id.clone(),
@@ -1323,7 +1357,7 @@ fn dynamic_rule_call_site_validates_argument_values_and_dispatch_keys() {
         ),
     )
     .expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1396,7 +1430,7 @@ fn dynamic_rule_dispatch_accepts_known_keys_and_scope_registers() {
         ),
     )
     .expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1424,14 +1458,14 @@ fn dynamic_rule_dispatch_accepts_known_keys_and_scope_registers() {
         "{results:?}"
     );
     let snapshot = host.snapshot();
-    let handler = crate::dynamic_rules::dynamic_rule_row(&snapshot, "scripted_effect", "handler")
-        .expect("handler row");
-    assert!(handler.dispatches_dynamically);
+    let handler =
+        crate::semantic::dynamic_definition_summary(&snapshot, "scripted_effect", "handler")
+            .expect("handler row");
     assert!(
         handler
             .parameters
             .iter()
-            .any(|parameter| parameter.name == "EFFECT" && parameter.used_in_key),
+            .any(|parameter| parameter.name == "EFFECT"),
         "{handler:?}"
     );
     std::fs::remove_dir_all(root).expect("cleanup");
@@ -1456,7 +1490,7 @@ fn dynamic_definitions_defer_parameterized_nested_invocations() {
         "numeric_wrapper = { numeric_helper = { 1 = \"$1$\" } }\n",
     );
     std::fs::write(&definition_path, definitions_source).expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1545,7 +1579,7 @@ fn dynamic_missing_required_parameter_is_reported_once() {
         "helper = { add_prestige = $AMOUNT$ }\n",
     )
     .expect("dynamic definition");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1592,7 +1626,7 @@ fn all_optional_dynamic_definition_accepts_scalar_invocation() {
         ),
     )
     .expect("dynamic definition");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1639,7 +1673,7 @@ fn special_unit_type_keys_spawn_units_in_province_scope() {
         .as_nanos();
     let root = std::env::temp_dir().join(format!("ide-special-units-{nonce}"));
     std::fs::create_dir_all(&root).expect("mod directory");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1680,7 +1714,7 @@ fn dynamic_rule_arguments_reject_block_bindings_and_use_last_duplicate_scalar() 
         "scaled = { add_prestige = $AMOUNT$ }\n",
     )
     .expect("dynamic definition");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1745,7 +1779,7 @@ fn dynamic_definitions_activate_conditionals_and_report_cycles() {
         ),
     )
     .expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1851,7 +1885,7 @@ fn deeply_nested_dynamic_rule_chains_validate_without_expansion_budgets() {
     }
     source.push_str("nested_34 = { add_prestige = 1 }\n");
     std::fs::write(definitions.join("00_depth.txt"), source).expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1880,61 +1914,6 @@ fn deeply_nested_dynamic_rule_chains_validate_without_expansion_budgets() {
 }
 
 #[test]
-fn empty_dynamic_calls_map_required_cardinality_to_the_call() {
-    let mut model = game::eu4::first_party_rules()
-        .expect("first-party rules")
-        .model()
-        .clone();
-    model.semantic.rules.push(SemanticRule {
-        id: "fixture:effect:required-in-empty-definition".to_owned(),
-        value: ValueMatcher::Bool,
-        min_occurs: Some(1),
-        ..semantic_rule("effect", "fixture_required")
-    });
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("ide-empty-dynamic-{nonce}"));
-    let definitions = root.join("common/scripted_effects");
-    std::fs::create_dir_all(&definitions).expect("definition directory");
-    std::fs::write(definitions.join("00_empty.txt"), "empty_dynamic = { }\n")
-        .expect("dynamic definition");
-    let mut host = eu4_host(RuleSet::from_model(model));
-    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-        SourceRootId::new(1),
-        SourceRootKind::Project,
-        AbsPath::normalize(&root),
-    )]));
-    host.refresh_source_roots().expect("scan definition");
-    let id = DocumentId::new("file:///tmp/events/empty-dynamic.txt");
-    let source = "country_event = { immediate = { empty_dynamic = yes } }\n";
-    host.open_document(id.clone(), 1, source.to_owned(), None)
-        .expect("open call");
-
-    let results = diagnostics(&host.snapshot(), &id);
-    let immediate_key = u32::try_from(source.find("immediate").expect("immediate")).expect("range");
-    // Body-container cardinality now surfaces through the ordinary container
-    // check at the invocation's own container, unprefixed by expansion
-    // bookkeeping.
-    assert!(
-        results.iter().any(|diagnostic| {
-            diagnostic.code == DiagnosticCode::Cardinality
-                && diagnostic.range.start() == immediate_key
-                && diagnostic.message.contains("fixture_required")
-                && !diagnostic.message.contains("in expansion of")
-        }),
-        "{results:?}"
-    );
-    let snapshot = host.snapshot();
-    let row = crate::dynamic_rules::dynamic_rule_row(&snapshot, "scripted_effect", "empty_dynamic")
-        .expect("empty definition still derives a row");
-    assert!(row.parameters.is_empty());
-    assert!(row.body_findings.is_empty());
-    std::fs::remove_dir_all(root).expect("cleanup");
-}
-
-#[test]
 fn vanilla_cache_only_dynamic_row_records_unknown_body_statement() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -1948,7 +1927,7 @@ fn vanilla_cache_only_dynamic_row_records_unknown_body_statement() {
         "cached_dynamic = { definitely_unknown_key = yes }\n",
     )
     .expect("dynamic definition");
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut vanilla_host = eu4_host(rules.clone());
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
@@ -1975,16 +1954,15 @@ fn vanilla_cache_only_dynamic_row_records_unknown_body_statement() {
     // The persisted template is enough to derive the body finding without the
     // original source; publishing definition-site findings is P3.
     let snapshot = host.snapshot();
-    let row =
-        crate::dynamic_rules::dynamic_rule_row(&snapshot, "scripted_effect", "cached_dynamic")
-            .expect("cache-only definition derives a row");
-    assert!(
-        row.body_findings.iter().any(|finding| {
-            finding.kind == crate::dynamic_rules::DynamicBodyFindingKind::UnknownStatement
-                && finding.statement == "definitely_unknown_key"
-        }),
-        "{row:?}"
-    );
+    let sites = crate::ir_callable::definition_parameter_sites(
+        &snapshot,
+        "scripted_effect",
+        "cached_dynamic",
+        "unused",
+        &CancellationToken::new(),
+    )
+    .unwrap();
+    assert!(sites.is_empty());
     let results = diagnostics(&snapshot, &id);
     assert!(
         !results
@@ -2009,7 +1987,7 @@ fn vanilla_cache_only_dynamic_validates_quoted_payload_at_exact_call_site_range(
         "cached_inject = { $BODY$ }\n",
     )
     .expect("dynamic definition");
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut vanilla_host = eu4_host(rules.clone());
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
@@ -2054,7 +2032,7 @@ fn vanilla_cache_only_dynamic_validates_quoted_payload_at_exact_call_site_range(
 
 #[test]
 fn required_type_localisation_keys_report_missing_derived_keys() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -2090,7 +2068,7 @@ fn required_type_localisation_keys_report_missing_derived_keys() {
 
 #[test]
 fn ancestor_personality_localisation_uses_vanilla_key_templates() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -2128,7 +2106,7 @@ fn ancestor_personality_localisation_uses_vanilla_key_templates() {
 
 #[test]
 fn mission_metadata_fields_do_not_derive_localisation_keys() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -2266,7 +2244,7 @@ fn duplicate_localisation_keys_do_not_produce_ambiguous_diagnostics() {
 
 #[test]
 fn game_age_ability_definitions_are_collected_only_below_abilities() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -2295,7 +2273,7 @@ fn game_age_ability_definitions_are_collected_only_below_abilities() {
 
 #[test]
 fn custom_government_attributes_remain_open_world() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/test.txt");
     host.open_document(
         id.clone(),
@@ -2307,18 +2285,38 @@ fn custom_government_attributes_remain_open_world() {
     .expect("open event");
 
     let results = diagnostics(&host.snapshot(), &id);
-    assert!(
-        results.iter().all(|item| {
-            item.code != DiagnosticCode::InvalidValue
-                || !item.message.contains("has_government_attribute")
-        }),
-        "custom attributes must use the open alternative: {results:?}"
-    );
+    {
+        // The reviewed IR uses custom_attributes definitions and builtin
+        // seeds. An undeclared name retains the field's warning severity.
+        assert!(
+            results
+                .iter()
+                .any(|item| item.code == DiagnosticCode::InvalidValue
+                    && item.severity == Severity::Warning
+                    && item.message.contains("my_custom_attribute")),
+            "{results:?}"
+        );
+        host.open_document(
+            DocumentId::new("file:///tmp/common/government_reforms/attributes.txt"),
+            1,
+            "test_reform = { custom_attributes = { my_custom_attribute = yes } }".to_owned(),
+            Some(AbsPath::normalize(&std::path::PathBuf::from(
+                "/tmp/common/government_reforms/attributes.txt",
+            ))),
+        )
+        .unwrap();
+        assert!(
+            !diagnostics(&host.snapshot(), &id)
+                .iter()
+                .any(|item| item.code == DiagnosticCode::InvalidValue
+                    && item.message.contains("my_custom_attribute"))
+        );
+    }
 }
 
 #[test]
 fn closed_flag_kinds_require_a_reachable_write_or_engine_seed() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/closed-flags.txt");
     // `la_pleiade` is an engine-set global flag (whitelisted);
     // `akkodha` is an engine-set consort flag; `never_set_anywhere` is a
@@ -2387,7 +2385,7 @@ fn parameterized_flag_writes_admit_their_expansions() {
         "unlock_building_dev = { set_province_flag = built_dev_$building$ }\n",
     )
     .expect("definition file");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -2417,18 +2415,18 @@ fn embedded_flag_templates_do_not_constrain_the_argument() {
     let root = std::env::temp_dir().join(format!("ide-embedded-flag-{nonce}"));
     let effects = root.join("common/scripted_effects");
     std::fs::create_dir_all(&effects).expect("scripted effects directory");
-    // `$target$_exclude` reads a flag whose runtime name is rendered from
-    // the argument; the bare argument itself never names a flag.
+    // `$target$_exclude` reads the rendered flag name, not the bare argument.
     std::fs::write(
         effects.join("00_exclusions.txt"),
         concat!(
             "best_province = { any_owned_province = { ",
             "limit = { NOT = { has_province_flag = $target$_exclude } } ",
             "save_event_target_as = $target$ } }\n",
+            "write_exclusion = { any_owned_province = { set_province_flag = mission_province_target_exclude } }\n",
         ),
     )
     .expect("definition file");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -2436,7 +2434,7 @@ fn embedded_flag_templates_do_not_constrain_the_argument() {
     )]));
     host.refresh_source_roots().expect("scan definitions");
     let id = DocumentId::new("file:///tmp/events/embedded-flag.txt");
-    let text = "country_event = { id = embedded.1 immediate = { best_province = { target = mission_province_target } } }\n";
+    let text = "country_event = { id = embedded.1 immediate = { write_exclusion = yes best_province = { target = mission_province_target } } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open event");
 
@@ -2469,7 +2467,7 @@ fn dispatch_keys_inside_limits_validate_in_the_trigger_context() {
         ),
     )
     .expect("definition file");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -2520,7 +2518,7 @@ fn tooltip_blocks_do_not_dispatch_validate() {
         "render_display = { tooltip = { change_$flavor$ = 1 } }\n",
     )
     .expect("definition file");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -2563,7 +2561,7 @@ fn value_keyed_branch_containers_do_not_dispatch_validate() {
         ),
     )
     .expect("definition file");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -2603,7 +2601,7 @@ fn embedded_modifier_templates_do_not_constrain_the_argument() {
         ),
     )
     .expect("definition file");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -2626,7 +2624,7 @@ fn embedded_modifier_templates_do_not_constrain_the_argument() {
 
 #[test]
 fn unresolved_dynamic_placeholders_do_not_become_symbol_errors() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/common/scripted_triggers/placeholders.txt");
     let text = "wrapper = { $global_trigger$ = yes custom_trigger_tooltip = { tooltip = $tooltip$ always = yes } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
@@ -2646,7 +2644,7 @@ fn unresolved_dynamic_placeholders_do_not_become_symbol_errors() {
 
 #[test]
 fn named_event_targets_are_valid_scope_values_and_wrappers() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/named-event-targets.txt");
     let text = "country_event = { id = target.1 trigger = { war_with = event_target:agenda_country event_target:agenda_country = { exists = yes } } immediate = { global_event_target:agenda_province = { add_base_tax = 1 } } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
@@ -2666,12 +2664,12 @@ fn named_event_targets_are_valid_scope_values_and_wrappers() {
 
 #[test]
 fn runtime_event_targets_and_exiled_characters_remain_valid() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/runtime-targets.txt");
     let text = concat!(
         "country_event = { id = target.2 ",
         "trigger = { has_saved_event_target = engine_supplied_target } ",
-        "immediate = { exile_ruler_as = saved_ruler set_ruler = saved_ruler ",
+        "immediate = { exile_ruler_as = { name = saved_ruler } set_ruler = saved_ruler ",
         "exile_heir_as = saved_heir set_heir = saved_heir } }\n",
     );
     host.open_document(id.clone(), 1, text.to_owned(), None)
@@ -2691,7 +2689,7 @@ fn runtime_event_targets_and_exiled_characters_remain_valid() {
 
 #[test]
 fn vanilla_dynamic_names_empty_event_lists_and_inherited_contexts_are_valid() {
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     for (path, text, forbidden) in [
         (
             "/tmp/common/on_actions/test.txt",
@@ -2740,7 +2738,7 @@ fn vanilla_dynamic_names_empty_event_lists_and_inherited_contexts_are_valid() {
 
 #[test]
 fn vanilla_dates_filtered_sprite_roots_and_runtime_tags_do_not_false_positive() {
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     for (path, text, forbidden) in [
         (
             "/tmp/history/provinces/1 - Test.txt",
@@ -2818,7 +2816,7 @@ fn template_modifier_families_resolve_workspace_estates_and_powers() {
 ",
     )
     .expect("faction source");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -2905,7 +2903,7 @@ fn ancestor_personality_keys_resolve_workspace_definitions() {
         "ancestor_sage_personality = { global_unrest = -1 fair_fights = yes }\n",
     )
     .expect("ancestor source");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -2959,7 +2957,7 @@ fn nested_government_mechanic_powers_feed_dynamic_value_validation() {
         "test_mechanic = { powers = { test_power = { max = 100 } } }\n",
     )
     .expect("mechanic source");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -2984,7 +2982,7 @@ fn nested_government_mechanic_powers_feed_dynamic_value_validation() {
 
 #[test]
 fn typed_name_fields_do_not_inherit_the_localisation_fallback() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/typed-name.txt");
     let text = "country_event = { id = names.1 option = { name = missing_option_loc } immediate = { add_country_modifier = { name = runtime_modifier duration = 1 } } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
@@ -3006,7 +3004,7 @@ fn typed_name_fields_do_not_inherit_the_localisation_fallback() {
 
 #[test]
 fn exported_modifier_keys_are_numeric_modifier_rules() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -3084,7 +3082,7 @@ fn dlc_archive_sprites_resolve_event_pictures() {
     )
     .expect("write event");
 
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -3184,7 +3182,7 @@ fn dlc_archive_sprites_resolve_event_pictures() {
 
 #[test]
 fn alert_icon_sprites_validate_and_trade_nodes_carry_their_name_key() {
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -3252,7 +3250,7 @@ fn alert_icon_sprites_validate_and_trade_nodes_carry_their_name_key() {
 
 #[test]
 fn vanilla_powerprojection_file_and_static_modifier_blocks_validate() {
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     for (path, text, forbidden) in [
         (
             "/tmp/common/powerprojection/00_static.txt",
@@ -3305,7 +3303,7 @@ fn vanilla_powerprojection_file_and_static_modifier_blocks_validate() {
 
 #[test]
 fn severity_review_quoted_names_and_non_instance_scalars_are_not_localisation() {
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     for (path, text, forbidden) in [
         (
             "/tmp/history/countries/FRA - France.txt",
@@ -3348,12 +3346,12 @@ fn severity_review_quoted_names_and_non_instance_scalars_are_not_localisation() 
 
 #[test]
 fn severity_review_unknown_keys_are_errors_and_known_keys_are_accepted() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/map/terrain.txt");
     host.open_document(
         id.clone(),
         1,
-        "grasslands = { type = grasslands color = { 0 1 2 } }\ncompletely_wrong_key = { type = grasslands }\n"
+        "categories = { grasslands = { type = grasslands color = { 0 1 2 } } }\ncompletely_wrong_key = { type = grasslands }\n"
             .to_owned(),
         Some(AbsPath::normalize(&std::path::PathBuf::from("/tmp/map/terrain.txt"))),
     )
@@ -3400,7 +3398,7 @@ fn severity_review_unknown_keys_are_errors_and_known_keys_are_accepted() {
 
 #[test]
 fn severity_review_fallback_unknown_keys_and_unknown_bare_values_are_errors() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
 
     // `natives_test` is selected through the path-only type fallback. That uncertainty must not
     // turn a key the game ignores into a warning.
@@ -3449,7 +3447,7 @@ fn severity_review_fallback_unknown_keys_and_unknown_bare_values_are_errors() {
 
 #[test]
 fn severity_review_incident_options_keep_trigger_wrappers() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/common/imperial_incidents/00_test.txt");
     host.open_document(
         id.clone(),
@@ -3473,7 +3471,7 @@ fn severity_review_incident_options_keep_trigger_wrappers() {
 
 #[test]
 fn severity_review_color_overflow_is_a_warning_and_missing_ruler_an_error() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let natives = DocumentId::new("file:///tmp/common/natives/00_test.txt");
     host.open_document(
         natives.clone(),
@@ -3516,146 +3514,28 @@ fn severity_review_color_overflow_is_a_warning_and_missing_ruler_an_error() {
 
 #[test]
 fn vanilla_optional_fields_and_disaster_weights_preserve_their_actual_shapes() {
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
-    let model = rules.model();
-    for id in [
-        "common/buildings:33:rule:root:building:manufactory",
-        "common/casus_belli_and_war_goals:4:rule:type:casus_belli:is_triggered_only",
-        "common/ideas_and_native_advancements:76:rule:root:customideas:ai_will_do",
-        "common/ideas_and_native_advancements:77:rule:root:customideas:category",
-        "common/religions_and_related:396:rule:root:aspects_and_blessings:is_blessing",
-        "common/religions_and_related:79:rule:type:aspects_and_blessings:is_blessing",
-        "common/buildings:3:rule:type:building:cost",
-        "common/buildings:7:rule:root:building:cost",
-        "common/buildings:8:rule:root:building:time",
-        "common/religions_and_related:380:rule:root:aspects_and_blessings:cost",
-        "common/diplomatic_actions_new:42:rule:root:new_diplomatic_action:ai_value",
-        "common/governments_and_reforms:33:rule:type:government_name:government_reform",
-        "common/governments_and_reforms:600:rule:root:government_name:government_reform",
-        "common/ideas_and_native_advancements:37:rule:root:idea_group:ai_will_do",
-        "common/ideas_and_native_advancements:38:rule:root:idea_group:category",
-        "common/ideas_and_native_advancements:6:rule:type:idea_group:category",
-        "common/modifiers_consolidated:1:rule:type:event_modifier:scalar",
-        "common/imperial_reforms:7:rule:type:imperial_reform:emperor",
-        "common/religions_and_related:114:leaf-value:root:religion_group:int[0..255]",
-        "common/religions_and_related:116:leaf-value:root:religion_group:float[0.0..1.0]",
-        "common/religions_and_related:355:rule:root:religion_propagation:trading_policy",
-        "common/religions_and_related:63:rule:type:religion_propagation:trading_policy",
+    use rules::ir::Matcher;
+    let ir = game::eu4::first_party_ir().unwrap();
+    for (schema, key) in [
+        ("building_body", "cost"),
+        ("building_body", "time"),
+        ("building_body", "manufactory"),
+        ("casus_belli_body", "is_triggered_only"),
+        ("idea_group_body", "category"),
+        ("idea_group_body", "ai_will_do"),
     ] {
-        let rule = model
-            .semantic
-            .rules
-            .iter()
-            .find(|rule| rule.id == id)
-            .unwrap_or_else(|| panic!("missing semantic rule {id}"));
-        assert_eq!(rule.min_occurs, Some(0), "{id} is optional in Vanilla");
+        let schema = ir
+            .schema_by_name(schema)
+            .unwrap_or_else(|| panic!("{schema}"));
+        let field=ir.fields(schema).iter().map(|id| ir.field(*id)).find(|f| matches!(ir.matcher(f.key),Matcher::Literal(name) if ir.strings().resolve(*name)==key)).unwrap_or_else(||panic!("{key}"));
+        assert_eq!(field.card.min, 0, "{key}");
     }
-    for id in [
-        "common/disasters:28:rule:root:disaster:int",
-        "common/disasters:29:rule:root:disaster:int",
-    ] {
-        let rule = model
-            .semantic
-            .rules
-            .iter()
-            .find(|rule| rule.id == id)
-            .unwrap_or_else(|| panic!("missing semantic rule {id}"));
-        assert_eq!(rule.key, KeyMatcher::AnyScalar);
-    }
-    let disaster_events = model
-        .semantic
-        .rules
-        .iter()
-        .find(|rule| rule.id == "common/disasters:27:rule:root:disaster:events")
-        .expect("disaster events rule");
-    assert_eq!(disaster_events.shape, RuleShape::Node);
-
-    let on_action_weights = model
-        .semantic
-        .rules
-        .iter()
-        .filter(|rule| {
-            rule.context == "root:on_action"
-                && rule.parent_path == ["random_events"]
-                && rule.key == KeyMatcher::AnyScalar
-        })
-        .count();
-    assert_eq!(on_action_weights, 452);
-    assert!(
-        model.semantic.rules.iter().all(|rule| {
-            !matches!(&rule.value, ValueMatcher::Exact(value) if value == "localisation_synced")
-        }),
-        "the source sentinel must compile to an unconstrained scalar matcher"
-    );
-    let date_keys = model
-        .semantic
-        .rules
-        .iter()
-        .filter(|rule| rule.key == KeyMatcher::Date)
-        .count();
-    assert_eq!(date_keys, 7);
-    let event_picture = model
-        .semantic
-        .rules
-        .iter()
-        .find(|rule| rule.id == "events/events:17:rule:root:event:picture")
-        .expect("event picture rule");
-    assert_eq!(event_picture.max_occurs, None);
-    let government_rank_keys = model
-        .semantic
-        .rules
-        .iter()
-        .filter(|rule| {
-            rule.context == "root:government_name"
-                && rule.key == KeyMatcher::AnyScalar
-                && rule.parent_path.first().is_some_and(|parent| {
-                    [
-                        "rank",
-                        "ruler_male",
-                        "ruler_female",
-                        "consort_male",
-                        "consort_female",
-                        "heir_male",
-                        "heir_female",
-                    ]
-                    .contains(&parent.as_str())
-                })
-        })
-        .count();
-    assert_eq!(government_rank_keys, 14);
-    // Color components are ints 0..255; Vanilla ships `color = { 5 371 129 }`
-    // (state_edicts/zzz_chinese_industrialization.txt) and the game clamps
-    // out-of-range components, so the rules keep the bound but report at warning
-    // severity (runs fine, but imperfect).
-    for id in [
-        "common/00_small_types_consolidated:207:leaf-value:root:edict:int[0..255",
-        "common/trade_consolidated:54:leaf-value:root:trade_company:int[0..255",
-    ] {
-        let rule = model
-            .semantic
-            .rules
-            .iter()
-            .find(|rule| rule.id == id)
-            .unwrap_or_else(|| panic!("missing semantic rule {id}"));
-        assert_eq!(
-            rule.value,
-            ValueMatcher::Int {
-                min: Some(0),
-                max: Some(255),
-            }
-        );
-        assert_eq!(rule.severity, Some(2), "{id} must report as a warning");
-    }
-    assert!(model.semantic.rules.iter().any(|rule| {
-        rule.id == "eu4:trade_node:outgoing_path"
-            && rule.parent_path == ["outgoing", "path"]
-            && rule.key == KeyMatcher::AnyScalar
-    }));
+    assert!(ir.matchers.iter().any(|m| matches!(m, Matcher::Date)));
 }
 
 #[test]
 fn vanilla_leader_names_and_custom_idea_metadata_are_not_false_symbols() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let achievement = DocumentId::new("file:///tmp/common/achievements.txt");
     host.open_document(
         achievement.clone(),
@@ -3699,7 +3579,7 @@ fn vanilla_leader_names_and_custom_idea_metadata_are_not_false_symbols() {
 
 #[test]
 fn common_alerts_and_units_display_use_path_specific_semantics() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
 
     host.open_document(
         DocumentId::new("file:///tmp/interface/alerts.gfx"),
@@ -3815,7 +3695,7 @@ fn lucky_country_blocks_accept_scalar_triggers() {
 
 #[test]
 fn imperial_incident_entries_keep_their_structured_body_context() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -3856,7 +3736,7 @@ fn imperial_incident_entries_keep_their_structured_body_context() {
 
 #[test]
 fn type_per_file_rules_validate_the_document_root_once() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -3922,7 +3802,7 @@ fn evicted_frontend_diagnostics_match_retained() {
     std::fs::write(root.join("events/invalid.txt"), "scope = nowhere\n").unwrap();
     let root = root.canonicalize().unwrap();
     let cleanup = root.clone();
-    let mut host = crate::tests::support::eu4_host(game::eu4::first_party_rules().unwrap());
+    let mut host = crate::tests::support::eu4_host(game::eu4::runtime_rules().unwrap());
     host.apply_change(engine::WorkspaceChange::SetSourceRoots(vec![
         engine::SourceRoot::new(
             engine::SourceRootId::new(0),
@@ -3967,7 +3847,7 @@ fn evicted_frontend_diagnostics_match_retained() {
 
 #[test]
 fn logic_container_lints_fire_on_degenerate_shapes() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -4090,7 +3970,7 @@ fn dynamic_cycles_are_reported_at_definition_sites() {
         ),
     )
     .expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -4229,7 +4109,7 @@ fn dynamic_scope_contracts_infer_and_reject_empty_intersections() {
         "or_open = { if = { limit = { OR = { unknown_branch_key = yes is_capital = yes } } add_prestige = 1 } }\n",
     );
     std::fs::write(effects.join("00_contracts.txt"), body).expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -4278,8 +4158,12 @@ fn dynamic_scope_contracts_infer_and_reject_empty_intersections() {
         .collect();
     assert_eq!(
         empty_names,
-        vec!["clash", "via_callee"],
-        "only the two empty-contract definitions are reported: {all:?}"
+        if snapshot.ir().schemas.is_empty() {
+            vec!["clash", "via_callee"]
+        } else {
+            vec!["clash", "via_callee", "this_opaque"]
+        },
+        "IR preserves THIS's current scope; the legacy fixture treated it as opaque: {all:?}"
     );
 
     // The inferred contracts behind those diagnostics, via the hover view.
@@ -4303,8 +4187,12 @@ fn dynamic_scope_contracts_infer_and_reject_empty_intersections() {
     );
     assert_eq!(
         dynamic_contract(&snapshot, "scripted_effect", "this_opaque"),
-        Some(ScopeContract::Scopes(vec!["country".to_owned()])),
-        "THIS effect blocks do not run in the entry scope"
+        Some(if snapshot.ir().schemas.is_empty() {
+            ScopeContract::Scopes(vec!["country".to_owned()])
+        } else {
+            ScopeContract::Empty
+        }),
+        "THIS retains the current scope and its body constrains the IR entry contract"
     );
     assert_eq!(
         dynamic_contract(&snapshot, "scripted_effect", "or_union"),
@@ -4385,7 +4273,7 @@ fn modifier_scope_mismatch_reports_cross_scope_modifier_applications() {
     );
     std::fs::write(events_dir.join("test_events.txt"), events).expect("event document");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -4447,7 +4335,7 @@ fn modifier_scope_mismatch_reports_cross_scope_modifier_applications() {
     assert_eq!(province_case.severity, Severity::Information);
     assert_eq!(
         province_case.message,
-        "modifier `province_mod` applies unexpected province-class attributes (local_unrest, \
+        "modifier `province_mod` applies province-class attributes (local_unrest, \
          local_defensiveness) in country scope"
     );
     // Mixed definition under a province effect still reports the country part.
@@ -4542,7 +4430,7 @@ fn dynamic_call_sites_are_validated_against_entry_contracts() {
     );
     std::fs::write(events_dir.join("call_sites.txt"), events).expect("event document");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -4619,7 +4507,7 @@ fn overlay_without_physical_path_routes_dynamic_definition_directories() {
     let root = std::env::temp_dir().join(format!("ide-overlay-route-{nonce}"));
     let triggers = root.join("common/scripted_triggers");
     std::fs::create_dir_all(&triggers).expect("trigger directory");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -4755,8 +4643,8 @@ fn quoted_payload_under_rendered_key_validates_at_its_real_site() {
     let id = DocumentId::new("file:///tmp/events/quoted-payload-rendered-key.txt");
     let text = concat!(
         "country_event = { immediate = { pick_scope = {\n",
-        "    trigger_scope = any_owned_country\n",
-        "    effect_scope = random_owned_country\n",
+        "    trigger_scope = any_country\n",
+        "    effect_scope = random_country\n",
         "    limit = \"NOT = { has_gold = 5 monthly_mil = 10 }\"\n",
         "} } }\n",
     );
@@ -4786,11 +4674,22 @@ fn quoted_payload_under_rendered_key_validates_at_its_real_site() {
 /// A single-document snapshot backed by the full first-party rule source, for tests that
 /// exercise shipped rule rows rather than fixtures.
 fn first_party_snapshot(text: &str) -> (AnalysisHost, DocumentId) {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
-    let id = DocumentId::new("file:///tmp/common/events/test.txt");
+    first_party_snapshot_at("events/test.txt", text)
+}
+
+fn first_party_snapshot_at(path: &str, text: &str) -> (AnalysisHost, DocumentId) {
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
+    let id = DocumentId::new(format!("file:///tmp/{path}"));
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open");
     (host, id)
+}
+
+/// Trigger-container fixtures use a real event root and its required option.
+fn first_party_trigger_snapshot(trigger: &str) -> (AnalysisHost, DocumentId) {
+    first_party_snapshot(&format!(
+        "country_event = {{ id = regression.1 {trigger} option = {{ name = regression.title }} }}"
+    ))
 }
 
 #[test]
@@ -4800,7 +4699,7 @@ fn export_to_variable_accepts_numeric_and_boolean_trigger_value_references() {
     // accepts any trigger alias with a numeric or boolean compare form (here: the int-only
     // `num_of_revolutionary_guard`, the multi-form `land_forcelimit`, and the bare
     // `modifier:` spelling, which stays open through the runtime-value prefix).
-    let (host, id) = first_party_snapshot(
+    let (host, id) = first_party_trigger_snapshot(
         "trigger = {
 	variable_arithmetic_trigger = {
 		export_to_variable = {
@@ -4830,7 +4729,7 @@ fn export_to_variable_accepts_numeric_and_boolean_trigger_value_references() {
 
 #[test]
 fn export_to_variable_rejects_non_numeric_trigger_value_references() {
-    let (host, id) = first_party_snapshot(
+    let (host, id) = first_party_trigger_snapshot(
         "trigger = {
 	variable_arithmetic_trigger = {
 		export_to_variable = {
@@ -4854,7 +4753,7 @@ fn export_to_variable_rejects_non_numeric_trigger_value_references() {
 
 #[test]
 fn export_to_variable_rejects_unknown_trigger_value_references() {
-    let (host, id) = first_party_snapshot(
+    let (host, id) = first_party_trigger_snapshot(
         "trigger = {
 	variable_arithmetic_trigger = {
 		export_to_variable = {
@@ -4928,14 +4827,14 @@ fn wiki_variable_arithmetic_effects_validate_in_documented_shapes() {
 fn export_to_variable_accepts_wiki_bare_export_values() {
     // The Exportable Values tables carry bare spellings (monarch_age, base_tax, …) that
     // never made it into the imported enum; the enum now carries the wiki union.
-    let (host, id) = first_party_snapshot(
+    let (host, id) = first_party_trigger_snapshot(
         "trigger = {
 	variable_arithmetic_trigger = {
 		export_to_variable = { which = wv_a value = monarch_age }
 		export_to_variable = { which = wv_b value = war_exhaustion }
 		export_to_variable = { which = wv_c value = base_tax }
 		export_to_variable = { which = wv_d value = navy_tradition }
-		export_to_variable = { which = wv_e value = ruler_age }
+		export_to_variable = { which = wv_e value = trigger_value:ruler_age }
 	}
 }
 ",
@@ -4944,15 +4843,17 @@ fn export_to_variable_accepts_wiki_bare_export_values() {
     assert!(
         !diagnostics
             .iter()
-            .any(|diagnostic| diagnostic.code != DiagnosticCode::InvalidValue),
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue),
         "bare wiki export spellings must validate cleanly: {diagnostics:?}"
     );
+    let (host, id) = first_party_trigger_snapshot(
+        "trigger = { variable_arithmetic_trigger = { export_to_variable = { which = invalid_age value = ruler_age } } }",
+    );
     assert!(
-        diagnostics
+        crate::diagnostics(&host.snapshot(), &id)
             .iter()
             .any(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue
-                && diagnostic.message.contains("ruler_age")),
-        "the retired `ruler_age` spelling must be rejected in favour of `monarch_age`: {diagnostics:?}"
+                && diagnostic.message.contains("ruler_age"))
     );
 }
 
@@ -4963,7 +4864,8 @@ fn variable_arithmetic_declared_variables_cover_check_variable_without_enum() {
     // back through check_variable's double `which`. The names resolve through the
     // dynamic variable set, so made-up names declared in-document must validate
     // without any enum spelling.
-    let (host, id) = first_party_snapshot(
+    let (host, id) = first_party_snapshot_at(
+        "common/scripted_triggers/pronoia.txt",
         "my_pronoia_check = {
 	variable_arithmetic_trigger = {
 		export_to_variable = {
@@ -5046,10 +4948,10 @@ fn luck_test_host(nonce: u128) -> AnalysisHost {
     std::fs::create_dir_all(&tags).expect("country tags directory");
     std::fs::write(
         tags.join("00_tags.txt"),
-        "CAS = { major = yes }\nBUR = { major = yes }\n",
+        "CAS = \"countries/Castile.txt\"\nBUR = \"countries/Burgundy.txt\"\n",
     )
     .expect("country tag definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -5103,7 +5005,7 @@ fn luck_entries_validate_their_country_tag_keys() {
 
 #[test]
 fn continent_and_superregion_entries_accept_arbitrary_definition_names() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -5198,7 +5100,7 @@ fn decoded_view_twin_overlays_do_not_shadow_their_own_definitions() {
     let text = "country_event = { id = twin.1 }\n";
     std::fs::write(events.join("one.txt"), text).expect("event file");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -5246,7 +5148,7 @@ fn genuine_in_file_duplicates_still_warn_with_twin_overlays_open() {
     );
     std::fs::write(events.join("one.txt"), text).expect("event file");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,

@@ -1,42 +1,4 @@
 {
-  "mixins": {
-    "keys__type_aspects_and_blessings": {
-      "fields": {
-        "is_blessing": {
-          "card": "0..1",
-          "value": "'yes' | 'no'",
-          "when": null
-        }
-      }
-    },
-    "keys__type_religion": {
-      "fields": {
-        "harmonized_modifier": {
-          "card": "1",
-          "value": "scalar",
-          "when": null
-        }
-      }
-    },
-    "keys__type_religion_group": {
-      "fields": {
-        "harmonized_modifier": {
-          "card": "0..1",
-          "value": "scalar",
-          "when": null
-        }
-      }
-    },
-    "keys__type_religion_propagation": {
-      "fields": {
-        "trading_policy": {
-          "card": "0..1",
-          "value": "'yes'",
-          "when": null
-        }
-      }
-    }
-  },
   "schemas": {
     "aspects_and_blessings_body": {
       "fields": {
@@ -50,14 +12,12 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "cost": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "effect": {
           "body": "effect",
@@ -69,14 +29,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "is_blessing": {
           "card": "0..1",
-          "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "modifier": {
           "body": "modifier",
@@ -88,14 +45,12 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "monarch_power": {
           "card": "0..1",
           "override": true,
-          "value": "'adm' | 'dip' | 'mil'",
-          "when": null
+          "value": "'adm' | 'dip' | 'mil'"
         },
         "potential": {
           "body": "trigger",
@@ -107,14 +62,12 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "sprite": {
           "card": "0..1",
           "override": true,
-          "value": "ref<sprite> | 'GFX_diplomats_of_the_reformation_aspect' | 'GFX_expel_heretics_aspect' | 'GFX_icons_of_the_church_icon' | 'GFX_innovativeness_aspect'",
-          "when": null
+          "value": "ref<sprite> | 'GFX_diplomats_of_the_reformation_aspect' | 'GFX_expel_heretics_aspect' | 'GFX_icons_of_the_church_icon' | 'GFX_innovativeness_aspect'"
         },
         "trigger": {
           "body": "trigger",
@@ -126,13 +79,9 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
-      },
-      "include": [
-        "keys__type_aspects_and_blessings"
-      ]
+      }
     },
     "aspects_and_blessings_body__ai_will_do": {
       "fields": {
@@ -140,8 +89,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -152,8 +100,7 @@
       "fields": {
         "is_blessing": {
           "card": "0..1",
-          "value": "'yes' | 'no'",
-          "when": null
+          "value": "'yes' | 'no'"
         }
       }
     },
@@ -168,14 +115,12 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "effect": {
           "body": "effect",
           "card": "0..1",
-          "doc": "Block of effects executed by the containing entry.",
-          "when": null
+          "doc": "Block of effects executed by the containing entry."
         },
         "potential": {
           "body": "trigger",
@@ -186,18 +131,15 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "removed_effect": {
           "body": "effect",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "sprite": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "trigger": {
           "body": "trigger",
@@ -208,10 +150,90 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
-      }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
     },
     "personal_deity_body__ai_will_do": {
       "fields": {
@@ -219,8 +241,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -232,51 +253,42 @@
         "ai_will_propagate_through_trade": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "can_form_personal_unions": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "center_of_religion": {
           "card": "0..1",
           "override": true,
-          "value": "ref<province_id>",
-          "when": null
+          "value": "ref<province_id>"
         },
         "crusade_name": {
           "card": "1",
           "override": true,
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "defender_of_faith": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "flag_emblem_index_range": {
           "card": "0..1",
           "list": "int",
-          "override": true,
-          "when": null
+          "override": true
         },
         "flags_with_emblem_percentage": {
           "card": "0..1",
           "doc": "Flag emblem values - Used for Dynamic Setup of Random Nations. Emblem texture: game/gfx/interface/client_state_symbols_large.dds Can be overridden per religion.",
           "override": true,
-          "value": "int[0..100]",
-          "when": null
+          "value": "int[0..100]"
         },
         "harmonized_modifier": {
           "card": "0..1",
-          "override": true,
-          "value": "ref<event_modifier>",
-          "when": null
+          "value": "ref<event_modifier>"
         },
         "religious_schools": {
           "body": "religion_group_body__religious_schools",
@@ -287,20 +299,15 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       },
-      "include": [
-        "keys__type_religion_group"
-      ],
       "patterns": [
         {
           "body": "religion_group_body__religion",
           "card": "0..*",
           "key": "def<religion>",
-          "override": true,
-          "when": null
+          "override": true
         }
       ]
     },
@@ -312,68 +319,57 @@
         "allow_female_defenders_of_the_faith": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "allowed_center_conversion": {
           "card": "0..1",
           "list": "ref<religion>",
-          "override": true,
-          "when": null
+          "override": true
         },
         "allowed_conversion": {
           "card": "0..1",
           "list": "ref<religion>",
-          "override": true,
-          "when": null
+          "override": true
         },
         "ancestors": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "aspects": {
           "card": "0..1",
-          "list": "ref<aspects_and_blessings.church_aspect>",
-          "override": true,
-          "when": null
+          "list": "ref<aspects_and_blessings>",
+          "override": true
         },
         "aspects_name": {
           "card": "0..1",
           "override": true,
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "authority": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "blessings": {
           "card": "0..1",
-          "list": "ref<aspects_and_blessings.blessing>",
-          "override": true,
-          "when": null
+          "list": "ref<aspects_and_blessings>",
+          "override": true
         },
         "can_have_secondary_religion": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "celebrate": {
           "body": "religion_group_body__religion__celebrate",
           "card": "0..1",
-          "override": true,
-          "when": null
+          "override": true
         },
         "color": {
           "card": "1",
           "list": "int[0..] | float[0.0..1.0]",
-          "override": true,
-          "when": null
+          "override": true
         },
         "country": {
           "body": "modifier",
@@ -384,8 +380,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "country_as_secondary": {
           "body": "modifier",
@@ -396,206 +391,172 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "date": {
           "card": "0..1",
           "override": true,
-          "value": "date",
-          "when": null
+          "value": "date"
         },
         "declare_war_in_regency": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "doom": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "fervor": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "fetishist_cult": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "flag_emblem_index_range": {
           "card": "0..1",
           "list": "int",
-          "override": true,
-          "when": null
+          "override": true
         },
         "flags_with_emblem_percentage": {
           "card": "0..1",
           "override": true,
-          "value": "int[0..100]",
-          "when": null
+          "value": "int[0..100]"
         },
         "gurus": {
           "body": "religion_group_body__religion__gurus",
           "card": "0..1",
-          "override": true,
-          "when": null
+          "override": true
         },
         "harmonized_modifier": {
           "card": "0..1",
-          "override": true,
-          "value": "ref<event_modifier>",
-          "when": null
+          "value": "ref<event_modifier>"
         },
         "has_patriarchs": {
           "card": "0..1",
           "doc": "Uses patriarch authority",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "heretic": {
           "card": "1",
           "list": "loc",
-          "override": true,
-          "when": null
+          "override": true
         },
         "holy_sites": {
           "card": "0..1",
           "list": "ref<province_id>",
-          "override": true,
-          "when": null
+          "override": true
         },
         "hre_heretic_religion": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "hre_religion": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "icon": {
           "card": "1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "misguided_heretic": {
           "card": "0..1",
           "doc": "Other christians hate them less",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "on_convert": {
           "body": "effect",
           "card": "0..1",
-          "override": true,
-          "when": null
+          "override": true
         },
         "orthodox_icons": {
           "body": "religion_group_body__religion__orthodox_icons",
           "card": "0..1",
-          "override": true,
-          "when": null
+          "override": true
         },
         "papacy": {
           "body": "religion_group_body__religion__papacy",
           "card": "0..1",
-          "override": true,
-          "when": null
+          "override": true
         },
         "personal_deity": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "province": {
           "body": "modifier",
           "card": "0..1",
-          "override": true,
-          "when": null
+          "override": true
         },
         "reform_tooltip": {
           "card": "0..1",
           "override": true,
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "religious_reforms": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "require_reformed_for_institution_development": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "uses_anglican_power": {
           "card": "0..1",
           "doc": "Uses church power/aspect mechanics",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "uses_church_power": {
           "card": "0..1",
           "doc": "Uses church power/aspect mechanics",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "uses_harmony": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "uses_hussite_power": {
           "card": "0..1",
           "doc": "Uses church power/aspect mechanics",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "uses_isolationism": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "uses_judaism_power": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "uses_karma": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "uses_piety": {
           "card": "0..1",
           "doc": "Uses piety mechanics",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "will_get_center": {
           "body": "trigger",
@@ -607,13 +568,9 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
-      },
-      "include": [
-        "keys__type_religion"
-      ]
+      }
     },
     "religion_group_body__religion__allowed_center_conversion": {
       "items": "ref<religion>"
@@ -622,10 +579,10 @@
       "items": "ref<religion>"
     },
     "religion_group_body__religion__aspects": {
-      "items": "ref<aspects_and_blessings.church_aspect>"
+      "items": "ref<aspects_and_blessings>"
     },
     "religion_group_body__religion__blessings": {
-      "items": "ref<aspects_and_blessings.blessing>"
+      "items": "ref<aspects_and_blessings>"
     },
     "religion_group_body__religion__celebrate": {
       "fields": {
@@ -638,8 +595,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "allow": {
           "body": "trigger",
@@ -650,13 +606,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "cost": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "effect": {
           "body": "effect",
@@ -667,8 +621,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "potential": {
           "body": "trigger",
@@ -679,8 +632,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -690,8 +642,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -709,8 +660,7 @@
         {
           "body": "religion_group_body__religion__gurus__guru",
           "card": "0..*",
-          "key": "def<guru>",
-          "when": null
+          "key": "def<guru>"
         }
       ]
     },
@@ -718,31 +668,26 @@
       "fields": {
         "chance": {
           "body": "religion_group_body__religion__gurus__guru__chance",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "modifier": {
           "body": "modifier",
           "card": "1",
-          "doc": "Block of modifiers applied while the containing entry is active.",
-          "when": null
+          "doc": "Block of modifiers applied while the containing entry is active."
         },
         "potential": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
-          "when": null
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility."
         },
         "teachings": {
           "body": "religion_group_body__religion__gurus__guru__teachings",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "trigger": {
           "body": "trigger",
           "card": "1",
-          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
-          "when": null
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply."
         }
       }
     },
@@ -751,29 +696,272 @@
         "factor": {
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "modifier": {
           "body": "religion_group_body__religion__gurus__guru__chance__modifier",
           "card": "0..*",
-          "doc": "Block of modifiers applied while the containing entry is active.",
-          "when": null
+          "doc": "Block of modifiers applied while the containing entry is active."
         }
       }
     },
     "religion_group_body__religion__gurus__guru__chance__modifier": {
       "fields": {
+        "AND": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "AND"
+          },
+          "doc": "Evaluates to true when every trigger inside the block is true.",
+          "override": true
+        },
+        "NOT": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "NOT"
+          },
+          "doc": "Evaluates to true when the trigger inside the block is false.",
+          "override": true
+        },
+        "OR": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "OR"
+          },
+          "doc": "Evaluates to true when at least one trigger inside the block is true.",
+          "override": true
+        },
+        "else": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "branch_continue"
+          },
+          "doc": "Follows if/else_if; executes when no previous branch ran.",
+          "override": true
+        },
+        "exclude_from_progress": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Excludes the triggers inside for the trigger counter in the UI, used in Age Objeciives.",
+          "override": true
+        },
         "factor": {
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
+        },
+        "hidden_trigger": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Hides the enclosed conditions so that they are still required but cannot be seen by human players.",
+          "override": true
+        },
+        "scope_field": {
+          "body": "trigger",
+          "card": "0..*",
+          "override": true
+        },
+        "this": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Switches the block's scope to the current scope; block contents are triggers.",
+          "override": true
         }
       },
       "include": [
         "keys__trigger"
+      ],
+      "patterns": [
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the country tags listed /Europa Universalis IV/common/country_tags",
+          "key": "ref<country_tag>",
+          "scope": {
+            "push": "country"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has hired an advisor of the specified type which has at least level X.",
+          "key": "ref<advisor_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[1..5]"
+        },
+        {
+          "body": "trigger__area_used",
+          "card": "0..*",
+          "doc": "Refers to the areas listed /Europa Universalis IV/map/areas.txt",
+          "key": "ref<area.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X buildings from the specified building type.",
+          "key": "ref<building>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__colonial_region",
+          "card": "0..*",
+          "doc": "Refers to any colonial region found in /Europa Universalis IV/common/colonial_regions/",
+          "key": "ref<colonial_region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__continent",
+          "card": "0..*",
+          "doc": "Refers to any continent found in /Europa Universalis IV/map/continent.txt",
+          "key": "ref<continent>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X ideas from the specified idea group.",
+          "key": "ref<idea_group>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[0..8]"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the support for the specified institution in the province is at least X.",
+          "key": "ref<institution>",
+          "scope": {
+            "in": [
+              "province"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "body": "trigger__province_group_used",
+          "card": "0..*",
+          "doc": "Refers to the province_group listed /Europa Universalis IV/map/provincegroup.txt",
+          "key": "ref<province_group.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<province_id>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__region",
+          "card": "0..*",
+          "doc": "Refers to any region found in /Europa Universalis IV/map/region.txt",
+          "key": "ref<region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has a tolerance of at least X of the specified religion. Note: No correct localisation.",
+          "key": "ref<religion>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "card": "0..*",
+          "key": "ref<scripted_trigger>",
+          "value": "bool"
+        },
+        {
+          "body": "trigger__scripted_trigger",
+          "card": "0..*",
+          "key": "ref<scripted_trigger>"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X vassals.",
+          "key": "ref<subject_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__superregion",
+          "card": "0..*",
+          "doc": "Refers to any superregion found in /Europa Universalis IV/map/superregion.txt",
+          "key": "ref<superregion>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__trade_company",
+          "card": "0..*",
+          "doc": "Refers to any trade company found in /Europa Universalis IV/common/trade_companies//",
+          "key": "ref<trade_company>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X provinces producing the specified trade good.",
+          "key": "ref<trade_good>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Scopes to the province, which is also a trade node (defined in common/tradenodes)",
+          "key": "ref<trade_node>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "key": "link"
+        }
       ]
     },
     "religion_group_body__religion__gurus__guru__teachings": {
@@ -781,8 +969,7 @@
         {
           "body": "religion_group_body__religion__gurus__guru__teachings__guru_teaching",
           "card": "0..*",
-          "key": "def<guru_teaching>",
-          "when": null
+          "key": "def<guru_teaching>"
         }
       ]
     },
@@ -791,18 +978,94 @@
         "cost": {
           "card": "1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "type": {
           "card": "0..1",
           "override": true,
-          "value": "'ADM' | 'DIP' | 'MIL'",
-          "when": null
+          "value": "'ADM' | 'DIP' | 'MIL'"
         }
       },
       "include": [
         "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
       ]
     },
     "religion_group_body__religion__heretic": {
@@ -822,8 +1085,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       ]
     },
@@ -833,25 +1095,100 @@
           "body": "religion_group_body__religion__orthodox_icons__orthodox_icon__ai_will_do",
           "card": "1",
           "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
-          "override": true,
-          "when": null
+          "override": true
         },
         "allow": {
           "body": "trigger",
           "card": "1",
           "doc": "Trigger conditions checked when using the entry.",
-          "override": true,
-          "when": null
+          "override": true
         },
         "visible": {
           "body": "trigger",
           "card": "1",
-          "override": true,
-          "when": null
+          "override": true
         }
       },
       "include": [
         "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
       ]
     },
     "religion_group_body__religion__orthodox_icons__orthodox_icon__ai_will_do": {
@@ -860,8 +1197,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -873,82 +1209,93 @@
         "bless_monarch": {
           "body": "religion_group_body__religion__papacy__bless_monarch",
           "card": "0..1",
-          "when": null
+          "def": {
+            "type": "papal_policy"
+          }
         },
         "concessions": {
           "body": "religion_group_body__religion__papacy__concessions",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "concilatory": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "election_cost": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "forgiveness_for_usury": {
           "body": "religion_group_body__religion__papacy__forgiveness_for_usury",
           "card": "0..1",
-          "when": null
+          "def": {
+            "type": "papal_policy"
+          }
         },
         "harsh": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "indulgence_for_sins": {
           "body": "religion_group_body__religion__papacy__indulgence_for_sins",
           "card": "0..1",
-          "when": null
+          "def": {
+            "type": "papal_policy"
+          }
         },
         "investigate_heresy": {
           "body": "religion_group_body__religion__papacy__investigate_heresy",
           "card": "0..1",
-          "when": null
+          "def": {
+            "type": "papal_policy"
+          }
         },
         "levy_church_tax": {
           "body": "religion_group_body__religion__papacy__levy_church_tax",
           "card": "0..1",
-          "when": null
+          "def": {
+            "type": "papal_policy"
+          }
         },
         "local_saint": {
           "body": "religion_group_body__religion__papacy__local_saint",
           "card": "0..1",
-          "when": null
+          "def": {
+            "type": "papal_policy"
+          }
         },
         "neutral": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "papal_tag": {
           "card": "1",
-          "value": "enum<country_tags>",
-          "when": null
+          "value": "ref<country_tag>"
         },
         "proclaim_holy_war": {
           "body": "religion_group_body__religion__papacy__proclaim_holy_war",
           "card": "0..1",
-          "when": null
+          "def": {
+            "type": "papal_policy"
+          }
         },
         "sanction_commercial_monopoly": {
           "body": "religion_group_body__religion__papacy__sanction_commercial_monopoly",
           "card": "0..1",
-          "when": null
+          "def": {
+            "type": "papal_policy"
+          }
         },
         "seat_of_papacy": {
           "card": "1",
-          "value": "ref<province_id>",
-          "when": null
+          "value": "ref<province_id>"
         },
         "send_papal_legate": {
           "body": "religion_group_body__religion__papacy__send_papal_legate",
           "card": "0..1",
-          "when": null
+          "def": {
+            "type": "papal_policy"
+          }
         }
       }
     },
@@ -963,8 +1310,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "allow": {
           "body": "trigger",
@@ -975,13 +1321,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "cost": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "effect": {
           "body": "effect",
@@ -992,8 +1336,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "potential": {
           "body": "trigger",
@@ -1004,8 +1347,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -1015,8 +1357,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -1027,23 +1368,19 @@
       "fields": {
         "first_concession": {
           "body": "religion_group_body__religion__papacy__concessions__first_concession",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "fourth_concession": {
           "body": "religion_group_body__religion__papacy__concessions__fourth_concession",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "second_concession": {
           "body": "religion_group_body__religion__papacy__concessions__second_concession",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "third_concession": {
           "body": "religion_group_body__religion__papacy__concessions__third_concession",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         }
       }
     },
@@ -1051,13 +1388,11 @@
       "fields": {
         "concilatory": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "harsh": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         }
       }
     },
@@ -1065,13 +1400,11 @@
       "fields": {
         "concilatory": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "harsh": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         }
       }
     },
@@ -1079,13 +1412,11 @@
       "fields": {
         "concilatory": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "harsh": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         }
       }
     },
@@ -1093,13 +1424,11 @@
       "fields": {
         "concilatory": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "harsh": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         }
       }
     },
@@ -1114,8 +1443,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "allow": {
           "body": "trigger",
@@ -1126,13 +1454,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "cost": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "effect": {
           "body": "effect",
@@ -1143,8 +1469,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "potential": {
           "body": "trigger",
@@ -1155,8 +1480,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -1166,8 +1490,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -1185,8 +1508,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "allow": {
           "body": "trigger",
@@ -1197,13 +1519,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "cost": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "effect": {
           "body": "effect",
@@ -1214,8 +1534,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "potential": {
           "body": "trigger",
@@ -1226,8 +1545,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -1237,8 +1555,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -1256,8 +1573,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "allow": {
           "body": "trigger",
@@ -1268,13 +1584,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "curia_treasury_cost": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "effect": {
           "body": "effect",
@@ -1285,8 +1599,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "potential": {
           "body": "trigger",
@@ -1297,8 +1610,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -1308,8 +1620,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -1327,8 +1638,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "allow": {
           "body": "trigger",
@@ -1339,13 +1649,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "cost": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "effect": {
           "body": "effect",
@@ -1356,8 +1664,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "potential": {
           "body": "trigger",
@@ -1368,8 +1675,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -1379,8 +1685,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -1398,8 +1703,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "allow": {
           "body": "trigger",
@@ -1410,13 +1714,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "cost": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "effect": {
           "body": "effect",
@@ -1427,8 +1729,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "potential": {
           "body": "trigger",
@@ -1439,8 +1740,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -1450,8 +1750,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -1469,8 +1768,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "allow": {
           "body": "trigger",
@@ -1481,13 +1779,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "cost": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "effect": {
           "body": "effect",
@@ -1498,8 +1794,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "potential": {
           "body": "trigger",
@@ -1510,8 +1805,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -1521,8 +1815,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -1540,8 +1833,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "allow": {
           "body": "trigger",
@@ -1552,13 +1844,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "cost": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "effect": {
           "body": "effect",
@@ -1569,8 +1859,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "potential": {
           "body": "trigger",
@@ -1581,8 +1870,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -1592,8 +1880,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -1611,8 +1898,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "allow": {
           "body": "trigger",
@@ -1623,13 +1909,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "cost": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "effect": {
           "body": "effect",
@@ -1640,8 +1924,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "potential": {
           "body": "trigger",
@@ -1652,8 +1935,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -1663,8 +1945,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -1676,8 +1957,7 @@
         {
           "body": "religion_group_body__religious_schools__religious_school",
           "card": "0..*",
-          "key": "def<religious_school>",
-          "when": null
+          "key": "def<religious_school>"
         }
       ]
     },
@@ -1694,15 +1974,13 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "invite_scholar_modifier_display": {
           "card": "1",
           "doc": "If you don't set this it will expand on_invite_scholar effect which might be super big",
           "override": true,
-          "value": "ref<static_modifier>",
-          "when": null
+          "value": "ref<static_modifier>"
         },
         "on_invite_scholar": {
           "body": "effect",
@@ -1715,14 +1993,12 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "picture": {
           "card": "1",
           "override": true,
-          "value": "ref<sprite>",
-          "when": null
+          "value": "ref<sprite>"
         },
         "potential_invite_scholar": {
           "body": "trigger",
@@ -1733,20 +2009,96 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       },
       "include": [
         "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
       ]
     },
     "religion_group_type_body": {
       "fields": {
         "harmonized_modifier": {
           "card": "0..1",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         }
       }
     },
@@ -1755,27 +2107,23 @@
         "base_conversion_speed": {
           "card": "1",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "map_icon": {
           "card": "1",
           "override": true,
-          "value": "ref<sprite>",
-          "when": null
+          "value": "ref<sprite>"
         },
         "max_distance": {
           "card": "0..1",
           "doc": "From Center of Reformation center province (default is NDefines::NReligion::MAX_RELIGIOUS_CENTER_SPREAD_DISTANCE).",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "religion": {
           "card": "0..1",
           "override": true,
-          "value": "ref<religion>",
-          "when": null
+          "value": "ref<religion>"
         },
         "target_province_weights": {
           "body": "religion_propagation_body__target_province_weights",
@@ -1787,20 +2135,14 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "trading_policy": {
           "card": "0..1",
           "doc": "Religion is taken from country using the trading policy. max_distance is not used.",
-          "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         }
-      },
-      "include": [
-        "keys__type_religion_propagation"
-      ]
+      }
     },
     "religion_propagation_body__target_province_weights": {
       "fields": {
@@ -1808,8 +2150,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -1820,8 +2161,7 @@
       "fields": {
         "trading_policy": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         }
       }
     },
@@ -1829,8 +2169,7 @@
       "fields": {
         "harmonized_modifier": {
           "card": "1",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         }
       }
     },
@@ -1845,8 +2184,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "can_buy_idea": {
           "body": "trigger",
@@ -1856,8 +2194,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "trigger": {
           "body": "trigger",
@@ -1868,8 +2205,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       },
       "patterns": [
@@ -1882,8 +2218,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       ]
     },
@@ -1893,8 +2228,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [

@@ -39,6 +39,7 @@ import { CliUsageError, REPOSITORY_ROOT, resolveOptions } from './lib/options.mj
 import { collectSourceFiles } from './lib/workspace.mjs';
 import { fileUri, overlayPathFor } from './lib/overlay.mjs';
 import { LspProtocolError } from './lib/client.mjs';
+import { completionPrefixSamples } from './lib/completion-audit.mjs';
 import {
   diagnoseTextFiles,
   handshake,
@@ -83,12 +84,14 @@ Options:
   --vanilla-source PATH   Vanilla tree (default: PDC_SWEEP_VANILLA_SOURCE or the standard Steam path)
   --vanilla-cache PATH    Vanilla .pdcindex (default: user configuration)
   --server PATH           paradoxcode executable to baseline (required; no auto-detection)
+  --rules-manifest PATH   manifest matching the selected server (default: rules/ir-manifest.json)
   --output DIR            baseline directory (default: ${DEFAULT_OUTPUT_DIR})
   --label NAME            local run label recorded in the baseline metadata (default: git describe)
   --timeout-ms N          session timeout (default: ${DEFAULT_TIMEOUT_MS})
   --file-timeout-ms N     per-request timeout (default: ${DEFAULT_FILE_TIMEOUT_MS})
   --batch-size N          files per diagnostic request (default: 16)
   --concurrency N         concurrent diagnostic workers (default: 8)
+  --completions-only      collect symbol context and completion probes without diagnosing Vanilla files
   --fail-on LEVEL         error, warning, or none (default: none)
   --help                  show this help
 `;
@@ -275,6 +278,7 @@ function parseBaselineArgs(argv) {
     batchSize: 16,
     concurrency: 8,
     failOn: 'none',
+    completionsOnly: false,
   };
   const numbers = new Map([
     ['--timeout-ms', 'timeoutMs'],
@@ -286,6 +290,7 @@ function parseBaselineArgs(argv) {
     ['--vanilla-source', 'vanillaSource'],
     ['--vanilla-cache', 'vanillaCache'],
     ['--server', 'server'],
+    ['--rules-manifest', 'rulesManifest'],
     ['--output', 'output'],
     ['--label', 'label'],
     ['--fail-on', 'failOn'],
@@ -293,6 +298,10 @@ function parseBaselineArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === '--help' || argument === '-h') return { help: true };
+    if (argument === '--completions-only') {
+      options.completionsOnly = true;
+      continue;
+    }
     const value = argv[index + 1];
     if (numbers.has(argument)) {
       if (!value || !/^[0-9]+$/.test(value)) throw new CliUsageError(`${argument} needs a number`);
@@ -335,6 +344,7 @@ function resolveBaselineOptions(raw) {
     vanillaSource,
     vanillaCache: raw.vanillaCache,
     server: raw.server,
+    rulesManifest: raw.rulesManifest,
     output: raw.output,
     timeoutMs: raw.timeoutMs,
     fileTimeoutMs: raw.fileTimeoutMs,
@@ -538,6 +548,7 @@ async function collectGoldenCompletions(client, options, report) {
     client.notify('textDocument/didOpen', {
       textDocument: { uri, languageId: 'eu4', version: 1, text },
     });
+    const version = { value: 1 };
     try {
       // Best-effort readiness signal only: a clean fixture may legitimately
       // never publish diagnostics (same non-fatal wait as sweep.mjs).
@@ -573,12 +584,17 @@ async function collectGoldenCompletions(client, options, report) {
           results.push({
             id: probe.id,
             golden_file: probe.goldenFile,
+            source_sha256: createHash('sha256').update(text).digest('hex'),
             document_path: probe.documentPath,
             reason: probe.reason,
             position: { line: probe.line, character: probe.character },
             labels: [...new Set(candidates.map((candidate) => candidate.label))].sort(compareStrings),
             candidates,
             is_incomplete: Array.isArray(response?.items) ? Boolean(response.isIncomplete) : false,
+            prefix_samples: await completionPrefixSamples(
+              client, uri, text, probe, version, options.fileTimeoutMs,
+            ),
+            prefix_coverage: 'representative samples; does not prove complete enumeration',
           });
           console.error(
             `[probe ${probe.id}] ${fixture.documentPath}:${probe.line}:${probe.character} -> ${candidates.length} candidate(s)`,
@@ -624,7 +640,7 @@ function compareDiagnostics(left, right) {
  * comparisons, so two runs over identical inputs serialize byte-identically
  * outside `metadata`.
  */
-function buildBaseline({ label, git, server, report, summary, completions, vanilla, startedAt }) {
+function buildBaseline({ label, git, server, report, summary, completions, vanilla, startedAt, completionsOnly }) {
   const diagnostics = report.files
     .map((file) => ({
       path: file.path,
@@ -639,8 +655,13 @@ function buildBaseline({ label, git, server, report, summary, completions, vanil
     .sort((left, right) => compareStrings(left.path, right.path));
   return {
     schema_version: 1,
-    kind: 'paradoxcode-rules-baseline',
+    kind: completionsOnly ? 'paradoxcode-completion-baseline' : 'paradoxcode-rules-baseline',
     metadata: {
+      coverage: {
+        diagnostics: !completionsOnly,
+        symbols: true,
+        completions: 'fixed golden positions and representative prefixes',
+      },
       label: label || git.describe || null,
       // The only wall-clock field in the whole document; exclude `metadata`
       // when diffing two baselines.
@@ -729,9 +750,11 @@ async function run(raw) {
       addToolError(report, `Vanilla cache was not enabled: ${vanillaMessage}`);
     }
 
-    const selected = await selectDiagnosableFiles(client, report, options, collected.files);
-    console.error(`Diagnosing ${selected.length} Vanilla files in bounded text batches`);
-    await diagnoseTextFiles(client, report, options, selected);
+    if (!raw.completionsOnly) {
+      const selected = await selectDiagnosableFiles(client, report, options, collected.files);
+      console.error(`Diagnosing ${selected.length} Vanilla files in bounded text batches`);
+      await diagnoseTextFiles(client, report, options, selected);
+    }
 
     // Symbol counts come from the workspace index as it stands after the
     // diagnosis pass, before the golden probe documents are opened (an open
@@ -773,7 +796,7 @@ async function run(raw) {
       : 'passed';
   // Full diagnostic report in the shared sweep/diagnose shape, next to the
   // baseline itself (all of it under the gitignored output tree).
-  const outputs = writeReports(report, resolve(raw.output));
+  const outputs = raw.completionsOnly ? undefined : writeReports(report, resolve(raw.output));
 
   const baseline = buildBaseline({
     label: raw.label,
@@ -784,6 +807,7 @@ async function run(raw) {
     completions,
     vanilla: vanillaBuildId(options.source),
     startedAt,
+    completionsOnly: raw.completionsOnly,
   });
   const outputDir = resolve(raw.output);
   mkdirSync(outputDir, { recursive: true });
@@ -812,7 +836,8 @@ async function run(raw) {
     console.log('Symbols: unavailable (see tool errors)');
   }
   console.log(`Completion probes: ${completions.length}/${GOLDEN_COMPLETION_PROBES.length} recorded`);
-  console.log(`Full report: ${outputs.jsonPath}`);
+  if (outputs) console.log(`Full report: ${outputs.jsonPath}`);
+  else console.log('Coverage: completion probes only; no full diagnostic report was produced.');
   console.log(`Baseline: ${baselinePath}`);
   console.log(`Stable baseline: ${latestPath}`);
   if (report.tool_errors.length) {

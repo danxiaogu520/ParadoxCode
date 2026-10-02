@@ -4,10 +4,11 @@
 //   
 diagnostics:
 - code=InvalidValue severity=Error certainty=certain range=21..28
-  message: invalid target `NOWHERE`: scope expression is not recognised
+  message: invalid value `NOWHERE` for `target`
   expected: a `country` scope
 - code=InvalidValue severity=Error certainty=certain range=37..44
-  message: invalid scope command target `NOWHERE`
+  message: invalid value `NOWHERE` for `scope`
   expected: a `country` scope
-- code=WrongScope severity=Error certainty=contextual range=54..61
-  message: target `capital` resolves to scope `province`, expected country
+- code=WrongScope severity=Error certainty=certain range=54..61
+  message: invalid value `capital` for `target`
+  expected: a `country` scope

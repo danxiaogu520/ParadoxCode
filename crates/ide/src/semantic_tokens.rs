@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use engine::{AnalysisSnapshot, DocumentId};
 use parser::{CstKind, CstNode, FileFormat, ParsedFile};
-use rules::KeyMatcher;
 use text::TextRange;
 
 use crate::semantic::effective_workspace_member_names;
@@ -73,7 +72,11 @@ pub fn semantic_tokens_in_range_with_cancellation(
     )?;
     if let Some(hir) = input.hir.as_deref().filter(|hir| hir.uses_ir()) {
         for token in &mut tokens {
-            if let Some(fact) = hir.field_fact_at(token.range) {
+            if !matches!(
+                token.token_type,
+                SemanticTokenType::Variable | SemanticTokenType::Parameter
+            ) && let Some(fact) = hir.field_fact_at(token.range)
+            {
                 let ir = snapshot.ir();
                 token.token_type = if fact.fields.iter().any(|id| ir.field(*id).control.is_some()) {
                     SemanticTokenType::Keyword
@@ -117,7 +120,7 @@ pub(crate) fn static_semantic_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<
         .iter()
         .map(|key| key.to_ascii_lowercase())
         .collect::<BTreeSet<_>>();
-    if !snapshot.ir().schemas.is_empty() {
+    {
         for schema in &snapshot.ir().schemas {
             keys.extend(
                 schema
@@ -126,24 +129,6 @@ pub(crate) fn static_semantic_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<
                     .map(|key| snapshot.ir().strings.resolve(*key).to_owned()),
             );
         }
-    } else {
-        for rule in &snapshot.rules().model().semantic.rules {
-            if let KeyMatcher::Exact(key) = &rule.key {
-                keys.insert(key.to_ascii_lowercase());
-            }
-        }
-        // Root entry keys (`country_event`, every on_action name) select type instances rather
-        // than matching an exact rule key, but they are script keys all the same.
-        keys.extend(
-            snapshot
-                .rules()
-                .model()
-                .semantic
-                .type_root_keys
-                .values()
-                .flatten()
-                .map(|key| key.to_ascii_lowercase()),
-        );
     }
     let keys = Arc::new(keys);
     snapshot.query_cache().insert(
@@ -160,7 +145,7 @@ fn semantic_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
     // Completion classifies workspace-defined dynamic definitions as callable functions. Reuse the
     // same effective (overlay-aware and source-priority-aware) member view for source coloring so
     // a definition does not switch back to the generic property color after insertion.
-    let dynamic_types = if !snapshot.ir().schemas.is_empty() {
+    let dynamic_types = {
         snapshot
             .ir()
             .types
@@ -172,21 +157,6 @@ fn semantic_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
                 )
             })
             .map(|info| snapshot.ir().strings.resolve(info.name).to_owned())
-            .collect::<Vec<_>>()
-    } else {
-        snapshot
-            .rules()
-            .model()
-            .semantic
-            .type_descriptors
-            .iter()
-            .filter_map(|(type_name, descriptor)| {
-                descriptor
-                    .dynamic_definition
-                    .as_ref()
-                    .filter(|dynamic_descriptor| dynamic_descriptor.enabled)
-                    .map(|_| type_name.clone())
-            })
             .collect::<Vec<_>>()
     };
     for type_name in dynamic_types {

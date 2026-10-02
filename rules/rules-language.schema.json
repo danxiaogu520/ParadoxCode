@@ -5,7 +5,7 @@
   "type": "object",
   "properties": {
     "enums": {
-      "description": "Enums, optionally with attribute columns.",
+      "description": "Enums as literal member lists.",
       "type": "object",
       "additionalProperties": {
         "$ref": "#/$defs/EnumSpec"
@@ -49,7 +49,7 @@
       "default": null
     },
     "traits": {
-      "description": "Capabilities, bindings, and constraints, expanded at compile time.",
+      "description": "Named trait markers; implementation data is declared on each type.",
       "type": "object",
       "additionalProperties": {
         "$ref": "#/$defs/TraitSpec"
@@ -68,11 +68,11 @@
   "additionalProperties": false,
   "$defs": {
     "BindingSpec": {
-      "description": "One trait binding: how a trait parameter maps to a localisation key or a\nsprite name.",
+      "description": "One type implementation binding: a localisation-key or sprite-name template.",
       "type": "object",
       "properties": {
         "loc": {
-          "description": "Localisation-key template (`\"{name}\"` references a trait parameter).",
+          "description": "Localisation-key template (`$` stands for the instance name).",
           "type": [
             "string",
             "null"
@@ -98,6 +98,29 @@
       },
       "additionalProperties": false
     },
+    "BlockForm": {
+      "description": "One legal combination of fields in a block. This describes structural\nalternatives without weakening the requirements of every branch.",
+      "type": "object",
+      "properties": {
+        "fields": {
+          "description": "Exact field names and their occurrence bounds in this form.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "patterns": {
+          "description": "Written pattern indices and their total occurrence bounds in this form.\nExact fields are excluded from pattern counts by normal dispatch.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        }
+      },
+      "additionalProperties": false
+    },
     "BlockSchema": {
       "description": "The full description of one block.",
       "type": "object",
@@ -109,6 +132,13 @@
             "$ref": "#/$defs/FieldOverloads"
           },
           "default": {}
+        },
+        "forms": {
+          "description": "Alternative combinations of direct-field occurrence bounds. At least\none complete form must match; ordinary field bounds still apply.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BlockForm"
+          }
         },
         "include": {
           "description": "Mixin names, expanded at compile time.",
@@ -207,6 +237,11 @@
           "description": "Display only, not executed (`tooltip`).",
           "type": "string",
           "const": "display_only"
+        },
+        {
+          "description": "A predicate whose boolean value is its constant result.",
+          "type": "string",
+          "const": "constant"
         }
       ]
     },
@@ -247,6 +282,14 @@
         },
         "op": {
           "description": "Logic operator for `logic` kinds (`AND` / `OR` / `NOT`).",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "selector_schema": {
+          "description": "Schema supplying the scalar selector keys and their branch value matchers.",
           "type": [
             "string",
             "null"
@@ -298,41 +341,14 @@
       ]
     },
     "EnumSpec": {
-      "description": "One enum: plain members, or a table with attribute columns.",
+      "description": "An enum is a list of literal member names.",
       "anyOf": [
         {
-          "description": "Shorthand: members without columns.",
+          "description": "Literal members.",
           "type": "array",
           "items": {
             "type": "string"
           }
-        },
-        {
-          "description": "A table with columns and rows.",
-          "type": "object",
-          "properties": {
-            "columns": {
-              "description": "Column name → column kind, e.g. `\"scope\": \"scope_type?\"`\n(the trailing `?` marks an optional column).",
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
-            },
-            "rows": {
-              "description": "Row name → column values.",
-              "type": "object",
-              "additionalProperties": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "required": [
-            "columns",
-            "rows"
-          ]
         }
       ]
     },
@@ -484,24 +500,8 @@
           ],
           "default": null
         },
-        "unless": {
-          "description": "Only applies to instances outside this subtype.",
-          "type": [
-            "string",
-            "null"
-          ],
-          "default": null
-        },
         "value": {
           "description": "Scalar type expression for the value.",
-          "type": [
-            "string",
-            "null"
-          ],
-          "default": null
-        },
-        "when": {
-          "description": "Only applies to instances of this subtype.",
           "type": [
             "string",
             "null"
@@ -679,6 +679,31 @@
       },
       "additionalProperties": false
     },
+    "RegisterRole": {
+      "description": "Game-independent state slots selected by scope register declarations.",
+      "oneOf": [
+        {
+          "description": "Root scope of the invocation.",
+          "type": "string",
+          "const": "root"
+        },
+        {
+          "description": "Current scope, without pushing a new frame.",
+          "type": "string",
+          "const": "current"
+        },
+        {
+          "description": "Earlier scope frames, nearest first.",
+          "type": "string",
+          "const": "previous"
+        },
+        {
+          "description": "Calling event's scope frames, nearest first.",
+          "type": "string",
+          "const": "from"
+        }
+      ]
+    },
     "RegisterSpec": {
       "description": "One scope register.",
       "type": "object",
@@ -690,24 +715,16 @@
             "null"
           ],
           "default": null
+        },
+        "role": {
+          "description": "Runtime register selected by this declared spelling.",
+          "$ref": "#/$defs/RegisterRole"
         }
       },
-      "additionalProperties": false
-    },
-    "RequiresSpec": {
-      "description": "Requirements of a trait.",
-      "type": "object",
-      "properties": {
-        "include": {
-          "description": "Mixin that must be included by the schemas defining the impl'ing type.",
-          "type": [
-            "string",
-            "null"
-          ],
-          "default": null
-        }
-      },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "required": [
+        "role"
+      ]
     },
     "RootSpec": {
       "description": "A [`FileRule`]'s root structure: either a schema name, or one field spec\ncarrying `def` for the whole-file-instance case.",
@@ -865,11 +882,6 @@
           "description": "All definitions remain visible.",
           "type": "string",
           "const": "merge"
-        },
-        {
-          "description": "Later directories shadow earlier ones wholesale.",
-          "type": "string",
-          "const": "replace-directory"
         }
       ]
     },
@@ -898,90 +910,14 @@
         }
       ]
     },
-    "SubtypeCond": {
-      "description": "A subtype condition: a conjunction of \"field → type expression\", where a\n`null` expression means the field must be absent.",
-      "type": "object",
-      "additionalProperties": {
-        "type": [
-          "string",
-          "null"
-        ]
-      }
-    },
     "SubtypeSpec": {
       "description": "One named subtype.",
       "type": "object",
-      "properties": {
-        "impl": {
-          "description": "Traits implemented only for instances of this subtype.",
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/ImplSpec"
-          },
-          "default": {}
-        },
-        "when": {
-          "description": "Instance-body predicate granting this subtype.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/SubtypeCond"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        }
-      },
       "additionalProperties": false
     },
     "TraitSpec": {
-      "description": "One trait: capabilities, bindings, and constraints.",
+      "description": "One named trait marker; implementation data belongs to the type.",
       "type": "object",
-      "properties": {
-        "bindings": {
-          "description": "Symbol bindings contributed by the trait.",
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/BindingSpec"
-          },
-          "default": {}
-        },
-        "capabilities": {
-          "description": "Capabilities the runtime interprets for this trait.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "default": null,
-          "items": {
-            "type": "string"
-          }
-        },
-        "params": {
-          "description": "Parameters with defaults (`\"$\"` = the instance name) or no default.",
-          "type": "object",
-          "additionalProperties": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "default": {}
-        },
-        "requires": {
-          "description": "Requirements the implementing type must satisfy.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/RequiresSpec"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        }
-      },
       "additionalProperties": false
     },
     "TypeResolution": {

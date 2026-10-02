@@ -4,11 +4,17 @@
 //! must not depend on editor protocol types. The underlying data model is provided by the
 //! `vfs`, `hir`, and `index` crates and re-exported here as the stable facade.
 
+/// Identity of all analyzer source, embedded rule data, compiler, and build options.
+/// Persistent semantic indexes from another build must be regenerated.
+pub const ANALYZER_BUILD_ID: &str = env!("PDC_ANALYZER_BUILD_ID");
+
 mod fingerprint;
 mod host;
 mod index_cache;
 mod query_cache;
 mod snapshot;
+/// Structured dependency and source-writing mechanisms, independent of game packages.
+pub mod structure;
 mod texture;
 
 pub use fingerprint::workspace_context_fingerprint;

@@ -13,7 +13,7 @@ fn production_factory_and_requests_use_ir() {
     .expect("production server");
     let snapshot = server.snapshot();
     assert!(!snapshot.ir().schemas.is_empty());
-    assert!(snapshot.rules().semantic_rules().next().is_none());
+    assert_eq!(snapshot.rules().rule_hash(), snapshot.ir().rule_hash());
     let (root, root_uri) = temp_workspace_dir();
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),

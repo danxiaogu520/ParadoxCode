@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use parser::{CstKind, CstNode, ParsedFile};
+use parser::ParsedFile;
 use rules::ir::{FieldId, SchemaId, SubtypeSet};
 use text::{TextRange, TextSize};
 
@@ -66,19 +66,6 @@ impl ScopeState {
             root: scope.clone(),
             current: vec![scope],
             from: Vec::new(),
-            previous: Vec::new(),
-        }
-    }
-
-    pub(crate) fn initial_registers(
-        root: ScopeValue,
-        current: ScopeValue,
-        from: ScopeValue,
-    ) -> Self {
-        Self {
-            root,
-            current: vec![current],
-            from: vec![from],
             previous: Vec::new(),
         }
     }
@@ -280,96 +267,10 @@ pub struct HirParameterReference {
     pub kind: HirParameterReferenceKind,
 }
 
-/// One source token retained by a dynamic-definition template.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TemplateToken {
-    /// Exact definition-side token range, including quotes when present.
-    pub range: TextRange,
-    /// Whether the source token was quoted.
-    pub quoted: bool,
-    /// Literal and parameter fragments in source order, excluding surrounding quotes.
-    pub fragments: Vec<TemplateFragment>,
-}
-
-/// One literal or parameter fragment within a dynamic template token.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum TemplateFragment {
-    /// Definition-side text copied without interpretation.
-    Literal(String),
-    /// One owner-local parameter slot.
-    Parameter {
-        /// Parameter spelling without delimiters.
-        name: Arc<str>,
-        /// Exact definition-side range of the delimited occurrence.
-        range: TextRange,
-    },
-}
-
-/// The value attached to a property in a dynamic template.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum TemplateValue {
-    /// One scalar token.
-    Scalar(TemplateToken),
-    /// One ordered script block.
-    Block {
-        /// Exact definition-side block range.
-        range: TextRange,
-        /// Properties, bare values, and conditional blocks in source order.
-        items: Vec<TemplateItem>,
-    },
-}
-
-/// One property retained in a dynamic template.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TemplateProperty {
-    /// Token supplying the property key.
-    pub key: TemplateToken,
-    /// Full definition-side property range.
-    pub range: TextRange,
-    /// Operator spelling recovered by the parser.
-    pub operator: Option<Arc<str>>,
-    /// Scalar or block value.
-    pub value: TemplateValue,
-}
-
-/// One conditional block retained in a dynamic template.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TemplateConditional {
-    /// Parameter spelling without `!`.
-    pub name: Arc<str>,
-    /// Whether the body is active when the parameter is absent.
-    pub negated: bool,
-    /// Full definition-side conditional range.
-    pub range: TextRange,
-    /// Ordered body items.
-    pub items: Vec<TemplateItem>,
-}
-
-/// One ordered item in a dynamic template container.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum TemplateItem {
-    /// A key/operator/value property.
-    Property(TemplateProperty),
-    /// A standalone scalar in a mixed block.
-    BareValue(TemplateToken),
-    /// A supplied/absent parameter conditional.
-    Conditional(TemplateConditional),
-}
-
-/// Reusable, source-ranged body of one scripted effect or trigger definition.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Template {
-    /// Dynamic symbol kind, such as `scripted_effect`.
-    pub kind: Arc<str>,
-    /// Definition name as written in source.
-    pub name: String,
-    /// Full owning definition range.
-    pub definition_range: TextRange,
-    /// Exact body block range.
-    pub body_range: TextRange,
-    /// Ordered body items.
-    pub items: Vec<TemplateItem>,
-}
+pub use rules::replacement::{
+    Template, TemplateConditional, TemplateFragment, TemplateItem, TemplateProperty, TemplateToken,
+    TemplateValue,
+};
 
 /// The interpretation layer that emitted a HIR reference.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -414,11 +315,19 @@ pub struct HirFile {
     pub(super) dynamic_templates: Vec<Template>,
     pub(super) definition_attributes: Vec<DefinitionAttributes>,
     pub(super) uses_ir: bool,
+    pub(super) symbol_facts_dependency: bool,
     pub(super) binding_references: Vec<HirReference>,
     pub(super) runtime_parameter_guards: Vec<(TextRange, Option<TextRange>)>,
 }
 
 impl HirFile {
+    /// Whether lowering consulted workspace symbols, including missing symbols.
+    /// Files without such reads can reuse their shard during symbol-fact replay.
+    #[must_use]
+    pub const fn depends_on_symbol_facts(&self) -> bool {
+        self.symbol_facts_dependency
+    }
+
     /// Whether this file was lowered through the compiled Rules IR path.
     #[must_use]
     pub const fn uses_ir(&self) -> bool {
@@ -446,6 +355,31 @@ impl HirFile {
     #[must_use]
     pub fn properties(&self) -> &[HirProperty] {
         &self.properties
+    }
+
+    /// Finds the first property with this exact key range in source order.
+    #[must_use]
+    pub fn property_at_key_range(&self, range: TextRange) -> Option<&HirProperty> {
+        let index = self
+            .properties
+            .partition_point(|property| property.key_range < range);
+        self.properties
+            .get(index)
+            .filter(|property| property.key_range == range)
+    }
+
+    /// Returns properties fully contained in `range`, in source order.
+    /// Source-ordered starts bound the search to this part of the document.
+    pub fn properties_in_range(&self, range: TextRange) -> impl Iterator<Item = &HirProperty> {
+        let first = self
+            .properties
+            .partition_point(|property| property.range.start() < range.start());
+        let last = self
+            .properties
+            .partition_point(|property| property.range.start() <= range.end());
+        self.properties[first..last]
+            .iter()
+            .filter(move |property| property.range.end() <= range.end())
     }
 
     /// Returns localisation definitions in source order.
@@ -656,72 +590,15 @@ impl HirFile {
         false
     }
 
-    /// Returns whether a substitution is only used in the body of an ordinary EU4 runtime
-    /// branch. Unlike the compact `[[parameter] ... ]` syntax, these branches are game-state
-    /// conditionals and therefore cannot be represented as a boolean signature requirement.
-    /// A value used by the branch's `limit` remains required because the game must evaluate that
-    /// condition before it can choose the branch.
     fn parameter_reference_is_runtime_guarded(&self, reference: &HirParameterReference) -> bool {
-        if self.uses_ir {
-            return self.runtime_parameter_guards.iter().any(|(branch, guard)| {
-                branch.start() <= reference.range.start()
-                    && reference.range.end() <= branch.end()
-                    && guard.is_none_or(|guard| {
-                        !(guard.start() <= reference.range.start()
-                            && reference.range.end() <= guard.end())
-                    })
-            });
-        }
-        fn containing_properties<'a>(
-            node: CstNode<'a>,
-            range: TextRange,
-            ancestors: &mut Vec<CstNode<'a>>,
-        ) -> bool {
-            if range.start() < node.range().start() || range.end() > node.range().end() {
-                return false;
-            }
-            let is_property = node.kind() == CstKind::Property;
-            if is_property {
-                ancestors.push(node);
-            }
-            if node
-                .children()
-                .any(|child| containing_properties(child, range, ancestors))
-            {
-                return true;
-            }
-            if is_property {
-                ancestors.pop();
-            }
-            true
-        }
-
-        let mut ancestors = Vec::new();
-        if !containing_properties(self.syntax.root(), reference.range, &mut ancestors) {
-            return false;
-        }
-        for (index, ancestor) in ancestors.iter().enumerate() {
-            let key = ancestor
-                .children()
-                .find(|child| child.kind() == CstKind::Key)
-                .and_then(|child| self.syntax.text(child.range()))
-                .map(str::trim);
-            let Some(key) = key else {
-                continue;
-            };
-            if !matches!(key.to_ascii_lowercase().as_str(), "if" | "else_if" | "else") {
-                continue;
-            }
-            let in_limit = ancestors
-                .get(index.saturating_add(1))
-                .and_then(|child| child.children().find(|node| node.kind() == CstKind::Key))
-                .and_then(|child| self.syntax.text(child.range()))
-                .is_some_and(|child| child.trim().eq_ignore_ascii_case("limit"));
-            if !in_limit {
-                return true;
-            }
-        }
-        false
+        self.runtime_parameter_guards.iter().any(|(branch, guard)| {
+            branch.start() <= reference.range.start()
+                && reference.range.end() <= branch.end()
+                && guard.is_none_or(|guard| {
+                    !(guard.start() <= reference.range.start()
+                        && reference.range.end() <= guard.end())
+                })
+        })
     }
 
     fn parameter_reference_occupies_token(&self, reference: &HirParameterReference) -> bool {

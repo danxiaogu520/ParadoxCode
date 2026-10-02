@@ -1,4 +1,5 @@
-crates/ide/src/tests/golden/*.txt text eol=lf
+# Golden input comments encode blank lines as "//   "; preserve that whitespace.
+crates/ide/src/tests/golden/*.txt text eol=lf whitespace=-blank-at-eol
 # The EDG-KTP pair is compared byte for byte: the release fixture encodes the
 # master with CRLF endings, so no platform may convert line endings on either.
 crates/transcode/tests/corpus/** -text

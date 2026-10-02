@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use engine::{AnalysisSnapshot, DocumentId, GlobIncludePatterns, ParsedSource, SourceRootKind};
-use game::eu4::mission::Severity;
-use game::eu4::mission::geometry::{self, ArrowGlyph};
+use game::mission::Severity;
+use game::mission::geometry::{self, ArrowGlyph};
 use ide::{
     CancellationToken, Cancelled, CompletionKind, LocalisationKeyMatch, SemanticToken,
     SemanticTokenType, complete_with_cancellation, completion_resolve,
@@ -29,7 +29,7 @@ use lsp_types::{
     TextDocumentPositionParams, TextEdit, Uri, WorkspaceEdit, WorkspaceSymbolParams,
 };
 use parser::format::format;
-use rules::{KeyMatcher, ParserKind, RuleShape};
+use rules::ParserKind;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use text::{LineIndex, LogicalPath, Position, TextRange};
@@ -114,96 +114,6 @@ fn symbol_search_limit_inner(limit: Option<usize>, max: usize) -> Result<usize, 
             "search limit must be at least 1",
         )),
         Some(limit) => Ok(limit.min(max)),
-    }
-}
-
-/// Compact display form of a semantic-rule key matcher. Exact matchers surface their literal
-/// key; structural matchers keep the member domain visible so search results can explain what
-/// the rule accepts.
-fn key_matcher_label(matcher: &KeyMatcher) -> String {
-    match matcher {
-        KeyMatcher::Exact(key) => key.clone(),
-        KeyMatcher::Type(domain) => format!("<{domain}>"),
-        KeyMatcher::Enum(domain) => format!("<{domain}>"),
-        KeyMatcher::Template {
-            prefix,
-            parameter,
-            suffix,
-        } => {
-            let domain = parameter
-                .type_domain()
-                .or_else(|| parameter.enum_domain())
-                .unwrap_or("member");
-            format!("{prefix}<{domain}>{suffix}")
-        }
-        KeyMatcher::AnyScalar => "<any key>".to_owned(),
-        KeyMatcher::Int { .. } => "<integer key>".to_owned(),
-        KeyMatcher::Date => "<date key>".to_owned(),
-        KeyMatcher::Dynamic(name) => format!("<dynamic: {name}>"),
-    }
-}
-
-fn rule_shape_label(shape: RuleShape) -> &'static str {
-    match shape {
-        RuleShape::Node => "node",
-        RuleShape::QuotedScript => "quotedScript",
-        RuleShape::Leaf => "leaf",
-        RuleShape::LeafValue => "leafValue",
-        RuleShape::ValueClause => "valueClause",
-    }
-}
-
-/// Joins a rule's documentation comments into one bounded string.
-fn bounded_documentation(documentation: &[String]) -> String {
-    let joined = documentation.join(" ");
-    let mut bounded = joined
-        .chars()
-        .take(MAX_RULE_DOCUMENTATION_CHARS)
-        .collect::<String>();
-    if bounded.len() < joined.len() {
-        bounded.push('…');
-    }
-    bounded
-}
-
-#[cfg(test)]
-mod rule_search_label_tests {
-    use super::{KeyMatcher, bounded_documentation, key_matcher_label};
-
-    #[test]
-    fn key_matcher_labels_exact_and_structural_domains() {
-        assert_eq!(
-            key_matcher_label(&KeyMatcher::Exact("add_army_tradition".to_owned())),
-            "add_army_tradition"
-        );
-        assert_eq!(
-            key_matcher_label(&KeyMatcher::Type("country_tag".to_owned())),
-            "<country_tag>"
-        );
-        assert_eq!(key_matcher_label(&KeyMatcher::AnyScalar), "<any key>");
-        assert_eq!(
-            key_matcher_label(&KeyMatcher::Template {
-                prefix: "monthly_".to_owned(),
-                parameter: rules::TemplateParameter {
-                    type_name: None,
-                    enum_name: Some("government_mechanic".to_owned()),
-                    strip_prefix: None,
-                },
-                suffix: "_power".to_owned(),
-            }),
-            "monthly_<government_mechanic>_power"
-        );
-    }
-
-    #[test]
-    fn bounded_documentation_appends_marker_only_when_truncated() {
-        assert_eq!(bounded_documentation(&[]), "");
-        let short = vec!["one".to_owned(), "two".to_owned()];
-        assert_eq!(bounded_documentation(&short), "one two");
-        let long = vec!["x".repeat(1_000)];
-        let bounded = bounded_documentation(&long);
-        assert_eq!(bounded.chars().count(), 401);
-        assert!(bounded.ends_with('…'));
     }
 }
 
@@ -650,118 +560,77 @@ impl SnapshotRequestContext {
         let mut entries = Vec::new();
         let mut truncated = false;
         let ir = self.snapshot.ir();
-        if !ir.schemas.is_empty() {
-            for schema in &ir.schemas {
-                let context = ir.strings.resolve(schema.name);
-                if context_query
+
+        for schema in &ir.schemas {
+            let context = ir.strings.resolve(schema.name);
+            if context_query
+                .as_deref()
+                .is_some_and(|query| !context.starts_with(query))
+            {
+                continue;
+            }
+            let Some(schema_id) = ir
+                .schema_instances(context)
+                .find(|id| std::ptr::eq(ir.schema(*id), schema))
+            else {
+                continue;
+            };
+            let mut fields = schema
+                .exact
+                .values()
+                .flatten()
+                .copied()
+                .chain(schema.patterns.iter().copied())
+                .collect::<Vec<_>>();
+            fields.sort_by_key(|field| field.index());
+            fields.dedup();
+            for field_id in fields {
+                let field = ir.field(field_id);
+                let label = match ir.matcher(field.key) {
+                    rules::ir::Matcher::Literal(value) => ir.strings().resolve(*value).to_owned(),
+                    _ => ide::ir_matcher_description(ir, field.key),
+                };
+                if key_query
                     .as_deref()
-                    .is_some_and(|query| !context.starts_with(query))
+                    .is_some_and(|query| !label.to_ascii_lowercase().contains(query))
                 {
                     continue;
                 }
-                let Some(schema_id) = ir
-                    .schema_instances(context)
-                    .find(|id| std::ptr::eq(ir.schema(*id), schema))
-                else {
+                let allowed = field
+                    .scope
+                    .as_ref()
+                    .map(|scope| {
+                        scope
+                            .scopes_in
+                            .iter()
+                            .map(|name| ir.strings.resolve(*name))
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                if scope_query.as_deref().is_some_and(|query| {
+                    !allowed.is_empty() && !allowed.iter().any(|allowed| allowed.contains(query))
+                }) {
                     continue;
-                };
-                let mut fields = schema
-                    .exact
-                    .values()
-                    .flatten()
-                    .copied()
-                    .chain(schema.patterns.iter().copied())
-                    .collect::<Vec<_>>();
-                fields.sort_by_key(|field| field.index());
-                fields.dedup();
-                for field_id in fields {
-                    let field = ir.field(field_id);
-                    let label = ide::ir_matcher_description(ir, field.key);
-                    if key_query
-                        .as_deref()
-                        .is_some_and(|query| !label.to_ascii_lowercase().contains(query))
-                    {
-                        continue;
-                    }
-                    let allowed = field
-                        .scope
-                        .as_ref()
-                        .map(|scope| {
-                            scope
-                                .scopes_in
-                                .iter()
-                                .map(|name| ir.strings.resolve(*name))
-                                .collect::<Vec<_>>()
-                        })
-                        .unwrap_or_default();
-                    if scope_query.as_deref().is_some_and(|query| {
-                        !allowed.is_empty()
-                            && !allowed.iter().any(|allowed| allowed.contains(query))
-                    }) {
-                        continue;
-                    }
-                    if entries.len() == limit {
-                        truncated = true;
-                        break;
-                    }
-                    let source = ir.provenance_of(field_id).map(|source| serde_json::json!({"file":ir.strings.resolve(source.file),"pointer":ir.strings.resolve(source.pointer)}));
-                    entries.push(serde_json::json!({
+                }
+                if entries.len() == limit {
+                    truncated = true;
+                    break;
+                }
+                let source = ir.provenance_of(field_id).map(|source| serde_json::json!({"file":ir.strings.resolve(source.file),"pointer":ir.strings.resolve(source.pointer)}));
+                entries.push(serde_json::json!({
                         "id": format!("ir:{}:{}", schema_id.index(), field_id.index()),
                         "context": context, "schema": schema_id.index(), "field":field_id.index(),
                         "key":label, "shape": ir.shape(field_id).map(|shape| format!("{shape:?}").to_ascii_lowercase()),
                         "allowedScopes":allowed, "pushScope": field.scope.as_ref().and_then(|scope| scope.push).map(|name| ir.strings.resolve(name)),
                         "deprecated":field.deprecated, "card":{"min":field.card.min,"max":field.card.max},
-                        "subtypeGate":field.gate.map(|gate| match gate {
-                            rules::ir::Gate::When(name) => serde_json::json!({"when":ir.strings.resolve(name)}),
-                            rules::ir::Gate::Unless(name) => serde_json::json!({"unless":ir.strings.resolve(name)}),
-                        }),
                         "documentation":field.doc.map(|doc| ir.strings.resolve(doc).chars().take(MAX_RULE_DOCUMENTATION_CHARS).collect::<String>()),"source":source
                     }));
-                }
-                if truncated {
-                    break;
-                }
             }
-            return Ok(serde_json::json!({"rules":entries,"truncated":truncated}));
-        }
-        for rule in self.snapshot.rules().semantic_rules() {
-            if let Some(query) = context_query.as_deref()
-                && !rule.context.to_ascii_lowercase().starts_with(query)
-            {
-                continue;
-            }
-            let label = key_matcher_label(&rule.key);
-            if let Some(query) = key_query.as_deref()
-                && !label.to_ascii_lowercase().contains(query)
-            {
-                continue;
-            }
-            if let Some(query) = scope_query.as_deref()
-                && !rule.allowed_scopes.is_empty()
-                && !rule
-                    .allowed_scopes
-                    .iter()
-                    .any(|allowed| allowed.to_ascii_lowercase().contains(query))
-            {
-                continue;
-            }
-            if entries.len() == limit {
-                truncated = true;
+            if truncated {
                 break;
             }
-            entries.push(serde_json::json!({
-                "id": rule.id,
-                "context": rule.context,
-                "parentPath": rule.parent_path,
-                "key": label,
-                "shape": rule_shape_label(rule.shape),
-                "allowedScopes": rule.allowed_scopes,
-                "pushScope": rule.push_scope,
-                "deprecated": rule.deprecated,
-                "documentation": bounded_documentation(&rule.documentation),
-            }));
         }
-        Ok(serde_json::json!({ "rules": entries, "truncated": truncated }))
+        Ok(serde_json::json!({"rules":entries,"truncated":truncated}))
     }
 
     /// Bounded search over indexed localisation definitions by key and/or value substring.
@@ -1054,10 +923,18 @@ impl SnapshotRequestContext {
                 format!("path is outside the active game profile: {}", params.path),
             ));
         }
-        let loaded = game::eu4::mission::parse_file(&params.text);
+        let view = game::mission::view(self.snapshot.game_profile())
+            .filter(|view| view.matches(&params.path))
+            .ok_or_else(|| {
+                RpcError::new(
+                    INVALID_PARAMS,
+                    "the active package does not expose a mission view at this path",
+                )
+            })?;
+        let loaded = view.parse(&params.text);
         let file = &loaded.file;
         let layout = geometry::layout_file(file);
-        let diagnostics = game::eu4::mission::validate(file);
+        let diagnostics = view.validate(file, &HashSet::new());
         let line_index = LineIndex::new(&params.text);
 
         // Resolve every mission title key in one workspace pass with the same
@@ -1070,7 +947,7 @@ impl SnapshotRequestContext {
         let mut title_keys = Vec::with_capacity(layout.len());
         let mut seen_title_keys = HashSet::with_capacity(layout.len());
         for pos in &layout {
-            let Some(key) = self.snapshot.rules().localisation_template_key(
+            let Some(key) = self.snapshot.localisation_template_key(
                 "mission",
                 "name",
                 &file.trees[pos.tree_index].missions[pos.mission_index].id,
@@ -1121,8 +998,7 @@ impl SnapshotRequestContext {
                 // the fallback.
                 let title_key = self
                     .snapshot
-                    .rules()
-                    .localisation_template_key("mission", "name", &mission.id)
+                    .localisation_template_key(&view.spec.symbol_kind, "name", &mission.id)
                     .unwrap_or_default();
                 let title = titles.get(&title_key).map(
                     |(language, value)| serde_json::json!({ "language": language, "value": value }),
@@ -1165,7 +1041,7 @@ impl SnapshotRequestContext {
             .map(|segment| {
                 serde_json::json!({
                     "glyph": glyph_name(segment.glyph),
-                    "texture": game::eu4::mission::arrow_sprite_name(glyph_name(segment.glyph)),
+                    "texture": geometry::arrow_sprite_name(glyph_name(segment.glyph)),
                     "tree": segment.tree,
                     "from": segment.from,
                     "x": segment.x,

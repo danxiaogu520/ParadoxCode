@@ -19,7 +19,8 @@ use index::{
     IndexSymbolFacts, SourceLoadContext, SourceReadJob, build_file_state_with_ir,
     build_file_state_with_ir_and_facts, empty_file_state, load_source_files,
     position_ranges_for_state, prepare_document_snapshot_with_ir,
-    prepare_document_snapshot_with_ir_and_facts, staged_overlay_document, unparsed_document,
+    prepare_document_snapshot_with_ir_and_facts, replay_symbol_dependent_files,
+    staged_overlay_document, unparsed_document,
 };
 use vfs::ParseCache;
 use vfs::scan::{
@@ -171,9 +172,6 @@ impl AnalysisHost {
                 rules::FileResolutionPolicy::ReplaceByRelativePath
             }
             rules::ir::FileResolution::Merge => rules::FileResolutionPolicy::Merge,
-            rules::ir::FileResolution::ReplaceDirectory => {
-                rules::FileResolutionPolicy::ReplaceDirectory
-            }
         };
         Some((
             self.ir.strings.resolve(file.name).to_owned(),
@@ -493,18 +491,23 @@ impl AnalysisHost {
             .documents
             .iter()
             .map(|(id, document)| {
-                let document =
-                    if document.source == DocumentSource::Overlay && document.hir.is_none() {
-                        document.clone()
-                    } else {
-                        prepare_document_snapshot_with_ir(
-                            &self.rules,
-                            &self.profile,
-                            &self.ir,
-                            &self.roots,
-                            document.clone(),
-                        )
-                    };
+                let document = if (document.source == DocumentSource::Overlay
+                    && document.hir.is_none())
+                    || document
+                        .hir
+                        .as_ref()
+                        .is_some_and(|hir| !hir.depends_on_symbol_facts())
+                {
+                    document.clone()
+                } else {
+                    prepare_document_snapshot_with_ir(
+                        &self.rules,
+                        &self.profile,
+                        &self.ir,
+                        &self.roots,
+                        document.clone(),
+                    )
+                };
                 (id.clone(), document)
             })
             .collect::<BTreeMap<_, _>>();
@@ -524,19 +527,24 @@ impl AnalysisHost {
             preliminary
                 .into_iter()
                 .map(|(id, document)| {
-                    let document =
-                        if document.source == DocumentSource::Overlay && document.hir.is_none() {
-                            document
-                        } else {
-                            prepare_document_snapshot_with_ir_and_facts(
-                                &self.rules,
-                                &self.profile,
-                                &self.ir,
-                                &facts,
-                                &self.roots,
-                                document,
-                            )
-                        };
+                    let document = if (document.source == DocumentSource::Overlay
+                        && document.hir.is_none())
+                        || document
+                            .hir
+                            .as_ref()
+                            .is_some_and(|hir| !hir.depends_on_symbol_facts())
+                    {
+                        document
+                    } else {
+                        prepare_document_snapshot_with_ir_and_facts(
+                            &self.rules,
+                            &self.profile,
+                            &self.ir,
+                            &facts,
+                            &self.roots,
+                            document,
+                        )
+                    };
                     (id, document)
                 })
                 .collect(),
@@ -640,10 +648,11 @@ impl AnalysisHost {
             Vec::<(SourceRootId, Arc<crate::index_cache::ReferenceIndexStore>)>::new();
 
         for cache in caches {
-            if cache.metadata().ir_hash != self.ir_fingerprint.as_ref() {
-                return Err(IndexCacheError::InvalidData(
-                    "cached rules IR does not match the active arena".to_owned(),
-                ));
+            if cache.metadata().build_id != crate::ANALYZER_BUILD_ID {
+                return Err(IndexCacheError::BuildMismatch {
+                    cached: cache.metadata().build_id.clone(),
+                    active: crate::ANALYZER_BUILD_ID.to_owned(),
+                });
             }
             if cache.metadata().game_id != self.rules.game_id()
                 || cache.metadata().game_id != self.profile.game_id
@@ -1137,13 +1146,13 @@ impl AnalysisHost {
                     .map(|(_, shard)| shard.clone()),
             );
         }
-        let mut index =
-            WorkspaceIndex::from_shards_cancellable(shards.iter().cloned(), cancellation)?;
+        let mut index = WorkspaceIndex::from_shards_cancellable(shards, cancellation)?;
         let priorities = source_priorities(&self.roots, &files);
         index.resolve_priorities_cancellable(&priorities, cancellation)?;
         if !self.ir.files.is_empty() {
-            // First-pass HIR discovers definitions. Re-lower every scanned file against that
-            // candidate index so IR refs and subtype predicates can resolve across files.
+            // First-pass HIR discovers ordinary definitions. Callable payloads can introduce
+            // further symbols; replay until the exact symbol facts stabilize so references
+            // in other files see them before committing the new workspace.
             let overlays = self
                 .documents
                 .values()
@@ -1151,51 +1160,49 @@ impl AnalysisHost {
                 .filter_map(|document| document.hir.clone())
                 .collect::<Vec<_>>();
             let overlay_file_ids = overlay_source_file_ids(&self.documents, &files);
-            let facts = IndexSymbolFacts::with_overlay_files(
-                &self.ir,
-                &index,
-                &overlays,
-                &overlay_file_ids,
-            );
-            let mut relowered = BTreeMap::new();
-            for (id, state) in &file_states {
-                cancellation.checkpoint()?;
-                let Some(file) = files.get(id) else { continue };
-                let mut rebuilt = build_file_state_with_ir_and_facts(
-                    file,
-                    state.source().to_owned(),
-                    state.revision(),
-                    &self.rules,
-                    &self.profile,
+            let mut passes = 0;
+            loop {
+                passes += 1;
+                let facts = IndexSymbolFacts::with_overlay_files(
+                    &self.ir,
+                    &index,
+                    &overlays,
+                    &overlay_file_ids,
+                );
+                let relowered = replay_symbol_dependent_files(
+                    &files,
+                    &file_states,
                     &self.ir,
                     &facts,
-                    self.parse_cache.as_ref(),
-                );
-                if state.parsed().is_none() {
-                    rebuilt = rebuilt.cache_only();
+                    &source_context,
+                )?;
+                let mut changed = false;
+                for (id, state) in relowered {
+                    cancellation.checkpoint()?;
+                    changed |= file_states
+                        .get(&id)
+                        .is_none_or(|previous| !state.shard().same_symbol_facts(previous.shard()));
+                    file_states.insert(id, state);
                 }
-                relowered.insert(*id, Arc::new(rebuilt));
-            }
-            file_states = relowered;
-            shards = file_states
-                .values()
-                .map(|state| state.shard_handle())
-                .collect();
-            if !self.installed_caches.is_empty() {
-                shards.extend(
-                    self.index
-                        .shards
-                        .iter()
-                        .filter(|(id, _)| {
-                            self.source_files
-                                .get(id)
-                                .is_some_and(|file| self.installed_caches.contains(&file.root_id))
-                        })
-                        .map(|(_, shard)| shard.clone()),
-                );
+                drop(facts);
+                index.replace_replayed_shards_cancellable(
+                    file_states.values().map(|state| state.shard_handle()),
+                    &priorities,
+                    cancellation,
+                )?;
+                if !changed {
+                    break;
+                }
+                if passes >= 32 {
+                    return Err(WorkspaceError::Io(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "IR symbol facts did not stabilize after 32 passes",
+                    )));
+                }
             }
         }
-        let mut index = WorkspaceIndex::from_shards_cancellable(shards, cancellation)?;
+        // The candidate now contains the final shards and resolved symbol facts;
+        // it can serve queries without rebuilding the same lookup maps again.
         let mut position_ranges = self.index.position_ranges().clone();
         position_ranges.retain_files(|file_id| {
             files.contains_key(&file_id) && !file_states.contains_key(&file_id)
@@ -1208,8 +1215,6 @@ impl AnalysisHost {
             );
         }
         index.replace_all_position_ranges(position_ranges);
-        let priorities = source_priorities(&self.roots, &files);
-        index.resolve_priorities_cancellable(&priorities, cancellation)?;
         cancellation.checkpoint()?;
         self.source_files = Arc::new(files);
         self.source_file_paths = Arc::new(source_file_paths(&self.source_files));
@@ -1465,6 +1470,9 @@ impl AnalysisHost {
                     else {
                         continue;
                     };
+                    if !previous.symbol_facts_dependency {
+                        continue;
+                    }
                     let state = build_file_state_with_ir_and_facts(
                         file,
                         previous.source().to_owned(),

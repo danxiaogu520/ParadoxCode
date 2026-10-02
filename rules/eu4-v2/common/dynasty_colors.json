@@ -4,8 +4,7 @@
       "fields": {
         "color": {
           "card": "1..*",
-          "list": "int[0..255]",
-          "when": null
+          "list": "int[0..255]"
         }
       }
     },

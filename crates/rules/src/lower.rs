@@ -11,10 +11,7 @@
 //! Everything the language defers to compile time happens here:
 //!
 //! - `include` expands mixins into flat exact-key maps (§7.2);
-//! - a parameterised schema is monomorphised once per argument tuple, and a
-//!   `map`/`pattern` whose `enum<E>` key feeds `$key.<column>` into its payload
-//!   expands into one pattern per distinct column group, each carrying the
-//!   group's row set (§3.3, §6);
+//! - a parameterised schema is monomorphised once per argument tuple (§3.3);
 //! - every mini-syntax string becomes an entry of one deduplicated matcher
 //!   arena (§2.2);
 //! - field provenance (source file + JSON pointer) is derived, never authored
@@ -26,23 +23,23 @@ use std::fmt;
 use rustc_hash::FxHashMap;
 
 use crate::compile::{
-    self, Actual, Diagnostic, SchemaRef, first_name, parse_card, parse_column, parse_def_type,
-    parse_schema_key, parse_schema_ref,
+    self, Actual, Diagnostic, SchemaRef, first_name, parse_card, parse_def_type, parse_schema_key,
+    parse_schema_ref,
 };
 use crate::expr::{self, Argument, Expr, LiteralPart, Param, Primary, ScalarKind, Segment};
 use crate::ir::{
-    Binding, BitSet, Card, Control, DefName, DefSpec, DocumentParser, EnumColumn, EnumId, EnumInfo,
-    EnumRow, Field, FieldId, FieldValue, FileResolution, FileRule, GameConfig, Gate, Interner,
-    LinkInfo, Matcher, MatcherId, Provenance, RefTarget, RegisterInfo, RootRule, RulesIr, Schema,
-    SchemaId, ScopeEffect, ScopeModel, ScopeRef, SubtypeCond, SubtypeGate, SubtypeInfo, Symbol,
-    TemplatePart, TraitArgument, TraitId, TraitImpl, TraitInfo, TypeId, TypeInfo, TypeResolution,
+    Binding, Card, Control, DefName, DefSpec, DocumentParser, EnumId, EnumInfo, EnumRow, Field,
+    FieldId, FieldValue, FileResolution, FileRule, GameConfig, Interner, LinkInfo, Matcher,
+    MatcherId, Provenance, RefTarget, RegisterInfo, RootRule, RulesIr, Schema, SchemaId,
+    ScopeEffect, ScopeModel, ScopeRef, SubtypeInfo, Symbol, TemplatePart, TraitArgument, TraitId,
+    TraitImpl, TraitInfo, TypeId, TypeInfo, TypeResolution,
 };
 use crate::matcher::FileMatcher;
 use crate::source::{
     ControlSpec as SourceControl, DefSpec as SourceDef, EnumSpec, FieldOverloads, FieldSpec,
     ImplSpec, ImplValue, MapSpec, MixinSpec, RootSpec, RuleFile, SchemaSpec, ScopesSpec, Severity,
-    SourceFileResolution, SourceParser, SubtypeCond as SourceCond, TraitSpec,
-    TypeResolution as SourceTypeResolution, TypeSpec,
+    SourceFileResolution, SourceParser, TraitSpec, TypeResolution as SourceTypeResolution,
+    TypeSpec,
 };
 
 /// Why lowering did not produce an IR.
@@ -81,7 +78,7 @@ impl std::error::Error for LowerError {}
 
 /// Compiles merged rule sources into the runtime IR.
 ///
-/// `sources` is `(source file name, parsed file)` in manifest order, and
+/// `sources` is `(source file name, parsed file)` in normalized relative-path order, and
 /// `game` is the non-language `game.json` payload.
 ///
 /// # Errors
@@ -144,28 +141,15 @@ struct Job {
     at: At,
 }
 
-/// The formal parameters and `$key` binding in scope while lowering a field.
+/// The formal parameters in scope while lowering a field.
 struct FieldContext<'c> {
     formals: &'c [(Symbol, Option<Symbol>)],
-    key: Option<&'c KeyBinding>,
 }
 
 impl FieldContext<'static> {
     fn closed() -> Self {
-        Self {
-            formals: &[],
-            key: None,
-        }
+        Self { formals: &[] }
     }
-}
-
-/// The `$key` binding of one generated enum-column group.
-struct KeyBinding {
-    /// Columns read through `$key.<column>`, in first-use order; `None` is a
-    /// bare `$key` read, which stands for the matched row name.
-    columns: Box<[Option<Symbol>]>,
-    /// The group's values, aligned to `columns`.
-    values: Box<[Option<Symbol>]>,
 }
 
 /// Where a draft field takes its key from.
@@ -179,8 +163,6 @@ enum DraftKey<'d> {
 
 /// One field specification about to be lowered.
 struct FieldDraft<'d> {
-    /// The schema the field belongs to, for `body: "self"` and instance gates.
-    schema: SchemaId,
     spec: &'d FieldSpec,
     key: DraftKey<'d>,
     at: At,
@@ -199,7 +181,6 @@ struct FieldKey {
     card: Card,
     scope: Option<ScopeEffect>,
     def: Option<DefSpec>,
-    gate: Option<Gate>,
     control: Option<Control>,
     doc: Option<Symbol>,
     severity: Severity,
@@ -233,7 +214,6 @@ enum MatcherKey {
     },
     Enum {
         id: u32,
-        rows: Option<BitSet>,
     },
     Scope(Option<Symbol>),
     Link,
@@ -257,7 +237,6 @@ enum RefKey {
         subtype: Option<Symbol>,
         strip_prefix: Option<Symbol>,
     },
-    Trait(u32),
 }
 
 /// The lowering pass's working state.
@@ -289,7 +268,6 @@ struct Lowering<'a> {
 
     instances: FxHashMap<InstanceKey, SchemaId>,
     jobs: VecDeque<Job>,
-    pending_gates: Vec<(SchemaId, TypeId, Symbol)>,
     matcher_index: FxHashMap<MatcherKey, MatcherId>,
     field_index: FxHashMap<FieldKey, FieldId>,
 }
@@ -323,7 +301,6 @@ impl<'a> Lowering<'a> {
             files: Vec::new(),
             instances: FxHashMap::default(),
             jobs: VecDeque::new(),
-            pending_gates: Vec::new(),
             matcher_index: FxHashMap::default(),
             field_index: FxHashMap::default(),
         }
@@ -336,13 +313,7 @@ impl<'a> Lowering<'a> {
         self.fill_scopes();
         self.register_files();
         self.drain_jobs();
-        while !self.pending_gates.is_empty() {
-            let gates = std::mem::take(&mut self.pending_gates);
-            for (schema, type_id, subtype) in gates {
-                self.attach_gate(schema, type_id, subtype);
-            }
-            self.drain_jobs();
-        }
+
         self.assemble()
     }
 
@@ -439,37 +410,8 @@ impl<'a> Lowering<'a> {
         }
     }
 
-    fn trait_info(&mut self, name: Symbol, spec: &TraitSpec) -> TraitInfo {
-        let mut params = Vec::with_capacity(spec.params.len());
-        for (param, default) in &spec.params {
-            let param = self.strings.intern_folded(param);
-            let default = default
-                .as_deref()
-                .map(|text| self.strings.intern_verbatim(text));
-            params.push((param, default));
-        }
-        let mut bindings = Vec::with_capacity(spec.bindings.len());
-        for (binding, spec) in &spec.bindings {
-            let binding = self.strings.intern_folded(binding);
-            let spec = self.binding(spec);
-            bindings.push((binding, spec));
-        }
-        let requires_include = spec
-            .requires
-            .as_ref()
-            .and_then(|requires| requires.include.as_deref())
-            .map(|include| self.strings.intern_folded(include));
-        let mut capabilities = Vec::new();
-        for capability in spec.capabilities.iter().flatten() {
-            capabilities.push(self.strings.intern_verbatim(capability));
-        }
-        TraitInfo {
-            name,
-            params,
-            bindings,
-            requires_include,
-            capabilities: capabilities.into_boxed_slice(),
-        }
+    fn trait_info(&mut self, name: Symbol, _spec: &TraitSpec) -> TraitInfo {
+        TraitInfo { name }
     }
 
     fn binding(&mut self, spec: &crate::source::BindingSpec) -> Binding {
@@ -489,53 +431,17 @@ impl<'a> Lowering<'a> {
     }
 
     fn enum_info(&mut self, name: Symbol, spec: &EnumSpec) -> EnumInfo {
-        match spec {
-            EnumSpec::Members(members) => {
-                let mut rows = Vec::with_capacity(members.len());
-                for member in members {
-                    let member = self.strings.intern_folded(member);
-                    rows.push(EnumRow {
-                        name: member,
-                        values: Box::new([]),
-                    });
-                }
-                EnumInfo {
-                    name,
-                    columns: Box::new([]),
-                    rows: rows.into_boxed_slice(),
-                }
-            }
-            EnumSpec::Table { columns, rows } => {
-                let mut declared = Vec::with_capacity(columns.len());
-                for (column, kind) in columns {
-                    let column = self.strings.intern_folded(column);
-                    declared.push(EnumColumn {
-                        name: column,
-                        optional: matches!(parse_column(kind), Ok((_, true))),
-                    });
-                }
-                let order = columns.keys().collect::<Vec<_>>();
-                let mut lowered = Vec::with_capacity(rows.len());
-                for (row, values) in rows {
-                    let row = self.strings.intern_folded(row);
-                    let mut cells = Vec::with_capacity(order.len());
-                    for column in &order {
-                        let value = values
-                            .get(column.as_str())
-                            .map(|value| self.strings.intern_folded(value));
-                        cells.push(value);
-                    }
-                    lowered.push(EnumRow {
-                        name: row,
-                        values: cells.into_boxed_slice(),
-                    });
-                }
-                EnumInfo {
-                    name,
-                    columns: declared.into_boxed_slice(),
-                    rows: lowered.into_boxed_slice(),
-                }
-            }
+        let EnumSpec::Members(members) = spec;
+        let rows = members
+            .iter()
+            .map(|member| EnumRow {
+                name: self.strings.intern_folded(member),
+                spelling: self.strings.intern_verbatim(member),
+            })
+            .collect::<Vec<_>>();
+        EnumInfo {
+            name,
+            rows: rows.into_boxed_slice(),
         }
     }
 
@@ -553,7 +459,7 @@ impl<'a> Lowering<'a> {
                 self.type_defs.push((symbol, spec));
                 let mut builtin = Vec::new();
                 for member in spec.builtin.iter().flatten() {
-                    builtin.push(self.strings.intern_folded(member));
+                    builtin.push(self.strings.intern_verbatim(member));
                 }
                 self.types.push(TypeInfo {
                     name: symbol,
@@ -577,17 +483,9 @@ impl<'a> Lowering<'a> {
                 continue;
             };
             let mut subtypes = Vec::with_capacity(spec.subtypes.len());
-            for (subtype_name, subtype) in &spec.subtypes {
-                let name = self.strings.intern_folded(subtype_name);
-                let when = subtype
-                    .when
-                    .as_ref()
-                    .map(|condition| self.lower_condition(&FieldContext::closed(), condition));
-                let trait_impls = self.lower_trait_impls(&subtype.trait_impls);
+            for subtype_name in spec.subtypes.keys() {
                 subtypes.push(SubtypeInfo {
-                    name,
-                    when,
-                    trait_impls,
+                    name: self.strings.intern_folded(subtype_name),
                 });
             }
             let trait_impls = self.lower_trait_impls(&spec.trait_impls);
@@ -635,6 +533,7 @@ impl<'a> Lowering<'a> {
             let name = self.strings.intern_folded(name);
             registers.push(RegisterInfo {
                 name,
+                role: register.role,
                 chain: register.chain.unwrap_or(false),
             });
         }
@@ -690,7 +589,6 @@ impl<'a> Lowering<'a> {
             let resolution = match rule.resolution {
                 SourceFileResolution::ReplaceByPath => FileResolution::ReplaceByPath,
                 SourceFileResolution::Merge => FileResolution::Merge,
-                SourceFileResolution::ReplaceDirectory => FileResolution::ReplaceDirectory,
             };
             let matcher = FileMatcher {
                 path_prefix: match (&rule.file, rule.path.as_str()) {
@@ -746,8 +644,9 @@ impl<'a> Lowering<'a> {
                     .body
                     .as_deref()
                     .and_then(|body| self.ensure_body(&context, body, None));
-                let def = field.def.as_ref().and_then(|def| self.lower_def(def, body));
-                RootRule::Instance { def, body }
+                let def = field.def.as_ref().and_then(|def| self.lower_def(def));
+                let scope = self.scope_effect(field.scope.as_ref());
+                RootRule::Instance { def, body, scope }
             }
             None => RootRule::Opaque,
         }
@@ -852,40 +751,63 @@ impl<'a> Lowering<'a> {
         };
         let context = FieldContext {
             formals: &job.formals,
-            key: None,
         };
         let at = job.at.clone();
-        let (exact, patterns, items) = match source.spec {
+        let (exact, patterns, items, forms) = match source.spec {
             SchemaSpec::Block(block) => {
                 let exact = self.lower_exact_fields(&context, job.schema, block, &at);
                 let mut patterns = Vec::new();
                 for (index, spec) in block.patterns.iter().enumerate() {
-                    patterns.extend(self.lower_pattern(
-                        &context,
-                        spec,
-                        &at.child("patterns").index(index),
-                        job.schema,
-                    ));
+                    let field =
+                        self.lower_pattern(&context, spec, &at.child("patterns").index(index));
+                    patterns.push(field);
                 }
                 let items = block
                     .items
                     .as_deref()
                     .map(|items| self.lower_expr_text(&context, items));
-                (exact, patterns, items)
+                let forms = block
+                    .forms
+                    .iter()
+                    .map(|form| {
+                        let mut counts = Vec::new();
+                        for (name, bounds) in &form.fields {
+                            let symbol = self.strings.intern_folded(name);
+                            if let Some(ids) = exact.get(&symbol) {
+                                counts.push((ids.clone(), card(bounds)));
+                            }
+                        }
+                        for (index, bounds) in &form.patterns {
+                            if let Some(id) = index
+                                .parse::<usize>()
+                                .ok()
+                                .and_then(|index| patterns.get(index))
+                            {
+                                counts.push((Box::new([*id]), card(bounds)));
+                            }
+                        }
+                        crate::ir::BlockForm {
+                            counts: counts.into_boxed_slice(),
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                (exact, patterns, items, forms)
             }
             SchemaSpec::Map { map } => {
-                let patterns = self.lower_map_into(&context, map, &at.child("map"), job.schema);
-                (FxHashMap::default(), patterns.to_vec(), None)
+                let patterns = self.lower_map_into(&context, map, &at.child("map"));
+                (FxHashMap::default(), patterns.to_vec(), None, Vec::new())
             }
             SchemaSpec::List { list } => {
                 let items = self.lower_expr_text(&context, list);
-                (FxHashMap::default(), Vec::new(), Some(items))
+                (FxHashMap::default(), Vec::new(), Some(items), Vec::new())
             }
         };
         let schema = &mut self.schemas[job.schema.index()];
         schema.exact = exact;
         schema.patterns = patterns.into_boxed_slice();
         schema.items = items;
+        schema.forms = forms.into_boxed_slice();
+        schema.open = matches!(source.spec, SchemaSpec::Block(block) if block.open);
     }
 
     /// Lowers the exact `fields` of one block, expanding its `include` mixins
@@ -893,7 +815,7 @@ impl<'a> Lowering<'a> {
     fn lower_exact_fields(
         &mut self,
         context: &FieldContext<'_>,
-        schema: SchemaId,
+        _schema: SchemaId,
         block: &crate::source::BlockSchema,
         at: &At,
     ) -> FxHashMap<Symbol, Box<[FieldId]>> {
@@ -931,129 +853,26 @@ impl<'a> Lowering<'a> {
                     spec_at = spec_at.index(index);
                 }
                 let draft = FieldDraft {
-                    schema,
                     spec,
                     key: DraftKey::Exact(&key),
                     at: spec_at,
                 };
-                ids.push(self.lower_field(context, &draft, None));
+                ids.push(self.lower_field(context, &draft));
             }
             exact.insert(symbol, ids.into_boxed_slice());
         }
         exact
     }
 
-    /// Lowers one `patterns` entry, expanding an enum-keyed field into one
-    /// pattern per attribute-column group (§6).
-    fn lower_pattern(
-        &mut self,
-        context: &FieldContext<'_>,
-        spec: &FieldSpec,
-        at: &At,
-        schema: SchemaId,
-    ) -> Vec<FieldId> {
-        let Some(raw_key) = spec.key.as_deref() else {
-            return Vec::new();
-        };
-        let parsed = expr::parse(raw_key).ok();
-        if let Some(parsed) = &parsed
-            && let Some(enum_id) = self.enum_of_key(parsed)
-        {
-            let columns = self.key_columns(spec);
-            if !columns.is_empty()
-                && let Some(groups) = self.group_rows(enum_id, &columns)
-            {
-                let mut out = Vec::with_capacity(groups.len());
-                for (values, rows) in groups {
-                    let binding = KeyBinding {
-                        columns: columns.clone().into_boxed_slice(),
-                        values: values.into_boxed_slice(),
-                    };
-                    let grouped = FieldContext {
-                        formals: context.formals,
-                        key: Some(&binding),
-                    };
-                    let key = self.intern_matcher(Matcher::Enum {
-                        id: enum_id,
-                        rows: Some(rows),
-                    });
-                    let draft = FieldDraft {
-                        schema,
-                        spec,
-                        key: DraftKey::Expression(raw_key),
-                        at: at.clone(),
-                    };
-                    out.push(self.lower_field(&grouped, &draft, Some(key)));
-                }
-                return out;
-            }
-        }
+    /// Lowers one authored pattern.
+    fn lower_pattern(&mut self, context: &FieldContext<'_>, spec: &FieldSpec, at: &At) -> FieldId {
+        let raw_key = spec.key.as_deref().expect("checked pattern key");
         let draft = FieldDraft {
-            schema,
             spec,
             key: DraftKey::Expression(raw_key),
             at: at.clone(),
         };
-        vec![self.lower_field(context, &draft, None)]
-    }
-
-    /// The enum a pattern key consists of, when the whole key is one
-    /// `enum<E>` alternative.
-    fn enum_of_key(&self, parsed: &Expr) -> Option<EnumId> {
-        let [Primary::Enum(argument)] = parsed.alternatives.as_slice() else {
-            return None;
-        };
-        let name = first_name(argument)?;
-        let symbol = self.strings.lookup_folded(&name)?;
-        self.enum_ids.get(&symbol).copied()
-    }
-
-    /// The `$key` columns a field's payload reads.
-    fn key_columns(&mut self, spec: &FieldSpec) -> Vec<Option<Symbol>> {
-        let mut out = Vec::new();
-        for column in collect_key_columns(spec) {
-            let column = column.map(|column| self.strings.intern_folded(&column));
-            out.push(column);
-        }
-        out
-    }
-
-    /// The distinct argument tuples the enum rows form under `columns`, each
-    /// with the rows carrying it.
-    fn group_rows(
-        &self,
-        enum_id: EnumId,
-        columns: &[Option<Symbol>],
-    ) -> Option<Vec<(Vec<Option<Symbol>>, BitSet)>> {
-        let info = &self.enums[enum_id.index()];
-        let mut positions = Vec::with_capacity(columns.len());
-        for column in columns {
-            positions.push(match column {
-                None => None,
-                Some(name) => Some(info.column(*name)?),
-            });
-        }
-        let mut groups: Vec<(Vec<Option<Symbol>>, BitSet)> = Vec::new();
-        for (index, row) in info.rows.iter().enumerate() {
-            let values = columns
-                .iter()
-                .zip(&positions)
-                .map(|(column, position)| match (column, position) {
-                    (None, _) => Some(row.name),
-                    (Some(_), Some(position)) => row.values.get(*position).copied().flatten(),
-                    (Some(_), None) => None,
-                })
-                .collect::<Vec<_>>();
-            match groups.iter_mut().find(|(existing, _)| *existing == values) {
-                Some((_, rows)) => rows.insert(index),
-                None => {
-                    let mut rows = BitSet::new(info.rows.len());
-                    rows.insert(index);
-                    groups.push((values, rows));
-                }
-            }
-        }
-        Some(groups)
+        self.lower_field(context, &draft)
     }
 
     /// Lowers one map into a single pattern field, for both the
@@ -1063,7 +882,6 @@ impl<'a> Lowering<'a> {
         context: &FieldContext<'_>,
         map: &MapSpec,
         at: &At,
-        schema: SchemaId,
     ) -> Box<[FieldId]> {
         let spec = FieldSpec {
             key: Some(map.key.clone()),
@@ -1074,34 +892,27 @@ impl<'a> Lowering<'a> {
             card: "0..*".to_owned(),
             scope: None,
             def: None,
-            when: None,
-            unless: None,
+
             control: None,
             doc: None,
             severity: None,
             deprecated: None,
             override_field: None,
         };
-        self.lower_pattern(context, &spec, at, schema)
-            .into_boxed_slice()
+        Box::new([self.lower_pattern(context, &spec, at)])
     }
 
     // ---- fields ----------------------------------------------------------
 
-    fn lower_field(
-        &mut self,
-        context: &FieldContext<'_>,
-        draft: &FieldDraft<'_>,
-        key_override: Option<MatcherId>,
-    ) -> FieldId {
+    fn lower_field(&mut self, context: &FieldContext<'_>, draft: &FieldDraft<'_>) -> FieldId {
         let spec = draft.spec;
-        let key = key_override.unwrap_or_else(|| match draft.key {
+        let key = match draft.key {
             DraftKey::Exact(text) => {
                 let text = self.strings.intern_verbatim(text);
                 self.intern_matcher(Matcher::Literal(text))
             }
             DraftKey::Expression(raw) => self.lower_expr_text(context, raw),
-        });
+        };
         let value = if let Some(raw) = spec.value.as_deref() {
             let quoted = expr::parse(raw)
                 .ok()
@@ -1129,41 +940,29 @@ impl<'a> Lowering<'a> {
             FieldValue::Block(inline)
         } else if let Some(map) = spec.map.as_ref() {
             let inline = self.inline_schema("$map");
-            let patterns = self.lower_map_into(context, map, &draft.at.child("map"), inline);
+            let patterns = self.lower_map_into(context, map, &draft.at.child("map"));
             self.schemas[inline.index()].patterns = patterns;
             FieldValue::Block(inline)
         } else {
             FieldValue::Scalar(self.opaque())
         };
-        // A `self` body still belongs to this schema, which is what an
-        // instance body's subtype gates attach to.
-        let body = match value {
-            FieldValue::Block(schema) | FieldValue::Quoted(schema) => Some(schema),
-            FieldValue::SelfBlock => Some(draft.schema),
-            FieldValue::Scalar(_) => None,
-        };
-        let shorthand = self.field_shorthand(context, draft, spec);
+        let shorthand = self.field_shorthand(context, draft);
         let def = match (spec.def.as_ref(), shorthand) {
-            (Some(source), _) => self.lower_def(source, body),
-            (None, Some((type_id, subtype))) => {
-                self.register_gates(body, type_id);
-                Some(DefSpec {
-                    type_id,
-                    subtype,
-                    name: DefName::Key,
-                    strip_prefix: None,
-                    strip_suffix: None,
-                })
-            }
+            (Some(source), _) => self.lower_def(source),
+            (None, Some((type_id, subtype))) => Some(DefSpec {
+                type_id,
+                subtype,
+                name: DefName::Key,
+                strip_prefix: None,
+                strip_suffix: None,
+            }),
             (None, None) => None,
         };
         let scope = self.scope_effect(spec.scope.as_ref());
-        let gate = match (spec.when.as_deref(), spec.unless.as_deref()) {
-            (Some(when), _) => Some(Gate::When(self.strings.intern_folded(when))),
-            (None, Some(unless)) => Some(Gate::Unless(self.strings.intern_folded(unless))),
-            (None, None) => None,
-        };
-        let control = spec.control.as_ref().map(|control| self.control(control));
+        let control = spec
+            .control
+            .as_ref()
+            .map(|control| self.control(context, control));
         let doc = spec
             .doc
             .as_deref()
@@ -1174,7 +973,6 @@ impl<'a> Lowering<'a> {
             card: card(&spec.card),
             scope,
             def,
-            gate,
             control,
             doc,
             severity: spec.severity.unwrap_or(Severity::Error),
@@ -1187,7 +985,6 @@ impl<'a> Lowering<'a> {
             card: field.card,
             scope: field.scope.clone(),
             def: field.def.clone(),
-            gate: field.gate,
             control: field.control.clone(),
             doc: field.doc,
             severity: field.severity,
@@ -1232,7 +1029,7 @@ impl<'a> Lowering<'a> {
         })
     }
 
-    fn control(&mut self, control: &SourceControl) -> Control {
+    fn control(&mut self, context: &FieldContext<'_>, control: &SourceControl) -> Control {
         let guard = control
             .guard
             .as_deref()
@@ -1255,15 +1052,19 @@ impl<'a> Lowering<'a> {
             chain: chain.into_boxed_slice(),
             op,
             on,
+            selector_schema: control
+                .selector_schema
+                .as_deref()
+                .and_then(|name| self.ensure_body(context, name, None)),
         }
     }
 
-    /// The `def<T>` shorthand of a field, from its key or payload expression.
+    /// A key-position `def<T>` defines the enclosing instance. Scalar and
+    /// list `def<T>` matchers define their own values, not the field's key.
     fn field_shorthand(
         &mut self,
         context: &FieldContext<'_>,
         draft: &FieldDraft<'_>,
-        spec: &FieldSpec,
     ) -> Option<(TypeId, Option<Symbol>)> {
         if let DraftKey::Expression(raw) = draft.key
             && let Ok(parsed) = expr::parse(raw)
@@ -1271,25 +1072,16 @@ impl<'a> Lowering<'a> {
         {
             return Some(shorthand);
         }
-        for raw in [spec.value.as_deref(), spec.list.as_deref()] {
-            if let Some(raw) = raw
-                && let Ok(parsed) = expr::parse(raw)
-                && let Some(shorthand) = self.def_shorthand(context, &parsed)
-            {
-                return Some(shorthand);
-            }
-        }
         None
     }
 
-    fn lower_def(&mut self, source: &SourceDef, body: Option<SchemaId>) -> Option<DefSpec> {
+    fn lower_def(&mut self, source: &SourceDef) -> Option<DefSpec> {
         let Ok((type_name, subtype)) = parse_def_type(&source.type_name) else {
             return None;
         };
         let symbol = self.strings.intern_folded(&type_name);
         let type_id = self.type_ids.get(&symbol).copied()?;
         let subtype = subtype.map(|subtype| self.strings.intern_folded(&subtype));
-        self.register_gates(body, type_id);
         let name = match source.name.as_deref().map(str::trim) {
             None | Some("key") => DefName::Key,
             Some("file") => DefName::File,
@@ -1313,17 +1105,6 @@ impl<'a> Lowering<'a> {
             strip_prefix,
             strip_suffix,
         })
-    }
-
-    /// Records one predicate per declared subtype of `type_id` on the schema
-    /// used as the instance body of a `def` (§5).
-    fn register_gates(&mut self, body: Option<SchemaId>, type_id: TypeId) {
-        let Some(body) = body else {
-            return;
-        };
-        for subtype in &self.types[type_id.index()].subtypes {
-            self.pending_gates.push((body, type_id, subtype.name));
-        }
     }
 
     /// The `def<T>` shorthand of an expression, if it declares one.
@@ -1440,7 +1221,7 @@ impl<'a> Lowering<'a> {
                 let name = first_name(argument).unwrap_or_default();
                 let symbol = self.strings.intern_folded(&name);
                 match self.enum_ids.get(&symbol).copied() {
-                    Some(id) => Matcher::Enum { id, rows: None },
+                    Some(id) => Matcher::Enum { id },
                     None => Matcher::Opaque,
                 }
             }
@@ -1503,13 +1284,6 @@ impl<'a> Lowering<'a> {
 
     fn lower_ref_argument(&mut self, context: &FieldContext<'_>, argument: &Argument) -> Matcher {
         match argument {
-            Argument::Trait(name) => {
-                let symbol = self.strings.intern_folded(name);
-                match self.trait_ids.get(&symbol).copied() {
-                    Some(id) => Matcher::Ref(RefTarget::Trait(id)),
-                    None => Matcher::Opaque,
-                }
-            }
             Argument::Path(segments) => match self.lower_type_path(context, segments) {
                 Some((type_id, subtype)) => Matcher::Ref(RefTarget::Type {
                     type_id,
@@ -1552,17 +1326,8 @@ impl<'a> Lowering<'a> {
         Some((type_id, names.get(1).copied()))
     }
 
-    /// The concrete name a `$name[.column]` parameter stands for.
+    /// The concrete name a `$name` formal parameter stands for.
     fn resolve_param(&mut self, context: &FieldContext<'_>, param: &Param) -> Option<Symbol> {
-        if param.name == "key" {
-            let key = context.key?;
-            let column = self.strings.intern_folded(param.column.as_deref()?);
-            let index = key
-                .columns
-                .iter()
-                .position(|candidate| *candidate == Some(column))?;
-            return key.values.get(index).copied().flatten();
-        }
         let name = self.strings.intern_folded(&param.name);
         context
             .formals
@@ -1574,13 +1339,7 @@ impl<'a> Lowering<'a> {
     fn resolve_actual(&mut self, context: &FieldContext<'_>, actual: &Actual) -> Option<Symbol> {
         match actual {
             Actual::Name(name) => Some(self.strings.intern_folded(name)),
-            Actual::Param { name, column } => self.resolve_param(
-                context,
-                &Param {
-                    name: name.clone(),
-                    column: column.clone(),
-                },
-            ),
+            Actual::Param { name } => self.resolve_param(context, &Param { name: name.clone() }),
         }
     }
 
@@ -1599,51 +1358,6 @@ impl<'a> Lowering<'a> {
             });
         }
         lowered.into_boxed_slice()
-    }
-
-    // ---- subtypes --------------------------------------------------------
-
-    fn lower_condition(
-        &mut self,
-        context: &FieldContext<'_>,
-        condition: &SourceCond,
-    ) -> SubtypeCond {
-        let mut entries = Vec::with_capacity(condition.0.len());
-        for (field, value) in &condition.0 {
-            let field = self.strings.intern_folded(field);
-            let matcher = value
-                .as_deref()
-                .map(|raw| self.lower_expr_text(context, raw));
-            entries.push((field, matcher));
-        }
-        SubtypeCond(entries.into_boxed_slice())
-    }
-
-    /// Records the `when` predicate of one subtype on a schema used as the
-    /// instance body of that subtype's type (§5).
-    fn attach_gate(&mut self, schema: SchemaId, type_id: TypeId, subtype: Symbol) {
-        let existing = self.schemas[schema.index()]
-            .subtype_gates
-            .iter()
-            .any(|gate| gate.type_id == type_id && gate.subtype == subtype);
-        if existing {
-            return;
-        }
-        let source = self.types[type_id.index()]
-            .subtypes
-            .iter()
-            .find(|candidate| candidate.name == subtype)
-            .and_then(|candidate| candidate.when.clone());
-        let Some(when) = source else {
-            return;
-        };
-        let mut gates = self.schemas[schema.index()].subtype_gates.to_vec();
-        gates.push(SubtypeGate {
-            type_id,
-            subtype,
-            when,
-        });
-        self.schemas[schema.index()].subtype_gates = gates.into_boxed_slice();
     }
 }
 
@@ -1706,15 +1420,13 @@ fn matcher_key(matcher: &Matcher) -> MatcherKey {
                 subtype: *subtype,
                 strip_prefix: *strip_prefix,
             },
-            RefTarget::Trait(trait_id) => RefKey::Trait(trait_id.index() as u32),
         }),
         Matcher::Def { type_id, subtype } => MatcherKey::Def {
             type_id: type_id.index() as u32,
             subtype: *subtype,
         },
-        Matcher::Enum { id, rows } => MatcherKey::Enum {
+        Matcher::Enum { id } => MatcherKey::Enum {
             id: id.index() as u32,
-            rows: rows.clone(),
         },
         Matcher::Scope(scope) => MatcherKey::Scope(*scope),
         Matcher::Link => MatcherKey::Link,
@@ -1729,184 +1441,326 @@ fn matcher_key(matcher: &Matcher) -> MatcherKey {
     }
 }
 
-/// The `$key` columns a field's payload reads, in first-use order.
-fn collect_key_columns(spec: &FieldSpec) -> Vec<Option<String>> {
-    fn push(columns: &mut Vec<Option<String>>, column: Option<&str>) {
-        let column = column.map(ToOwned::to_owned);
-        if !columns.contains(&column) {
-            columns.push(column);
-        }
-    }
-
-    fn from_schema_ref(columns: &mut Vec<Option<String>>, raw: &str) {
-        let Ok(reference) = parse_schema_ref(raw) else {
-            return;
-        };
-        for argument in &reference.args {
-            if let Actual::Param { name, column } = argument
-                && name == "key"
-            {
-                push(columns, column.as_deref());
-            }
-        }
-    }
-
-    fn from_expr(columns: &mut Vec<Option<String>>, parsed: &Expr) {
-        for alternative in &parsed.alternatives {
-            match alternative {
-                Primary::Param(param) if param.name == "key" => {
-                    push(columns, param.column.as_deref());
-                }
-                Primary::Ref(argument)
-                | Primary::Def(argument)
-                | Primary::Enum(argument)
-                | Primary::Scope(argument)
-                | Primary::Quoted(argument) => {
-                    for segment in argument.segments().unwrap_or_default() {
-                        if let Segment::Param(param) = segment
-                            && param.name == "key"
-                        {
-                            push(columns, param.column.as_deref());
-                        }
-                    }
-                }
-                Primary::Literal(parts) => {
-                    for part in parts {
-                        if let LiteralPart::Hole(hole) = part {
-                            from_expr(columns, hole);
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
-    let mut columns = Vec::new();
-    if let Some(body) = spec.body.as_deref() {
-        from_schema_ref(&mut columns, body);
-    }
-    for raw in [spec.value.as_deref(), spec.list.as_deref()] {
-        if let Some(raw) = raw
-            && let Ok(parsed) = expr::parse(raw)
-        {
-            from_expr(&mut columns, &parsed);
-        }
-    }
-    if let Some(map) = spec.map.as_ref() {
-        if let Some(body) = map.body.as_deref() {
-            from_schema_ref(&mut columns, body);
-        }
-        for raw in [Some(map.key.as_str()), map.value.as_deref()] {
-            if let Some(raw) = raw
-                && let Ok(parsed) = expr::parse(raw)
-            {
-                from_expr(&mut columns, &parsed);
-            }
-        }
-    }
-    columns
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ir::{RefTarget, ScalarFields, Shape};
+    use crate::ir::{RefTarget, Shape};
     use text::LogicalPath;
 
     /// A miniature of the real `events` + `on_actions` + `decisions` sources:
     /// every construct phase 3 lowers specially appears here in the shape the
     /// migrated corpus spells it.
     const SAMPLE: &str = r#"{
-      "files": {
-        "events":     { "path": "events", "ext": "txt", "root": "event_file" },
-        "on_actions": { "path": "common/on_actions", "ext": "txt",
-                        "resolution": "replace-by-path", "root": "on_actions_file" },
-        "decisions":  { "path": "decisions", "ext": "txt", "root": "decision_file" },
-        "localisation": { "path": "localisation", "ext": "yml", "parser": "localisation" }
-      },
-      "enums": {
-        "on_actions": {
-          "columns": { "scope": "scope_type?" },
-          "rows": {
-            "on_startup": { "scope": "country" },
-            "on_province_religion_converted": { "scope": "province" },
-            "on_battle_won_unit": { "scope": "unit" }
+  "files": {
+    "events": {
+      "path": "events",
+      "ext": "txt",
+      "root": "event_file"
+    },
+    "on_actions": {
+      "path": "common/on_actions",
+      "ext": "txt",
+      "resolution": "replace-by-path",
+      "root": "on_actions_file"
+    },
+    "decisions": {
+      "path": "decisions",
+      "ext": "txt",
+      "root": "decision_file"
+    },
+    "localisation": {
+      "path": "localisation",
+      "ext": "yml",
+      "parser": "localisation"
+    }
+  },
+  "enums": {
+    "on_actions_country": [
+      "on_startup"
+    ],
+    "on_actions_province": [
+      "on_province_religion_converted"
+    ],
+    "on_actions_unit": [
+      "on_battle_won_unit"
+    ]
+  },
+  "mixins": {
+    "gated": {
+      "fields": {
+        "potential": {
+          "body": "trigger",
+          "card": "0..1"
+        }
+      }
+    }
+  },
+  "schemas": {
+    "event_file": {
+      "fields": {
+        "namespace": {
+          "value": "scalar",
+          "card": "0..1"
+        },
+        "country_event": {
+          "def": {
+            "type": "event.country",
+            "name": "field:id"
+          },
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          },
+          "body": "event_body",
+          "card": "0..*"
+        },
+        "province_event": {
+          "def": {
+            "type": "event.province",
+            "name": "field:id"
+          },
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          },
+          "body": "event_body",
+          "card": "0..*"
+        }
+      }
+    },
+    "event_body": {
+      "include": [
+        "gated"
+      ],
+      "fields": {
+        "id": {
+          "value": "scalar",
+          "card": "1"
+        },
+        "is_triggered_only": {
+          "value": "bool",
+          "card": "0..1"
+        },
+        "mean_time_to_happen": {
+          "body": "mtth",
+          "card": "0..1"
+        },
+        "option": {
+          "body": "event_option",
+          "card": "0..*"
+        },
+        "desc": [
+          {
+            "value": "loc",
+            "card": "0..*"
+          },
+          {
+            "body": "conditional_desc",
+            "card": "0..*"
+          }
+        ]
+      }
+    },
+    "event_option": {
+      "fields": {
+        "name": {
+          "value": "loc",
+          "card": "1"
+        }
+      }
+    },
+    "conditional_desc": {
+      "fields": {
+        "trigger": {
+          "body": "trigger",
+          "card": "0..1"
+        },
+        "desc": {
+          "value": "loc",
+          "card": "1"
+        }
+      }
+    },
+    "mtth": {
+      "include": [
+        "gated"
+      ],
+      "fields": {
+        "months": {
+          "value": "int[0..]",
+          "card": "0..1"
+        }
+      }
+    },
+    "trigger": {
+      "patterns": [
+        {
+          "key": "link",
+          "body": "self",
+          "card": "0..*"
+        }
+      ]
+    },
+    "effect": {
+      "patterns": [
+        {
+          "key": "link",
+          "body": "self",
+          "card": "0..*"
+        }
+      ]
+    },
+    "on_actions_file": {
+      "patterns": [
+        {
+          "key": "enum<on_actions_country>",
+          "body": "on_action_body<country>",
+          "card": "0..1"
+        },
+        {
+          "key": "enum<on_actions_province>",
+          "body": "on_action_body<province>",
+          "card": "0..1"
+        },
+        {
+          "key": "enum<on_actions_unit>",
+          "body": "on_action_body<unit>",
+          "card": "0..1"
+        },
+        {
+          "key": "'on_harmonized_{scalar}'",
+          "body": "on_action_body<country>",
+          "card": "0..1"
+        }
+      ]
+    },
+    "on_action_body<S>": {
+      "fields": {
+        "events": {
+          "list": "ref<event.$S>",
+          "card": "0..*"
+        },
+        "random_events": {
+          "map": {
+            "key": "int",
+            "value": "ref<event.$S> | '0'"
+          },
+          "card": "0..1"
+        }
+      }
+    },
+    "decision_file": {
+      "fields": {
+        "country_decisions": {
+          "map": {
+            "key": "def<decision>",
+            "body": "decision_body"
+          },
+          "card": "0..1"
+        }
+      }
+    },
+    "decision_body": {
+      "fields": {
+        "potential": {
+          "body": "trigger",
+          "card": "1"
+        },
+        "effect": {
+          "body": "effect",
+          "card": "1"
+        },
+        "major": {
+          "value": "'yes'",
+          "card": "0..1"
+        },
+        "color": {
+          "list": "int[0..]",
+          "card": "0..1"
+        }
+      }
+    }
+  },
+  "types": {
+    "event": {
+      "resolution": "replace",
+      "subtypes": {
+        "country": {},
+        "province": {},
+        "triggered": {}
+      }
+    },
+    "event_target": {
+      "open": true
+    },
+    "decision": {
+      "impl": {
+        "Localised": {
+          "name": {
+            "loc": "$_title",
+            "required": true
           }
         }
-      },
-      "mixins": {
-        "gated": { "fields": { "potential": { "body": "trigger", "card": "0..1" } } }
-      },
-      "schemas": {
-        "event_file": { "fields": {
-          "namespace":      { "value": "scalar", "card": "0..1" },
-          "country_event":  { "def": { "type": "event.country", "name": "field:id" },
-                              "scope": { "set": { "root": "country", "this": "country" } },
-                              "body": "event_body", "card": "0..*" },
-          "province_event": { "def": { "type": "event.province", "name": "field:id" },
-                              "scope": { "set": { "root": "province", "this": "province" } },
-                              "body": "event_body", "card": "0..*" }
-        }},
-        "event_body": { "include": ["gated"], "fields": {
-          "id":                  { "value": "scalar", "card": "1" },
-          "is_triggered_only":   { "value": "bool", "card": "0..1" },
-          "mean_time_to_happen": { "body": "mtth", "card": "0..1", "unless": "triggered" },
-          "option":              { "body": "event_option", "card": "0..*" },
-          "desc": [ { "value": "loc", "card": "0..*" },
-                    { "body": "conditional_desc", "card": "0..*" } ]
-        }},
-        "event_option":     { "fields": { "name": { "value": "loc", "card": "1" } } },
-        "conditional_desc": { "fields": { "trigger": { "body": "trigger", "card": "0..1" },
-                                          "desc":    { "value": "loc", "card": "1" } } },
-        "mtth": { "include": ["gated"], "fields": { "months": { "value": "int[0..]", "card": "0..1" } } },
-        "trigger": { "patterns": [ { "key": "link", "body": "self", "card": "0..*" } ] },
-        "effect":  { "patterns": [ { "key": "link", "body": "self", "card": "0..*" } ] },
-        "on_actions_file": { "patterns": [
-          { "key": "enum<on_actions>", "body": "on_action_body<$key.scope>", "card": "0..1" },
-          { "key": "'on_harmonized_{scalar}'", "body": "on_action_body<country>", "card": "0..1" }
-        ]},
-        "on_action_body<S>": { "fields": {
-          "events":        { "list": "ref<event.$S>", "card": "0..*" },
-          "random_events": { "map": { "key": "int", "value": "ref<event.$S> | '0'" }, "card": "0..1" }
-        }},
-        "decision_file": { "fields": {
-          "country_decisions": { "map": { "key": "def<decision>", "body": "decision_body" },
-                                 "card": "0..1" }
-        }},
-        "decision_body": { "fields": {
-          "potential": { "body": "trigger", "card": "1" },
-          "effect":    { "body": "effect", "card": "1" },
-          "major":     { "value": "'yes'", "card": "0..1" },
-          "color":     { "list": "int[0..]", "card": "0..1" }
-        }}
-      },
-      "types": {
-        "event": { "resolution": "replace", "subtypes": {
-          "country": {},
-          "province": {},
-          "triggered": { "when": { "is_triggered_only": "'yes'" } }
-        }},
-        "event_target": { "open": true },
-        "decision": { "impl": { "Localised": {
-          "name": { "loc": "$_title", "required": true } } } },
-        "scripted_effect": { "impl": { "Callable": { "body": "effect" } } }
-      },
-      "traits": {
-        "Localised": {},
-        "Callable": { "params": { "body": "schema" },
-                      "capabilities": ["replacement", "condition"] }
-      },
-      "scopes": {
-        "types": ["country", "province", "unit", "trade_node"],
-        "registers": { "root": {}, "this": {}, "prev": { "chain": true } },
-        "links": {
-          "owner": { "from": ["province", "unit"], "to": "country" },
-          "event_target:{ref<event_target>}": { "from": ["any"], "to": "any" }
-        },
-        "compat": [{ "actual": "trade_node", "expected": "province" }]
       }
-    }"#;
+    },
+    "scripted_effect": {
+      "impl": {
+        "Callable": {
+          "body": "effect"
+        }
+      }
+    }
+  },
+  "traits": {
+    "Localised": {},
+    "Callable": {}
+  },
+  "scopes": {
+    "types": [
+      "country",
+      "province",
+      "unit",
+      "district"
+    ],
+    "registers": {
+      "root": {
+        "role": "root"
+      },
+      "this": {
+        "role": "current"
+      },
+      "prev": {
+        "role": "previous",
+        "chain": true
+      }
+    },
+    "links": {
+      "owner": {
+        "from": [
+          "province",
+          "unit"
+        ],
+        "to": "country"
+      },
+      "event_target:{ref<event_target>}": {
+        "from": [
+          "any"
+        ],
+        "to": "any"
+      }
+    },
+    "compat": [
+      {
+        "actual": "district",
+        "expected": "province"
+      }
+    ]
+  }
+}"#;
 
     fn sample() -> Vec<(String, RuleFile)> {
         vec![(
@@ -1925,18 +1779,71 @@ mod tests {
         ir.strings().lookup_folded(text).expect("interned")
     }
 
-    /// The `event_body` schema's subtype predicates decide the subtype set from
-    /// the instance body's direct scalar fields (§5).
-    struct Body(Option<&'static str>);
-
-    impl ScalarFields for Body {
-        fn scalar(&self, key: &str) -> Option<&str> {
-            if key == "is_triggered_only" {
-                self.0
-            } else {
-                None
-            }
+    #[test]
+    fn file_instance_preserves_open_body_and_declared_entry_scope() {
+        let source = serde_json::from_str::<RuleFile>(
+            r#"{
+  "scopes": {
+    "types": [
+      "country"
+    ],
+    "registers": {
+      "root": {
+        "role": "root"
+      },
+      "this": {
+        "role": "current"
+      }
+    }
+  },
+  "files": {
+    "history": {
+      "path": "history/countries",
+      "ext": "txt",
+      "root": {
+        "body": "history_body",
+        "card": "1",
+        "scope": {
+          "set": {
+            "root": "country",
+            "this": "country"
+          }
         }
+      }
+    }
+  },
+  "schemas": {
+    "history_body": {
+      "open": true
+    }
+  }
+}"#,
+        )
+        .expect("source");
+        let ir = lower(&[("history.json".into(), source)], GameConfig::default())
+            .expect("checked lowering");
+        let path = text::LogicalPath::parse("history/countries/Test.txt").unwrap();
+        let (_, file) = ir.file_rule(&path).expect("file");
+        let RootRule::Instance {
+            body: Some(body),
+            scope: Some(scope),
+            ..
+        } = &file.root
+        else {
+            panic!("file instance must preserve its scope and body");
+        };
+        assert!(ir.schema(*body).open);
+        assert_eq!(scope.set.len(), 2);
+        assert!(
+            scope
+                .set
+                .iter()
+                .all(|(_, value)| ir.strings().resolve(*value) == "country")
+        );
+        let bytes = serde_json::to_vec(&ir).expect("baked payload");
+        let decoded = RulesIr::from_baked(&bytes).expect("decode");
+        assert_eq!(decoded.file_rule(&path).unwrap().1.root, file.root);
+        assert!(decoded.schema(*body).open);
     }
 
     #[test]
@@ -2003,114 +1910,14 @@ mod tests {
     }
 
     #[test]
-    fn subtype_predicates_decide_the_subtype_set() {
-        let ir = lower_sample();
-        let event = ir.type_by_name("event").expect("the event type");
-        let event_body = ir.schema_by_name("event_body").expect("event_body");
-        let triggered = symbol(&ir, "triggered");
-
-        let gates = ir.schema(event_body).subtype_gates.clone();
-        assert_eq!(gates.len(), 1, "only `triggered` has a `when`");
-        assert_eq!(gates[0].type_id, event);
-        assert_eq!(gates[0].subtype, triggered);
-
-        let holds = ir.subtypes_of(event_body, &Body(Some("yes")));
-        assert!(holds.contains(event, triggered));
-        assert_eq!(holds.len(), 1);
-        assert!(ir.subtypes_of(event_body, &Body(Some("no"))).is_empty());
-        assert!(ir.subtypes_of(event_body, &Body(None)).is_empty());
-
-        // The `unless: triggered` gate excludes the field exactly when the
-        // subtype holds.
-        let field = ir
-            .lookup(event_body, "mean_time_to_happen", Shape::Block)
-            .next()
-            .expect("the gated field");
-        assert_eq!(ir.field(field).gate, Some(Gate::Unless(triggered)));
-        assert!(!ir.fields(event_body, &holds).contains(&field));
-        assert!(
-            ir.fields(event_body, &ir.subtypes_of(event_body, &Body(None)))
-                .contains(&field)
-        );
-    }
-
-    #[test]
-    fn enum_column_groups_monomorphise_the_body() {
-        let ir = lower_sample();
-        let on_actions = ir.enum_by_name("on_actions").expect("the on_actions enum");
-        let file = ir
-            .schema_by_name("on_actions_file")
-            .expect("on_actions_file");
-
-        let patterns = ir.schema(file).patterns.clone();
-        assert_eq!(patterns.len(), 4, "three scope groups plus one template");
-        let mut scopes = Vec::new();
-        for id in patterns {
-            let field = ir.field(id);
-            let Matcher::Enum {
-                id: enum_id,
-                rows: Some(rows),
-            } = ir.matcher(field.key)
-            else {
-                continue;
-            };
-            assert_eq!(*enum_id, on_actions);
-            assert_eq!(rows.len(), 1, "one group per distinct scope value");
-            let FieldValue::Block(body) = field.value else {
-                panic!("a grouped pattern has a block body");
-            };
-            let schema = ir.schema(body);
-            assert_eq!(ir.strings().resolve(schema.name), "on_action_body");
-            assert_eq!(schema.arguments.len(), 1);
-            scopes.push(ir.strings().resolve(schema.arguments[0]).to_owned());
-        }
-        // Groups follow the first row carrying each tuple; rows sort by name.
-        scopes.sort();
-        assert_eq!(scopes, vec!["country", "province", "unit"]);
-
-        // `$S` was substituted in the monomorphised body.
-        let event = ir.type_by_name("event").expect("the event type");
-        let country = symbol(&ir, "country");
-        let body = ir
-            .schema_instances("on_action_body")
-            .find(|id| ir.schema(*id).arguments.as_ref() == [country])
-            .expect("the country instance");
-        let events = ir
-            .lookup(body, "events", Shape::Block)
-            .next()
-            .expect("the events field");
-        let list = ir.child(events, body).expect("the list schema");
-        let items = ir.schema(list).items.expect("the element matcher");
-        assert!(matches!(
-            ir.matcher(items),
-            Matcher::Ref(RefTarget::Type { type_id, subtype, .. })
-                if *type_id == event && *subtype == Some(country)
-        ));
-        let random = ir
-            .lookup(body, "random_events", Shape::Block)
-            .next()
-            .expect("the random_events field");
-        let map = ir.child(random, body).expect("the map schema");
-        let entry = ir.schema(map).patterns[0];
-        let FieldValue::Scalar(value) = ir.field(entry).value else {
-            panic!("a map value is scalar");
-        };
-        let Matcher::Union(alternatives) = ir.matcher(value) else {
-            panic!("`ref<event.$S> | '0'` stays a union");
-        };
-        assert_eq!(alternatives.len(), 2);
-        assert!(matches!(
-            ir.matcher(alternatives[1]),
-            Matcher::Literal(text) if ir.strings().resolve(*text) == "0"
-        ));
-    }
-
-    #[test]
     fn link_patterns_stay_self_blocks_and_resolve_scopes() {
         let ir = lower_sample();
         let province = symbol(&ir, "province");
         let unit = symbol(&ir, "unit");
         let country = symbol(&ir, "country");
+        let district = symbol(&ir, "district");
+        assert!(ir.scopes_compatible(district, province));
+        assert!(!ir.scopes_compatible(province, district));
 
         let trigger = ir.schema_by_name("trigger").expect("trigger");
         let pattern = ir.schema(trigger).patterns[0];
@@ -2227,30 +2034,13 @@ mod tests {
         }));
     }
 
-    /// The real first-party corpus lowers, and its key constructs survive. The
-    /// test is skipped when the sources are not checked out beside the crate.
+    /// The real first-party corpus lowers, and its key constructs survive.
     #[test]
     fn the_first_party_corpus_lowers() {
         let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4-v2");
-        let Ok(manifest) = std::fs::read_to_string(directory.join("manifest.json")) else {
-            eprintln!("rules/eu4-v2 is not checked out; skipping");
-            return;
-        };
-        let manifest: serde_json::Value = serde_json::from_str(&manifest).expect("manifest parses");
-        let mut sources = Vec::new();
-        for name in manifest["files"].as_array().expect("a file list") {
-            let name = name.as_str().expect("a file name");
-            let text = std::fs::read_to_string(directory.join(name)).expect("a listed file");
-            sources.push((
-                name.to_owned(),
-                serde_json::from_str(&text).unwrap_or_else(|error| panic!("{name}: {error}")),
-            ));
-        }
-        let profile: crate::profile::GameProfile = serde_json::from_str(
-            &std::fs::read_to_string(directory.join("game.json")).expect("game.json"),
-        )
-        .expect("game.json parses");
-        let ir = lower(&sources, GameConfig { profile }).expect("rules/eu4-v2 lowers");
+        let sources =
+            crate::bundle::load_directory(&directory).expect("first-party source directory");
+        let ir = lower(&sources.files, sources.game).expect("rules/eu4-v2 lowers");
 
         assert_eq!(
             ir.files.len(),
@@ -2264,9 +2054,12 @@ mod tests {
             matches!(gfx.root, RootRule::Schema(schema) if ir.strings().resolve(ir.schema(schema).name) == "sprite_file")
         );
         assert!(ir.schemas.len() > 1_000, "{} schemas", ir.schemas.len());
+        // Restored inherited patterns and explicit rebasing of wrapper `self`
+        // bodies add authored positions beyond the initial conversion. Keep
+        // a bounded arena budget so accidental flattening still fails loudly.
         assert!(
-            (5_000..12_000).contains(&ir.fields.len()),
-            "{} fields, near the source's own 6,080 + shared mixin fields",
+            (5_000..16_000).contains(&ir.fields.len()),
+            "{} fields, including restored patterns and wrapper overrides",
             ir.fields.len()
         );
         assert!(
@@ -2291,39 +2084,59 @@ mod tests {
         );
         assert_eq!(
             ir.scopes.links.len(),
-            100,
-            "every declared scope link survives"
+            26,
+            "global scope links survive; context-specific iterators remain fields"
         );
 
-        // `on_actions` monomorphises into one body per distinct `scope` column
-        // value, each pattern carrying only its group's rows (§6).
-        let on_actions = ir.enum_by_name("on_actions").expect("the on_actions enum");
+        // Authored scope groups instantiate the same parameterised body. Every
+        // row stays covered exactly once, with its entry scope preserved.
+        assert!(
+            ir.enum_by_name("on_actions").is_none(),
+            "unused column table is removed"
+        );
         let file = ir
             .schema_by_name("on_actions_file")
             .expect("on_actions_file");
         let mut group_rows = std::collections::BTreeMap::new();
+        let mut all_rows = std::collections::BTreeSet::new();
         let mut template_patterns = 0;
         for id in ir.schema(file).patterns.iter() {
             let field = ir.field(*id);
-            let Matcher::Enum {
-                id,
-                rows: Some(rows),
-            } = ir.matcher(field.key)
-            else {
+            let Matcher::Enum { id } = ir.matcher(field.key) else {
+                assert!(matches!(ir.matcher(field.key), Matcher::Template(_)));
                 template_patterns += 1;
                 continue;
             };
-            assert_eq!(*id, on_actions, "the group key stays the on_actions enum");
+            let members = ir
+                .enum_info(*id)
+                .rows
+                .iter()
+                .map(|row| row.name)
+                .collect::<Vec<_>>();
+            for member in &members {
+                assert!(
+                    all_rows.insert(*member),
+                    "on-action groups must be disjoint"
+                );
+            }
             let FieldValue::Block(body) = field.value else {
                 panic!("a grouped pattern has a block body");
             };
             let schema = ir.schema(body);
             assert_eq!(ir.strings().resolve(schema.name), "on_action_body");
+            let scope = field.scope.as_ref().expect("on-action entry scope");
+            for register in ["root", "this"] {
+                assert!(scope.set.iter().any(|(name, value)| {
+                    ir.strings().resolve(*name) == register && *value == schema.arguments[0]
+                }));
+            }
+            assert!(field.def.is_some(), "on-actions are indexed definitions");
             group_rows.insert(
                 ir.strings().resolve(schema.arguments[0]).to_owned(),
-                rows.len(),
+                members.len(),
             );
         }
+        assert_eq!(all_rows.len(), 258, "all grouped on-action members survive");
         assert_eq!(
             template_patterns, 1,
             "the on_harmonized template stays one pattern"

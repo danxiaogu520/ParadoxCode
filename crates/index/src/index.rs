@@ -663,6 +663,16 @@ pub struct FileIndexShard {
 }
 
 impl FileIndexShard {
+    /// Compares the exact facts that can affect another file's schema walk.
+    /// References do not participate: they consume these facts.
+    #[must_use]
+    pub fn same_symbol_facts(&self, other: &Self) -> bool {
+        self.definitions == other.definitions
+            && self.dynamic_definitions == other.dynamic_definitions
+            && self.definition_attributes == other.definition_attributes
+            && self.flag_writes == other.flag_writes
+    }
+
     /// Hash of everything this file contributes to *other* files' diagnostics:
     /// definition identities (kind, name, active), dynamic-definition
     /// signatures and templates, retained attribute summaries, and flag
@@ -968,7 +978,26 @@ impl WorkspaceIndex {
     /// Returns a cached editor position for one indexed byte range, if available.
     #[must_use]
     pub fn position_for(&self, file_id: SourceFileId, range: TextRange) -> Option<PositionRange> {
-        self.position_ranges.get((file_id, range)).copied()
+        self.position_ranges
+            .get((file_id, range))
+            .copied()
+            .or_else(|| {
+                // Definition positions are persisted under the full declaration range,
+                // while navigation targets its name. Reuse that position without
+                // retaining a second entry for every definition in large caches.
+                self.shard(file_id)?
+                    .definitions
+                    .iter()
+                    .find_map(|definition| {
+                        (definition.selection_range == range)
+                            .then(|| {
+                                self.position_ranges
+                                    .get((file_id, definition.range))
+                                    .copied()
+                            })
+                            .flatten()
+                    })
+            })
     }
 
     /// Returns all cached editor positions retained by this index.
@@ -1059,6 +1088,47 @@ impl WorkspaceIndex {
     ) {
         let affected = self.replace_shard_entries(shard);
         self.resolve_definition_buckets(&affected, priorities);
+    }
+
+    /// Applies a symbol-fact replay with unchanged file priorities.
+    /// Reference-only changes preserve resolved definition buckets; changed
+    /// symbol facts update only their buckets and rebuild the flag-write view.
+    pub fn replace_replayed_shards_cancellable(
+        &mut self,
+        shards: impl IntoIterator<Item = Arc<FileIndexShard>>,
+        priorities: &BTreeMap<SourceFileId, u64>,
+        cancellation: &WorkspaceScanToken,
+    ) -> Result<(), WorkspaceError> {
+        let mut flags_changed = false;
+        for shard in shards {
+            cancellation.checkpoint()?;
+            let previous = self.shards.get(&shard.file_id);
+            if previous.is_some_and(|previous| Arc::ptr_eq(previous, &shard)) {
+                continue;
+            }
+            flags_changed |=
+                previous.is_none_or(|previous| previous.flag_writes != shard.flag_writes);
+            if previous.is_some_and(|previous| previous.same_symbol_facts(&shard)) {
+                // Definition ordinals and resolved activity remain valid.
+                self.remove_position_ranges(shard.file_id);
+                self.shards.insert(shard.file_id, shard);
+            } else {
+                self.replace_shard_resolved(shard, priorities);
+            }
+        }
+        if flags_changed {
+            self.flag_writes.clear();
+            for shard in self.shards.values() {
+                cancellation.checkpoint()?;
+                for write in &shard.flag_writes {
+                    self.flag_writes
+                        .entry(Box::from(write.kind.to_ascii_lowercase()))
+                        .or_default()
+                        .record(&write.name);
+                }
+            }
+        }
+        Ok(())
     }
 
     fn replace_shard_entries(&mut self, shard: Arc<FileIndexShard>) -> Vec<(Box<str>, Box<str>)> {

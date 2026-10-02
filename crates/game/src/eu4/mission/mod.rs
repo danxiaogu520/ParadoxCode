@@ -41,3 +41,17 @@ pub use write::{
     BlockSpacing, Indent, WriteStyle, apply_tree_edit, detect_style, render_mission_block,
     render_tree,
 };
+
+/// First-party facts used by compatibility entry points and editing surfaces.
+fn view_spec() -> &'static rules::ProfileMissionViewSpec {
+    static SPEC: std::sync::OnceLock<rules::ProfileMissionViewSpec> = std::sync::OnceLock::new();
+    SPEC.get_or_init(|| {
+        super::first_party_ir()
+            .expect("embedded game IR")
+            .game
+            .profile
+            .mission_view
+            .clone()
+            .expect("mission view facts")
+    })
+}

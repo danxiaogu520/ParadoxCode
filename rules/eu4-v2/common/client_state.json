@@ -4,13 +4,11 @@
       "fields": {
         "name": {
           "body": "client_state_body__name",
-          "card": "1..*",
-          "when": null
+          "card": "1..*"
         },
         "region": {
           "card": "1",
-          "value": "ref<region>",
-          "when": null
+          "value": "ref<region>"
         }
       }
     },
@@ -18,8 +16,7 @@
       "fields": {
         "name": {
           "card": "1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "trigger": {
           "body": "trigger",
@@ -31,8 +28,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         }
       }
     }

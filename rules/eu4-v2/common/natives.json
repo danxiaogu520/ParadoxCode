@@ -4,28 +4,23 @@
       "fields": {
         "color": {
           "card": "1",
-          "list": "int[0..255]",
-          "when": null
+          "list": "int[0..255]"
         },
         "graphical_culture": {
           "card": "1",
-          "value": "enum<graphical_cultures>",
-          "when": null
+          "value": "enum<graphical_cultures>"
         },
         "icon": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "provinces": {
           "card": "1",
-          "list": "ref<province_id>",
-          "when": null
+          "list": "ref<province_id>"
         },
         "unit": {
           "card": "1",
-          "value": "ref<unit_type>",
-          "when": null
+          "value": "ref<unit_type>"
         }
       }
     },

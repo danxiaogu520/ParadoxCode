@@ -168,6 +168,76 @@ samply 优先（`cargo install samply`，产物可拖 Firefox Profiler），否�
 
 ## 已知限制
 
+Vanilla 的逐条 error 审查使用 `audit-errors.py`，不要求与旧版错误数量对齐。
+它检查完整报告和冻结 manifest，保存每条诊断的稳定身份、上下文、原安装及 DLC
+资源证据和待确认状态；支持与实际资源解析器一致的 `.tga`/`.dds` 回退。
+人工决定必须按诊断身份提供解释与证据；过期决定、报告不完整及错误总数不匹配均拒绝导出。
+输出只允许放在忽略的 `performance-results/` 中。
+
+```sh
+python3 lab/perf/audit-errors.py \
+  --report performance-results/phase5/selected-run/project-TIMESTAMP.json \
+  --manifest performance-results/phase5/binaries/selected-manifest.json \
+  --installation /path/to/installed/game \
+  --output performance-results/phase5/semantic-review
+```
+
+阶段五规则切换的语义对照使用 `compare-rules.py`，详见
+[本地验收记录](../../docs/phase5-validation.md)。这是跨平台的只读报告比较工具；
+definition/reference 计数来自完整 SQLite 缓存，包含延迟加载的引用。
+它校验语料和规则身份，标记截断的补全探针，不会自动批准语义差异。
+输出强制位于忽略的 `performance-results/` 中。
+
+每个固定补全探针还使用相同的 17 个确定性前缀采样。脚本按 LSP 的 UTF-16 位置
+替换完整单词，采样后恢复原文；比较报告分别列出每个前缀的增加、移除和截断情况。
+这些是代表性样本，不能证明枚举了整个候选域。基础探针或采样仍被 512 上限截断时，
+即使两边数量相同，也仍标记为未验收。
+
+`completion-inventory.py` 可以在指定源码快照上构建临时 harness，直接调用实际 IDE
+补全入口，导出固定探针在 LSP 的 512 上限之前的全部候选标签及插入文本、替换范围、kind/detail。
+独立 harness 的构建戳不同时，按缓存记录的源目录重新索引，不绕过生产缓存门禁。
+它校验规则指纹、新版基线的 golden 输入 SHA-256、输出项数和连续序号，
+并要求前 512 项的标签集合与冻结的 LSP 结果一致。
+这完整覆盖这些固定位置的 IDE 输出；集合差异仍需审查，也不代表覆盖所有脚本位置。
+
+只验收补全时，可在 `baseline.mjs` 上使用 `--completions-only`。
+该模式加载指定 Vanilla 缓存并获取符号上下文和探针，不执行全量文本诊断；
+输出使用 `paradoxcode-completion-baseline` kind 和显式 coverage，不生成 full diagnostic report。
+
+```sh
+python3 lab/perf/completion-inventory.py \
+  --repo /path/to/selected/source --mode ir \
+  --cache performance-results/phase5/ir-subtypes-acceptance.pdcindex \
+  --baseline performance-results/phase5/ir-subtypes-acceptance/baseline-latest.json \
+  --output performance-results/phase5/completion-inventory-ir-latest
+```
+
+`memory-pairs.py` 顺序运行三组独立 `mem_probe` 配对。每组使用 `wait4` 读取被测
+子进程自身的 OS 峰值；遇到探针的 `PHASE` 标记时，只查询该子进程 PID 的 RSS，
+包含缓存清除和宿主释放后的阶段。若系统不允许读取 RSS，报告记录采样失败，不能
+把缺失值当作零。该脚本需要支持 `wait4` 和 `ps` 的 Unix 环境，OS 压缩与分配器
+保留仍会影响 RSS；诊断工作量不同的计时不能直接当作性能结论。
+报告同时保留完整诊断阶段的耗时、文件数、诊断数与 digest。优化同一版本的规则时，
+使用 `--require-identical-diagnostics` 要求所有运行的文件数、诊断数、digest 一致；
+缺少摘要或发生漂移会非零退出。旧规则与新规则的比较允许语义差异，需另外解释。
+
+```sh
+python3 lab/perf/memory-pairs.py \
+  --before /path/to/frozen/legacy/mem_probe \
+  --after performance-results/phase5/binaries/ir-mem-subtypes-acceptance \
+  --output performance-results/phase5/memory-subtypes-pairs --repeat 3
+```
+
+同规则的性能优化对照：
+
+```sh
+python3 lab/perf/memory-pairs.py \
+  --before /path/to/frozen/ir-before/mem_probe \
+  --after /path/to/frozen/ir-after/mem_probe \
+  --output performance-results/phase5/performance-same-rules-pairs \
+  --repeat 3 --require-identical-diagnostics
+```
+
 - 基线二进制副本在规则哈希演进出 checkout 后无法再被 sweep 接受（sweep 的防呆设计）；
   其历史使命由当时记录的 `sweep-summary.json` 承担。
 - cwtools 的 EU4 `.cwt` 配置自身带少量规则告警，且两工具诊断语义不同——对照只看吞吐量级。

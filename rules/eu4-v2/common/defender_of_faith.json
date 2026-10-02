@@ -5,34 +5,28 @@
         "ai_will_do": {
           "body": "defender_faith_body__ai_will_do",
           "card": "1",
-          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
-          "when": null
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it."
         },
         "level": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "modifier": {
           "body": "modifier",
           "card": "0..1",
-          "doc": "Block of modifiers applied while the containing entry is active.",
-          "when": null
+          "doc": "Block of modifiers applied while the containing entry is active."
         },
         "range_from": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "range_to": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "same_faith_modifier": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         }
       }
     },
@@ -42,8 +36,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [

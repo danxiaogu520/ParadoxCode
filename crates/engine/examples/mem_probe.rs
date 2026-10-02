@@ -5,7 +5,7 @@
 //! tokens, HIR collections, index shards, cached positions and previews) so
 //! memory work targets the real hot spot. Not part of any test gate.
 //!
-//! Usage: `cargo run --release -p engine --example mem_probe -- <mod root>`
+//! Usage: `cargo run --release -p engine --example mem_probe -- <mod root> [--rules-only]`
 
 use std::mem::size_of;
 use std::path::Path;
@@ -54,6 +54,10 @@ fn main() {
         ir.fields.len(),
         ir.matchers.len()
     );
+    // Rules-only mode isolates cold IR load time and retained arena memory.
+    if std::env::args().any(|argument| argument == "--rules-only") {
+        return;
+    }
     let rules = rules::RuleSet::from_ir_catalog(&ir);
     let profile = ir.game.profile.clone();
     let mut host = AnalysisHost::with_ir(rules, profile, Arc::clone(&ir));
@@ -81,6 +85,7 @@ fn main() {
     host.refresh_source_roots().expect("scan");
     let scan_seconds = started.elapsed().as_secs_f64();
     println!("vanilla cache installed: {vanilla_installed}");
+    phase_rss("index-retained");
 
     let snapshot = host.snapshot();
     let mut source_bytes = 0usize;
@@ -356,6 +361,7 @@ fn main() {
     println!("read:  {:.1}s", read_ns as f64 / 1e9);
     println!("parse: {:.1}s", parse_ns as f64 / 1e9);
     println!("lower: {:.1}s", lower_ns as f64 / 1e9);
+    phase_rss("lower-retained");
 
     // Diagnostics pass timing (single thread) for optimization feedback. The
     // digest hashes every diagnostic (code, range, severity, certainty,
@@ -444,8 +450,9 @@ fn main() {
     phase_rss("evicted");
 
     // Ablation: drop the entire host (index, shards, positions, sources,
-    // rules). Anything the working set keeps afterwards is allocator
-    // retention from the scan's transient frontends, not live data.
+    // rules). Remaining RSS may include allocator-retained pages, separately
+    // shared handles or thread-local query views; RSS alone does not prove
+    // that all of it is allocator fragmentation.
     drop(host);
     phase_rss("dropped");
     phase_rss("end");

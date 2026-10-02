@@ -14,11 +14,12 @@ use rules::RuleSet;
 use text::{LogicalPath, Position, PositionRange, TextRange};
 
 fn eu4_host() -> AnalysisHost {
-    AnalysisHost::with_profile(game::eu4::bootstrap_rules(), game::eu4::profile())
+    eu4_host_with(game::eu4::runtime_rules().unwrap())
 }
 
-fn eu4_host_with(rules: RuleSet) -> AnalysisHost {
-    AnalysisHost::with_profile(rules, game::eu4::profile())
+fn eu4_host_with(catalog: RuleSet) -> AnalysisHost {
+    let ir = game::eu4::first_party_ir().expect("embedded IR");
+    AnalysisHost::with_ir(catalog, ir.game.profile.clone(), ir)
 }
 
 /// Creates an isolated fixture root under the system temp directory. Cleanup

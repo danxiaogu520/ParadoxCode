@@ -4,8 +4,7 @@
       "fields": {
         "name": {
           "card": "1",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "random": {
           "card": "0..1",
@@ -13,13 +12,11 @@
             "kind": "chance"
           },
           "doc": "Appears to default to yes.",
-          "value": "'no'",
-          "when": null
+          "value": "'no'"
         },
         "text": {
           "body": "defined_text_body__text",
-          "card": "1..*",
-          "when": null
+          "card": "1..*"
         }
       }
     },
@@ -27,14 +24,12 @@
       "fields": {
         "localisation_key": {
           "card": "1",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "trigger": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
-          "when": null
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply."
         }
       }
     }

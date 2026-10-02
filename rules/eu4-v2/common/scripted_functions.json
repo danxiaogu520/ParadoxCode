@@ -5,14 +5,12 @@
         "condition": {
           "body": "scripted_function_body__condition",
           "card": "0..*",
-          "doc": "Block containing a tooltip, potential, and an allow section.",
-          "when": null
+          "doc": "Block containing a tooltip, potential, and an allow section."
         },
         "effect": {
           "body": "effect",
           "card": "0..1",
-          "doc": "Block of effects executed by the containing entry.",
-          "when": null
+          "doc": "Block of effects executed by the containing entry."
         }
       }
     },
@@ -21,22 +19,19 @@
         "allow": {
           "body": "trigger",
           "card": "1",
-          "doc": "If triggered then action can be performed, even if potential is triggered.",
-          "when": null
+          "doc": "If triggered then action can be performed, even if potential is triggered."
         },
         "potential": {
           "body": "trigger",
           "card": "1",
-          "doc": "If triggered it will prevent the action from being performed.",
-          "when": null
+          "doc": "If triggered it will prevent the action from being performed."
         },
         "tooltip": {
           "card": "0..1",
           "control": {
             "kind": "display_only"
           },
-          "value": "loc",
-          "when": null
+          "value": "loc"
         }
       }
     }

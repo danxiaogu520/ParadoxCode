@@ -8,36 +8,31 @@
           "doc": "Trigger conditions checked when using the entry.",
           "scope": {
             "push": "country"
-          },
-          "when": null
+          }
         },
         "base": {
           "body": "modifier",
           "card": "1",
           "scope": {
             "push": "country"
-          },
-          "when": null
+          }
         },
         "effect": {
           "body": "effect",
           "card": "0..1",
-          "doc": "When Hegemony is proclaimed",
-          "when": null
+          "doc": "When Hegemony is proclaimed"
         },
         "max": {
           "body": "modifier",
           "card": "1",
           "scope": {
             "push": "country"
-          },
-          "when": null
+          }
         },
         "removed_effect": {
           "body": "effect",
           "card": "0..1",
-          "doc": "When Hegemony is lost",
-          "when": null
+          "doc": "When Hegemony is lost"
         },
         "scale": {
           "body": "modifier",
@@ -45,8 +40,7 @@
           "doc": "At max 100% tickup.",
           "scope": {
             "push": "country"
-          },
-          "when": null
+          }
         }
       }
     }

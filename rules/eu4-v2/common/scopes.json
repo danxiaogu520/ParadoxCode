@@ -4,73 +4,59 @@
       "fields": {
         "Advisor": {
           "body": "scopes_body__advisor",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "Consort": {
           "body": "scopes_body__consort",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "Country": {
           "body": "scopes_body__country",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "Culture": {
           "body": "scopes_body__culture",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "Heir": {
           "body": "scopes_body__heir",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "Leader": {
           "body": "scopes_body__leader",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "Mercenary Company": {
           "body": "scopes_body__mercenary_company",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "Monarch": {
           "body": "scopes_body__monarch",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "Province": {
           "body": "scopes_body__province",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "Rebel Faction": {
           "body": "scopes_body__rebel_faction",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "Religion": {
           "body": "scopes_body__religion",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "Trade Company": {
           "body": "scopes_body__trade_company",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "Trade Node": {
           "body": "scopes_body__trade_node",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "Unit": {
           "body": "scopes_body__unit",
-          "card": "1",
-          "when": null
+          "card": "1"
         }
       }
     },
@@ -78,8 +64,7 @@
       "fields": {
         "aliases": {
           "card": "1",
-          "list": "'advisor'",
-          "when": null
+          "list": "'advisor'"
         }
       }
     },
@@ -90,8 +75,7 @@
       "fields": {
         "aliases": {
           "card": "1",
-          "list": "'consort'",
-          "when": null
+          "list": "'consort'"
         }
       }
     },
@@ -102,8 +86,7 @@
       "fields": {
         "aliases": {
           "card": "1",
-          "list": "'country'",
-          "when": null
+          "list": "'country'"
         }
       }
     },
@@ -114,8 +97,7 @@
       "fields": {
         "aliases": {
           "card": "1",
-          "list": "'culture'",
-          "when": null
+          "list": "'culture'"
         }
       }
     },
@@ -126,8 +108,7 @@
       "fields": {
         "aliases": {
           "card": "1",
-          "list": "'heir'",
-          "when": null
+          "list": "'heir'"
         }
       }
     },
@@ -138,8 +119,7 @@
       "fields": {
         "aliases": {
           "card": "1",
-          "list": "'leader'",
-          "when": null
+          "list": "'leader'"
         }
       }
     },
@@ -150,8 +130,7 @@
       "fields": {
         "aliases": {
           "card": "1",
-          "list": "'mercenary_company'",
-          "when": null
+          "list": "'mercenary_company'"
         }
       }
     },
@@ -162,8 +141,7 @@
       "fields": {
         "aliases": {
           "card": "1",
-          "list": "'monarch'",
-          "when": null
+          "list": "'monarch'"
         }
       }
     },
@@ -174,8 +152,7 @@
       "fields": {
         "aliases": {
           "card": "1",
-          "list": "'province'",
-          "when": null
+          "list": "'province'"
         }
       }
     },
@@ -186,8 +163,7 @@
       "fields": {
         "aliases": {
           "body": "scopes_body__rebel_faction__aliases",
-          "card": "1",
-          "when": null
+          "card": "1"
         }
       }
     },
@@ -195,8 +171,7 @@
       "fields": {
         "rebel_faction": {
           "card": "1",
-          "value": "'rebelfaction'",
-          "when": null
+          "value": "'rebelfaction'"
         }
       }
     },
@@ -204,8 +179,7 @@
       "fields": {
         "aliases": {
           "card": "1",
-          "list": "'religion'",
-          "when": null
+          "list": "'religion'"
         }
       }
     },
@@ -216,8 +190,7 @@
       "fields": {
         "aliases": {
           "card": "1",
-          "list": "'trade_company'",
-          "when": null
+          "list": "'trade_company'"
         }
       }
     },
@@ -228,13 +201,11 @@
       "fields": {
         "aliases": {
           "body": "scopes_body__trade_node__aliases",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "is_subscope_of": {
           "card": "1",
-          "list": "'province'",
-          "when": null
+          "list": "'province'"
         }
       }
     },
@@ -242,8 +213,7 @@
       "fields": {
         "trade_node": {
           "card": "1",
-          "value": "'tradenode'",
-          "when": null
+          "value": "'tradenode'"
         }
       }
     },
@@ -254,8 +224,7 @@
       "fields": {
         "aliases": {
           "card": "1",
-          "list": "'unit'",
-          "when": null
+          "list": "'unit'"
         }
       }
     },

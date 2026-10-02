@@ -1,8 +1,5 @@
 //! Symbol hovers: definition resolution, shadowing, and localisation previews.
 
-use std::collections::BTreeSet;
-use std::sync::Arc;
-
 use super::dynamic::dynamic_signature_hover;
 use super::render::{HoverModel, code_span};
 use crate::localisation::{
@@ -195,10 +192,4 @@ pub(crate) fn symbol_source_root(snapshot: &AnalysisSnapshot, location: &Locatio
         None if location.document.is_some() => "Open overlay".to_owned(),
         None => "Unknown source root".to_owned(),
     }
-}
-
-/// Script keys the rules and profile know about, shared with semantic-token classification so
-/// hover and coloring agree on what counts as a known key.
-pub(crate) fn known_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<String>> {
-    crate::semantic_tokens::static_semantic_keys(snapshot)
 }

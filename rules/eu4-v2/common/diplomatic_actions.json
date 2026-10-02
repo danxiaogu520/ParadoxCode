@@ -5,8 +5,7 @@
         "condition": {
           "body": "diplomatic_action_body__condition",
           "card": "0..*",
-          "doc": "A diplomatic action can have any number of condition blocks, each with its own tooltip, potential and allow section.",
-          "when": null
+          "doc": "A diplomatic action can have any number of condition blocks, each with its own tooltip, potential and allow section."
         },
         "effect": {
           "body": "effect",
@@ -18,8 +17,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "pre_effect": {
           "body": "effect",
@@ -31,8 +29,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -48,8 +45,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "potential": {
           "body": "trigger",
@@ -61,16 +57,14 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "tooltip": {
           "card": "0..1",
           "control": {
             "kind": "display_only"
           },
-          "value": "loc",
-          "when": null
+          "value": "loc"
         }
       }
     }

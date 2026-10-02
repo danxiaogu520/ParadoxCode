@@ -33,8 +33,6 @@ pub(crate) struct IndexCacheLoadRequest<'a> {
     pub(crate) rules: RuleSet,
     pub(crate) ir: Arc<RulesIr>,
     pub(crate) profile: GameProfile,
-    pub(crate) current_rule_hash: String,
-    pub(crate) current_ir_hash: String,
     pub(crate) auto_vanilla: Option<&'a AutoVanillaConfiguration>,
     pub(crate) log: Option<&'a (dyn Fn(&str) + Sync)>,
     pub(crate) progress: Option<&'a (dyn Fn(usize, usize) + Sync)>,
@@ -70,8 +68,6 @@ pub(crate) fn run_index_cache_load_with_options(
         rules,
         ir,
         profile,
-        current_rule_hash,
-        current_ir_hash,
         auto_vanilla,
         log,
         progress,
@@ -147,28 +143,21 @@ pub(crate) fn run_index_cache_load_with_options(
                 loaded.index().position_ranges().len(),
             ));
         }
-        if loaded.metadata().rule_hash == current_rule_hash
-            && loaded.metadata().ir_hash == current_ir_hash
-        {
+        if loaded.metadata().build_id == engine::ANALYZER_BUILD_ID {
             if let Some(log) = log {
-                log(&format!(
-                    "Vanilla cache phase: active rules hash matches ({current_rule_hash}); no rebuild required"
-                ));
+                log("Vanilla cache phase: analyzer build matches; no rebuild required");
             }
             return Ok((
                 loaded,
                 format!("Vanilla symbols loaded from {}", path.display()),
             ));
         }
-        let stale_hash = loaded.metadata().rule_hash.clone();
-        let stale_ir_hash = loaded.metadata().ir_hash.clone();
-        let ir_mismatch = stale_ir_hash != current_ir_hash;
-        let incompatible_legacy_hash =
-            !context.ir.files.is_empty() && stale_hash != current_rule_hash;
+        let stale_build = &loaded.metadata().build_id;
+        let current_build = engine::ANALYZER_BUILD_ID;
         let source = loaded.source_root().path.clone();
         if let Some(log) = log {
             log(&format!(
-                "Vanilla cache {} is stale (rules hash {stale_hash} != {current_rule_hash}, IR fingerprint {stale_ir_hash} != {current_ir_hash}); regenerating from {}",
+                "Vanilla cache {} is stale (analyzer build {stale_build} != {current_build}); regenerating from {}",
                 path.display(),
                 source.display()
             ));
@@ -179,16 +168,12 @@ pub(crate) fn run_index_cache_load_with_options(
             Ok(cache) => Ok((
                 cache,
                 format!(
-                    "Vanilla cache was regenerated for the active rules hash {current_rule_hash} and loaded from {}",
+                    "Vanilla cache was regenerated for the active analyzer build {current_build} and loaded from {}",
                     path.display()
                 ),
             )),
-            Err(error) if ir_mismatch || incompatible_legacy_hash => Err(format!(
-                "{error}; refusing to install the Vanilla cache because its rule identity is stale (cached legacy hash {stale_hash}, active {current_rule_hash}; cached rules-v2 IR fingerprint {stale_ir_hash}, active {current_ir_hash})"
-            )),
-            Err(error) => Ok((
-                loaded,
-                format!("{error}; using the existing cache built with rules hash {stale_hash}"),
+            Err(error) => Err(format!(
+                "{error}; refusing to install the Vanilla cache because its analyzer build is stale (cached {stale_build}, active {current_build})"
             )),
         }
     })();

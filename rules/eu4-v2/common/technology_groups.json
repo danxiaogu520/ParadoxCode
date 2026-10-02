@@ -4,48 +4,39 @@
       "fields": {
         "adm_tech": {
           "card": "0..1",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "dip_tech": {
           "card": "0..1",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "is_primitive": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "mil_tech": {
           "card": "0..1",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "nation_designer_cost": {
           "body": "technology_group_body__nation_designer_cost",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "nation_designer_trigger": {
           "body": "trigger",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "nation_designer_unit_type": {
           "card": "0..1",
-          "value": "ref<technology_group>",
-          "when": null
+          "value": "ref<technology_group>"
         },
         "start_cost_modifier": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "start_level": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         }
       }
     },
@@ -60,13 +51,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "value": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         }
       }
     }

@@ -893,7 +893,7 @@ impl LspServer {
                             ),
                         )?;
                         let mut diagnostics_dirty = false;
-                        let current_rule_hash = self.host.snapshot().rules().rule_hash().to_hex();
+
                         let mut install_metadata = Vec::new();
                         let mut install_caches = Vec::new();
                         for (config, result) in result.results {
@@ -901,7 +901,7 @@ impl LspServer {
                                 Ok((cache, message)) => {
                                     install_metadata.push((
                                         config,
-                                        cache.metadata().rule_hash.clone(),
+                                        cache.metadata().build_id.clone(),
                                         message,
                                     ));
                                     install_caches.push(cache);
@@ -947,20 +947,11 @@ impl LspServer {
                                             ),
                                         ),
                                     )?;
-                                    for (_, cache_rule_hash, message) in install_metadata {
-                                        if cache_rule_hash != current_rule_hash {
-                                            write_message(
-                                                &mut output,
-                                                &show_warning_notification(format!(
-                                                    "{message}; the installed dependency cache was built with rules hash {cache_rule_hash}, but the active rules hash is {current_rule_hash}"
-                                                )),
-                                            )?;
-                                        } else {
-                                            write_message(
-                                                &mut output,
-                                                &show_info_notification(message),
-                                            )?;
-                                        }
+                                    for (_, _, message) in install_metadata {
+                                        write_message(
+                                            &mut output,
+                                            &show_info_notification(message),
+                                        )?;
                                     }
                                 }
                                 Err(error) => {
@@ -1068,11 +1059,9 @@ impl LspServer {
                         )?;
                         match result.result {
                             Ok((cache, message)) => {
-                                let cache_rule_hash = cache.metadata().rule_hash.clone();
                                 let cached_files = cache.source_files().len();
                                 let cached_positions = cache.index().position_ranges().len();
-                                let current_rule_hash =
-                                    self.host.snapshot().rules().rule_hash().to_hex();
+
                                 write_message(
                                     &mut output,
                                     &log_message_notification(
@@ -1097,19 +1086,10 @@ impl LspServer {
                                                 ),
                                             ),
                                         )?;
-                                        if cache_rule_hash != current_rule_hash {
-                                            write_message(
-                                                &mut output,
-                                                &show_warning_notification(format!(
-                                                    "{message}; the installed cache was built with rules hash {cache_rule_hash}, but the active rules hash is {current_rule_hash}"
-                                                )),
-                                            )?;
-                                        } else {
-                                            write_message(
-                                                &mut output,
-                                                &show_info_notification(message),
-                                            )?;
-                                        }
+                                        write_message(
+                                            &mut output,
+                                            &show_info_notification(message),
+                                        )?;
                                         let open = self
                                             .host
                                             .snapshot()

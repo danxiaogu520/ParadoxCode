@@ -23,7 +23,7 @@ fn main() -> Result<(), pdc::LspError> {
 
     let rules_started = std::time::Instant::now();
     let loading_message = format!(
-        "compiling first-party {} rules from the embedded source bundle",
+        "loading compiled first-party {} rules",
         pdc::INSTALL_DESCRIPTOR.game_id
     );
     eprintln!("paradoxcode: {loading_message}");

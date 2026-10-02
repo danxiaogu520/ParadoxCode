@@ -1,21 +1,13 @@
 {
-  "mixins": {
-    "keys__type_area": {},
-    "keys__type_province_group": {}
-  },
   "schemas": {
     "area_body": {
       "fields": {
         "color": {
           "card": "0..1",
           "list": "int[0..]",
-          "override": true,
-          "when": null
+          "override": true
         }
       },
-      "include": [
-        "keys__type_area"
-      ],
       "items": "ref<province_id>"
     },
     "area_body__color": {
@@ -31,16 +23,14 @@
       "fields": {
         "equator_y_on_province_image": {
           "card": "1",
-          "value": "ref<province_id>",
-          "when": null
+          "value": "int[0..]"
         }
       },
       "patterns": [
         {
-          "card": "10..10",
-          "key": "ref<climate>",
-          "list": "ref<province_id>",
-          "when": null
+          "card": "0..1",
+          "key": "def<climate>",
+          "list": "ref<province_id>"
         }
       ]
     },
@@ -48,9 +38,6 @@
       "items": "ref<province_id>"
     },
     "province_group_body": {
-      "include": [
-        "keys__type_province_group"
-      ],
       "items": "ref<province_id>"
     },
     "province_group_type_body": {
@@ -60,18 +47,15 @@
       "fields": {
         "height": {
           "card": "1",
-          "list": "float",
-          "when": null
+          "list": "float"
         },
         "position": {
           "card": "1",
-          "list": "float",
-          "when": null
+          "list": "float"
         },
         "rotation": {
           "card": "1",
-          "list": "float",
-          "when": null
+          "list": "float"
         }
       }
     },
@@ -88,13 +72,11 @@
       "fields": {
         "areas": {
           "card": "0..1",
-          "list": "ref<area.used>",
-          "when": null
+          "list": "ref<area.used>"
         },
         "monsoon": {
           "card": "0..*",
-          "list": "scalar",
-          "when": null
+          "list": "scalar"
         }
       }
     },

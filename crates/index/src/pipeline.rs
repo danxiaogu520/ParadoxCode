@@ -2,10 +2,10 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 
-use parser::{CstKind, CstNode, FileFormat, ParsedFile, parse};
+use parser::{FileFormat, ParsedFile, parse};
 use rules::ir::{DocumentParser, RulesIr, SymbolFacts};
 use rules::{GameProfile, ParserKind, RuleSet};
 use text::{AbsPath, LineIndex, LogicalPath, PositionRange, TextRange};
@@ -16,8 +16,8 @@ use crate::index::{
 };
 use crate::{record_pipeline_lower, record_pipeline_parse};
 use hir::{
-    HirFile, lower_shared, lower_shared_with_ir, lower_shared_with_ir_and_facts,
-    lower_shared_with_profile,
+    HirFile, lower_shared, lower_shared_for_index_with_ir, lower_shared_with_ir,
+    lower_shared_with_ir_and_facts, lower_shared_with_profile,
 };
 use vfs::ParseCache;
 use vfs::read_source_file_cancellable;
@@ -33,6 +33,7 @@ pub struct IndexSymbolFacts<'a> {
     index: &'a crate::WorkspaceIndex,
     overlays: &'a [Arc<HirFile>],
     excluded_file_ids: Option<&'a BTreeSet<SourceFileId>>,
+    templates: OnceLock<BTreeMap<String, crate::FlagWriteIndex>>,
 }
 
 impl<'a> IndexSymbolFacts<'a> {
@@ -47,6 +48,7 @@ impl<'a> IndexSymbolFacts<'a> {
             index,
             overlays,
             excluded_file_ids: None,
+            templates: OnceLock::new(),
         }
     }
 
@@ -62,6 +64,7 @@ impl<'a> IndexSymbolFacts<'a> {
             index,
             overlays,
             excluded_file_ids: Some(excluded_file_ids),
+            templates: OnceLock::new(),
         }
     }
 
@@ -80,6 +83,44 @@ impl<'a> IndexSymbolFacts<'a> {
                     definition.kind.eq_ignore_ascii_case(kind)
                         && definition.name.eq_ignore_ascii_case(name)
                 })
+            })
+            || self.template_member(kind, name)
+    }
+
+    fn template_member(&self, kind: &str, name: &str) -> bool {
+        let templates = self.templates.get_or_init(|| {
+            let mut templates = BTreeMap::<String, crate::FlagWriteIndex>::new();
+            for (definition, active) in self.index.definition_identities() {
+                if active
+                    && definition.name.contains('$')
+                    && self
+                        .excluded_file_ids
+                        .is_none_or(|files| !files.contains(&definition.file_id))
+                {
+                    templates
+                        .entry(definition.kind.to_ascii_lowercase())
+                        .or_default()
+                        .record(&definition.name);
+                }
+            }
+            for hir in self.overlays {
+                for definition in hir
+                    .definitions()
+                    .iter()
+                    .filter(|definition| definition.name.contains('$'))
+                {
+                    templates
+                        .entry(definition.kind.to_ascii_lowercase())
+                        .or_default()
+                        .record(&definition.name);
+                }
+            }
+            templates
+        });
+        templates
+            .get(&kind.to_ascii_lowercase())
+            .is_some_and(|patterns| {
+                patterns.membership(name) != crate::FlagWriteMembership::Unknown
             })
     }
 
@@ -123,6 +164,41 @@ impl<'a> IndexSymbolFacts<'a> {
 }
 
 impl rules::ir::SymbolFacts for IndexSymbolFacts<'_> {
+    fn replacement_template(
+        &self,
+        type_id: rules::ir::TypeId,
+        name: &str,
+    ) -> Option<Arc<rules::replacement::Template>> {
+        let kind = self.ir.strings.resolve(self.ir.type_info(type_id).name);
+        let mut overlay = None;
+        for hir in self.overlays {
+            for definition in hir.definitions().iter().filter(|definition| {
+                definition.kind.eq_ignore_ascii_case(kind)
+                    && definition.name.eq_ignore_ascii_case(name)
+            }) {
+                if overlay.is_some() {
+                    return None;
+                }
+                overlay = Some(hir.dynamic_template(kind, name, definition.range));
+            }
+        }
+        if let Some(template) = overlay {
+            return template.cloned().map(Arc::new);
+        }
+        let definition = self.index.active_definition(kind, name)?;
+        if self
+            .excluded_file_ids
+            .is_some_and(|files| files.contains(&definition.file_id))
+        {
+            return None;
+        }
+        self.index
+            .active_dynamic_definition(kind, name)?
+            .template
+            .clone()
+            .map(Arc::new)
+    }
+
     fn type_member(&self, type_id: rules::ir::TypeId, name: &str) -> bool {
         let ty = self.ir.type_info(type_id);
         let kind = self.ir.strings.resolve(ty.name);
@@ -146,25 +222,6 @@ impl rules::ir::SymbolFacts for IndexSymbolFacts<'_> {
             self.ir.strings.resolve(subtype),
         )
     }
-
-    fn trait_impl_member(&self, trait_id: rules::ir::TraitId, name: &str) -> bool {
-        self.ir.types.iter().any(|ty| {
-            let kind = self.ir.strings.resolve(ty.name);
-            let type_member = self.has_member(kind, name);
-            type_member
-                && ty
-                    .trait_impls
-                    .iter()
-                    .any(|implementation| implementation.trait_id == trait_id)
-                || ty.subtypes.iter().any(|subtype| {
-                    self.has_subtype(kind, name, self.ir.strings.resolve(subtype.name))
-                        && subtype
-                            .trait_impls
-                            .iter()
-                            .any(|implementation| implementation.trait_id == trait_id)
-                })
-        })
-    }
 }
 
 pub fn parse_source(
@@ -183,6 +240,7 @@ pub fn parse_source(
         None,
         None,
         None,
+        false,
     )
 }
 
@@ -196,6 +254,7 @@ fn parse_source_with_cache(
     cache: Option<(&SourceFile, &ParseCache)>,
     ir: Option<&RulesIr>,
     facts: Option<&dyn SymbolFacts>,
+    index_only: bool,
 ) -> (Option<ParsedSource>, Option<Arc<HirFile>>) {
     match parser {
         ParserKind::Script => {
@@ -204,6 +263,14 @@ fn parse_source_with_cache(
             let hir = Arc::new(logical_path.map_or_else(
                 || lower_shared(Arc::clone(&parsed), rules),
                 |path| match ir {
+                    Some(ir) if index_only => lower_shared_for_index_with_ir(
+                        Arc::clone(&parsed),
+                        path,
+                        rules,
+                        profile,
+                        ir,
+                        facts,
+                    ),
                     Some(ir) => match facts {
                         Some(facts) => lower_shared_with_ir_and_facts(
                             Arc::clone(&parsed),
@@ -226,6 +293,14 @@ fn parse_source_with_cache(
             let hir = Arc::new(logical_path.map_or_else(
                 || lower_shared(Arc::clone(&parsed), rules),
                 |path| match ir {
+                    Some(ir) if index_only => lower_shared_for_index_with_ir(
+                        Arc::clone(&parsed),
+                        path,
+                        rules,
+                        profile,
+                        ir,
+                        facts,
+                    ),
                     Some(ir) => match facts {
                         Some(facts) => lower_shared_with_ir_and_facts(
                             Arc::clone(&parsed),
@@ -282,8 +357,9 @@ fn parser_for_document(
                 .filter_map(|relative| LogicalPath::parse(&relative.to_string_lossy()).ok())
                 .min_by_key(|path| path.as_str().len())
         })
-        .or_else(|| path.and_then(|path| LogicalPath::parse(&path.to_string_lossy()).ok()))
+        .or_else(|| path.and_then(|path| rules.logical_path_for_uri(&path.to_string_lossy())))
         .or_else(|| rules.logical_path_for_uri(id.as_str()))
+        .or_else(|| path.and_then(|path| LogicalPath::parse(&path.to_string_lossy()).ok()))
         .or_else(|| {
             id.as_str()
                 .split(['/', '\\'])
@@ -393,6 +469,7 @@ fn prepare_document_snapshot_impl(
             None,
             ir,
             facts,
+            false,
         )
     });
     document.parsed = parsed;
@@ -454,6 +531,110 @@ pub struct SourceLoadContext<'a> {
     pub parse_cache: Option<&'a ParseCache>,
     pub cancellation: &'a WorkspaceScanToken,
     pub progress: Option<&'a (dyn Fn(usize, usize) + Sync)>,
+}
+
+/// Relowers files that read workspace symbols against one immutable pass of facts.
+/// Large files are lowered alone; small files use at most four frontends at once,
+/// within the caller's worker limit. This bounds concurrent frontend allocations.
+pub fn replay_symbol_dependent_files(
+    files: &BTreeMap<SourceFileId, SourceFile>,
+    states: &BTreeMap<SourceFileId, Arc<FileState>>,
+    ir: &RulesIr,
+    facts: &(dyn SymbolFacts + Sync),
+    context: &SourceLoadContext<'_>,
+) -> Result<BTreeMap<SourceFileId, Arc<FileState>>, WorkspaceError> {
+    let mut jobs = states
+        .iter()
+        .filter(|(_, state)| state.symbol_facts_dependency)
+        .collect::<Vec<_>>();
+    // A large CST/HIR can be much larger than its source. Process those on the
+    // calling thread before starting workers, so their allocation peaks cannot
+    // overlap with other frontends or accumulate in separate worker arenas.
+    jobs.sort_by_key(|(_, state)| std::cmp::Reverse(state.source().len()));
+    const MAX_PARALLEL_SOURCE_BYTES: usize = 256 * 1024;
+    let large_count =
+        jobs.partition_point(|(_, state)| state.source().len() > MAX_PARALLEL_SOURCE_BYTES);
+    let workers = thread::available_parallelism()
+        .map_or(1, |count| count.get())
+        .min(context.limits.max_workers.clamp(1, 4))
+        .min(jobs.len());
+    let rebuild = |id: &SourceFileId, state: &FileState| {
+        context.cancellation.checkpoint()?;
+        let Some(file) = files.get(id) else {
+            return Ok(None);
+        };
+        let mut rebuilt = build_file_state_impl(
+            file,
+            state.source().to_owned(),
+            state.revision(),
+            context.rules,
+            context.profile,
+            context.parse_cache,
+            Some(ir),
+            Some(facts),
+            state.parsed().is_none(),
+        );
+        if state.parsed().is_none() {
+            rebuilt = rebuilt.cache_only();
+        }
+        Ok(Some((*id, Arc::new(rebuilt))))
+    };
+    let mut results = BTreeMap::new();
+    for (id, state) in jobs.drain(..large_count) {
+        if let Some((id, state)) = rebuild(id, state)? {
+            results.insert(id, state);
+        }
+    }
+    if jobs.len() < PARALLEL_SOURCE_THRESHOLD || workers < 2 {
+        for (id, state) in jobs {
+            if let Some((id, state)) = rebuild(id, state)? {
+                results.insert(id, state);
+            }
+        }
+        return Ok(results);
+    }
+    let queue = Mutex::new(VecDeque::from(jobs));
+    thread::scope(|scope| {
+        let handles = (0..workers)
+            .map(|_| {
+                scope.spawn(|| {
+                    let mut results = BTreeMap::new();
+                    loop {
+                        let job = queue
+                            .lock()
+                            .map_err(|_| {
+                                WorkspaceError::Io(std::io::Error::other(
+                                    "workspace replay queue was poisoned",
+                                ))
+                            })?
+                            .pop_front();
+                        let Some((id, state)) = job else { break };
+                        if let Some((id, state)) = rebuild(id, state)? {
+                            results.insert(id, state);
+                        }
+                    }
+                    Ok::<_, WorkspaceError>(results)
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut first_error = None;
+        for handle in handles {
+            match handle.join() {
+                Ok(Ok(batch)) => results.extend(batch),
+                Ok(Err(error)) => {
+                    first_error.get_or_insert(error);
+                }
+                Err(_) => {
+                    first_error.get_or_insert_with(|| {
+                        WorkspaceError::Io(std::io::Error::other(
+                            "workspace replay worker panicked",
+                        ))
+                    });
+                }
+            }
+        }
+        first_error.map_or(Ok(results), Err)
+    })
 }
 
 pub fn load_source_files(
@@ -598,6 +779,7 @@ fn load_source_file_job(
             context.parse_cache,
             context.ir,
             None,
+            !job.retain_frontend,
         );
         if job.retain_frontend {
             Arc::new(state)
@@ -660,6 +842,7 @@ pub fn build_file_state_with_cache(
         parse_cache,
         None,
         None,
+        false,
     )
 }
 
@@ -682,6 +865,7 @@ pub fn build_file_state_with_ir(
         parse_cache,
         Some(ir),
         None,
+        false,
     )
 }
 
@@ -706,6 +890,7 @@ pub fn build_file_state_with_ir_and_facts(
         parse_cache,
         Some(ir),
         Some(facts),
+        false,
     )
 }
 
@@ -719,6 +904,7 @@ fn build_file_state_impl(
     parse_cache: Option<&ParseCache>,
     ir: Option<&RulesIr>,
     facts: Option<&dyn SymbolFacts>,
+    index_only: bool,
 ) -> FileState {
     let parser = if let Some(ir) = ir.filter(|ir| !ir.files.is_empty()) {
         ir.file_rule(&file.logical_path)
@@ -735,6 +921,7 @@ fn build_file_state_impl(
             source: Arc::from(source),
             parsed: None,
             hir: None,
+            symbol_facts_dependency: false,
             shard: Arc::new(FileIndexShard {
                 file_id: file.id,
                 definitions: Vec::new(),
@@ -756,6 +943,7 @@ fn build_file_state_impl(
         parse_cache.map(|cache| (file, cache)),
         ir,
         facts,
+        index_only,
     );
     let shard = match (parsed.as_ref(), hir.as_deref()) {
         (Some(ParsedSource::Text(parsed)), Some(hir)) => shard_for_source(file, parsed, hir, rules),
@@ -786,6 +974,9 @@ fn build_file_state_impl(
         revision,
         source: shared_source,
         parsed,
+        symbol_facts_dependency: hir
+            .as_ref()
+            .is_some_and(|hir| hir.depends_on_symbol_facts()),
         hir,
         shard: Arc::new(shard),
         cached_localisation_previews: None,
@@ -798,6 +989,7 @@ pub fn empty_file_state(file: &SourceFile, revision: u64) -> FileState {
         source: Arc::from(""),
         parsed: None,
         hir: None,
+        symbol_facts_dependency: false,
         shard: Arc::new(FileIndexShard {
             file_id: file.id,
             definitions: Vec::new(),
@@ -864,9 +1056,6 @@ fn shard_from_parsed(
     let mut definitions = Vec::new();
     let mut references = Vec::new();
     collect_hir_semantics(file, hir, &mut definitions, &mut references);
-    if !hir.uses_ir() {
-        collect_semantic_type_members(file, parsed, rules, &mut definitions);
-    }
     // Shards stay resident in the workspace index; exact-fit the vectors so
     // growth doubling does not leave ~2x slack per file.
     definitions.shrink_to_fit();
@@ -885,58 +1074,24 @@ fn shard_from_parsed(
     }
 }
 
-/// Collects `dynamic_set` write sites (`set_country_flag = name`) from the
-/// flattened HIR property list. Names keep `$param$` fragments verbatim; the
-/// index interprets them as reachability patterns.
-fn collect_flag_writes(hir: &HirFile, rules: &RuleSet) -> Vec<crate::index::FlagWrite> {
-    let mut writes = Vec::new();
-    if hir.uses_ir() {
-        for definition in hir.definitions() {
-            if definition.range == definition.selection_range {
-                writes.push(crate::index::FlagWrite {
-                    kind: definition.kind.clone(),
-                    name: vfs::intern_shard_string(&definition.name),
-                    range: definition.selection_range,
-                });
-            }
-        }
-        return writes;
-    }
-    for property in hir.properties() {
-        let Some(kind) = rules.dynamic_write_kind(&property.key) else {
-            continue;
-        };
-        let Some(scalar) = &property.scalar else {
-            continue;
-        };
-        if scalar.value.is_empty() {
-            continue;
-        }
-        writes.push(crate::index::FlagWrite {
-            kind: vfs::intern_shard_string(kind),
-            name: vfs::intern_shard_string(&scalar.value),
-            range: scalar.range,
-        });
-    }
-    writes
+fn collect_flag_writes(hir: &HirFile, _rules: &RuleSet) -> Vec<crate::index::FlagWrite> {
+    hir.definitions()
+        .iter()
+        .filter(|d| d.range == d.selection_range)
+        .map(|d| crate::index::FlagWrite {
+            kind: d.kind.clone(),
+            name: vfs::intern_shard_string(&d.name),
+            range: d.selection_range,
+        })
+        .collect()
 }
 
-fn collect_dynamic_definitions(hir: &HirFile, rules: &RuleSet) -> Vec<DynamicDefinitionSummary> {
+fn collect_dynamic_definitions(hir: &HirFile, _rules: &RuleSet) -> Vec<DynamicDefinitionSummary> {
     let mut summaries = Vec::new();
     for definition in hir.definitions() {
-        let enabled = if hir.uses_ir() {
-            hir.dynamic_template(&definition.kind, &definition.name, definition.range)
-                .is_some()
-        } else {
-            rules
-                .model()
-                .semantic
-                .type_descriptors
-                .iter()
-                .find(|(kind, _)| kind.eq_ignore_ascii_case(&definition.kind))
-                .and_then(|(_, descriptor)| descriptor.dynamic_definition.as_ref())
-                .is_some_and(|descriptor| descriptor.enabled)
-        };
+        let enabled = hir
+            .dynamic_template(&definition.kind, &definition.name, definition.range)
+            .is_some();
         if !enabled {
             continue;
         }
@@ -966,227 +1121,6 @@ fn collect_dynamic_definitions(hir: &HirFile, rules: &RuleSet) -> Vec<DynamicDef
     summaries
 }
 
-/// Collects workspace members declared by semantic `type[...]` definitions.
-///
-/// The semantic engine builds these members from the parsed workspace rather than treating a type's name as
-/// a literal root key. For example, `type[mission]` with `skip_root_key = any` exposes every child
-/// of every root clause in `missions/*.txt` as a `<mission>` member. Keeping this in the workspace
-/// shard makes semantic key/value matching, completion, and hover see the same dynamic names.
-fn collect_semantic_type_members(
-    file: &SourceFile,
-    parsed: &ParsedFile,
-    rules: &RuleSet,
-    definitions: &mut Vec<Definition>,
-) {
-    for descriptor in rules.model().semantic.type_descriptors.values() {
-        if !semantic_type_path_matches(descriptor, &file.logical_path) {
-            continue;
-        }
-        // File-based type instances are emitted by HIR with the filename range. The generic
-        // property collector must not reinterpret their top-level fields as type members.
-        if descriptor.type_per_file {
-            continue;
-        }
-
-        if descriptor.skip_root_paths.is_empty() {
-            for child in parsed.root().children() {
-                if child.kind() != CstKind::Property {
-                    continue;
-                }
-                let Some(key) = semantic_property_key(child, parsed) else {
-                    continue;
-                };
-                if !semantic_type_root_key_allowed(rules, descriptor, &key) {
-                    continue;
-                }
-                collect_semantic_type_definition(file, parsed, descriptor, child, definitions);
-            }
-        } else {
-            for root in parsed.root().children() {
-                if root.kind() != CstKind::Property {
-                    continue;
-                }
-                for skip_path in &descriptor.skip_root_paths {
-                    collect_semantic_skip_root_path(
-                        file,
-                        parsed,
-                        descriptor,
-                        root,
-                        skip_path,
-                        definitions,
-                    );
-                }
-            }
-        }
-    }
-}
-
-fn collect_semantic_skip_root_path(
-    file: &SourceFile,
-    parsed: &ParsedFile,
-    descriptor: &rules::TypeDescriptor,
-    node: CstNode<'_>,
-    path: &[String],
-    definitions: &mut Vec<Definition>,
-) {
-    let Some(head) = path.first() else {
-        collect_semantic_block_children(file, parsed, descriptor, node, definitions);
-        return;
-    };
-    let node_key = semantic_property_key(node, parsed).unwrap_or_default();
-    if !head.eq_ignore_ascii_case("any") && !head.eq_ignore_ascii_case(&node_key) {
-        return;
-    }
-    if path.len() == 1 {
-        collect_semantic_block_children(file, parsed, descriptor, node, definitions);
-        return;
-    }
-    for child in semantic_block_properties(node) {
-        collect_semantic_skip_root_path(file, parsed, descriptor, child, &path[1..], definitions);
-    }
-}
-
-fn collect_semantic_block_children(
-    file: &SourceFile,
-    parsed: &ParsedFile,
-    descriptor: &rules::TypeDescriptor,
-    node: CstNode<'_>,
-    definitions: &mut Vec<Definition>,
-) {
-    for child in semantic_block_properties(node) {
-        collect_semantic_type_definition(file, parsed, descriptor, child, definitions);
-    }
-}
-
-fn collect_semantic_type_definition(
-    file: &SourceFile,
-    parsed: &ParsedFile,
-    descriptor: &rules::TypeDescriptor,
-    node: CstNode<'_>,
-    definitions: &mut Vec<Definition>,
-) {
-    let Some(key) = semantic_property_key(node, parsed) else {
-        return;
-    };
-    if !semantic_type_key_matches(descriptor, &key) {
-        return;
-    }
-    let Some(name) = descriptor
-        .name_field
-        .as_deref()
-        .and_then(|field| find_property(node, field, parsed))
-        .or(Some(key))
-        .map(|name| descriptor.splice_definition_name(&name).to_owned())
-    else {
-        return;
-    };
-    if name.is_empty() {
-        return;
-    }
-    let key_range = node
-        .children()
-        .find(|child| child.kind() == CstKind::Key)
-        .map(|child| child.range());
-    definitions.push(Definition {
-        kind: vfs::intern_shard_string(&descriptor.name),
-        name: vfs::intern_shard_string(&name),
-        file_id: file.id,
-        range: node.range(),
-        selection_range: key_range.unwrap_or(node.range()),
-        active: true,
-    });
-}
-
-fn semantic_type_key_matches(descriptor: &rules::TypeDescriptor, key: &str) -> bool {
-    descriptor
-        .type_key_filter
-        .as_ref()
-        .is_none_or(|(values, negate)| {
-            (values.iter().any(|value| value.eq_ignore_ascii_case(key))) != *negate
-        })
-}
-
-/// Whether a top-level property key may be a type instance for `descriptor`.
-///
-/// Mirrors `hir::semantics::semantic_type_root_key_allowed`: descriptors with an enumerated
-/// root-key set (`type_root_keys`) reject unrelated file headers such as EU4's `namespace`.
-fn semantic_type_root_key_allowed(
-    rules: &RuleSet,
-    descriptor: &rules::TypeDescriptor,
-    key: &str,
-) -> bool {
-    let Some(roots) = rules.model().semantic.type_root_keys.get(&descriptor.name) else {
-        return true;
-    };
-    roots.iter().any(|root| root.eq_ignore_ascii_case(key))
-}
-
-fn semantic_block_properties(node: CstNode<'_>) -> impl Iterator<Item = CstNode<'_>> {
-    node.children()
-        .filter(|child| child.kind() == CstKind::Value)
-        .flat_map(|value| {
-            value
-                .children()
-                .filter(|block| block.kind() == CstKind::Block)
-        })
-        .flat_map(|block| {
-            block
-                .children()
-                .filter(|child| child.kind() == CstKind::Property)
-        })
-}
-
-fn semantic_property_key(node: CstNode<'_>, parsed: &ParsedFile) -> Option<String> {
-    node.children()
-        .find(|child| child.kind() == CstKind::Key)
-        .and_then(|child| parsed.text(child.range()))
-        .map(|key| key.trim().to_owned())
-        .filter(|key| !key.is_empty())
-}
-
-fn semantic_type_path_matches(
-    descriptor: &rules::TypeDescriptor,
-    logical_path: &LogicalPath,
-) -> bool {
-    let path = logical_path
-        .as_str()
-        .replace('\\', "/")
-        .to_ascii_lowercase();
-    let (directory, file_name) = path.rsplit_once('/').unwrap_or(("", path.as_str()));
-    if let Some(prefix) = descriptor.path.as_deref() {
-        let prefix = prefix
-            .trim_matches('/')
-            .strip_prefix("game/")
-            .unwrap_or(prefix.trim_matches('/'));
-        let matches = if descriptor.path_strict {
-            directory.eq_ignore_ascii_case(prefix)
-        } else {
-            directory.eq_ignore_ascii_case(prefix)
-                || (hir::ascii_ci_starts_with(directory, prefix)
-                    && directory.len() > prefix.len()
-                    && directory.as_bytes()[prefix.len()] == b'/')
-        };
-        if !matches {
-            return false;
-        }
-    }
-    if let Some(expected_file) = descriptor.path_file.as_deref()
-        && !file_name.eq_ignore_ascii_case(expected_file)
-    {
-        return false;
-    }
-    if let Some(expected_extension) = descriptor.path_extension.as_deref() {
-        let expected_extension = expected_extension.trim_start_matches('.');
-        let actual_extension = file_name
-            .rsplit_once('.')
-            .map_or("", |(_, extension)| extension);
-        if !actual_extension.eq_ignore_ascii_case(expected_extension) {
-            return false;
-        }
-    }
-    true
-}
-
 fn collect_hir_semantics(
     file: &SourceFile,
     hir: &HirFile,
@@ -1212,43 +1146,10 @@ fn collect_hir_semantics(
     }
 }
 
-fn find_property(node: CstNode<'_>, wanted: &str, parsed: &ParsedFile) -> Option<String> {
-    if node.kind() == CstKind::Property {
-        let key = node
-            .children()
-            .find(|child| child.kind() == CstKind::Key)
-            .and_then(|child| parsed.text(child.range()))
-            .map(str::trim);
-        if key == Some(wanted) {
-            for child in node.children() {
-                if matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString) {
-                    return parsed
-                        .text(child.range())
-                        .map(|value| value.trim_matches('"').trim().to_owned());
-                }
-                if child.kind() == CstKind::Value
-                    && let Some(value) = child.children().find(|value| {
-                        matches!(value.kind(), CstKind::BareValue | CstKind::QuotedString)
-                    })
-                {
-                    return parsed
-                        .text(value.range())
-                        .map(|value| value.trim_matches('"').trim().to_owned());
-                }
-            }
-        }
-    }
-    node.children()
-        .find_map(|child| find_property(child, wanted, parsed))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rules::{
-        FileCategory, FileMatcher, FileResolutionPolicy, ProfileDefinitionRule, ProfileMatchMode,
-        ProfileTextMatcher, RulesModel,
-    };
+    use rules::{FileCategory, FileMatcher, FileResolutionPolicy};
     use std::path::PathBuf;
     use vfs::{SourceRootId, SourceRootKind, WorkspaceScanIssueKind};
 
@@ -1263,9 +1164,9 @@ mod tests {
     }
 
     fn generic_script_rules() -> RuleSet {
-        RuleSet::from_model(RulesModel {
-            game_id: "test".to_owned(),
-            file_categories: vec![FileCategory {
+        RuleSet::from_catalog(
+            "test".to_owned(),
+            vec![FileCategory {
                 id: "script".to_owned(),
                 parser: ParserKind::Script,
                 resolution: FileResolutionPolicy::ReplaceByRelativePath,
@@ -1278,8 +1179,8 @@ mod tests {
                     case_sensitive: false,
                 },
             }],
-            ..RulesModel::default()
-        })
+            GameProfile::empty("test"),
+        )
     }
 
     #[test]
@@ -1333,19 +1234,6 @@ mod tests {
             category_id: Some("script".to_owned()),
             resolution: FileResolutionPolicy::ReplaceByRelativePath,
         }
-    }
-
-    fn event_profile() -> GameProfile {
-        let mut profile = GameProfile::empty("test");
-        profile.definitions = vec![ProfileDefinitionRule {
-            path: ProfileTextMatcher::insensitive(ProfileMatchMode::Prefix, "events/"),
-            key: ProfileTextMatcher::insensitive(ProfileMatchMode::Exact, "country_event"),
-            kind: "event".to_owned(),
-            name_field: Some("id".to_owned()),
-            requires_value: true,
-            retain_attributes: false,
-        }];
-        profile
     }
 
     static NO_FILES: std::sync::LazyLock<BTreeMap<SourceFileId, SourceFile>> =
@@ -1417,15 +1305,25 @@ mod tests {
 
     #[test]
     fn malformed_scripts_still_shard_partial_definitions_and_count_syntax_errors() {
-        let rules = generic_script_rules();
-        let profile = event_profile();
+        let file_spec=serde_json::from_value(serde_json::json!({"types":{"event":{}},"files":{"script":{"path":"events","ext":"txt","root":"root"}},"schemas":{"root":{"fields":{"country_event":{"body":"event_body","card":"0..*","def":{"type":"event","name":"field:id"}}}},"event_body":{"fields":{"id":{"value":"scalar","card":"1"}}}}})).unwrap();
+        let profile = GameProfile::empty("test");
+        let ir = rules::lower::lower(
+            &[("fixture.json".to_owned(), file_spec)],
+            rules::ir::GameConfig {
+                profile: profile.clone(),
+            },
+        )
+        .unwrap();
+        let rules = RuleSet::from_ir_catalog(&ir);
         let file = fixture_source_file(SourceFileId::new(11), "events/broken.txt");
-        let state = build_file_state(
+        let state = build_file_state_with_ir(
             &file,
             "country_event = { id = broken.1 }\ntrailing = {\n".to_owned(),
             4,
             &rules,
             &profile,
+            &ir,
+            None,
         );
         assert!(state.parsed().is_some());
         // The intact event definition survives next to the unterminated block.

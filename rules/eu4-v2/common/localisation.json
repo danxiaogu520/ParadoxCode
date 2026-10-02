@@ -4,391 +4,314 @@
       "fields": {
         "GetAdjective": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetAdjectiveCap": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetAdm": {
           "card": "1",
-          "value": "'monarch'",
-          "when": null
+          "value": "'monarch'"
         },
         "GetAreaName": {
           "card": "1",
-          "value": "'province'",
-          "when": null
+          "value": "'province'"
         },
         "GetArmyName": {
           "card": "1",
-          "value": "'rebel_faction'",
-          "when": null
+          "value": "'rebel_faction'"
         },
         "GetBrahminsName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetBurghersName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetCachedAgendasFlavorText": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetCapitalName": {
           "card": "1",
-          "value": "'province'",
-          "when": null
+          "value": "'province'"
         },
         "GetClergyName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetColonialRegionName": {
           "card": "1",
-          "value": "'province'",
-          "when": null
+          "value": "'province'"
         },
         "GetContinentName": {
           "card": "1",
-          "value": "'province'",
-          "when": null
+          "value": "'province'"
         },
         "GetCossacksName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetCountryModifiers": {
           "card": "1",
-          "value": "'religion'",
-          "when": null
+          "value": "'religion'"
         },
         "GetCult": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetCultureGroupName": {
           "card": "1",
-          "value": "'Variable'",
-          "when": null
+          "value": "'Variable'"
         },
         "GetCultureName": {
           "card": "1",
-          "value": "'Variable'",
-          "when": null
+          "value": "'Variable'"
         },
         "GetDate": {
           "card": "1",
-          "value": "'any'",
-          "when": null
+          "value": "'any'"
         },
         "GetDateText": {
           "card": "1",
-          "value": "'any'",
-          "when": null
+          "value": "'any'"
         },
         "GetDaughterSon": {
           "body": "localisation_commands_body__getdaughterson",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetDhimmiName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetDip": {
           "card": "1",
-          "value": "'monarch'",
-          "when": null
+          "value": "'monarch'"
         },
         "GetEunuchsName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetFlagshipName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetGhilmanName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetGroupName": {
           "body": "localisation_commands_body__getgroupname",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetHerHim": {
           "body": "localisation_commands_body__getherhim",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetHerHimCap": {
           "body": "localisation_commands_body__getherhimcap",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetHerHis": {
           "body": "localisation_commands_body__getherhis",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetHerHisCap": {
           "body": "localisation_commands_body__getherhiscap",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetHersHis": {
           "body": "localisation_commands_body__gethershis",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetHersHisCap": {
           "body": "localisation_commands_body__gethershiscap",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetHerselfHimself": {
           "body": "localisation_commands_body__getherselfhimself",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetHerselfHimselfCap": {
           "body": "localisation_commands_body__getherselfhimselfcap",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetJainsName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetJanissariesName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetLeaderName": {
           "card": "1",
-          "value": "'rebel_faction'",
-          "when": null
+          "value": "'rebel_faction'"
         },
         "GetLostFlagshipName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetMarathasName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetMil": {
           "card": "1",
-          "value": "'monarch'",
-          "when": null
+          "value": "'monarch'"
         },
         "GetMonth": {
           "card": "1",
-          "value": "'any'",
-          "when": null
+          "value": "'any'"
         },
         "GetMotherFather": {
           "body": "localisation_commands_body__getmotherfather",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetName": {
           "card": "1",
-          "value": "'any' | 'Variable'",
-          "when": null
+          "value": "'any' | 'Variable'"
         },
         "GetNobilityName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetParliamentName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetParliamentWithGrammer": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetProvinceModifiers": {
           "card": "1",
-          "value": "'religion'",
-          "when": null
+          "value": "'religion'"
         },
         "GetQizilbashName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetRajputsName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetRandomShipName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetRegion": {
           "card": "1",
-          "list": "'trade_company'",
-          "when": null
+          "list": "'trade_company'"
         },
         "GetRegionName": {
           "card": "1",
-          "value": "'province'",
-          "when": null
+          "value": "'province'"
         },
         "GetReligionGroupName": {
           "card": "1",
-          "value": "'Variable'",
-          "when": null
+          "value": "'Variable'"
         },
         "GetReligionName": {
           "card": "1",
-          "value": "'Variable'",
-          "when": null
+          "value": "'Variable'"
         },
         "GetReligiousSchool": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetReligiousSchoolCountryModifiers": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetSheHe": {
           "body": "localisation_commands_body__getshehe",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetSheHeCap": {
           "body": "localisation_commands_body__getshehecap",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetSisterBrother": {
           "body": "localisation_commands_body__getsisterbrother",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetStats": {
           "body": "localisation_commands_body__getstats",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetSuperRegionName": {
           "card": "1",
-          "value": "'province'",
-          "when": null
+          "value": "'province'"
         },
         "GetTag": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetTitle": {
           "body": "localisation_commands_body__gettitle",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetTradeGoodsName": {
           "card": "1",
-          "value": "'province'",
-          "when": null
+          "value": "'province'"
         },
         "GetTradeNodeName": {
           "card": "1",
-          "value": "'province'",
-          "when": null
+          "value": "'province'"
         },
         "GetTribesName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetVaishyasName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "GetValue": {
           "card": "1",
-          "value": "'variable'",
-          "when": null
+          "value": "'variable'"
         },
         "GetWifeHusband": {
           "body": "localisation_commands_body__getwifehusband",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetWomanMan": {
           "body": "localisation_commands_body__getwomanman",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "GetYear": {
           "card": "1",
-          "value": "'any'",
-          "when": null
+          "value": "'any'"
         },
         "GovernmentName": {
           "card": "1",
-          "value": "'country'",
-          "when": null
+          "value": "'country'"
         },
         "Leader": {
           "card": "1",
-          "value": "'unit'",
-          "when": null
+          "value": "'unit'"
         },
         "Location": {
           "card": "1",
-          "value": "'unit'",
-          "when": null
+          "value": "'unit'"
         },
         "NativeCulture": {
           "card": "1",
-          "value": "'province'",
-          "when": null
+          "value": "'province'"
         },
         "OriginalReligion": {
           "card": "1",
-          "value": "'province'",
-          "when": null
+          "value": "'province'"
         }
       },
       "patterns": [
         {
           "card": "1",
           "key": "enum<defined_text_commands>",
-          "value": "'any'",
-          "when": null
+          "value": "'any'"
         }
       ]
     },
@@ -396,13 +319,11 @@
       "fields": {
         "consort": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         },
         "monarch": {
           "card": "1",
-          "value": "'heir'",
-          "when": null
+          "value": "'heir'"
         }
       }
     },
@@ -410,8 +331,7 @@
       "fields": {
         "religion": {
           "card": "1",
-          "value": "'culture'",
-          "when": null
+          "value": "'culture'"
         }
       }
     },
@@ -419,13 +339,11 @@
       "fields": {
         "consort": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         },
         "monarch": {
           "card": "1",
-          "value": "'heir'",
-          "when": null
+          "value": "'heir'"
         }
       },
       "items": "'leader'"
@@ -434,13 +352,11 @@
       "fields": {
         "consort": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         },
         "monarch": {
           "card": "1",
-          "value": "'heir'",
-          "when": null
+          "value": "'heir'"
         }
       },
       "items": "'leader'"
@@ -449,13 +365,11 @@
       "fields": {
         "consort": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         },
         "monarch": {
           "card": "1",
-          "value": "'heir'",
-          "when": null
+          "value": "'heir'"
         }
       },
       "items": "'leader'"
@@ -464,13 +378,11 @@
       "fields": {
         "consort": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         },
         "monarch": {
           "card": "1",
-          "value": "'heir'",
-          "when": null
+          "value": "'heir'"
         }
       },
       "items": "'leader'"
@@ -479,13 +391,11 @@
       "fields": {
         "consort": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         },
         "monarch": {
           "card": "1",
-          "value": "'heir'",
-          "when": null
+          "value": "'heir'"
         }
       },
       "items": "'leader'"
@@ -494,13 +404,11 @@
       "fields": {
         "consort": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         },
         "monarch": {
           "card": "1",
-          "value": "'heir'",
-          "when": null
+          "value": "'heir'"
         }
       },
       "items": "'leader'"
@@ -509,13 +417,11 @@
       "fields": {
         "consort": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         },
         "monarch": {
           "card": "1",
-          "value": "'heir'",
-          "when": null
+          "value": "'heir'"
         }
       },
       "items": "'leader'"
@@ -524,13 +430,11 @@
       "fields": {
         "consort": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         },
         "monarch": {
           "card": "1",
-          "value": "'heir'",
-          "when": null
+          "value": "'heir'"
         }
       },
       "items": "'leader'"
@@ -539,13 +443,11 @@
       "fields": {
         "consort": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         },
         "monarch": {
           "card": "1",
-          "value": "'heir'",
-          "when": null
+          "value": "'heir'"
         }
       }
     },
@@ -556,13 +458,11 @@
       "fields": {
         "consort": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         },
         "monarch": {
           "card": "1",
-          "value": "'heir'",
-          "when": null
+          "value": "'heir'"
         }
       },
       "items": "'leader'"
@@ -571,13 +471,11 @@
       "fields": {
         "consort": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         },
         "monarch": {
           "card": "1",
-          "value": "'heir'",
-          "when": null
+          "value": "'heir'"
         }
       },
       "items": "'leader'"
@@ -586,13 +484,11 @@
       "fields": {
         "consort": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         },
         "monarch": {
           "card": "1",
-          "value": "'heir'",
-          "when": null
+          "value": "'heir'"
         }
       }
     },
@@ -600,8 +496,7 @@
       "fields": {
         "monarch": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         }
       }
     },
@@ -609,13 +504,11 @@
       "fields": {
         "consort": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         },
         "monarch": {
           "card": "1",
-          "value": "'heir'",
-          "when": null
+          "value": "'heir'"
         }
       }
     },
@@ -623,13 +516,11 @@
       "fields": {
         "consort": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         },
         "monarch": {
           "card": "1",
-          "value": "'heir'",
-          "when": null
+          "value": "'heir'"
         }
       }
     },
@@ -637,13 +528,11 @@
       "fields": {
         "consort": {
           "card": "1",
-          "value": "'advisor'",
-          "when": null
+          "value": "'advisor'"
         },
         "monarch": {
           "card": "1",
-          "value": "'heir'",
-          "when": null
+          "value": "'heir'"
         }
       },
       "items": "'leader'"

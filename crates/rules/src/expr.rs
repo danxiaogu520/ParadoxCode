@@ -37,7 +37,7 @@ pub enum Primary {
         kind: ScalarKind,
         range: Option<Range>,
     },
-    /// `ref<event>`, `ref<event.country>`, `ref<impl ModifierSource>`, `ref<event.$S>`.
+    /// `ref<event>`, `ref<event.country>`, `ref<event.$S>`.
     Ref(Argument),
     /// `def<country_flag>`: defines a symbol at this position.
     Def(Argument),
@@ -51,7 +51,7 @@ pub enum Primary {
     Path { category: Option<String> },
     /// `'yes'` (constant) or `'monthly_{ref<power>}'` (template).
     Literal(Vec<LiteralPart>),
-    /// `$S` or `$key.scope`: a parameter of the enclosing parameterized schema.
+    /// `$S`: a formal parameter of the enclosing parameterized schema.
     Param(Param),
 }
 
@@ -116,8 +116,6 @@ impl Number {
 pub enum Argument {
     /// `event`, `event.country`, `event.$S`: a dotted path of names and parameters.
     Path(Vec<Segment>),
-    /// `impl ModifierSource`: the name of a trait.
-    Trait(String),
     /// `estate strip_prefix estate_`: a path whose member name loses an affix
     /// before it is substituted (the legacy template `strip_prefix`).
     Stripped {
@@ -134,7 +132,6 @@ impl Argument {
     pub fn segments(&self) -> Option<&[Segment]> {
         match self {
             Self::Path(segments) | Self::Stripped { segments, .. } => Some(segments),
-            Self::Trait(_) => None,
         }
     }
 }
@@ -146,13 +143,10 @@ pub enum Segment {
     Param(Param),
 }
 
-/// `$name` or `$name.column`: a formal parameter of the enclosing
-/// parameterized schema, optionally reading one column of a matched
-/// enum row (`$key.scope`).
+/// `$name`: a formal parameter of the enclosing parameterized schema.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Param {
     pub name: String,
-    pub column: Option<String>,
 }
 
 /// One piece of a literal: literal text or a `{expr}` hole.
@@ -454,7 +448,7 @@ impl<'source> Cursor<'source> {
         }
         let first = self.read_ident()?;
         if first == "impl" {
-            return Ok(Argument::Trait(self.read_ident()?));
+            return Err(self.error(self.position, "trait references are not supported"));
         }
         let mut segments = vec![Segment::Name(first)];
         loop {
@@ -504,13 +498,10 @@ impl<'source> Cursor<'source> {
         self.bump();
         let name = self.read_ident()?;
         self.skip_whitespace();
-        let column = if self.peek() == Some('.') {
-            self.bump();
-            Some(self.read_ident()?)
-        } else {
-            None
-        };
-        Ok(Param { name, column })
+        if self.peek() == Some('.') {
+            return Err(self.error(self.position, "parameter attributes are not supported"));
+        }
+        Ok(Param { name })
     }
 
     /// Parses the body of a `'...'` literal (`quoted`), or a bare template
@@ -726,14 +717,10 @@ mod tests {
                 Segment::Name("event".to_owned()),
                 Segment::Param(Param {
                     name: "S".to_owned(),
-                    column: None
                 }),
             ]))
         );
-        assert_eq!(
-            one("ref<impl ModifierSource>"),
-            Primary::Ref(Argument::Trait("ModifierSource".to_owned()))
-        );
+        assert!(parse("ref<impl ModifierSource>").is_err());
         assert_eq!(
             one("def<country_flag>"),
             Primary::Def(Argument::Path(vec![Segment::Name(
@@ -773,33 +760,13 @@ mod tests {
             one("ref<$S>"),
             Primary::Ref(Argument::Path(vec![Segment::Param(Param {
                 name: "S".to_owned(),
-                column: None,
             })]))
         );
         assert_eq!(
             one("quoted<$body>"),
             Primary::Quoted(Argument::Path(vec![Segment::Param(Param {
                 name: "body".to_owned(),
-                column: None,
             })]))
-        );
-    }
-
-    #[test]
-    fn parameters_parse_with_columns() {
-        assert_eq!(
-            one("$S"),
-            Primary::Param(Param {
-                name: "S".to_owned(),
-                column: None
-            })
-        );
-        assert_eq!(
-            one("$key.scope"),
-            Primary::Param(Param {
-                name: "key".to_owned(),
-                column: Some("scope".to_owned())
-            })
         );
     }
 
@@ -949,6 +916,28 @@ mod tests {
     }
 
     #[test]
+    fn formal_parameters_parse_and_attributes_are_rejected() {
+        assert_eq!(
+            one("$S"),
+            Primary::Param(Param {
+                name: "S".to_owned()
+            })
+        );
+        assert_eq!(
+            one("ref<event.$S>"),
+            Primary::Ref(Argument::Path(vec![
+                Segment::Name("event".to_owned()),
+                Segment::Param(Param {
+                    name: "S".to_owned()
+                })
+            ]))
+        );
+        for removed in ["$key.scope", "$S.scope", "ref<impl ModifierSource>"] {
+            assert!(parse(removed).is_err(), "{removed}");
+        }
+    }
+
+    #[test]
     fn parameter_errors_report_columns() {
         let failure = error("$");
         assert_eq!(failure.column, 2);
@@ -958,9 +947,11 @@ mod tests {
         );
 
         let failure = error("$key.");
-        assert_eq!(failure.column, 6);
+        assert_eq!(failure.column, 5);
         assert!(
-            failure.message.contains("expected an identifier"),
+            failure
+                .message
+                .contains("parameter attributes are not supported"),
             "{failure}"
         );
     }

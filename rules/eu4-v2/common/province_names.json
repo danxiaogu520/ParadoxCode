@@ -5,8 +5,12 @@
         {
           "card": "0..*",
           "key": "ref<province_id>",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
+        },
+        {
+          "body": "province_names_body__province_id",
+          "card": "0..*",
+          "key": "ref<province_id>"
         }
       ]
     },

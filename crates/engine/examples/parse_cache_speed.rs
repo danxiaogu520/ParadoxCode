@@ -17,7 +17,7 @@ fn main() {
     let _ = std::fs::remove_dir_all(&cache_root);
     let parse_cache = vfs::ParseCache::new(&cache_root);
 
-    let rules = game::eu4::first_party_rules().expect("embedded rules");
+    let rules = game::eu4::runtime_rules().expect("embedded rules");
     let profile = game::eu4::profile();
 
     let mut files: Vec<(PathBuf, String)> = Vec::new();

@@ -7,8 +7,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- 删除旧规则模型、编译模块、规则源和兼容语义消费者，生产语义统一读取 RulesIr；迁移保留的行为夹具，并修复引号脚本补全及缓存名称定位。
+- 修复 EU4 叛军需求和教廷行动的本地化绑定遗漏，恢复祖先性格描述的可选展示；嵌套字段的颜色分量不再被索引为省份引用。
+- EU4 贸易节点的执行作用域全面并入 `province`，同步规则值域、寄存器、链接、诊断和补全；节点符号引用与导航保留。
+
+- 规则源改为目录递归发现并按路径排序，删除源清单；持久索引以分析器构建身份失效（SQLite 24）。
+- 任务树以规则包声明的能力、字段名和写回顺序接入 IDE/LSP；图及写回机制移入引擎。
+
 ### Added
 
+- Rule-source formatting with `rulec fmt`, explicit default expansion with `--expanded`,
+  and a read-only `--check`. Installation recognition facts now live in `game.json` and
+  generate the static game descriptor at build time. Unused and insufficiently reused
+  mixins are removed or inlined without changing compiled rule semantics.
 - Phase 4 of the rules redesign moves production HIR, IDE and LSP consumers
   onto the compiled rules-v2 IR. Schema facts drive scopes, definitions and
   references, subtype restrictions, diagnostics, completion, hover and
@@ -187,6 +198,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
+- Retire the one-shot `rules-migrate` binary and converter modules. Behavior
+  contracts now run directly against the maintained rule sources and production
+  IR; the migration coverage report remains as a historical snapshot.
 - `AGENTS.md` is deleted and the repository policy check no longer requires
   it.
 - The `transcode` contract from `npm run test:contract` / `test:ci` (the remaining

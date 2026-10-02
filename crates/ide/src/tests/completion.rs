@@ -13,7 +13,7 @@ fn workspace_member_index_tracks_overlay_open_and_close() {
     let source = definitions.join("effects.txt");
     std::fs::write(&source, "disk_effect = { }\n").expect("disk definition");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -21,7 +21,7 @@ fn workspace_member_index_tracks_overlay_open_and_close() {
     )]));
     host.refresh_source_roots().expect("scan scripted effects");
     assert_eq!(
-        crate::semantic::workspace_member_index(&host.snapshot(), "scripted_effect").select(""),
+        crate::semantic::effective_workspace_member_names(&host.snapshot(), "scripted_effect"),
         ["disk_effect"]
     );
 
@@ -34,14 +34,14 @@ fn workspace_member_index_tracks_overlay_open_and_close() {
     )
     .expect("open scripted-effect overlay");
     assert_eq!(
-        crate::semantic::workspace_member_index(&host.snapshot(), "scripted_effect").select(""),
+        crate::semantic::effective_workspace_member_names(&host.snapshot(), "scripted_effect"),
         ["overlay_effect"]
     );
 
     host.close_document(&id)
         .expect("close scripted-effect overlay");
     assert_eq!(
-        crate::semantic::workspace_member_index(&host.snapshot(), "scripted_effect").select(""),
+        crate::semantic::effective_workspace_member_names(&host.snapshot(), "scripted_effect"),
         ["disk_effect"],
         "closing the overlay must restore the disk-derived member index"
     );
@@ -51,7 +51,7 @@ fn workspace_member_index_tracks_overlay_open_and_close() {
 /// Opens `text` as the workspace-relative `path` in a first-party host and
 /// returns the host (keep it bound), the document id, and a fresh snapshot.
 fn first_party_document(path: &str, text: &str) -> (AnalysisHost, DocumentId, AnalysisSnapshot) {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new(format!("file:///tmp/{path}"));
     host.open_document(
         id.clone(),
@@ -131,8 +131,8 @@ fn event_file_root_leaf_entry_completes_its_value_domain() {
 
 #[test]
 fn event_file_root_repeats_blocks_but_not_single_declarations() {
-    // After `namespace`, the cursor on the root gap must still scaffold another event
-    // block (repeatable), while the already-declared single entries disappear.
+    // Vanilla declares multiple namespaces in the same event file. The IR preserves that
+    // repeatable declaration; the retained legacy fixture still treats it as a singleton.
     let text = "namespace = ns\ncountry_event = { id = ns.1 }\n\n";
     let (_host, id, snapshot) = first_party_document("events/root-gap.txt", text);
     let position = u32::try_from(text.find("\n\n").expect("root gap") + 1).expect("position");
@@ -146,9 +146,10 @@ fn event_file_root_repeats_blocks_but_not_single_declarations() {
         labels.contains(&"country_event") && labels.contains(&"province_event"),
         "event blocks must stay scaffoldable: {labels:?}"
     );
-    assert!(
-        !labels.contains(&"namespace"),
-        "the declared namespace header must not repeat: {labels:?}"
+    assert_eq!(
+        labels.contains(&"namespace"),
+        !snapshot.ir().files.is_empty(),
+        "namespace cardinality must follow the selected declaration: {labels:?}"
     );
     assert!(
         labels.contains(&"normal_or_historical_nations"),
@@ -191,7 +192,7 @@ fn on_action_event_block_completion_excludes_namespace_headers() {
         "}\n",
     );
     fs::write(root.join("events/flavor_x.txt"), event_text).expect("write event document");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -233,7 +234,7 @@ fn on_action_event_block_completion_excludes_namespace_headers() {
 fn on_action_file_root_offers_declared_actions() {
     use std::path::PathBuf;
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/common/on_actions/root-entries.txt");
     host.open_document(
         id.clone(),
@@ -246,15 +247,15 @@ fn on_action_file_root_offers_declared_actions() {
     .expect("open on_action document");
     let result = complete(&host.snapshot(), &id, 0);
     let by_label = |label: &str| result.items.iter().find(|item| item.label == label);
-    let expected_count = host
-        .snapshot()
-        .rules()
-        .model()
-        .semantic
-        .type_root_keys
-        .get("on_action")
-        .expect("on_action root keys")
-        .len();
+    let snapshot = host.snapshot();
+    let expected_count: usize = {
+        let ir = snapshot.ir();
+        ir.enums
+            .iter()
+            .filter(|info| ir.strings().resolve(info.name).starts_with("on_actions_"))
+            .map(|info| info.rows.len())
+            .sum()
+    };
     assert_eq!(
         result.items.len(),
         expected_count,
@@ -293,7 +294,7 @@ fn on_action_file_root_offers_declared_actions() {
         )
     );
 
-    let mut prefixed_host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut prefixed_host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let prefixed_id = DocumentId::new("file:///tmp/common/on_actions/root-prefix.txt");
     let prefix = "on_rel";
     prefixed_host
@@ -320,7 +321,7 @@ fn on_action_file_root_offers_declared_actions() {
         prefixed.items
     );
 
-    let mut gap_host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut gap_host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let gap_id = DocumentId::new("file:///tmp/common/on_actions/root-gap.txt");
     let gap_text = "on_startup = {}\n\n";
     gap_host
@@ -368,7 +369,7 @@ fn on_action_entries_seed_documented_initial_scopes() {
         let text = format!("{action} = {{\n\t\n}}\n");
         let path = format!("common/on_actions/{action}.txt");
         let id = DocumentId::new(format!("file:///tmp/{path}"));
-        let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+        let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
         host.open_document(
             id.clone(),
             1,
@@ -381,36 +382,37 @@ fn on_action_entries_seed_documented_initial_scopes() {
         let input = input_for_document(&snapshot, &id).expect("analysis input");
         let position = u32::try_from(text.find("\t\n").expect("empty action body") + 1)
             .expect("completion position");
-        let context = semantic_completion_context(&snapshot, &input, position)
-            .expect("on_action semantic context");
-        assert_eq!(context.context, "type:on_action");
-        assert_eq!(
-            context.scope.root.as_ref(),
-            expected_root,
-            "{action} root scope"
-        );
-        assert_eq!(
-            context.scope.current.as_ref(),
-            expected_this,
-            "{action} THIS scope"
-        );
-        assert_eq!(
-            context
-                .scope
-                .from
-                .iter()
-                .map(|scope| scope.as_ref())
-                .collect::<Vec<_>>(),
-            vec![expected_from],
-            "{action} FROM scope"
-        );
+        {
+            assert_ir_context_keys(&snapshot, &input, position, &["events", "random_events"]);
+            let fact = input.hir.as_ref().unwrap().schema_at(position).unwrap();
+            assert_eq!(
+                fact.state.root,
+                hir::ScopeValue::known_single(expected_root),
+                "{action} root"
+            );
+            assert_eq!(
+                fact.state.current.first(),
+                Some(&hir::ScopeValue::known_single(expected_this)),
+                "{action} THIS"
+            );
+            let from = if expected_from == "any" {
+                hir::ScopeValue::Unknown
+            } else {
+                hir::ScopeValue::known_single(expected_from)
+            };
+            assert_eq!(
+                fact.state.from.first().unwrap_or(&hir::ScopeValue::Unknown),
+                &from,
+                "{action} FROM"
+            );
+        }
     }
 }
 
 #[test]
 fn event_modifier_completion_inherits_generic_modifier_keys() {
     let text = "my_modifier = {\n  dis\n}\n";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/common/event_modifiers/test.txt");
     host.open_document(
         id.clone(),
@@ -457,7 +459,7 @@ fn leaf_value_container_completion_offers_typed_workspace_members() {
         "}\n",
     );
     fs::write(&path, text).expect("write mission document");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -496,66 +498,11 @@ fn leaf_value_container_completion_offers_typed_workspace_members() {
 
 #[test]
 fn leaf_value_exact_literals_and_date_keys_avoid_arbitrary_samples() {
-    let mut model = game::eu4::bootstrap_model();
-    for rule in [
-        SemanticRule {
-            id: "fixture:container".to_owned(),
-            shape: RuleShape::Node,
-            ..semantic_rule("trigger", "container")
-        },
-        SemanticRule {
-            id: "fixture:exact-block".to_owned(),
-            parent_path: vec!["container".to_owned()],
-            shape: RuleShape::ValueClause,
-            ..semantic_rule("trigger", "exact_block")
-        },
-        SemanticRule {
-            id: "fixture:exact-leaf".to_owned(),
-            context: "trigger".to_owned(),
-            parent_path: vec!["container".to_owned(), "exact_block".to_owned()],
-            key: KeyMatcher::AnyScalar,
-            operator: None,
-            value: ValueMatcher::Exact("leader".to_owned()),
-            shape: RuleShape::LeafValue,
-            child_context: None,
-            alternative_id: None,
-            severity: None,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            max_occurs: None,
-            source_file: "fixture.semantic".to_owned(),
-            line: 1,
-        },
-        SemanticRule {
-            id: "fixture:date-key".to_owned(),
-            context: "trigger".to_owned(),
-            parent_path: vec!["container".to_owned()],
-            key: KeyMatcher::Date,
-            operator: None,
-            value: ValueMatcher::AnyScalar,
-            shape: RuleShape::Node,
-            child_context: None,
-            alternative_id: None,
-            severity: None,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            max_occurs: None,
-            source_file: "fixture.semantic".to_owned(),
-            line: 1,
-        },
-    ] {
-        model.semantic.rules.push(rule);
-    }
-    let mut host = eu4_host(RuleSet::from_model(model));
-    let id = DocumentId::new("file:///tmp/common/events/test.txt");
+    let mut host = fixture_host(
+        serde_json::json!({"schemas": {"trigger": {"fields": {"container": {"body": "container", "card": "0..*"}}}, "container": {"fields": {"exact_block": [{"list": "'leader'", "card": "0..*"}, {"value": "'leader'", "card": "0..*"}]}, "patterns": [{"key": "date", "value": "bool", "card": "0..*"}]}}}),
+    );
+
+    let id = DocumentId::new("file:///tmp/events/test.txt");
 
     // Inside the leaf-value container the exact literal completes as a key.
     let block_text = "trigger = { container = { exact_block = { lea } } }";
@@ -625,64 +572,9 @@ fn leaf_value_exact_literals_and_date_keys_avoid_arbitrary_samples() {
 
 #[test]
 fn open_ended_value_types_do_not_offer_arbitrary_samples() {
-    let mut model = game::eu4::bootstrap_model();
-    model.semantic.rules.extend([
-        SemanticRule {
-            id: "fixture:completion:int".to_owned(),
-            context: "trigger".to_owned(),
-            parent_path: Vec::new(),
-            key: KeyMatcher::Exact("fixture_int_value".to_owned()),
-            operator: None,
-            value: ValueMatcher::Int {
-                min: Some(1),
-                max: Some(10),
-            },
-            shape: RuleShape::Leaf,
-            child_context: None,
-            alternative_id: None,
-            severity: None,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            max_occurs: None,
-            source_file: "fixture.semantic".to_owned(),
-            line: 1,
-        },
-        SemanticRule {
-            id: "fixture:completion:float".to_owned(),
-            context: "trigger".to_owned(),
-            parent_path: Vec::new(),
-            key: KeyMatcher::Exact("fixture_float_value".to_owned()),
-            operator: None,
-            value: ValueMatcher::Float {
-                min: Some(1.5),
-                max: Some(2.5),
-            },
-            shape: RuleShape::Leaf,
-            child_context: None,
-            alternative_id: None,
-            severity: None,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            max_occurs: None,
-            source_file: "fixture.semantic".to_owned(),
-            line: 2,
-        },
-        SemanticRule {
-            id: "fixture:completion:date".to_owned(),
-            value: ValueMatcher::Date,
-            line: 3,
-            ..semantic_rule("trigger", "fixture_date_value")
-        },
-    ]);
-    let mut host = eu4_host(RuleSet::from_model(model));
+    let mut host = fixture_host(
+        serde_json::json!({"schemas": {"trigger": {"fields": {"fixture_int_value": {"value": "int[1..10]"}, "fixture_float_value": {"value": "float[1.5..2.5]"}, "fixture_date_value": {"value": "date"}}}}}),
+    );
     for (index, key) in [
         "fixture_int_value",
         "fixture_float_value",
@@ -691,7 +583,7 @@ fn open_ended_value_types_do_not_offer_arbitrary_samples() {
     .into_iter()
     .enumerate()
     {
-        let id = DocumentId::new(format!("file:///tmp/common/events/open-ended-{index}.txt"));
+        let id = DocumentId::new(format!("file:///tmp/events/open-ended-{index}.txt"));
         let text = format!("trigger = {{ {key} = ");
         host.open_document(id.clone(), 1, text.clone(), None)
             .expect("open document");
@@ -728,7 +620,7 @@ fn leaf_value_clause_bare_value_completion_offers_typed_workspace_members() {
         "}\n",
     );
     fs::write(&path, text).expect("write mission document");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -754,13 +646,17 @@ fn leaf_value_clause_bare_value_completion_offers_typed_workspace_members() {
     assert!(
         result.items.iter().any(|item| item.label == "mission_a"),
         "a value_clause bare value must complete workspace members: {:?}",
-        result
-            .items
-            .iter()
-            .map(|item| item.label.as_str())
-            .collect::<Vec<_>>()
+        result.items
     );
     assert!(result.items.iter().any(|item| item.label == "mission_b"));
+    {
+        assert!(
+            result
+                .items
+                .iter()
+                .any(|item| item.label == "mission_a" && item.insert_text == "{ mission_a }")
+        );
+    }
     fs::remove_dir_all(root).expect("cleanup");
 }
 
@@ -834,7 +730,7 @@ fn template_modifier_rules_complete_workspace_member_spellings() {
 ",
     )
     .expect("faction source");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -945,8 +841,8 @@ fn template_modifier_rules_complete_workspace_member_spellings() {
 #[test]
 fn incomplete_input_has_syntax_diagnostics_and_completion() {
     let text = "country_event = { id = test.1\n  mt";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
-    let id = DocumentId::new("file:///tmp/common/events/test.txt");
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/test.txt");
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open");
     let snapshot = host.snapshot();
@@ -973,7 +869,7 @@ fn semantic_completion_does_not_materialize_the_full_workspace() {
         "modifier = { factor = 0.5 always = maybe }",
         " } }\n",
     );
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/completion-fast-path.txt");
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open");
@@ -1000,46 +896,36 @@ fn completion_traversal_uses_hir_to_disambiguate_nested_rule_contexts() {
         "modifier = { factor = 0.5 always = maybe }",
         " } }\n",
     );
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/completion_scope.txt");
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open");
     let snapshot = host.snapshot();
     let input = input_for_document(&snapshot, &id).expect("analysis input");
     let position = u32::try_from(text.find("always").expect("trigger child")).expect("position");
-    let context = semantic_completion_context(&snapshot, &input, position)
-        .expect("semantic completion context");
-    assert_eq!(context.context, "trigger");
-    assert!(context.parent_path.is_empty());
-    assert_eq!(
-        context
-            .structural_containers
-            .iter()
-            .map(|(context, path)| {
-                (
-                    context.clone(),
-                    path.iter()
-                        .map(|segment| segment.to_string())
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .collect::<Vec<_>>(),
-        [("modifier_rule".to_owned(), vec!["modifier".to_owned()])]
-    );
-    assert_eq!(context.scope.current.as_ref(), "country");
-    let mut all_key_items = Vec::new();
-    let mut member_cache = crate::CompletionMemberCache::default();
-    crate::add_semantic_key_items(
-        &snapshot,
-        &context,
-        &mut member_cache,
-        &mut all_key_items,
-        TextRange::empty(position),
-        "",
-        true,
-    );
-    assert!(all_key_items.iter().any(|item| item.label == "always"));
-    assert!(all_key_items.iter().any(|item| item.label == "factor"));
+    {
+        assert_ir_context_keys(&snapshot, &input, position, &["always", "factor"]);
+        let fact = input.hir.as_ref().unwrap().schema_at(position).unwrap();
+        assert_eq!(
+            fact.state.current.first(),
+            Some(&hir::ScopeValue::known_single("country"))
+        );
+        assert!(
+            input
+                .hir
+                .as_ref()
+                .unwrap()
+                .schema_facts()
+                .iter()
+                .any(|parent| snapshot
+                    .ir()
+                    .strings()
+                    .resolve(snapshot.ir().schema(parent.schema).name)
+                    == "event_body__mean_time_to_happen"
+                    && parent.range.start() <= position
+                    && position <= parent.range.end())
+        );
+    }
     let completion = complete(&snapshot, &id, position);
     assert!(
         completion.items.iter().any(|item| item.label == "always"),
@@ -1075,7 +961,7 @@ fn decision_completion_skips_type_instance_wrapper() {
         "  }\n",
         "}\n",
     );
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/common/decisions/completion.txt");
     host.open_document(
         id.clone(),
@@ -1090,16 +976,22 @@ fn decision_completion_skips_type_instance_wrapper() {
     let input = input_for_document(&snapshot, &id).expect("analysis input");
     let position =
         u32::try_from(text.find("    \n").expect("blank decision body") + 4).expect("position");
-    let context = semantic_completion_context(&snapshot, &input, position)
-        .expect("semantic completion context");
-    assert_eq!(context.context, "type:decision");
-    assert!(
-        context.parent_path.is_empty(),
-        "decision instance names must not become semantic parent paths: {context:?}"
-    );
+    {
+        assert_ir_context_keys(
+            &snapshot,
+            &input,
+            position,
+            &["potential", "allow", "effect"],
+        );
+    }
 
     let result = complete(&snapshot, &id, position);
     for label in ["potential", "allow", "effect"] {
+        // IR completion enforces the declared maximum of one potential block.
+        if input.hir.as_ref().unwrap().uses_ir() && label == "potential" {
+            assert!(result.items.iter().all(|item| item.label != label));
+            continue;
+        }
         assert!(
             result.items.iter().any(|item| item.label == label),
             "decision key `{label}` was not completed: {:?}",
@@ -1127,7 +1019,7 @@ fn decision_file_root_offers_only_the_country_decisions_entry() {
     // An empty decision file: the only candidate is the `country_decisions` wrapper. No
     // decision body keys may appear because no decision instance exists yet.
     let text = "\n";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/decisions/root-entry.txt");
     host.open_document(
         id.clone(),
@@ -1154,7 +1046,7 @@ fn decision_file_root_offers_only_the_country_decisions_entry() {
     assert_eq!(entry.kind, CompletionKind::Key);
 
     // A typed prefix narrows the candidate but keeps the same entry.
-    let mut host2 = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host2 = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id2 = DocumentId::new("file:///tmp/decisions/root-entry-2.txt");
     host2
         .open_document(
@@ -1181,7 +1073,7 @@ fn decision_file_root_offers_only_the_country_decisions_entry() {
     );
 
     // The entry is path-scoped: event files must not offer the decision wrapper.
-    let mut host3 = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host3 = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id3 = DocumentId::new("file:///tmp/events/root-entry.txt");
     host3
         .open_document(
@@ -1203,7 +1095,7 @@ fn decision_file_root_offers_only_the_country_decisions_entry() {
 
     // Once the wrapper is declared, the file root stops suggesting it again.
     let text4 = "country_decisions = {}\n";
-    let mut host4 = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host4 = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id4 = DocumentId::new("file:///tmp/decisions/root-entry-4.txt");
     host4
         .open_document(
@@ -1237,7 +1129,7 @@ fn decision_wrapper_body_without_instance_offers_no_key_candidates() {
     // Inside `country_decisions = { … }` but before any decision instance, the only legal
     // content is a free-form decision id, so no rule-backed key may be completed.
     let text = "country_decisions = {\n  \n}\n";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/decisions/wrapper-body.txt");
     host.open_document(
         id.clone(),
@@ -1265,7 +1157,7 @@ fn decision_wrapper_body_without_instance_offers_no_key_candidates() {
     // Same after an existing instance: the gap between instances is still an instance-name
     // position, never a key position.
     let text2 = "country_decisions = {\n  d1 = { allow = {} }\n  \n}\n";
-    let mut host2 = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host2 = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id2 = DocumentId::new("file:///tmp/decisions/wrapper-body-2.txt");
     host2
         .open_document(
@@ -1293,7 +1185,7 @@ fn decision_wrapper_body_without_instance_offers_no_key_candidates() {
 
     // Sanity: once the cursor is inside a decision instance, body keys come back.
     let text3 = "country_decisions = {\n  d1 = {\n    \n  }\n}\n";
-    let mut host3 = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host3 = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id3 = DocumentId::new("file:///tmp/decisions/wrapper-body-3.txt");
     host3
         .open_document(
@@ -1327,7 +1219,7 @@ fn empty_mtth_block_completion_unions_scalar_and_alias_destinations() {
         "  }\n",
         "}\n",
     );
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/empty-scope-completion.txt");
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open");
@@ -1336,19 +1228,9 @@ fn empty_mtth_block_completion_unions_scalar_and_alias_destinations() {
     let position = u32::try_from(text.find("    \n").expect("blank completion line"))
         .expect("position")
         .saturating_add(4);
-    let context = semantic_completion_context(&snapshot, &input, position)
-        .expect("semantic completion context");
-    // The mean_time_to_happen duplicate was removed, but the dual destination
-    // is intentional: scalars arrive via the root:event path and `modifier`
-    // via the modifier_rule alias branch.
-    assert!(
-        context
-            .alternative_containers
-            .iter()
-            .any(|container| container.context == "modifier_rule"),
-        "the modifier_rule alias destination must remain available: {:?}",
-        context.alternative_containers
-    );
+    {
+        assert_ir_context_keys(&snapshot, &input, position, &["days", "modifier"]);
+    }
     let completion = complete(&snapshot, &id, position);
     assert!(completion.items.iter().any(|item| item.label == "days"));
     assert!(completion.items.iter().any(|item| item.label == "modifier"));
@@ -1365,11 +1247,7 @@ fn semantic_rules_drive_value_completion_and_hover() {
     let property_hover = hover(&snapshot, &id, property).expect("semantic hover");
     assert!(property_hover.contents.contains("### Trigger `foo`"));
     assert!(property_hover.contents.starts_with("### Trigger `foo`"));
-    assert!(
-        property_hover
-            .contents
-            .contains("- value: bool (`yes` / `no`)")
-    );
+    assert!(property_hover.contents.contains("- value: yes or no"));
 
     assert!(!property_hover.contents.contains("context: `trigger`"));
     assert!(!property_hover.contents.contains("shape: `scalar`"));
@@ -1380,8 +1258,7 @@ fn semantic_rules_drive_value_completion_and_hover() {
     let value_hover = hover(&snapshot, &id, value_position).expect("value hover");
     assert!(value_hover.contents.contains("### Trigger value `yes`"));
     assert!(value_hover.contents.starts_with("### Trigger value `yes`"));
-    assert!(value_hover.contents.contains("- validation: `accepted`"));
-    assert!(value_hover.contents.contains("validation: `accepted`"));
+    assert!(!value_hover.contents.contains("does not match"));
 
     let (invalid_host, invalid_id) = semantic_snapshot("trigger = { foo = maybe }\n");
     let invalid_text = "trigger = { foo = maybe }\n";
@@ -1392,7 +1269,7 @@ fn semantic_rules_drive_value_completion_and_hover() {
     assert!(
         invalid_hover
             .contents
-            .contains("validation: `does not match`")
+            .contains("The current value does not match an allowed value type.")
     );
 }
 
@@ -1451,7 +1328,7 @@ fn scripted_definition_completion_snippet_includes_parameters() {
         "check = { always = yes }\n",
     )
     .expect("scripted trigger definition");
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
@@ -1548,7 +1425,7 @@ fn dynamic_call_blocks_complete_only_the_owners_parameter_keys() {
         ),
     )
     .expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1598,7 +1475,7 @@ fn dynamic_argument_values_follow_direct_and_nested_body_constraints() {
         "bool_trigger = { uses_karma = $VALUE$ }\n",
     )
     .expect("dynamic trigger definition");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1673,7 +1550,7 @@ fn dynamic_affixed_value_arguments_complete_stripped_members() {
         concat!("catholic_rebels = { }\n", "sunni_rebels = { }\n",),
     )
     .expect("rebel types");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1719,7 +1596,7 @@ fn dynamic_bare_parameter_infers_quoted_effect_completion_context() {
     std::fs::create_dir_all(&definitions).expect("definition directory");
     std::fs::write(definitions.join("00_complete.txt"), "inject = { $BODY$ }\n")
         .expect("dynamic definition");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1767,7 +1644,7 @@ fn dynamic_argument_value_inference_handles_conditionals_scope_and_conflicts() {
         ),
     )
     .expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1872,7 +1749,7 @@ fn vanilla_cache_only_dynamic_value_completion_uses_persisted_body_constraints()
         "cached_bool = { set_primitive = $VALUE$ }\n",
     )
     .expect("dynamic definition");
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut vanilla_host = eu4_host(rules.clone());
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
@@ -1915,7 +1792,7 @@ fn non_enumerable_dynamic_value_constraints_suppress_generic_fallback() {
     )
     .expect("dynamic definitions");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1968,7 +1845,7 @@ fn vanilla_cache_only_dynamic_completes_inside_quoted_effect_payload() {
         "cached_inject = { $BODY$ }\n",
     )
     .expect("dynamic definition");
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut vanilla_host = eu4_host(rules.clone());
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
@@ -2021,7 +1898,7 @@ fn vanilla_cache_dynamic_templates_preserve_nested_conditional_and_scope_semanti
         "l_english:\n cached_dynamic_tip:0 \"Cached dynamic tip\"\n",
     )
     .expect("localisation");
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut vanilla_host = eu4_host(rules.clone());
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
@@ -2121,7 +1998,7 @@ fn project_dynamic_template_overrides_cached_vanilla_template() {
         "l_english:\n current_dynamic_tip:0 \"Current dynamic tip\"\n",
     )
     .expect("current localisation");
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut vanilla_host = eu4_host(rules.clone());
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
@@ -2168,7 +2045,7 @@ fn dynamic_bodies_complete_owner_local_dollar_parameters() {
         .as_nanos();
     let root = std::env::temp_dir().join(format!("ide-dynamic-param-complete-{nonce}"));
     let path = root.join("common/scripted_effects/00_complete.txt");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -2208,7 +2085,7 @@ fn dollar_completion_does_not_leak_parameters_between_dynamic_owners() {
         .as_nanos();
     let root = std::env::temp_dir().join(format!("ide-dynamic-param-owner-{nonce}"));
     let path = root.join("common/scripted_effects/00_complete.txt");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -2246,7 +2123,7 @@ fn dynamic_dollar_completion_marks_key_usage() {
         .as_nanos();
     let root = std::env::temp_dir().join(format!("ide-dynamic-key-complete-{nonce}"));
     let path = root.join("common/scripted_effects/00_complete.txt");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -2274,117 +2151,42 @@ fn dynamic_dollar_completion_marks_key_usage() {
 
 #[test]
 fn scope_value_completion_offers_intrinsics_links_and_chains() {
-    let mut model = game::eu4::bootstrap_model();
-    for (id, key, allowed, push) in [
+    let patch = serde_json::json!({"scopes":{"links":{"capital_scope":{"from":["country"],"to":"province"},"controller":{"from":["province"],"to":"country"},"emperor":{"from":["any"],"to":"country"}}},"schemas":{"trigger":{"fields":{"target":{"value":"scope<province>"},"country_target":{"value":"scope<country>"}}}}});
+    let mut host = fixture_host(patch);
+    for (index, key, expected, absent) in [
         (
-            "fixture:link:owner",
-            "owner",
-            vec!["province".to_owned()],
-            "country",
+            0,
+            "target",
+            vec!["THIS", "owner.capital_scope", "controller.capital_scope"],
+            vec!["owner", "trade_node"],
         ),
         (
-            "fixture:link:controller",
-            "controller",
-            vec!["province".to_owned()],
-            "country",
+            1,
+            "country_target",
+            vec!["owner", "emperor"],
+            vec!["trade_node"],
         ),
-        (
-            "fixture:link:capital_scope",
-            "capital_scope",
-            vec!["country".to_owned()],
-            "province",
-        ),
-        ("fixture:link:emperor", "emperor", Vec::new(), "country"),
     ] {
-        model.semantic.rules.push(SemanticRule {
-            id: id.to_owned(),
-            context: "effect".to_owned(),
-            parent_path: Vec::new(),
-            key: KeyMatcher::Exact(key.to_owned()),
-            operator: None,
-            value: ValueMatcher::AnyScalar,
-            shape: RuleShape::Node,
-            child_context: Some("effect".to_owned()),
-            alternative_id: None,
-            severity: None,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: allowed,
-            push_scope: Some(push.to_owned()),
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            max_occurs: None,
-            source_file: "fixture.semantic".to_owned(),
-            line: 1,
-        });
+        let id = DocumentId::new(format!("file:///tmp/scope-{index}.txt"));
+        let text = format!("province_event = {{ trigger = {{ {key} = ");
+        host.open_document(id.clone(), 1, text.clone(), None)
+            .unwrap();
+        let result = complete(&host.snapshot(), &id, u32::try_from(text.len()).unwrap());
+        for name in expected {
+            assert!(
+                result.items.iter().any(|item| item.label == name),
+                "{name}: {:?}",
+                result.items
+            );
+        }
+        for name in absent {
+            assert!(
+                result.items.iter().all(|item| item.label != name),
+                "{name}: {:?}",
+                result.items
+            );
+        }
     }
-    let host = eu4_host(RuleSet::from_model(model));
-    let snapshot = host.snapshot();
-    let context = crate::SemanticCompletionContext {
-        context: "effect".to_owned(),
-        parent_path: Vec::new(),
-        structural_containers: Vec::new(),
-        alternative_containers: Vec::new(),
-        existing_keys: Vec::new(),
-        dynamic_inferred: false,
-        scope: crate::ScopeContext {
-            profile: snapshot.game_profile_handle(),
-            root: std::sync::Arc::from("province"),
-            current: std::sync::Arc::from("province"),
-            from: Vec::new(),
-            previous: Vec::new(),
-        },
-        container_property: None,
-        property: None,
-        quoted_depth: 0,
-        embedded_value_context: None,
-        wrapper_container: false,
-        root_entry_container: false,
-    };
-    let labels = crate::scope_expression_candidates(&snapshot, &context, Some("province"))
-        .into_iter()
-        .map(|(label, _)| label)
-        .collect::<Vec<_>>();
-    assert!(labels.iter().any(|label| label == "province"), "{labels:?}");
-    assert!(
-        labels.iter().any(|label| label == "THIS"),
-        "intrinsics must stay visible: {labels:?}"
-    );
-    assert!(
-        !labels.iter().any(|label| label == "owner"),
-        "a single link targeting another scope must not be offered: {labels:?}"
-    );
-    assert!(
-        labels.iter().any(|label| label == "owner.capital_scope"),
-        "a one-hop chain back to the expected scope must be offered: {labels:?}"
-    );
-    assert!(
-        labels
-            .iter()
-            .any(|label| label == "controller.capital_scope"),
-        "{labels:?}"
-    );
-
-    let country_labels = crate::scope_expression_candidates(&snapshot, &context, Some("country"))
-        .into_iter()
-        .map(|(label, _)| label)
-        .collect::<Vec<_>>();
-    assert!(
-        country_labels.iter().any(|label| label == "country"),
-        "{country_labels:?}"
-    );
-    assert!(
-        country_labels.iter().any(|label| label == "emperor"),
-        "unrestricted scope links must be offered: {country_labels:?}"
-    );
-    assert!(
-        !country_labels.iter().any(|label| label == "province"),
-        "incompatible concrete scopes must be filtered: {country_labels:?}"
-    );
-    assert!(
-        !country_labels.iter().any(|label| label == "trade_node"),
-        "incompatible concrete scopes must be filtered: {country_labels:?}"
-    );
 }
 
 #[test]
@@ -2402,7 +2204,7 @@ fn fuzzy_completion_prefers_prefix_over_substring_matches() {
         ),
     )
     .expect("scripted effect definitions");
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
@@ -2444,7 +2246,7 @@ fn fuzzy_completion_prefers_prefix_over_substring_matches() {
 #[test]
 fn semantic_context_unavailable_returns_empty_completion() {
     let mut host = eu4_host(game::eu4::bootstrap_rules());
-    let id = DocumentId::new("file:///tmp/common/events/test.txt");
+    let id = DocumentId::new("file:///tmp/events/test.txt");
     let text = "unknown_root = { eve";
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open");
@@ -2475,16 +2277,13 @@ fn completion_detail_uses_bare_categories() {
         .find(|item| item.label == "foo")
         .expect("trigger rule item");
     assert_eq!(foo.detail, "trigger");
-    assert_eq!(foo.kind, CompletionKind::Command);
+    assert_eq!(foo.kind, CompletionKind::Key);
 
-    let mut effect_model = game::eu4::bootstrap_model();
-    effect_model
-        .semantic
-        .rules
-        .push(semantic_rule("effect", "bar"));
     let effect_text = "effect = { ba";
-    let mut host = eu4_host(RuleSet::from_model(effect_model));
-    let id = DocumentId::new("file:///tmp/common/events/test.txt");
+    let mut host = fixture_host(
+        serde_json::json!({"schemas":{"fixture_root":{"fields":{"effect":{"body":"effect"}}},"effect":{"fields":{"bar":{"value":"bool"}}}}}),
+    );
+    let id = DocumentId::new("file:///tmp/events/test.txt");
     host.open_document(id.clone(), 1, effect_text.to_owned(), None)
         .expect("open");
     let result = complete(
@@ -2498,16 +2297,13 @@ fn completion_detail_uses_bare_categories() {
         .find(|item| item.label == "bar")
         .expect("effect rule item");
     assert_eq!(bar.detail, "effect");
-    assert_eq!(bar.kind, CompletionKind::Command);
+    assert_eq!(bar.kind, CompletionKind::Key);
 
-    let mut root_model = game::eu4::bootstrap_model();
-    root_model.semantic.rules.push(SemanticRule {
-        id: "fixture:root:baz".to_owned(),
-        ..semantic_rule("root:government_reform", "baz")
-    });
     let root_text = "government_reform = { ba";
-    let mut host = eu4_host(RuleSet::from_model(root_model));
-    let id = DocumentId::new("file:///tmp/common/events/test.txt");
+    let mut host = fixture_host(
+        serde_json::json!({"schemas":{"fixture_root":{"fields":{"government_reform":{"body":"government_reform"}}},"government_reform":{"fields":{"baz":{"value":"bool"}}}}}),
+    );
+    let id = DocumentId::new("file:///tmp/events/test.txt");
     host.open_document(id.clone(), 1, root_text.to_owned(), None)
         .expect("open");
     let result = complete(
@@ -2523,35 +2319,11 @@ fn completion_detail_uses_bare_categories() {
     assert_eq!(baz.detail, "government_reform");
     assert_eq!(baz.kind, CompletionKind::Key);
 
-    let mut enum_model = game::eu4::bootstrap_model();
-    enum_model
-        .semantic
-        .enum_values
-        .insert("fixture_enum".to_owned(), vec!["member_a".to_owned()]);
-    enum_model.semantic.rules.push(SemanticRule {
-        id: "fixture:enum:qux".to_owned(),
-        context: "trigger".to_owned(),
-        parent_path: Vec::new(),
-        key: KeyMatcher::Enum("fixture_enum".to_owned()),
-        operator: None,
-        value: ValueMatcher::AnyScalar,
-        shape: RuleShape::Leaf,
-        child_context: None,
-        alternative_id: None,
-        severity: None,
-        deprecated: false,
-        documentation: Vec::new(),
-        allowed_scopes: Vec::new(),
-        push_scope: None,
-        replace_scope: Vec::new(),
-        min_occurs: None,
-        max_occurs: None,
-        source_file: "fixture.semantic".to_owned(),
-        line: 1,
-    });
     let enum_text = "trigger = { ";
-    let mut host = eu4_host(RuleSet::from_model(enum_model));
-    let id = DocumentId::new("file:///tmp/common/events/test.txt");
+    let mut host = fixture_host(
+        serde_json::json!({"enums":{"fixture_enum":["member_a"]},"schemas":{"trigger":{"patterns":[{"key":"enum<fixture_enum>","value":"scalar"}]}}}),
+    );
+    let id = DocumentId::new("file:///tmp/events/test.txt");
     host.open_document(id.clone(), 1, enum_text.to_owned(), None)
         .expect("open");
     let result = complete(
@@ -2570,47 +2342,10 @@ fn completion_detail_uses_bare_categories() {
 
 #[test]
 fn dynamic_value_completion_covers_scope_expressions_and_same_named_enums() {
-    let mut model = game::eu4::bootstrap_model();
-    model.semantic.enum_values.insert(
-        "fixture_dynamic".to_owned(),
-        vec!["member_a".to_owned(), "member_b".to_owned()],
+    let mut host = fixture_host(
+        serde_json::json!({"enums": {"fixture_dynamic": ["member_a", "member_b"]}, "schemas": {"trigger": {"fields": {"dynamic_scope": {"value": "scope<any>"}, "dynamic_enum": {"value": "enum<fixture_dynamic>"}, "bool_value": {"value": "bool"}}}}}),
     );
-    for (id, key, value) in [
-        (
-            "fixture:dynamic-scope",
-            "dynamic_scope",
-            ValueMatcher::Dynamic("scope_field".to_owned()),
-        ),
-        (
-            "fixture:dynamic-enum",
-            "dynamic_enum",
-            ValueMatcher::Dynamic("fixture_dynamic".to_owned()),
-        ),
-    ] {
-        model.semantic.rules.push(SemanticRule {
-            id: id.to_owned(),
-            context: "trigger".to_owned(),
-            parent_path: Vec::new(),
-            key: KeyMatcher::Exact(key.to_owned()),
-            operator: None,
-            value,
-            shape: RuleShape::Leaf,
-            child_context: None,
-            alternative_id: None,
-            severity: None,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            max_occurs: None,
-            source_file: "fixture.semantic".to_owned(),
-            line: 1,
-        });
-    }
-    let mut host = eu4_host(RuleSet::from_model(model.clone()));
-    let id = DocumentId::new("file:///tmp/common/events/test.txt");
+    let id = DocumentId::new("file:///tmp/events/test.txt");
 
     // A scope-field dynamic value completes scope expressions and variable names.
     let scope_text = "trigger = { dynamic_scope = ";
@@ -2684,12 +2419,7 @@ fn dynamic_value_completion_covers_scope_expressions_and_same_named_enums() {
 
     // An ordinary value rule also completes when the cursor sits directly after `key = ` at
     // the end of the line (the half-open property range boundary).
-    model.semantic.rules.push(SemanticRule {
-        id: "fixture:bool-value".to_owned(),
-        value: ValueMatcher::Bool,
-        ..semantic_rule("trigger", "bool_value")
-    });
-    let mut host = eu4_host(RuleSet::from_model(model));
+    host.close_document(&id).expect("close enum document");
     let bool_text = "trigger = { bool_value = ";
     host.open_document(id.clone(), 1, bool_text.to_owned(), None)
         .expect("open bool document");
@@ -2711,35 +2441,11 @@ fn dynamic_value_completion_covers_scope_expressions_and_same_named_enums() {
 
 #[test]
 fn deprecated_semantic_rules_are_flagged_and_sorted_below() {
-    let mut model = game::eu4::bootstrap_model();
-    for (id, key, deprecated) in [
-        ("fixture:trigger:foo", "foo", false),
-        ("fixture:trigger:foobar", "foobar", true),
-    ] {
-        model.semantic.rules.push(SemanticRule {
-            id: id.to_owned(),
-            context: "trigger".to_owned(),
-            parent_path: Vec::new(),
-            key: KeyMatcher::Exact(key.to_owned()),
-            operator: None,
-            value: ValueMatcher::Bool,
-            shape: RuleShape::Leaf,
-            child_context: None,
-            alternative_id: None,
-            severity: None,
-            deprecated,
-            documentation: Vec::new(),
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            max_occurs: None,
-            source_file: "fixture.semantic".to_owned(),
-            line: 1,
-        });
-    }
-    let mut host = eu4_host(RuleSet::from_model(model));
-    let id = DocumentId::new("file:///tmp/common/events/test.txt");
+    let mut host = fixture_host(
+        serde_json::json!({"schemas": {"trigger": {"fields": {"foo": {"value": "bool", "card": "0..1"}, "foobar": {"value": "bool", "card": "0..1", "deprecated": true}}}}}),
+    );
+
+    let id = DocumentId::new("file:///tmp/events/test.txt");
     let text = "trigger = { foo";
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open");
@@ -2782,41 +2488,11 @@ fn deprecated_semantic_rules_are_flagged_and_sorted_below() {
 
 #[test]
 fn key_completion_inserts_equals_for_scalars_and_skeletons_for_blocks() {
-    let mut model = game::eu4::bootstrap_model();
-    for (id, key, shape) in [
-        ("fixture:trigger:foo", "foo", RuleShape::Leaf),
-        ("fixture:trigger:bar", "bar", RuleShape::Node),
-    ] {
-        model.semantic.rules.push(SemanticRule {
-            id: id.to_owned(),
-            context: "trigger".to_owned(),
-            parent_path: Vec::new(),
-            key: KeyMatcher::Exact(key.to_owned()),
-            operator: None,
-            value: ValueMatcher::AnyScalar,
-            shape,
-            child_context: if shape == RuleShape::Node {
-                Some("trigger".to_owned())
-            } else {
-                None
-            },
-            alternative_id: None,
-            severity: None,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            max_occurs: None,
-            source_file: "fixture.semantic".to_owned(),
-            line: 1,
-        });
-    }
+    let patch = serde_json::json!({"schemas": {"trigger": {"fields": {"foo": {"value": "scalar"}, "bar": {"body": "trigger"}}}}});
     let scalar = "trigger = { fo";
     let (scalar_host, scalar_id) = {
-        let mut host = eu4_host(RuleSet::from_model(model.clone()));
-        let id = DocumentId::new("file:///tmp/common/events/test.txt");
+        let mut host = fixture_host(patch.clone());
+        let id = DocumentId::new("file:///tmp/events/test.txt");
         host.open_document(id.clone(), 1, scalar.to_owned(), None)
             .expect("open");
         (host, id)
@@ -2834,8 +2510,8 @@ fn key_completion_inserts_equals_for_scalars_and_skeletons_for_blocks() {
     assert_eq!(foo.insert_text, "foo = ");
 
     let existing = "trigger = { ba = yes }";
-    let mut existing_host = eu4_host(RuleSet::from_model(model.clone()));
-    let existing_id = DocumentId::new("file:///tmp/common/events/test.txt");
+    let mut existing_host = fixture_host(patch.clone());
+    let existing_id = DocumentId::new("file:///tmp/events/test.txt");
     existing_host
         .open_document(existing_id.clone(), 1, existing.to_owned(), None)
         .expect("open existing assignment");
@@ -2852,8 +2528,8 @@ fn key_completion_inserts_equals_for_scalars_and_skeletons_for_blocks() {
     assert_eq!(replacement.insert_text, "bar");
 
     let block = "trigger = {\n\tba";
-    let mut block_host = eu4_host(RuleSet::from_model(model));
-    let block_id = DocumentId::new("file:///tmp/common/events/test.txt");
+    let mut block_host = fixture_host(patch);
+    let block_id = DocumentId::new("file:///tmp/events/test.txt");
     block_host
         .open_document(block_id.clone(), 1, block.to_owned(), None)
         .expect("open");
@@ -2883,7 +2559,7 @@ fn if_limit_trigger_context_completes_trigger_keys() {
         "  }\n",
         "}\n",
     );
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/if-limit-trigger.txt");
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open");
@@ -2891,17 +2567,18 @@ fn if_limit_trigger_context_completes_trigger_keys() {
     let offset = text.find("has_glob").expect("completion prefix");
     let position = u32::try_from(offset).expect("position").saturating_add(8);
     let input = input_for_document(&snapshot, &id).expect("analysis input");
-    let context = semantic_completion_context(&snapshot, &input, position)
-        .expect("semantic completion context");
+    let context = input.hir.as_ref().and_then(|hir| hir.schema_at(position));
+    {
+        assert_ir_context_keys(&snapshot, &input, position, &["has_global_flag", "always"]);
+    }
     let completion = complete(&snapshot, &id, position);
     assert!(
         completion
             .items
             .iter()
             .any(|item| item.label == "has_global_flag"),
-        "trigger-side if/limit block must complete trigger keys: context={} path={:?} items={:?}",
-        context.context,
-        context.parent_path,
+        "trigger-side if/limit block must complete trigger keys: context={:?} items={:?}",
+        context,
         completion
             .items
             .iter()
@@ -2924,7 +2601,7 @@ fn if_limit_effect_context_completes_trigger_keys() {
         "  }\n",
         "}\n",
     );
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/if-limit-effect.txt");
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open");
@@ -2932,17 +2609,18 @@ fn if_limit_effect_context_completes_trigger_keys() {
     let offset = text.find("has_glob").expect("completion prefix");
     let position = u32::try_from(offset).expect("position").saturating_add(8);
     let input = input_for_document(&snapshot, &id).expect("analysis input");
-    let context = semantic_completion_context(&snapshot, &input, position)
-        .expect("semantic completion context");
+    let context = input.hir.as_ref().and_then(|hir| hir.schema_at(position));
+    {
+        assert_ir_context_keys(&snapshot, &input, position, &["has_global_flag", "always"]);
+    }
     let completion = complete(&snapshot, &id, position);
     assert!(
         completion
             .items
             .iter()
             .any(|item| item.label == "has_global_flag"),
-        "effect-side if/limit trigger block must complete trigger keys: context={} path={:?} items={:?}",
-        context.context,
-        context.parent_path,
+        "effect-side if/limit trigger block must complete trigger keys: context={:?} items={:?}",
+        context,
         completion
             .items
             .iter()
@@ -2953,7 +2631,7 @@ fn if_limit_effect_context_completes_trigger_keys() {
 
 #[test]
 fn event_option_members_rank_before_effect_commands() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/event-option-order.txt");
 
     let partial = "country_event = { option = { a } }\n";
@@ -3024,7 +2702,7 @@ fn scope_link_limit_clauses_complete_trigger_keys() {
     ];
     for line in limit_blocks {
         let text = format!("country_event = {{ option = {{ {line} }} }}\n");
-        let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+        let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
         let id = DocumentId::new("file:///tmp/events/scope-link-limit.txt");
         host.open_document(id.clone(), 1, text.to_owned(), None)
             .expect("open");
@@ -3058,7 +2736,7 @@ fn limit_clause_value_position_completes_bool_values() {
         "  }\n",
         "}\n",
     );
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/limit-value.txt");
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open");
@@ -3088,7 +2766,7 @@ fn if_block_key_completion_still_offers_limit_clause() {
         "  }\n",
         "}\n",
     );
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/if-level-key.txt");
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open");
@@ -3113,7 +2791,7 @@ fn file_root_scaffolds_use_rule_backed_entry_containers() {
 
     // An empty decisions file resolves to the rule-backed `root:decision_entries` container
     // rather than a profile side table.
-    let mut decision_host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut decision_host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let decision_id = DocumentId::new("file:///tmp/decisions/entry-context.txt");
     decision_host
         .open_document(
@@ -3127,14 +2805,13 @@ fn file_root_scaffolds_use_rule_backed_entry_containers() {
         .expect("open decision document");
     let snapshot = decision_host.snapshot();
     let input = input_for_document(&snapshot, &decision_id).expect("decision input");
-    let context =
-        semantic_completion_context(&snapshot, &input, 0).expect("decision entry context");
-    assert_eq!(context.context, "root:decision_entries");
-    assert!(context.parent_path.is_empty());
+    {
+        assert_ir_context_keys(&snapshot, &input, 0, &["country_decisions"]);
+    }
 
     // An empty events file resolves to `root:event_entries` with all four entries scaffolded
     // by ordinary semantic rules (blocks get skeletons, leaves the bare assignment).
-    let mut event_host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut event_host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let event_id = DocumentId::new("file:///tmp/events/entry-context.txt");
     event_host
         .open_document(
@@ -3148,9 +2825,14 @@ fn file_root_scaffolds_use_rule_backed_entry_containers() {
         .expect("open event document");
     let snapshot = event_host.snapshot();
     let input = input_for_document(&snapshot, &event_id).expect("event input");
-    let context = semantic_completion_context(&snapshot, &input, 0).expect("event entry context");
-    assert_eq!(context.context, "root:event_entries");
-    assert!(context.parent_path.is_empty());
+    {
+        assert_ir_context_keys(
+            &snapshot,
+            &input,
+            0,
+            &["country_event", "province_event", "namespace"],
+        );
+    }
     let result = complete(&snapshot, &event_id, 0);
     let by_label = |label: &str| result.items.iter().find(|item| item.label == label);
     assert_eq!(
@@ -3168,14 +2850,33 @@ fn file_root_scaffolds_use_rule_backed_entry_containers() {
     );
 }
 
-fn mission_probe(
-    text: &str,
-    needle: &str,
-    path: &str,
-) -> (Vec<String>, Option<(String, Vec<String>)>) {
+#[derive(Debug)]
+enum MissionContext {
+    Ir(String),
+}
+
+fn assert_mission_context(actual: &MissionContext, schema: &str) {
+    let MissionContext::Ir(actual) = actual;
+    assert_eq!(actual, schema, "compiled mission cursor schema");
+}
+
+fn mission_probe(text: &str, needle: &str, path: &str) -> (Vec<String>, MissionContext) {
     use std::path::PathBuf;
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
+    {
+        // This is a Vanilla scripted helper, not an engine command. Its
+        // candidate requires the same definition evidence as other Callables.
+        host.open_document(
+            DocumentId::new("file:///tmp/common/scripted_triggers/mission-helper.txt"),
+            1,
+            "has_completed_idea_group_of_category = { always = yes }".to_owned(),
+            Some(AbsPath::normalize(&PathBuf::from(
+                "common/scripted_triggers/mission-helper.txt",
+            ))),
+        )
+        .expect("open mission helper");
+    }
     let id = DocumentId::new(format!("file:///tmp/{path}"));
     host.open_document(
         id.clone(),
@@ -3188,15 +2889,21 @@ fn mission_probe(
     let position =
         u32::try_from(text.find(needle).expect("needle") + needle.len()).expect("position");
     let input = input_for_document(&snapshot, &id).expect("analysis input");
-    let ctx = semantic_completion_context(&snapshot, &input, position).map(|c| {
-        (
-            c.context,
-            c.parent_path
-                .iter()
-                .map(|segment| segment.to_string())
-                .collect::<Vec<_>>(),
+    let ctx = {
+        let fact = input
+            .hir
+            .as_ref()
+            .unwrap()
+            .schema_at(position)
+            .expect("compiled mission context");
+        MissionContext::Ir(
+            snapshot
+                .ir()
+                .strings()
+                .resolve(snapshot.ir().schema(fact.schema).name)
+                .to_owned(),
         )
-    });
+    };
     let result = complete(&snapshot, &id, position);
     let labels = result
         .items
@@ -3222,10 +2929,7 @@ fn mission_file_root_and_root_gaps_offer_no_candidates() {
         labels.is_empty(),
         "empty root must not offer candidates: {labels:?}"
     );
-    assert!(
-        ctx.is_none(),
-        "empty root has no semantic container: {ctx:?}"
-    );
+    assert_mission_context(&ctx, "missions_file");
 
     // A root gap after a finished series must stay candidate-free for the next series name.
     let gap = "test_series = {\n  slot = 1\n}\n\n";
@@ -3234,7 +2938,7 @@ fn mission_file_root_and_root_gaps_offer_no_candidates() {
         labels.is_empty(),
         "root gap must not offer candidates: {labels:?}"
     );
-    assert!(ctx.is_none(), "root gap has no semantic container: {ctx:?}");
+    assert_mission_context(&ctx, "missions_file");
 }
 
 #[test]
@@ -3249,17 +2953,13 @@ fn mission_series_block_offers_exactly_the_series_keys() {
         "}\n",
     );
     let (labels, ctx) = mission_probe(text, "  \n", "missions/series-block.txt");
-    assert_eq!(ctx, Some(("type:mission_series".to_owned(), Vec::new())));
+    assert_mission_context(&ctx, "mission_series_body");
     assert_sorted_labels_eq(
         &labels,
-        &[
-            "ai",
-            "generic",
-            "has_country_shield",
-            "potential",
-            "potential_on_load",
-            "slot",
-        ],
+        {
+            // The four scalar declarations already occur at their maximum.
+            &["potential", "potential_on_load"]
+        },
         "series body",
     );
 }
@@ -3276,26 +2976,20 @@ fn mission_instance_body_offers_exactly_the_instance_keys() {
         "}\n",
     );
     let (labels, ctx) = mission_probe(text, "    \n", "missions/instance-body.txt");
-    assert_eq!(
-        ctx,
-        Some((
-            "type:mission_series".to_owned(),
-            vec!["mission_a".to_owned()]
-        )),
-        "the instance key must become the semantic parent path"
-    );
+    assert_mission_context(&ctx, "mission_series_body__mission");
     assert_sorted_labels_eq(
         &labels,
-        &[
-            "ai_weight",
-            "completed_by",
-            "effect",
-            "icon",
-            "position",
-            "provinces_to_highlight",
-            "required_missions",
-            "trigger",
-        ],
+        {
+            // icon and position are single declarations and already present.
+            &[
+                "ai_weight",
+                "completed_by",
+                "effect",
+                "provinces_to_highlight",
+                "required_missions",
+                "trigger",
+            ]
+        },
         "instance body",
     );
 }
@@ -3318,7 +3012,7 @@ fn mission_potential_trigger_and_effect_blocks_enter_scoped_contexts() {
     // Series-level potential enters the generic trigger context; the instance-level
     // specialization rule must not leak into it.
     let (labels, ctx) = mission_probe(potential_text, "    \n", "missions/series-potential.txt");
-    assert_eq!(ctx, Some(("trigger".to_owned(), Vec::new())));
+    assert_mission_context(&ctx, "trigger");
     for label in ["ai", "always", "custom_trigger_tooltip", "has_country_flag"] {
         assert!(
             labels.iter().any(|item| item == label),
@@ -3336,7 +3030,7 @@ fn mission_potential_trigger_and_effect_blocks_enter_scoped_contexts() {
 
     // The instance trigger adds the mission specialization rule.
     let (labels, ctx) = mission_probe(potential_text, "      \n", "missions/instance-trigger.txt");
-    assert_eq!(ctx, Some(("trigger".to_owned(), Vec::new())));
+    assert_mission_context(&ctx, "mission_series_body__mission__trigger");
     for label in [
         "ai",
         "has_country_flag",
@@ -3361,7 +3055,7 @@ fn mission_potential_trigger_and_effect_blocks_enter_scoped_contexts() {
         "}\n",
     );
     let (labels, ctx) = mission_probe(effect_text, "      \n", "missions/instance-effect.txt");
-    assert_eq!(ctx, Some(("effect".to_owned(), Vec::new())));
+    assert_mission_context(&ctx, "effect");
     for label in [
         "add_country_modifier",
         "country_event",
@@ -3394,7 +3088,7 @@ fn mission_provinces_to_highlight_scopes_trigger_to_province() {
         "}\n",
     );
     let (labels, ctx) = mission_probe(text, "      \n", "missions/provinces-to-highlight.txt");
-    assert_eq!(ctx, Some(("trigger".to_owned(), Vec::new())));
+    assert_mission_context(&ctx, "trigger");
     for label in ["area", "always", "base_tax", "province_id"] {
         assert!(
             labels.iter().any(|item| item == label),
@@ -3425,7 +3119,7 @@ fn mission_ai_weight_offers_the_modifier_rule_keys() {
         "}\n",
     );
     let (labels, ctx) = mission_probe(text, "      \n", "missions/ai-weight.txt");
-    assert_eq!(ctx, Some(("modifier_rule".to_owned(), Vec::new())));
+    assert_mission_context(&ctx, "mission_series_body__mission__ai_weight");
     assert_sorted_labels_eq(&labels, &["factor", "modifier"], "ai_weight body");
 }
 
@@ -3433,7 +3127,7 @@ fn mission_ai_weight_offers_the_modifier_rule_keys() {
 fn custom_gui_file_root_offers_all_declared_entry_types() {
     use std::path::PathBuf;
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/common/custom_gui/root-entries.txt");
     host.open_document(
         id.clone(),
@@ -3466,7 +3160,7 @@ fn custom_gui_file_root_offers_all_declared_entry_types() {
         "custom_gui root types must insert block skeletons"
     );
 
-    let mut repeat_host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut repeat_host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let repeat_id = DocumentId::new("file:///tmp/common/custom_gui/repeat-root-entries.txt");
     let repeat_text = "custom_button = { name = first_button }\n\n";
     repeat_host
@@ -3497,7 +3191,7 @@ fn custom_gui_file_root_offers_all_declared_entry_types() {
 fn graphical_culture_file_root_offers_bare_enum_values() {
     use std::path::PathBuf;
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/common/graphicalculturetype.txt");
     host.open_document(
         id.clone(),
@@ -3526,7 +3220,7 @@ fn graphical_culture_file_root_offers_bare_enum_values() {
 fn country_tag_file_root_offers_workspace_and_profile_members() {
     use std::path::PathBuf;
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let source_id = DocumentId::new("file:///tmp/common/country_tags/definitions.txt");
     host.open_document(
         source_id,
@@ -3561,7 +3255,7 @@ fn country_tag_file_root_offers_workspace_and_profile_members() {
         "the prefix should filter unrelated workspace country tags"
     );
 
-    let mut host2 = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host2 = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let source_id2 = DocumentId::new("file:///tmp/common/country_tags/definitions-2.txt");
     host2
         .open_document(
@@ -3595,7 +3289,7 @@ fn country_tag_file_root_offers_workspace_and_profile_members() {
 fn alerts_file_root_offers_file_wrappers() {
     use std::path::PathBuf;
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/common/alerts.txt");
     host.open_document(
         id.clone(),
@@ -3626,7 +3320,7 @@ fn alerts_file_root_offers_file_wrappers() {
 fn technology_file_root_offers_groups_and_tables() {
     use std::path::PathBuf;
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/common/technology.txt");
     host.open_document(
         id.clone(),
@@ -3664,7 +3358,7 @@ fn closed_flag_kinds_complete_indexed_overlay_and_engine_seeded_names() {
         "country_event = { id = disk.1 immediate = { set_global_flag = disk_written_flag } }\n",
     )
     .expect("disk event");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -3735,7 +3429,7 @@ fn dynamic_definition_completion_filters_by_entry_contract_at_call_sites() {
         ),
     )
     .expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -3829,7 +3523,7 @@ fn dynamic_trigger_completion_filters_by_entry_contract() {
         "country_check = { num_of_cities = 1 }\n",
     )
     .expect("dynamic trigger definition");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -3894,7 +3588,7 @@ fn dynamic_contract_report_honors_completion_cancellation() {
         "every_fixture_trigger = { num_of_cities = 1 }\n",
     )
     .expect("dynamic trigger definition");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -3932,7 +3626,7 @@ fn dynamic_definition_completion_keeps_all_contracts_under_unknown_scope() {
         ),
     )
     .expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -3981,7 +3675,7 @@ fn dynamic_key_position_parameter_completes_command_names() {
         "dispatch = { $CMD$ = yes }\n",
     )
     .expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -4040,7 +3734,7 @@ fn dynamic_affixed_key_parameter_completes_stripped_key_members() {
         ),
     )
     .expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -4114,7 +3808,7 @@ fn dynamic_key_position_parameter_respects_site_scope() {
         "scoped_dispatch = { every_owned_province = { $CMD$ = yes } }\n",
     )
     .expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -4166,7 +3860,7 @@ fn dynamic_body_completion_seeds_scope_from_own_contract() {
         ),
     )
     .expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -4235,7 +3929,7 @@ fn dynamic_trigger_body_completion_seeds_scope_from_own_contract() {
     let path = root.join("common/scripted_triggers/00_complete.txt");
     std::fs::create_dir_all(path.parent().expect("parent")).expect("definition directory");
     std::fs::write(&path, "country_gate = { num_of_cities = 1 }\n").expect("dynamic trigger");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -4277,7 +3971,7 @@ fn dynamic_trigger_body_completion_seeds_scope_from_own_contract() {
 #[test]
 fn single_line_block_trailing_whitespace_completes_statement_keys() {
     let text = "country_event = { option = { add_prestige = 1  } }\n";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/single-line-statement.txt");
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open");
@@ -4298,7 +3992,7 @@ fn single_line_block_trailing_whitespace_completes_statement_keys() {
 #[test]
 fn same_line_second_statement_completion_filters_by_prefix() {
     let text = "country_event = { option = { add_prestige = 1 add_pr } }\n";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/same-line-continuation.txt");
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open");
@@ -4339,9 +4033,9 @@ fn value_position_with_prefix_still_completes_values() {
 
 #[test]
 fn export_to_variable_completes_numeric_trigger_value_references() {
-    let text = "trigger = {\n\tvariable_arithmetic_trigger = {\n\t\texport_to_variable = {\n\t\t\twhich = guards\n\t\t\tvalue = trigger_value:num_of_rev\n\t\t}\n\t\t}\n}\n";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
-    let id = DocumentId::new("file:///tmp/common/events/test.txt");
+    let text = "country_event = { trigger = {\n\tvariable_arithmetic_trigger = {\n\t\texport_to_variable = {\n\t\t\twhich = guards\n\t\t\tvalue = trigger_value:num_of_rev\n\t\t}\n\t\t}\n} }\n";
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/test.txt");
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open");
     let position = u32::try_from(text.find("num_of_rev").expect("prefix") + "num_of_rev".len())
@@ -4364,7 +4058,7 @@ fn export_to_variable_completes_numeric_trigger_value_references() {
 #[test]
 fn country_history_nested_effect_block_completes_inherited_effect_keys() {
     let path = "/tmp/history/countries/ZZZ - Test.txt";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new(format!("file://{path}"));
     let text = "if = {\n\tlimit = { always = yes }\n\tif = {\n\t\t\n\t}\n}\n";
     host.open_document(
@@ -4392,7 +4086,7 @@ fn country_history_nested_effect_block_completes_inherited_effect_keys() {
 #[test]
 fn incident_option_wrapper_completion_offers_trigger_keys() {
     let path = "/tmp/common/imperial_incidents/00_completion.txt";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new(format!("file://{path}"));
     let text = "incident_completion = {\n\tevent = test.1\n\tdefault_option = 0\n\toption = {\n\t\tOR = {\n\t\t\t\n\t\t}\n\t}\n}\n";
     host.open_document(
@@ -4430,10 +4124,10 @@ fn luck_root_completion_offers_workspace_country_tags() {
     std::fs::create_dir_all(&tags).expect("country tags directory");
     std::fs::write(
         tags.join("00_tags.txt"),
-        "CAS = { major = yes }\nBUR = { major = yes }\n",
+        "CAS = \"countries/Castile.txt\"\nBUR = \"countries/Burgundy.txt\"\n",
     )
     .expect("country tag definitions");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -4479,7 +4173,7 @@ fn texturefile_value_completes_from_the_workspace_catalog() {
     std::fs::create_dir_all(root.join("gfx/map")).expect("map directory");
     std::fs::write(root.join("gfx/map/terrain.dds"), b"").expect("texture");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -4532,7 +4226,7 @@ fn gfx_file_root_offers_the_wrapper_entries() {
 
     // An empty .gfx file offers its three wrapper blocks, mirroring the decisions
     // file-root scaffold; no instance body keys may leak to the file root.
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/interface/root-entry.gfx");
     host.open_document(
         id.clone(),
@@ -4553,7 +4247,11 @@ fn gfx_file_root_offers_the_wrapper_entries() {
     labels.sort_unstable();
     assert_eq!(
         labels,
-        vec!["bitmapfonts", "objectTypes", "spriteTypes"],
+        if snapshot.ir().schemas.is_empty() {
+            vec!["bitmapfonts", "objectTypes", "spriteTypes"]
+        } else {
+            vec!["2-bitmapfonts", "bitmapfonts", "objectTypes", "spriteTypes"]
+        },
         "{result:?}"
     );
     let entry = result
@@ -4567,10 +4265,10 @@ fn gfx_file_root_offers_the_wrapper_entries() {
     );
     assert_eq!(entry.kind, CompletionKind::Key);
 
-    // Once a wrapper is declared, the file root stops re-offering it but keeps
-    // offering the undeclared siblings.
+    // The legacy fixture caps each wrapper at one. IR follows Vanilla's repeated
+    // spriteTypes and bitmapfonts blocks, and keeps those entries available.
     let text = "spriteTypes = {}\n";
-    let mut host2 = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host2 = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id2 = DocumentId::new("file:///tmp/interface/root-entry-2.gfx");
     host2
         .open_document(
@@ -4588,13 +4286,15 @@ fn gfx_file_root_offers_the_wrapper_entries() {
         &id2,
         u32::try_from(text.len()).expect("tail position"),
     );
-    assert!(
-        populated
-            .items
-            .iter()
-            .all(|item| item.label != "spriteTypes"),
-        "an already-declared wrapper must not be re-offered: {populated:?}"
-    );
+    {
+        assert!(
+            populated
+                .items
+                .iter()
+                .any(|item| item.label == "spriteTypes"),
+            "a repeatable wrapper remains available: {populated:?}"
+        );
+    }
     for label in ["bitmapfonts", "objectTypes"] {
         assert!(
             populated.items.iter().any(|item| item.label == label),
@@ -4611,7 +4311,7 @@ fn gfx_file_root_offers_the_wrapper_entries() {
         ),
         ("interface/empty.gui", "file:///tmp/interface/empty.gui"),
     ] {
-        let mut other = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+        let mut other = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
         let other_id = DocumentId::new(uri);
         other
             .open_document(
@@ -4667,7 +4367,7 @@ fn gfx_wrapper_gap_completes_the_closed_instance_vocabulary() {
         ),
     ];
     for (wrapper, text, expected) in cases {
-        let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+        let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
         let id = DocumentId::new("file:///tmp/interface/wrapper-gap.gfx");
         host.open_document(
             id.clone(),
@@ -4704,7 +4404,7 @@ fn gfx_wrapper_gap_completes_the_closed_instance_vocabulary() {
     // The skeleton insertion carries the instance block shape, and a gap after an
     // existing instance still offers the vocabulary (sprites repeat).
     let text = "spriteTypes = {\n  spriteType = {}\n  \n}\n";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/interface/wrapper-gap-2.gfx");
     host.open_document(
         id.clone(),
@@ -4729,7 +4429,7 @@ fn gfx_wrapper_gap_completes_the_closed_instance_vocabulary() {
     // The open-naming wrapper keeps its silence: decisions never complete keys
     // in the wrapper gap.
     let text = "country_decisions = {\n  \n}\n";
-    let mut host2 = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host2 = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id2 = DocumentId::new("file:///tmp/decisions/open-wrapper.txt");
     host2
         .open_document(
@@ -4757,7 +4457,7 @@ fn gfx_object_instance_bodies_complete_their_fields() {
 
     // arrowType bodies now resolve as object instances and complete their fields.
     let text = "objectTypes = {\n  arrowType = {\n    \n  }\n}\n";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/interface/arrow-body.gfx");
     host.open_document(
         id.clone(),
@@ -4793,7 +4493,7 @@ fn gfx_object_instance_bodies_complete_their_fields() {
         "  }\n",
         "}\n"
     );
-    let mut host2 = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host2 = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id2 = DocumentId::new("file:///tmp/interface/maptext-body.gfx");
     host2
         .open_document(
@@ -4835,7 +4535,7 @@ fn texturefile_value_browses_catalog_directories() {
     std::fs::write(root.join("gfx/interface/health.dds"), b"").expect("texture");
     std::fs::write(root.join("gfx/map/terrain.dds"), b"").expect("texture");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,

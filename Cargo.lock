@@ -304,6 +304,7 @@ name = "game"
 version = "0.4.2"
 dependencies = [
  "dunce",
+ "engine",
  "parser",
  "rules",
  "serde",
@@ -359,6 +360,7 @@ dependencies = [
  "parser",
  "rules",
  "rustc-hash",
+ "serde_json",
  "text",
  "vfs",
 ]
@@ -465,6 +467,7 @@ dependencies = [
  "parser",
  "rules",
  "rustc-hash",
+ "serde_json",
  "text",
  "transcode",
  "vfs",
@@ -499,6 +502,7 @@ dependencies = [
  "hir",
  "parser",
  "rules",
+ "serde_json",
  "text",
  "vfs",
 ]
@@ -657,6 +661,7 @@ dependencies = [
  "parser",
  "percent-encoding",
  "rules",
+ "rusqlite",
  "serde",
  "serde_json",
  "tempfile",
@@ -783,6 +788,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
  "text",
 ]
 

@@ -5,8 +5,7 @@
         "ai_importance": {
           "card": "0..1",
           "doc": "How highly the AI prioritises enacting this decision; a factor around 400 appears to be high priority.",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "ai_will_do": {
           "body": "decision_body__ai_will_do",
@@ -17,8 +16,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "allow": {
           "body": "trigger",
@@ -29,26 +27,22 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "color": {
           "card": "0..1",
           "doc": "Changes the color used in the decision tab",
-          "list": "int[0..]",
-          "when": null
+          "list": "int[0..]"
         },
         "do_not_core": {
           "card": "0..*",
           "doc": "The AI will not try to core this province if the decision is available, meant to prevent them from using monarch power coring provinces that will get cored or given away to another country.",
-          "value": "ref<province_id>",
-          "when": null
+          "value": "ref<province_id>"
         },
         "do_not_integrate": {
           "card": "0..*",
           "doc": "The AI will not try to integrate this country if the decision is available, meant to prevent them from using diplomatic power integrating countries that will get annexed or changed.",
-          "value": "enum<country_tags>",
-          "when": null
+          "value": "ref<country_tag>"
         },
         "effect": {
           "body": "effect",
@@ -59,13 +53,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "major": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "potential": {
           "body": "trigger",
@@ -76,8 +68,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "provinces_to_highlight": {
           "body": "trigger",
@@ -88,8 +79,7 @@
               "root": "country",
               "this": "province"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -99,8 +89,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "int[0..400]",
-          "when": null
+          "value": "int[0..400]"
         }
       },
       "include": [
@@ -115,8 +104,7 @@
         "country_decisions": {
           "body": "decision_file__country_decisions",
           "card": "0..1",
-          "doc": "Wrapper block containing all country decision instances.",
-          "when": null
+          "doc": "Wrapper block containing all country decision instances."
         }
       }
     },

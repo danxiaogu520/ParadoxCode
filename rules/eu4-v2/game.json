@@ -108,6 +108,31 @@
       "sprite_probes": {}
     }
   },
+  "install": {
+    "display_name": "Europa Universalis IV",
+    "executable_paths": {
+      "linux": [
+        "eu4"
+      ],
+      "macos": [
+        "Europa Universalis IV.app/Contents/MacOS/eu4"
+      ],
+      "windows": [
+        "eu4.exe"
+      ]
+    },
+    "installation_directory_names": [
+      "Europa Universalis IV"
+    ],
+    "steam_app_id": 236850,
+    "validation_directories": [
+      "common",
+      "events",
+      "missions",
+      "decisions",
+      "localisation"
+    ]
+  },
   "scan_archive_extensions": [
     "gfx"
   ],
@@ -408,5 +433,51 @@
     "scripted_localization",
     "scripted_loc"
   ],
-  "source_encoding": "windows-1252"
+  "source_encoding": "windows-1252",
+  "source_format_version": 13,
+  "target_game_version": "1.37.5",
+  "mission_view": {
+    "path": {
+      "mode": "prefix",
+      "pattern": "missions/",
+      "case_sensitive": false
+    },
+    "symbol_kind": "mission",
+    "tree_fields": {
+      "slot": "slot",
+      "generic": "generic",
+      "ai": "ai",
+      "has_country_shield": "has_country_shield",
+      "potential": "potential",
+      "potential_on_load": "potential_on_load"
+    },
+    "node_fields": {
+      "icon": "icon",
+      "type": "type",
+      "provinces_to_highlight": "provinces_to_highlight",
+      "required_missions": "required_missions",
+      "position": "position",
+      "completed_by": "completed_by",
+      "trigger": "trigger",
+      "effect": "effect"
+    },
+    "tree_field_order": [
+      "slot",
+      "generic",
+      "ai",
+      "potential_on_load",
+      "potential",
+      "has_country_shield"
+    ],
+    "node_field_order": [
+      "icon",
+      "required_missions",
+      "position",
+      "completed_by",
+      "type",
+      "provinces_to_highlight",
+      "trigger",
+      "effect"
+    ]
+  }
 }

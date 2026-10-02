@@ -1,13 +1,16 @@
 # 规则系统重构：设计方案
 
-> 状态：**设计已定稿；阶段 0–4 已完成**，阶段 5 待实施。阶段 0 于 2026-09-29 合入 main（分支 `refactor/rules-drop-records`）；阶段 1–4 在长期分支 `feat/rules-v2`（2026-09-30 / 10-01）。第 3 节列出全部已定决策；第 8 节只剩实施期间凭数据收口的细节，不阻塞开工。
+> 状态：**阶段 1–5 已完成本次范围内的实现与本地验收**（2026-10-03）。阶段 0 于 2026-09-29 合入 main；阶段 1–5 在长期分支 `feat/rules-v2`。89 条待核验资源项按用户决定排除；PR CI 仍是合并门禁。完整落地状态见 §8.1，冻结版本和验收边界见 `docs/phase5-validation.md`。
 > 前提：项目处于 0.x，**允许破坏性修改，不考虑历史兼容**；规则源格式**继续使用 JSON**。
-> 统计口径：2026-09-29，`rules/eu4`（`source_format_version` 10）与 `crates/*`。
+> 重构前问题的统计口径：2026-09-29，`rules/eu4`（`source_format_version` 10）与 `crates/*`。第 1 节保留当时的问题和代码位置，当前入口见文末。
 
 ## 0. 目标
 
-让规则本身成为一个**自洽的小型类型语言**：作者写面向人的源语言（可嵌套、可复用、可条件化），
+让规则本身成为一个**自洽的小型类型语言**：作者写面向人的源语言（可嵌套、可复用），
 编译器（`rulec`）做语义检查并降级为**树形 runtime IR**；消费方沿 IR 树行走，不再在运行时从扁平行重建结构。
+
+2026-10-02 的范围简化删除字段 `when`/`unless`、结构推导 subtype、枚举属性列和通用 trait 元数据；
+显式 subtype、脚本控制流和 Callable 文本条件继续使用。上述删除属于方案变更，不列为待补实现。
 
 非目标（第一版不做）：mod 叠加规则（`extends`/`patch`）、多游戏、按游戏版本（`since`/`until`）分叉。
 只保证 IR 中 `game_id` 的位置，不为这些特性做任何语义设计（决策 D4）。
@@ -68,15 +71,15 @@
 
 ```
 files     → 路径选择 → 解析器 / 根 schema
-schemas   → 结构：fields / patterns / items / include / when / def / 参数
+schemas   → 结构：fields / patterns / items / include / def / 参数
 mixins    → 纯结构字段包（编译期展开）
 types     → 符号名字空间：resolution / subtypes / open / builtin / impl
-traits    → 能力 + 绑定 + 约束（编译期展开）
-enums     → 枚举，可带属性列（承载 on_actions 等）
+traits    → 名称标记；实现数据由 types.*.impl 给出
+enums     → 字面成员列表
 scopes    → 作用域类型 / 寄存器 / 链接 / 兼容
 ```
 
-与旧草案相比，**没有顶层 `intrinsics` 段**：控制流原语是字段属性（2.9），避免“键名全局生效”；**没有单独的 `tables`**：enum 可带列（2.6），一个概念。
+与旧草案相比，**没有顶层 `intrinsics` 段**：控制流原语是字段属性（2.9），避免“键名全局生效”；**没有单独的 `tables`**：enum 只保存字面成员列表（2.6）。
 
 目录按游戏领域组织（决策 D3）：
 
@@ -106,10 +109,9 @@ range     = "[" [ number ] ".." [ number ] "]" ;
 ctor      = "ref" | "def" | "enum" | "scope" | "quoted" ;
 arg       = name [ "." name ]            (* ref<event.country>：类型.subtype *)
           | name "strip_prefix" name     (* ref<estate strip_prefix estate_>：去掉词缀 *)
-          | "impl" name                  (* ref<impl ModifierSource> *)
           | param ;
 literal   = "'" { char | "{" expr "}" } "'" ;   (* 无洞即常量；有洞即模板 *)
-param     = "$" name [ "." name ] ;       (* 参数化 schema 的形参；$key.<列> 见 2.6 *)
+param     = "$" name ;                    (* 参数化 schema 的形参 *)
 name      = ident ;
 ```
 
@@ -121,7 +123,7 @@ name      = ident ;
 | `int[1..10]` `float[0..]` `bool` `date` | 标量类型；边界一律为数字 | `Int`/`Float`/`Bool`/`Date` |
 | `loc` | 本地化键 | `Localisation` |
 | `path` `path<gfx>` | 文件路径；`<texture>` 等为路径类别 | `Filepath`/`TexturePath` |
-| `ref<event>` `ref<event.country>` `ref<impl ModifierSource>` | 符号引用；可限定 subtype 或 trait | `Type`、`Dynamic`、`lexicon.member_kind_aliases` |
+| `ref<event>` `ref<event.country>` | 符号引用；可限定 subtype | `Type`、`Dynamic`、`lexicon.member_kind_aliases` |
 | `def<country_flag>` | 在此处**定义**一个符号 | `DynamicSet`、`profile.value_definitions` |
 | `enum<country_tags>` | 枚举成员 | `Enum` |
 | `scope<country>` `scope<any>` | 作用域表达式（寄存器、链接、tag…） | `Scope` |
@@ -166,7 +168,6 @@ schema 是一个**块**的描述：
 | `card` | `"1"`、`"0..1"`、`"1..*"`、`"0..*"`、`"2..5"` | `"0..1"`（现有 8,463 行中 7,355 行 `max=1`，1,013 行无上限） |
 | `scope` | 作用域效应，见 2.8 | 无 |
 | `def` | 此位置定义一个符号实例，见 2.4 | 无 |
-| `when` / `unless` | subtype 条件，见 2.5 | 无 |
 | `control` | 控制流原语，见 2.9 | 无 |
 | `doc` / `severity` / `deprecated` | 文档 / 诊断等级 / 弃用 | 空 / error / false |
 
@@ -184,7 +185,7 @@ schema 是一个**块**的描述：
 }}
 ```
 
-约束：形参只能出现在类型表达式的 `arg` 位置；只允许一层参数（schema 形参不能再作为另一参数化 schema 的实参以外的用途）；每个参数化 schema 的实例数上限 64，超出即编译错误（防爆炸）。
+约束：形参只能出现在类型表达式或另一 schema 的实参位置；只允许一层参数（schema 形参不能再作为另一参数化 schema 的实参以外的用途）；每个参数化 schema 的实例数上限 64，超出即编译错误（防爆炸）。
 
 ### 2.4 Files 与 def：根结构合入 schema
 
@@ -214,12 +215,12 @@ schema 是一个**块**的描述：
 }
 ```
 
-`files` 条目：`path`（目录前缀，去掉 `game/` 遗留前缀）、`ext`、`file`（精确文件名，取代 `path_file`）、`strict`（不递归子目录）、`parser`（`script`/`localisation`/`asset`/`syntax-only`，默认 `script`）、`resolution`（`replace-by-path`/`merge`/`replace-directory`，默认 `replace-by-path`）、`root`（根 schema 名；或一个带 `def` 的字段规格，表示整个文件就是一个实例）。
+`files` 条目：`path`（目录前缀，去掉 `game/` 遗留前缀）、`ext`、`file`（精确文件名，取代 `path_file`）、`strict`（不递归子目录）、`parser`（`script`/`localisation`/`asset`/`syntax-only`，默认 `script`）、`resolution`（`replace-by-path`/`merge`，默认 `replace-by-path`）、`root`（根 schema 名；或一个带 `def` 的字段规格，表示整个文件就是一个实例）。
 
 `def` 规格：
 - 简写：值或键位置写 `def<T>`，实例名取该标量本身。
 - 完整：`{ "type": "T[.subtype]", "name": ... }`，`name` 取 `"key"`（默认）/ `"field:<字段名>"` / `"file"`（文件名去扩展名），可附 `"strip_prefix"`/`"strip_suffix"`（取代 `name_strip_prefix/suffix` 与 `lexicon.member_name_suffixes`）。
-- 在 def 位置写 subtype（`event.country`）即给实例打上该 subtype；这是 subtype 的第一种来源（2.5）。
+- 在 def 位置写 subtype（`event.country`）即给实例打上该 subtype；subtype 只由定义位置赋予（2.5）。
 
 旧机制映射：
 
@@ -239,59 +240,37 @@ schema 是一个**块**的描述：
 
 结果：Types 子系统只剩纯符号语义；“去哪收集实例、哪里是引用”全由结构回答；一个类型可有多个 def 位置。
 
-### 2.5 条件与 subtype
+### 2.5 显式 subtype 与统一展示
 
-subtype 有两种来源，均在 `types` 中声明：
+subtype 只用于由定义位置明确赋予的符号分类，例如 `def` 的
+`event.country` 与对应的 `ref<event.country>`。subtype 声明为空对象。
+不再依据实例字段推导 subtype，不支持字段 `when`/`unless` 或 subtype 内的 `impl`。
 
-```jsonc
-"types": { "event": {
-  "subtypes": {
-    "country":   {},                                         // 来源一：由 def 位置赋予（events_file）
-    "province":  {},
-    "triggered": { "when": { "is_triggered_only": "'yes'" } } // 来源二：由实例体中的标量字段判定
-  }
-}}
-```
+schema 字段统一提供，继续执行类型、形态、作用域与数量检查。
+本地化和图标 binding 合并至类型级 `impl`，所有实例均可展示；原条件必需
+binding 改为可选展示项，类型原有的必需 binding 保持原要求。
+原先引用结构推导 subtype 的表达式放宽为基础类型引用。
+字段数量组合继续由 `forms` 表达，脚本 `if`/`else` 等由 `control` 表达。
+源格式版本升为 13，解析器拒绝已删除的条件语法和未使用的泛化声明。
 
-`when` 是“字段 → 类型表达式”的合取；值写 `null` 表示“该字段不存在”（取代 `conditional_definitions` 的 `absent_field`）。字段规格用 `when`/`unless` 引用 subtype：
-
-```jsonc
-"event_body": { "fields": {
-  "is_triggered_only":   { "value": "bool" },
-  "mean_time_to_happen": { "body": "mtth", "unless": "triggered" },
-  "trigger":             { "body": "trigger" }
-}}
-```
-
-**求值顺序（消除循环依赖）**：
-1. 先确定 def 赋予的 subtype；
-2. 再对实例体的**直接子标量字段**求值所有 `when` 谓词；被任何 `when` 读取的字段本身**不得带** `when`/`unless`（编译期检查）；
-3. 最后用得到的 subtype 集合校验整个实例体。多个 subtype 可同时成立（`country` + `triggered`）。
-
-`ref<event.triggered>` 只接受满足该 subtype 的实例。
-
-### 2.6 Enums：可带属性列
+### 2.6 Enums：字面成员列表
 
 ```jsonc
 "enums": {
-  "dlc_event_pictures": ["...", "..."],                        // 简写：无列
-  "on_actions": {
-    "columns": { "scope": "scope_type", "from": "scope_type?" },
-    "rows": {
-      "on_startup":                     { "scope": "country" },
-      "on_province_religion_converted": { "scope": "province" }
-    }
-  }
+  "on_actions_country": ["on_startup"],
+  "on_actions_province": ["on_province_religion_converted"]
 },
 "schemas": {
-  "on_actions_file": { "map": { "key": "enum<on_actions>", "body": "on_action_body<$key.scope>" } }
+  "on_actions_file": { "patterns": [
+    { "key": "enum<on_actions_country>", "body": "on_action_body<country>", "card": "0..*" },
+    { "key": "enum<on_actions_province>", "body": "on_action_body<province>", "card": "0..*" }
+  ] }
 }
 ```
 
-`$key` 是 map/pattern 中**被匹配到的键**的隐式绑定；键为带列 enum 时可读其列。编译器按列值把 enum 行分组，为每组生成一个 pattern（键 matcher 为该组行子集，值为单态化后的 `on_action_body<country>` 等），runtime 仍然只有普通 pattern。
-
-on_action 从 1,130 行变为一个参数化 schema + 一张 enum，并恢复国家/省份事件的区分。
-`profile.enum_extra_members` 直接并入 rows；`engine_set_flags` 见 2.7 的 `builtin`。
+不同作用域由明确分组的 enum 和 pattern 表达，共用 `on_action_body<S>`。
+不再保留属性列、行子集或 `$key` 隐式绑定，参数只来自 schema 显式形参。
+`profile.enum_extra_members` 直接并入成员列表；`engine_set_flags` 见 2.7 的 `builtin`。
 
 ### 2.7 Types、mixin 与 trait
 
@@ -321,15 +300,14 @@ on_action 从 1,130 行变为一个参数化 schema + 一张 enum，并恢复国
 
 include 冲突（两个 mixin 或 mixin 与本体声明同一键）为编译错误，除非本体显式覆盖（本体优先，且必须标 `"override": true`）。
 
-**trait = 能力与约束**（属于 Types）。第一版内置集合固定为 4 个，新增 trait 需要改 Rust（runtime 要理解它的语义）：
+**trait = 消费方识别的名称标记**（属于 Types）。声明只写空对象，实际绑定或 body 由类型的 `impl` 给出，不保留通用 params、bindings、requires 或 capability 标签。第一版内置集合固定为 4 个，新增 trait 需要改 Rust（runtime 要理解它的语义）：
 
 ```jsonc
 "traits": {
   "Localised":      {},                                   // binding 集合由 impl 给出
   "HasIcon":        {},                                   // binding 集合由 impl 给出
   "ModifierSource": {},
-  "Callable":       { "params": { "body": "schema" },
-                      "capabilities": ["replacement", "condition", "dynamic_key", "opaque_text"] }
+  "Callable":       {}
 },
 "types": {
   "decision": { "impl": { "Localised": {
@@ -338,11 +316,8 @@ include 冲突（两个 mixin 或 mixin 与本体声明同一键）为编译错�
   } } },
   "idea_group": {
     "impl": { "Localised": { "name": { "loc": "$", "required": true },
-                             "bonus": { "loc": "$_bonus", "required": true } } },
-    "subtypes": { "country_idea": {
-      "when": { "free": "'yes'" },
-      "impl": { "Localised": { "start": { "loc": "$_start", "required": true } } }
-    } }
+                             "bonus": { "loc": "$_bonus", "required": true },
+                             "start": { "loc": "$_start" } } }
   },
   "building":        { "impl": { "Localised": { "name": { "loc": "building_$", "required": true } },
                                  "HasIcon": { "icon": { "sprite": "GFX_$", "required": true } },
@@ -351,19 +326,19 @@ include 冲突（两个 mixin 或 mixin 与本体声明同一键）为编译错�
 }
 ```
 
-- `Localised`/`HasIcon` 的 **impl 逐条枚举 binding**：实参名即 binding 名（hover 行标签与稳定身份的一部分），实参值给出 `loc`/`sprite` 模板与 `required`。binding 集合是**每类型的数据**，故 trait 本身不声明 binding。D19 变更说明：① 语料用例 188 条 binding、96 个类型、38 个 binding 名；② IR 退化形态——单态化时展开为每类型（含子类型）的 `(name, 模板, required)` 扁平行，runtime 无动态派发；③ 对 64 实例上限无影响（trait impl 不是参数化 schema 实例）；④ 规范 diff 见 `docs/rules-language.md` §7.3。
+- `Localised`/`HasIcon` 的 **impl 逐条枚举 binding**：实参名即 binding 名（hover 行标签与稳定身份的一部分），实参值给出 `loc`/`sprite` 模板与 `required`。binding 集合是**每类型的数据**，故 trait 本身不声明 binding。D19 变更说明：① 语料用例 188 条 binding、96 个类型、38 个 binding 名；② IR 退化形态——单态化时展开为每类型的 `(name, 模板, required)` 扁平行，runtime 无动态派发；③ 对 64 实例上限无影响（trait impl 不是参数化 schema 实例）；④ 规范 diff 见 `docs/rules-language.md` §7.3。
 - binding 模板里的 `$` 是**实例名占位符**，与类型表达式的 `$形参` 不在同一语法中（binding 模板不是类型表达式）。
-- `impl` 可写在 subtype 内，只对该 subtype 生效（取代 binding 的 `subtype`/`condition`）；subtype impl **追加** binding，重复声明同名 binding 是错误。
-- `Localised`/`HasIcon` 取代 `bindings/localisation.json` 与 `bindings/sprite.json`；`Callable` 取代 `dynamic_definition` 与 `token_definitions`（`$param$` 参数由 Callable 统一处理），其 capability 集合是 legacy usage flags 的并集（含 `opaque_text`）；`ModifierSource` 取代 profile `semantic_context_inheritance` 中 22 条 `type:X → [modifier]`，并使 `ref<impl ModifierSource>` 可用——这些类型的 modifier 字段直接写在实例体里，因此不带 `requires`。
+- `impl` 只在类型级声明，对该类型的所有实例生效。
+- `Localised`/`HasIcon` 取代 `bindings/localisation.json` 与 `bindings/sprite.json`；`Callable` 取代 `dynamic_definition` 与 `token_definitions`（`$param$` 参数由 Callable 统一处理），调用语义由其 trait 身份和 body 实参决定；`ModifierSource` 取代 profile `semantic_context_inheritance` 中 22 条 `type:X → [modifier]`，消费方直接查询实现该 trait 的类型以执行 modifier 诊断。引用只支持具体类型及显式 subtype。
 
-**判定规则**：只有满足以下之一才定义为 trait，否则用 mixin——(a) 引擎/IDE 会统一处理它（hover、本地化检查、调用参数推导）；(b) 它出现在类型约束中。
+**判定规则**：只有引擎/IDE 会统一处理它（hover、本地化检查、调用参数推导）才定义为 trait，否则用 mixin。
 **防过度设计约束**：无 trait 继承链；同一作用域对同一 trait 只能 impl 一次、同一 binding 名只能贡献一次；全部编译期展开成扁平数据，runtime 无动态派发。
 
 ### 2.8 Scopes
 
 ```jsonc
 "scopes": {
-  "types":     ["country", "province", "trade_node", "unit", "monarch", "heir", "consort",
+  "types":     ["country", "province", "unit", "monarch", "heir", "consort",
                 "mercenary_company", "rebel_faction", "religion", "culture", "advisor", "leader",
                 "trade_company", "global", "none"],
   "registers": { "root": {}, "this": {}, "prev": { "chain": true }, "from": { "chain": true } },
@@ -375,10 +350,11 @@ include 冲突（两个 mixin 或 mixin 与本体声明同一键）为编译错�
     "event_target:{ref<event_target>}":        { "from": ["any"], "to": "any" },
     "global_event_target:{ref<global_event_target>}": { "from": ["any"], "to": "any" }
   },
-  "compat": [{ "actual": "trade_node", "expected": "province" }]
+  "compat": []
 }
 ```
 
+- EU4 的贸易节点执行作用域统一为 `province`，包括迭代器、节点名称块和贸易政策寄存器。`trade_node` 仅保留为节点定义与 `ref<trade_node>` 的符号类型，不作为 scope 类型或别名。
 - `any` 是保留字，表示任意作用域，不出现在 `types` 中。
 - `registers.chain` 表示可重复拼接（`prev_prev`、`fromfrom`…），取代 `dynamic_rules.rs:1856` 的硬编码列表与 `scope_names` 中手写的 `prev_prev`。
 - 链接键可以是模板，取代 `dynamic_scope_prefixes`；`dynamic_value_prefixes` 同理以值模板表达（`'variable:{ref<variable>}'`）。
@@ -398,7 +374,7 @@ trigger/effect 中的作用域切换块不再逐条手写，由一个 pattern �
 "trigger": { "patterns": [ { "key": "link", "body": "self" } ] }
 ```
 
-`link` 键匹配时，编译器已知链接的 `from`/`to`，runtime 据此检查当前作用域并 push 目标作用域。与链接同名的标量 trigger（如 `controller = ROOT`）照常写在 `fields` 中：按 2.3 的查找规则，标量形态命中精确字段，块形态落到 `link` pattern。现有 540 条带 `push_scope` 的 trigger/effect 行里，纯链接的那部分由转换脚本折叠进 `scopes.links`。
+`link` 键匹配时，编译器已知链接的 `from`/`to`，runtime 据此检查当前作用域并 push 目标作用域。与链接同名的标量 trigger（如 `controller = ROOT`）照常写在 `fields` 中：按 2.3 的查找规则，标量形态命中精确字段，块形态落到 `link` pattern。只将 trigger/effect 语义一致的纯链接折叠进 `scopes.links`；只属于一个上下文的块保留为带 `body`、`scope.in`、`scope.push` 的显式字段。用户已确认 EU4 的 `any_*` 仅用于 trigger/limit，effect 使用 `every_*` 或 `random_*`，不能通过全局 `link` 扩大其可用上下文。
 
 ### 2.9 控制流：字段上的 `control` 属性
 
@@ -425,6 +401,7 @@ trigger/effect 中的作用域切换块不再逐条手写，由一个 pattern �
 | `branch` / `branch_continue` | if 链：`chain` 列出可跟随的兄弟键；`guard` 为守卫子块 | `lints.rs` if 链、`diagnostics.rs:3130`、`hir/model.rs:625` |
 | `guard` | 守卫子块，体在 trigger 上下文 | `diagnostics.rs:3121`、`dynamic_rules.rs:1868` 的 `limit` |
 | `logic` | `AND`/`OR`/`NOT`，带 `"op"`；作用域透明；`NOT` 的多条件 lint 由 `op` 驱动 | `lints.rs:32,63,72`、`transparent_scope_wrappers` |
+| `constant` | 标量 bool 谓词的结果等于其值；仅声明此原语的字段参与逻辑常量折叠 | `always` 按名字识别的常量 lint |
 | `weighted` / `chance` | 值作键的加权分支 / 概率块 | `diagnostics.rs:3025` 的 `random`/`random_list` |
 | `switch` | 分支键是“`on` 字段所指 trigger 的合法值”：runtime 读取 `on_trigger` 的值，到 trigger schema 中查该键的标量字段，用其值 matcher 校验各分支键；分支体为 `self`。此行为完全由 kind 实现，不需要额外的表达式语法 | `diagnostics.rs:3025` 的 `trigger_switch` |
 | `transparent` | 作用域透明包装 | `transparent_scope_wrappers` |
@@ -432,9 +409,13 @@ trigger/effect 中的作用域切换块不再逐条手写，由一个 pattern �
 
 `trigger`/`mtth`/`mean_time_to_happen` 切换上下文**不是**控制流，只是普通字段（`"body": "trigger"`、`"body": "mtth"`）；`dynamic_rules.rs:1868` 的硬编码随树形 IR 自然消失。`control_flow_keys` 由带 `control` 的字段推导。
 
+`constant` 的 D19 证据与退化形态见 `rules-language.md` §9：保留普通 scalar bool IR，
+只增加字段属性，不创建 schema 实例，不影响 64 实例上限。只有声明此属性的谓词才能折叠，
+避免把 `is_capital = yes` 等普通条件误当成常量。
+
 ### 2.10 语言基础设施
 
-- **编译期语义检查**：未定义/未引用的 schema、type、enum、mixin；include 冲突；不可达重载；参数化实例数超限；subtype `when` 依赖违规；作用域链接 `from` 不匹配；trait 未满足 `requires`；同一 binding 重复贡献。
+- **编译期语义检查**：未定义/未引用的 schema、type、enum、mixin；include 冲突；不可达重载；参数化实例数超限；作用域链接 `from` 不匹配。
 - **JSON Schema**：由 Rust 源类型生成（schemars），供编辑器补全与校验；类型表达式在 JSON Schema 中只做 `pattern` 粗校验，精确校验靠 `rulec`（接受的代价）。
 - **工具**：`rulec fmt`（规范化格式、省略默认值、字段排序）、`rulec check`（只做语义检查，编辑器可调用）。
 - **语言规范**：`docs/rules-language.md`，本节内容的正式版。
@@ -451,14 +432,14 @@ trigger/effect 中的作用域切换块不再逐条手写，由一个 pattern �
 | D5 | 源格式 JSON；不以 `SemanticRule` 为中间层；`parent_path`、`context` 字符串、`alternative_id` 一次去掉 | 原决策 |
 | D6 | 正确性靠 golden 测试 + 原版全量扫描（sweep）的**基线对比**（第 6 节），不做新旧逐行对拍 | 原决策，补充基线 |
 | D7 | Schemas / Types / Scopes 三个正交子系统为骨架；root entry 通过 `files` + `def` 合入结构；mixin 与 trait 分离 | 原决策 |
-| D8 | enum 与 table 合一（可带列）；控制流为字段属性而非顶层段；作用域效应只有对象形式；字段 `card` 默认 `0..1`（**该默认已被 D14 推翻：`card` 改为必填显式**） | 技术决定 |
+| D8 | enum 只保留字面成员列表（**属性列已于源版本 13 删除**）；控制流为字段属性而非顶层段；作用域效应只有对象形式；字段 `card` 强制显式（原默认 `0..1` 已被 D14 推翻） | 技术决定，后续简化 |
 | D9 | 删除全局 `references` 表：引用只来自 schema 中的 `ref<>`。未被 schema 覆盖的位置不再产生引用——这是有意的行为变化，由基线中的引用计数对比兜底 | 技术决定 |
 | D10 | 参数化 schema 编译期单态化；runtime 无泛型、无动态派发 | 技术决定 |
 | D11 | 第一版内置 trait 固定为 Localised / HasIcon / ModifierSource / Callable | 技术决定 |
 | D12 | profile 拆分：非语言部分（install、filesystem 扫描、hover_cards、fallback_keys）移入 `game.json` 且不参与语言语义；其余全部并入语言（第 4 节表） | 技术决定 |
 | D13 | **职责分离：机制闭集、策略全量。** `engine`/`hir`/`ide`/`pdc`/`parser` 只实现机制（匹配、作用域、单态化、索引、诊断框架）；一切游戏策略（键、形状、作用域、名字、目录）只能来自规则数据。程序**不按规则目录结构读规则**（全盘读取，D16）；规则目录只服务人工维护 | 用户决策 |
 | D14 | **规则显隐（默认值哲学）。** 高频设默认、低频强制显式；默认值**只许出现在收紧语义一侧**（放宽型默认必须挂基线）；默认准入门槛为单值占比 ≥2/3；一切默认可机械展开（`fmt --expanded` / hover）。据此 **`card` 无默认、强制显式**（数据：`1` 占 50%、`0..1` 占 35%、可重复型 13%，无多数派，且它驱动「缺必填键 / 重复键」两类诊断），`FileRule.resolution` 默认翻转为 `merge` | 用户决策 |
-| D15 | **避免重复的边界。** 复用（mixin / 参数化 schema / enum 列 / trait / `self`）必须满足三次法则（≥3 个真实站点才抽象）；深度上限为 `include` 一层、参数一层、禁止传递链；复用不得破坏溯源 | 用户决策（配套） |
+| D15 | **避免重复的边界。** 复用（mixin / 参数化 schema / enum / trait / `self`）必须满足三次法则（≥3 个真实站点才抽象）；深度上限为 `include` 一层、参数一层、禁止传递链；复用不得破坏溯源 | 用户决策（配套） |
 | D16 | **废除 manifest + 全盘读取。** 目录是维护单元，清单是派生物；全盘扫 → 路径排序合并 → 同名定义报错（确定性由排序保证）。规则 hash 降级为**身份/断言**（基线对拍、bug 报告、CI 漂移），不参与运行时缓存决策；**缓存以构建身份为戳，更新即强制重建**；构建身份预留规则 hash 字段（D4 精神） | 用户决策 |
 | D17 | **任务树三层归属。** `crates/game/src/eu4/mission` 拆为：事实→规则（顶层块=树、`required_missions`=边、`slot`/`position`=几何字段）；机制→引擎（引用图组装、环检测、稳定字段序回写）；游戏形态→游戏包，经**能力接口**暴露。引擎与 ide 不得按 `game_id` 分支；第二个结构化视图出现前不抽象 `tree_views` DSL | 用户决策 |
 | D18 | **`INSTALL_DESCRIPTOR` 进 `game.json`。** 判据：平台探测是机制（留引擎），游戏识别是数据（进 `game.json` 的 `install` 段，细化 D12） | 代定（用户授权） |
@@ -507,7 +488,7 @@ trigger/effect 中的作用域切换块不再逐条手写，由一个 pattern �
 | `profile/lexicon.json` | `fallback_keys` → `game.json`；`member_kind_aliases` 删除（转换脚本一次性把别名归一为类型名）；`member_name_suffixes` → def 的 `strip_suffix`；`enum_extra_members` → enum rows |
 | `profile/scopes.json` | `scopes`（`scope_member_aliases` → links；`root_scopes` → def 的 `scope.set`；`scope_completions` 推导） |
 | `profile/semantics.json` | `root_entry_specs` 推导；`transparent_scope_wrappers`/`control_flow_keys` → `control`；`semantic_context_inheritance` → include + `ModifierSource`；`quoted_script_definition_keys` → `quoted<…>` |
-| `profile/symbols.json` | `definitions`/`container_value_definitions` → def 位置；`value_definitions` → `def<>`；`references` → `ref<>`；`conditional_definitions` → subtype `when`；`token_definitions` → `Callable` |
+| `profile/symbols.json` | `definitions`/`container_value_definitions` → def 位置；`value_definitions` → `def<>`；`references` → `ref<>`；`conditional_definitions` 的引用放宽为基础类型；`token_definitions` → `Callable` |
 | `profile/dynamic.json` | `dynamic_scope_prefixes` → 模板链接；`dynamic_value_prefixes` → 值模板；`open_world_value_kinds` → `open`；`closed_dynamic_kinds` → 默认；`engine_set_flags` → `builtin` |
 | `crates/game/src/eu4/mod.rs::RESOLVED_SYMBOL_KINDS` | `resolution: "replace"` |
 
@@ -537,7 +518,6 @@ pub struct Schema {
     pub patterns: Box<[FieldId]>,                          // 按序尝试
     pub items: Option<MatcherId>,
     pub open: bool,
-    pub subtype_gates: Box<[SubtypeGate]>,                 // 本 schema 作为某类型实例体时的 when 谓词
 }
 
 pub struct Field {
@@ -546,7 +526,6 @@ pub struct Field {
     pub card: Card,                      // (min, Option<max>)
     pub scope: Option<ScopeEffect>,
     pub def: Option<DefSpec>,
-    pub gate: Option<SubtypeCond>,       // when / unless
     pub control: Option<ControlKind>,
     pub doc: Option<Symbol>,
     pub severity: Severity,
@@ -554,9 +533,9 @@ pub struct Field {
 }
 ```
 
-`Matcher` 是 2.2 表达式的降级结果：`Scalar | Literal | Template | Int | Float | Bool | Date | Loc | Path | Ref{type, subtype, trait} | Def{..} | Enum{id, rows: Option<BitSet>} | Scope | Link | Quoted | Opaque | Union(Box<[MatcherId]>)`。
+`Matcher` 是 2.2 表达式的降级结果：`Scalar | Literal | Template | Int | Float | Bool | Date | Loc | Path | Ref{type, subtype} | Def{..} | Enum{id} | Scope | Link | Quoted | Opaque | Union(Box<[MatcherId]>)`。
 
-**已实现**（阶段 3，`crates/rules/src/ir.rs` + `lower.rs`）。实际形态与本节草图的逐条差异（traits arena、`Field.gate` 的类型、`FileRule.root` 三态、`fields` 返回 `Vec`）见 §6 阶段 3 的实施备注。
+**已实现**（阶段 3，`crates/rules/src/ir.rs` + `lower.rs`）。实际形态与本节草图的逐条差异（traits arena、`FileRule.root` 三态、`fields` 返回 `Vec`）见 §6 阶段 3 的实施备注。
 
 ### 5.2 查询 API
 
@@ -567,8 +546,7 @@ impl RulesIr {
     fn root_schema(&self, path: &LogicalPath) -> Option<SchemaId>;
     fn lookup(&self, schema: SchemaId, key: &str, shape: Shape) -> Candidates<'_>; // 精确哈希 + patterns
     fn child(&self, field: FieldId, current: SchemaId) -> Option<SchemaId>;        // 解开 SelfBlock
-    fn fields(&self, schema: SchemaId, subtypes: &SubtypeSet) -> impl Iterator<Item = FieldId>; // 补全
-    fn subtypes_of(&self, schema: SchemaId, body: &impl ScalarFields) -> SubtypeSet;
+    fn fields(&self, schema: SchemaId) -> impl Iterator<Item = FieldId>; // 补全
 }
 ```
 
@@ -603,24 +581,24 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 ### 阶段 2：转换脚本 — **已完成**（自动部分 2026-09-30，人工收口 2026-10-01）
 
 > 实施备注：
-> - 工具为 `crates/tools` 下的 `rules-migrate`（`cargo run -p tools --bin rules-migrate`，切换后删除），读 `rules/eu4`（旧 manifest），写 `rules/eu4-v2/`（新源暂存区，阶段 5 切换时改名顶替）与 `docs/rules-migrate-report.md`（覆盖率 + 人工清单）。可重复运行、输出确定（重复运行逐字节一致，实测）。
+> - 历史工具 `rules-migrate` 曾读取 `rules/eu4`，生成 `rules/eu4-v2/` 与 `docs/rules-migrate-report.md`；当时重复运行逐字节一致。2026-10-02 已删除转换器及其专属测试，新源直接维护，不再从旧源重新生成。迁移报告保留为源版本 13 的历史转换记录；旧模型和旧源的最终退役仍属于阶段 5。
 > - 验收：`rulec check rules/eu4-v2` **0 error**（329 条 `UnusedDefinition` warning 属迁移期正常）；行数对平：8,463 = 1,227 去重 + 6,907 进字段 + 149 进 items + 127 折叠进 `scopes.links` + 10 折叠为寄存器位移 + 8 进 on_action 折叠 + 35 孤儿行（进人工清单）。
-> - on_action 折叠按设计产出 `on_actions` enum（`scope` 列）+ `on_action_body<S>`，但**丢弃了 `from` 列**：（scope, from）组合共 65 个，会打爆 §10.1 检查 4 的 64 实例上限；`starts_with`（`on_harmonized_*`）落为一条模板 pattern，body 参数待人工定夺。
-> - `ModifierSource` trait 暂不带 `requires: {include: "modifier_block"}`：`semantic_context_inheritance` 的 type:X→modifier 是"实例体自带 modifier 字段"而非"含 `modifier` 子块"，两种形态并存，requires 形态留人工收口（连同 trait impl 一起）。
+> - 历史输出（现已改为显式分组）：on_action 折叠按当时设计产出 `on_actions` enum（`scope` 列）+ `on_action_body<S>`，但**丢弃了 `from` 列**：（scope, from）组合共 65 个，会打爆 §10.1 检查 4 的 64 实例上限；`starts_with`（`on_harmonized_*`）落为一条模板 pattern，body 参数待人工定夺。
+> - 历史设计（requires 已删除）：`ModifierSource` trait 当时未带 `requires: {include: "modifier_block"}`：`semantic_context_inheritance` 的 type:X→modifier 是"实例体自带 modifier 字段"而非"含 `modifier` 子块"，两种形态并存，requires 形态留人工收口（连同 trait impl 一起）。
 > - 修了两处 phase 1 的实现缺陷：`compile::check_instantiation_cap` 的迭代计数原为逐轮累加、域 ≥3 必然打到上限，改为不动点重算；`source` 源类型补 `Serialize`（转换器序列化输出用），JSON Schema 工件随之重新生成（schemars 现在能写出 `default` 值）。
-> - 人工清单按类别落在 `docs/rules-migrate-report.md`：38 个魔法段位置的 def/ref 判定、`strip_prefix` 模板、typed-prefix 算子过滤、`when` 谓词、trait impl（含子类型折叠）、文件类目扩展名/排除前缀、孤儿结构位置等。
-> - D14（`card` 无默认、`FileRule.resolution` 默认翻转等显隐裁决）落地后需重跑 `rules-migrate` 重生成 `rules/eu4-v2`——转换器已确定性，重跑无额外成本；这是 §3.2 缺口 1–4 的一部分。
+> - 人工清单按类别落在 `docs/rules-migrate-report.md`：38 个魔法段位置的 def/ref 判定、`strip_prefix` 模板、typed-prefix 算子过滤、trait impl（所有展示 binding 合并到类型级）、文件类目扩展名/排除前缀、孤儿结构位置等。
+> - D14（`card` 无默认、`FileRule.resolution` 默认翻转等显隐裁决）落地时已重跑转换器生成新源；这是 §3.2 缺口 1–4 的历史处理记录。
 
 - **自动部分**：`parent_path` 扁平行 → 嵌套 schema；alternative → 重载/union；matcher → 表达式字符串；去重（1,227 条）；on_action 折叠为 enum + 参数化 schema；纯链接行折叠进 `scopes.links`；profile 各表按第 4 节搬迁；`member_kind_aliases` 归一。
-- **人工部分**：324 处魔法段的真实结构、subtype 的 `when`、trait impl、`control` mixin、mixin 抽取。
+- **人工部分**：324 处魔法段的真实结构、trait impl、`control` mixin、mixin 抽取。
 - **人工收口结果**（2026-10-01）：`docs/rules-migrate-report.md` 的人工清单为空，全部条目要么被机械化、要么作为**显式损失**记入覆盖率表：
   - 魔法段 def/ref 判定：非定义上下文（`trigger`/`effect`）的 `{type: X}` 键判为调用位（20 处）；跨目录引用按「上下文的 profile 路径 vs 类型的 profile 路径」判定（5 处转 ref pattern，13 处保持 def map）。
-  - `Localised`/`HasIcon` 改为 **impl 逐条枚举 binding**（D19 变更说明见 §2.7），trait 不再声明固定 binding；子类型条件的 binding 还原为 subtype impl + `when` 谓词。
-  - `date_field` 伪段与 `key_segment` 对齐、同路径多类型的 file root 合并、`when`/`params` 中的 `null` 不再被裁掉、条件定义挂到同路径的定义类型上。
+  - `Localised`/`HasIcon` 改为 **impl 逐条枚举 binding**（D19 变更说明见 §2.7），trait 不再声明固定 binding；原条件 binding 合并至类型级 impl，作为可选展示项。
+  - `date_field` 伪段与 `key_segment` 对齐、同路径多类型的 file root 合并、`params` 中的 `null` 不再被裁掉、原条件定义的引用放宽至同路径基础类型。
   - `token_definitions` 参数键折叠进 `Callable` 的 dynamic-key 能力（最后一个空 enum 桩消失）；`strip_prefix` 模板在表达式语法中新增 `strip_prefix` 子句（D19 三处用例）。
   - 显式损失（覆盖率表逐条计数）：typed-prefix 算子过滤 3、on-action `from` 列 258、实例名前缀条件的 binding 3、field 源 binding 0、参数键 6。
-- 自动部分必须**可重复运行、结果确定**：人工精修开始前如果 main 上的 `rules/eu4` 有改动，重跑即可；人工精修开始后冻结 main 上的 `rules/eu4`（如有紧急修改，在两边手工同步）。
-- 验收：输出通过 `rulec check`；报告自动覆盖率（按行数）与人工清单。**已满足**：`rulec check rules/eu4-v2` 0 error（273 条迁移期 `UnusedDefinition` warning）、8,463 行对平、人工清单为空、`rules-migrate` 重复运行逐字节一致。
+- 历史自动转换要求**可重复运行、结果确定**，已在人工精修前后验证。转换器退役后，规则行为回归直接读取新源或生产 IR；转换专属的别名归一与旧路径序列化断言随工具删除。
+- 当时验收：输出通过 `rulec check`，0 error（273 条迁移期 `UnusedDefinition` warning）、8,463 行对平、人工清单为空、重复运行逐字节一致。转换器退役后的回归覆盖与验证见 `docs/phase5-validation.md`。
 
 ### 阶段 3：IR 与查询 API — **已完成**（2026-10-01）
 
@@ -629,16 +607,10 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 >   入口是 `lower::lower(sources, GameConfig) -> Result<RulesIr, LowerError>`：先跑 `compile::check`，
 >   只要有 error 就拒绝产出 IR（阶段 5 退出标准 6「拒绝烘焙」的落点）。
 > - 与 §5.1 草图的差异（阶段 4 消费方必须知道）：
->   1. 草图没有 traits arena，但 `Callable.capabilities`、trait 的 `requires`、以及
->      `Localised`/`HasIcon` 的 impl 参数必须有去处，故 `RulesIr` 增加 `traits: Vec<TraitInfo>`
->      （params / bindings / requires_include / capabilities）。
->   2. `Field.gate` 是 `Option<Gate>`（`When(subtype)` / `Unless(subtype)`）而不是 `SubtypeCond`：
->      门控说的是「实例是否带某 subtype」，不是字段谓词；`SubtypeCond` 只出现在
->      `Schema.subtype_gates` 与 `TypeInfo.subtypes[].when` 上（二者语义一致，都是字段谓词）。
->   3. `RulesIr::fields` 返回确定性排序的 `Vec<FieldId>`（不是迭代器），补全可直接做成员判断。
->   4. `subtypes_of(schema, body)` 只用 IR 内可判定的 matcher；符号型 matcher（`ref<>` / `def<>` /
->      `ref<impl T>`）要 workspace 事实，走 `subtypes_of_with(schema, body, &impl SymbolFacts)`；
->      默认的 `NoSymbolFacts` 一律判否——宁可少给 subtype，不多给。
+>   1. `RulesIr` 保留 `traits: Vec<TraitInfo>` 名称标记，`Callable` 按身份识别；
+>      本地化/图标绑定与 Callable body 只保存在类型 impl，通用 trait 元数据已删除。
+>   2. 2026-10-02 简化：删除 `Field.gate`、`Schema.subtype_gates`、字段谓词求值和 subtype trait impl。
+>      `RulesIr::fields(schema)` 返回完整的确定性字段列表。显式 subtype 只用于引用分类。
 >   5. `FileRule.root` 是三态 `RootRule`：`Schema(id)` / `Instance { def, body }`（整文件一个实例）/
 >      `Opaque`（`localisation`、`asset`、`syntax-only` 不建模结构），取代草图里的裸 `SchemaId`。
 > - `Symbol` 分两类：**身份**（schema / type / enum / trait / scope / register / 字段键 / 形参 / 类别名）
@@ -651,13 +623,11 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 >   未做 field 驻留前是 93,378 field——mixin「编译期展开」的乘法代价，阶段 5 的 `mem_probe` 依赖这一步。
 > - matcher 是 arena 里的一条记录，`Schema.exact: FxHashMap<Symbol, Box<[FieldId]>>` 的键是折叠后的
 >   小写键；`lookup` 先给同 shape 的 exact 重载（按书写序），再给 `patterns`（按书写序）。
-> - 单态化：语料只有 `on_action_body<S>` 一个参数化 schema。`on_actions_file` 的两条 pattern 里，
->   `enum<on_actions>` + `$key.scope` 按 `scope` 列分成 4 组（country 174 / province 81 / unit 2 /
->   mercenary_company 1），每组产出一条 key matcher 带该组行集的 pattern，并单态化出
->   `on_action_body<country|province|unit|mercenary_company>` 四个实例；第二条
->   `'on_harmonized_{scalar}'` 落成模板 pattern，复用 `on_action_body<country>`。实例键是
->   `(base name, 实参元组)`，`Schema.arguments` 保留实参。真的出现未绑实参时用保留名 `$unbound`
->   占位（合法语料里不该出现，语料测试断言它从未被驻留）。
+> - 单态化：语料只有 `on_action_body<S>` 一个参数化 schema。`on_actions_file` 使用
+>   country、province、unit、mercenary_company 四个字面 enum 和显式 pattern，直接引用
+>   对应的 `on_action_body<scope>`；`on_harmonized` 模板复用 country 实例。
+>   不再生成属性列分组或 matcher 行子集。实例键是 `(base name, 实参元组)`，
+>   `Schema.arguments` 保留实参，语料断言不存在未绑定形参。
 > - `body: "self"` 保持 `FieldValue::SelfBlock`（arena 没有自环），由 `child(field, current)` 解开；
 >   字段级 `map` / `list` 生成保留名 `$map` / `$list` 的合成 schema（`$` 不是合法标识符字符，
 >   不可能与声明名撞车），schema 级 `{ "map": … }` / `{ "list": … }` 简写就地展开。
@@ -666,8 +636,7 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 >   所以 IR 的 `FileMatcher` 固定 `case_sensitive: false` / `path_suffix: None`，`strict` 只作为
 >   扫描事实保留、不参与匹配。同分序要在阶段 5 的 sweep 对比里复核。
 > - 单测：`lower::tests` 用一份 events + on_action + decisions 的样板覆盖 def 收集（含 `map` 键上的
->   def、`field:id` 名字来源、mixin 字段的 provenance）、subtype 判定（`when` 命中/落空、`unless`
->   门控过滤补全）、查询 API 的 shape 分派（同键多 shape 重载、pattern 只答自己描述的 shape、
+>   def、`field:id` 名字来源、mixin 字段的 provenance）、显式 subtype 引用分类与所有字段查询、查询 API 的 shape 分派（同键多 shape 重载、pattern 只答自己描述的 shape、
 >   键大小写不敏感）、单态化（分组行集、`$S` 代入、`ref | '0'` union）、`link` pattern（`SelfBlock`、
 >   scope link 的 `from`/`to`、模板 link 的空洞）；另有 `the_first_party_corpus_lowers` 全量降级
 >   `rules/eu4-v2`，断言 137 条 files、on_action 四组行数分布、100 条 scope link、4 个 event subtype、
@@ -675,18 +644,22 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 
 - 实现第 5 节 IR、编译降级与查询 API；以 events + on_action + decisions 为样板写 IR 级单测（def 收集、subtype 判定、单态化、`link` pattern）。
 
-### 阶段 4：消费方改造 — **已完成**（2026-10-01）
+### 阶段 4：消费方改造 — **已完成**（主路径 2026-10-01，验收收口 2026-10-03）
 
-- HIR、IDE 与生产 LSP 入口改为直接消费 `RulesIr`。阶段 5 再删除旧源目录、转换器和仅由旧模型测试使用的兼容路径。
+- HIR、IDE 与生产 LSP 入口直接消费 `RulesIr`。转换器于 2026-10-02 退役；阶段 5 已删除旧源目录和旧模型兼容路径，并完成保留行为的夹具迁移与验收。
+
+> 以下记录主路径接入时的局部验证范围。后续全量语料和旧夹具对照发现的 Callable、作用域、
+> 诊断和呈现缺口已在阶段五收口；历史局部验证不能代替最终验收。
+> 最终证据见 [阶段五本地验收记录](phase5-validation.md)。
 
 > 实施备注：
 > - `game::eu4::first_party_ir()` 的嵌入式 bundle 成为生产语义来源。`runtime_rules()` / `RuleSet::from_ir_catalog`
 >   只提供文件目录和 `game.json` 的配置桥接，**不生成扁平 SemanticRule**；stdio 入口安装同一个 `Arc<RulesIr>`。
->   `pdc/ruleSearch` 返回 schema/field、card、subtype gate 与真实源文件/JSON pointer；`mem_probe` 统计 IR arena。
+>   `pdc/ruleSearch` 返回 schema/field、card 与真实源文件/JSON pointer；`mem_probe` 统计 IR arena。
 > - HIR 沿 `SchemaId` 行走，为块记录 schema、subtypes、入口作用域，为键记录选定 `FieldId`。
 >   exact/pattern、形态重载、`self`、列表裸值、def/ref、trait bindings、Callable 参数及引号脚本都由 IR 驱动。
 >   register/link 和 `Field.scope` 更新 ROOT/THIS/FROM/PREV；`Field.control` 决定参数的分支可选性。
-> - subtype 的 ref/trait 谓词使用工作区 `SymbolFacts`。磁盘扫描和缓存重建先收集定义，再依据候选索引重降级引用；
+> - 显式 subtype 的 ref 使用工作区 `SymbolFacts`。磁盘扫描和缓存重建先收集定义，再依据候选索引重降级引用；
 >   IDE 的文档、闭合文件和临时文本查询使用 overlay-aware 的完整符号事实，不受补全来源偏好影响。
 > - 诊断、补全、hover、导航、localisation previews、semantic tokens 和 scope inlay 改用 HIR facts / IR。
 >   控制链、guard、logic、switch、display、cardinality 和 subtype 限制按字段声明执行；Callable 签名来自 HIR。
@@ -710,12 +683,73 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 >   转换器重复生成的 90 个 bundle 文件逐字节一致，且与仓库源文件一致。
 >   授权原版 sweep、补全候选对比与加载性能退出标准仍属于阶段 5。
 
-### 阶段 5：切换
+### 阶段 5：切换 — **本次范围内已完成**（2026-10-03）
 
-- 删除旧 `model`/`rulec`/`SemanticRule` 与全部旧规则文件；`source_format_version` 升为 11。
+2026-10-03 的最终清理已删除旧模型、旧编译模块、旧规则源及兼容消费者。
+资源项按用户明确决定排除 89 条；其余 Vanilla error、定义/引用差异和固定完整补全集合均已完成审查。
+最终工作区回归 976 项通过，全部目标/特性 Clippy、rustdoc 和工程产物检查通过。
+三组最终性能配对相对 `96f50c8` 峰值 RSS 中位数 1,146.75 → 1,071.09 MiB，
+规则加载 191.5 → 22.8 ms；六项退出标准满足本次范围，阶段五验收结束。
+完整证据及首次扫描仍多 1.7 秒的已知风险见 [最终验收记录](phase5-validation.md#退出标准)。
+以下引用块保留各轮历史数据，不代表当前仍存在旧源或兼容消费者。
+
+> **本轮模块工作收官，仍有后续退出项（2026-10-02）**：新 IR 的检查、lower 和 bake 在
+> `crates/game/build.rs` 执行；运行时解码 arena 并恢复查询索引。
+> 当前源版本为 13，字段条件、结构推导 subtype 与 subtype trait 门控已删除，通用 trait 元数据等未使用机制与迁移器已退役。
+> `rules/ir-manifest.json` 与嵌入产物、重新编译结果由 artifact gate 核对。
+> 检查失败拒绝创建或覆盖产物已有负例。
+>
+> 2026-10-02 用户结束本轮 Vanilla error 逐条审查，保留 268 个待审查身份，转入补全模块。
+> 当前源版本 13 的补全冻结版修复联合值域遗漏作用域过滤；生产 IR IDE 433 项通过。
+> 固定 11 个位置的完整候选与 LSP 上限内输出一致，7 组相同、4 组差异已逐项解释，
+> 补全退出项在该固定范围通过。此补全轮不执行 Vanilla 全量诊断，不替代剩余语义与引用审查。
+>
+> 源版本 13 的首轮性能冻结版已优化模糊建议、schema/属性范围查找、作用域模板及缓存生命周期；
+> 全工作区 1,031 项、生产 IR IDE 438 项测试、fmt 和全目标 Clippy 通过。
+> 相对阶段五开始时旧模型基线（`96f50c8`）的三组安静完整配对诊断中位数 45.8 → 23.0 秒，完整探针 86.3 → 74.2 秒，
+> 峰值 RSS 1,065.56 → 999.73 MiB（下降 6.18%）；同规则优化前后均为 11,649 条，
+> digest `0xd8432448a0e077f6`。仅规则加载另测三组，194.4 → 22.8 ms。
+> 该基线下内存与规则加载退出项通过，诊断延迟劣化已修复。
+> 随后以远端 origin/main `e771357` 的源码独立编译，重跑三组相同采样节点对照：
+> 诊断 46.1 → 22.9 秒、规则加载 52.4 → 22.9 ms，但峰值 RSS 756.75 → 869.13 MiB，
+> 上升 14.85%，该轮 origin/main 内存退出项未通过。首次扫描扣采样等待后为 3.6 → 13.0 秒。
+>
+> 最新峰值 RSS 与首次扫描专项优化增加索引专用 lowering、按符号事实依赖重放、
+> 稳定索引复用与大文件串行/小文件限量并行。全工作区 1,033 项、生产 IR IDE 438 项、
+> HIR 46 项、fmt 和全目标全特性 Clippy 通过。九个安静完整进程轮换三个冻结版本：
+> 同规则峰值中位数 1,028.39 → 935.45 MiB（下降 9.04%），首次加载并扫描 12.9 → 5.2 秒
+> （下降 59.69%）；完整诊断均为 11,649 条、digest `0xd8432448a0e077f6`。
+> 同期 origin/main 峰值为 977.06 MiB，当前低 4.26%；仅规则加载 51.7 → 23.1 ms，
+> 本轮内存与规则加载中位数退出项通过。首次加载并扫描仍比 main 的 3.5 秒多 1.7 秒。
+> RSS 波动较大，完整范围、二进制/源码 SHA 及测量边界见 `docs/phase5-validation.md`。
+>
+> 最近覆盖各验收面的完整冻结版为简化前的 `ir-bindings-acceptance`，源版本 11、指纹 `3250e7ac…`，SQLite 23。
+> 当前 source 13 / SQLite 24 的 Vanilla 语义报告已重新冻结；资源与引用审查状态见下方 D6/9，完整补全和性能证据仍归属于各自冻结版本。
+> 常规 Rust 门禁 1,033 项、生产 IR 对照 430 项（含 80 项空旧模型专项）、
+> Clippy、Rustdoc、artifact、policy 及最新 release 的 LSP/MCP smoke 均通过。
+> 同一份 Vanilla 文本完成 8,670 文件全量审计：8,344 errors，旧版为 8,123；
+> 按位置新增 286、移除 65，尚需完成全部诊断和引用差异的语义归类。
+> 完整缓存为 587,104 definitions、432,652 references；31 类定义计数依据已重新核对，
+> 194 类引用差异继续审查。全部 11 个完整补全集合已导出且前 512 项与 LSP 一致；
+> 仍为 7 组相同、4 组差异，与 roundtrip 轮集合相同。
+>
+> 本轮修复联合值域误建引用、重叠类型导航、提示 payload 缓存摘要重复、
+> 脚本函数被精确字段遮蔽、标量参数引用、legacy 改革及本地化绑定断链。
+> （历史记录，结构条件已于 2026-10-02 删除。）已知作用域的寄存器值参与重载选择。
+> 政府属性接受内置和自定义名称；寄存器 `role`、switch `selector_schema` 已声明化。
+> 常规测试继续保留旧模型夹具，生产 IR 差异有独立断言；旧源与兼容路径尚未删除。
+>
+> 安静环境下三组规则加载中位数 190.9 → 19.2 ms，峰值 RSS 40.95 → 23.23 MiB。
+> 该历史冻结版完整内存三组顺序配对均正常完成：峰值 RSS 中位数 1,013.83 → 931.61 MiB
+> （下降 8.11%），释放后 RSS 902.27 → 510.55 MiB。诊断阶段中位数 45.8 → 194.5 秒，
+> 延迟劣化仍存在；该结论对应同一冻结版本，没有并发编译或全量审计。
+> 完整证据、剩余规则问题及复现方法见 [阶段五本地验收记录](phase5-validation.md)。
+> 本地语料、缓存、完整报告和冻结二进制均保持忽略。
+
+- 已删除旧 `model`/规则编译模块/`SemanticRule` 与全部旧规则文件；当前 `source_format_version` 为 13。
 - **退出标准**（全部满足才合入 main）：
   1. golden 全部通过，所有更新过的 golden 逐条有归类说明；
-  2. sweep 对比基线：无未解释的新增 error；每类型定义数一致或有解释；每类型引用数一致或有解释（D9 的兜底）；
+  2. Vanilla 全量语义审查：每个 error 都有位置、上下文、原因与证据，区分原版问题、规则问题、分析器问题及审计语料缺失；规则和分析器误报修复后重跑。旧版只作定位参考，不要求错误、定义或引用数量完全对齐；定义与引用按实际语义验证（D9 的兜底）；
   3. 补全候选对比：固定位置的候选集合一致或有解释；
   4. `mem_probe` 内存与规则加载时间不劣于切换前；
   5. 1.3 列出的硬编码全部删除（grep 验证）；
@@ -736,10 +770,35 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 - `desc` 等“标量或块”字段的完整清单，由转换脚本统计 `shape` 冲突得出。
 - `open` 类型的 `ref` 是否对“从未 def 过的名字”给出 info 级提示：以 sweep 噪声量决定。
 
+### 8.1 原计划落地盘点（最终状态，2026-10-03）
+
+| 原则 | 当前落地状态 |
+| --- | --- |
+| D2/3/7/10/11：类型语言、领域组织、正交子系统、单态化和内置 trait | 生产主路径已落地；D4 的非目标未扩张 |
+| D1/5：一次切换与删除旧模型 | 已完成。旧源、旧模型、旧编译模块、SemanticRule 及兼容消费者已删除，生产语义统一读取 RulesIr；保留行为夹具已迁移，旧 API 专用夹具按理由退役 |
+| D6/9：语义审查和结构声明引用 | 本次范围内通过。最终 8,324 errors 中 7,948 条有冻结资源缺失证据、214 条原版问题、73 条规范性诊断；89 条资源项按用户决定排除，诊断仍正常输出。最终 587,163 个定义及 431,839 条引用的完整多重集合与已审冻结版一致，相对旧版的差异全部归类，未归类位置为零。绑定遗漏已修复，tutorial 的 11 处覆盖限制保留；38 项既有策略保持现状，R09 全面合并为 province。证据见 phase5-validation.md |
+| D8/14：声明控制流、显式 card 与默认值展开 | 严格解析、语义检查和 bake 硬门已落地；新增 `rulec fmt`、`--expanded`、只读 `--check` |
+| D15：复用边界与溯源 | include/参数层级和溯源已有约束；删除 8 个未使用 mixin，将 28 个不足三处的 mixin 展开到 32 个源使用位置；仅保留直接使用 25–86 次的 4 个共享词汇 mixin |
+| D12/18：非语言配置和安装识别数据化 | 安装事实已移入 `game.json.install`，构建生成静态 descriptor；平台探测接口和发现行为保持原契约 |
+| D13/17：全部游戏策略声明化和任务树能力接口 | 原计划边界已验收。任务树路径、命名空间、字段和写回顺序来自规则配置；图与写回机制移入引擎，布局留游戏包；生产 IDE/pdc 无 EU4 分支。§1.3 的旧控制流、ScopeContext 和 matcher 消费者已删除，当前消费者读取 IR 声明；D20 的额外归零提案不属于本次退出条件 |
+| D16：全盘读源、废除 manifest、构建身份缓存 | 已落实：递归读取 JSON、相对路径排序、同名定义拒绝；源 manifest 删除，包身份移入 game.json；SQLite 24 按构建身份失效，规则/IR 指纹仅作报告身份 |
+| D19：特性准入说明 | trait binding、strip_prefix、constant 已有规范与语料说明 |
+| D20：无猜测与豁免归零 | 仍是待认可提案；当前 3 个开放 schema、6 个开放类型、83 个 fallback key，未宣称归零 |
+
+低风险收尾中间版本的 IR 指纹为 `fd079aa53a8e61ee46baa0767b18ca4d67bd9e29ec9b72229f69df2f1f54218b`。
+随后 D16 使用 SQLite 24 和构建身份失效；当前规则指纹为
+`c82f078ed894a5cd6c7416292599e55d87e0a4a6363eb06542cbb901443e6eea`，源格式仍为 13。
+用户已撤回重复 custom_attributes 的合并放行，恢复 `0..1`；38 项复核中其他项保持现状；R09 已明确批准将 trade_node 执行作用域全面合并为 province。
+此前补全、全量 Vanilla 和性能报告继续属于各自冻结版本；最终冻结版已另行复核既定门禁。
+固定收官清单见 [阶段五退出标准](phase5-validation.md#退出标准)：引用差异归类、旧模型及
+硬编码删除、完整补全和原性能指标均已通过本次范围；89 条资源项明确排除，不作为本次阻塞。
+D20、扩展 tutorial 支持等不自动追加为阶段五退出条件。
+
 ## 附：关键代码位置
 
-- 规则模型/编译/运行时：`crates/rules/src/{model,matcher,profile,rulec,runtime,canonical}.rs`
-- 嵌入与 EU4 profile：`crates/game/src/eu4/mod.rs`
-- 规则源：`rules/eu4/`（`manifest.json` 列出全部文件）
-- 主要消费方：`crates/hir/src/{scope,semantics,model,collector}.rs`，`crates/ide/src/{semantic,resolution,navigation,diagnostics,lints,dynamic_rules,dynamic_contracts,modifier_scope,localisation,semantic_tokens}.rs`，`crates/ide/src/completion/`，`crates/ide/src/hover/`
-- 扫描：`scripts/sweep.mjs`（本地，不进 CI）
+- 规则源/编译/运行时：`crates/rules/src/{source,compile,lower,ir,bake,catalog,runtime}.rs`，CLI 为 `crates/rules/src/bin/{rulec,bake-ir}.rs`
+- 嵌入与 EU4 profile：`crates/game/build.rs`，`crates/game/src/eu4/mod.rs`
+- 规则源：`rules/eu4-v2/`（递归发现 JSON）；产物身份：`rules/ir-manifest.json`
+- 主要消费方：`crates/hir/src/{ir_lowering,callable,scope,model,collector}.rs`，`crates/ide/src/{ir_queries,ir_semantic,ir_callable,resolution,navigation,diagnostics,dynamic_rules,dynamic_contracts,localisation,semantic_tokens}.rs`，`crates/ide/src/completion/`，`crates/ide/src/hover/`
+- 任务树通用机制：`crates/engine/src/structure.rs`；游戏布局：`crates/game/src/mission.rs`
+- 扫描：`editors/vscode/scripts/sweep.mjs`（本地，不进 CI）；只读审计工具：`lab/perf/`

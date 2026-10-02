@@ -1,404 +1,6 @@
 {
   "scopes": {
-    "compat": [
-      {
-        "actual": "trade_node",
-        "expected": "province"
-      }
-    ],
     "links": {
-      "all_active_trade_node": {
-        "from": [
-          "country"
-        ],
-        "to": "trade_node"
-      },
-      "all_ally": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "all_capital_provinces": {
-        "from": [
-          "any"
-        ],
-        "to": "province"
-      },
-      "all_claimed_provinces": {
-        "from": [
-          "country"
-        ],
-        "to": "province"
-      },
-      "all_coalition_member": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "all_core_country": {
-        "from": [
-          "province"
-        ],
-        "to": "country"
-      },
-      "all_core_province": {
-        "from": [
-          "country"
-        ],
-        "to": "province"
-      },
-      "all_countries_including_self": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "all_country": {
-        "from": [
-          "any"
-        ],
-        "to": "country"
-      },
-      "all_elector": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "all_empty_neighbor_province": {
-        "from": [
-          "province"
-        ],
-        "to": "province"
-      },
-      "all_enemy_country": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "all_federation_members": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "all_heretic_province": {
-        "from": [
-          "country"
-        ],
-        "to": "province"
-      },
-      "all_known_country": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "all_local_enemy": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "all_neighbor_country": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "all_neighbor_province": {
-        "from": [
-          "province"
-        ],
-        "to": "province"
-      },
-      "all_owned_province": {
-        "from": [
-          "country"
-        ],
-        "to": "province"
-      },
-      "all_owned_province_cumulative": {
-        "from": [
-          "any"
-        ],
-        "to": "province"
-      },
-      "all_privateering_country": {
-        "from": [
-          "trade_node"
-        ],
-        "to": "country"
-      },
-      "all_province": {
-        "from": [
-          "any"
-        ],
-        "to": "province"
-      },
-      "all_province_in_state": {
-        "from": [
-          "province"
-        ],
-        "to": "province"
-      },
-      "all_rival_country": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "all_state_province": {
-        "from": [
-          "country"
-        ],
-        "to": "province"
-      },
-      "all_states": {
-        "from": [
-          "country"
-        ],
-        "to": "province"
-      },
-      "all_subject_country": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "all_trade_node": {
-        "from": [
-          "country"
-        ],
-        "to": "trade_node"
-      },
-      "all_trade_node_member_country": {
-        "from": [
-          "trade_node"
-        ],
-        "to": "country"
-      },
-      "all_trade_node_member_province": {
-        "from": [
-          "province"
-        ],
-        "to": "province"
-      },
-      "all_war_enemy_countries": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "any_active_trade_node": {
-        "from": [
-          "country"
-        ],
-        "to": "trade_node"
-      },
-      "any_ally": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "any_army": {
-        "from": [
-          "country"
-        ],
-        "to": "unit"
-      },
-      "any_capital_province": {
-        "from": [
-          "any"
-        ],
-        "to": "province"
-      },
-      "any_claimed_province": {
-        "from": [
-          "country"
-        ],
-        "to": "province"
-      },
-      "any_coalition_member": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "any_core_country": {
-        "from": [
-          "province"
-        ],
-        "to": "country"
-      },
-      "any_core_province": {
-        "from": [
-          "country"
-        ],
-        "to": "province"
-      },
-      "any_country": {
-        "from": [
-          "any"
-        ],
-        "to": "country"
-      },
-      "any_country_active_in_node": {
-        "from": [
-          "trade_node"
-        ],
-        "to": "country"
-      },
-      "any_elector": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "any_empty_neighbor_province": {
-        "from": [
-          "province"
-        ],
-        "to": "province"
-      },
-      "any_enemy_country": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "any_federation_members": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "any_friendly_coast_border_province": {
-        "from": [
-          "province"
-        ],
-        "to": "province"
-      },
-      "any_great_power": {
-        "from": [
-          "any"
-        ],
-        "to": "country"
-      },
-      "any_heretic_province": {
-        "from": [
-          "country"
-        ],
-        "to": "province"
-      },
-      "any_hired_mercenary_company": {
-        "from": [
-          "country"
-        ],
-        "to": "mercenary_company"
-      },
-      "any_known_country": {
-        "from": [
-          "any"
-        ],
-        "to": "country"
-      },
-      "any_local_enemy": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "any_neighbor_country": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "any_neighbor_province": {
-        "from": [
-          "country",
-          "province"
-        ],
-        "to": "province"
-      },
-      "any_other_great_power": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "any_owned_province": {
-        "from": [
-          "country",
-          "province"
-        ],
-        "to": "province"
-      },
-      "any_privateering_country": {
-        "from": [
-          "trade_node"
-        ],
-        "to": "country"
-      },
-      "any_province": {
-        "from": [
-          "any"
-        ],
-        "to": "province"
-      },
-      "any_province_in_state": {
-        "from": [
-          "province"
-        ],
-        "to": "province"
-      },
-      "any_rival_country": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "any_subject_country": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
-      "any_trade_node": {
-        "from": [
-          "country"
-        ],
-        "to": "trade_node"
-      },
-      "any_trade_node_member_country": {
-        "from": [
-          "province"
-        ],
-        "to": "country"
-      },
-      "any_trade_node_member_province": {
-        "from": [
-          "province"
-        ],
-        "to": "province"
-      },
-      "any_tribal_land": {
-        "from": [
-          "country"
-        ],
-        "to": "province"
-      },
-      "any_war_enemy_country": {
-        "from": [
-          "country"
-        ],
-        "to": "country"
-      },
       "capital": {
         "from": [
           "country"
@@ -435,12 +37,6 @@
         ],
         "to": "country"
       },
-      "enemy_unit": {
-        "from": [
-          "unit"
-        ],
-        "to": "unit"
-      },
       "enlightenment_origin": {
         "from": [
           "any"
@@ -452,12 +48,6 @@
           "any"
         ],
         "to": "any"
-      },
-      "expulsion_target": {
-        "from": [
-          "province"
-        ],
-        "to": "province"
       },
       "feudalism_origin": {
         "from": [
@@ -483,18 +73,6 @@
         ],
         "to": "province"
       },
-      "home_trade_node": {
-        "from": [
-          "country"
-        ],
-        "to": "trade_node"
-      },
-      "home_trade_node_effect_scope": {
-        "from": [
-          "country"
-        ],
-        "to": "trade_node"
-      },
       "industrialization_origin": {
         "from": [
           "any"
@@ -516,7 +94,7 @@
       },
       "most_province_trade_power": {
         "from": [
-          "trade_node"
+          "province"
         ],
         "to": "country"
       },
@@ -544,27 +122,9 @@
         ],
         "to": "country"
       },
-      "owns_all_provinces": {
-        "from": [
-          "country"
-        ],
-        "to": "province"
-      },
-      "papal_controller": {
-        "from": [
-          "any"
-        ],
-        "to": "country"
-      },
       "printing_press_origin": {
         "from": [
           "any"
-        ],
-        "to": "province"
-      },
-      "province_group": {
-        "from": [
-          "province"
         ],
         "to": "province"
       },
@@ -586,19 +146,6 @@
         ],
         "to": "province"
       },
-      "strongest_trade_power": {
-        "from": [
-          "province",
-          "trade_node"
-        ],
-        "to": "country"
-      },
-      "tooltip": {
-        "from": [
-          "any"
-        ],
-        "to": "any"
-      },
       "tribal_owner": {
         "from": [
           "province"
@@ -614,18 +161,23 @@
     },
     "registers": {
       "from": {
-        "chain": true
+        "chain": true,
+        "role": "from"
       },
       "prev": {
-        "chain": true
+        "chain": true,
+        "role": "previous"
       },
-      "root": {},
-      "this": {}
+      "root": {
+        "role": "root"
+      },
+      "this": {
+        "role": "current"
+      }
     },
     "types": [
       "province",
       "country",
-      "trade_node",
       "unit",
       "monarch",
       "heir",

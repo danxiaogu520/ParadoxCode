@@ -602,33 +602,33 @@ fn eu4_scan_uses_the_explicit_script_folder_whitelist() {
     );
     assert!(
         snapshot
-            .index()
-            .active_definition("event", "whitelist.common")
-            .is_some()
+            .source_files()
+            .values()
+            .any(|file| file.logical_path.as_str() == "common/countries/allowed.txt")
     );
     assert!(
         snapshot
-            .index()
-            .active_definition("event", "whitelist.technology")
-            .is_some()
+            .source_files()
+            .values()
+            .any(|file| file.logical_path.as_str() == "common/technology.txt")
     );
     assert!(
         snapshot
-            .index()
-            .active_definition("event", "whitelist.gfx_nested")
-            .is_some()
+            .source_files()
+            .values()
+            .any(|file| file.logical_path.as_str() == "gfx/sprite_packs/allowed.txt")
     );
     assert!(
         snapshot
-            .index()
-            .active_definition("event", "whitelist.map_area")
-            .is_some()
+            .source_files()
+            .values()
+            .any(|file| file.logical_path.as_str() == "map/area.txt")
     );
     assert!(
         snapshot
-            .index()
-            .active_definition("event", "whitelist.map_lakes")
-            .is_some()
+            .source_files()
+            .values()
+            .any(|file| file.logical_path.as_str() == "map/lakes/00_lakes.txt")
     );
     assert!(
         snapshot

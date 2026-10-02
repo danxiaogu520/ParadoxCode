@@ -105,7 +105,17 @@ fn escape(text: &str) -> String {
 
 fn assert_golden(name: &str, text: &str, items: &[Diagnostic]) {
     let actual = render(name, text, items);
-    let path = golden_dir().join(format!("{name}.txt"));
+    // Reviewed IR differences: THIS preserves scope, country_tag uses actual
+    // symbols, and an unknown mission key names the innermost definition.
+    // Other first-party cases continue sharing the legacy snapshots.
+    let fixture = {
+        match name {
+            "dynamic_scope_contracts" => "ir_dynamic_scope_contracts",
+            "localisation_derived_keys" => "ir_localisation_derived_keys",
+            _ => name,
+        }
+    };
+    let path = golden_dir().join(format!("{fixture}.txt"));
     if std::env::var_os("PDC_UPDATE_GOLDEN").is_some() {
         std::fs::create_dir_all(golden_dir()).expect("create golden directory");
         std::fs::write(&path, &actual)
@@ -133,33 +143,8 @@ fn analyze_text(host: &AnalysisHost, id: &DocumentId) -> Vec<Diagnostic> {
     diagnostics(&host.snapshot(), id)
 }
 
-/// A `RuleShape::Leaf` rule with the fixture defaults used across the corpus.
-fn leaf_rule(id: &str, context: &str, key: KeyMatcher, value: ValueMatcher) -> SemanticRule {
-    SemanticRule {
-        id: id.to_owned(),
-        context: context.to_owned(),
-        parent_path: Vec::new(),
-        key,
-        operator: None,
-        value,
-        shape: RuleShape::Leaf,
-        child_context: None,
-        alternative_id: None,
-        severity: None,
-        deprecated: false,
-        documentation: Vec::new(),
-        allowed_scopes: Vec::new(),
-        push_scope: None,
-        replace_scope: Vec::new(),
-        min_occurs: None,
-        max_occurs: None,
-        source_file: "fixture.semantic".to_owned(),
-        line: 1,
-    }
-}
-
 fn first_party_host(root: &std::path::Path) -> AnalysisHost {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -172,7 +157,10 @@ fn first_party_host(root: &std::path::Path) -> AnalysisHost {
 #[test]
 fn golden_syntax_errors() {
     let text = "trigger = {\n  missing =\n";
-    let (host, id) = snapshot(text);
+    let mut host = AnalysisHost::new(RuleSet::empty());
+    let id = DocumentId::new("file:///tmp/syntax.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .unwrap();
     assert_golden("syntax_errors", text, &analyze_text(&host, &id));
 }
 
@@ -190,19 +178,10 @@ fn golden_semantic_leaf_unknown_key_cardinality() {
 #[test]
 fn golden_enum_did_you_mean() {
     let text = "trigger = { mode = histori }\n";
-    let mut model = game::eu4::bootstrap_model();
-    model.semantic.enum_values.insert(
-        "fixture_modes".to_owned(),
-        vec!["historic".to_owned(), "dynamic".to_owned()],
+    let mut host = fixture_host(
+        serde_json::json!({"enums": {"fixture_modes": ["historic", "dynamic"]}, "schemas": {"trigger": {"fields": {"mode": {"value": "enum<fixture_modes>"}}}}}),
     );
-    model.semantic.rules.push(leaf_rule(
-        "fixture:trigger:mode",
-        "trigger",
-        KeyMatcher::Exact("mode".to_owned()),
-        ValueMatcher::Enum("fixture_modes".to_owned()),
-    ));
-    let mut host = eu4_host(RuleSet::from_model(model));
-    let id = DocumentId::new("file:///tmp/common/events/golden-enum.txt");
+    let id = DocumentId::new("file:///tmp/events/golden-enum.txt");
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open golden enum fixture");
     assert_golden("enum_did_you_mean", text, &analyze_text(&host, &id));
@@ -211,41 +190,9 @@ fn golden_enum_did_you_mean() {
 #[test]
 fn golden_value_clause_bare_values() {
     let text = "terrain = { color = { 1 2 300 } }\n";
-    let mut model = game::eu4::bootstrap_model();
-    let mut color = leaf_rule(
-        "fixture:terrain:color",
-        "terrain",
-        KeyMatcher::Exact("color".to_owned()),
-        ValueMatcher::AnyScalar,
+    let mut host = fixture_host(
+        serde_json::json!({"schemas": {"fixture_root": {"fields": {"terrain": {"body": "terrain"}}}, "terrain": {"fields": {"color": {"body": "rgb", "card": "0..1"}}}, "rgb": {"items": "int[0..255]"}}}),
     );
-    color.shape = RuleShape::ValueClause;
-    color.operator = Some("=".to_owned());
-    model.semantic.rules.push(color);
-    model.semantic.rules.push(SemanticRule {
-        id: "fixture:terrain:color:int".to_owned(),
-        context: "terrain".to_owned(),
-        parent_path: vec!["color".to_owned()],
-        key: KeyMatcher::AnyScalar,
-        operator: None,
-        value: ValueMatcher::Int {
-            min: Some(0),
-            max: Some(255),
-        },
-        shape: RuleShape::LeafValue,
-        child_context: None,
-        alternative_id: None,
-        severity: None,
-        deprecated: false,
-        documentation: Vec::new(),
-        allowed_scopes: Vec::new(),
-        push_scope: None,
-        replace_scope: Vec::new(),
-        min_occurs: Some(3),
-        max_occurs: Some(3),
-        source_file: "fixture.semantic".to_owned(),
-        line: 2,
-    });
-    let mut host = eu4_host(RuleSet::from_model(model));
     let id = DocumentId::new("file:///tmp/common/terrain/golden.txt");
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open golden terrain fixture");
@@ -255,21 +202,10 @@ fn golden_value_clause_bare_values() {
 #[test]
 fn golden_scope_target_failures() {
     let text = "trigger = { target = NOWHERE scope = NOWHERE target = capital }\n";
-    let mut model = game::eu4::bootstrap_model();
-    model.semantic.rules.push(leaf_rule(
-        "fixture:trigger:target",
-        "trigger",
-        KeyMatcher::Exact("target".to_owned()),
-        ValueMatcher::Scope(Some("country".to_owned())),
-    ));
-    model.semantic.rules.push(leaf_rule(
-        "fixture:trigger:scope-command",
-        "trigger",
-        KeyMatcher::Exact("scope".to_owned()),
-        ValueMatcher::Scope(Some("country".to_owned())),
-    ));
-    let mut host = eu4_host(RuleSet::from_model(model));
-    let id = DocumentId::new("file:///tmp/common/events/golden-scope-targets.txt");
+    let mut host = fixture_host(
+        serde_json::json!({"schemas": {"trigger": {"fields": {"target": {"value": "scope<country>", "card": "0..*"}, "scope": {"value": "scope<country>"}}}}}),
+    );
+    let id = DocumentId::new("file:///tmp/events/golden-scope-targets.txt");
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open golden scope-target fixture");
     assert_golden("scope_target_failures", text, &analyze_text(&host, &id));

@@ -4,13 +4,11 @@
       "fields": {
         "area": {
           "card": "1",
-          "value": "enum<rebel_areas>",
-          "when": null
+          "value": "enum<rebel_areas>"
         },
         "artillery": {
           "card": "1",
-          "value": "float[0.0..1.0]",
-          "when": null
+          "value": "float[0.0..1.0]"
         },
         "can_enforce_trigger": {
           "body": "trigger",
@@ -22,8 +20,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "can_negotiate_trigger": {
           "body": "trigger",
@@ -35,35 +32,29 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "cavalry": {
           "card": "1",
-          "value": "float[0.0..1.0]",
-          "when": null
+          "value": "float[0.0..1.0]"
         },
         "color": {
           "card": "1",
-          "list": "int[0..]",
-          "when": null
+          "list": "int[0..]"
         },
         "defect_delay": {
           "card": "0..1",
           "doc": "Held provinces will auto-defect after 18 months, regardless of accept/enforce demands.",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "defection": {
           "card": "1",
-          "value": "enum<rebel_defection>",
-          "when": null
+          "value": "enum<rebel_defection>"
         },
         "demands_description": {
           "card": "1",
           "doc": "Localisation for their demands",
-          "value": "loc",
-          "when": null
+          "value": "def<rebel_demand_loc>"
         },
         "demands_enforced_effect": {
           "body": "effect",
@@ -75,78 +66,63 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "disband_on_leader_death": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "dynasty": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "general": {
           "card": "1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "gfx_type": {
           "card": "1",
-          "value": "enum<rebel_gfx_type>",
-          "when": null
+          "value": "enum<rebel_gfx_type>"
         },
         "government": {
           "card": "0..1",
-          "value": "enum<rebel_governments>",
-          "when": null
+          "value": "enum<rebel_governments>"
         },
         "handle_action_build_core": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "handle_action_change_culture": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "handle_action_negotiate": {
           "card": "1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "handle_action_send_missionary": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "handle_action_stability": {
           "card": "1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "has_reform": {
           "card": "0..1",
-          "value": "ref<government_reform>",
-          "when": null
+          "value": "ref<government_reform>"
         },
         "independence": {
           "card": "1",
-          "value": "enum<rebel_independence>",
-          "when": null
+          "value": "enum<rebel_independence>"
         },
         "infantry": {
           "card": "1",
-          "value": "float[0.0..1.0]",
-          "when": null
+          "value": "float[0.0..1.0]"
         },
         "morale": {
           "card": "1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "movement_evaluation": {
           "body": "rebel_type_body__movement_evaluation",
@@ -157,29 +133,24 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "reinforcing": {
           "card": "1",
           "doc": "Will reinforce (double rate in rebel controlled provinces)",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "religion": {
           "card": "0..1",
-          "value": "ref<religion>",
-          "when": null
+          "value": "ref<religion>"
         },
         "resilient": {
           "card": "1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "revolutionary": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "siege_won_effect": {
           "body": "effect",
@@ -191,8 +162,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "siege_won_trigger": {
           "body": "trigger",
@@ -204,14 +174,12 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "smart": {
           "card": "1",
           "doc": "Do assault forts, tactically withdraw from battle, etc.",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "spawn_chance": {
           "body": "rebel_type_body__spawn_chance",
@@ -222,19 +190,16 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "unit_transfer": {
           "card": "1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "will_relocate": {
           "card": "1",
           "doc": "Units will relocate if they have sieged all provinces nearby and has to move over sea.",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         }
       }
     },
@@ -247,8 +212,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -261,8 +225,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [

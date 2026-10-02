@@ -4,35 +4,29 @@
       "fields": {
         "allow_settlement_growth": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "allows_taking_land_without_independence": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "annex_cost_per_development": {
           "card": "0..1",
           "doc": "How much it costs in DIP to annex, based on development",
-          "value": "float[0.0..]",
-          "when": null
+          "value": "float[0.0..]"
         },
         "base_liberty_desire": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "bestow_gifts": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "block_settlement_growth": {
           "card": "0..1",
           "doc": "Subject Interactions: (immediate)",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_ally": {
           "body": "subject_type_body__can_ally",
@@ -44,30 +38,25 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "can_be_annexed": {
           "card": "0..1",
           "doc": "Properties:",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_be_co_belligerented": {
           "card": "0..1",
           "doc": "Enemies can force this subject to join its overlord into the defense war. Only used when the subject has the \"joins_overlords_wars = no\". By default it's \"no\".",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_be_integrated": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_concentrate_development": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_fight": {
           "body": "subject_type_body__can_fight",
@@ -79,30 +68,25 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "can_fight_independence_war": {
           "card": "0..1",
           "doc": "Properties:",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_gain_favors": {
           "card": "0..1",
           "doc": "If favors can be gained with subject like allies",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_have_great_projects_moved_by_overlord": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_have_subjects_of_other_types": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_marry": {
           "body": "subject_type_body__can_marry",
@@ -114,19 +98,16 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "can_release_and_play": {
           "card": "0..1",
           "doc": "\"Release Colony\" in SubjectView",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_release_in_peace": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_rival": {
           "body": "subject_type_body__can_rival",
@@ -138,291 +119,239 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "can_send_missionary_to_subject": {
           "card": "0..1",
           "doc": "Requires Cradle of Civilization",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_send_tribute": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_set_mil_focus": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_transfer_in_peace": {
           "card": "0..1",
           "doc": "Whether this subject type can be made into a vassal with the \"Transfer Subject\" Age Ability.",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_union_break": {
           "card": "0..1",
           "doc": "Only works together with has_overlords_ruler",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "can_use_claims": {
           "card": "0..1",
           "doc": "Whether the overlord can use the subject's claims and cores for declaring war",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "change_colonial_type": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "cities_required_for_bonuses": {
           "card": "0..1",
           "doc": "How many cities the subject needs before giving bonuses to overlord",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "conscript_general": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "contribute_to_capital": {
           "card": "0..1",
           "doc": "(enable)",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "copy_from": {
           "card": "0..1",
           "doc": "copy_from copies everything except count and is_potential_overlord",
-          "value": "ref<subject_type>",
-          "when": null
+          "value": "ref<subject_type>"
         },
         "count": {
           "card": "0..1",
           "doc": "count = x means it \"counts as\" x in some triggers.",
-          "value": "ref<subject_type>",
-          "when": null
+          "value": "ref<subject_type>"
         },
         "counts_as_overlord_holding": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "counts_for_borders": {
           "card": "0..1",
           "doc": "Whether distance between borders counts this subject type as part of its overlord's borders.",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "created_by_overlord": {
           "card": "0..1",
           "doc": "Properties:",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "customize_subject": {
           "card": "0..1",
           "doc": "Subject Interactions:",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "decrease_tariffs": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "demand_additional_tribute": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "demand_artifacts": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "diplomacy_overlord_sprite": {
           "card": "0..1",
           "doc": "The one that the overlord sees",
-          "value": "ref<sprite>",
-          "when": null
+          "value": "ref<sprite>"
         },
         "diplomacy_subject_sprite": {
           "card": "0..1",
           "doc": "The one that the subject sees",
-          "value": "ref<sprite>",
-          "when": null
+          "value": "ref<sprite>"
         },
         "diplomacy_view_class": {
           "card": "0..1",
           "doc": "diplomacy_view_class decides how subjects are grouped together in diplomacy view and in foreign province view: 0 means it won't be listed, 1 means it will be listed together only with the same subject type. Other values means it will be listed together with all subjects of the same diplomacy_view_class",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "disable_inheritance": {
           "card": "0..1",
           "doc": "Use this for Personal Union types of subjects to disallow the inheriting mechanic",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "divert_trade": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "does_overlord_size_count_for_warscore_cost": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "dynamically_created_during_history": {
           "card": "0..1",
           "doc": "If the country is automatically created. ( Makes for special checks during history )",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "eats_overlords_colonies": {
           "card": "0..1",
           "doc": "Whether subject assumes control of overlord's colonies in same colonial region.",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "embargo_rivals": {
           "card": "0..1",
           "doc": "Subject Interactions: (continuous)",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "enforce_culture": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "enforce_religion": {
           "card": "0..1",
           "doc": "Subject Interactions: (immediate)",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "expel_ronin": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "extend_trading_range": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "favors_cost_to_join_defensive_wars": {
           "card": "0..1",
           "doc": "Defines how much favors the overlord need to invest to call the subject into a defensive war",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "favors_cost_to_join_offensive_wars": {
           "card": "0..1",
           "doc": "Defines how much favors the overlord need to invest to call the subject into an offensive war",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "force_isolation": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "force_seppuku": {
           "card": "0..1",
           "doc": "(enable)",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "forcelimit_to_overlord": {
           "card": "0..1",
           "doc": "Percent of subject FL to use as base for modifiers",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "forms_trade_companies": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "fortify_march": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "gets_help_with_rebels": {
           "card": "0..1",
           "doc": "Only for AI. Bidirectional.",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "gives_daimyo_bonuses": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "grant_administrative_autonomy": {
           "card": "0..1",
           "doc": "Grants -10% Liberty Desire at the cost of -20 Reform Progress",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "grant_core_claim": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "grant_province": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "has_colonial_parent": {
           "card": "0..1",
           "doc": "Regulates most rules that should hold only for colonies",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "has_overlords_ruler": {
           "card": "0..1",
           "doc": "Properties:",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "has_power_projection": {
           "card": "0..1",
           "doc": "Properties:",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "increase_tariffs": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "integration_requires_same_religion_group": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_colony_subtype": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_march": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "is_potential_overlord": {
           "body": "trigger",
@@ -433,368 +362,303 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "is_voluntary": {
           "card": "0..1",
           "doc": "Whether they can leave the relationship whenever they want",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "joins_colonial_wars": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "joins_overlords_wars": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "knowledge_sharing": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "liberty_desire_development_ratio": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "liberty_desire_negative_prestige": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "liberty_desire_revolution": {
           "card": "0..1",
           "doc": "Liberty desire at 100% revolution spread in country",
-          "value": "int | float",
-          "when": null
+          "value": "int | float"
         },
         "liberty_desire_same_dynasty": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "manpower_to_overlord": {
           "card": "0..1",
           "doc": "Percent of subject FL to use as base for modifiers",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "max_government_rank": {
           "card": "0..1",
           "doc": "0 means no limit",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "military_focus": {
           "card": "0..1",
           "doc": "How much the AI subject should spend etc. on army and forts. 0 should make them spend nothing. Very high values will probably not make a big difference since there will be sanity checks.",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "modifier_overlord": [
           {
             "card": "0..*",
             "doc": "Use \"clear\" to clear after copy_from. Otherwise it just adds a static modifier.",
-            "value": "'clear'",
-            "when": null
+            "value": "'clear'"
           },
           {
             "body": "subject_type_body__modifier_overlord",
             "card": "0..*",
-            "doc": "Use \"clear\" to clear after copy_from. Otherwise it just adds a static modifier.",
-            "when": null
+            "doc": "Use \"clear\" to clear after copy_from. Otherwise it just adds a static modifier."
           }
         ],
         "modifier_subject": [
           {
             "card": "0..*",
             "doc": "Use \"clear\" to clear after copy_from. Otherwise it just adds a static modifier.",
-            "value": "'clear'",
-            "when": null
+            "value": "'clear'"
           },
           {
             "body": "subject_type_body__modifier_subject",
             "card": "0..*",
-            "doc": "Use \"clear\" to clear after copy_from. Otherwise it just adds a static modifier.",
-            "when": null
+            "doc": "Use \"clear\" to clear after copy_from. Otherwise it just adds a static modifier."
           }
         ],
         "must_accept_cta_from_overlord": {
           "card": "0..1",
           "doc": "Overlord can ask subject to join wars like it could ask allies to join. You would require favors to call them to wars. Only used when the subject has the \"joins_overlords_wars = no\". By default it's \"no\"",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "naval_forcelimit_to_overlord": {
           "card": "0..1",
           "doc": "Percent of subject FL to use as base for modifiers",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "opinion_cost_instead_of_favors_cost": {
           "card": "0..1",
           "doc": "Whether subject require favors or opinion to join the war, if yes requires opinion, if no requires favors, which is the default unless Leviathan DLC is owned",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "opinion_cost_to_join_defensive_wars": {
           "card": "0..1",
           "doc": "Defines how much opinion the subject loses of the overlord to call the subject into a defensive war. Applied if you do not have Leviathan",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "opinion_cost_to_join_offensive_wars": {
           "card": "0..1",
           "doc": "Defines how much opinion the subject loses of the overlord to call the subject into an offensive war. Applied if you do not have Leviathan",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "opinion_on_subject_integration": {
           "card": "0..1",
           "doc": "Opinion hit on subjects from seeing another subject integrated, defaults to -30",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "overlord_can_attack": {
           "card": "0..1",
           "doc": "Properties:",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "overlord_can_be_subject": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "overlord_can_fabricate_for": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "overlord_enforce_peace_attacking": {
           "card": "0..1",
           "doc": "Whether the overlord can enforce peace on the subject's enemy even when the subject is the attacker",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "overlord_opinion_modifier": {
           "card": "0..1",
           "doc": "If not \"null\" it will look for a modifier with that name in 00_opinion_modifiers.txt and other files in that directory.",
-          "value": "'null' | ref<opinion_modifier>",
-          "when": null
+          "value": "'null' | ref<opinion_modifier>"
         },
         "overlord_protects_external": {
           "card": "0..1",
           "doc": "Whether overlord always gets called (declinable) against countries without the same overlord. When this is 'no' overlord will only join if the defender would have been blocked (by its subject type) from attacking the attacker.",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "pays_overlord": {
           "card": "0..1",
           "doc": "1.0 represents the amount payed by vassals",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "placate_rulers": {
           "card": "0..1",
           "doc": "(immediate)",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "place_relative_on_throne": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "press_sailors": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "relative_power_class": {
           "card": "0..1",
           "doc": "relative_power_class decides how Subjects are grouped together when considering relative strenghth towards overlord: If it is 0 they won't consider relative power and if it is 1 they will only consider their own power (and those supporting their independence) compared to their Overlord's. Otherwise they will sum up the power of every Subject of the same relative_power_class as themselves, and all countries who support either themselves or one of their allies in the same relative_power_class.",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "replace_governor": {
           "card": "0..1",
           "doc": "Subject Interactions:",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "request_extra_levies": {
           "card": "0..1",
           "doc": "Seizes a month's worth of manpower and sailors for +25% Liberty Desire",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "restoration_cb": {
           "card": "0..1",
-          "value": "ref<casus_belli>",
-          "when": null
+          "value": "ref<casus_belli>"
         },
         "return_land": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "sacrifice_heir": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "sacrifice_ruler": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "sailors_to_overlord": {
           "card": "0..1",
           "doc": "Percent of subject FL to use as base for modifiers",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "sankin_kotai": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "scutage": {
           "card": "0..1",
           "doc": "Subject Interactions:",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "seize_court_resources": {
           "card": "0..1",
           "doc": "Seizes a month's worth of monarch power generation for +25% Liberty Desire",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "seize_territory": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "send_additional_troops": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "send_officers": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "separatists_become_subjects": {
           "card": "0..1",
           "doc": "Whether separatist rebels enforcing demands will become subjects of the overlord.",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "share_rebel_popup": {
           "card": "0..1",
           "doc": "Whether the Overlord gets popups about Subject's rebels and sees them in Stability View.",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "should_quit_wars_on_activation": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "siphon_income": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "sprite": {
           "card": "0..1",
           "doc": "Graphics:",
-          "value": "ref<sprite>",
-          "when": null
+          "value": "ref<sprite>"
         },
         "start_colonial_war": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "subject_opinion_modifier": {
           "card": "0..1",
           "doc": "If not \"null\" it will look for a modifier with that name in 00_opinion_modifiers.txt and other files in that directory.",
-          "value": "'null' | ref<opinion_modifier>",
-          "when": null
+          "value": "'null' | ref<opinion_modifier>"
         },
         "subsidize_armies": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "support_loyalists": {
           "card": "0..1",
           "doc": "Subject Interactions:",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "sword_hunt": {
           "card": "0..1",
           "doc": "(special)",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "takeondebt": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "takes_diplo_slot": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "transfer_subjects_when_made": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "transfer_trade_if_merchant_republic": {
           "card": "0..1",
           "doc": "Properties:",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "transfer_trade_power": {
           "card": "0..1",
           "doc": "Properties:",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "trust_on_start": {
           "card": "0..1",
           "doc": "Overlord and subject will each get this much extra trust with each other at game start",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "upgrade_subject_type": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "uses_military_focus": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "uses_tariffs": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         }
       }
     },
@@ -802,33 +666,27 @@
       "fields": {
         "can_send_tribute": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "colonial_region_nations": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "independent_nations": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "neighboring_primitives": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "other_overlord": {
           "card": "0..*",
-          "value": "ref<subject_type> | 'all'",
-          "when": null
+          "value": "ref<subject_type> | 'all'"
         },
         "same_overlord": {
           "card": "0..*",
-          "value": "ref<subject_type>",
-          "when": null
+          "value": "ref<subject_type>"
         }
       }
     },
@@ -836,33 +694,27 @@
       "fields": {
         "can_send_tribute": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "colonial_region_nations": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "independent_nations": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "neighboring_primitives": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "other_overlord": {
           "card": "0..*",
-          "value": "'all' | ref<subject_type>",
-          "when": null
+          "value": "'all' | ref<subject_type>"
         },
         "same_overlord": {
           "card": "0..*",
-          "value": "ref<subject_type>",
-          "when": null
+          "value": "ref<subject_type>"
         }
       }
     },
@@ -870,33 +722,27 @@
       "fields": {
         "can_send_tribute": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "colonial_region_nations": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "independent_nations": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "neighboring_primitives": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "other_overlord": {
           "card": "0..*",
-          "value": "ref<subject_type> | 'all'",
-          "when": null
+          "value": "ref<subject_type> | 'all'"
         },
         "same_overlord": {
           "card": "0..*",
-          "value": "ref<subject_type> | 'all'",
-          "when": null
+          "value": "ref<subject_type> | 'all'"
         }
       }
     },
@@ -904,33 +750,27 @@
       "fields": {
         "can_send_tribute": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "colonial_region_nations": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "independent_nations": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "neighboring_primitives": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "other_overlord": {
           "card": "0..*",
-          "value": "ref<subject_type> | 'all'",
-          "when": null
+          "value": "ref<subject_type> | 'all'"
         },
         "same_overlord": {
           "card": "0..*",
-          "value": "ref<subject_type>",
-          "when": null
+          "value": "ref<subject_type>"
         }
       }
     },
@@ -938,19 +778,16 @@
       "fields": {
         "expiration_message_overlord": {
           "card": "0..1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "expiration_message_subject": {
           "card": "0..1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "modifier": {
           "card": "1",
           "doc": "Block of modifiers applied while the containing entry is active.",
-          "value": "ref<static_modifier> | ref<event_modifier>",
-          "when": null
+          "value": "ref<static_modifier> | ref<event_modifier>"
         },
         "trigger": {
           "body": "trigger",
@@ -962,8 +799,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -971,19 +807,16 @@
       "fields": {
         "expiration_message_overlord": {
           "card": "0..1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "expiration_message_subject": {
           "card": "0..1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "modifier": {
           "card": "1",
           "doc": "Block of modifiers applied while the containing entry is active.",
-          "value": "ref<static_modifier> | ref<event_modifier>",
-          "when": null
+          "value": "ref<static_modifier> | ref<event_modifier>"
         },
         "trigger": {
           "body": "trigger",
@@ -995,8 +828,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -1010,13 +842,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "cost": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "effect": {
           "body": "effect",
@@ -1027,8 +857,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "modifier_overlord": {
           "body": "modifier",
@@ -1038,8 +867,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "modifier_subject": {
           "body": "modifier",
@@ -1049,8 +877,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "removed_effect": {
           "body": "effect",
@@ -1060,8 +887,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     }

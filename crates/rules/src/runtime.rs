@@ -1,14 +1,9 @@
-use crate::canonical::{RuleHash, canonical_hash};
-use crate::matcher::KeyMatcher;
-use crate::model::{
-    FileCategory, RuleShape, RulesModel, SemanticModel, SemanticRule, SymbolBinding, TypeRootScope,
-};
-use text::LogicalPath;
-
-use rustc_hash::{FxHashMap, FxHashSet};
-use std::collections::BTreeMap;
+//! Immutable scanning catalog derived from the compiled IR.
+use crate::{FileCategory, GameProfile, RuleHash};
+use rustc_hash::FxHashMap;
+use sha2::{Digest, Sha256};
 use std::fmt;
-
+use text::LogicalPath;
 /// Errors from rule construction, validation, or first-party source compilation.
 #[derive(Debug)]
 pub enum RulesError {
@@ -34,517 +29,117 @@ impl fmt::Display for RulesError {
 
 impl std::error::Error for RulesError {}
 
-/// An immutable runtime rule set.
+/// Scanning metadata; semantic consumers use `RulesIr` directly.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RuleSet {
-    pub(crate) rule_hash: RuleHash,
-    pub(crate) model: RulesModel,
-    pub(crate) exact_semantic_rules: FxHashMap<Box<str>, Vec<usize>>,
-    pub(crate) semantic_rules_by_context: FxHashMap<Box<str>, Vec<usize>>,
-    /// Lowercased context -> (lowercased exact key -> rule indices).
-    pub(crate) semantic_exact_rules_by_context_key:
-        FxHashMap<Box<str>, FxHashMap<Box<str>, Vec<usize>>>,
-    /// Lowercased context -> rule indices whose key is not exact.
-    pub(crate) semantic_non_exact_rules_by_context: FxHashMap<Box<str>, Vec<usize>>,
-    /// Lowercased type names whose `root:<name>` semantic context holds at least one rule.
-    ///
-    /// Root-context selection probes this per descriptor during lowering; building the
-    /// `root:<name>` string and scanning rules per probe dominated context resolution.
-    pub(crate) root_context_types: FxHashSet<Box<str>>,
-    /// Lowercased type name -> trimmed dynamic-definition body context for enabled dynamic definitions.
-    ///
-    /// Dynamic-shape probes run per property during validation; the previous linear scan over
-    /// type descriptors (plus a trimmed clone per hit) is now a single map probe.
-    pub(crate) dynamic_definition_contexts: FxHashMap<Box<str>, Option<Box<str>>>,
-    /// Whether each rule's context is `effect` or `trigger`, precomputed once so scope
-    /// link resolution stops re-lowercasing rule contexts per lookup.
-    pub(crate) effect_trigger_contexts: Vec<bool>,
-    /// Lowercased exact key -> dynamic value kind for leaf rules whose value
-    /// is a `dynamic_set` write site (`set_country_flag = X` declares `X`).
-    /// Precomputed once so the engine's per-file property scan resolves each
-    /// write key with a single map probe.
-    pub(crate) dynamic_write_keys: FxHashMap<Box<str>, Box<str>>,
+    rule_hash: RuleHash,
+    game_id: String,
+    file_categories: Vec<FileCategory>,
+    profile: GameProfile,
+    callable_contexts: FxHashMap<Box<str>, Box<str>>,
 }
-
-/// Deterministic ordering for one binding family, shared by the runtime sort
-/// and the canonical hash.
-fn sort_symbol_bindings(bindings: &mut [SymbolBinding]) {
-    bindings.sort_by(|left, right| {
-        (
-            left.type_name.as_str(),
-            left.subtype.as_deref().unwrap_or_default(),
-            left.name.as_str(),
-            left.key.as_deref().unwrap_or_default(),
-        )
-            .cmp(&(
-                right.type_name.as_str(),
-                right.subtype.as_deref().unwrap_or_default(),
-                right.name.as_str(),
-                right.key.as_deref().unwrap_or_default(),
-            ))
-    });
-}
-
 impl RuleSet {
-    /// The key one named template binding expands to for a given instance.
-    /// Specialized consumers (the mission card, the mission preview) resolve
-    /// their keys through this so the bindings JSON stays the single source.
-    #[must_use]
-    pub fn localisation_template_key(
-        &self,
-        type_name: &str,
-        binding_name: &str,
-        instance: &str,
-    ) -> Option<String> {
-        self.model
-            .semantic
-            .localisation_bindings
-            .iter()
-            .find(|binding| {
-                binding.type_name.eq_ignore_ascii_case(type_name)
-                    && binding.name.eq_ignore_ascii_case(binding_name)
-            })
-            .and_then(|binding| binding.key.as_deref())
-            .map(|template| template.replace('$', instance))
-    }
-
-    /// Creates an empty rule set for bootstrapping the crate graph.
+    /// Empty scanning catalog for syntax-only hosts.
     #[must_use]
     pub fn empty() -> Self {
+        Self::from_catalog(String::new(), Vec::new(), GameProfile::default())
+    }
+    /// Constructs a catalog for source-scanning fixtures and nonsemantic providers.
+    #[must_use]
+    pub fn from_catalog(
+        game_id: String,
+        mut file_categories: Vec<FileCategory>,
+        profile: GameProfile,
+    ) -> Self {
+        file_categories.sort_by(|a, b| a.id.cmp(&b.id));
+        let bytes = serde_json::to_vec(&(&game_id, &file_categories, &profile))
+            .expect("catalog serialization");
+        let rule_hash = RuleHash::from_bytes(Sha256::digest(&bytes).into());
         Self {
-            rule_hash: RuleHash::empty(),
-            model: RulesModel {
-                game_id: String::new(),
-                file_categories: Vec::new(),
-                semantic: SemanticModel {
-                    rules: Vec::new(),
-                    enum_values: BTreeMap::new(),
-                    type_root_keys: BTreeMap::new(),
-                    type_root_scopes: BTreeMap::new(),
-                    type_descriptors: BTreeMap::new(),
-                    localisation_bindings: Vec::new(),
-                    sprite_bindings: Vec::new(),
-                },
-                profile: crate::GameProfile::default(),
-            },
-            exact_semantic_rules: FxHashMap::default(),
-            semantic_rules_by_context: FxHashMap::default(),
-            semantic_exact_rules_by_context_key: FxHashMap::default(),
-            semantic_non_exact_rules_by_context: FxHashMap::default(),
-            root_context_types: FxHashSet::default(),
-            dynamic_definition_contexts: FxHashMap::default(),
-            effect_trigger_contexts: Vec::new(),
-            dynamic_write_keys: FxHashMap::default(),
+            rule_hash,
+            game_id,
+            file_categories,
+            profile,
+            callable_contexts: FxHashMap::default(),
         }
     }
-
-    /// File catalog bridge used while the legacy container is retired.
-    /// Semantic consumers read `RulesIr`; this contains no flattened rules.
+    /// Extracts scanning and Callable metadata without flattening semantic fields.
     #[must_use]
     pub fn from_ir_catalog(ir: &crate::ir::RulesIr) -> Self {
         use crate::ir::{DocumentParser, FileResolution};
-        Self::from_model(crate::RulesModel {
-            game_id: ir.game_id().to_owned(),
-            profile: ir.game.profile.clone(),
-            file_categories: ir
-                .files
-                .iter()
-                .map(|file| crate::FileCategory {
-                    id: ir.strings.resolve(file.name).to_owned(),
-                    matcher: file.matcher.clone(),
-                    parser: match file.parser {
-                        DocumentParser::Script => crate::ParserKind::Script,
-                        DocumentParser::Localisation => crate::ParserKind::Localisation,
-                        DocumentParser::Asset => crate::ParserKind::Asset,
-                        DocumentParser::SyntaxOnly => crate::ParserKind::SyntaxOnly,
-                    },
-                    resolution: match file.resolution {
-                        FileResolution::ReplaceByPath => {
-                            crate::FileResolutionPolicy::ReplaceByRelativePath
+        let files = ir
+            .files
+            .iter()
+            .map(|file| FileCategory {
+                id: ir.strings.resolve(file.name).to_owned(),
+                matcher: file.matcher.clone(),
+                parser: match file.parser {
+                    DocumentParser::Script => crate::ParserKind::Script,
+                    DocumentParser::Localisation => crate::ParserKind::Localisation,
+                    DocumentParser::Asset => crate::ParserKind::Asset,
+                    DocumentParser::SyntaxOnly => crate::ParserKind::SyntaxOnly,
+                },
+                resolution: match file.resolution {
+                    FileResolution::ReplaceByPath => {
+                        crate::FileResolutionPolicy::ReplaceByRelativePath
+                    }
+                    FileResolution::Merge => crate::FileResolutionPolicy::Merge,
+                },
+            })
+            .collect();
+        let mut rules = Self::from_catalog(ir.game_id().to_owned(), files, ir.game.profile.clone());
+        rules.rule_hash = ir.rule_hash();
+        if let Some(callable) = ir.trait_by_name("Callable") {
+            for ty in &ir.types {
+                if let Some(implementation) = ty.trait_impls.iter().find(|i| i.trait_id == callable)
+                    && let Some(body) = implementation.arguments.iter().find_map(|(name, value)| {
+                        if !ir.strings.resolve(*name).eq_ignore_ascii_case("body") {
+                            return None;
                         }
-                        FileResolution::Merge => crate::FileResolutionPolicy::Merge,
-                        FileResolution::ReplaceDirectory => {
-                            crate::FileResolutionPolicy::ReplaceDirectory
+                        match value {
+                            crate::ir::TraitArgument::Text(body) => Some(ir.strings.resolve(*body)),
+                            _ => None,
                         }
-                    },
-                })
-                .collect(),
-            ..crate::RulesModel::default()
-        })
-    }
-
-    /// Builds a runtime rule set and computes its canonical logical hash.
-    #[must_use]
-    pub fn from_model(mut model: RulesModel) -> Self {
-        model
-            .file_categories
-            .sort_by(|left, right| left.id.cmp(&right.id));
-        model
-            .semantic
-            .rules
-            .sort_by(|left, right| left.id.cmp(&right.id));
-        sort_symbol_bindings(&mut model.semantic.localisation_bindings);
-        sort_symbol_bindings(&mut model.semantic.sprite_bindings);
-        for values in model.semantic.enum_values.values_mut() {
-            values.sort();
-            values.dedup();
-        }
-        for values in model.semantic.type_root_keys.values_mut() {
-            values.sort();
-            values.dedup();
-        }
-        let rule_hash = canonical_hash(&model);
-        let mut exact_semantic_rules = FxHashMap::<Box<str>, Vec<usize>>::default();
-        let mut semantic_rules_by_context = FxHashMap::<Box<str>, Vec<usize>>::default();
-        let mut semantic_exact_rules_by_context_key =
-            FxHashMap::<Box<str>, FxHashMap<Box<str>, Vec<usize>>>::default();
-        let mut semantic_non_exact_rules_by_context = FxHashMap::<Box<str>, Vec<usize>>::default();
-        let mut root_context_types = FxHashSet::<Box<str>>::default();
-        let mut dynamic_definition_contexts = FxHashMap::<Box<str>, Option<Box<str>>>::default();
-        for (type_name, descriptor) in &model.semantic.type_descriptors {
-            let context = descriptor
-                .dynamic_definition
-                .as_ref()
-                .filter(|descriptor| descriptor.enabled)
-                .map(|descriptor| Box::from(descriptor.body_context.trim()));
-            if context.is_some() {
-                dynamic_definition_contexts
-                    .insert(type_name.to_ascii_lowercase().into_boxed_str(), context);
-            }
-        }
-        let mut effect_trigger_contexts = Vec::with_capacity(model.semantic.rules.len());
-        let mut dynamic_write_keys = FxHashMap::<Box<str>, Box<str>>::default();
-        for (index, rule) in model.semantic.rules.iter().enumerate() {
-            let context_key: Box<str> = rule.context.to_ascii_lowercase().into_boxed_str();
-            effect_trigger_contexts
-                .push(context_key.as_ref() == "effect" || context_key.as_ref() == "trigger");
-            if rule.parent_path.is_empty()
-                && matches!(rule.shape, crate::RuleShape::Leaf)
-                && let KeyMatcher::Exact(key) = &rule.key
-                && let crate::ValueMatcher::DynamicSet(kind) = &rule.value
-                && !key.trim().is_empty()
-                && !kind.is_empty()
-            {
-                dynamic_write_keys
-                    .entry(key.to_ascii_lowercase().into_boxed_str())
-                    .or_insert_with(|| kind.to_ascii_lowercase().into_boxed_str());
-            }
-            match &rule.key {
-                KeyMatcher::Exact(key) => {
-                    let key: Box<str> = key.to_ascii_lowercase().into_boxed_str();
-                    exact_semantic_rules
-                        .entry(key.clone())
-                        .or_default()
-                        .push(index);
-                    semantic_exact_rules_by_context_key
-                        .entry(context_key.clone())
-                        .or_default()
-                        .entry(key)
-                        .or_default()
-                        .push(index);
-                }
-                _ => {
-                    semantic_non_exact_rules_by_context
-                        .entry(context_key.clone())
-                        .or_default()
-                        .push(index);
+                    })
+                {
+                    rules
+                        .callable_contexts
+                        .insert(ir.strings.resolve(ty.name).into(), body.into());
                 }
             }
-            semantic_rules_by_context
-                .entry(context_key)
-                .or_default()
-                .push(index);
         }
-        for context_key in semantic_rules_by_context.keys() {
-            if let Some(type_name) = context_key.strip_prefix("root:") {
-                root_context_types.insert(type_name.into());
-            }
-        }
-        Self {
-            rule_hash,
-            model,
-            exact_semantic_rules,
-            semantic_rules_by_context,
-            semantic_exact_rules_by_context_key,
-            semantic_non_exact_rules_by_context,
-            root_context_types,
-            dynamic_definition_contexts,
-            effect_trigger_contexts,
-            dynamic_write_keys,
-        }
+        rules
     }
-
-    /// Returns the dynamic value kind a leaf write site with this exact key
-    /// declares members of, when the rule data marks the key as a
-    /// `dynamic_set` writer (for example `set_country_flag` -> `country_flag`).
-    pub fn dynamic_write_kind(&self, key: &str) -> Option<&str> {
-        let lowered = key.to_ascii_lowercase();
-        self.dynamic_write_keys
-            .get(lowered.as_str())
-            .map(Box::as_ref)
-    }
-
-    /// Returns whether rule data declares any write site for this dynamic
-    /// value kind (case-folded), meaning the kind's membership is decidable
-    /// from write sites plus engine seeds.
-    pub fn is_dynamic_write_kind(&self, kind: &str) -> bool {
-        let lowered = kind.to_ascii_lowercase();
-        self.dynamic_write_keys
-            .values()
-            .any(|candidate| candidate.as_ref() == lowered.as_str())
-    }
-
-    /// Returns the normalized model.
+    /// Configuration supplied by the compiled game package.
     #[must_use]
-    pub const fn model(&self) -> &RulesModel {
-        &self.model
+    pub const fn profile(&self) -> &GameProfile {
+        &self.profile
     }
-
-    /// Returns the data-only profile carried by this rule set.
+    /// Stable file catalog, without semantic rules.
     #[must_use]
-    pub const fn profile(&self) -> &crate::GameProfile {
-        &self.model.profile
+    pub fn file_categories(&self) -> &[FileCategory] {
+        &self.file_categories
     }
-
-    /// Returns exact-key semantic rule candidates without scanning unrelated matchers.
-    pub fn exact_semantic_rules(&self, key: &str) -> impl Iterator<Item = &SemanticRule> {
-        case_insensitive_indices(&self.exact_semantic_rules, key)
-            .into_iter()
-            .flatten()
-            .map(|index| &self.model.semantic.rules[*index])
-    }
-
-    /// Returns the rule indices behind [`Self::exact_semantic_rules`] without borrowing the
-    /// rules themselves, so callers can pair indices with precomputed per-rule facts.
+    /// Declared Callable body context, derived from trait implementation arguments.
     #[must_use]
-    pub fn exact_semantic_rule_indices(&self, key: &str) -> &[usize] {
-        case_insensitive_indices(&self.exact_semantic_rules, key)
-            .map_or(&[], |indices| indices.as_slice())
+    pub fn dynamic_definition_context(&self, kind: &str) -> Option<&str> {
+        self.callable_contexts
+            .get(kind.to_ascii_lowercase().as_str())
+            .map(AsRef::as_ref)
     }
-
-    /// Returns whether the rule at `index` is declared in the `effect` or `trigger` context.
-    ///
-    /// Precomputed at load time; scope link resolution consults it per exact-key lookup and
-    /// must not re-fold rule context strings on the hot path.
-    #[must_use]
-    pub fn semantic_rule_is_effect_or_trigger(&self, index: usize) -> bool {
-        self.effect_trigger_contexts
-            .get(index)
-            .is_some_and(|flag| *flag)
-    }
-
-    /// Returns rule indices whose key matcher is not exact for one context.
-    ///
-    /// These are the rules a key-indexed lookup must still scan; callers that
-    /// memoize them per container avoid repeating the scan per property.
-    pub fn semantic_non_exact_rules_for_context(
-        &self,
-        context: &str,
-    ) -> impl Iterator<Item = usize> + '_ {
-        let context_key = normalized_ascii_query(context);
-        self.semantic_non_exact_rules_by_context
-            .get(context_key.as_ref())
-            .into_iter()
-            .flatten()
-            .copied()
-    }
-
-    /// Returns exact-key rule indices for one (context, key) pair.
-    pub fn semantic_exact_rules_for_context_key(
-        &self,
-        context: &str,
-        key: &str,
-    ) -> impl Iterator<Item = usize> + '_ {
-        let context_key = normalized_ascii_query(context);
-        let key = normalized_ascii_query(key);
-        self.semantic_exact_rules_by_context_key
-            .get(context_key.as_ref())
-            .and_then(|by_key| by_key.get(key.as_ref()))
-            .into_iter()
-            .flatten()
-            .copied()
-    }
-
-    /// Returns rule indices for one context (both exact and non-exact keys).
-    ///
-    /// Lets callers memoize filtered index lists without recovering indices
-    /// from references.
-    pub fn semantic_rule_indices_for_context(
-        &self,
-        context: &str,
-    ) -> impl Iterator<Item = usize> + '_ {
-        let context_key = normalized_ascii_query(context);
-        self.semantic_rules_by_context
-            .get(context_key.as_ref())
-            .into_iter()
-            .flatten()
-            .copied()
-    }
-
-    /// Returns the semantic rule at one index from `semantic_rule_indices_for_context`.
-    #[must_use]
-    pub fn semantic_rule_at(&self, index: usize) -> Option<&SemanticRule> {
-        self.model.semantic.rules.get(index)
-    }
-
-    /// Iterates every compiled semantic rule regardless of context.
-    pub fn semantic_rules(&self) -> impl Iterator<Item = &SemanticRule> {
-        self.model.semantic.rules.iter()
-    }
-
-    /// Returns whether the `root:<type_name>` semantic context holds at least one rule.
-    ///
-    /// Equivalent to `semantic_rules_for_context(&format!("root:{type_name}")).next().is_some()`
-    /// or to finding any rule whose context equals `root:<type_name>` case-insensitively, but
-    /// probes a precomputed set without building the context string.
-    #[must_use]
-    pub fn has_root_context_rules(&self, type_name: &str) -> bool {
-        let type_name = normalized_ascii_query(type_name);
-        self.root_context_types.contains(type_name.as_ref())
-    }
-
-    /// Whether any rule across `lookup_contexts` names a concrete entry key at the
-    /// container root.
-    ///
-    /// A context without named keys (`root:luck`'s lone tag-keyed wrapper) lets its
-    /// wildcard or data-typed rules speak for the entry body itself; a context that
-    /// also declares `Exact`/`Enum` keys describes the entry body through them, and
-    /// its wildcard rules target entry children instead. Shared by the diagnostics
-    /// walk and HIR lowering so both gate entry reroutes on the same rule set.
-    #[must_use]
-    pub fn declares_named_entry_keys(&self, lookup_contexts: &[String]) -> bool {
-        lookup_contexts.iter().any(|context| {
-            self.semantic_rules_for_context(context).any(|rule| {
-                rule.parent_path.is_empty()
-                    && matches!(rule.key, KeyMatcher::Exact(_) | KeyMatcher::Enum(_))
-            })
-        })
-    }
-
-    /// Whether any rule across `lookup_contexts` speaks for the entry keys themselves.
-    ///
-    /// A data-typed key matcher (`root:luck`'s `country_tag`, `root:government_ranks`'
-    /// rank `int`) on a block rule at the container root is an entry-key vocabulary:
-    /// keys outside the vocabulary are unknown. Bare-value rows (`root:continent`'s
-    /// province list) also sit at the container root with wildcard keys, but they
-    /// describe the entry body's scalars and say nothing about the entry key, so
-    /// `LeafValue` shapes are excluded. Shared by the diagnostics walk and completion
-    /// so both gate entry-key enforcement on the same rule set.
-    #[must_use]
-    pub fn declares_entry_key_vocabulary(&self, lookup_contexts: &[String]) -> bool {
-        lookup_contexts.iter().any(|context| {
-            self.semantic_rules_for_context(context).any(|rule| {
-                rule.parent_path.is_empty()
-                    && !matches!(rule.shape, RuleShape::LeafValue)
-                    && matches!(
-                        rule.key,
-                        KeyMatcher::Type(_) | KeyMatcher::Int { .. } | KeyMatcher::Date
-                    )
-            })
-        })
-    }
-
-    /// Returns the trimmed body context of a type's enabled dynamic definition, if any.
-    ///
-    /// The result may be an empty string (enabled but blank context); callers keep
-    /// their own emptiness handling. Equivalent to scanning `type_descriptors` for a
-    /// case-insensitive name match with an enabled `dynamic_definition`.
-    pub fn dynamic_definition_context(&self, type_name: &str) -> Option<&str> {
-        let type_name = normalized_ascii_query(type_name);
-        self.dynamic_definition_contexts
-            .get(type_name.as_ref())
-            .and_then(|context| context.as_deref())
-    }
-
-    /// Returns semantic rules for one context without scanning unrelated contexts.
-    pub fn semantic_rules_for_context(&self, context: &str) -> impl Iterator<Item = &SemanticRule> {
-        case_insensitive_indices(&self.semantic_rules_by_context, context)
-            .into_iter()
-            .flatten()
-            .map(|index| &self.model.semantic.rules[*index])
-    }
-
-    /// Returns semantic rules for one context and property key without scanning unrelated rules.
-    ///
-    /// Exact-key rules are indexed per context and key, so per-property lookups stay proportional
-    /// to the few matching rules plus the context's non-exact matchers (type, enum, dynamic).
-    pub fn semantic_rules_for_context_key(
-        &self,
-        context: &str,
-        key: &str,
-    ) -> impl Iterator<Item = &SemanticRule> {
-        let context_key = normalized_ascii_query(context);
-        let key = normalized_ascii_query(key);
-        let exact = self
-            .semantic_exact_rules_by_context_key
-            .get(context_key.as_ref())
-            .and_then(|by_key| by_key.get(key.as_ref()))
-            .into_iter()
-            .flatten();
-        let non_exact = self
-            .semantic_non_exact_rules_by_context
-            .get(context_key.as_ref())
-            .into_iter()
-            .flatten();
-        exact
-            .chain(non_exact)
-            .map(|index| &self.model.semantic.rules[*index])
-    }
-
-    /// Returns the profile-declared initial scope for a type root key.
-    ///
-    /// Type and root-key identities are logical names, so callers should not have to know how
-    /// the source compiler cased them. The fast path serves canonical source spelling while the
-    /// fallback keeps hand-authored or legacy artifacts case-insensitive.
-    #[must_use]
-    pub fn type_root_scope(&self, type_name: &str, root_key: &str) -> Option<&str> {
-        self.type_root_scope_registers(type_name, root_key)
-            .map(|scopes| scopes.root.as_str())
-    }
-
-    /// Returns the initial `ROOT`, `THIS`, and `FROM` scope registers for a type root key.
-    ///
-    /// Legacy scalar declarations are normalized by the source compiler to `THIS = ROOT` and
-    /// `FROM = any`, so callers can rely on all three fields being populated.
-    #[must_use]
-    pub fn type_root_scope_registers(
-        &self,
-        type_name: &str,
-        root_key: &str,
-    ) -> Option<&TypeRootScope> {
-        let scopes = self
-            .model
-            .semantic
-            .type_root_scopes
-            .get(type_name)
-            .or_else(|| {
-                self.model
-                    .semantic
-                    .type_root_scopes
-                    .iter()
-                    .find(|(candidate, _)| candidate.eq_ignore_ascii_case(type_name))
-                    .map(|(_, scopes)| scopes)
-            })?;
-        // A `*` entry declares the type's default registers for root keys that
-        // are not statically known, such as history files whose fields (or tag
-        // wrappers) sit directly at the file root.
-        scopes
-            .get(root_key)
-            .or_else(|| {
-                scopes
-                    .iter()
-                    .find(|(candidate, _)| candidate.eq_ignore_ascii_case(root_key))
-                    .map(|(_, scope)| scope)
-            })
-            .or_else(|| scopes.get("*"))
-    }
-
-    /// Returns the matching file category.
+    /// Most specific matching category in deterministic catalog order.
     #[must_use]
     pub fn classify(&self, path: &LogicalPath) -> Option<&FileCategory> {
-        self.model.classify(path)
+        self.file_categories
+            .iter()
+            .filter(|c| c.matcher.matches(path))
+            .max_by_key(|c| c.matcher.specificity())
     }
-
+    /// Selected game identity.
+    #[must_use]
+    pub fn game_id(&self) -> &str {
+        &self.game_id
+    }
     /// Derives a logical path for a document addressed by URI without a physical
     /// path, such as an editor scratch buffer.
     ///
@@ -573,7 +168,7 @@ impl RuleSet {
             let Ok(path) = LogicalPath::parse(&candidate) else {
                 continue;
             };
-            let Some(category) = self.model.classify(&path) else {
+            let Some(category) = self.classify(&path) else {
                 continue;
             };
             let score @ (rank, _) = category.matcher.specificity();
@@ -589,13 +184,6 @@ impl RuleSet {
         }
         best.map(|(_, path)| path)
     }
-
-    /// Returns the stable game profile identity carried by this artifact.
-    #[must_use]
-    pub fn game_id(&self) -> &str {
-        &self.model.game_id
-    }
-
     /// Validates that this rule set can be consumed by the selected game profile.
     pub fn ensure_game(&self, expected: &str) -> Result<(), RulesError> {
         if self.game_id() == expected {
@@ -607,146 +195,9 @@ impl RuleSet {
             })
         }
     }
-
     /// Returns the canonical content hash.
     #[must_use]
     pub const fn rule_hash(&self) -> RuleHash {
         self.rule_hash
-    }
-}
-fn case_insensitive_indices<'a>(
-    index: &'a FxHashMap<Box<str>, Vec<usize>>,
-    key: &str,
-) -> Option<&'a Vec<usize>> {
-    let key = normalized_ascii_query(key);
-    index.get(key.as_ref())
-}
-
-fn normalized_ascii_query(value: &str) -> std::borrow::Cow<'_, str> {
-    if value.bytes().any(|byte| byte.is_ascii_uppercase()) {
-        std::borrow::Cow::Owned(value.to_ascii_lowercase())
-    } else {
-        std::borrow::Cow::Borrowed(value)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{RuleShape, SemanticRule, ValueMatcher};
-
-    fn context_rule(context: &str, key: KeyMatcher, parent_path: &[&str]) -> SemanticRule {
-        SemanticRule {
-            id: format!("{context}:1"),
-            context: context.to_owned(),
-            parent_path: parent_path
-                .iter()
-                .map(|segment| (*segment).to_owned())
-                .collect(),
-            key,
-            operator: None,
-            value: ValueMatcher::Bool,
-            shape: RuleShape::Node,
-            child_context: None,
-            alternative_id: None,
-            severity: None,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: Vec::new(),
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs: None,
-            max_occurs: None,
-            source_file: "semantic/test.json".to_owned(),
-            line: 1,
-        }
-    }
-
-    fn rule_set(rules: Vec<SemanticRule>) -> RuleSet {
-        let mut model = RulesModel::default();
-        model.semantic.rules = rules;
-        RuleSet::from_model(model)
-    }
-
-    #[test]
-    fn named_entry_keys_are_detected_at_the_container_root_only() {
-        let set = rule_set(vec![
-            context_rule(
-                "root:on_action",
-                KeyMatcher::Exact("events".to_owned()),
-                &[],
-            ),
-            context_rule(
-                "root:on_action",
-                KeyMatcher::Exact("trigger".to_owned()),
-                &["events"],
-            ),
-        ]);
-        assert!(set.declares_named_entry_keys(&["root:on_action".to_owned()]));
-
-        let set = rule_set(vec![context_rule(
-            "root:on_action",
-            KeyMatcher::Enum("event_names".to_owned()),
-            &[],
-        )]);
-        assert!(set.declares_named_entry_keys(&["root:on_action".to_owned()]));
-    }
-
-    #[test]
-    fn data_typed_entry_keys_stay_wildcard_only() {
-        let set = rule_set(vec![
-            context_rule("root:luck", KeyMatcher::Type("country_tag".to_owned()), &[]),
-            context_rule(
-                "root:government_ranks",
-                KeyMatcher::Int {
-                    min: Some(1),
-                    max: Some(10),
-                },
-                &[],
-            ),
-            context_rule(
-                "root:luck",
-                KeyMatcher::Exact("always".to_owned()),
-                &["always"],
-            ),
-        ]);
-        assert!(!set.declares_named_entry_keys(&["type:luck".to_owned(), "root:luck".to_owned()]),);
-        assert!(!set.declares_named_entry_keys(&[
-            "type:government_ranks".to_owned(),
-            "root:government_ranks".to_owned()
-        ]));
-    }
-
-    #[test]
-    fn entry_key_vocabulary_requires_typed_block_rows() {
-        // `root:luck`'s typed wrapper and `root:government_ranks`' rank range speak
-        // for the entry keys themselves.
-        let set = rule_set(vec![
-            context_rule("root:luck", KeyMatcher::Type("country_tag".to_owned()), &[]),
-            context_rule(
-                "root:government_ranks",
-                KeyMatcher::Int {
-                    min: Some(1),
-                    max: Some(10),
-                },
-                &[],
-            ),
-        ]);
-        assert!(set.declares_entry_key_vocabulary(&["root:luck".to_owned()]),);
-        assert!(set.declares_entry_key_vocabulary(&["root:government_ranks".to_owned()]));
-    }
-
-    #[test]
-    fn bare_value_rows_do_not_form_an_entry_key_vocabulary() {
-        // `root:continent`'s province rows share the container root with wildcard
-        // keys, but their LeafValue shape describes entry-body scalars, not keys.
-        let mut continent_row = context_rule(
-            "root:continent",
-            KeyMatcher::Type("province_id".to_owned()),
-            &[],
-        );
-        continent_row.shape = RuleShape::LeafValue;
-        let set = rule_set(vec![continent_row]);
-        assert!(!set.declares_entry_key_vocabulary(&["root:continent".to_owned()]));
     }
 }

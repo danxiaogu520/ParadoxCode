@@ -191,6 +191,7 @@ fn write_cache(
             cache.metadata.schema_version.to_string().into_bytes(),
         ),
         ("game_id", cache.metadata.game_id.clone().into_bytes()),
+        ("build_id", cache.metadata.build_id.clone().into_bytes()),
         ("rule_hash", cache.metadata.rule_hash.clone().into_bytes()),
         ("ir_hash", cache.metadata.ir_hash.clone().into_bytes()),
         (

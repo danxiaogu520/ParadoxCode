@@ -2,8 +2,8 @@
 //!
 //! A [`RulesIr`] is a closed arena: every key, name, and template is an
 //! interned [`Symbol`], every structure is an id-addressed entry, and all
-//! expansion — mixin includes, parameterised-schema monomorphisation, and
-//! enum attribute-column grouping — has already happened at compile time
+//! expansion — mixin includes and parameterised-schema monomorphisation —
+//! has already happened at compile time
 //! (`crate::lower`). Consumers walk it by id and never re-derive a context
 //! from a `(context, parent_path)` pair.
 //!
@@ -20,6 +20,7 @@
 //! model: it is the shape phase 4 migrates the consumers onto and phase 5
 //! keeps.
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use rustc_hash::FxHashMap;
@@ -33,7 +34,9 @@ use crate::source::{ControlKind, Severity};
 /// One interned string.
 ///
 /// Compare symbols for identity; resolve them through [`Interner::resolve`].
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(
+    Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize,
+)]
 pub struct Symbol(u32);
 
 impl Symbol {
@@ -48,9 +51,10 @@ impl Symbol {
 ///
 /// One interner is shared by every string in a [`RulesIr`]; interning order is
 /// deterministic because lowering walks `BTreeMap`s and ordered slices.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Interner {
     strings: Vec<Box<str>>,
+    #[serde(skip)]
     index: FxHashMap<Box<str>, Symbol>,
 }
 
@@ -133,7 +137,7 @@ impl Interner {
 }
 
 /// Index of a [`Schema`] in [`RulesIr::schemas`].
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct SchemaId(pub(crate) u32);
 
 impl SchemaId {
@@ -145,7 +149,7 @@ impl SchemaId {
 }
 
 /// Index of a [`Field`] in [`RulesIr::fields`].
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct FieldId(pub(crate) u32);
 
 impl FieldId {
@@ -157,7 +161,7 @@ impl FieldId {
 }
 
 /// Index of a [`Matcher`] in [`RulesIr::matchers`].
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct MatcherId(pub(crate) u32);
 
 impl MatcherId {
@@ -169,7 +173,7 @@ impl MatcherId {
 }
 
 /// Index of a [`TypeInfo`] in [`RulesIr::types`].
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct TypeId(pub(crate) u32);
 
 impl TypeId {
@@ -181,7 +185,7 @@ impl TypeId {
 }
 
 /// Index of a [`TraitInfo`] in [`RulesIr::traits`].
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct TraitId(pub(crate) u32);
 
 impl TraitId {
@@ -193,7 +197,7 @@ impl TraitId {
 }
 
 /// Index of an [`EnumInfo`] in [`RulesIr::enums`].
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct EnumId(pub(crate) u32);
 
 impl EnumId {
@@ -205,7 +209,7 @@ impl EnumId {
 }
 
 /// A compiled rule set: the whole of §5.1.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RulesIr {
     /// The `game.json` identity this rule set was compiled for.
     pub game_id: Symbol,
@@ -219,9 +223,9 @@ pub struct RulesIr {
     pub matchers: Vec<Matcher>,
     /// Symbol namespaces and their traits.
     pub types: Vec<TypeInfo>,
-    /// Trait definitions (parameters, bindings, capabilities).
+    /// Named trait markers.
     pub traits: Vec<TraitInfo>,
-    /// Enums with their attribute columns.
+    /// Enums with literal members.
     pub enums: Vec<EnumInfo>,
     /// The scope model.
     pub scopes: ScopeModel,
@@ -231,6 +235,7 @@ pub struct RulesIr {
     pub provenance: Vec<Provenance>,
     /// The non-language `game.json` payload.
     pub game: GameConfig,
+    #[serde(skip)]
     lookups: Lookups,
 }
 
@@ -245,7 +250,7 @@ struct Lookups {
 
 /// One `files` entry: which documents a rule selects and how their root is
 /// described.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FileRule {
     /// The entry name, a stable logical identity used for diagnostics.
     pub name: Symbol,
@@ -262,7 +267,7 @@ pub struct FileRule {
 }
 
 /// What the root of a selected document holds.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum RootRule {
     /// The document root is a block described by this schema.
     Schema(SchemaId),
@@ -272,6 +277,8 @@ pub enum RootRule {
         def: Option<DefSpec>,
         /// The instance body schema, when the root declares one.
         body: Option<SchemaId>,
+        /// Scope registers and entry transition declared on the whole file.
+        scope: Option<ScopeEffect>,
     },
     /// The parser has no script structure (`localisation`, `asset`,
     /// `syntax-only`), so no root is modelled.
@@ -279,7 +286,7 @@ pub enum RootRule {
 }
 
 /// The document parser of a [`FileRule`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum DocumentParser {
     /// Paradox script.
     Script,
@@ -292,19 +299,16 @@ pub enum DocumentParser {
 }
 
 /// The definition-priority policy of a [`FileRule`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum FileResolution {
     /// Later paths shadow earlier ones per file path.
     ReplaceByPath,
     /// All definitions remain visible (the default).
     Merge,
-    /// Later directories shadow earlier ones wholesale.
-    ReplaceDirectory,
 }
 
-/// One block description: exact fields, ordered patterns, bare-value items,
-/// and the instance-body subtype gates recorded for it.
-#[derive(Clone, Debug, Default)]
+/// One block description: exact fields, ordered patterns and bare-value items.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Schema {
     /// The declared schema name, folded. Every monomorphised instance shares
     /// it; [`Self::arguments`] tells the instances apart.
@@ -317,33 +321,22 @@ pub struct Schema {
     pub patterns: Box<[FieldId]>,
     /// The element matcher for bare values in a list block.
     pub items: Option<MatcherId>,
+    /// Legal combinations of direct-field counts; empty means unrestricted.
+    #[serde(default)]
+    pub forms: Box<[BlockForm]>,
     /// Whether undeclared keys are allowed.
     pub open: bool,
-    /// Subtype predicates to evaluate when a block lowered to this schema is
-    /// used as a symbol-instance body.
-    pub subtype_gates: Box<[SubtypeGate]>,
 }
 
-/// One subtype predicate attached to a schema used as an instance body.
-#[derive(Clone, Debug)]
-pub struct SubtypeGate {
-    /// The type that owns the subtype.
-    pub type_id: TypeId,
-    /// The subtype granted when [`Self::when`] holds.
-    pub subtype: Symbol,
-    /// The predicate, evaluated against the body's direct scalar fields.
-    pub when: SubtypeCond,
+/// One alternative conjunction of direct-field occurrence bounds.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BlockForm {
+    /// Each clause counts occurrences selected by any of these field ids.
+    pub counts: Box<[(Box<[FieldId]>, Card)]>,
 }
-
-/// A conjunction of "field → expected scalar" predicates.
-///
-/// A `None` expectation requires the field to be *absent*; a `Some` matcher
-/// requires the field to be present with a matching scalar.
-#[derive(Clone, Debug, Default)]
-pub struct SubtypeCond(pub Box<[(Symbol, Option<MatcherId>)]>);
 
 /// One field specification.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Field {
     /// The key matcher.
     pub key: MatcherId,
@@ -355,8 +348,6 @@ pub struct Field {
     pub scope: Option<ScopeEffect>,
     /// Symbol instance defined at this position.
     pub def: Option<DefSpec>,
-    /// Subtype gate.
-    pub gate: Option<Gate>,
     /// Control-flow primitive.
     pub control: Option<Control>,
     /// Documentation text.
@@ -368,7 +359,7 @@ pub struct Field {
 }
 
 /// What a [`Field`]'s value is.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum FieldValue {
     /// A scalar described by this matcher.
     Scalar(MatcherId),
@@ -381,7 +372,7 @@ pub enum FieldValue {
 }
 
 /// The shape a field's value takes, for §3.2 dispatch.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Shape {
     /// A scalar.
     Scalar,
@@ -392,7 +383,7 @@ pub enum Shape {
 }
 
 /// A cardinality `(min, max)`; `None` max means unbounded.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct Card {
     /// Minimum occurrences.
     pub min: u32,
@@ -401,7 +392,7 @@ pub struct Card {
 }
 
 /// The scope effect of a field.
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct ScopeEffect {
     /// Scopes the field is valid in; empty means any.
     pub scopes_in: Box<[Symbol]>,
@@ -412,7 +403,7 @@ pub struct ScopeEffect {
 }
 
 /// A symbol instance definition.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct DefSpec {
     /// The defined type.
     pub type_id: TypeId,
@@ -427,7 +418,7 @@ pub struct DefSpec {
 }
 
 /// How a [`DefSpec`] derives its instance name.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum DefName {
     /// The scalar key itself (the default).
     Key,
@@ -437,17 +428,8 @@ pub enum DefName {
     File,
 }
 
-/// A field's subtype gate.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Gate {
-    /// The field applies only to instances carrying this subtype.
-    When(Symbol),
-    /// The field applies only to instances outside this subtype.
-    Unless(Symbol),
-}
-
 /// The control-flow primitive attached to a field.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct Control {
     /// Which primitive this field implements.
     pub kind: ControlKind,
@@ -459,10 +441,12 @@ pub struct Control {
     pub op: Option<Symbol>,
     /// Field name whose scalar values are the branch keys of a `switch`.
     pub on: Option<Symbol>,
+    /// Schema supplying the switch selector's scalar keys.
+    pub selector_schema: Option<SchemaId>,
 }
 
 /// One entry of the deduplicated matcher arena.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Matcher {
     /// Any scalar.
     Scalar,
@@ -501,13 +485,10 @@ pub enum Matcher {
         /// The subtype granted at this position.
         subtype: Option<Symbol>,
     },
-    /// A member of an enum, restricted to `rows` when the matcher came from an
-    /// attribute-column group.
+    /// A literal member of an enum.
     Enum {
         /// The enum.
         id: EnumId,
-        /// The accepted rows, or all of them when `None`.
-        rows: Option<BitSet>,
     },
     /// A scope expression of the named scope type (`None` is `any`).
     Scope(Option<Symbol>),
@@ -522,7 +503,7 @@ pub enum Matcher {
 }
 
 /// One piece of a template.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TemplatePart {
     /// Literal text.
     Text(Symbol),
@@ -531,7 +512,7 @@ pub enum TemplatePart {
 }
 
 /// What a [`Matcher::Ref`] points at.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum RefTarget {
     /// A symbol type, optionally qualified by a subtype, optionally stripping
     /// an affix from the resolved member name (the legacy template parameter's
@@ -544,12 +525,10 @@ pub enum RefTarget {
         /// Affix removed from the resolved member name.
         strip_prefix: Option<Symbol>,
     },
-    /// Any type implementing the trait.
-    Trait(TraitId),
 }
 
 /// One symbol namespace.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TypeInfo {
     /// The type name, folded.
     pub name: Symbol,
@@ -566,7 +545,7 @@ pub struct TypeInfo {
 }
 
 /// The conflict behaviour of a symbol type.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TypeResolution {
     /// Later definitions shadow earlier ones.
     Replace,
@@ -575,18 +554,14 @@ pub enum TypeResolution {
 }
 
 /// One named subtype.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SubtypeInfo {
     /// The subtype name, folded.
     pub name: Symbol,
-    /// Instance-body predicate granting this subtype.
-    pub when: Option<SubtypeCond>,
-    /// Traits implemented only for instances of this subtype.
-    pub trait_impls: Vec<TraitImpl>,
 }
 
 /// One trait implementation and its arguments.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TraitImpl {
     /// The implemented trait.
     pub trait_id: TraitId,
@@ -595,7 +570,7 @@ pub struct TraitImpl {
 }
 
 /// One trait-implementation argument.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TraitArgument {
     /// A plain argument value (`Callable`'s body schema name).
     Text(Symbol),
@@ -605,7 +580,7 @@ pub enum TraitArgument {
 
 /// One trait binding: how a bound symbol's key or name is derived from an
 /// instance name.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Binding {
     /// Localisation-key template; `$` is the instance name.
     pub loc: Option<Symbol>,
@@ -616,79 +591,40 @@ pub struct Binding {
 }
 
 /// One trait definition.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TraitInfo {
     /// The trait name, folded.
     pub name: Symbol,
-    /// Parameters with their defaults (`$` means the instance name), or no
-    /// default.
-    pub params: Vec<(Symbol, Option<Symbol>)>,
-    /// Bindings the trait contributes itself; empty for `Localised`/`HasIcon`.
-    pub bindings: Vec<(Symbol, Binding)>,
-    /// A mixin the schemas defining an impl'ing type must include.
-    pub requires_include: Option<Symbol>,
-    /// Capabilities the runtime interprets.
-    pub capabilities: Box<[Symbol]>,
 }
 
 /// One enum.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EnumInfo {
     /// The enum name, folded.
     pub name: Symbol,
-    /// Attribute columns, in declaration order.
-    pub columns: Box<[EnumColumn]>,
     /// Rows, sorted by row name.
     pub rows: Box<[EnumRow]>,
 }
 
 impl EnumInfo {
-    /// The index of a column by name.
-    #[must_use]
-    pub fn column(&self, name: Symbol) -> Option<usize> {
-        self.columns.iter().position(|column| column.name == name)
-    }
-
     /// The index of a row by name.
     #[must_use]
     pub fn row(&self, name: Symbol) -> Option<usize> {
         self.rows.iter().position(|row| row.name == name)
     }
-
-    /// The rows carrying `value` in `column`.
-    #[must_use]
-    pub fn rows_matching(&self, column: usize, value: Option<Symbol>) -> BitSet {
-        let mut set = BitSet::new(self.rows.len());
-        for (index, row) in self.rows.iter().enumerate() {
-            if row.values.get(column).copied().flatten() == value {
-                set.insert(index);
-            }
-        }
-        set
-    }
 }
 
-/// One attribute column of an enum.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct EnumColumn {
-    /// The column name, folded.
-    pub name: Symbol,
-    /// Whether rows may omit the column.
-    pub optional: bool,
-}
-
-/// One row of an enum, with its column values aligned to
-/// [`EnumInfo::columns`].
-#[derive(Clone, Debug)]
+/// One literal member of an enum.
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EnumRow {
     /// The row name, folded.
     pub name: Symbol,
-    /// One value per column, `None` when the row omits an optional column.
-    pub values: Box<[Option<Symbol>]>,
+    /// The authored spelling offered by completion and documentation.
+    pub spelling: Symbol,
 }
 
 /// The scope model.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ScopeModel {
     /// Scope type names; `any` is not listed.
     pub types: Box<[Symbol]>,
@@ -701,6 +637,30 @@ pub struct ScopeModel {
 }
 
 impl ScopeModel {
+    /// Resolves a declared register spelling or chain, returning a one-based depth.
+    #[must_use]
+    pub fn register(&self, strings: &Interner, name: &str) -> Option<(&RegisterInfo, usize)> {
+        self.registers.iter().find_map(|register| {
+            let base = strings.resolve(register.name);
+            if name.eq_ignore_ascii_case(base) {
+                return Some((register, 1));
+            }
+            if !register.chain {
+                return None;
+            }
+            let name = name.replace('_', "");
+            let base = base.replace('_', "");
+            (!base.is_empty()
+                && name.len().is_multiple_of(base.len())
+                && !name.is_empty()
+                && name
+                    .as_bytes()
+                    .chunks(base.len())
+                    .all(|part| part.eq_ignore_ascii_case(base.as_bytes())))
+            .then(|| (register, name.len() / base.len()))
+        })
+    }
+
     /// Whether `name` is a declared scope type or the reserved `any`.
     #[must_use]
     pub fn is_known_scope(&self, strings: &Interner, name: Symbol) -> bool {
@@ -725,16 +685,18 @@ impl ScopeModel {
 }
 
 /// One scope register.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RegisterInfo {
     /// The register name, folded.
     pub name: Symbol,
+    /// Game-independent scope slot selected by this spelling.
+    pub role: crate::source::RegisterRole,
     /// Whether the register chains (`prev_prev`, `fromfrom`, …).
     pub chain: bool,
 }
 
 /// One scope link.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LinkInfo {
     /// The declared key text (template text), verbatim.
     pub name: Symbol,
@@ -757,7 +719,7 @@ impl LinkInfo {
 }
 
 /// One end of a scope link: a concrete scope type, or `any`.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ScopeRef {
     /// The reserved `any`.
     Any,
@@ -777,7 +739,7 @@ impl ScopeRef {
 }
 
 /// Where one compiled field came from.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Provenance {
     /// The field.
     pub field: FieldId,
@@ -792,9 +754,9 @@ pub struct Provenance {
 /// Rule structure moved into the language (schemas, types, enums, scopes);
 /// what remains is installation and presentation configuration, which stays
 /// the [`GameProfile`] the composition root already selects.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct GameConfig {
-    /// Scan layout, source encoding, fallback keys, and hover cards.
+    /// Installation recognition, scan layout, source encoding, fallback keys, and hover cards.
     pub profile: GameProfile,
 }
 
@@ -812,74 +774,22 @@ impl GameConfig {
     }
 }
 
-/// A subset of an enum's rows, or of an enum's members.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct BitSet(Box<[u64]>);
-
-impl BitSet {
-    /// An empty set able to hold `len` members.
-    #[must_use]
-    pub fn new(len: usize) -> Self {
-        Self(vec![0; len.div_ceil(64)].into_boxed_slice())
-    }
-
-    /// Adds `index`.
-    pub fn insert(&mut self, index: usize) {
-        let word = index / 64;
-        if word >= self.0.len() {
-            let mut words = self.0.to_vec();
-            words.resize(word + 1, 0);
-            self.0 = words.into_boxed_slice();
-        }
-        self.0[word] |= 1 << (index % 64);
-    }
-
-    /// Whether `index` is a member.
-    #[must_use]
-    pub fn contains(&self, index: usize) -> bool {
-        self.0
-            .get(index / 64)
-            .is_some_and(|word| word & (1 << (index % 64)) != 0)
-    }
-
-    /// The number of members.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.0.iter().map(|word| word.count_ones() as usize).sum()
-    }
-
-    /// Whether the set is empty.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.0.iter().all(|word| *word == 0)
-    }
-
-    /// Iterates the members in ascending order.
-    pub fn iter(&self) -> impl Iterator<Item = usize> + '_ {
-        self.0.iter().enumerate().flat_map(|(word, bits)| {
-            (0..64)
-                .filter(move |bit| bits & (1 << bit) != 0)
-                .map(move |bit| word * 64 + bit)
-        })
-    }
-}
-
-/// The direct scalar fields of one symbol instance, as the subtype predicates
-/// of §5 see them.
-///
-/// Implementations must compare `key` case-insensitively: the IR passes the
-/// folded spelling the language made canonical.
-pub trait ScalarFields {
-    /// The scalar value of the direct child field `key`, if the field is
-    /// present and scalar.
-    fn scalar(&self, key: &str) -> Option<&str>;
-}
-
 /// Workspace facts the IR cannot decide alone.
 ///
-/// A `when` predicate or a `ref<…>` matcher may name a symbol that only the
+/// A `ref<…>` matcher may name a symbol that only the
 /// workspace index knows, so the IR asks for it instead of guessing.
 pub trait SymbolFacts {
+    /// Source-ranged body of a uniquely active replacement definition.
+    /// Missing or ambiguous definitions grant no payload interpretation.
+    fn replacement_template(
+        &self,
+        type_id: TypeId,
+        name: &str,
+    ) -> Option<std::sync::Arc<crate::replacement::Template>> {
+        let _ = (type_id, name);
+        None
+    }
+
     /// Whether `name` is a known member of `type_id`.
     fn type_member(&self, type_id: TypeId, name: &str) -> bool {
         let _ = (type_id, name);
@@ -892,26 +802,19 @@ pub trait SymbolFacts {
         let _ = (type_id, subtype, name);
         false
     }
-
-    /// Whether `name` is a known instance of some type implementing `trait_id`.
-    fn trait_impl_member(&self, trait_id: TraitId, name: &str) -> bool {
-        let _ = (trait_id, name);
-        false
-    }
 }
 
 /// Facts that know no workspace symbols.
 ///
-/// Symbol-typed matchers then match nothing, which under-grants subtypes
-/// instead of over-granting them; consumers with a workspace index pass their
-/// own [`SymbolFacts`].
+/// Symbol-typed matchers then match nothing; consumers with a workspace index
+/// pass their own [`SymbolFacts`].
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NoSymbolFacts;
 
 impl SymbolFacts for NoSymbolFacts {}
 
 /// The subtypes holding for one instance.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SubtypeSet {
     entries: Vec<(TypeId, Symbol)>,
 }
@@ -928,12 +831,6 @@ impl SubtypeSet {
     #[must_use]
     pub fn contains(&self, type_id: TypeId, subtype: Symbol) -> bool {
         self.entries.contains(&(type_id, subtype))
-    }
-
-    /// Whether any type grants `subtype`.
-    #[must_use]
-    pub fn contains_name(&self, subtype: Symbol) -> bool {
-        self.entries.iter().any(|(_, name)| *name == subtype)
     }
 
     /// Whether no subtype holds.
@@ -1010,6 +907,12 @@ impl RulesIr {
     /// method computes the digest from the current content on each call.
     #[must_use]
     pub fn fingerprint(&self) -> String {
+        self.rule_hash().to_hex()
+    }
+
+    /// The canonical identity shared by the runtime catalog and index caches.
+    #[must_use]
+    pub fn rule_hash(&self) -> crate::RuleHash {
         let mut hasher = Sha256::new();
         hasher.update(b"paradoxcode/rules-v2-ir/v1\0");
         hash_debug(&mut hasher, &self.game_id);
@@ -1036,17 +939,13 @@ impl RulesIr {
             hash_debug(&mut hasher, &exact);
             hash_debug(&mut hasher, &schema.patterns);
             hash_debug(&mut hasher, &schema.items);
+            hash_debug(&mut hasher, &schema.forms);
             hash_debug(&mut hasher, &schema.open);
-            hash_debug(&mut hasher, &schema.subtype_gates);
         }
         let profile =
             serde_json::to_vec(&self.game.profile).expect("game profiles are serializable");
         hash_bytes(&mut hasher, &profile);
-        hasher
-            .finalize()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect()
+        crate::RuleHash::from_bytes(hasher.finalize().into())
     }
 
     /// Assembles a rule set from already-lowered parts and builds its name
@@ -1119,6 +1018,35 @@ impl RulesIr {
             game,
             lookups,
         }
+    }
+
+    /// Decodes a trusted compiler-produced arena and restores its lookup indexes.
+    ///
+    /// # Errors
+    /// Returns an error if the embedded payload is not valid compiled JSON.
+    pub fn from_baked(bytes: &[u8]) -> Result<Self, serde_json::Error> {
+        let mut ir: Self = serde_json::from_slice(bytes)?;
+        ir.strings.index = ir
+            .strings
+            .strings
+            .iter()
+            .enumerate()
+            .map(|(index, text)| (text.clone(), Symbol(index as u32)))
+            .collect();
+        Ok(Self::new(
+            ir.game_id,
+            ir.files,
+            ir.schemas,
+            ir.fields,
+            ir.matchers,
+            ir.types,
+            ir.traits,
+            ir.enums,
+            ir.scopes,
+            ir.strings,
+            ir.provenance,
+            ir.game,
+        ))
     }
 
     /// An empty rule set: the state a host starts in before a bundle is
@@ -1213,6 +1141,41 @@ impl RulesIr {
         self.strings
             .lookup_folded(name)
             .and_then(|symbol| self.lookups.types.get(&symbol).copied())
+    }
+
+    /// Expands an unconditional Localised template binding for one instance.
+    #[must_use]
+    pub fn localisation_template_key(
+        &self,
+        type_name: &str,
+        binding_name: &str,
+        instance: &str,
+    ) -> Option<String> {
+        let ty = self.type_info(self.type_by_name(type_name)?);
+        let localised = self.trait_by_name("Localised")?;
+        let implementation = ty
+            .trait_impls
+            .iter()
+            .find(|implementation| implementation.trait_id == localised)?;
+        implementation
+            .arguments
+            .iter()
+            .find_map(|(name, argument)| {
+                if !self
+                    .strings
+                    .resolve(*name)
+                    .eq_ignore_ascii_case(binding_name)
+                {
+                    return None;
+                }
+                match argument {
+                    TraitArgument::Binding(Binding {
+                        loc: Some(template),
+                        ..
+                    }) => Some(self.strings.resolve(*template).replace('$', instance)),
+                    _ => None,
+                }
+            })
     }
 
     /// The trait declared under `name`, if any.
@@ -1359,10 +1322,10 @@ impl RulesIr {
         }
     }
 
-    /// The fields of a schema valid under `subtypes`, deterministically
+    /// All fields of a schema, deterministically
     /// ordered by [`FieldId`] — the completion surface.
     #[must_use]
-    pub fn fields(&self, schema: SchemaId, subtypes: &SubtypeSet) -> Vec<FieldId> {
+    pub fn fields(&self, schema: SchemaId) -> Vec<FieldId> {
         let schema = self.schema(schema);
         let mut ids = Vec::with_capacity(schema.exact.len() + schema.patterns.len());
         for overloads in schema.exact.values() {
@@ -1371,60 +1334,7 @@ impl RulesIr {
         ids.extend(schema.patterns.iter().copied());
         ids.sort_unstable();
         ids.dedup();
-        ids.retain(|id| self.gate_holds(self.field(*id).gate, subtypes));
         ids
-    }
-
-    /// Whether a field's subtype gate holds under `subtypes`.
-    #[must_use]
-    pub fn gate_holds(&self, gate: Option<Gate>, subtypes: &SubtypeSet) -> bool {
-        match gate {
-            None => true,
-            Some(Gate::When(subtype)) => subtypes.contains_name(subtype),
-            Some(Gate::Unless(subtype)) => !subtypes.contains_name(subtype),
-        }
-    }
-
-    /// The subtypes holding for an instance body, using no workspace facts.
-    #[must_use]
-    pub fn subtypes_of(&self, schema: SchemaId, body: &impl ScalarFields) -> SubtypeSet {
-        self.subtypes_of_with(schema, body, &NoSymbolFacts)
-    }
-
-    /// The subtypes holding for an instance body, resolving symbol matchers
-    /// through `facts`.
-    #[must_use]
-    pub fn subtypes_of_with(
-        &self,
-        schema: SchemaId,
-        body: &impl ScalarFields,
-        facts: &impl SymbolFacts,
-    ) -> SubtypeSet {
-        let mut set = SubtypeSet::default();
-        for gate in self.schema(schema).subtype_gates.iter() {
-            if self.condition_holds(&gate.when, body, facts) {
-                set.insert(gate.type_id, gate.subtype);
-            }
-        }
-        set
-    }
-
-    /// Whether a subtype predicate holds against an instance body.
-    #[must_use]
-    pub fn condition_holds(
-        &self,
-        condition: &SubtypeCond,
-        body: &impl ScalarFields,
-        facts: &impl SymbolFacts,
-    ) -> bool {
-        condition.0.iter().all(|(field, expected)| {
-            let present = body.scalar(self.strings.resolve(*field));
-            match (present, expected) {
-                (None, None) => true,
-                (None, Some(_)) | (Some(_), None) => false,
-                (Some(value), Some(matcher)) => self.scalar_matches(*matcher, value, facts),
-            }
-        })
     }
 
     /// Whether a scalar value matches a matcher.
@@ -1476,10 +1386,9 @@ impl RulesIr {
                         |subtype| facts.type_subtype_member(*type_id, subtype, name),
                     )
                 }
-                RefTarget::Trait(trait_id) => facts.trait_impl_member(*trait_id, value),
             },
             Matcher::Def { type_id, .. } => facts.type_member(*type_id, value),
-            Matcher::Enum { id, rows } => self.enum_contains(*id, rows.as_ref(), value),
+            Matcher::Enum { id } => self.enum_contains(*id, value),
             Matcher::Scope(scope) => self.scope_matches(scope.as_ref().copied(), value),
             Matcher::Union(alternatives) => alternatives
                 .iter()
@@ -1487,18 +1396,14 @@ impl RulesIr {
         }
     }
 
-    /// Whether `value` is a member of an enum, restricted to `rows` when the
-    /// matcher came from an attribute-column group.
+    /// Whether `value` is a literal member of an enum.
     #[must_use]
-    pub fn enum_contains(&self, id: EnumId, rows: Option<&BitSet>, value: &str) -> bool {
+    pub fn enum_contains(&self, id: EnumId, value: &str) -> bool {
         let info = self.enum_info(id);
         let Some(symbol) = self.strings.lookup_folded(value) else {
             return false;
         };
-        let Some(index) = info.row(symbol) else {
-            return false;
-        };
-        rows.is_none_or(|rows| rows.contains(index))
+        info.row(symbol).is_some()
     }
 
     /// Whether an actual scope satisfies an expected scope, including declared overrides.
@@ -1588,19 +1493,6 @@ mod tests {
     }
 
     #[test]
-    fn bit_sets_track_members() {
-        let mut set = BitSet::new(3);
-        assert!(set.is_empty());
-        set.insert(0);
-        set.insert(70);
-        assert!(set.contains(0));
-        assert!(!set.contains(1));
-        assert!(set.contains(70));
-        assert_eq!(set.len(), 2);
-        assert_eq!(set.iter().collect::<Vec<_>>(), vec![0, 70]);
-    }
-
-    #[test]
     fn fingerprint_is_stable_and_distinguishes_empty_from_compiled_ir() {
         let empty = RulesIr::empty();
         assert_eq!(empty.fingerprint(), RulesIr::empty().fingerprint());
@@ -1625,5 +1517,28 @@ mod tests {
         schema.exact = FxHashMap::default();
         schema.exact.extend(entries);
         assert_eq!(compiled.fingerprint(), reordered.fingerprint());
+
+        let alpha = compiled
+            .lookup(SchemaId(0), "alpha", Shape::Scalar)
+            .next()
+            .unwrap();
+        reordered.schemas[0].forms = vec![BlockForm {
+            counts: vec![(
+                vec![alpha].into_boxed_slice(),
+                Card {
+                    min: 1,
+                    max: Some(1),
+                },
+            )]
+            .into_boxed_slice(),
+        }]
+        .into_boxed_slice();
+        assert_ne!(
+            compiled.fingerprint(),
+            reordered.fingerprint(),
+            "changing block forms must invalidate index caches"
+        );
+        let decoded = RulesIr::from_baked(&serde_json::to_vec(&reordered).unwrap()).unwrap();
+        assert_eq!(decoded.fingerprint(), reordered.fingerprint());
     }
 }

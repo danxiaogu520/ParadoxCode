@@ -1,23 +1,11 @@
 {
-  "mixins": {
-    "keys__type_trade_good": {
-      "fields": {
-        "is_latent": {
-          "card": "0..1",
-          "value": "'yes'",
-          "when": null
-        }
-      }
-    }
-  },
   "schemas": {
     "prices_body": {
       "patterns": [
         {
           "body": "prices_body__trade_good",
           "card": "1..*",
-          "key": "ref<trade_good>",
-          "when": null
+          "key": "ref<trade_good>"
         }
       ]
     },
@@ -27,32 +15,29 @@
           "card": "1",
           "doc": "base price in $. (default is 1.0 if not specified",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "goldtype": {
           "card": "0..1",
           "doc": "This resource works like 'gold' if yes, using prices from mine-value in province instead of supply/demand and baseprice. Also creates gold-inflation",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
+        },
+        "is_latent": {
+          "card": "0..1",
+          "value": "'yes'"
         }
-      },
-      "include": [
-        "keys__type_trade_good"
-      ]
+      }
     },
     "trade_center_body": {
       "fields": {
         "cost": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "development": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "global_modifiers": {
           "body": "modifier",
@@ -62,13 +47,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "level": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "province_modifiers": {
           "body": "modifier",
@@ -78,8 +61,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "state_modifiers": {
           "body": "modifier",
@@ -89,13 +71,11 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "type": {
           "card": "1",
-          "value": "enum<trade_center_types>",
-          "when": null
+          "value": "enum<trade_center_types>"
         }
       }
     },
@@ -103,18 +83,15 @@
       "fields": {
         "color": {
           "card": "1",
-          "list": "int[0..255]",
-          "when": null
+          "list": "int[0..255]"
         },
         "names": {
           "body": "trade_company_body__names",
-          "card": "1..*",
-          "when": null
+          "card": "1..*"
         },
         "provinces": {
           "card": "1",
-          "list": "ref<province_id>",
-          "when": null
+          "list": "ref<province_id>"
         }
       }
     },
@@ -125,8 +102,7 @@
       "fields": {
         "name": {
           "card": "1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "trigger": {
           "body": "trigger",
@@ -137,8 +113,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -149,18 +124,15 @@
       "fields": {
         "ai_area_worth": {
           "body": "trade_company_investment_body__ai_area_worth",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "ai_global_worth": {
           "body": "trade_company_investment_body__ai_global_worth",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "ai_region_worth": {
           "body": "trade_company_investment_body__ai_region_worth",
-          "card": "1",
-          "when": null
+          "card": "1"
         },
         "allow": {
           "body": "trigger",
@@ -171,53 +143,43 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "area_modifier": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "category": {
           "card": "1",
-          "value": "enum<trade_company_investment_types>",
-          "when": null
+          "value": "enum<trade_company_investment_types>"
         },
         "company_province_area_modifier": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "company_region_modifier": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "cost": {
           "card": "1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "owner_company_region_modifier": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "owner_modifier": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "sprite": {
           "card": "1",
-          "value": "ref<sprite>",
-          "when": null
+          "value": "ref<sprite>"
         },
         "upgrades_to": {
           "card": "0..1",
-          "value": "ref<trade_company_investment>",
-          "when": null
+          "value": "ref<trade_company_investment>"
         }
       }
     },
@@ -226,8 +188,7 @@
         "factor": {
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       }
     },
@@ -236,8 +197,7 @@
         "factor": {
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       }
     },
@@ -246,8 +206,7 @@
         "factor": {
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       }
     },
@@ -262,26 +221,21 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "color": {
           "card": "1",
           "list": "float[0.0..1.0]",
-          "override": true,
-          "when": null
+          "override": true
         },
         "is_latent": {
           "card": "0..1",
-          "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "is_valuable": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "modifier": {
           "body": "modifier",
@@ -293,8 +247,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "province": {
           "body": "modifier",
@@ -305,15 +258,13 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "rnw_latent_chance": {
           "card": "0..1",
           "doc": "\"Kind of on average how many provinces we want to spawn with it.\"",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "trigger": {
           "body": "trigger",
@@ -325,13 +276,9 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         }
-      },
-      "include": [
-        "keys__type_trade_good"
-      ]
+      }
     },
     "trade_good_body__chance": {
       "fields": {
@@ -339,8 +286,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -354,8 +300,7 @@
       "fields": {
         "is_latent": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         }
       }
     },
@@ -363,38 +308,31 @@
       "fields": {
         "ai_will_propagate_through_trade": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "color": {
           "card": "0..1",
-          "list": "int[0..]",
-          "when": null
+          "list": "int[0..]"
         },
         "end": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "inland": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "location": {
           "card": "1",
-          "value": "ref<province_id>",
-          "when": null
+          "value": "ref<province_id>"
         },
         "members": {
           "card": "1",
-          "list": "ref<province_id>",
-          "when": null
+          "list": "ref<province_id>"
         },
         "outgoing": {
           "body": "trade_node_body__outgoing",
-          "card": "0..*",
-          "when": null
+          "card": "0..*"
         }
       }
     },
@@ -408,19 +346,16 @@
       "fields": {
         "control": {
           "card": "1",
-          "list": "float",
-          "when": null
+          "list": "float"
         },
         "name": {
           "card": "1",
-          "value": "ref<trade_node_name>",
-          "when": null
+          "value": "ref<trade_node>"
         },
         "path": {
           "card": "0..1",
           "doc": "Province path for an outgoing trade-node connection.",
-          "list": "ref<province_id>",
-          "when": null
+          "list": "ref<province_id>"
         }
       }
     },
@@ -434,42 +369,37 @@
       "fields": {
         "button_gfx": {
           "card": "1",
-          "value": "ref<sprite>",
-          "when": null
+          "value": "ref<sprite>"
         },
         "can_maintain": {
           "body": "trigger",
           "card": "0..1",
           "scope": {
             "set": {
-              "from": "trade_node",
+              "from": "province",
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "can_select": {
           "body": "trigger",
           "card": "1",
           "scope": {
             "set": {
-              "from": "trade_node",
+              "from": "province",
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "center_of_reformation": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "cooldown": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "countries_with_merchant_modifier": {
           "body": "modifier",
@@ -480,63 +410,242 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "node_province_modifier": {
-          "body": "modifier",
+          "body": "trading_policy_node_province_modifier",
           "card": "0..1",
           "scope": {
             "set": {
-              "root": "trade_node",
-              "this": "trade_node"
+              "root": "province",
+              "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "potential": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
-          "when": null
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility."
         },
         "show_alert": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "trade_power": {
           "body": "trading_policy_body__trade_power",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "unique": {
           "card": "0..1",
           "doc": "Whether only one country may select the policy in a trade node.",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         }
-      }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
     },
     "trading_policy_body__trade_power": {
       "fields": {
         "duration": {
           "card": "1",
           "doc": "-1 = limitless",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "key": {
           "card": "1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "power_modifier": {
           "card": "1",
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       }
+    },
+    "trading_policy_node_province_modifier": {
+      "fields": {
+        "artillery_levels_available_vs_fort": {
+          "card": "0..1",
+          "doc": "Adds to the maximum levels of artillery on siege",
+          "override": true,
+          "scope": {
+            "in": [
+              "province"
+            ]
+          },
+          "value": "float"
+        },
+        "siege_ability": {
+          "card": "0..1",
+          "doc": "Modifies the siege ability that affects siege phase length. Reverse concept of defensiveness.",
+          "override": true,
+          "scope": {
+            "in": [
+              "province"
+            ]
+          },
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
     }
   }
 }

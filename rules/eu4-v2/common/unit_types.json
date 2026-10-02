@@ -1,108 +1,82 @@
 {
-  "mixins": {
-    "keys__type_unit_type": {
-      "fields": {
-        "type": {
-          "card": "1",
-          "value": "enum<land_unit_types> | enum<naval_unit_types>",
-          "when": null
-        }
-      }
-    }
-  },
   "schemas": {
     "unit_type_body": {
       "fields": {
         "base_cannons": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "blockade": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "defensive_fire": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "defensive_morale": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "defensive_shock": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "hull_size": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "maneuver": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "manpower": {
           "card": "0..1",
           "doc": "Changes the manpower cost to recruit, 1 is 1000 manpower",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "offensive_fire": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "offensive_morale": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "offensive_shock": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "sail_speed": {
           "card": "0..1",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "sailors": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "sprite_level": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "trade_power": {
           "card": "0..1",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "trigger": {
           "body": "trigger",
@@ -114,32 +88,24 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "type": {
           "card": "1",
-          "override": true,
-          "value": "enum<unit_types>",
-          "when": null
+          "value": "enum<unit_types>"
         },
         "unit_type": {
           "card": "0..1",
           "override": true,
-          "value": "ref<technology_group>",
-          "when": null
+          "value": "ref<technology_group>"
         }
-      },
-      "include": [
-        "keys__type_unit_type"
-      ]
+      }
     },
     "unit_type_type_body": {
       "fields": {
         "type": {
           "card": "1",
-          "value": "enum<land_unit_types> | enum<naval_unit_types>",
-          "when": null
+          "value": "enum<land_unit_types> | enum<naval_unit_types>"
         }
       }
     }

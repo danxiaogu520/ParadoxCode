@@ -13,6 +13,20 @@ pub(crate) fn try_ir_completion(
     position: TextSize,
     cancellation: &CancellationToken,
 ) -> Result<Option<Vec<CompletionItem>>, Cancelled> {
+    try_ir_completion_inner(snapshot, input, position, cancellation, 0)
+}
+
+fn try_ir_completion_inner(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: TextSize,
+    cancellation: &CancellationToken,
+    depth: usize,
+) -> Result<Option<Vec<CompletionItem>>, Cancelled> {
+    cancellation.checkpoint()?;
+    if depth >= 8 {
+        return Ok(Some(Vec::new()));
+    }
     if !ir_semantic::has_ir_schema(snapshot, input) {
         return Ok(None);
     }
@@ -20,6 +34,9 @@ pub(crate) fn try_ir_completion(
         return Ok(None);
     };
     let ir = snapshot.ir();
+    if let Some(items) = path_value_completion(snapshot, input, hir, position, cancellation)? {
+        return Ok(Some(items));
+    }
     let (local_source, local_position, quoted_layers) =
         completion_coordinates(input, position, cancellation)?;
     let local_replacement = word_range(&local_source, local_position);
@@ -31,9 +48,60 @@ pub(crate) fn try_ir_completion(
         .unwrap_or_default();
     let replacement_range =
         map_completion_range(local_replacement, &quoted_layers).unwrap_or(local_replacement);
+    if let Some((token_start, script)) = quoted_layers.last() {
+        let start = map_completion_range(
+            TextRange::new(*token_start, *token_start).expect("empty token range"),
+            &quoted_layers[..quoted_layers.len() - 1],
+        )
+        .map(|range| range.start());
+        if let Some(schema) = hir
+            .schema_facts()
+            .iter()
+            .find(|fact| Some(fact.range.start()) == start)
+        {
+            // Quoted HIR retains mapped semantic facts, while its properties belong to
+            // the outer document. Complete against the decoded fragment so a missing
+            // scalar after `key =` is still recognized as a value position.
+            let parsed = std::sync::Arc::new(script.parsed().clone());
+            let nested_hir = hir::lower_ir_schema(
+                parsed.clone(),
+                ir,
+                schema.schema,
+                schema.subtypes.clone(),
+                schema.state.clone(),
+                &WorkspaceFacts { snapshot },
+            );
+            let mut fragment = input.clone();
+            fragment.source = parsed.source_handle();
+            fragment.parsed = ParsedContent::Text(parsed);
+            fragment.hir = Some(std::sync::Arc::new(nested_hir));
+            let mut items = try_ir_completion_inner(
+                snapshot,
+                &fragment,
+                local_position,
+                cancellation,
+                depth + 1,
+            )?
+            .unwrap_or_default();
+            for item in &mut items {
+                item.replacement_range =
+                    map_completion_range(item.replacement_range, &quoted_layers)
+                        .unwrap_or(replacement_range);
+                for _ in &quoted_layers {
+                    item.insert_text = encode_quoted_script_text(&item.insert_text);
+                }
+            }
+            return Ok(Some(items));
+        }
+    }
     let value_property = hir.properties().iter().find(|property| {
         position > property.key_range.end()
-            && position <= property.range.end()
+            && (position <= property.range.end()
+                || (property.value_range.is_none()
+                    && input
+                        .source
+                        .get(property.range.end() as usize..position as usize)
+                        .is_some_and(|gap| gap.trim().is_empty())))
             && property.operator.is_some()
             && !schema_fact_at_cursor(hir, position).is_some_and(|active| {
                 hir.field_fact_at(property.key_range).is_some_and(|field| {
@@ -42,9 +110,9 @@ pub(crate) fn try_ir_completion(
                         .any(|parent| parent.schema == field.schema && parent.range == active.range)
                 })
             })
-            && !property
-                .value_range
-                .is_some_and(|range| hir.schema_facts().iter().any(|fact| fact.range == range))
+            && !property.value_range.is_some_and(|range| {
+                !range.is_empty() && hir.schema_facts().iter().any(|fact| fact.range == range)
+            })
     });
     let mut items = Vec::new();
     if let Some((invocation, summary)) = callable_invocation_at(ir, snapshot, hir, position)
@@ -57,17 +125,56 @@ pub(crate) fn try_ir_completion(
                     .any(|parameter| parameter.name.eq_ignore_ascii_case(&property.key))
         })
     {
-        let constraints = ir_semantic::callable_parameter_matchers(
+        let constraints = crate::ir_callable::parameter_sites(
             snapshot,
             &summary.kind,
             &summary.name,
+            &property.key,
+            &crate::ir_callable::invocation_bindings(hir, invocation),
+            crate::ir_callable::invocation_state(hir, invocation),
             cancellation,
         )?;
-        if let Some(matchers) = constraints.get(&property.key.to_ascii_lowercase()) {
+        {
+            if !quoted_layers.is_empty() {
+                for site in &constraints {
+                    let crate::ir_callable::Domain::Payload { schema, .. } = site.domain else {
+                        continue;
+                    };
+                    let parsed = std::sync::Arc::new(parser::parse(
+                        parser::FileFormat::Script,
+                        &local_source,
+                    ));
+                    let hir = hir::lower_ir_schema(
+                        parsed.clone(),
+                        ir,
+                        schema,
+                        Default::default(),
+                        site.state.clone(),
+                        &WorkspaceFacts { snapshot },
+                    );
+                    let mut fragment = input.clone();
+                    fragment.source = parsed.source_handle();
+                    fragment.parsed = ParsedContent::Text(parsed);
+                    fragment.hir = Some(std::sync::Arc::new(hir));
+                    if let Some(nested) = try_ir_completion_inner(
+                        snapshot,
+                        &fragment,
+                        local_position,
+                        cancellation,
+                        depth + 1,
+                    )? {
+                        for mut item in nested {
+                            item.replacement_range =
+                                map_completion_range(item.replacement_range, &quoted_layers)
+                                    .unwrap_or(replacement_range);
+                            items.push(item);
+                        }
+                    }
+                }
+            }
             append_callable_value_items(
                 snapshot,
-                ir,
-                matchers,
+                &constraints,
                 replacement_range,
                 prefix,
                 &property.key,
@@ -83,35 +190,21 @@ pub(crate) fn try_ir_completion(
         }
     }
     if value_property.is_none()
-        && let Some((invocation, summary)) = callable_invocation_at(ir, snapshot, hir, position)
+        && let Some((_, summary)) = callable_invocation_at(ir, snapshot, hir, position)
     {
-        let current = hir
-            .properties()
-            .iter()
-            .find(|property| contains(property.key_range, position));
         for parameter in &summary.parameters {
             cancellation.checkpoint()?;
             if !parameter
                 .name
                 .to_ascii_lowercase()
                 .starts_with(&prefix.to_ascii_lowercase())
-                || hir.properties().iter().any(|property| {
-                    property.path.len() == invocation.path.len() + 1
-                        && property.path.starts_with(&invocation.path)
-                        && current.is_none_or(|current| current.key_range != property.key_range)
-                        && property.key.eq_ignore_ascii_case(&parameter.name)
-                })
             {
                 continue;
             }
             items.push(CompletionItem {
                 label: parameter.name.clone(),
                 kind: CompletionKind::DynamicParameter,
-                detail: if parameter.required {
-                    "required callable parameter".into()
-                } else {
-                    "optional callable parameter".into()
-                },
+                detail: "parameter".into(),
                 documentation: None,
                 replacement_range,
                 insert_text: format!("{} = ", parameter.name),
@@ -131,39 +224,50 @@ pub(crate) fn try_ir_completion(
         }
         return Ok(Some(items));
     }
+    let contracts = crate::dynamic_contracts::dynamic_contract_report_view(snapshot, cancellation)?;
+    let scope_state = schema_fact_at_cursor(hir, position).map(|fact| {
+        let mut state = fact.state.clone();
+        if state.current.first().is_none_or(|current| matches!(current, hir::ScopeValue::Unknown) || matches!(current, hir::ScopeValue::Known(scopes) if scopes.iter().all(|scope| scope.eq_ignore_ascii_case("any"))))
+            && let Some(owner) = hir.definitions().iter().find(|definition| contains(definition.range, position)
+                && crate::semantic::dynamic_definition_type(snapshot, &definition.kind))
+            && let Some(crate::dynamic_contracts::ScopeContract::Scopes(scopes)) = contracts.contract(&owner.kind, &owner.name)
+            && scopes.len() == 1 {
+            state.current = vec![hir::ScopeValue::known_single(&scopes[0])];
+        }
+        state
+    });
     if let Some(property) = value_property {
         let Some(fact) = hir.field_fact_at(property.key_range) else {
             return Ok(Some(items));
         };
-        let mut candidates = fact
-            .fields
-            .iter()
-            .copied()
-            .filter(|field| ir.shape(*field) == Some(Shape::Scalar))
-            .collect::<Vec<_>>();
-        if candidates.is_empty() {
-            candidates.extend(
-                ir.lookup(fact.schema, &property.key, Shape::Scalar)
-                    .filter(|field| ir.gate_holds(ir.field(*field).gate, &fact.subtypes)),
-            );
-        }
         let facts = WorkspaceFacts { snapshot };
-        let selected = property
-            .scalar
-            .as_ref()
-            .and_then(|scalar| {
-                candidates
-                    .iter()
-                    .copied()
-                    .find(|candidate| match ir.field(*candidate).value {
-                        FieldValue::Scalar(matcher) => {
-                            ir_semantic::matcher_matches(ir, matcher, &scalar.value, &facts)
-                        }
-                        _ => false,
-                    })
+        let mut candidates = ir
+            .lookup(fact.schema, &property.key, Shape::Scalar)
+            .filter(|field| {
+                ir_semantic::matcher_matches(ir, ir.field(*field).key, &property.key, &facts)
             })
-            .or_else(|| candidates.first().copied());
-        if let Some(field_id) = selected {
+            .collect::<Vec<_>>();
+        if candidates
+            .iter()
+            .any(|field| matches!(ir.matcher(ir.field(*field).key), Matcher::Literal(_)))
+        {
+            candidates
+                .retain(|field| matches!(ir.matcher(ir.field(*field).key), Matcher::Literal(_)));
+        }
+        candidates.retain(|field_id| {
+            ir.field(*field_id).scope.as_ref().is_none_or(|scope| {
+                scope.scopes_in.is_empty()
+                    || scope_state
+                        .as_ref()
+                        .and_then(|state| state.current.first())
+                        .is_none_or(|current| {
+                            ir_semantic::scope_allows(ir, current, &scope.scopes_in)
+                        })
+            })
+        });
+        // The current token may be incomplete or belong to another overload.
+        // Offer every scalar overload available in the current scope.
+        for field_id in candidates.iter().copied() {
             let field = ir.field(field_id);
             if let FieldValue::Scalar(matcher) = field.value {
                 append_value_items(
@@ -175,73 +279,171 @@ pub(crate) fn try_ir_completion(
                     field.doc,
                     replacement_range,
                     prefix,
-                    schema_fact_at_cursor(hir, position).map(|fact| &fact.state),
+                    scope_state.as_ref(),
                     cancellation,
                     &mut items,
                 )?;
+            }
+        }
+        if candidates.is_empty() {
+            for field_id in ir.lookup(fact.schema, &property.key, Shape::Block) {
+                let field = ir.field(field_id);
+                let FieldValue::Block(schema) = field.value else {
+                    continue;
+                };
+                let Some(matcher) = ir.schema(schema).items else {
+                    continue;
+                };
+                let start = items.len();
+                append_value_items(
+                    snapshot,
+                    ir,
+                    matcher,
+                    field_id,
+                    field.deprecated,
+                    field.doc,
+                    replacement_range,
+                    prefix,
+                    scope_state.as_ref(),
+                    cancellation,
+                    &mut items,
+                )?;
+                for item in &mut items[start..] {
+                    item.insert_text = format!("{{ {} }}", item.insert_text);
+                }
             }
         }
     } else {
         let Some(schema_fact) = schema_fact_at_cursor(hir, position) else {
             return Ok(Some(items));
         };
-        for field_id in ir.fields(schema_fact.schema, &schema_fact.subtypes) {
-            cancellation.checkpoint()?;
-            let field = ir.field(field_id);
-            let current_property = hir
-                .properties()
-                .iter()
-                .find(|property| contains(property.key_range, position));
-            let existing_count = hir
-                .properties()
-                .iter()
-                .filter(|property| {
-                    if current_property
-                        .is_some_and(|current| current.key_range == property.key_range)
-                    {
-                        return false;
-                    }
-                    crate::support::contains(schema_fact.range, property.key_range.start())
-                        && hir.field_fact_at(property.key_range).is_some_and(|fact| {
-                            fact.schema == schema_fact.schema && fact.fields.contains(&field_id)
-                        })
-                })
-                .count() as u32;
-            if field.card.max.is_some_and(|max| existing_count >= max) {
-                continue;
-            }
-            let matcher = field.key;
-            for label in ir_semantic::spellings_with_state(
-                ir,
-                matcher,
-                snapshot,
-                prefix,
-                schema_fact_at_cursor(hir, position).map(|fact| &fact.state),
-            ) {
+        let state = scope_state.as_ref().expect("schema fact at cursor");
+        if let Some(matcher) = ir.schema(schema_fact.schema).items {
+            for label in
+                ir_semantic::spellings_with_state(ir, matcher, snapshot, prefix, Some(state))
+            {
                 cancellation.checkpoint()?;
-                if !label
-                    .to_ascii_lowercase()
-                    .starts_with(&prefix.to_ascii_lowercase())
-                {
+                let Some(rank) = prefix_rank(&label, prefix) else {
                     continue;
-                }
-                let label_text = key_insert_text(
-                    snapshot,
-                    ir,
-                    matcher,
-                    &schema_fact.subtypes,
-                    ir.shape(field_id),
-                    &label,
-                    current_property.is_none_or(|property| property.operator.is_none()),
-                );
+                };
                 items.push(CompletionItem {
                     label: label.clone(),
                     kind: matcher_kind(ir.matcher(matcher)),
                     detail: ir_semantic::describe(ir, matcher),
+                    documentation: None,
+                    replacement_range,
+                    insert_text: label,
+                    sort_score: rank,
+                    deprecated: false,
+                    resolve_data: None,
+                });
+            }
+        }
+        for field_id in ir.fields(schema_fact.schema) {
+            cancellation.checkpoint()?;
+            let field = ir.field(field_id);
+            if field.scope.as_ref().is_some_and(|scope| {
+                !scope.scopes_in.is_empty()
+                    && state.current.first().is_some_and(|current| {
+                        !ir_semantic::scope_allows(ir, current, &scope.scopes_in)
+                    })
+            }) {
+                continue;
+            }
+            let current_property = hir
+                .properties()
+                .iter()
+                .find(|property| contains(property.key_range, position));
+            let matcher = field.key;
+            for label in
+                ir_semantic::spellings_with_state(ir, matcher, snapshot, prefix, Some(state))
+            {
+                cancellation.checkpoint()?;
+                let Some(rank) = prefix_rank(&label, prefix) else {
+                    continue;
+                };
+                let callable_kind = crate::ir_callable::callable_kind(ir, matcher);
+                if let Some(kind) = &callable_kind
+                    && let Some(crate::dynamic_contracts::ScopeContract::Scopes(expected)) =
+                        contracts.contract(kind, &label)
+                    && let Some(current) = state.current.first()
+                {
+                    let expected = expected
+                        .iter()
+                        .filter_map(|name| ir.strings().lookup_folded(name))
+                        .collect::<Vec<_>>();
+                    if !ir_semantic::scope_allows(ir, current, &expected) {
+                        continue;
+                    }
+                }
+                let existing_count = hir
+                    .properties()
+                    .iter()
+                    .filter(|property| {
+                        property.key.eq_ignore_ascii_case(&label)
+                            && current_property
+                                .is_none_or(|current| current.key_range != property.key_range)
+                            && crate::support::contains(
+                                schema_fact.range,
+                                property.key_range.start(),
+                            )
+                            && hir.field_fact_at(property.key_range).is_some_and(|fact| {
+                                fact.schema == schema_fact.schema
+                                    && fact
+                                        .fields
+                                        .iter()
+                                        .any(|id| ir.shape(*id) == ir.shape(field_id))
+                            })
+                    })
+                    .count() as u32;
+                if field.card.max.is_some_and(|max| existing_count >= max) {
+                    continue;
+                }
+                let assignment =
+                    current_property.is_none_or(|property| property.operator.is_none());
+                let label_text = key_insert_text(
+                    snapshot,
+                    ir,
+                    matcher,
+                    ir.shape(field_id),
+                    &label,
+                    assignment,
+                );
+                let label_text = if assignment
+                    && matches!(field.value, FieldValue::Scalar(value) if matches!(ir.matcher(value), Matcher::Path(_)))
+                {
+                    format!("{label} = \"$0\"")
+                } else {
+                    label_text
+                };
+                items.push(CompletionItem {
+                    label: label.clone(),
+                    kind: if callable_kind.is_some() {
+                        CompletionKind::DynamicDefinition
+                    } else if matches!(ir.matcher(matcher), Matcher::Literal(_)) {
+                        CompletionKind::Key
+                    } else {
+                        matcher_kind(ir.matcher(matcher))
+                    },
+                    detail: if let Matcher::Enum { id: enum_id } = ir.matcher(matcher) {
+                        ir.strings()
+                            .resolve(ir.enums[enum_id.index()].name)
+                            .to_owned()
+                    } else {
+                        ir_semantic::field_context(ir, schema_fact.schema, field_id)
+                    },
                     documentation: field.doc.map(|doc| ir.strings().resolve(doc).to_owned()),
                     replacement_range,
                     insert_text: label_text,
-                    sort_score: u32::from(field.deprecated),
+                    sort_score: rank
+                        + 1000 * u32::from(field.deprecated)
+                        + 100
+                            * u32::from(ir.provenance_of(field_id).is_some_and(|origin| {
+                                !ir.strings().resolve(origin.pointer).starts_with(&format!(
+                                    "/schemas/{}/fields/",
+                                    ir.strings().resolve(ir.schema(schema_fact.schema).name)
+                                ))
+                            })),
                     deprecated: field.deprecated,
                     resolve_data: Some(format!("ir-field:{}", field_id.index())),
                 });
@@ -252,7 +454,16 @@ pub(crate) fn try_ir_completion(
         (a.sort_score, a.label.to_ascii_lowercase())
             .cmp(&(b.sort_score, b.label.to_ascii_lowercase()))
     });
-    items.dedup_by(|a, b| a.label.eq_ignore_ascii_case(&b.label));
+    let mut seen = std::collections::BTreeSet::new();
+    let mut exact_labels = std::collections::BTreeSet::new();
+    items.retain(|item| {
+        let block = item
+            .insert_text
+            .split_once('=')
+            .is_some_and(|(_, value)| value.trim_start().starts_with('{'));
+        exact_labels.insert(item.label.clone())
+            && seen.insert((item.label.to_ascii_lowercase(), block))
+    });
     for item in &mut items {
         for _ in 0..quoted_layers.len() {
             item.insert_text = encode_quoted_script_text(&item.insert_text);
@@ -264,40 +475,44 @@ pub(crate) fn try_ir_completion(
 #[allow(clippy::too_many_arguments)]
 fn append_callable_value_items(
     snapshot: &AnalysisSnapshot,
-    ir: &rules::ir::RulesIr,
-    matchers: &[MatcherId],
+    sites: &[crate::ir_callable::ParameterSite],
     replacement_range: TextRange,
     prefix: &str,
     parameter: &str,
     cancellation: &CancellationToken,
     items: &mut Vec<CompletionItem>,
 ) -> Result<(), Cancelled> {
-    let Some(first) = matchers.first().copied() else {
+    let Some(first) = sites.first() else {
         return Ok(());
     };
-    let mut candidates = ir_semantic::spellings(ir, first, snapshot, prefix);
-    let facts = WorkspaceFacts { snapshot };
+    let mut candidates = first.candidates(snapshot, parameter, prefix);
     candidates.retain(|candidate| {
-        matchers.iter().all(|matcher| {
-            ir_semantic::matcher_matches_in_snapshot(snapshot, ir, *matcher, candidate, &facts)
-        })
+        sites
+            .iter()
+            .all(|site| site.accepts_candidate(snapshot, parameter, candidate))
     });
+    candidates.sort();
+    candidates.dedup();
     for label in candidates {
         cancellation.checkpoint()?;
-        if !label
-            .to_ascii_lowercase()
-            .starts_with(&prefix.to_ascii_lowercase())
-        {
+        let Some(rank) = prefix_rank(&label, prefix) else {
             continue;
-        }
+        };
         items.push(CompletionItem {
             label: label.clone(),
-            kind: matcher_kind(ir.matcher(first)),
-            detail: format!("value for Callable parameter `{parameter}`"),
-            documentation: Some(ir_semantic::describe(ir, first)),
+            kind: CompletionKind::Value,
+            detail: if sites
+                .iter()
+                .all(|site| matches!(site.domain, crate::ir_callable::Domain::Unresolved))
+            {
+                "scope".to_owned()
+            } else {
+                format!("value for Callable parameter `{parameter}`")
+            },
+            documentation: None,
             replacement_range,
             insert_text: label,
-            sort_score: 0,
+            sort_score: rank,
             deprecated: false,
             resolve_data: None,
         });
@@ -328,14 +543,7 @@ fn callable_invocation_at<'a>(
                 (info
                     .trait_impls
                     .iter()
-                    .any(|implementation| implementation.trait_id == callable)
-                    || info.subtypes.iter().any(|subtype| {
-                        fact.subtypes.contains(*type_id, subtype.name)
-                            && subtype
-                                .trait_impls
-                                .iter()
-                                .any(|implementation| implementation.trait_id == callable)
-                    }))
+                    .any(|implementation| implementation.trait_id == callable))
                 .then(|| ir.strings().resolve(info.name).to_owned())
             })?;
             if hir.definitions().iter().any(|definition| {
@@ -354,6 +562,54 @@ fn callable_invocation_at<'a>(
 }
 
 type CompletionCoordinates = (String, TextSize, Vec<(TextSize, QuotedScript)>);
+
+fn path_value_completion(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    hir: &hir::HirFile,
+    position: TextSize,
+    cancellation: &CancellationToken,
+) -> Result<Option<Vec<CompletionItem>>, Cancelled> {
+    let ir = snapshot.ir();
+    let Some((scalar, field)) = hir.properties().iter().find_map(|property| {
+        let scalar = property.scalar.as_ref()?;
+        if !contains(scalar.range, position) { return None; }
+        let fact = hir.field_fact_at(property.key_range)?;
+        fact.fields.iter().find_map(|id| {
+            let field = ir.field(*id);
+            matches!(field.value, FieldValue::Scalar(id) if matches!(ir.matcher(id), Matcher::Path(Some(category))
+                if ir.strings().resolve(*category).eq_ignore_ascii_case("gfx")))
+                .then_some((scalar, field))
+        })
+    }) else { return Ok(None); };
+    let start = scalar.range.start() + u32::from(scalar.quoted);
+    let Some(range) = TextRange::new(start, position) else {
+        return Ok(Some(Vec::new()));
+    };
+    let prefix = input.source_text(range).unwrap_or_default();
+    let children = snapshot.texture_catalog().children_with_prefix(prefix);
+    let mut items = Vec::new();
+    for (labels, kind, detail) in [
+        (children.directories, CompletionKind::Folder, "directory"),
+        (children.files, CompletionKind::Value, "texture path"),
+    ] {
+        for label in labels {
+            cancellation.checkpoint()?;
+            items.push(CompletionItem {
+                insert_text: label.to_owned(),
+                label: label.to_owned(),
+                kind,
+                detail: detail.into(),
+                documentation: field.doc.map(|id| ir.strings().resolve(id).to_owned()),
+                replacement_range: range,
+                sort_score: u32::from(kind != CompletionKind::Folder),
+                deprecated: field.deprecated,
+                resolve_data: None,
+            });
+        }
+    }
+    Ok(Some(items))
+}
 
 fn completion_coordinates(
     input: &ParsedInput,
@@ -431,20 +687,30 @@ fn append_value_items(
 ) -> Result<(), Cancelled> {
     for label in ir_semantic::spellings_with_state(ir, matcher, snapshot, prefix, scope_state) {
         cancellation.checkpoint()?;
-        if !label
-            .to_ascii_lowercase()
-            .starts_with(&prefix.to_ascii_lowercase())
-        {
+        let Some(rank) = prefix_rank(&label, prefix) else {
             continue;
-        }
+        };
         items.push(CompletionItem {
             label: label.clone(),
             kind: matcher_kind(ir.matcher(matcher)),
-            detail: ir_semantic::describe(ir, matcher),
+            detail: if let Matcher::Ref(RefTarget::Type { type_id, .. }) = ir.matcher(matcher)
+                && ir
+                    .type_info(*type_id)
+                    .builtin
+                    .iter()
+                    .any(|member| ir.strings().resolve(*member).eq_ignore_ascii_case(&label))
+            {
+                format!(
+                    "engine-set {}",
+                    ir.strings().resolve(ir.type_info(*type_id).name)
+                )
+            } else {
+                ir_semantic::describe(ir, matcher)
+            },
             documentation: doc.map(|doc| ir.strings().resolve(doc).to_owned()),
             replacement_range,
             insert_text: label,
-            sort_score: u32::from(deprecated),
+            sort_score: rank + 1000 * u32::from(deprecated),
             deprecated,
             resolve_data: Some(format!("ir-field:{}", field_id.index())),
         });
@@ -456,10 +722,20 @@ fn matcher_kind(matcher: &Matcher) -> CompletionKind {
     match matcher {
         Matcher::Enum { .. } => CompletionKind::EnumMember,
         Matcher::Scope(_) | Matcher::Link => CompletionKind::Scope,
-        Matcher::Ref(RefTarget::Type { .. })
-        | Matcher::Ref(RefTarget::Trait(_))
-        | Matcher::Def { .. } => CompletionKind::Symbol,
+        Matcher::Ref(RefTarget::Type { .. }) | Matcher::Def { .. } => CompletionKind::Symbol,
         _ => CompletionKind::Value,
+    }
+}
+
+fn prefix_rank(label: &str, prefix: &str) -> Option<u32> {
+    let label = label.to_ascii_lowercase();
+    let prefix = prefix.to_ascii_lowercase();
+    if label.starts_with(&prefix) {
+        Some(0)
+    } else if label.contains(&prefix) {
+        Some(100)
+    } else {
+        None
     }
 }
 
@@ -467,7 +743,6 @@ fn key_insert_text(
     snapshot: &AnalysisSnapshot,
     ir: &rules::ir::RulesIr,
     matcher: MatcherId,
-    subtypes: &rules::ir::SubtypeSet,
     shape: Option<Shape>,
     label: &str,
     assignment: bool,
@@ -476,12 +751,12 @@ fn key_insert_text(
         return label.to_owned();
     }
     match shape {
-        Some(Shape::Block) => callable_snippet(snapshot, ir, matcher, subtypes, label)
+        Some(Shape::Block) => callable_snippet(snapshot, ir, matcher, label)
             .unwrap_or_else(|| format!("{label} = {{\n\t$0\n}}")),
         Some(Shape::Quoted) => format!("{label} = \"\n\t$0\n\""),
-        Some(Shape::Scalar) => callable_snippet(snapshot, ir, matcher, subtypes, label)
-            .filter(|snippet| snippet.contains("$1"))
-            .unwrap_or_else(|| format!("{label} = ")),
+        Some(Shape::Scalar) => {
+            callable_snippet(snapshot, ir, matcher, label).unwrap_or_else(|| format!("{label} = "))
+        }
         None => format!("{label} = "),
     }
 }
@@ -490,7 +765,6 @@ fn callable_snippet(
     snapshot: &AnalysisSnapshot,
     ir: &rules::ir::RulesIr,
     matcher: MatcherId,
-    subtypes: &rules::ir::SubtypeSet,
     name: &str,
 ) -> Option<String> {
     let rules::ir::Matcher::Ref(RefTarget::Type { type_id, .. }) = ir.matcher(matcher) else {
@@ -502,32 +776,14 @@ fn callable_snippet(
         .trait_impls
         .iter()
         .any(|implementation| implementation.trait_id == callable)
-        && !info.subtypes.iter().any(|subtype| {
-            subtypes.contains(*type_id, subtype.name)
-                && subtype
-                    .trait_impls
-                    .iter()
-                    .any(|implementation| implementation.trait_id == callable)
-        })
     {
         return None;
     }
     let kind = ir.strings().resolve(info.name);
-    let summary = crate::semantic::dynamic_definition_summary(snapshot, kind, name)?;
-    let required = summary
-        .parameters
-        .iter()
-        .filter(|parameter| parameter.required)
-        .collect::<Vec<_>>();
-    if required.is_empty() {
-        return Some(format!("{name} = {{\n\t$0\n}}"));
-    }
-    let mut body = format!("{name} = {{\n");
-    for (index, parameter) in required.iter().enumerate() {
-        body.push_str(&format!("\t{} = ${}\n", parameter.name, index + 1));
-    }
-    body.push_str(&format!("\t${}\n}}", required.len() + 1));
-    Some(body)
+    crate::semantic::dynamic_definition_summary(snapshot, kind, name)?;
+    Some(crate::semantic::scripted_definition_snippet(
+        snapshot, kind, name,
+    ))
 }
 
 fn contains(range: TextRange, position: TextSize) -> bool {

@@ -10,26 +10,22 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "default_option": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "event": {
           "card": "1",
-          "value": "ref<event.country>",
-          "when": null
+          "value": "ref<event.country>"
         }
       },
       "patterns": [
         {
           "body": "imperial_incident_option",
           "card": "0..3",
-          "key": "scalar",
-          "when": null
+          "key": "scalar"
         }
       ]
     }

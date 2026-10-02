@@ -4,8 +4,7 @@
       "fields": {
         "frame": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "immediate_effect": {
           "body": "effect",
@@ -15,8 +14,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "mean_time_to_happen": {
           "body": "incident_body__mean_time_to_happen",
@@ -26,8 +24,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "potential": {
           "body": "trigger",
@@ -38,8 +35,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "trigger": {
           "body": "trigger",
@@ -50,13 +46,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "variable_initial": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         }
       }
     },
@@ -65,8 +59,7 @@
         "months": {
           "card": "1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         }
       },
       "include": [

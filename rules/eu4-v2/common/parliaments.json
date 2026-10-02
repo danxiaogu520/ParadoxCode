@@ -12,8 +12,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "chance": {
           "body": "parliament_bribe_body__chance",
@@ -24,8 +23,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "effect": {
           "body": "effect",
@@ -37,18 +35,15 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "estate": {
           "card": "0..1",
-          "value": "ref<estate>",
-          "when": null
+          "value": "ref<estate>"
         },
         "name": {
           "card": "0..1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "trigger": {
           "body": "trigger",
@@ -60,8 +55,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -71,8 +65,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -85,8 +78,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -104,8 +96,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "allow": {
           "body": "trigger",
@@ -116,19 +107,16 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "backing_percentage": {
           "card": "0..1",
           "doc": "Percentage of seats that will back up the issue. Defaults to PARLIAMENT_BACKING_PERCENTAGE",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "category": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "chance": {
           "body": "parliament_issue_body__chance",
@@ -138,20 +126,17 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "chance_of_decision": {
           "card": "0..1",
           "doc": "Chance debate is decided upon after debate duration, defaults to PARLIAMENT_CHANCE_OF_DECISION",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "debate_duration": {
           "card": "0..1",
           "doc": "How many years an issue will last before being able to be randomly decided on, defaults to PARLIAMENT_DEBATE_DURATION",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "effect": {
           "body": "effect",
@@ -162,25 +147,21 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "effect_duration": {
           "card": "0..1",
           "doc": "How many years the effects of a passed issue last, also prevents picking a new issue, defaults to PARLIAMENT_EFFECT_DURATION",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "influence_scaled_modifier": {
           "body": "modifier",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "modifier": {
           "body": "modifier",
           "card": "0..1",
-          "doc": "Block of modifiers applied while the containing entry is active.",
-          "when": null
+          "doc": "Block of modifiers applied while the containing entry is active."
         },
         "on_issue_taken": {
           "body": "effect",
@@ -190,13 +171,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "scale_estate_influence": {
           "card": "0..1",
-          "value": "ref<estate>",
-          "when": null
+          "value": "ref<estate>"
         }
       }
     },
@@ -206,8 +185,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -220,8 +198,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [

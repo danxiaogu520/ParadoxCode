@@ -11,33 +11,109 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "cost": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "effect": {
           "body": "modifier",
           "card": "1",
-          "doc": "Block of effects executed by the containing entry.",
-          "when": null
+          "doc": "Block of effects executed by the containing entry."
         },
         "potential": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
-          "when": null
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility."
         },
         "trigger": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
-          "when": null
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply."
         }
-      }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
     },
     "fervor_body__ai_will_do": {
       "fields": {
@@ -45,8 +121,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [

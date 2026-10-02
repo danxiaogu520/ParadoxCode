@@ -5,20 +5,17 @@
         {
           "card": "0..*",
           "key": "enum<spritepacks>",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         {
           "card": "0..*",
           "key": "ref<packentity>",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         {
           "card": "0..*",
           "key": "scalar",
-          "value": "int",
-          "when": null
+          "value": "int"
         }
       ]
     }

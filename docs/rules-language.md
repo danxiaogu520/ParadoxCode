@@ -13,18 +13,24 @@ script diagnostics catalogued in `docs/diagnostics.md`.
 
 ## 1. Top-level sections and directory layout
 
-A rule source is a set of JSON files listed in `manifest.json` (which also
-carries `game_id` and `target_game_version`). Each file MAY contain any subset
+A rule source directory contains a root `game.json` and regular `.json` source
+files discovered recursively. No source manifest is used. Sources MUST be merged
+in normalized relative-path order; directory names do not affect interpretation.
+Non-JSON files are ignored; symbolic links are rejected to prevent aliases and
+cycles. Package identity (`source_format_version: 13`, `game_id`, and optional
+`target_game_version`) lives in `game.json`; another source format version is
+rejected. Identity metadata is separate from the runtime profile and language IR.
+Each source file MAY contain any subset
 of seven top-level sections:
 
 | Section | Contents |
 |---|---|
 | `files` | Path selection → parser / root schema |
-| `schemas` | Structure: `fields` / `patterns` / `items` / `include` / `when` / `def` / parameters |
+| `schemas` | Structure: `fields` / `patterns` / `items` / `include` / `def` / parameters |
 | `mixins` | Pure structural field bundles (expanded at compile time) |
 | `types` | Symbol namespaces: `resolution` / `subtypes` / `open` / `builtin` / `impl` |
-| `traits` | Capabilities + bindings + constraints (expanded at compile time) |
-| `enums` | Enums, optionally with attribute columns (carry `on_actions` and the like) |
+| `traits` | Named trait markers; implementation data belongs to `types.*.impl` |
+| `enums` | Literal member lists |
 | `scopes` | Scope types / registers / links / compat |
 
 The compiler merges the same-named section across all files into one namespace.
@@ -34,18 +40,17 @@ between files.
 
 There is **no top-level `intrinsics` section**: control-flow primitives are
 field attributes (§9), so no key name is globally significant. There is **no
-separate `tables` section**: an enum with columns is one concept (§6).
+separate `tables` section**: enums contain literal member lists (§6).
 
 The directory layout is organised by game domain; the shared parts live in
 `core/`:
 
 ```
-rules/eu4/
-  manifest.json          # lists every file; game_id, target_game_version
-  game.json              # non-language parts: install, filesystem scan, hover_cards, fallback_keys
+rules/eu4-v2/
+  game.json              # package identity; install, filesystem scan, hover_cards, fallback_keys
   core/
     scopes.json          # scopes section
-    control-flow.json    # control-flow mixins (if chains, AND/OR/NOT, random_list, …)
+    special.json         # helper schemas; control attributes belong to fields
     traits.json          # built-in traits
     trigger.json effect.json modifier.json
   events.json            # files + schemas + types + enums(on_actions), one domain per file
@@ -73,22 +78,18 @@ range     = "[" [ number ] ".." [ number ] "]" ;
 ctor      = "ref" | "def" | "enum" | "scope" | "quoted" ;
 arg       = name [ "." name ]            (* ref<event.country>：类型.subtype *)
           | name "strip_prefix" name     (* ref<estate strip_prefix estate_>：去掉词缀 *)
-          | "impl" name                  (* ref<impl ModifierSource> *)
           | param ;
 literal   = "'" { char | "{" expr "}" } "'" ;   (* 无洞即常量；有洞即模板 *)
-param     = "$" name [ "." name ] ;       (* 参数化 schema 的形参；$key.<列> 见 2.6 *)
+param     = "$" name ;                    (* 参数化 schema 的形参 *)
 name      = ident ;
 ```
 
-The grammar block above is quoted verbatim from the design document; the three
-comments gloss `arg = name ["." name]` as *type.subtype* (`ref<event.country>`),
-`"impl" name` as *trait reference* (`ref<impl ModifierSource>`), and
-`param` as *a formal parameter of a parameterised schema; `$key.<column>` is
-described in §6*. The remaining lexical rules are normative:
+Constructor paths name a type and optional subtype (`ref<event.country>`),
+or use a formal parameter of the enclosing parameterised schema. The remaining
+lexical rules are normative:
 
 - Whitespace outside literals is insignificant between tokens and at the ends
-  of the expression; `ref<impl ModifierSource>` is written exactly as shown,
-  space included. Whitespace inside literal text is literal text.
+  of the expression. Whitespace inside literal text is literal text.
 - An identifier `name` matches `[A-Za-z_][A-Za-z0-9_]*`.
 - A number (range bound) matches `-?[0-9]+(\.[0-9]+)?`: a plain decimal digit
   sequence with an optional `-` and optional fractional part, and no exponent
@@ -104,13 +105,12 @@ described in §6*. The remaining lexical rules are normative:
   is literal text. Literals nest: a hole may contain another quoted literal. A
   literal with no hole is a constant; a literal with holes is a template.
 - The `arg` of a constructor (between `<` and `>`) is `seg ["." seg]`,
-  `seg "strip_prefix" Ident`, or `"impl" Ident`, where
-  `seg = Ident | "$" Ident ["." Ident]`. `$name.column` reads a column of a
-  parameter (§6). `strip_prefix` names the affix removed from the resolved
+  or `seg "strip_prefix" Ident`, where `seg = Ident | "$" Ident`.
+  `strip_prefix` names the affix removed from the resolved
   member name before substitution; the affix must be an identifier
   (`ref<estate strip_prefix estate_>`), which is the legacy template
   parameter's `strip_prefix`.
-- A bare `param` (`$name[.column]`) is a legal alternative on its own.
+- A bare `param` (`$name`) is a legal alternative on its own.
 - Union has the lowest precedence and is tried in written order. An empty
   branch is a parse error.
 - `path` takes an optional `<category>` (for example `path<gfx>`); the category
@@ -125,12 +125,12 @@ described in §6*. The remaining lexical rules are normative:
 |---|---|---|
 | `scalar` | Any scalar | `AnyScalar` |
 | `'yes'` | Constant | `Exact` |
-| `'monthly_{ref<government_mechanic_power>}'` | Template | `Template`, `TypedPrefix` (`'trigger_value:{ref<scripted_trigger>}'`) |
+| `'monthly_{ref<government_mechanic_power>}'` | Template | `Template`, `TypedPrefix` (`'trigger_value:{enum<numeric_or_bool_trigger>}'`) |
 | `'{ref<estate strip_prefix estate_>}_loyalty_modifier'` | Template whose hole strips an affix from the member name (`estate_burghers` → `burghers`); the clause is the legacy template parameter's `strip_prefix` | `Template` with a `strip_prefix` parameter |
 | `int[1..10]` `float[0..]` `bool` `date` | Scalar types; bounds are always numbers | `Int`/`Float`/`Bool`/`Date` |
 | `loc` | Localisation key | `Localisation` |
 | `path` `path<gfx>` | File path; `<…>` is a path category | `Filepath`/`TexturePath` |
-| `ref<event>` `ref<event.country>` `ref<impl ModifierSource>` | Symbol reference; optionally qualified by subtype or trait | `Type`, `Dynamic`, `lexicon.member_kind_aliases` |
+| `ref<event>` `ref<event.country>` | Symbol reference; optionally qualified by subtype | `Type`, `Dynamic`, `lexicon.member_kind_aliases` |
 | `def<country_flag>` | **Defines** a symbol at this position | `DynamicSet`, `profile.value_definitions` |
 | `enum<country_tags>` | Enum member | `Enum` |
 | `scope<country>` `scope<any>` | Scope expression (register, link, tag, …) | `Scope` |
@@ -173,8 +173,36 @@ A schema describes one block:
 ```
 
 A schema combines exact `fields`, ordered `patterns`, `items` for list blocks,
-`include` for mixin expansion, `when`/`unless`-gated fields and `def` positions
+`include` for mixin expansion and `def` positions
 (§4–§5), and optionally formal parameters in its name.
+
+`forms` expresses alternative combinations of direct-field counts. Every
+declared field keeps its ordinary type, scope and cardinality checks; the block
+must additionally satisfy at least one complete form. A form names exact fields
+case-insensitively in `fields`, and written pattern indices in `patterns`:
+
+```jsonc
+"variable_operation": {
+  "fields": {
+    "which": { "value": "ref<variable>", "card": "0..2" },
+    "value": { "value": "float", "card": "0..1" }
+  },
+  "forms": [
+    { "fields": { "which": "2", "value": "0" } },
+    { "fields": { "which": "1", "value": "1" } }
+  ]
+}
+```
+
+This accepts two `which` operands or one `which` plus one `value`; empty,
+incomplete and mixed forms remain errors. A pattern constraint counts all keys
+selected by that pattern, after exact-key dispatch, rather than counting each
+spelling independently. `{"patterns":{"0":"1..2"}}` constrains the first
+written pattern. Counts include all shape overloads of a named field. Fields
+omitted from a form retain their ordinary bounds. Empty forms, undeclared
+field/pattern targets and invalid bounds are compile errors, so bake refuses
+them. The compiler resolves constraints to field ids; runtime does not know
+game command names.
 
 ### 3.1 Field specifications
 
@@ -188,7 +216,6 @@ A field specification is the value of a `fields` entry or an element of
 | `card` | `"1"`, `"0..1"`, `"1..*"`, `"0..*"`, `"2..5"`; **mandatory** (D14) | — |
 | `scope` | Scope effect, see §8 | none |
 | `def` | Defines a symbol instance at this position, see §4 | none |
-| `when` / `unless` | Subtype conditions, see §5 | none |
 | `control` | Control-flow primitive, see §9 | none |
 | `doc` / `severity` / `deprecated` | Documentation / diagnostic severity / deprecation | empty / `error` / `false` |
 
@@ -281,7 +308,7 @@ are declared with `def` at chosen positions in schemas:
 | `strict` | Do not recurse into subdirectories |
 | `exclude` | Path prefixes this entry does not apply to (the legacy `path_exclude_prefixes`) |
 | `parser` | `script` / `localisation` / `asset` / `syntax-only`; default `script` |
-| `resolution` | `replace-by-path` / `merge` / `replace-directory`; default `merge` (D14: a default must cover the corpus majority) |
+| `resolution` | `replace-by-path` / `merge`; default `merge` (D14: a default must cover the corpus majority) |
 | `root` | Root schema name; or a field specification carrying `def`, meaning the whole file is one instance. **Required for the `script` parser** — without it the entry would validate nothing, and the no-guessing rule forbids that; `localisation` and `asset` entries MAY omit it |
 
 A category whose structure the rules do not model still declares a root: an
@@ -298,8 +325,7 @@ leaving the file unvalidated by omission.
   the instance name (replacing `name_strip_prefix`/`name_strip_suffix` and
   `lexicon.member_name_suffixes`).
 - **Subtype at `def`.** Writing a subtype in the def type (`event.country`)
-  tags the instance with that subtype. This is the first of the two subtype
-  sources (§5).
+  tags the instance with that subtype (§5).
 
 One type may have several `def` positions. After this section, the Types
 subsystem carries only pure symbol semantics: *where instances are collected
@@ -321,77 +347,53 @@ and where references come from* is answered entirely by structure.
 | `profile.symbols.references` (18) | `ref<…>` in value positions; there is **no global reference table** (decision D9) |
 | `entry_wrapper_reroutes` heuristic | Removed; schemas describe the structure explicitly |
 
-## 5. Conditions and subtypes
+## 5. Explicit subtypes
 
-A subtype has two sources, both declared in `types`:
-
-```jsonc
-"types": { "event": {
-  "subtypes": {
-    "country":   {},                                         // source 1: assigned by the def position (events_file)
-    "province":  {},
-    "triggered": { "when": { "is_triggered_only": "'yes'" } } // source 2: decided by scalar fields of the instance body
-  }
-}}
-```
-
-A `when` predicate is a conjunction of *field → type expression* entries. A
-value of `null` means "this field is absent" (replacing the `absent_field` of
-`conditional_definitions`). Field specifications reference subtypes with
-`when`/`unless`:
+Subtypes classify symbol instances by their definition position:
 
 ```jsonc
-"event_body": { "fields": {
-  "is_triggered_only":   { "value": "bool", "card": "0..1" },
-  "mean_time_to_happen": { "body": "mtth", "card": "0..1", "unless": "triggered" },
-  "trigger":             { "body": "trigger", "card": "0..*" }
-}}
+"types": { "event": { "subtypes": { "country": {}, "province": {} } } }
 ```
 
-**Evaluation order** (this eliminates circular dependencies):
+A `def` of type `event.country` grants the `country` subtype;
+`ref<event.country>` accepts only instances explicitly assigned that subtype.
+Subtype entries are empty objects. They do not carry predicates or trait impls.
 
-1. Determine the subtypes assigned by `def`.
-2. Evaluate every `when` predicate against the **direct child scalar fields**
-   of the instance body. A field read by any `when` predicate MUST NOT itself
-   carry `when`/`unless`; this is checked at compile time (§10, check 5).
-3. Validate the whole instance body against the resulting subtype set. Several
-   subtypes may hold at once (`country` + `triggered`).
+All schema fields are available regardless of sibling field values. There is
+no field `when`/`unless` syntax, subtype `when` predicate, or conditional binding
+selection. Type, shape, scope and cardinality checks still apply. Structural
+alternatives based on field counts use `forms` (§3); script control flow is
+specified separately by `control` (§9).
 
-`ref<event.triggered>` accepts only instances that satisfy that subtype.
+Every localisation/icon binding is declared at the type level and available
+for every instance. Former conditional bindings become optional display
+bindings; existing type-level required bindings retain their requirement.
+Former references to structurally inferred subtypes use the base type.
+Source format version 13 rejects the removed syntax.
 
-## 6. Enums with columns
+## 6. Enums
 
-An enum is either a shorthand array of member names or a `columns` + `rows`
-table:
+An enum is an array of literal member names. Related groups use separate enums
+and explicit patterns; they may share a parameterised body:
 
 ```jsonc
 "enums": {
-  "dlc_event_pictures": ["...", "..."],                        // shorthand: no columns
-  "on_actions": {
-    "columns": { "scope": "scope_type", "from": "scope_type?" },
-    "rows": {
-      "on_startup":                     { "scope": "country" },
-      "on_province_religion_converted": { "scope": "province" }
-    }
-  }
+  "on_actions_country": ["on_startup"],
+  "on_actions_province": ["on_province_religion_converted"]
 },
 "schemas": {
-  "on_actions_file": { "map": { "key": "enum<on_actions>", "body": "on_action_body<$key.scope>" } }
+  "on_actions_file": { "patterns": [
+    { "key": "enum<on_actions_country>", "body": "on_action_body<country>", "card": "0..*" },
+    { "key": "enum<on_actions_province>", "body": "on_action_body<province>", "card": "0..*" }
+  ] }
 }
 ```
 
-`$key` is the implicit binding of the key matched in a `map` or `pattern`.
-When the key is an enum with columns, its columns are readable as
-`$key.<column>` (and as `$name.column` for a formal parameter, §2). The
-compiler groups enum rows by column values and generates one pattern per group
-(the key matcher covers that group's rows, the value is the monomorphised
-schema such as `on_action_body<country>`); the runtime still sees only plain
-patterns.
-
-`on_actions` shrinks from 1,130 rows to one parameterised schema plus one enum,
-and the country/province event distinction is restored. The old
-`profile.enum_extra_members` merge directly into `rows`. `engine_set_flags`
-moves to `builtin` (§7).
+There are no enum attribute columns, row subsets, or implicit `$key` parameters.
+Only declared schema formals may be used as `$name`. The compiler monomorphises
+`on_action_body<S>` for the explicitly supplied scope names.
+`profile.enum_extra_members` merge into the member lists. Engine-provided symbol
+members use type `builtin` (§7).
 
 ## 7. Types, mixins, and traits
 
@@ -432,7 +434,10 @@ between two mixins cannot be overridden and is always an error (§10, check 2).
 
 ### 7.3 Traits
 
-A trait is a capability plus constraints. It belongs to the Types subsystem.
+A trait is a named marker recognised by a runtime consumer. It belongs to the
+Types subsystem. Trait declarations are empty objects; implementation data
+belongs to each type. There are no trait declaration parameters, bindings,
+requirements, or capability labels.
 The first version's built-in set is fixed at four; adding a trait requires
 changing Rust, because the runtime must understand its semantics:
 
@@ -441,22 +446,18 @@ changing Rust, because the runtime must understand its semantics:
   "Localised":      {},                                   // bindings come from the impl
   "HasIcon":        {},                                   // bindings come from the impl
   "ModifierSource": {},
-  "Callable":       { "params": { "body": "schema" },
-                      "capabilities": ["replacement", "condition", "dynamic_key", "opaque_text"] }
+  "Callable":       {}
 },
 "types": {
   "decision": { "impl": { "Localised": {
     "name": { "loc": "$_title", "required": true },
     "desc": { "loc": "$_desc" }
   } } },
-  "idea_group": {
-    "impl": { "Localised": { "name": { "loc": "$", "required": true },
-                             "bonus": { "loc": "$_bonus", "required": true } } },
-    "subtypes": { "country_idea": {
-      "when": { "free": "'yes'" },
-      "impl": { "Localised": { "start": { "loc": "$_start", "required": true } } }
-    } }
-  },
+  "idea_group": { "impl": { "Localised": {
+    "name": { "loc": "$", "required": true },
+    "bonus": { "loc": "$_bonus", "required": true },
+    "start": { "loc": "$_start" }
+  } } },
   "building":        { "impl": { "Localised": { "name": { "loc": "building_$", "required": true } },
                                  "HasIcon": { "icon": { "sprite": "GFX_$", "required": true } },
                                  "ModifierSource": {} } },
@@ -475,18 +476,43 @@ changing Rust, because the runtime must understand its semantics:
 - In binding templates, `$` is the **instance-name placeholder**. This is a
   different syntax from the type-expression `$param`: binding templates are not
   type expressions.
-- `impl` may be written inside a `subtype`, taking effect only for that subtype
-  (replacing the `subtype`/`condition` of the old bindings). A subtype impl
-  *adds* bindings; contributing a binding name that the type-level impl already
-  declares is an error (§10, check 8).
+- `impl` is declared on the type and applies to every instance.
 - `Localised`/`HasIcon` replace `bindings/localisation.json` and
   `bindings/sprite.json`; `Callable` replaces `dynamic_definition` and
   `token_definitions` (its `$param$` arguments are handled uniformly by
   `Callable`); `ModifierSource` replaces the 22 `type:X → [modifier]` rows of
-  profile `semantic_context_inheritance` and makes `ref<impl ModifierSource>`
-  usable. `ModifierSource` declares no `requires`: the legacy
-  `semantic_context_inheritance` types carry their modifier fields directly in
-  the body, not behind a `modifier` sub-block.
+  profile `semantic_context_inheritance`. Modifier diagnostics consult its type
+  implementations directly. References name concrete types and optional explicit
+  subtypes. A `Callable` implementation supplies the body schema; its trait
+  identity enables scripted-call argument processing and replay.
+
+Callable arguments substitute text before runtime branches execute. Every
+`$param$` occurrence outside a `[[param] ... ]` activation chunk is required,
+including occurrences embedded in a word such as `PREFIX_$param$_END` and
+occurrences inside ordinary `if`/`else` blocks. Activation chunks are selected
+by parameter presence; inactive chunks do not demand their substitutions.
+Constraints apply to the rendered token and use the invocation's scope.
+An unprotected forwarding substitution is still required even when the callee
+uses that argument only in an activation chunk. Protect the entire forwarding
+call to make omission valid. Presentation-only blocks do not exempt textual
+substitutions from this requirement.
+
+Symbol indexing records syntactic writes and references inside presentation-only
+blocks, including quoted Callable payloads. These declarations support navigation
+and rename; they do not imply that the preview executes. Scalar scope alternatives
+match only actual scope expressions and must not suppress other typed references.
+An enum fallback also retains navigation when an earlier reference branch resolves
+to an installed symbol. Resolved overlapping reference branches retain their
+indexed targets, including overlapping subtypes of the same namespace. A scalar
+fallback does not create an unresolved reference. Unknown-scope overloads keep
+all scope alternatives for validation while collecting references only from
+value domains that match.
+
+A quoted script supplied to a parameter must be valid at every distinct active
+usage of that parameter. Overloads at the same source usage and scope are
+alternatives; different usages impose simultaneous constraints. A bare spliced
+fragment does not repeat the enclosing block's mandatory keys, while complete
+blocks created inside that fragment retain their own structural requirements.
 
 **Trait vs mixin.** Define something as a trait only if at least one holds:
 (a) the engine/IDE handles it uniformly (hover, localisation checks, call
@@ -494,18 +520,17 @@ argument derivation); (b) it appears in type constraints. Otherwise use a
 mixin.
 
 **Anti-over-design constraints.** There is no trait inheritance. A type may
-impl a given trait only once (type-level and all subtype-level impls together,
-§10, check 8). Everything is expanded to flat data at compile time; the runtime
-does no dynamic dispatch.
+impl a given trait only once at the type level. Everything is expanded to
+flat data at compile time; the runtime does no dynamic dispatch.
 
 ## 8. Scopes
 
 ```jsonc
 "scopes": {
-  "types":     ["country", "province", "trade_node", "unit", "monarch", "heir", "consort",
+  "types":     ["country", "province", "unit", "monarch", "heir", "consort",
                 "mercenary_company", "rebel_faction", "religion", "culture", "advisor", "leader",
                 "trade_company", "global", "none"],
-  "registers": { "root": {}, "this": {}, "prev": { "chain": true }, "from": { "chain": true } },
+  "registers": { "root": { "role": "root" }, "this": { "role": "current" }, "prev": { "role": "previous", "chain": true }, "from": { "role": "from", "chain": true } },
   "links": {
     "owner":      { "from": ["province", "unit"], "to": "country" },
     "controller": { "from": ["province"], "to": "country" },
@@ -514,12 +539,14 @@ does no dynamic dispatch.
     "event_target:{ref<event_target>}":        { "from": ["any"], "to": "any" },
     "global_event_target:{ref<global_event_target>}": { "from": ["any"], "to": "any" }
   },
-  "compat": [{ "actual": "trade_node", "expected": "province" }]
+  "compat": []
 }
 ```
 
+- EU4 trade-node execution uses `province` everywhere, including node iterators, named-node scope blocks, and trading-policy registers. `trade_node` remains a symbol namespace for definitions and `ref<trade_node>`; it is not a scope type or an alias.
 - `any` is a reserved word meaning *any scope*; it never appears in `types`.
-- `registers.chain` means the register concatenates (`prev_prev`, `fromfrom`,
+- `registers.role` is required: `root`, `current`, `previous`, or `from` selects the runtime state slot. Register spellings are arbitrary; the runtime never infers the role from a name.
+- `registers.chain` is allowed only for `previous` and `from` roles. It means the register concatenates (`prev_prev`, `fromfrom`,
   …), replacing the hard-coded list in `dynamic_rules.rs` and the hand-written
   `prev_prev` entries in `scope_names`.
 - Link keys may be templates (§2), replacing `dynamic_scope_prefixes`;
@@ -527,6 +554,10 @@ does no dynamic dispatch.
   (`'variable:{ref<variable>}'`).
 - `scope_completions` is derived from registers + types and is no longer
   written by hand.
+- A `THIS = { ... }` block keeps the current scope. It does not erase scope
+  constraints or push another previous-scope entry. In a Callable body,
+  `add_prestige = 1 THIS = { change_province_name = "X" }` therefore has a
+  conflicting country/province entry requirement.
 
 The scope effect on a rule is one field, and it has **only the object form**
 (no string shorthand, eliminating the ambiguity of `"scope": "country"`):
@@ -538,10 +569,10 @@ The scope effect on a rule is one field, and it has **only the object form**
 `in` replaces `allowed_scopes` (default: any), `push` replaces `push_scope`,
 and `set` replaces `replace_scope` together with `TypeRootScope`. All values of
 `in`/`push`/`set`, and the keys of `set`, MUST be declared scope types, `any`
-(for the values) or declared registers (for the keys) — §10, check 6.
+(for the values) or declared registers (for the keys) — §10, check 5.
 
-Scope-switch blocks in trigger/effect schemas are no longer written row by
-row; one pattern describes them uniformly:
+Context-neutral scope-switch blocks in trigger/effect schemas share one
+pattern:
 
 ```jsonc
 "trigger": { "patterns": [ { "key": "link", "body": "self", "card": "0..*" } ] }
@@ -552,8 +583,19 @@ the runtime checks the current scope against `from` and pushes the `to` scope.
 Scalar triggers that share a link's name (such as `controller = ROOT`) stay in
 `fields` as ordinary exact fields: by the §3 lookup rules the scalar shape hits
 the exact field and the block shape falls through to the `link` pattern. The
-pure-link part of the existing 540 trigger/effect rows with `push_scope` is
-folded into `scopes.links` by the conversion.
+pure-link rows with identical trigger/effect semantics are folded into
+`scopes.links` by the conversion. Context-specific blocks retain explicit
+fields with `body`, `scope.in` and `scope.push`. In EU4, `any_*` belongs to
+trigger/limit; effects use `every_*` or `random_*`. For example:
+
+```jsonc
+"trigger": { "fields": { "any_country": {
+  "body": "self", "card": "0..*", "scope": { "push": "country" }
+} } }
+```
+
+This field is inherited only with the trigger vocabulary. It does not make
+`any_country` a globally available link or an effect key.
 
 ## 9. Control flow
 
@@ -569,7 +611,7 @@ attributes on field specifications, written in the mixins of
   "limit":          { "body": "trigger", "card": "0..1", "control": { "kind": "guard" } },
   "random_list":    { "map": { "key": "int", "body": "self" }, "card": "0..*", "control": { "kind": "weighted" } },
   "random":         { "body": "random_body", "card": "0..1", "control": { "kind": "chance" } },       // random_body = self + chance field
-  "trigger_switch": { "body": "trigger_switch_body", "card": "0..1", "control": { "kind": "switch", "on": "on_trigger" } },
+  "trigger_switch": { "body": "trigger_switch_body", "card": "0..1", "control": { "kind": "switch", "on": "on_trigger", "selector_schema": "trigger" } },
   "hidden_effect":  { "body": "self", "card": "0..*", "control": { "kind": "transparent" } },
   "tooltip":        { "body": "self", "card": "0..1", "control": { "kind": "display_only" } }
 }}}
@@ -583,8 +625,9 @@ previously hard-coded behaviour:
 | `branch` / `branch_continue` | if chain: `chain` lists the sibling keys that may follow; `guard` names the guard sub-block | the if-chain lints in `lints.rs`, `diagnostics.rs`, `hir/model.rs` |
 | `guard` | Guard sub-block; its body is in trigger context | the `limit` handling in `diagnostics.rs` / `dynamic_rules.rs` |
 | `logic` | `AND`/`OR`/`NOT`, carrying `"op"`; scope-transparent; the `NOT` multi-condition lint is driven by `op` | the `NOT` lints in `lints.rs`, `transparent_scope_wrappers` |
+| `constant` | A scalar boolean predicate whose result equals its value; logic folding uses only these declared predicates | the name-based `always` constant-condition lint |
 | `weighted` / `chance` | Weighted branches with values as keys / probability block | the `random`/`random_list` handling in `diagnostics.rs` |
-| `switch` | Branch keys are *legal values of the trigger named by the `on` field*: the runtime reads the `on_trigger` value, looks up that key's scalar field in the trigger schema, and validates each branch key with its value matcher; branch bodies are `self`. This behaviour is fully implemented by the `kind` and needs no extra expression syntax | the `trigger_switch` handling in `diagnostics.rs` |
+| `switch` | Branch keys are *legal values of the predicate named by the `on` field*: `on` and an explicit `selector_schema` are required. The runtime finds the selected scalar field in that schema and validates each branch key with its value matcher; branch bodies follow the field's body declaration. `selector_schema` cannot be `self` and is only valid for `switch` | the `trigger_switch` handling in `diagnostics.rs` |
 | `transparent` | Scope-transparent wrapper | `transparent_scope_wrappers` |
 | `display_only` | Affects presentation only; not executed | the `tooltip` handling in `diagnostics.rs` |
 
@@ -592,6 +635,12 @@ previously hard-coded behaviour:
 flow; those are ordinary fields (`"body": "trigger"`, `"body": "mtth"`). The
 corresponding hard-coding disappears naturally with the tree-shaped IR.
 `control_flow_keys` is derived from the fields that carry `control`.
+
+`constant` preserves a scalar `bool` matcher and adds no schema instances or template expansion.
+EU4 declares it on `always`; ordinary boolean predicates such as `is_capital` are not constants.
+Three local Vanilla uses are `common/scripted_triggers/00_scripted_triggers_estates.txt:97`,
+`common/scripted_triggers/02_scripted_triggers_for_mission_conditions.txt:154`, and
+`decisions/England.txt:143`. It has no effect on the 64-instance limit.
 
 ## 10. Infrastructure
 
@@ -613,29 +662,17 @@ trigger conditions are exhaustive with respect to the check's scope.
    error. Within `patterns`, a later pattern fully covered by an earlier
    pattern — key expression and shape structurally identical — is an error.
    The test is conservative: structural equivalence only.
-4. **Parameterisation.** A formal parameter may appear only in an `arg`
-   position of a type expression or as an actual argument of another
+4. **Parameterisation.** A formal parameter may appear only in a type expression or as an actual
+   argument of another
    parameterised schema. Only one level of parameters is allowed: an actual
    argument may only be a concrete name or the formal parameter of the
    enclosing parameterised schema. Each parameterised schema is limited to 64
    instances; exceeding the limit is an error.
-5. **Subtype `when` dependency.** A field read by any `when` predicate MUST NOT
-   itself carry `when`/`unless`; violation is an error. Undefined field names
-   read by a `when`, and undefined names inside the predicate's value
-   expressions, fall under check 1.
-6. **Scope link `from` mismatch.** The `from`/`to` of links, the
+5. **Scope link `from` mismatch.** The `from`/`to` of links, the
    `actual`/`expected` of compat entries, and the values of `scope.in`,
    `scope.push`, and `scope.set` MUST be declared scope types or `any`. The
    keys of `scope.set` MUST be declared registers. `from` MUST NOT be empty.
    Violation is an error.
-7. **Unsatisfied trait `requires`.** When a type impls a trait, that trait's
-   `requires` conditions (for example `{ "include": "modifier_block" }`) MUST
-   hold on the schema used at the type's `def` position; if they do not, it is
-   an error.
-8. **Duplicate trait binding.** A type may implement a trait at its own level
-   and again per subtype (§7.3), but a binding name may be contributed only
-   once: a subtype impl redeclaring a type-level binding is an error.
-
 ### 10.2 JSON Schema
 
 A JSON Schema artifact is generated by `schemars` from the Rust source types
@@ -647,8 +684,17 @@ precise validation is `rulec`'s job (an accepted trade-off).
 
 - `rulec check` runs parsing and semantic checks over a rule source directory
   and prints diagnostics as text. Editors may call it directly.
-- `rulec fmt` writes the canonical form: normalised formatting, omitted
-  defaults, sorted fields. (Not implemented at this stage.)
+- `rulec fmt <source-dir>` writes the canonical form of the declared language
+  source files: two-space JSON, sorted object keys, and omitted defaults.
+  It preserves overload, pattern, and enum-member order, declaration names,
+  literal values, and schema shorthands. Configuration files are not rewritten.
+- `rulec fmt <source-dir> --expanded` mechanically spells out defaults on the
+  source structures. Absent optional mechanisms remain `null`; required
+  `card` values are retained. It does not expand mixins or monomorphise schemas.
+- `--check` may be combined with either formatting mode: it reports files
+  requiring changes and exits non-zero without writing. Parsing and rendering
+  of the entire bundle finish before a write begins, so invalid JSON in a later
+  source file does not leave earlier files partially formatted.
 
 ### 10.4 Provenance
 
@@ -656,11 +702,35 @@ The compiler generates provenance — source file + JSON pointer — for every
 compiled field. Rule sources MUST NOT hand-write `id`/`source_file`/`line`
 metadata; provenance is derived, never authored.
 
+### 10.5 Installation configuration
+
+`game.json` MAY carry an `install` object, independent of the script language.
+The first-party game package requires it and compiles it into its installation
+descriptor at build time. The executable markers, validation directories,
+launcher directory names, and optional Steam identity come only from this data;
+platform discovery remains a generic mechanism.
+
+```json
+{ "install": {
+  "display_name": "Example Game",
+  "executable_paths": { "windows": ["game.exe"], "linux": ["game"], "macos": [] },
+  "validation_directories": ["common"],
+  "installation_directory_names": ["Example Game"],
+  "steam_app_id": null
+} }
+```
+
+The object and its platform-path object reject unknown keys. All fields except
+`steam_app_id` are required; an unsupported platform uses an explicit empty
+list. The descriptor shares the enclosing `game_id` instead of declaring it
+again. Installation data participates in artifact identity, without supplying
+script keys, scopes, definitions or references.
+
 ## 11. Diagnostics summary
 
 | Diagnostic | Severity | Trigger |
 |---|---|---|
-| Parse error | error | An illegal identifier or number; a range after a primitive other than `int`/`float`; non-whole `int` bounds or a lower bound above its upper bound; an invalid escape; an unterminated literal or hole; an invalid `arg`; an empty union branch; a union mixing scalar and quoted branches (§2); a malformed link-key template, schema reference, `card`, `def` name, or enum column declaration; a missing `card`; a `script` files entry without `root`; a `map` without exactly one of `value`/`body`; a trait binding without exactly one of `loc`/`sprite` |
+| Parse error | error | An illegal identifier or number; a range after a primitive other than `int`/`float`; non-whole `int` bounds or a lower bound above its upper bound; an invalid escape; an unterminated literal or hole; an invalid `arg`; an empty union branch; a union mixing scalar and quoted branches (§2); a malformed link-key template, schema reference, `card`, or `def` name; a missing `card`; a `script` files entry without `root`; a `map` without exactly one of `value`/`body`; a trait binding without exactly one of `loc`/`sprite` |
 | `CardLint` | warning / info | `card` is `0..0` (warning: disables the field rather than bounding it), `N..N` (info: a fixed-length tuple better written as `list` plus the arity), or two overloads of one key disagree on the upper bound (info) |
 | `DuplicateName` | error | A schema, mixin, type, enum, trait, files entry, or scope declaration is defined twice across sources (§1) |
 | `UndefinedReference` | error | A referenced schema, type, enum, mixin, or trait is not defined (check 1) |
@@ -668,7 +738,33 @@ metadata; provenance is derived, never authored.
 | `IncludeConflict` | error | Two mixins, or a mixin and the schema, declare the same key without an `"override": true` schema field; or two mixins conflict (check 2) |
 | `UnreachableOverload` | error | A same-key same-shape overload, or a later pattern, is fully shadowed (check 3) |
 | `ParameterError` | error | A formal parameter out of position; more than one parameter level; more than 64 instances of one parameterised schema (check 4) |
-| `SubtypeWhenDependency` | error | A field read by a `when` predicate carries `when`/`unless` (check 5) |
-| `ScopeReferenceError` | error | A links/compat/scope-effect value or `set` key is not a declared scope type, `any`, or register; or a link `from` is empty (check 6) |
-| `UnsatisfiedTraitRequirement` | error | A trait's `requires` does not hold at the type's `def` position (check 7) |
-| `DuplicateTraitImpl` | error | A type-level impl and a subtype impl of one trait contribute the same binding name (check 8) |
+| `ScopeReferenceError` | error | A links/compat/scope-effect value or `set` key is not a declared scope type, `any`, or register; or a link `from` is empty (check 5) |
+
+### 10.6 Structured mission-view capability
+
+`game.json.mission_view` declares the first supported structured view. It is
+optional: an absent capability disables mission diagnostics and preview, regardless
+of `game_id`. This is a concrete mission model, not a general tree-view DSL.
+
+- `path`: profile text matcher selecting the view's logical files.
+- `symbol_kind`: declared node type used for workspace references and title bindings.
+- `tree_fields`: script spellings for `slot`, `generic`, `ai`, `has_country_shield`,
+  `potential`, and `potential_on_load` roles.
+- `node_fields`: script spellings for `icon`, `type`, `provinces_to_highlight`,
+  `required_missions`, `position`, `completed_by`, `trigger`, and `effect` roles.
+- `tree_field_order` / `node_field_order`: each role MUST appear exactly once.
+
+Field spellings MUST be nonempty and unique within each level. Unknown members,
+incomplete or duplicate orders, and an undeclared `symbol_kind` reject the bake.
+The game package exposes this through its mission-view capability interface;
+engine and IDE do not branch on the game identity. Generic graph assembly, stable
+cycle detection, field ordering and block replacement live in the engine. Grid
+geometry and layout validation remain in the game package.
+
+Persistent semantic indexes carry SQLite schema 24 and an analyzer build stamp.
+Persistent syntax frontends likewise use schema 7 and the build stamp; obsolete
+frontends are ordinary misses and reparse from source.
+The stamp covers analyzer source, embedded rule data, dependency lock, compiler,
+target and compilation settings. A stamp mismatch requires regeneration; failed
+regeneration refuses the stale shards. Rule and IR hashes remain report metadata,
+independent of the invalidation decision.

@@ -1,14 +1,12 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
 use engine::{AnalysisSnapshot, Definition, DocumentId, DocumentSource, Reference, SourceFileId};
-use hir::{HirFile, HirReference, HirReferenceOrigin};
-use rules::{KeyMatcher, RuleShape};
+use hir::{HirFile, HirReference};
 #[cfg(test)]
 use std::cell::Cell;
 use text::{LogicalPath, TextRange, TextSize};
 
-use crate::completion::{SemanticCompletionContext, infer_dynamic_quoted_script_constraints};
 use crate::quoted_script::{QuotedScriptParse, QuotedScriptSession};
 use crate::semantic::*;
 use crate::support::*;
@@ -124,43 +122,7 @@ fn semantic_data_with_cancellation_uncached(
         collect_quoted_semantics(snapshot, input, &mut data, cancellation)?;
         return Ok(data);
     };
-    if hir.uses_ir() {
-        for definition in hir.definitions() {
-            cancellation.checkpoint()?;
-            data.definitions.push(make_definition(
-                input,
-                &definition.kind,
-                definition.name.clone(),
-                definition.range,
-                definition.selection_range,
-            ));
-        }
-        for reference in hir.references() {
-            cancellation.checkpoint()?;
-            data.references.push(ReferenceInternal {
-                kind: reference.kind.to_string(),
-                name: reference.name.clone(),
-                range: reference.range,
-                document: input.document.clone(),
-                file: input.file,
-                path: input.path.clone(),
-            });
-        }
-        return Ok(data);
-    }
-    // The inactive-range set is only consulted for first-party semantic references; skip building
-    // it entirely when this file has none, keeping semantic_data O(references + definitions).
-    let has_semantic_references = hir.references().iter().any(|reference| {
-        matches!(
-            reference.origin,
-            HirReferenceOrigin::Semantic | HirReferenceOrigin::SemanticTyped
-        )
-    });
-    let inactive_semantic_references = if has_semantic_references {
-        inactive_semantic_reference_ranges(snapshot, hir)
-    } else {
-        BTreeSet::new()
-    };
+
     for definition in hir.definitions() {
         cancellation.checkpoint()?;
         data.definitions.push(make_definition(
@@ -171,44 +133,14 @@ fn semantic_data_with_cancellation_uncached(
             definition.selection_range,
         ));
     }
-    for reference in hir
-        .references()
-        .iter()
-        .filter(|reference| {
-            matches!(
-                reference.origin,
-                HirReferenceOrigin::Profile
-                    | HirReferenceOrigin::Semantic
-                    | HirReferenceOrigin::SemanticTyped
-                    | HirReferenceOrigin::DynamicDefinition
-                    | HirReferenceOrigin::DerivedLocalisation
-                    | HirReferenceOrigin::DerivedSprite
-            )
-        })
-        .filter(|reference| semantic_reference_is_active(&inactive_semantic_references, reference))
-        .filter(|reference| dynamic_reference_is_callable(snapshot, hir, reference))
-        .filter(|reference| {
-            !matches!(
-                reference.kind.to_ascii_lowercase().as_str(),
-                "scripted_effect" | "scripted_trigger"
-            ) || !reference
-                .name
-                .chars()
-                .any(|character| character.is_whitespace() || matches!(character, '=' | '{' | '}'))
-        })
-        .filter(|reference| {
-            reference.origin != HirReferenceOrigin::DynamicDefinition
-                || workspace_member(snapshot, &reference.kind, &reference.name)
-        })
-        .filter(|reference| {
-            reference.origin != HirReferenceOrigin::SemanticTyped
-                || workspace_member(snapshot, &reference.kind, &reference.name)
-        })
-    {
+    for reference in hir.references() {
         cancellation.checkpoint()?;
+        if !ir_reference_is_callable(snapshot, hir, reference) {
+            continue;
+        }
         data.references.push(ReferenceInternal {
             kind: reference.kind.to_string(),
-            name: reference.name.to_string(),
+            name: reference.name.clone(),
             range: reference.range,
             document: input.document.clone(),
             file: input.file,
@@ -216,84 +148,7 @@ fn semantic_data_with_cancellation_uncached(
         });
     }
     collect_quoted_semantics(snapshot, input, &mut data, cancellation)?;
-    collect_inferred_typed_references(
-        snapshot,
-        hir,
-        input,
-        &mut data,
-        &inactive_semantic_references,
-        has_semantic_references,
-    );
     Ok(data)
-}
-
-/// Recovers the typed references the HIR lowering refused to emit for
-/// multi-kind value positions (`add_country_modifier`'s `name` accepts both
-/// `event_modifier` and `static_modifier`). Membership disambiguates a
-/// concrete value to one kind, which is exactly what navigation and the
-/// localisation preview need; ambiguous or unknown values keep the HIR
-/// lowering's no-reference behavior. Skips ranges already referenced and
-/// ranges inside type-invalid containers, so the added references never
-/// contradict the diagnostics and never stack on an existing interpretation.
-fn collect_inferred_typed_references(
-    snapshot: &AnalysisSnapshot,
-    hir: &HirFile,
-    input: &ParsedInput,
-    data: &mut SemanticFile,
-    inactive_semantic_references: &BTreeSet<text::TextRange>,
-    has_semantic_references: bool,
-) {
-    for property in hir.properties() {
-        let Some(scalar) = property.scalar.as_ref() else {
-            continue;
-        };
-        if scalar.quoted
-            || scalar.value.is_empty()
-            || scalar.value.contains('$')
-            || scalar.value.eq_ignore_ascii_case("yes")
-            || scalar.value.eq_ignore_ascii_case("no")
-        {
-            continue;
-        }
-        // Typed membership only ever matches identifiers or province ids, so
-        // anything else (numbers, dates, arithmetic) cannot win a kind and is
-        // skipped before the rule scan.
-        let value = scalar.value.as_bytes();
-        let identifier = value
-            .iter()
-            .any(|byte| byte.is_ascii_alphabetic() || *byte == b'_');
-        if !identifier && !value.iter().all(|byte| byte.is_ascii_digit()) {
-            continue;
-        }
-        if data
-            .references
-            .iter()
-            .any(|reference| reference.range == scalar.range)
-        {
-            continue;
-        }
-        if has_semantic_references && inactive_semantic_references.contains(&scalar.range) {
-            continue;
-        }
-        let Some(kind) = crate::semantic::semantic_inferred_typed_kind(
-            snapshot,
-            hir,
-            property.key_range,
-            &property.key,
-            &scalar.value,
-            property.operator.as_deref(),
-        ) else {
-            continue;
-        };
-        data.references.push(ReferenceInternal {
-            kind,
-            name: scalar.value.clone(),
-            range: scalar.range,
-            document: input.document.clone(),
-            file: input.file,
-            path: input.path.clone(),
-        });
-    }
 }
 
 fn collect_quoted_semantics(
@@ -305,506 +160,202 @@ fn collect_quoted_semantics(
     if input.format != parser::FileFormat::Script {
         return Ok(());
     }
-    let ParsedContent::Text(parsed) = &input.parsed;
-    let mut quoted_scripts = QuotedScriptSession::new(cancellation);
-    let mut collector = QuotedSemanticCollector {
+
+    collect_ir_callable_payload_semantics(
         snapshot,
         input,
         data,
-        quoted_scripts: &mut quoted_scripts,
+        &mut QuotedScriptSession::new(cancellation),
+        0,
+    )?;
+    // Sort only after every quoted layer has mapped its appended ranges.
+    // Reordering the shared vector during recursion invalidates those slices.
+    data.references.sort_by(|left, right| {
+        (&left.kind, &left.name, left.range).cmp(&(&right.kind, &right.name, right.range))
+    });
+    data.references.dedup_by(|left, right| {
+        left.kind == right.kind && left.name == right.name && left.range == right.range
+    });
+    Ok(())
+}
+
+fn collect_ir_callable_payload_semantics(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    data: &mut SemanticFile,
+    session: &mut QuotedScriptSession<'_>,
+    depth: usize,
+) -> Result<(), Cancelled> {
+    let Some(hir) = input.hir.as_deref() else {
+        return Ok(());
     };
-    for root in script_properties(input, parsed.root()) {
-        collector.quoted_scripts.cancellation().checkpoint()?;
-        let Some(context) = semantic_root_context(snapshot, &root.key, input.path.as_ref()) else {
+    for invocation in hir.properties() {
+        session.cancellation().checkpoint()?;
+        let Some(fact) = hir.field_fact_at(invocation.key_range) else {
             continue;
         };
-        let scope = semantic_initial_scope(snapshot, input, &context, &root.key, root.key_range);
-        collector.collect(QuotedSemanticContainer {
-            context: &context,
-            parent_path: &[],
-            scope: &scope,
-            properties: &root.block,
-            embedded: false,
-            container_key: None,
-            container_property: None,
-            quoted_depth: 0,
-        })?;
+        let Some(kind) = fact.fields.iter().find_map(|id| {
+            crate::ir_callable::callable_kind(snapshot.ir(), snapshot.ir().field(*id).key)
+        }) else {
+            continue;
+        };
+        let mut arguments = hir
+            .properties_in_range(invocation.range)
+            .filter(|argument| {
+                invocation.range.start() < argument.range.start()
+                    && argument.range.end() <= invocation.range.end()
+                    && argument.path.len() == invocation.path.len() + 1
+                    && argument.scalar.as_ref().is_some_and(|scalar| scalar.quoted)
+            })
+            .peekable();
+        if arguments.peek().is_none() {
+            continue;
+        }
+        let bindings = crate::ir_callable::invocation_bindings(hir, invocation);
+        for argument in arguments {
+            let scalar = argument.scalar.as_ref().expect("quoted argument");
+            let sites = crate::ir_callable::parameter_symbol_sites(
+                snapshot,
+                &kind,
+                &invocation.key,
+                &argument.key,
+                &bindings,
+                crate::ir_callable::invocation_state(hir, invocation),
+                session.cancellation(),
+            )?;
+            if !sites
+                .iter()
+                .any(|site| matches!(site.domain, crate::ir_callable::Domain::Payload { .. }))
+            {
+                continue;
+            }
+            let Some(raw) = input.source_text(scalar.range) else {
+                continue;
+            };
+            let QuotedScriptParse::Parsed(script) = session.parse(raw, depth)? else {
+                continue;
+            };
+            let definition_start = data.definitions.len();
+            let reference_start = data.references.len();
+            for site in sites {
+                let crate::ir_callable::Domain::Payload { schema, .. } = site.domain else {
+                    continue;
+                };
+                let fragment = hir::lower_ir_schema(
+                    Arc::new(script.parsed().clone()),
+                    snapshot.ir(),
+                    schema,
+                    Default::default(),
+                    site.state,
+                    &crate::ir_queries::SnapshotSymbolFacts { snapshot },
+                );
+                let mut nested = input.clone();
+                nested.source = Arc::from(script.parsed().source());
+                nested.parsed = ParsedContent::Text(Arc::new(script.parsed().clone()));
+                nested.hir = Some(Arc::new(fragment));
+                for definition in nested.hir.as_deref().unwrap().definitions() {
+                    data.definitions.push(make_definition(
+                        &nested,
+                        &definition.kind,
+                        definition.name.clone(),
+                        definition.range,
+                        definition.selection_range,
+                    ));
+                }
+                for reference in nested.hir.as_deref().unwrap().references() {
+                    if !ir_reference_is_callable(
+                        snapshot,
+                        nested.hir.as_deref().unwrap(),
+                        reference,
+                    ) {
+                        continue;
+                    }
+                    data.references.push(ReferenceInternal {
+                        kind: reference.kind.to_string(),
+                        name: reference.name.clone(),
+                        range: reference.range,
+                        document: input.document.clone(),
+                        file: input.file,
+                        path: input.path.clone(),
+                    });
+                }
+                collect_ir_callable_payload_semantics(snapshot, &nested, data, session, depth + 1)?;
+            }
+            let map = |range| {
+                script
+                    .source_map()
+                    .decoded_range(range)
+                    .and_then(|relative| {
+                        TextRange::new(
+                            scalar.range.start().checked_add(relative.start())?,
+                            scalar.range.start().checked_add(relative.end())?,
+                        )
+                    })
+            };
+            for definition in &mut data.definitions[definition_start..] {
+                definition.symbol.range = map(definition.symbol.range).unwrap_or(scalar.range);
+                definition.symbol.selection_range =
+                    map(definition.symbol.selection_range).unwrap_or(scalar.range);
+                definition.symbol.location.range =
+                    map(definition.symbol.location.range).unwrap_or(scalar.range);
+            }
+            for reference in &mut data.references[reference_start..] {
+                reference.range = map(reference.range).unwrap_or(scalar.range);
+            }
+        }
     }
     Ok(())
 }
 
-struct QuotedSemanticCollector<'snapshot, 'input, 'data, 'session, 'cancel> {
-    snapshot: &'snapshot AnalysisSnapshot,
-    input: &'input ParsedInput,
-    data: &'data mut SemanticFile,
-    quoted_scripts: &'session mut QuotedScriptSession<'cancel>,
-}
-
-struct QuotedSemanticContainer<'a> {
-    context: &'a str,
-    parent_path: &'a [std::sync::Arc<str>],
-    scope: &'a ScopeContext,
-    properties: &'a [ScriptProperty],
-    embedded: bool,
-    container_key: Option<&'a str>,
-    container_property: Option<&'a ScriptProperty>,
-    quoted_depth: usize,
-}
-
-impl QuotedSemanticCollector<'_, '_, '_, '_, '_> {
-    fn collect(&mut self, container: QuotedSemanticContainer<'_>) -> Result<(), Cancelled> {
-        for property in container.properties {
-            self.quoted_scripts.cancellation().checkpoint()?;
-            if container.embedded {
-                collect_embedded_property_semantics(
-                    EmbeddedSemanticInput {
-                        snapshot: self.snapshot,
-                        input: self.input,
-                        data: self.data,
-                    },
-                    container.context,
-                    container.parent_path,
-                    container.scope,
-                    container.container_key,
-                    property,
-                );
-            }
-            if property.block_range.is_none()
-                && let Some(origin) = property.quoted_source.as_ref()
-                && let Some(invocation) = container.container_property
-            {
-                let inference_context = SemanticCompletionContext {
-                    context: container.context.to_owned(),
-                    parent_path: container.parent_path.to_vec(),
-                    structural_containers: Vec::new(),
-                    alternative_containers: Vec::new(),
-                    existing_keys: Vec::new(),
-                    dynamic_inferred: false,
-                    scope: container.scope.clone(),
-                    container_property: Some(invocation.clone()),
-                    property: Some(property.clone()),
-                    quoted_depth: container.quoted_depth,
-                    embedded_value_context: None,
-                    wrapper_container: false,
-                    root_entry_container: false,
-                };
-                let inferred = infer_dynamic_quoted_script_constraints(
-                    self.snapshot,
-                    &inference_context,
-                    property,
-                    self.quoted_scripts.cancellation(),
-                )?;
-                if !inferred.is_empty() {
-                    if let QuotedScriptParse::Parsed(script) = self
-                        .quoted_scripts
-                        .parse(origin.source(), container.quoted_depth)?
-                    {
-                        let (quoted_properties, _) = quoted_script_container(&script, origin);
-                        for site in inferred {
-                            self.collect(QuotedSemanticContainer {
-                                context: &site.context,
-                                parent_path: &site.parent_path,
-                                scope: &site.scope,
-                                properties: &quoted_properties,
-                                embedded: true,
-                                container_key: None,
-                                container_property: None,
-                                quoted_depth: container.quoted_depth.saturating_add(1),
-                            })?;
-                        }
-                    }
-                    continue;
-                }
-            }
-            let transparent = container.context.eq_ignore_ascii_case("trigger")
-                && self
-                    .snapshot
-                    .game_profile()
-                    .is_transparent_scope_wrapper(&property.key);
-            let matching = semantic_rules_for_container_key(
-                self.snapshot,
-                container.context,
-                container.parent_path,
-                &property.key,
-            )
-            .into_iter()
-            .filter(|rule| {
-                !matches!(rule.shape, RuleShape::LeafValue)
-                    && semantic_rule_key_matches(
-                        self.snapshot,
-                        rule,
-                        container.parent_path,
-                        &property.key,
-                    )
-            })
-            .collect::<Vec<_>>();
-            let Some(selected) = semantic_selected_transition(SemanticTransitionInput {
-                snapshot: self.snapshot,
-                matching: &matching,
-                selected_alternative: None,
-                context: container.context,
-                parent_path: container.parent_path,
-                property,
-                scope: container.scope,
-                transparent_wrapper: transparent,
-            }) else {
-                continue;
-            };
-            let (next_context, next_path) = semantic_transition_destination(
-                selected,
-                container.context,
-                container.parent_path,
-                &property.key,
-                transparent,
-            );
-            let next_scope = semantic_child_scope(self.snapshot, container.scope, selected);
-            if matches!(selected.shape, rules::RuleShape::QuotedScript) {
-                let Some(origin) = property.quoted_source.as_ref() else {
-                    continue;
-                };
-                let QuotedScriptParse::Parsed(script) = self
-                    .quoted_scripts
-                    .parse(origin.source(), container.quoted_depth)?
-                else {
-                    continue;
-                };
-                let (quoted_properties, _) = quoted_script_container(&script, origin);
-                self.collect(QuotedSemanticContainer {
-                    context: &next_context,
-                    parent_path: &next_path,
-                    scope: &next_scope,
-                    properties: &quoted_properties,
-                    embedded: true,
-                    container_key: None,
-                    container_property: None,
-                    quoted_depth: container.quoted_depth.saturating_add(1),
-                })?;
-            } else if property.block_range.is_some() {
-                self.collect(QuotedSemanticContainer {
-                    context: &next_context,
-                    parent_path: &next_path,
-                    scope: &next_scope,
-                    properties: &property.block,
-                    embedded: container.embedded,
-                    container_key: Some(&property.key),
-                    container_property: Some(property),
-                    quoted_depth: container.quoted_depth,
-                })?;
-            }
-        }
-        Ok(())
-    }
-}
-
-struct EmbeddedSemanticInput<'a> {
-    snapshot: &'a AnalysisSnapshot,
-    input: &'a ParsedInput,
-    data: &'a mut SemanticFile,
-}
-
-fn collect_embedded_property_semantics(
-    source: EmbeddedSemanticInput<'_>,
-    context: &str,
-    parent_path: &[std::sync::Arc<str>],
-    scope: &ScopeContext,
-    container_key: Option<&str>,
-    property: &ScriptProperty,
-) {
-    let EmbeddedSemanticInput {
-        snapshot,
-        input,
-        data,
-    } = source;
-    if let Some((value, range)) = property.scalar.as_ref() {
-        if let Some(kind) = input.profile.reference_kind(&property.key)
-            && !value.is_empty()
-            && !value.eq_ignore_ascii_case("yes")
-            && !value.eq_ignore_ascii_case("no")
-            && value.parse::<f64>().is_err()
-        {
-            data.references
-                .push(embedded_reference(input, kind, value, *range));
-        }
-        if let Some(kind) = input
-            .profile
-            .value_definition_kind(&property.key, container_key)
-            && !value.is_empty()
-        {
-            data.definitions.push(make_definition(
-                input,
-                kind,
-                value.to_string(),
-                property.range,
-                *range,
-            ));
-        }
-        if !property.quoted
-            && semantic_rules_for_container_key(snapshot, context, parent_path, &property.key)
-                .iter()
-                .any(|rule| {
-                    matches!(rule.shape, RuleShape::Leaf)
-                        && matches!(rule.value, rules::ValueMatcher::Localisation)
-                        && semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
-                        && semantic_scope_allows(rule, scope)
-                        && semantic_property_matches(snapshot, rule, property, scope)
-                })
-        {
-            data.references
-                .push(embedded_reference(input, "localisation", value, *range));
-        }
-    }
-
-    for rule in semantic_rules_for_container_key(snapshot, context, parent_path, &property.key)
-        .into_iter()
-        .filter(|rule| {
-            semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
-                && semantic_scope_allows(rule, scope)
-        })
-    {
-        let type_name = match &rule.key {
-            KeyMatcher::Type(type_name) | KeyMatcher::Dynamic(type_name)
-                if dynamic_definition_type(snapshot, type_name) =>
-            {
-                type_name
-            }
-            _ => continue,
-        };
-        let Some(summary) = dynamic_definition_summary(snapshot, type_name, &property.key) else {
-            continue;
-        };
-        if dynamic_invocation_shape_matches(
-            snapshot,
-            type_name,
-            &summary,
-            property.scalar.as_ref().map(|(value, _)| value.as_ref()),
-            property.block_range.is_some(),
-        ) {
-            data.references.push(embedded_reference(
-                input,
-                type_name,
-                &property.key,
-                property.key_range,
-            ));
-            break;
-        }
-    }
-}
-
-fn embedded_reference(
-    input: &ParsedInput,
-    kind: &str,
-    name: &str,
-    range: TextRange,
-) -> ReferenceInternal {
-    ReferenceInternal {
-        kind: kind.to_owned(),
-        name: name.to_owned(),
-        range,
-        document: input.document.clone(),
-        file: input.file,
-        path: input.path.clone(),
-    }
-}
-
-fn dynamic_reference_is_callable(
+/// HIR records the declared key reference even when the invocation value is
+/// malformed. Navigation must apply the same scalar form and required-argument
+/// checks as diagnostics, using the actual compiled field rather than a legacy
+/// type descriptor.
+fn ir_reference_is_callable(
     snapshot: &AnalysisSnapshot,
     hir: &HirFile,
     reference: &HirReference,
 ) -> bool {
-    if reference.origin != HirReferenceOrigin::DynamicDefinition {
+    let ir = snapshot.ir();
+    let Some(property) = hir.property_at_key_range(reference.range) else {
+        return true;
+    };
+    let Some(fact) = hir.field_fact_at(property.key_range) else {
+        return true;
+    };
+    let fields = fact
+        .fields
+        .iter()
+        .filter(|id| {
+            crate::ir_callable::callable_kind(ir, ir.field(**id).key)
+                .is_some_and(|kind| kind.eq_ignore_ascii_case(&reference.kind))
+        })
+        .collect::<Vec<_>>();
+    if fields.is_empty() || property.scalar.is_none() {
         return true;
     }
-    dynamic_reference_range_is_callable(
-        snapshot,
-        hir,
-        &reference.kind,
-        &reference.name,
-        reference.range,
-    )
-}
-
-fn dynamic_reference_range_is_callable(
-    snapshot: &AnalysisSnapshot,
-    hir: &HirFile,
-    kind: &str,
-    name: &str,
-    range: TextRange,
-) -> bool {
-    let Some(summary) = dynamic_definition_summary(snapshot, kind, name) else {
-        return false;
-    };
-    let Some(property) = hir
-        .properties()
-        .iter()
-        .find(|property| property.key_range == range)
+    let Some(summary) = dynamic_definition_summary(snapshot, &reference.kind, &reference.name)
     else {
         return false;
     };
-    dynamic_invocation_shape_matches(
-        snapshot,
-        kind,
-        &summary,
-        property.scalar.as_ref().map(|scalar| scalar.value.as_str()),
-        property.scalar.is_none() && property.value_range.is_some(),
-    )
-}
-
-pub(crate) fn inactive_semantic_reference_ranges(
-    snapshot: &AnalysisSnapshot,
-    hir: &HirFile,
-) -> BTreeSet<TextRange> {
-    let mut inactive = BTreeSet::new();
-    let mut invalid_ancestors = Vec::<(Vec<String>, TextRange)>::new();
-    // Container rule sets are identical for every property in one (context, parent_path). Cache
-    // them per context and path so dynamic members (e.g. one container per mission) do not
-    // rebuild and re-filter the container rules for every property.
-    let mut cached_containers =
-        HashMap::<String, HashMap<Vec<String>, ContainerRuleCache<'_>>>::new();
-    for property in hir.properties() {
-        while invalid_ancestors.last().is_some_and(|(path, range)| {
-            !property.path.starts_with(path) || !text_range_within(property.range, *range)
-        }) {
-            invalid_ancestors.pop();
-        }
-        let own_invalid =
-            semantic_type_property_is_invalid(snapshot, hir, property, &mut cached_containers);
-        if (!invalid_ancestors.is_empty() || own_invalid)
-            && let Some(scalar) = property.scalar.as_ref()
-        {
-            inactive.insert(scalar.range);
-        }
-        if own_invalid {
-            invalid_ancestors.push((property.path.clone(), property.range));
-        }
-    }
-    inactive
-}
-
-/// One (context, parent_path) container's rule set, with derived fast-path indexes so the
-/// per-property validity check does not rescan the container rules for every property.
-pub(crate) struct ContainerRuleCache<'a> {
-    pub(crate) rules: Vec<&'a rules::SemanticRule>,
-    /// Lowercased keys of non-leaf exact rules; a property key in this set is valid by a concrete
-    /// match without scanning `rules`.
-    pub(crate) concrete_keys: HashSet<String>,
-    /// Whether any concrete non-leaf rule uses an `AnyScalar` matcher (matches every key).
-    pub(crate) any_scalar_concrete: bool,
-    /// Whether the container carries concrete non-leaf rules at all (enum/qualified matchers that
-    /// the key set cannot express still need the scan).
-    pub(crate) has_concrete: bool,
-    /// Whether the container carries `Type` matchers, the only rules the workspace check applies
-    /// to.
-    pub(crate) has_type: bool,
-}
-
-pub(crate) fn semantic_type_property_is_invalid<'a>(
-    snapshot: &'a AnalysisSnapshot,
-    hir: &HirFile,
-    property: &hir::HirProperty,
-    cached_containers: &mut HashMap<String, HashMap<Vec<String>, ContainerRuleCache<'a>>>,
-) -> bool {
-    if property.path.len() <= 1 {
+    if summary.parameters.iter().any(|parameter| {
+        crate::dynamic_rules::parameter_effectively_required(snapshot, &summary, parameter)
+    }) {
         return false;
     }
-    let Some(fact) = hir.scope_fact_at(property.key_range) else {
-        return false;
-    };
-    let fact_path: Vec<std::sync::Arc<str>> = fact
-        .parent_path
-        .iter()
-        .map(|segment| engine::intern_shard_string(segment))
-        .collect();
-    let by_path = match cached_containers.get_mut(fact.context.as_str()) {
-        Some(by_path) => by_path,
-        None => cached_containers.entry(fact.context.clone()).or_default(),
-    };
-    if !by_path.contains_key(fact.parent_path.as_slice()) {
-        // `semantic_rules_for_container` ignores its scope argument; build it once per container
-        // only so the caller does not allocate a scope context for every property.
-        let scope = scope_context_from_hir(snapshot.game_profile_handle(), &fact.state);
-        let rules = semantic_rules_for_container(snapshot, &fact.context, &fact_path, &scope);
-        let mut concrete_keys = HashSet::new();
-        let mut any_scalar_concrete = false;
-        let mut has_concrete = false;
-        let mut has_type = false;
-        for rule in &rules {
-            match &rule.key {
-                KeyMatcher::Type(_) | KeyMatcher::Template { .. } => has_type = true,
-                KeyMatcher::Dynamic(_) => {}
-                KeyMatcher::Exact(key) if !matches!(rule.shape, RuleShape::LeafValue) => {
-                    has_concrete = true;
-                    concrete_keys.insert(key.to_ascii_lowercase());
-                }
-                KeyMatcher::AnyScalar if !matches!(rule.shape, RuleShape::LeafValue) => {
-                    has_concrete = true;
-                    any_scalar_concrete = true;
-                }
-                KeyMatcher::Exact(_)
-                | KeyMatcher::AnyScalar
-                | KeyMatcher::Date
-                | KeyMatcher::Int { .. }
-                | KeyMatcher::Enum(_) => {}
-            }
-        }
-        by_path.insert(
-            fact.parent_path.clone(),
-            ContainerRuleCache {
-                rules,
-                concrete_keys,
-                any_scalar_concrete,
-                has_concrete,
-                has_type,
-            },
-        );
-    }
-    let entry = by_path
-        .get(fact.parent_path.as_slice())
-        .expect("filled above");
-    if entry.any_scalar_concrete
-        || entry
-            .concrete_keys
-            .contains(&property.key.to_ascii_lowercase())
-    {
-        return false;
-    }
-    if entry.has_concrete
-        && entry.rules.iter().any(|rule| {
-            !matches!(rule.key, KeyMatcher::Type(_) | KeyMatcher::Dynamic(_))
-                && !matches!(rule.shape, RuleShape::LeafValue)
-                && semantic_rule_key_matches(snapshot, rule, &fact_path, &property.key)
-        })
-    {
-        return false;
-    }
-    // The workspace check below only fires for containers that actually carry Type matchers.
-    if !entry.has_type {
-        return false;
-    }
-    entry.rules.iter().any(|rule| {
-        let KeyMatcher::Type(type_name) = &rule.key else {
-            return false;
-        };
-        match workspace_type_member(snapshot, type_name, &property.key) {
-            WorkspaceTypeMember::Present => false,
-            WorkspaceTypeMember::Absent => true,
-            WorkspaceTypeMember::Unknown => {
-                !type_member_provably_valid(snapshot, type_name, &property.key)
-            }
-        }
+    let scalar = property.scalar.as_ref().unwrap();
+    let state = crate::ir_callable::invocation_state(hir, property);
+    fields.into_iter().any(|id| match ir.field(*id).value {
+        rules::ir::FieldValue::Scalar(matcher) => crate::ir_semantic::matcher_matches_with_state(
+            snapshot,
+            ir,
+            matcher,
+            &scalar.value,
+            &crate::ir_semantic::WorkspaceFacts { snapshot },
+            &state,
+        ),
+        _ => false,
     })
-}
-
-pub(crate) fn semantic_reference_is_active(
-    inactive_semantic_references: &BTreeSet<TextRange>,
-    reference: &HirReference,
-) -> bool {
-    if !matches!(
-        reference.origin,
-        HirReferenceOrigin::Semantic | HirReferenceOrigin::SemanticTyped
-    ) {
-        return true;
-    }
-    !inactive_semantic_references.contains(&reference.range)
 }
 
 pub(crate) fn text_range_within(inner: TextRange, outer: TextRange) -> bool {
@@ -1412,22 +963,6 @@ pub(crate) fn indexed_reference(
     file_id: SourceFileId,
     reference: &Reference,
 ) -> Option<ReferenceInternal> {
-    if snapshot.ir().schemas.is_empty() && dynamic_definition_type(snapshot, &reference.kind) {
-        if !workspace_member(snapshot, &reference.kind, &reference.name) {
-            return None;
-        }
-        if let Some(hir) = snapshot.file_state(file_id).and_then(|state| state.hir())
-            && !dynamic_reference_range_is_callable(
-                snapshot,
-                hir,
-                &reference.kind,
-                &reference.name,
-                reference.range,
-            )
-        {
-            return None;
-        }
-    }
     let path = snapshot
         .source_files()
         .get(&file_id)

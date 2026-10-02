@@ -31,194 +31,142 @@
     "eu4_path_common_achievements": {
       "ext": "txt",
       "file": "achievements.txt",
-      "parser": "script",
       "path": "common",
-      "resolution": "merge",
-      "root": "common_file"
+      "root": "common_achievements_file"
     },
     "eu4_path_common_advisortypes": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/advisortypes",
-      "resolution": "merge",
       "root": "common_advisortypes_file"
     },
     "eu4_path_common_ages": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/ages",
-      "resolution": "merge",
       "root": "common_ages_file"
     },
     "eu4_path_common_ai_army": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/ai_army",
-      "resolution": "merge",
       "root": "common_ai_army_file"
     },
     "eu4_path_common_ai_attitudes": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/ai_attitudes",
-      "resolution": "merge",
       "root": "open_script_file"
     },
     "eu4_path_common_ai_personalities": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/ai_personalities",
-      "resolution": "merge",
       "root": "common_ai_personalities_file"
     },
     "eu4_path_common_alerts": {
       "ext": "txt",
       "file": "alerts.txt",
-      "parser": "script",
       "path": "common",
-      "resolution": "merge",
       "root": "alerts_body"
     },
     "eu4_path_common_ancestor_personalities": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/ancestor_personalities",
-      "resolution": "merge",
       "root": "common_ancestor_personalities_file"
     },
     "eu4_path_common_bookmarks": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/bookmarks",
-      "resolution": "merge",
       "root": "common_bookmarks_file"
     },
     "eu4_path_common_buildings": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/buildings",
-      "resolution": "merge",
       "root": "common_buildings_file"
     },
     "eu4_path_common_cb_types": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/cb_types",
-      "resolution": "merge",
       "root": "common_cb_types_file"
     },
     "eu4_path_common_centers_of_trade": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/centers_of_trade",
-      "resolution": "merge",
       "root": "common_centers_of_trade_file"
     },
     "eu4_path_common_church_aspects": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/church_aspects",
-      "resolution": "merge",
       "root": "common_church_aspects_file"
     },
     "eu4_path_common_client_states": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/client_states",
-      "resolution": "merge",
       "root": "common_client_states_file"
     },
     "eu4_path_common_colonial_regions": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/colonial_regions",
-      "resolution": "merge",
       "root": "common_colonial_regions_file"
     },
     "eu4_path_common_countries": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/countries",
-      "resolution": "merge",
       "root": {
         "body": "country_file_body",
         "card": "0..1",
         "def": {
           "name": "file",
           "type": "country_file"
-        },
-        "when": null
+        }
       }
     },
     "eu4_path_common_country_colors": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/country_colors",
-      "resolution": "merge",
       "root": {
         "body": "country_color_file_body",
         "card": "0..1",
         "def": {
           "name": "file",
           "type": "country_color_file"
-        },
-        "when": null
+        }
       }
     },
     "eu4_path_common_country_tags": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/country_tags",
-      "resolution": "merge",
-      "root": "open_script_file"
+      "root": "country_tags_file"
     },
     "eu4_path_common_cultures": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/cultures",
-      "resolution": "merge",
       "root": "common_cultures_file"
     },
     "eu4_path_common_custom_country_colors": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/custom_country_colors",
-      "resolution": "merge",
       "root": "open_script_file"
     },
     "eu4_path_common_custom_gui": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/custom_gui",
-      "resolution": "merge",
       "root": "custom_gui_file"
     },
     "eu4_path_common_custom_ideas": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/custom_ideas",
-      "resolution": "merge",
       "root": "common_custom_ideas_file"
     },
     "eu4_path_common_decrees": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/decrees",
-      "resolution": "merge",
       "root": "common_decrees_file"
     },
     "eu4_path_common_defender_of_faith": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/defender_of_faith",
-      "resolution": "merge",
       "root": "common_defender_of_faith_file"
     },
     "eu4_path_common_defines": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/defines",
-      "resolution": "merge",
       "root": "open_script_file"
     },
     "eu4_path_common_defines_lua": {
@@ -229,655 +177,479 @@
     },
     "eu4_path_common_diplomatic_actions": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/diplomatic_actions",
-      "resolution": "merge",
       "root": "common_diplomatic_actions_file"
     },
     "eu4_path_common_disasters": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/disasters",
-      "resolution": "merge",
       "root": "common_disasters_file"
     },
     "eu4_path_common_dynasty_colors": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/dynasty_colors",
-      "resolution": "merge",
       "root": {
         "body": "dynasty_colors_body",
         "card": "0..1",
         "def": {
           "name": "file",
           "type": "dynasty_colors"
-        },
-        "when": null
+        }
       }
     },
     "eu4_path_common_estate_agendas": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/estate_agendas",
-      "resolution": "merge",
       "root": "common_estate_agendas_file"
     },
     "eu4_path_common_estate_crown_land": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/estate_crown_land",
-      "resolution": "merge",
       "root": "common_estate_crown_land_file"
     },
     "eu4_path_common_estate_privileges": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/estate_privileges",
-      "resolution": "merge",
       "root": "common_estate_privileges_file"
     },
     "eu4_path_common_estates": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/estates",
-      "resolution": "merge",
       "root": "common_estates_file"
     },
     "eu4_path_common_estates_preload": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/estates_preload",
-      "resolution": "merge",
       "root": "common_estates_preload_file"
     },
     "eu4_path_common_event_modifiers": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/event_modifiers",
-      "resolution": "merge",
       "root": "common_event_modifiers_file"
     },
     "eu4_path_common_factions": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/factions",
-      "resolution": "merge",
       "root": "common_factions_file"
     },
     "eu4_path_common_federation_advancements": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/federation_advancements",
-      "resolution": "merge",
       "root": "common_federation_advancements_file"
     },
     "eu4_path_common_fervor": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/fervor",
-      "resolution": "merge",
       "root": "common_fervor_file"
     },
     "eu4_path_common_fetishist_cults": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/fetishist_cults",
-      "resolution": "merge",
       "root": "common_fetishist_cults_file"
     },
     "eu4_path_common_flagship_modifications": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/flagship_modifications",
-      "resolution": "merge",
       "root": "common_flagship_modifications_file"
     },
     "eu4_path_common_golden_bulls": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/golden_bulls",
-      "resolution": "merge",
       "root": "common_golden_bulls_file"
     },
     "eu4_path_common_government_mechanics": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/government_mechanics",
-      "resolution": "merge",
       "root": "common_government_mechanics_file"
     },
     "eu4_path_common_government_names": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/government_names",
-      "resolution": "merge",
       "root": "common_government_names_file"
     },
     "eu4_path_common_government_ranks": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/government_ranks",
-      "resolution": "merge",
       "root": "open_script_file"
     },
     "eu4_path_common_government_reforms": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/government_reforms",
-      "resolution": "merge",
       "root": "common_government_reforms_file"
     },
     "eu4_path_common_governments": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/governments",
-      "resolution": "merge",
       "root": "common_governments_file"
     },
     "eu4_path_common_graphicalculturetype": {
       "ext": "txt",
       "file": "graphicalculturetype.txt",
-      "parser": "script",
       "path": "common",
-      "resolution": "merge",
-      "root": "open_script_file"
+      "root": "graphical_cultures_file"
     },
     "eu4_path_common_great_projects": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/great_projects",
-      "resolution": "merge",
       "root": "common_great_projects_file"
     },
     "eu4_path_common_hegemons": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/hegemons",
-      "resolution": "merge",
       "root": "common_hegemons_file"
     },
     "eu4_path_common_historial_lucky": {
       "ext": "txt",
       "file": "historial_lucky.txt",
-      "parser": "script",
       "path": "common",
-      "resolution": "merge",
-      "root": "common_file"
+      "root": "luck_body"
     },
     "eu4_path_common_holy_orders": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/holy_orders",
-      "resolution": "merge",
       "root": "common_holy_orders_file"
     },
     "eu4_path_common_ideas": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/ideas",
-      "resolution": "merge",
       "root": "common_ideas_file"
     },
     "eu4_path_common_imperial_incidents": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/imperial_incidents",
-      "resolution": "merge",
       "root": "common_imperial_incidents_file"
     },
     "eu4_path_common_imperial_reforms": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/imperial_reforms",
-      "resolution": "merge",
       "root": "common_imperial_reforms_file"
     },
     "eu4_path_common_incidents": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/incidents",
-      "resolution": "merge",
       "root": "common_incidents_file"
     },
     "eu4_path_common_institutions": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/institutions",
-      "resolution": "merge",
       "root": "common_institutions_file"
     },
     "eu4_path_common_insults": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/insults",
-      "resolution": "merge",
       "root": "common_insults_file"
     },
     "eu4_path_common_isolationism": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/isolationism",
-      "resolution": "merge",
       "root": "common_isolationism_file"
     },
     "eu4_path_common_leader_personalities": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/leader_personalities",
-      "resolution": "merge",
       "root": "common_leader_personalities_file"
     },
     "eu4_path_common_mercenary_companies": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/mercenary_companies",
-      "resolution": "merge",
       "root": "common_mercenary_companies_file"
     },
     "eu4_path_common_natives": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/natives",
-      "resolution": "merge",
       "root": "common_natives_file"
     },
     "eu4_path_common_naval_doctrines": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/naval_doctrines",
-      "resolution": "merge",
       "root": "common_naval_doctrines_file"
     },
     "eu4_path_common_new_diplomatic_actions": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/new_diplomatic_actions",
-      "resolution": "merge",
       "root": "common_new_diplomatic_actions_file"
     },
     "eu4_path_common_opinion_modifiers": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/opinion_modifiers",
-      "resolution": "merge",
       "root": "common_opinion_modifiers_file"
     },
     "eu4_path_common_parliament_bribes": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/parliament_bribes",
-      "resolution": "merge",
       "root": "common_parliament_bribes_file"
     },
     "eu4_path_common_parliament_issues": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/parliament_issues",
-      "resolution": "merge",
       "root": "common_parliament_issues_file"
     },
     "eu4_path_common_peace_treaties": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/peace_treaties",
-      "resolution": "merge",
       "root": "common_peace_treaties_file"
     },
     "eu4_path_common_personal_deities": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/personal_deities",
-      "resolution": "merge",
       "root": "common_personal_deities_file"
     },
     "eu4_path_common_policies": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/policies",
-      "resolution": "merge",
       "root": "common_policies_file"
     },
     "eu4_path_common_powerprojection": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/powerprojection",
-      "resolution": "merge",
       "root": "common_powerprojection_file"
     },
     "eu4_path_common_prices": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/prices",
-      "resolution": "merge",
       "root": {
         "body": "prices_body",
         "card": "0..1",
         "def": {
           "name": "file",
           "type": "prices"
-        },
-        "when": null
+        }
       }
     },
     "eu4_path_common_professionalism": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/professionalism",
-      "resolution": "merge",
       "root": "common_professionalism_file"
     },
     "eu4_path_common_province_names": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/province_names",
-      "resolution": "merge",
       "root": {
         "body": "province_names_body",
         "card": "0..1",
         "def": {
           "name": "file",
           "type": "province_names"
-        },
-        "when": null
+        }
       }
     },
     "eu4_path_common_province_triggered_modifiers": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/province_triggered_modifiers",
-      "resolution": "merge",
       "root": "common_province_triggered_modifiers_file"
     },
     "eu4_path_common_rebel_types": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/rebel_types",
-      "resolution": "merge",
       "root": "common_rebel_types_file"
     },
     "eu4_path_common_region_colors": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/region_colors",
-      "resolution": "merge",
       "root": {
         "body": "region_colors_body",
         "card": "0..1",
         "def": {
           "name": "file",
           "type": "region_colors"
-        },
-        "when": null
+        }
       }
     },
     "eu4_path_common_religions": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/religions",
-      "resolution": "merge",
       "root": "common_religions_file"
     },
     "eu4_path_common_religious_conversions": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/religious_conversions",
-      "resolution": "merge",
       "root": "common_religious_conversions_file"
     },
     "eu4_path_common_religious_reforms": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/religious_reforms",
-      "resolution": "merge",
       "root": "common_religious_reforms_file"
     },
     "eu4_path_common_revolt_triggers": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/revolt_triggers",
-      "resolution": "merge",
       "root": "common_revolt_triggers_file"
     },
     "eu4_path_common_revolution": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/revolution",
-      "resolution": "merge",
       "root": "common_revolution_file"
     },
     "eu4_path_common_ruler_personalities": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/ruler_personalities",
-      "resolution": "merge",
       "root": "common_ruler_personalities_file"
     },
     "eu4_path_common_scripted_effects": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/scripted_effects",
-      "resolution": "merge",
       "root": "common_scripted_effects_file"
     },
     "eu4_path_common_scripted_functions": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/scripted_functions",
-      "resolution": "merge",
       "root": "common_scripted_functions_file"
     },
     "eu4_path_common_scripted_loc": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/scripted_loc",
-      "resolution": "merge",
-      "root": "open_script_file"
+      "root": "scripted_localisation_file"
     },
     "eu4_path_common_scripted_localisation": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/scripted_localisation",
-      "resolution": "merge",
-      "root": "open_script_file"
+      "root": "scripted_localisation_file"
     },
     "eu4_path_common_scripted_localization": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/scripted_localization",
-      "resolution": "merge",
-      "root": "open_script_file"
+      "root": "scripted_localisation_file"
     },
     "eu4_path_common_scripted_triggers": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/scripted_triggers",
-      "resolution": "merge",
       "root": "common_scripted_triggers_file"
     },
     "eu4_path_common_state_edicts": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/state_edicts",
-      "resolution": "merge",
       "root": "common_state_edicts_file"
     },
     "eu4_path_common_static_modifiers": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/static_modifiers",
-      "resolution": "merge",
       "root": "common_static_modifiers_file"
     },
     "eu4_path_common_subject_type_upgrades": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/subject_type_upgrades",
-      "resolution": "merge",
       "root": "common_subject_type_upgrades_file"
     },
     "eu4_path_common_subject_types": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/subject_types",
-      "resolution": "merge",
       "root": "common_subject_types_file"
     },
     "eu4_path_common_technologies": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/technologies",
-      "resolution": "merge",
       "root": "common_technologies_file"
     },
     "eu4_path_common_technology": {
       "ext": "txt",
       "file": "technology.txt",
-      "parser": "script",
       "path": "common",
-      "resolution": "merge",
       "root": "technology_file_file"
     },
     "eu4_path_common_timed_modifiers": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/timed_modifiers",
-      "resolution": "merge",
       "root": "common_timed_modifiers_file"
     },
     "eu4_path_common_trade_companies": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/trade_companies",
-      "resolution": "merge",
       "root": "common_trade_companies_file"
     },
     "eu4_path_common_tradecompany_investments": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/tradecompany_investments",
-      "resolution": "merge",
       "root": "common_tradecompany_investments_file"
     },
     "eu4_path_common_tradegoods": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/tradegoods",
-      "resolution": "merge",
       "root": "common_tradegoods_file"
     },
     "eu4_path_common_tradenodes": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/tradenodes",
-      "resolution": "merge",
       "root": "common_tradenodes_file"
     },
     "eu4_path_common_trading_policies": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/trading_policies",
-      "resolution": "merge",
       "root": "common_trading_policies_file"
     },
     "eu4_path_common_triggered_modifiers": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/triggered_modifiers",
-      "resolution": "merge",
       "root": "common_triggered_modifiers_file"
     },
     "eu4_path_common_units": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/units",
-      "resolution": "merge",
       "root": {
         "body": "unit_type_body",
         "card": "0..1",
         "def": {
           "name": "file",
           "type": "unit_type"
-        },
-        "when": null
+        }
       }
     },
     "eu4_path_common_units_display": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/units_display",
-      "resolution": "merge",
       "root": {
         "body": "units_display_body",
         "card": "0..1",
         "def": {
+          "name": "file",
           "type": "units_display"
-        },
-        "when": null
+        }
       }
     },
     "eu4_path_common_wargoal_types": {
       "ext": "txt",
-      "parser": "script",
       "path": "common/wargoal_types",
-      "resolution": "merge",
       "root": "common_wargoal_types_file"
     },
     "eu4_path_customizable_localization": {
       "ext": "txt",
-      "parser": "script",
       "path": "customizable_localization",
-      "resolution": "merge",
       "root": "customizable_localization_file"
     },
     "eu4_path_decisions": {
       "ext": "txt",
-      "parser": "script",
       "path": "decisions",
-      "resolution": "merge",
       "root": "decision_file"
     },
     "eu4_path_events": {
       "ext": "txt",
-      "parser": "script",
       "path": "events",
-      "resolution": "merge",
       "root": "event_file"
     },
     "eu4_path_gfx_sprite_packs": {
       "ext": "txt",
-      "parser": "script",
       "path": "gfx/sprite_packs",
-      "resolution": "merge",
       "root": "gfx_sprite_packs_file"
     },
     "eu4_path_gfx_sprite_packs_order": {
       "ext": "txt",
-      "parser": "script",
       "path": "gfx/sprite_packs_order",
-      "resolution": "merge",
       "root": {
         "body": "packorder_body",
         "card": "0..1",
         "def": {
           "name": "file",
           "type": "packorder"
-        },
-        "when": null
+        }
       }
     },
     "eu4_path_history_advisors": {
       "ext": "txt",
-      "parser": "script",
       "path": "history/advisors",
-      "resolution": "merge",
       "root": "history_advisors_file"
     },
     "eu4_path_history_countries": {
       "ext": "txt",
-      "parser": "script",
       "path": "history/countries",
-      "resolution": "merge",
       "root": {
         "body": "country_history_body",
         "card": "0..1",
@@ -890,30 +662,24 @@
             "root": "country",
             "this": "country"
           }
-        },
-        "when": null
+        }
       }
     },
     "eu4_path_history_diplomacy": {
       "ext": "txt",
-      "parser": "script",
       "path": "history/diplomacy",
-      "resolution": "merge",
       "root": {
         "body": "diplomacy_history_body",
         "card": "0..1",
         "def": {
           "name": "file",
           "type": "diplomacy_history"
-        },
-        "when": null
+        }
       }
     },
     "eu4_path_history_provinces": {
       "ext": "txt",
-      "parser": "script",
       "path": "history/provinces",
-      "resolution": "merge",
       "root": {
         "body": "province_history_body",
         "card": "0..1",
@@ -926,30 +692,24 @@
             "root": "province",
             "this": "province"
           }
-        },
-        "when": null
+        }
       }
     },
     "eu4_path_history_wars": {
       "ext": "txt",
-      "parser": "script",
       "path": "history/wars",
-      "resolution": "merge",
       "root": {
         "body": "war_history_body",
         "card": "0..1",
         "def": {
-          "name": "field:name",
+          "name": "file",
           "type": "war_history"
-        },
-        "when": null
+        }
       }
     },
     "eu4_path_interface": {
       "ext": "txt",
-      "parser": "script",
       "path": "interface",
-      "resolution": "merge",
       "root": "open_script_file"
     },
     "eu4_path_map": {
@@ -957,21 +717,16 @@
         "map/random/tiles"
       ],
       "ext": "txt",
-      "parser": "script",
       "path": "map",
-      "resolution": "merge",
       "root": "open_script_file"
     },
     "eu4_path_missions": {
       "ext": "txt",
-      "parser": "script",
       "path": "missions",
-      "resolution": "merge",
       "root": "missions_file"
     },
     "files_common_custom_country_colors_00_custom_country_colors_txt": {
       "file": "00_custom_country_colors.txt",
-      "parser": "script",
       "path": "common/custom_country_colors",
       "resolution": "replace-by-path",
       "root": {
@@ -980,14 +735,12 @@
         "def": {
           "name": "file",
           "type": "custom_country_colors"
-        },
-        "when": null
+        }
       },
       "strict": true
     },
     "files_common_government_ranks_00_government_ranks_txt": {
       "file": "00_government_ranks.txt",
-      "parser": "script",
       "path": "common/government_ranks",
       "resolution": "replace-by-path",
       "root": {
@@ -996,55 +749,48 @@
         "def": {
           "name": "file",
           "type": "government_ranks"
-        },
-        "when": null
+        }
       }
     },
     "files_interface_gfx": {
       "ext": "gfx",
-      "parser": "script",
       "path": "interface",
       "resolution": "replace-by-path",
       "root": "sprite_file"
     },
     "files_map_ambient_object_txt": {
       "file": "ambient_object.txt",
-      "parser": "script",
       "path": "map",
       "resolution": "replace-by-path",
-      "root": "map_file"
+      "root": "map_ambient_objects_file"
     },
     "files_map_area_txt": {
       "file": "area.txt",
-      "parser": "script",
       "path": "map",
       "resolution": "replace-by-path",
-      "root": "map_file"
+      "root": "map_area_file"
     },
     "files_map_climate_txt": {
       "file": "climate.txt",
-      "parser": "script",
       "path": "map",
       "resolution": "replace-by-path",
       "root": {
         "body": "mapclimate_body",
         "card": "0..1",
         "def": {
+          "name": "file",
           "type": "mapclimate"
-        },
-        "when": null
+        }
       }
     },
     "files_map_continent_txt": {
       "file": "continent.txt",
-      "parser": "script",
       "path": "map",
       "resolution": "replace-by-path",
-      "root": "map_file"
+      "root": "map_continent_file"
     },
     "files_map_default_map": {
       "file": "default.map",
-      "parser": "script",
       "path": "map",
       "resolution": "replace-by-path",
       "root": {
@@ -1053,48 +799,41 @@
         "def": {
           "name": "file",
           "type": "default_map"
-        },
-        "when": null
+        }
       }
     },
     "files_map_positions_txt": {
       "file": "positions.txt",
-      "parser": "script",
       "path": "map",
       "resolution": "replace-by-path",
-      "root": "map_file"
+      "root": "map_positions_file"
     },
     "files_map_provincegroup_txt": {
       "file": "provincegroup.txt",
-      "parser": "script",
       "path": "map",
       "resolution": "replace-by-path",
-      "root": "map_file"
+      "root": "map_provincegroup_file"
     },
     "files_map_region_txt": {
       "file": "region.txt",
-      "parser": "script",
       "path": "map",
       "resolution": "replace-by-path",
-      "root": "map_file"
+      "root": "map_region_file"
     },
     "files_map_superregion_txt": {
       "file": "superregion.txt",
-      "parser": "script",
       "path": "map",
       "resolution": "replace-by-path",
-      "root": "map_file"
+      "root": "map_superregion_file"
     },
     "files_map_terrain_txt": {
       "file": "terrain.txt",
-      "parser": "script",
       "path": "map",
       "resolution": "replace-by-path",
-      "root": "map_file"
+      "root": "map_terrain_file"
     },
     "files_map_trade_winds_txt": {
       "file": "trade_winds.txt",
-      "parser": "script",
       "path": "map",
       "resolution": "replace-by-path",
       "root": {
@@ -1103,8 +842,7 @@
         "def": {
           "name": "file",
           "type": "trade_winds"
-        },
-        "when": null
+        }
       }
     },
     "localisation": {
@@ -1130,7 +868,6 @@
         "asset",
         "sfx"
       ],
-      "parser": "script",
       "path": "",
       "resolution": "replace-by-path",
       "root": "open_script_file"
@@ -1152,13 +889,21 @@
     "ambient_object_body": {},
     "ancestor_personality_body": {},
     "climate_body": {},
+    "common_achievements_file": {
+      "patterns": [
+        {
+          "body": "achievement_body",
+          "card": "0..1",
+          "key": "def<achievement>"
+        }
+      ]
+    },
     "common_advisortypes_file": {
       "patterns": [
         {
           "body": "advisor_type_body",
           "card": "0..1",
-          "key": "def<advisor_type>",
-          "when": null
+          "key": "def<advisor_type>"
         }
       ]
     },
@@ -1167,8 +912,7 @@
         {
           "body": "game_age_body",
           "card": "0..1",
-          "key": "def<game_age>",
-          "when": null
+          "key": "def<game_age>"
         }
       ]
     },
@@ -1176,8 +920,7 @@
       "fields": {
         "province": {
           "body": "common_ai_army_file__province",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         }
       }
     },
@@ -1186,8 +929,7 @@
         {
           "body": "ai_army_body",
           "card": "0..1",
-          "key": "def<ai_army>",
-          "when": null
+          "key": "def<ai_army>"
         }
       ]
     },
@@ -1196,8 +938,7 @@
         {
           "body": "ai_personality_body",
           "card": "0..1",
-          "key": "def<ai_personality>",
-          "when": null
+          "key": "def<ai_personality>"
         }
       ]
     },
@@ -1206,14 +947,12 @@
         {
           "body": "ancestor_personalities_body",
           "card": "0..1",
-          "key": "def<ancestor_personalities>",
-          "when": null
-        },
-        {
-          "body": "ancestor_personality_body",
-          "card": "0..1",
-          "key": "def<ancestor_personality>",
-          "when": null
+          "def": {
+            "strip_prefix": "ancestor_",
+            "strip_suffix": "_personality",
+            "type": "ancestor_personality"
+          },
+          "key": "def<ancestor_personality>"
         }
       ]
     },
@@ -1225,8 +964,7 @@
           "def": {
             "name": "field:name",
             "type": "bookmark"
-          },
-          "when": null
+          }
         }
       }
     },
@@ -1235,8 +973,7 @@
         {
           "body": "building_body",
           "card": "0..1",
-          "key": "def<building>",
-          "when": null
+          "key": "def<building>"
         }
       ]
     },
@@ -1245,8 +982,7 @@
         {
           "body": "casus_belli_body",
           "card": "0..1",
-          "key": "def<casus_belli>",
-          "when": null
+          "key": "def<casus_belli>"
         }
       ]
     },
@@ -1255,8 +991,7 @@
         {
           "body": "trade_center_body",
           "card": "0..1",
-          "key": "def<trade_center>",
-          "when": null
+          "key": "def<trade_center>"
         }
       ]
     },
@@ -1265,8 +1000,7 @@
         {
           "body": "aspects_and_blessings_body",
           "card": "0..1",
-          "key": "def<aspects_and_blessings>",
-          "when": null
+          "key": "def<aspects_and_blessings>"
         }
       ]
     },
@@ -1275,8 +1009,7 @@
         {
           "body": "client_state_body",
           "card": "0..1",
-          "key": "def<client_state>",
-          "when": null
+          "key": "def<client_state>"
         }
       ]
     },
@@ -1285,8 +1018,7 @@
         {
           "body": "colonial_region_body",
           "card": "0..1",
-          "key": "def<colonial_region>",
-          "when": null
+          "key": "def<colonial_region>"
         }
       ]
     },
@@ -1295,18 +1027,16 @@
         {
           "body": "culture_group_body",
           "card": "0..1",
-          "key": "def<culture_group>",
-          "when": null
+          "key": "def<culture_group>"
         }
       ]
     },
     "common_custom_ideas_file": {
       "patterns": [
         {
-          "body": "customideas_body",
+          "body": "custom_ideas_group",
           "card": "0..1",
-          "key": "def<customideas>",
-          "when": null
+          "key": "scalar"
         }
       ]
     },
@@ -1315,8 +1045,7 @@
         {
           "body": "decree_body",
           "card": "0..1",
-          "key": "def<decree>",
-          "when": null
+          "key": "def<decree>"
         }
       ]
     },
@@ -1325,8 +1054,7 @@
         {
           "body": "defender_faith_body",
           "card": "0..1",
-          "key": "def<defender_faith>",
-          "when": null
+          "key": "def<defender_faith>"
         }
       ]
     },
@@ -1335,8 +1063,7 @@
         {
           "body": "diplomatic_action_body",
           "card": "0..1",
-          "key": "def<diplomatic_action>",
-          "when": null
+          "key": "def<diplomatic_action>"
         }
       ]
     },
@@ -1345,8 +1072,7 @@
         {
           "body": "disaster_body",
           "card": "0..1",
-          "key": "def<disaster>",
-          "when": null
+          "key": "def<disaster>"
         }
       ]
     },
@@ -1355,8 +1081,7 @@
         {
           "body": "estate_agenda_body",
           "card": "0..1",
-          "key": "def<estate_agenda>",
-          "when": null
+          "key": "def<estate_agenda>"
         }
       ]
     },
@@ -1368,8 +1093,7 @@
           "def": {
             "name": "field:key",
             "type": "estate_crown_land_bonus"
-          },
-          "when": null
+          }
         },
         "interaction": {
           "body": "estate_interaction_body",
@@ -1377,8 +1101,7 @@
           "def": {
             "name": "field:key",
             "type": "estate_interaction"
-          },
-          "when": null
+          }
         }
       }
     },
@@ -1387,8 +1110,7 @@
         {
           "body": "estate_privilege_body",
           "card": "0..1",
-          "key": "def<estate_privilege>",
-          "when": null
+          "key": "def<estate_privilege>"
         }
       ]
     },
@@ -1397,8 +1119,7 @@
         {
           "body": "estate_body",
           "card": "0..1",
-          "key": "def<estate>",
-          "when": null
+          "key": "def<estate>"
         }
       ]
     },
@@ -1407,18 +1128,16 @@
         {
           "body": "estate_modifier_body",
           "card": "0..1",
-          "key": "def<estate_modifier>",
-          "when": null
+          "key": "ref<estate>"
         }
       ]
     },
     "common_event_modifiers_file": {
       "patterns": [
         {
-          "body": "modifier",
+          "body": "event_modifier_body",
           "card": "0..1",
-          "key": "def<event_modifier>",
-          "when": null
+          "key": "def<event_modifier>"
         }
       ]
     },
@@ -1427,8 +1146,7 @@
         {
           "body": "faction_body",
           "card": "0..1",
-          "key": "def<faction>",
-          "when": null
+          "key": "def<faction>"
         }
       ]
     },
@@ -1437,8 +1155,7 @@
         {
           "body": "federation_advancements_body",
           "card": "0..1",
-          "key": "def<federation_advancements>",
-          "when": null
+          "key": "def<federation_advancements>"
         }
       ]
     },
@@ -1447,8 +1164,7 @@
         {
           "body": "fervor_body",
           "card": "0..1",
-          "key": "def<fervor>",
-          "when": null
+          "key": "def<fervor>"
         }
       ]
     },
@@ -1457,8 +1173,7 @@
         {
           "body": "cult_body",
           "card": "0..1",
-          "key": "def<cult>",
-          "when": null
+          "key": "def<cult>"
         }
       ]
     },
@@ -1467,14 +1182,12 @@
         {
           "body": "achievement_body",
           "card": "0..1",
-          "key": "def<achievement>",
-          "when": null
+          "key": "def<achievement>"
         },
         {
           "body": "luck_body",
           "card": "0..1",
-          "key": "def<luck>",
-          "when": null
+          "key": "def<luck>"
         }
       ]
     },
@@ -1483,8 +1196,7 @@
         {
           "body": "flagship_modification_body",
           "card": "0..1",
-          "key": "def<flagship_modification>",
-          "when": null
+          "key": "def<flagship_modification>"
         }
       ]
     },
@@ -1493,8 +1205,7 @@
         {
           "body": "golden_bull_body",
           "card": "0..1",
-          "key": "def<golden_bull>",
-          "when": null
+          "key": "def<golden_bull>"
         }
       ]
     },
@@ -1503,8 +1214,7 @@
         {
           "body": "government_mechanic_body",
           "card": "0..1",
-          "key": "def<government_mechanic>",
-          "when": null
+          "key": "def<government_mechanic>"
         }
       ]
     },
@@ -1513,34 +1223,31 @@
         {
           "body": "government_name_body",
           "card": "0..1",
-          "key": "def<government_name>",
-          "when": null
+          "key": "def<government_name>"
         }
       ]
     },
     "common_government_reforms_file": {
       "patterns": [
         {
-          "body": "government_attributes_body",
-          "card": "0..1",
-          "key": "def<government_attributes>",
-          "when": null
-        },
-        {
           "body": "government_reform_body",
           "card": "0..1",
-          "key": "def<government_reform>",
-          "when": null
+          "key": "def<government_reform>"
         }
       ]
     },
     "common_governments_file": {
+      "fields": {
+        "pre_dharma_mapping": {
+          "body": "pre_dharma_mapping_body",
+          "card": "0..1"
+        }
+      },
       "patterns": [
         {
           "body": "government_body",
           "card": "0..1",
-          "key": "def<government>",
-          "when": null
+          "key": "def<government>"
         }
       ]
     },
@@ -1549,8 +1256,7 @@
         {
           "body": "great_project_body",
           "card": "0..1",
-          "key": "def<great_project>",
-          "when": null
+          "key": "def<great_project>"
         }
       ]
     },
@@ -1559,8 +1265,7 @@
         {
           "body": "hegemon_body",
           "card": "0..1",
-          "key": "def<hegemon>",
-          "when": null
+          "key": "def<hegemon>"
         }
       ]
     },
@@ -1569,8 +1274,7 @@
         {
           "body": "holy_order_body",
           "card": "0..1",
-          "key": "def<holy_order>",
-          "when": null
+          "key": "def<holy_order>"
         }
       ]
     },
@@ -1579,8 +1283,7 @@
         {
           "body": "idea_group_body",
           "card": "0..1",
-          "key": "def<idea_group>",
-          "when": null
+          "key": "def<idea_group>"
         }
       ]
     },
@@ -1589,8 +1292,7 @@
         {
           "body": "imperial_incident_body",
           "card": "0..1",
-          "key": "def<imperial_incident>",
-          "when": null
+          "key": "def<imperial_incident>"
         }
       ]
     },
@@ -1599,8 +1301,7 @@
         {
           "body": "imperial_reform_body",
           "card": "0..1",
-          "key": "def<imperial_reform>",
-          "when": null
+          "key": "def<imperial_reform>"
         }
       ]
     },
@@ -1609,8 +1310,7 @@
         {
           "body": "incident_body",
           "card": "0..1",
-          "key": "def<incident>",
-          "when": null
+          "key": "def<incident>"
         }
       ]
     },
@@ -1619,8 +1319,7 @@
         {
           "body": "institution_body",
           "card": "0..1",
-          "key": "def<institution>",
-          "when": null
+          "key": "def<institution>"
         }
       ]
     },
@@ -1629,8 +1328,7 @@
         {
           "body": "insult_body",
           "card": "0..1",
-          "key": "def<insult>",
-          "when": null
+          "key": "def<insult>"
         }
       ]
     },
@@ -1639,8 +1337,7 @@
         {
           "body": "isolationism_body",
           "card": "0..1",
-          "key": "def<isolationism>",
-          "when": null
+          "key": "def<isolationism>"
         }
       ]
     },
@@ -1649,8 +1346,16 @@
         {
           "body": "leader_personality_body",
           "card": "0..1",
-          "key": "def<leader_personality>",
-          "when": null
+          "key": "def<leader_personality>"
+        }
+      ]
+    },
+    "common_luck_file": {
+      "patterns": [
+        {
+          "body": "luck_body",
+          "card": "0..1",
+          "key": "def<luck>"
         }
       ]
     },
@@ -1659,8 +1364,7 @@
         {
           "body": "mercenary_company_body",
           "card": "0..1",
-          "key": "def<mercenary_company>",
-          "when": null
+          "key": "def<mercenary_company>"
         }
       ]
     },
@@ -1669,8 +1373,7 @@
         {
           "body": "natives_body",
           "card": "0..1",
-          "key": "def<natives>",
-          "when": null
+          "key": "def<natives>"
         }
       ]
     },
@@ -1679,18 +1382,22 @@
         {
           "body": "naval_doctrine_body",
           "card": "0..1",
-          "key": "def<naval_doctrine>",
-          "when": null
+          "key": "def<naval_doctrine>"
         }
       ]
     },
     "common_new_diplomatic_actions_file": {
+      "fields": {
+        "static_actions": {
+          "body": "static_diplomatic_actions_body",
+          "card": "0..1"
+        }
+      },
       "patterns": [
         {
           "body": "new_diplomatic_action_body",
           "card": "0..1",
-          "key": "def<new_diplomatic_action>",
-          "when": null
+          "key": "def<new_diplomatic_action>"
         }
       ]
     },
@@ -1699,8 +1406,7 @@
         {
           "body": "opinion_modifier_body",
           "card": "0..1",
-          "key": "def<opinion_modifier>",
-          "when": null
+          "key": "def<opinion_modifier>"
         }
       ]
     },
@@ -1709,8 +1415,7 @@
         {
           "body": "parliament_bribe_body",
           "card": "0..1",
-          "key": "def<parliament_bribe>",
-          "when": null
+          "key": "def<parliament_bribe>"
         }
       ]
     },
@@ -1719,24 +1424,16 @@
         {
           "body": "parliament_issue_body",
           "card": "0..1",
-          "key": "def<parliament_issue>",
-          "when": null
+          "key": "def<parliament_issue>"
         }
       ]
     },
     "common_peace_treaties_file": {
       "patterns": [
         {
-          "body": "peace_options_body",
-          "card": "0..1",
-          "key": "def<peace_options>",
-          "when": null
-        },
-        {
           "body": "peace_treaty_body",
           "card": "0..1",
-          "key": "def<peace_treaty>",
-          "when": null
+          "key": "def<peace_treaty>"
         }
       ]
     },
@@ -1745,8 +1442,7 @@
         {
           "body": "personal_deity_body",
           "card": "0..1",
-          "key": "def<personal_deity>",
-          "when": null
+          "key": "def<personal_deity>"
         }
       ]
     },
@@ -1755,8 +1451,7 @@
         {
           "body": "policy_body",
           "card": "0..1",
-          "key": "def<policy>",
-          "when": null
+          "key": "def<policy>"
         }
       ]
     },
@@ -1765,8 +1460,7 @@
         {
           "body": "power_projection_body",
           "card": "0..1",
-          "key": "def<power_projection>",
-          "when": null
+          "key": "def<power_projection>"
         }
       ]
     },
@@ -1775,8 +1469,7 @@
         {
           "body": "professionalism_modifier_body",
           "card": "0..1",
-          "key": "def<professionalism_modifier>",
-          "when": null
+          "key": "def<professionalism_modifier>"
         }
       ]
     },
@@ -1785,40 +1478,25 @@
         {
           "body": "province_triggered_modifier_body",
           "card": "0..1",
-          "key": "def<province_triggered_modifier>",
-          "when": null
+          "key": "def<province_triggered_modifier>"
         }
       ]
     },
     "common_rebel_types_file": {
       "patterns": [
         {
-          "body": "rebel_demand_loc_body",
-          "card": "0..1",
-          "key": "def<rebel_demand_loc>",
-          "when": null
-        },
-        {
           "body": "rebel_type_body",
           "card": "0..1",
-          "key": "def<rebel_type>",
-          "when": null
+          "key": "def<rebel_type>"
         }
       ]
     },
     "common_religions_file": {
       "patterns": [
         {
-          "body": "papal_policy_body",
-          "card": "0..1",
-          "key": "def<papal_policy>",
-          "when": null
-        },
-        {
           "body": "religion_group_body",
           "card": "0..1",
-          "key": "def<religion_group>",
-          "when": null
+          "key": "def<religion_group>"
         }
       ]
     },
@@ -1827,8 +1505,7 @@
         {
           "body": "religion_propagation_body",
           "card": "0..1",
-          "key": "def<religion_propagation>",
-          "when": null
+          "key": "def<religion_propagation>"
         }
       ]
     },
@@ -1837,18 +1514,22 @@
         {
           "body": "religious_reform_group_body",
           "card": "0..1",
-          "key": "def<religious_reform_group>",
-          "when": null
+          "key": "def<religious_reform_group>"
         }
       ]
     },
     "common_revolt_triggers_file": {
       "patterns": [
         {
-          "body": "revolt_trigger_body",
+          "body": "trigger",
           "card": "0..1",
           "key": "def<revolt_trigger>",
-          "when": null
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
         }
       ]
     },
@@ -1857,8 +1538,7 @@
         {
           "body": "center_of_revolution_conversion_body",
           "card": "0..1",
-          "key": "def<center_of_revolution_conversion>",
-          "when": null
+          "key": "def<center_of_revolution_conversion>"
         }
       ]
     },
@@ -1867,8 +1547,7 @@
         {
           "body": "ruler_personality_body",
           "card": "0..1",
-          "key": "def<ruler_personality>",
-          "when": null
+          "key": "def<ruler_personality>"
         }
       ]
     },
@@ -1877,8 +1556,7 @@
         {
           "body": "effect",
           "card": "0..1",
-          "key": "def<scripted_effect>",
-          "when": null
+          "key": "def<scripted_effect>"
         }
       ]
     },
@@ -1887,8 +1565,7 @@
         {
           "body": "scripted_function_body",
           "card": "0..1",
-          "key": "def<scripted_function>",
-          "when": null
+          "key": "def<scripted_function>"
         }
       ]
     },
@@ -1897,8 +1574,7 @@
         {
           "body": "trigger",
           "card": "0..1",
-          "key": "def<scripted_trigger>",
-          "when": null
+          "key": "def<scripted_trigger>"
         }
       ]
     },
@@ -1907,8 +1583,7 @@
         {
           "body": "edict_body",
           "card": "0..1",
-          "key": "def<edict>",
-          "when": null
+          "key": "def<edict>"
         }
       ]
     },
@@ -1917,8 +1592,7 @@
         {
           "body": "static_modifier_body",
           "card": "0..1",
-          "key": "def<static_modifier>",
-          "when": null
+          "key": "def<static_modifier>"
         }
       ]
     },
@@ -1927,8 +1601,7 @@
         {
           "body": "subject_upgrades_body",
           "card": "0..1",
-          "key": "def<subject_upgrades>",
-          "when": null
+          "key": "def<subject_upgrades>"
         }
       ]
     },
@@ -1936,9 +1609,8 @@
       "patterns": [
         {
           "body": "subject_type_body",
-          "card": "0..1",
-          "key": "def<subject_type>",
-          "when": null
+          "card": "0..*",
+          "key": "def<subject_type>"
         }
       ]
     },
@@ -1949,16 +1621,18 @@
           "card": "0..*",
           "def": {
             "type": "tech_ahead_of_time"
-          },
-          "when": null
+          }
+        },
+        "monarch_power": {
+          "card": "0..1",
+          "value": "'ADM' | 'DIP' | 'MIL'"
         },
         "technology": {
           "body": "technology_body",
           "card": "0..*",
           "def": {
             "type": "technology"
-          },
-          "when": null
+          }
         }
       }
     },
@@ -1967,8 +1641,7 @@
         {
           "body": "timed_modifier_body",
           "card": "0..1",
-          "key": "def<timed_modifier>",
-          "when": null
+          "key": "def<timed_modifier>"
         }
       ]
     },
@@ -1977,8 +1650,7 @@
         {
           "body": "trade_company_body",
           "card": "0..1",
-          "key": "def<trade_company>",
-          "when": null
+          "key": "def<trade_company>"
         }
       ]
     },
@@ -1987,8 +1659,7 @@
         {
           "body": "trade_company_investment_body",
           "card": "0..1",
-          "key": "def<trade_company_investment>",
-          "when": null
+          "key": "def<trade_company_investment>"
         }
       ]
     },
@@ -1997,8 +1668,7 @@
         {
           "body": "trade_good_body",
           "card": "0..1",
-          "key": "def<trade_good>",
-          "when": null
+          "key": "def<trade_good>"
         }
       ]
     },
@@ -2007,14 +1677,7 @@
         {
           "body": "trade_node_body",
           "card": "0..1",
-          "key": "def<trade_node>",
-          "when": null
-        },
-        {
-          "body": "trade_node_name_body",
-          "card": "0..1",
-          "key": "def<trade_node_name>",
-          "when": null
+          "key": "def<trade_node>"
         }
       ]
     },
@@ -2023,8 +1686,7 @@
         {
           "body": "trading_policy_body",
           "card": "0..1",
-          "key": "def<trading_policy>",
-          "when": null
+          "key": "def<trading_policy>"
         }
       ]
     },
@@ -2033,8 +1695,7 @@
         {
           "body": "triggered_modifier_body",
           "card": "0..1",
-          "key": "def<triggered_modifier>",
-          "when": null
+          "key": "def<triggered_modifier>"
         }
       ]
     },
@@ -2043,65 +1704,87 @@
         {
           "body": "wargoal_type_body",
           "card": "0..1",
-          "key": "def<wargoal_type>",
-          "when": null
+          "key": "def<wargoal_type>"
         }
       ]
     },
     "country_tag_body": {},
+    "country_tags_file": {
+      "patterns": [
+        {
+          "card": "0..1",
+          "key": "def<country_tag>",
+          "value": "path"
+        }
+      ]
+    },
     "culture_body": {},
     "custom_gui_body": {},
     "custom_gui_file": {
       "fields": {
         "custom_button": {
-          "body": "custom_gui_body",
-          "card": "0..1",
+          "body": "custom_button_body",
+          "card": "0..*",
           "def": {
-            "type": "custom_gui"
-          },
-          "when": null
+            "name": "field:name",
+            "type": "custom_button"
+          }
         },
         "custom_icon": {
-          "body": "custom_gui_body",
-          "card": "0..1",
+          "body": "custom_icon_body",
+          "card": "0..*",
           "def": {
-            "type": "custom_gui"
-          },
-          "when": null
+            "name": "field:name",
+            "type": "custom_icon"
+          }
         },
         "custom_shield": {
-          "body": "custom_gui_body",
-          "card": "0..1",
+          "body": "custom_shield_body",
+          "card": "0..*",
           "def": {
-            "type": "custom_gui"
-          },
-          "when": null
+            "name": "field:name",
+            "type": "custom_shield"
+          }
         },
         "custom_text_box": {
-          "body": "custom_gui_body",
-          "card": "0..1",
+          "body": "custom_text_box_body",
+          "card": "0..*",
           "def": {
-            "type": "custom_gui"
-          },
-          "when": null
+            "name": "field:name",
+            "type": "custom_text_box"
+          }
         },
         "custom_window": {
-          "body": "custom_gui_body",
-          "card": "0..1",
+          "body": "custom_window_body",
+          "card": "0..*",
           "def": {
-            "type": "custom_gui"
-          },
-          "when": null
+            "name": "field:name",
+            "type": "custom_window"
+          }
         }
       }
+    },
+    "custom_ideas_group": {
+      "fields": {
+        "category": {
+          "card": "0..1",
+          "value": "enum<power_categories>"
+        }
+      },
+      "patterns": [
+        {
+          "body": "customideas_body",
+          "card": "0..1",
+          "key": "def<customideas>"
+        }
+      ]
     },
     "customizable_localization_file": {
       "patterns": [
         {
           "body": "defined_text_body",
-          "card": "0..1",
-          "key": "def<defined_text>",
-          "when": null
+          "card": "0..*",
+          "key": "def<defined_text>"
         }
       ]
     },
@@ -2110,46 +1793,97 @@
         {
           "body": "decision_body",
           "card": "0..1",
-          "key": "def<decision>",
-          "when": null
+          "key": "def<decision>"
         }
       ]
     },
-    "estate_modifier_body": {},
+    "estate_modifier_body": {
+      "fields": {
+        "modifier_definition": {
+          "body": "estate_modifier_definition_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:key",
+            "type": "estate_modifier"
+          },
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        }
+      }
+    },
+    "estate_modifier_definition_body": {
+      "fields": {
+        "key": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "0..1"
+        },
+        "type": {
+          "card": "1",
+          "value": "'loyalty' | 'influence' | 'privileges'"
+        }
+      }
+    },
     "game_age_ability_body": {},
+    "gfx_engine_object": {
+      "open": true
+    },
+    "gfx_global_textcolors": {
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "scalar",
+          "list": "int[0..255]"
+        }
+      ]
+    },
     "gfx_sprite_packs_file": {
       "patterns": [
         {
-          "body": "packentity_body",
+          "body": "sprite_pack_body",
           "card": "0..1",
-          "key": "def<packentity>",
-          "when": null
+          "key": "def<packentity>"
         },
         {
           "body": "sprite_pack_body",
           "card": "0..1",
-          "key": "def<sprite_pack>",
-          "when": null
+          "key": "def<sprite_pack>"
         }
       ]
     },
     "government_attributes_body": {},
     "government_mechanic_interaction_body": {},
     "government_mechanic_power_body": {
-      "include": [
-        "keys__type_government_mechanic_power"
-      ]
+      "fields": {
+        "base_monthly_growth": {
+          "card": "1",
+          "value": "float"
+        },
+        "development_scaled_monthly_growth": {
+          "card": "1",
+          "value": "float"
+        }
+      }
     },
     "graphical_cultures_body": {},
+    "graphical_cultures_file": {
+      "items": "enum<graphical_cultures>"
+    },
     "guru_body": {},
     "guru_teaching_body": {},
     "history_advisors_file": {
       "patterns": [
         {
           "body": "advisor_id_body",
-          "card": "0..1",
-          "key": "def<advisor_id>",
-          "when": null
+          "card": "0..*",
+          "key": "def<advisor_id>"
         }
       ]
     },
@@ -2162,8 +1896,7 @@
           "def": {
             "name": "field:name",
             "type": "bitmap_font"
-          },
-          "when": null
+          }
         }
       }
     },
@@ -2175,8 +1908,11 @@
           "def": {
             "name": "field:name",
             "type": "bitmap_font"
-          },
-          "when": null
+          }
+        },
+        "textcolors": {
+          "body": "gfx_global_textcolors",
+          "card": "0..1"
         }
       }
     },
@@ -2188,8 +1924,7 @@
           "def": {
             "name": "field:name",
             "type": "object"
-          },
-          "when": null
+          }
         },
         "PieChartType": {
           "body": "object_body",
@@ -2197,8 +1932,7 @@
           "def": {
             "name": "field:name",
             "type": "object"
-          },
-          "when": null
+          }
         },
         "animatedmaptext": {
           "body": "object_body",
@@ -2206,8 +1940,7 @@
           "def": {
             "name": "field:name",
             "type": "object"
-          },
-          "when": null
+          }
         },
         "arrowType": {
           "body": "object_body",
@@ -2215,8 +1948,7 @@
           "def": {
             "name": "field:name",
             "type": "object"
-          },
-          "when": null
+          }
         },
         "pdxmesh": {
           "body": "object_body",
@@ -2224,8 +1956,7 @@
           "def": {
             "name": "field:name",
             "type": "object"
-          },
-          "when": null
+          }
         },
         "pdxparticle": {
           "body": "object_body",
@@ -2233,8 +1964,7 @@
           "def": {
             "name": "field:name",
             "type": "object"
-          },
-          "when": null
+          }
         },
         "tradeRouteType": {
           "body": "object_body",
@@ -2242,76 +1972,94 @@
           "def": {
             "name": "field:name",
             "type": "object"
-          },
-          "when": null
+          }
         }
       }
+    },
+    "map_ambient_objects_file": {
+      "fields": {
+        "type": {
+          "body": "ambient_object_basis_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:type",
+            "type": "ambient_object_basis"
+          }
+        }
+      }
+    },
+    "map_area_file": {
+      "patterns": [
+        {
+          "body": "area_body",
+          "card": "0..1",
+          "key": "def<area.used>"
+        }
+      ]
+    },
+    "map_continent_file": {
+      "patterns": [
+        {
+          "body": "continent_body",
+          "card": "0..1",
+          "key": "def<continent>"
+        }
+      ]
     },
     "map_file": {
       "fields": {
         "categories": {
           "body": "map_file__categories",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "terrain": {
           "body": "map_file__terrain",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "tree": {
           "body": "map_file__tree",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "type": {
           "body": "map_file__type",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         }
       },
       "patterns": [
         {
           "body": "ambient_object_basis_body",
           "card": "0..1",
-          "key": "def<ambient_object_basis>",
-          "when": null
+          "key": "def<ambient_object_basis>"
         },
         {
           "body": "area_body",
           "card": "0..1",
-          "key": "def<area>",
-          "when": null
+          "key": "def<area>"
         },
         {
           "body": "continent_body",
           "card": "0..1",
-          "key": "def<continent>",
-          "when": null
+          "key": "def<continent>"
         },
         {
           "body": "province_group_body",
           "card": "0..1",
-          "key": "def<province_group>",
-          "when": null
+          "key": "def<province_group>"
         },
         {
           "body": "province_id_body",
           "card": "0..1",
-          "key": "def<province_id>",
-          "when": null
+          "key": "def<province_id>"
         },
         {
           "body": "region_body",
           "card": "0..1",
-          "key": "def<region>",
-          "when": null
+          "key": "def<region>"
         },
         {
           "body": "superregion_body",
           "card": "0..1",
-          "key": "def<superregion>",
-          "when": null
+          "key": "def<superregion>"
         }
       ]
     },
@@ -2320,8 +2068,7 @@
         {
           "body": "terrain_body",
           "card": "0..1",
-          "key": "def<terrain>",
-          "when": null
+          "key": "def<terrain>"
         }
       ]
     },
@@ -2330,8 +2077,7 @@
         {
           "body": "graphical_terrain_body",
           "card": "0..1",
-          "key": "def<graphical_terrain>",
-          "when": null
+          "key": "def<graphical_terrain>"
         }
       ]
     },
@@ -2340,8 +2086,7 @@
         {
           "body": "tree_terrain_body",
           "card": "0..1",
-          "key": "def<tree_terrain>",
-          "when": null
+          "key": "def<tree_terrain>"
         }
       ]
     },
@@ -2350,10 +2095,61 @@
         {
           "body": "ambient_object_body",
           "card": "0..1",
-          "key": "def<ambient_object>",
-          "when": null
+          "key": "def<ambient_object>"
         }
       ]
+    },
+    "map_positions_file": {
+      "patterns": [
+        {
+          "body": "province_id_body",
+          "card": "0..1",
+          "key": "def<province_id>"
+        }
+      ]
+    },
+    "map_provincegroup_file": {
+      "patterns": [
+        {
+          "body": "province_group_body",
+          "card": "0..1",
+          "key": "def<province_group.used>"
+        }
+      ]
+    },
+    "map_region_file": {
+      "patterns": [
+        {
+          "body": "region_body",
+          "card": "0..1",
+          "key": "def<region>"
+        }
+      ]
+    },
+    "map_superregion_file": {
+      "patterns": [
+        {
+          "body": "superregion_body",
+          "card": "0..1",
+          "key": "def<superregion>"
+        }
+      ]
+    },
+    "map_terrain_file": {
+      "fields": {
+        "categories": {
+          "body": "map_file__categories",
+          "card": "0..1"
+        },
+        "terrain": {
+          "body": "map_file__terrain",
+          "card": "0..1"
+        },
+        "tree": {
+          "body": "map_file__tree",
+          "card": "0..1"
+        }
+      }
     },
     "mission_body": {},
     "missions_file": {
@@ -2361,8 +2157,7 @@
         {
           "body": "mission_series_body",
           "card": "0..1",
-          "key": "def<mission_series>",
-          "when": null
+          "key": "def<mission_series>"
         }
       ]
     },
@@ -2373,25 +2168,96 @@
     "packentity_body": {},
     "papal_policy_body": {},
     "peace_options_body": {},
+    "pre_dharma_mapping_body": {
+      "patterns": [
+        {
+          "body": "pre_dharma_mapping_entry",
+          "card": "0..1",
+          "doc": "Legacy save government identifiers form a mapping table; they are not references to current reform definitions.",
+          "key": "scalar"
+        }
+      ]
+    },
+    "pre_dharma_mapping_entry": {
+      "fields": {
+        "government": {
+          "card": "1",
+          "value": "ref<government>"
+        },
+        "legacy_government": {
+          "card": "1",
+          "value": "ref<government_reform> | enum<hardcoded_legacygovernments>"
+        }
+      }
+    },
     "rebel_demand_loc_body": {},
     "religion_body": {
-      "include": [
-        "keys__type_religion"
-      ]
+      "fields": {
+        "harmonized_modifier": {
+          "card": "1",
+          "value": "scalar"
+        }
+      }
     },
     "religious_reform_body": {},
     "religious_school_body": {},
-    "revolt_trigger_body": {},
+    "revolt_trigger_body": {
+      "include": [
+        "keys__trigger"
+      ]
+    },
+    "scripted_localisation_body": {
+      "fields": {
+        "name": {
+          "card": "1",
+          "value": "scalar"
+        }
+      },
+      "open": true
+    },
+    "scripted_localisation_file": {
+      "patterns": [
+        {
+          "body": "scripted_localisation_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "defined_text"
+          },
+          "key": "scalar"
+        }
+      ]
+    },
     "sprite_file__spriteTypes": {
       "fields": {
+        "LineChartType": {
+          "body": "object_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "object"
+          }
+        },
+        "PieChartType": {
+          "body": "object_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "object"
+          }
+        },
         "corneredTileSpriteType": {
           "body": "sprite_body",
           "card": "0..*",
           "def": {
             "name": "field:name",
             "type": "sprite"
-          },
-          "when": null
+          }
+        },
+        "cursor_offset": {
+          "card": "0..1",
+          "doc": "Global cursor hotspot offset.",
+          "list": "int"
         },
         "frameAnimatedSpriteType": {
           "body": "sprite_body",
@@ -2399,8 +2265,7 @@
           "def": {
             "name": "field:name",
             "type": "sprite"
-          },
-          "when": null
+          }
         },
         "maskedShieldType": {
           "body": "sprite_body",
@@ -2408,8 +2273,12 @@
           "def": {
             "name": "field:name",
             "type": "sprite"
-          },
-          "when": null
+          }
+        },
+        "pdxmesh": {
+          "body": "gfx_engine_object",
+          "card": "0..*",
+          "doc": "Engine mesh object; it does not declare a sprite."
         },
         "progressbartype": {
           "body": "sprite_body",
@@ -2417,8 +2286,7 @@
           "def": {
             "name": "field:name",
             "type": "sprite"
-          },
-          "when": null
+          }
         },
         "spriteType": {
           "body": "sprite_body",
@@ -2426,8 +2294,7 @@
           "def": {
             "name": "field:name",
             "type": "sprite"
-          },
-          "when": null
+          }
         },
         "textSpriteType": {
           "body": "sprite_body",
@@ -2435,31 +2302,164 @@
           "def": {
             "name": "field:name",
             "type": "sprite"
-          },
-          "when": null
+          }
         }
       }
     },
     "states_general_faction_body": {},
-    "tech_ahead_of_time_body": {},
-    "technology_file_body": {},
+    "static_diplomatic_action_body": {
+      "fields": {
+        "alert_index": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "alert_tooltip": {
+          "card": "0..1",
+          "value": "loc"
+        }
+      }
+    },
+    "static_diplomatic_actions_body": {
+      "patterns": [
+        {
+          "body": "static_diplomatic_action_body",
+          "card": "0..1",
+          "key": "def<diplomatic_action>"
+        }
+      ]
+    },
+    "tech_ahead_of_time_body": {
+      "fields": {
+        "ahead_of_time_benefit_adm": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "ahead_of_time_benefit_dip": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "ahead_of_time_benefit_mil": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "monthly_russian_modernization": {
+          "card": "0..1",
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
+    },
+    "technology_file_body": {
+      "fields": {
+        "adm_tech": {
+          "card": "0..1",
+          "value": "path<common>"
+        },
+        "dip_tech": {
+          "card": "0..1",
+          "value": "path<common>"
+        },
+        "mil_tech": {
+          "card": "0..1",
+          "value": "path<common>"
+        }
+      }
+    },
     "technology_file_file": {
       "fields": {
         "groups": {
-          "body": "technology_file_body",
+          "body": "technology_file_file__groups",
           "card": "0..1",
           "def": {
             "type": "technology_file"
-          },
-          "when": null
+          }
         },
         "tables": {
           "body": "technology_file_body",
           "card": "0..1",
           "def": {
             "type": "technology_file"
-          },
-          "when": null
+          }
         }
       }
     },
@@ -2468,8 +2468,7 @@
         {
           "body": "technology_group_body",
           "card": "0..1",
-          "key": "def<technology_group>",
-          "when": null
+          "key": "def<technology_group>"
         }
       ]
     },

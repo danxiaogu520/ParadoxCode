@@ -7,16 +7,14 @@ use crate::quoted_script::{QuotedScriptParse, QuotedScriptSession};
 use crate::types::{CancellationToken, Cancelled, Diagnostic, DiagnosticCode, Severity};
 use crate::{semantic::effective_workspace_member_names, support::ParsedInput};
 use engine::AnalysisSnapshot;
-use hir::{
-    HirFile, ScopeState, ScopeValue, TemplateFragment, TemplateItem, TemplateToken, TemplateValue,
-};
+use hir::{HirFile, ScopeState, ScopeValue};
 use parser::QuotedScript;
 use rules::ir::{
-    FieldId, FieldValue, Matcher, MatcherId, RefTarget, RulesIr, ScalarFields, SchemaId, Shape,
-    SymbolFacts, TemplatePart, TypeId,
+    FieldId, FieldValue, Matcher, MatcherId, RefTarget, RulesIr, SchemaId, Shape, SymbolFacts,
+    TemplatePart, TypeId,
 };
 use rules::source::{ControlKind, Severity as RuleSeverity};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use text::TextRange;
 
 /// Workspace-backed symbol lookup for the IR's type and trait matchers.
@@ -44,6 +42,7 @@ pub(crate) fn matcher_matches(
     facts: &impl SymbolFacts,
 ) -> bool {
     match ir.matcher(matcher) {
+        Matcher::Link => hir::is_ir_scope_link(ir, value),
         Matcher::Def { .. } => !value.is_empty(),
         Matcher::Union(alternatives) => alternatives
             .iter()
@@ -98,7 +97,7 @@ pub(crate) fn matcher_matches_in_snapshot(
     }
 }
 
-fn matcher_matches_with_state(
+pub(crate) fn matcher_matches_with_state(
     snapshot: &AnalysisSnapshot,
     ir: &RulesIr,
     matcher: MatcherId,
@@ -118,7 +117,7 @@ fn matcher_matches_with_state(
     }
 }
 
-fn matcher_template_matches(
+pub(crate) fn matcher_template_matches(
     ir: &RulesIr,
     parts: &[TemplatePart],
     value: &str,
@@ -165,23 +164,16 @@ pub(crate) fn describe(ir: &RulesIr, matcher: MatcherId) -> String {
         Matcher::Ref(RefTarget::Type {
             type_id, subtype, ..
         }) => describe_type(ir, *type_id, *subtype),
-        Matcher::Ref(RefTarget::Trait(trait_id)) => {
-            format!(
-                "an instance implementing `{}`",
-                ir.strings().resolve(ir.trait_info(*trait_id).name)
-            )
-        }
+
         Matcher::Def { type_id, subtype } => {
             format!("a definition of {}", describe_type(ir, *type_id, *subtype))
         }
-        Matcher::Enum { id, rows } => {
+        Matcher::Enum { id } => {
             let info = ir.enum_info(*id);
             let values = info
                 .rows
                 .iter()
-                .enumerate()
-                .filter(|(index, _)| rows.as_ref().is_none_or(|set| set.contains(*index)))
-                .map(|(_, row)| ir.strings().resolve(row.name))
+                .map(|row| ir.strings().resolve(row.spelling))
                 .collect::<Vec<_>>();
             if values.is_empty() {
                 format!("a `{}` value", ir.strings().resolve(info.name))
@@ -229,7 +221,49 @@ pub(crate) fn spellings_with_state(
     prefix: &str,
     state: Option<&ScopeState>,
 ) -> Vec<String> {
+    if let Matcher::Union(alternatives) = ir.matcher(matcher) {
+        let mut values = alternatives
+            .iter()
+            .flat_map(|alternative| spellings_with_state(ir, *alternative, snapshot, prefix, state))
+            .collect::<Vec<_>>();
+        values.sort_by_key(|value| value.to_ascii_lowercase());
+        values.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
+        return values;
+    }
     let mut values = spellings(ir, matcher, snapshot, prefix);
+    if matches!(ir.matcher(matcher), Matcher::Scope(_) | Matcher::Link) {
+        // Keep the default list bounded to pairs of static declared links. Dynamic
+        // link operands are workspace-sized and must not form a Cartesian product.
+        let links = ir
+            .scopes
+            .links
+            .iter()
+            .filter(|link| {
+                link.pattern
+                    .iter()
+                    .all(|part| matches!(part, TemplatePart::Text(_)))
+            })
+            .map(|link| template_text(ir, &link.pattern))
+            .collect::<Vec<_>>();
+        let expected = match ir.matcher(matcher) {
+            Matcher::Scope(expected) => *expected,
+            _ => None,
+        };
+        for first in &links {
+            for second in &links {
+                let name = format!("{first}.{second}");
+                if name
+                    .to_ascii_lowercase()
+                    .contains(&prefix.to_ascii_lowercase())
+                    && scope_expression_allowed(ir, snapshot, &name, expected, state)
+                {
+                    values.push(name);
+                }
+            }
+        }
+        values.sort_by_key(|value| value.to_ascii_lowercase());
+        values.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
+    }
     if let Matcher::Scope(expected) = ir.matcher(matcher) {
         values.retain(|name| scope_expression_allowed(ir, snapshot, name, *expected, state));
     } else if matches!(ir.matcher(matcher), Matcher::Link) {
@@ -245,6 +279,29 @@ fn scope_expression_allowed(
     expected: Option<rules::ir::Symbol>,
     state: Option<&ScopeState>,
 ) -> bool {
+    if name.contains('.') {
+        let Some(mut chained) = state.cloned() else {
+            return hir::is_ir_scope_link(ir, name);
+        };
+        let segments = name.split('.').collect::<Vec<_>>();
+        for (index, segment) in segments.iter().enumerate() {
+            if !scope_expression_allowed(
+                ir,
+                snapshot,
+                segment,
+                if index + 1 == segments.len() {
+                    expected
+                } else {
+                    None
+                },
+                Some(&chained),
+            ) {
+                return false;
+            }
+            chained = hir::transition_ir_scope(ir, chained, None, segment);
+        }
+        return true;
+    }
     let current = state.and_then(|state| state.current.first());
     if let Some(link) = ir.scopes.links.iter().find(|link| {
         matcher_template_matches(ir, &link.pattern, name, &WorkspaceFacts { snapshot })
@@ -277,31 +334,10 @@ fn scope_expression_allowed(
         {
             return true;
         }
-        if ir.scopes.registers.iter().any(|register| {
-            ir.strings()
-                .resolve(register.name)
-                .eq_ignore_ascii_case(name)
-                || (register.chain
-                    && register_chain_depth(name, ir.strings().resolve(register.name)).is_some())
-        }) {
-            return if let Some(state) = state {
-                scope_state_register_matches(ir, state, name, expected)
-            } else {
-                true
-            };
-        }
-        return ["this", "root", "prev", "from"].iter().any(|prefix| {
-            (name.eq_ignore_ascii_case(prefix) || register_chain_depth(name, prefix).is_some())
-                && state
-                    .is_some_and(|state| scope_state_register_matches(ir, state, name, expected))
-        });
+        return ir.scopes.register(ir.strings(), name).is_some()
+            && state.is_none_or(|state| scope_state_register_matches(ir, state, name, expected));
     }
-    ir.scope_matches(None, name)
-        || ir.scopes.registers.iter().any(|register| {
-            let base = ir.strings().resolve(register.name);
-            name.eq_ignore_ascii_case(base)
-                || (register.chain && register_chain_depth(name, base).is_some())
-        })
+    ir.scope_matches(None, name) || ir.scopes.register(ir.strings(), name).is_some()
 }
 
 fn scope_state_register_matches(
@@ -310,21 +346,7 @@ fn scope_state_register_matches(
     register: &str,
     expected: rules::ir::Symbol,
 ) -> bool {
-    let (base, depth) = ["this", "root", "prev", "from"]
-        .into_iter()
-        .find_map(|base| register_chain_depth(register, base).map(|depth| (base, depth)))
-        .unwrap_or((register, 1));
-    let value = if base.eq_ignore_ascii_case("root") {
-        Some(&state.root)
-    } else if base.eq_ignore_ascii_case("this") {
-        state.current.first()
-    } else if base.eq_ignore_ascii_case("prev") {
-        state.previous.get(depth.saturating_sub(1))
-    } else if base.eq_ignore_ascii_case("from") {
-        state.from.get(depth.saturating_sub(1))
-    } else {
-        None
-    };
+    let value = hir::ir_scope_register_value(ir, state, register);
     value.is_none_or(|value| match value {
         ScopeValue::Unknown => true,
         ScopeValue::Invalid => false,
@@ -333,20 +355,6 @@ fn scope_state_register_matches(
                 .lookup_folded(name)
                 .is_some_and(|name| ir.scopes_compatible(name, expected))
         }),
-    })
-}
-
-fn register_chain_depth(name: &str, base: &str) -> Option<usize> {
-    if name.eq_ignore_ascii_case(base) {
-        return Some(1);
-    }
-    (2..=4).find(|&depth| {
-        name.eq_ignore_ascii_case(&base.repeat(depth))
-            || name.eq_ignore_ascii_case(
-                &std::iter::repeat_n(base, depth)
-                    .collect::<Vec<_>>()
-                    .join("_"),
-            )
     })
 }
 
@@ -362,14 +370,12 @@ fn spellings_into(
         Matcher::Template(parts) => template_spellings(ir, parts, snapshot, prefix, out),
         Matcher::Bool => out.extend(["yes".into(), "no".into()]),
         Matcher::Date => {}
-        Matcher::Enum { id, rows } => {
+        Matcher::Enum { id } => {
             let info = ir.enum_info(*id);
             out.extend(
                 info.rows
                     .iter()
-                    .enumerate()
-                    .filter(|(index, _)| rows.as_ref().is_none_or(|set| set.contains(*index)))
-                    .map(|(_, row)| ir.strings().resolve(row.name).to_owned()),
+                    .map(|row| ir.strings().resolve(row.spelling).to_owned()),
             );
         }
         Matcher::Scope(scope) => {
@@ -387,16 +393,16 @@ fn spellings_into(
                 scope_link_and_register_names(ir, snapshot)
                     .into_iter()
                     .filter(|name| {
-                        scope.is_none_or(|expected| {
-                            ir.scopes.links.iter().any(|link| {
-                                link.to
-                                    .type_name()
-                                    .is_some_and(|actual| ir.scopes_compatible(actual, expected))
-                                    && scope_link_spellings(ir, link, snapshot)
+                        ir.scopes.register(ir.strings(), name).is_some()
+                            || scope.is_none_or(|expected| {
+                                ir.scopes.links.iter().any(|link| {
+                                    link.to.type_name().is_some_and(|actual| {
+                                        ir.scopes_compatible(actual, expected)
+                                    }) && scope_link_spellings(ir, link, snapshot)
                                         .iter()
                                         .any(|candidate| candidate.eq_ignore_ascii_case(name))
-                            }) || name.eq_ignore_ascii_case(ir.strings().resolve(expected))
-                        })
+                                }) || name.eq_ignore_ascii_case(ir.strings().resolve(expected))
+                            })
                     }),
             );
         }
@@ -437,43 +443,18 @@ fn spellings_into(
                     }),
             );
         }
-        Matcher::Ref(RefTarget::Trait(trait_id)) => {
-            let facts = WorkspaceFacts { snapshot };
-            for info in &ir.types {
-                if info.trait_impls.iter().any(|imp| imp.trait_id == *trait_id) {
-                    out.extend(
-                        info.builtin
-                            .iter()
-                            .map(|member| ir.strings().resolve(*member).to_owned()),
-                    );
-                    out.extend(effective_workspace_member_names(
-                        snapshot,
-                        ir.strings().resolve(info.name),
-                    ));
-                }
-                let Some(type_id) = ir.type_by_name(ir.strings().resolve(info.name)) else {
-                    continue;
-                };
-                for subtype in info.subtypes.iter().filter(|subtype| {
-                    subtype
-                        .trait_impls
-                        .iter()
-                        .any(|implementation| implementation.trait_id == *trait_id)
-                }) {
-                    out.extend(
-                        effective_workspace_member_names(snapshot, ir.strings().resolve(info.name))
-                            .into_iter()
-                            .filter(|member| {
-                                facts.type_subtype_member(type_id, subtype.name, member)
-                            }),
-                    );
-                }
-            }
-        }
+
         Matcher::Def { type_id, .. } => {
             let name = ir.strings().resolve(ir.type_info(*type_id).name);
             out.extend(effective_workspace_member_names(snapshot, name));
+            out.extend(
+                ir.type_info(*type_id)
+                    .builtin
+                    .iter()
+                    .map(|member| ir.strings().resolve(*member).to_owned()),
+            );
         }
+        Matcher::Loc => out.extend(effective_workspace_member_names(snapshot, "localisation")),
         Matcher::Union(items) => {
             for item in items {
                 spellings_into(ir, *item, snapshot, prefix, out);
@@ -482,7 +463,6 @@ fn spellings_into(
         Matcher::Scalar
         | Matcher::Int { .. }
         | Matcher::Float { .. }
-        | Matcher::Loc
         | Matcher::Path(_)
         | Matcher::Quoted(_)
         | Matcher::Opaque => {}
@@ -526,28 +506,23 @@ fn template_spellings(
     out.extend(variants.into_iter().filter(|value| {
         value
             .to_ascii_lowercase()
-            .starts_with(&prefix.to_ascii_lowercase())
+            .contains(&prefix.to_ascii_lowercase())
     }));
 }
 
 fn scope_link_and_register_names(ir: &RulesIr, snapshot: &AnalysisSnapshot) -> Vec<String> {
-    let mut names = vec![
-        "this".to_owned(),
-        "root".to_owned(),
-        "prev".to_owned(),
-        "from".to_owned(),
-    ];
+    let mut names = Vec::new();
     for link in ir.scopes.links.iter() {
         names.extend(scope_link_spellings(ir, link, snapshot));
     }
     for register in ir.scopes.registers.iter() {
-        let name = ir.strings().resolve(register.name);
-        names.push(name.to_owned());
+        let name = ir.strings().resolve(register.name).to_ascii_uppercase();
+        names.push(name.clone());
         if register.chain {
             for depth in 2..=4 {
                 names.push(name.repeat(depth));
                 names.push(
-                    std::iter::repeat_n(name, depth)
+                    std::iter::repeat_n(name.as_str(), depth)
                         .collect::<Vec<_>>()
                         .join("_"),
                 );
@@ -692,15 +667,175 @@ fn schema_diagnostics(
     hir: &HirFile,
     cancellation: &CancellationToken,
 ) -> Result<Vec<Diagnostic>, Cancelled> {
+    schema_diagnostics_at_depth(snapshot, hir, cancellation, 0, false)
+}
+
+/// Rule-only overload groups that can impose an occurrence bound. Keep every
+/// overload in a retained group: an unbounded or differently scoped alternative
+/// still participates in the effective bounds at each source location.
+struct CardinalityGroups(Vec<(MatcherId, Vec<FieldId>)>);
+
+/// Point queries over schema ranges, preserving the linear lookup's shortest
+/// containing range and source-order tie break. Subtree end bounds avoid
+/// visiting disjoint earlier blocks for every scalar in a large document.
+struct SchemaFactIndex<'a> {
+    entries: Vec<(usize, &'a hir::SchemaFact)>,
+    max_ends: Vec<text::TextSize>,
+    leaf_base: usize,
+}
+
+struct SchemaPointQuery {
+    position: text::TextSize,
+    schema: Option<SchemaId>,
+    limit: usize,
+}
+
+impl<'a> SchemaFactIndex<'a> {
+    fn new(facts: &'a [hir::SchemaFact]) -> Self {
+        let mut entries = facts.iter().enumerate().collect::<Vec<_>>();
+        entries.sort_by_key(|(_, fact)| fact.range.start());
+        let leaf_base = entries.len().max(1).next_power_of_two();
+        let mut max_ends = vec![0; leaf_base * 2];
+        for (index, (_, fact)) in entries.iter().enumerate() {
+            max_ends[leaf_base + index] = fact.range.end();
+        }
+        for node in (1..leaf_base).rev() {
+            max_ends[node] = max_ends[node * 2].max(max_ends[node * 2 + 1]);
+        }
+        Self {
+            entries,
+            max_ends,
+            leaf_base,
+        }
+    }
+
+    fn at(
+        &self,
+        position: text::TextSize,
+        schema: Option<SchemaId>,
+    ) -> Option<&'a hir::SchemaFact> {
+        let query = SchemaPointQuery {
+            position,
+            schema,
+            limit: self
+                .entries
+                .partition_point(|(_, fact)| fact.range.start() <= position),
+        };
+        let mut best = None;
+        self.visit(1, 0..self.leaf_base, &query, &mut best);
+        best.map(|(_, fact)| fact)
+    }
+
+    fn visit(
+        &self,
+        node: usize,
+        bounds: std::ops::Range<usize>,
+        query: &SchemaPointQuery,
+        best: &mut Option<(usize, &'a hir::SchemaFact)>,
+    ) {
+        if bounds.start >= query.limit || self.max_ends[node] < query.position {
+            return;
+        }
+        if bounds.len() == 1 {
+            let (index, fact) = self.entries[bounds.start];
+            if query.schema.is_none_or(|schema| fact.schema == schema)
+                && crate::support::contains(fact.range, query.position)
+                && best.is_none_or(|(previous, previous_fact)| {
+                    (fact.range.len(), index) < (previous_fact.range.len(), previous)
+                })
+            {
+                *best = Some((index, fact));
+            }
+            return;
+        }
+        let middle = bounds.start + bounds.len() / 2;
+        self.visit(node * 2, bounds.start..middle, query, best);
+        self.visit(node * 2 + 1, middle..bounds.end, query, best);
+    }
+}
+
+fn cardinality_groups(
+    snapshot: &AnalysisSnapshot,
+    schema: SchemaId,
+) -> std::sync::Arc<CardinalityGroups> {
+    let key = format!("ir-cardinality-groups:{}", schema.index());
+    if let Some(groups) = snapshot
+        .query_cache()
+        .get::<CardinalityGroups>(snapshot.revision(), &key)
+    {
+        return groups;
+    }
+    let ir = snapshot.ir();
+    let mut groups = BTreeMap::<MatcherId, Vec<FieldId>>::new();
+    for id in ir.fields(schema) {
+        groups.entry(ir.field(id).key).or_default().push(id);
+    }
+    let groups = std::sync::Arc::new(CardinalityGroups(
+        groups
+            .into_iter()
+            .filter(|(_, ids)| {
+                ids.iter()
+                    .any(|id| ir.field(*id).card.min != 0 || ir.field(*id).card.max.is_some())
+            })
+            .collect(),
+    ));
+    snapshot.query_cache().insert(
+        snapshot.revision(),
+        engine::CacheDomain::Index,
+        key,
+        std::sync::Arc::clone(&groups),
+    );
+    groups
+}
+
+fn schema_diagnostics_at_depth(
+    snapshot: &AnalysisSnapshot,
+    hir: &HirFile,
+    cancellation: &CancellationToken,
+    callable_depth: usize,
+    partial_root: bool,
+) -> Result<Vec<Diagnostic>, Cancelled> {
     let ir = snapshot.ir();
     let facts = WorkspaceFacts { snapshot };
+    let schema_index = SchemaFactIndex::new(hir.schema_facts());
     let mut diagnostics = Vec::new();
     let callable_arguments = callable_argument_key_ranges(snapshot, hir, cancellation)?;
     let mut direct_counts =
         BTreeMap::<(TextRange, FieldId), BTreeMap<String, (u32, TextRange)>>::new();
+    let mut unbound_keys = BTreeSet::new();
     let properties = hir.properties();
     for property in properties {
         cancellation.checkpoint()?;
+        let owner_range = (!hir.parameter_references().is_empty())
+            .then(|| {
+                hir.definitions()
+                    .iter()
+                    .find(|definition| {
+                        definition.range.start() <= property.range.start()
+                            && property.range.end() <= definition.range.end()
+                            && crate::semantic::dynamic_definition_type(snapshot, &definition.kind)
+                    })
+                    .map(|definition| definition.range)
+            })
+            .flatten();
+        let binding_dependent = |range: TextRange| {
+            owner_range.is_some_and(|owner| {
+                hir.parameter_references().iter().any(|reference| {
+                    reference.owner_range == owner
+                        && range.start() <= reference.range.start()
+                        && reference.range.end() <= range.end()
+                })
+            })
+        };
+        if binding_dependent(property.key_range) {
+            if let Some(field) = hir.field_fact_at(property.key_range)
+                && let Some(parent) =
+                    schema_index.at(property.key_range.start(), Some(field.schema))
+            {
+                unbound_keys.insert((parent.range, parent.schema));
+            }
+            continue;
+        }
         if callable_arguments.contains(&property.key_range) {
             continue;
         }
@@ -708,14 +843,14 @@ fn schema_diagnostics(
             continue;
         };
         let Some(parent_schema) =
-            ir.schema_facts_for_range(hir, field_fact.schema, property.key_range)
+            schema_index.at(property.key_range.start(), Some(field_fact.schema))
         else {
             continue;
         };
         let candidates = field_fact.fields.clone();
         if candidates.is_empty() {
             let known = ir
-                .fields(field_fact.schema, &field_fact.subtypes)
+                .fields(field_fact.schema)
                 .into_iter()
                 .find(|id| matcher_matches(ir, ir.field(*id).key, &property.key, &facts));
             if let Some(id) = known {
@@ -737,11 +872,33 @@ fn schema_diagnostics(
                     ),
                 ));
             } else if !ir.schema(field_fact.schema).open {
+                let expected = ir
+                    .schema(field_fact.schema)
+                    .exact
+                    .is_empty()
+                    .then(|| {
+                        ir.fields(field_fact.schema).into_iter().find_map(|id| {
+                            let key = ir.field(id).key;
+                            matches!(ir.matcher(key), Matcher::Ref(_) | Matcher::Enum { .. })
+                                .then(|| describe(ir, key))
+                        })
+                    })
+                    .flatten();
                 diagnostics.push(Diagnostic::new(
                     DiagnosticCode::UnknownKey,
                     DiagnosticCode::UnknownKey.severity(),
                     property.key_range,
-                    format!("unknown key `{}`", property.key),
+                    misplaced_callable_key(snapshot, field_fact.schema, &property.key)
+                        .unwrap_or_else(|| {
+                            format!(
+                                "unknown key `{}`{}{}",
+                                property.key,
+                                unknown_key_context(snapshot, hir, field_fact.schema, property),
+                                expected.map_or(String::new(), |expected| format!(
+                                    "; expected {expected}"
+                                ))
+                            )
+                        }),
                 ));
             }
             continue;
@@ -789,6 +946,39 @@ fn schema_diagnostics(
             && !scope.scopes_in.is_empty()
             && !scope_allows(ir, current, &scope.scopes_in)
         {
+            let actual = match current {
+                ScopeValue::Known(names) => names
+                    .iter()
+                    .map(|name| name.as_ref())
+                    .collect::<Vec<_>>()
+                    .join("/"),
+                _ => "any".to_owned(),
+            };
+            let expected = scope
+                .scopes_in
+                .iter()
+                .map(|scope| format!("`{}`", ir.strings().resolve(*scope)))
+                .collect::<Vec<_>>()
+                .join(" or ");
+            diagnostics.push(
+                Diagnostic::new(
+                    DiagnosticCode::WrongScope,
+                    DiagnosticCode::WrongScope.severity(),
+                    property.key_range,
+                    format!("`{}` is not available in scope `{actual}`", property.key),
+                )
+                .with_expected(expected),
+            );
+        }
+        if matches!(ir.matcher(field.key), Matcher::Link)
+            && !scope_expression_allowed(
+                ir,
+                snapshot,
+                &property.key,
+                None,
+                Some(&parent_schema.state),
+            )
+        {
             diagnostics.push(Diagnostic::new(
                 DiagnosticCode::WrongScope,
                 DiagnosticCode::WrongScope.severity(),
@@ -797,6 +987,7 @@ fn schema_diagnostics(
             ));
         }
         if let (FieldValue::Scalar(matcher), Some(scalar)) = (field.value, property.scalar.as_ref())
+            && !binding_dependent(scalar.range)
             && !matcher_matches_with_state(
                 snapshot,
                 ir,
@@ -806,21 +997,107 @@ fn schema_diagnostics(
                 &parent_schema.state,
             )
         {
-            diagnostics.push(Diagnostic::new(
-                DiagnosticCode::InvalidValue,
-                severity(field.severity),
+            let wrong_scope =
+                matcher_has_scope(ir, matcher) && hir::is_ir_scope_link(ir, &scalar.value);
+            let texture = matcher_has_texture_path(ir, matcher);
+            let mut diagnostic = Diagnostic::new(
+                if wrong_scope {
+                    DiagnosticCode::WrongScope
+                } else if texture {
+                    DiagnosticCode::UnknownTexturePath
+                } else {
+                    DiagnosticCode::InvalidValue
+                },
+                if wrong_scope {
+                    DiagnosticCode::WrongScope.severity()
+                } else {
+                    severity(field.severity)
+                },
                 scalar.range,
-                format!("expected {}", describe(ir, matcher)),
-            ));
+                if texture {
+                    format!(
+                        "texture file `{}` not found in any mod, game, or DLC pack root",
+                        scalar.value
+                    )
+                } else {
+                    format!("invalid value `{}` for `{}`", scalar.value, property.key)
+                },
+            );
+            if !texture {
+                diagnostic = diagnostic.with_expected(diagnostic_description(ir, matcher));
+            }
+            if matches!(ir.matcher(matcher), Matcher::Enum { .. }) {
+                let names = spellings(ir, matcher, snapshot, "");
+                if let Some(candidate) =
+                    crate::suggest::best_suggestion(&scalar.value, names.iter().map(String::as_str))
+                {
+                    diagnostic
+                        .message
+                        .push_str(&crate::messages::did_you_mean(Some(candidate)));
+                    diagnostic = diagnostic.with_fix(crate::QuickFix::suggestion(
+                        format!("Did you mean '{candidate}'?"),
+                        scalar.range,
+                        format!("\"{}\"", parser::encode_quoted_script_text(candidate)),
+                    ));
+                }
+            }
+            diagnostics.push(diagnostic);
         }
     }
     for fact in hir.schema_facts() {
         cancellation.checkpoint()?;
-        let mut overloads = BTreeMap::<MatcherId, Vec<FieldId>>::new();
-        for id in ir.fields(fact.schema, &fact.subtypes) {
-            overloads.entry(ir.field(id).key).or_default().push(id);
+        let schema = ir.schema(fact.schema);
+        // A substituted key can satisfy a required field or pattern only after
+        // binding. Keep this deferral local to its immediate enclosing schema.
+        let partial = unbound_keys.contains(&(fact.range, fact.schema))
+            || (partial_root
+                && fact.range.start() == 0
+                && fact.range.end() as usize == hir.syntax().source().len());
+        if !partial
+            && !schema.forms.is_empty()
+            && !schema.forms.iter().any(|form| {
+                form.counts.iter().all(|(ids, card)| {
+                    let count = ids
+                        .iter()
+                        .filter_map(|id| direct_counts.get(&(fact.range, *id)))
+                        .flat_map(|counts| counts.values())
+                        .fold(0_u32, |total, (count, _)| total.saturating_add(*count));
+                    count >= card.min && card.max.is_none_or(|max| count <= max)
+                })
+            })
+        {
+            let forms = schema
+                .forms
+                .iter()
+                .map(|form| {
+                    form.counts
+                        .iter()
+                        .map(|(ids, card)| {
+                            let name = ids
+                                .first()
+                                .map(|id| matcher_key_name(ir, ir.field(*id).key))
+                                .unwrap_or_default();
+                            let bounds = match card.max {
+                                Some(max) if max == card.min => card.min.to_string(),
+                                Some(max) => format!("{}..{max}", card.min),
+                                None => format!("{}..*", card.min),
+                            };
+                            format!("`{name}` × {bounds}")
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                })
+                .collect::<Vec<_>>()
+                .join("; or ");
+            diagnostics.push(Diagnostic::new(
+                DiagnosticCode::Cardinality,
+                DiagnosticCode::Cardinality.severity(),
+                TextRange::empty(fact.range.start()),
+                format!("block must match one of these forms: {forms}"),
+            ));
         }
-        for (key, ids) in overloads {
+        let overloads = cardinality_groups(snapshot, fact.schema);
+        for (key, ids) in &overloads.0 {
             let applicable = ids
                 .iter()
                 .copied()
@@ -836,6 +1113,22 @@ fn schema_diagnostics(
                 })
                 .collect::<Vec<_>>();
             if applicable.is_empty() {
+                continue;
+            }
+            let min = applicable
+                .iter()
+                .map(|id| ir.field(*id).card.min)
+                .max()
+                .unwrap_or(0);
+            let max = if applicable.iter().any(|id| ir.field(*id).card.max.is_none()) {
+                None
+            } else {
+                applicable
+                    .iter()
+                    .filter_map(|id| ir.field(*id).card.max)
+                    .max()
+            };
+            if min == 0 && max.is_none() {
                 continue;
             }
             let mut counts = BTreeMap::<String, (u32, TextRange)>::new();
@@ -855,46 +1148,29 @@ fn schema_diagnostics(
                 .map(|(_, range)| *range)
                 .min_by_key(|range| range.start())
                 .unwrap_or(fact.range);
-            let min = applicable
-                .iter()
-                .map(|id| ir.field(*id).card.min)
-                .max()
-                .unwrap_or(0);
-            let max = if applicable.iter().any(|id| ir.field(*id).card.max.is_none()) {
-                None
-            } else {
-                applicable
-                    .iter()
-                    .filter_map(|id| ir.field(*id).card.max)
-                    .max()
-            };
             let field = ir.field(applicable[0]);
-            if count < min {
-                let owned_guard = hir.properties().iter().find(|property| property.value_range == Some(fact.range)).and_then(|property| {
-                    hir.field_fact_at(property.key_range)
-                }).is_some_and(|owner| owner.fields.iter().any(|id| {
-                    ir.field(*id).control.as_ref().and_then(|control| control.guard).is_some_and(|guard| {
-                        matches!(ir.matcher(key), Matcher::Literal(name) if *name == guard)
-                    })
-                }));
-                if !owned_guard {
-                    let name = matcher_key_name(ir, key);
-                    diagnostics.push(field_diagnostic(
-                        ir,
-                        fact.schema,
-                        applicable[0],
-                        Diagnostic::new(
-                            DiagnosticCode::Cardinality,
-                            severity(field.severity),
-                            TextRange::empty(anchor.start()),
-                            format!(
-                                "`{name}` must occur at least {} {}",
-                                min,
-                                if min == 1 { "time" } else { "times" }
-                            ),
-                        ),
-                    ));
-                }
+            if !partial && count < min {
+                let name = matcher_key_name(ir, *key);
+                diagnostics.push(field_diagnostic(
+                    ir,
+                    fact.schema,
+                    applicable[0],
+                    Diagnostic::new(
+                        DiagnosticCode::Cardinality,
+                        severity(field.severity),
+                        hir.properties()
+                            .iter()
+                            .find(|property| property.value_range == Some(fact.range))
+                            .map_or(TextRange::empty(anchor.start()), |property| {
+                                property.key_range
+                            }),
+                        if min == 1 {
+                            format!("this block is missing required key `{name}`")
+                        } else {
+                            format!("`{name}` must occur at least {min} times")
+                        },
+                    ),
+                ));
             }
             // Pattern cardinality limits repeated instances of the same key,
             // not the entire vocabulary accepted by that pattern.
@@ -921,28 +1197,42 @@ fn schema_diagnostics(
     }
     for value in hir.bare_values() {
         cancellation.checkpoint()?;
-        let Some(fact) = hir
-            .schema_facts()
-            .iter()
-            .filter(|fact| crate::support::contains(fact.range, value.range.start()))
-            .min_by_key(|fact| fact.range.len())
-        else {
+        let Some(fact) = schema_index.at(value.range.start(), None) else {
             continue;
         };
         let Some(matcher) = ir.schema(fact.schema).items else {
             continue;
         };
         if !matcher_matches_with_state(snapshot, ir, matcher, &value.value, &facts, &fact.state) {
-            diagnostics.push(Diagnostic::new(
-                DiagnosticCode::InvalidValue,
-                DiagnosticCode::InvalidValue.severity(),
-                value.range,
-                format!("expected {}", describe(ir, matcher)),
-            ));
+            let overflow = numeric_range_overflow(ir, matcher, &value.value);
+            diagnostics.push(
+                Diagnostic::new(
+                    DiagnosticCode::InvalidValue,
+                    if overflow {
+                        Severity::Warning
+                    } else {
+                        DiagnosticCode::InvalidValue.severity()
+                    },
+                    value.range,
+                    if overflow {
+                        format!("value `{}` is out of range", value.value)
+                    } else {
+                        format!("value `{}` is not valid here", value.value)
+                    },
+                )
+                .with_expected(diagnostic_description(ir, matcher)),
+            );
         }
     }
     diagnostics.extend(control_lints(ir, hir, &facts, cancellation)?);
-    diagnostics.extend(callable_argument_diagnostics(snapshot, hir, cancellation)?);
+    if callable_depth < 8 {
+        diagnostics.extend(callable_argument_diagnostics(
+            snapshot,
+            hir,
+            cancellation,
+            callable_depth,
+        )?);
+    }
     for diagnostic in &mut diagnostics {
         if diagnostic.provenance.is_some() || diagnostic.code == DiagnosticCode::UnknownKey {
             continue;
@@ -961,6 +1251,159 @@ fn schema_diagnostics(
         }
     }
     Ok(diagnostics)
+}
+
+fn callable_context(snapshot: &AnalysisSnapshot, schema: SchemaId) -> Option<&str> {
+    let ir = snapshot.ir();
+    ir.fields(schema).into_iter().find_map(|id| {
+        let kind = crate::ir_callable::callable_kind(ir, ir.field(id).key)?;
+        snapshot.rules().dynamic_definition_context(&kind)
+    })
+}
+
+fn unknown_key_context(
+    snapshot: &AnalysisSnapshot,
+    hir: &HirFile,
+    schema: SchemaId,
+    property: &hir::HirProperty,
+) -> String {
+    if let Some(context) = callable_context(snapshot, schema) {
+        return format!(" in {} `{context}` block", indefinite_article(context));
+    }
+    hir.definitions()
+        .iter()
+        .filter(|definition| {
+            definition.range.start() <= property.range.start()
+                && property.range.end() <= definition.range.end()
+        })
+        .min_by_key(|definition| definition.range.len())
+        .map_or(String::new(), |definition| {
+            format!(
+                " in {} `{}` definition",
+                indefinite_article(&definition.kind),
+                definition.kind
+            )
+        })
+}
+
+fn indefinite_article(name: &str) -> &'static str {
+    if name.starts_with(['a', 'e', 'i', 'o', 'u']) {
+        "an"
+    } else {
+        "a"
+    }
+}
+
+fn misplaced_callable_key(
+    snapshot: &AnalysisSnapshot,
+    schema: SchemaId,
+    key: &str,
+) -> Option<String> {
+    let ir = snapshot.ir();
+    let current = callable_context(snapshot, schema)?;
+    for ty in &ir.types {
+        let name = ir.strings().resolve(ty.name);
+        let Some(other) = snapshot.rules().dynamic_definition_context(name) else {
+            continue;
+        };
+        if other == current {
+            continue;
+        }
+        let Some(schema) = ir.schema_by_name(other) else {
+            continue;
+        };
+        if ir.fields(schema).into_iter().any(|id| matches!(ir.matcher(ir.field(id).key), Matcher::Literal(name) if ir.strings().resolve(*name).eq_ignore_ascii_case(key))) {
+            let guard = ir.schema_by_name(current).and_then(|schema| ir.fields(schema).into_iter().find_map(|id| {
+                let field = ir.field(id);
+                if field.control.as_ref()?.kind != ControlKind::Guard { return None; }
+                match ir.matcher(field.key) { Matcher::Literal(name) => Some(ir.strings().resolve(*name)), _ => None }
+            }));
+            return Some(format!("`{key}` is {} {other} and cannot be used inside {} {current} block{}", indefinite_article(other), indefinite_article(current), guard.map_or(String::new(), |guard| format!("; conditions belong in a `{guard}` block"))));
+        }
+    }
+    None
+}
+
+fn matcher_has_texture_path(ir: &RulesIr, matcher: MatcherId) -> bool {
+    match ir.matcher(matcher) {
+        Matcher::Path(Some(category)) => {
+            ir.strings().resolve(*category).eq_ignore_ascii_case("gfx")
+        }
+        Matcher::Union(items) => items.iter().any(|item| matcher_has_texture_path(ir, *item)),
+        _ => false,
+    }
+}
+
+/// Diagnostic expectations preserve the public message contract. Hover can use
+/// the more compact matcher description without changing diagnostic identities.
+fn diagnostic_description(ir: &RulesIr, matcher: MatcherId) -> String {
+    match ir.matcher(matcher) {
+        Matcher::Ref(RefTarget::Type {
+            type_id, subtype, ..
+        }) => {
+            let name = ir.strings().resolve(ir.type_info(*type_id).name);
+            subtype.map_or_else(
+                || format!("{} `{name}` name", indefinite_article(name)),
+                |subtype| {
+                    format!(
+                        "{} `{}` `{name}` name",
+                        indefinite_article(ir.strings().resolve(subtype)),
+                        ir.strings().resolve(subtype)
+                    )
+                },
+            )
+        }
+        Matcher::Int { min, max } => diagnostic_range("whole number", *min, *max),
+        Matcher::Float { min, max } => diagnostic_range("number", *min, *max),
+        Matcher::Enum { id } => format!(
+            "one of {}",
+            ir.enum_info(*id)
+                .rows
+                .iter()
+                .map(|row| format!("`{}`", ir.strings().resolve(row.spelling)))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        Matcher::Union(items) => items
+            .iter()
+            .map(|item| diagnostic_description(ir, *item))
+            .collect::<Vec<_>>()
+            .join(", or "),
+        _ => describe(ir, matcher),
+    }
+}
+
+fn diagnostic_range<T: std::fmt::Display>(name: &str, min: Option<T>, max: Option<T>) -> String {
+    match (min, max) {
+        (Some(min), Some(max)) => format!("a {name} between {min} and {max}"),
+        (Some(min), None) => format!("a {name} of at least {min}"),
+        (None, Some(max)) => format!("a {name} of at most {max}"),
+        (None, None) => format!("a {name}"),
+    }
+}
+
+fn matcher_has_scope(ir: &RulesIr, matcher: MatcherId) -> bool {
+    match ir.matcher(matcher) {
+        Matcher::Scope(_) => true,
+        Matcher::Union(items) => items.iter().any(|item| matcher_has_scope(ir, *item)),
+        _ => false,
+    }
+}
+
+fn numeric_range_overflow(ir: &RulesIr, matcher: MatcherId, value: &str) -> bool {
+    match ir.matcher(matcher) {
+        Matcher::Int { min, max } => value.parse::<i64>().is_ok_and(|value| {
+            min.is_some_and(|min| value < min) || max.is_some_and(|max| value > max)
+        }),
+        Matcher::Float { min, max } => value.parse::<f64>().is_ok_and(|value| {
+            value.is_finite()
+                && (min.is_some_and(|min| value < min) || max.is_some_and(|max| value > max))
+        }),
+        Matcher::Union(items) => items
+            .iter()
+            .any(|item| numeric_range_overflow(ir, *item, value)),
+        _ => false,
+    }
 }
 
 fn field_provenance(
@@ -1030,7 +1473,17 @@ fn quoted_schema_diagnostics(
         };
         let script = match session.parse(raw, layers.len())? {
             QuotedScriptParse::Parsed(script) => script,
-            QuotedScriptParse::Opaque | QuotedScriptParse::Limited(_) => continue,
+            QuotedScriptParse::Opaque => continue,
+            QuotedScriptParse::Limited(reason) => {
+                let range = map_quoted_range(scalar.range, layers).unwrap_or(scalar.range);
+                out.push(Diagnostic::new(
+                    crate::DiagnosticCode::Syntax,
+                    crate::Severity::Warning,
+                    range,
+                    reason.message().to_owned(),
+                ));
+                continue;
+            }
         };
         let parent = hir
             .schema_facts()
@@ -1056,9 +1509,24 @@ fn quoted_schema_diagnostics(
             );
             layers.push((scalar.range.start(), script.clone()));
             let mut nested = schema_diagnostics(snapshot, &fragment, cancellation)?;
+            nested.extend(
+                script
+                    .parsed()
+                    .errors()
+                    .iter()
+                    .map(crate::diagnostics::diagnostic_from_syntax),
+            );
             for diagnostic in &mut nested {
                 if let Some(mapped) = map_quoted_range(diagnostic.range, layers) {
                     diagnostic.range = mapped;
+                }
+                for fix in &mut diagnostic.fixes {
+                    if let Some(mapped) = map_quoted_range(fix.range, layers) {
+                        fix.range = mapped;
+                        for _ in layers.iter() {
+                            fix.new_text = parser::encode_quoted_script_text(&fix.new_text);
+                        }
+                    }
                 }
             }
             out.extend(nested);
@@ -1102,6 +1570,7 @@ fn callable_argument_diagnostics(
     snapshot: &AnalysisSnapshot,
     hir: &HirFile,
     cancellation: &CancellationToken,
+    depth: usize,
 ) -> Result<Vec<Diagnostic>, Cancelled> {
     let ir = snapshot.ir();
     let Some(callable) = ir.trait_by_name("Callable") else {
@@ -1122,14 +1591,7 @@ fn callable_argument_diagnostics(
                 let implements = info
                     .trait_impls
                     .iter()
-                    .any(|implementation| implementation.trait_id == callable)
-                    || info.subtypes.iter().any(|subtype| {
-                        field_fact.subtypes.contains(type_id, subtype.name)
-                            && subtype
-                                .trait_impls
-                                .iter()
-                                .any(|implementation| implementation.trait_id == callable)
-                    });
+                    .any(|implementation| implementation.trait_id == callable);
                 implements.then(|| ir.strings().resolve(info.name).to_owned())
             })
         }) else {
@@ -1143,17 +1605,22 @@ fn callable_argument_diagnostics(
         }) {
             continue;
         }
+        if hir.parameter_references().iter().any(|reference| {
+            property.range.start() <= reference.range.start()
+                && reference.range.end() <= property.range.end()
+        }) {
+            continue;
+        }
         let Some(summary) =
             crate::semantic::dynamic_definition_summary(snapshot, &kind, &property.key)
         else {
             continue;
         };
-        let parameter_matchers =
-            callable_parameter_matchers(snapshot, &kind, &property.key, cancellation)?;
+        let bindings = crate::ir_callable::invocation_bindings(hir, property);
+        let state = crate::ir_callable::invocation_state(hir, property);
         let child_path_len = property.path.len() + 1;
         let arguments = hir
-            .properties()
-            .iter()
+            .properties_in_range(property.range)
             .filter(|child| {
                 child.path.len() == child_path_len
                     && child.path.starts_with(&property.path)
@@ -1162,37 +1629,153 @@ fn callable_argument_diagnostics(
             })
             .collect::<Vec<_>>();
         let mut counts = BTreeMap::<String, u32>::new();
-        for argument in &arguments {
+        for (argument_index, argument) in arguments.iter().enumerate() {
             cancellation.checkpoint()?;
-            if let (Some(scalar), Some(matchers)) = (
-                argument.scalar.as_ref(),
-                parameter_matchers.get(&argument.key.to_ascii_lowercase()),
-            ) {
-                let invalid = matchers
-                    .iter()
-                    .copied()
-                    .filter(|matcher| {
-                        !matcher_matches_in_snapshot(
-                            snapshot,
-                            ir,
-                            *matcher,
-                            &scalar.value,
-                            &WorkspaceFacts { snapshot },
-                        )
+            // The game's last scalar binding wins; earlier duplicate values still get the
+            // duplicate warning, but must not produce a stale usage-site error.
+            let shadowed = arguments[argument_index + 1..].iter().any(|later| {
+                later.key.eq_ignore_ascii_case(&argument.key) && later.scalar.is_some()
+            });
+            if let Some(scalar) = argument.scalar.as_ref().filter(|_| !shadowed) {
+                let sites = crate::ir_callable::parameter_sites(
+                    snapshot,
+                    &kind,
+                    &property.key,
+                    &argument.key,
+                    &bindings,
+                    state.clone(),
+                    cancellation,
+                )?;
+                if !scalar.quoted
+                    && sites.iter().any(|site| {
+                        matches!(site.domain, crate::ir_callable::Domain::Payload { .. })
                     })
+                {
+                    diagnostics.push(Diagnostic::new(DiagnosticCode::InvalidValue, Severity::Warning,
+                        scalar.range, format!("parameter `{}` of scripted `{}` is spliced into a quoted script payload; provide its value as a quoted script", argument.key, summary.name)));
+                }
+                if scalar.quoted
+                    && sites.iter().any(|site| {
+                        matches!(site.domain, crate::ir_callable::Domain::Payload { .. })
+                    })
+                {
+                    let source = hir.syntax().source();
+                    if let Some(raw) =
+                        source.get(scalar.range.start() as usize..scalar.range.end() as usize)
+                    {
+                        let mut session = QuotedScriptSession::new(cancellation);
+                        if let QuotedScriptParse::Parsed(script) = session.parse(raw, depth)? {
+                            let mut usages: Vec<(
+                                &crate::ir_callable::ParameterSite,
+                                Vec<Vec<Diagnostic>>,
+                            )> = Vec::new();
+                            for site in &sites {
+                                let crate::ir_callable::Domain::Payload { schema, complete } =
+                                    site.domain
+                                else {
+                                    continue;
+                                };
+                                let fragment = hir::lower_ir_schema(
+                                    std::sync::Arc::new(script.parsed().clone()),
+                                    ir,
+                                    schema,
+                                    Default::default(),
+                                    site.state.clone(),
+                                    &WorkspaceFacts { snapshot },
+                                );
+                                let diagnostics = schema_diagnostics_at_depth(
+                                    snapshot,
+                                    &fragment,
+                                    cancellation,
+                                    depth + 1,
+                                    !complete,
+                                )?;
+                                if let Some((_, alternatives)) =
+                                    usages.iter_mut().find(|(other, _)| {
+                                        other.origin == site.origin
+                                            && other.token.range == site.token.range
+                                            && other.state == site.state
+                                    })
+                                {
+                                    alternatives.push(diagnostics);
+                                } else {
+                                    usages.push((site, vec![diagnostics]));
+                                }
+                            }
+                            // Overloads at one usage are alternatives. Distinct usages all
+                            // interpret the payload, so each must accept its statements.
+                            let mut emitted = BTreeSet::new();
+                            for (_, alternatives) in usages {
+                                let Some(first) = alternatives.first() else {
+                                    continue;
+                                };
+                                for diagnostic in first {
+                                    if alternatives.iter().all(|group| {
+                                        group.iter().any(|candidate| {
+                                            candidate.code == diagnostic.code
+                                                && candidate.range == diagnostic.range
+                                        })
+                                    }) && emitted.insert((diagnostic.code, diagnostic.range))
+                                    {
+                                        let mut diagnostic = diagnostic.clone();
+                                        if let Some(relative) =
+                                            script.source_map().decoded_range(diagnostic.range)
+                                            && let Some(range) = TextRange::new(
+                                                scalar.range.start() + relative.start(),
+                                                scalar.range.start() + relative.end(),
+                                            )
+                                        {
+                                            diagnostic.range = range;
+                                            diagnostics.push(diagnostic);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                let invalid = sites
+                    .iter()
+                    .filter(|site| !site.accepts(snapshot, &argument.key, &scalar.value))
                     .collect::<Vec<_>>();
                 if !invalid.is_empty() {
-                    let expected = invalid
-                        .iter()
-                        .map(|matcher| describe(ir, *matcher))
-                        .collect::<Vec<_>>();
+                    let key_site = invalid.iter().find_map(|site| match site.domain {
+                        crate::ir_callable::Domain::Key { schema, .. } => Some(schema),
+                        _ => None,
+                    });
+                    let reason = key_site.map_or_else(
+                        || "does not match its usage in the definition body".to_owned(),
+                        |schema| {
+                            format!(
+                                "does not name a known {} key",
+                                ir.strings().resolve(ir.schema(schema).name)
+                            )
+                        },
+                    );
+                    let rendered = invalid.iter().find_map(|site| {
+                        site.rendered_value(&argument.key, &scalar.value)
+                            .filter(|value| value != &scalar.value)
+                    });
+                    let reason = rendered.map_or(reason.clone(), |rendered| {
+                        format!("renders as `{rendered}` at its usage site, which {reason}")
+                    });
                     diagnostics.push(Diagnostic::new(
                         DiagnosticCode::InvalidValue,
                         DiagnosticCode::InvalidValue.severity(),
                         scalar.range,
-                        format!("expected {}", expected.join(" and ")),
+                        format!(
+                            "argument `{}` for parameter `{}` of scripted `{}` {reason}",
+                            scalar.value, argument.key, summary.name
+                        ),
                     ));
                 }
+            } else if argument.scalar.is_none() {
+                diagnostics.push(Diagnostic::new(
+                    DiagnosticCode::InvalidValue,
+                    DiagnosticCode::InvalidValue.severity(),
+                    argument.value_range.unwrap_or(argument.range),
+                    format!("parameter `{}` of scripted `{}` is used as a scalar value in its body and must be provided as one", argument.key, summary.name),
+                ));
             }
             let count = counts.entry(argument.key.to_ascii_lowercase()).or_default();
             *count = count.saturating_add(1);
@@ -1217,33 +1800,71 @@ fn callable_argument_diagnostics(
                     DiagnosticCode::UnknownKey.severity(),
                     argument.key_range,
                     format!(
-                        "unexpected parameter `{}` of scripted `{}`",
-                        argument.key, summary.name
+                        "unexpected parameter `{}` of scripted `{}` (known: {})",
+                        argument.key,
+                        summary.name,
+                        summary
+                            .parameters
+                            .iter()
+                            .map(|parameter| parameter.name.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
                     ),
                 ));
             }
         }
-        let missing = summary
+        let unconditional = summary
             .parameters
             .iter()
             .filter(|parameter| {
-                parameter.required
+                crate::dynamic_rules::parameter_effectively_required(snapshot, &summary, parameter)
                     && !counts
                         .keys()
                         .any(|name| name.eq_ignore_ascii_case(&parameter.name))
             })
-            .map(|parameter| format!("`{}`", parameter.name))
+            .map(|parameter| parameter.name.clone())
             .collect::<Vec<_>>();
+        let active = crate::ir_callable::missing_parameters(
+            snapshot,
+            &kind,
+            &property.key,
+            &bindings,
+            state,
+            cancellation,
+        )?;
+        let missing = unconditional
+            .iter()
+            .chain(active.iter())
+            .filter(|name| !bindings.keys().any(|key| key.eq_ignore_ascii_case(name)))
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
         if !missing.is_empty() {
+            let listed = missing
+                .iter()
+                .map(|name| format!("`{name}`"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let message = if unconditional.is_empty() {
+                format!(
+                    "dynamic definition `{}` requires parameter(s) {listed} in the active branch",
+                    summary.name
+                )
+            } else {
+                format!(
+                    "dynamic definition `{}` is missing required parameter(s): {listed}{}",
+                    summary.name,
+                    if property.scalar.is_some() {
+                        "; provide them in a parameter block"
+                    } else {
+                        ""
+                    }
+                )
+            };
             diagnostics.push(Diagnostic::new(
                 DiagnosticCode::Cardinality,
                 DiagnosticCode::Cardinality.severity(),
                 property.key_range,
-                format!(
-                    "dynamic definition `{}` is missing required parameter(s): {}",
-                    summary.name,
-                    missing.join(", ")
-                ),
+                message,
             ));
         }
     }
@@ -1260,6 +1881,7 @@ fn callable_argument_key_ranges(
         return Ok(Default::default());
     };
     let mut ranges = std::collections::BTreeSet::new();
+    let mut invocation_paths = BTreeSet::new();
     for invocation in hir.properties() {
         cancellation.checkpoint()?;
         if invocation.scalar.is_some() {
@@ -1276,14 +1898,7 @@ fn callable_argument_key_ranges(
                 let implements = info
                     .trait_impls
                     .iter()
-                    .any(|implementation| implementation.trait_id == callable)
-                    || info.subtypes.iter().any(|subtype| {
-                        field_fact.subtypes.contains(type_id, subtype.name)
-                            && subtype
-                                .trait_impls
-                                .iter()
-                                .any(|implementation| implementation.trait_id == callable)
-                    });
+                    .any(|implementation| implementation.trait_id == callable);
                 implements.then(|| ir.strings().resolve(info.name).to_owned())
             })
         });
@@ -1295,20 +1910,25 @@ fn callable_argument_key_ranges(
                 && definition.name.eq_ignore_ascii_case(&invocation.key)
                 && definition.range.start() <= invocation.range.start()
                 && invocation.range.end() <= definition.range.end()
-        }) || crate::semantic::dynamic_definition_summary(snapshot, &kind, &invocation.key)
-            .is_none()
-        {
+        }) {
             continue;
         }
-        ranges.extend(
-            hir.properties()
-                .iter()
-                .filter(|property| {
-                    property.path.len() == invocation.path.len() + 1
-                        && property.path.starts_with(&invocation.path)
-                })
-                .map(|property| property.key_range),
-        );
+        // Ambiguous definitions have no reliable signature. Keep their
+        // argument block open and let Callable validation use a signature
+        // only when one is available.
+        invocation_paths.insert(invocation.path.as_slice());
+    }
+    if !invocation_paths.is_empty() {
+        for property in hir.properties() {
+            cancellation.checkpoint()?;
+            if property
+                .path
+                .split_last()
+                .is_some_and(|(_, parent)| invocation_paths.contains(parent))
+            {
+                ranges.insert(property.key_range);
+            }
+        }
     }
     Ok(ranges)
 }
@@ -1327,237 +1947,11 @@ fn callable_targets(ir: &RulesIr, matcher: MatcherId, out: &mut Vec<TypeId>) {
     }
 }
 
-/// Infers the IR scalar matcher constraints attached to Callable parameters by replaying the
-/// definition template against its declared body schema. Runtime branching is conservatively
-/// unioned; each distinct usage remains available to validate all reachable constraints.
-pub(crate) fn callable_parameter_matchers(
-    snapshot: &AnalysisSnapshot,
-    kind: &str,
-    name: &str,
-    cancellation: &CancellationToken,
-) -> Result<BTreeMap<String, Vec<MatcherId>>, Cancelled> {
-    cancellation.checkpoint()?;
-    let ir = snapshot.ir();
-    let Some(summary) = crate::semantic::dynamic_definition_summary(snapshot, kind, name) else {
-        return Ok(BTreeMap::new());
-    };
-    let Some(template) = summary.template.as_ref() else {
-        return Ok(BTreeMap::new());
-    };
-    let Some(type_id) = ir.type_by_name(kind) else {
-        return Ok(BTreeMap::new());
-    };
-    let Some(callable) = ir.trait_by_name("Callable") else {
-        return Ok(BTreeMap::new());
-    };
-    let body_name = ir
-        .type_info(type_id)
-        .trait_impls
-        .iter()
-        .filter(|implementation| implementation.trait_id == callable)
-        .find_map(|implementation| {
-            implementation.arguments.iter().find_map(|(key, value)| {
-                (ir.strings().resolve(*key) == "body").then(|| match value {
-                    rules::ir::TraitArgument::Text(body) => ir.strings().resolve(*body).to_owned(),
-                    rules::ir::TraitArgument::Binding(_) => String::new(),
-                })
-            })
-        });
-    let Some(body_name) = body_name.filter(|name| !name.is_empty()) else {
-        return Ok(BTreeMap::new());
-    };
-    let Some(schema) = ir.schema_by_name(&body_name) else {
-        return Ok(BTreeMap::new());
-    };
-    let facts = WorkspaceFacts { snapshot };
-    let mut matchers = BTreeMap::new();
-    let mut budget = 16_384;
-    collect_template_matchers(
-        ir,
-        &facts,
-        schema,
-        &template.items,
-        &mut matchers,
-        cancellation,
-        &mut budget,
-    )?;
-    for matchers in matchers.values_mut() {
-        matchers.sort_unstable();
-        matchers.dedup();
-    }
-    Ok(matchers)
-}
-
-#[derive(Default)]
-struct TemplateScalars(BTreeMap<String, String>);
-
-impl ScalarFields for TemplateScalars {
-    fn scalar(&self, key: &str) -> Option<&str> {
-        self.0
-            .iter()
-            .find(|(candidate, _)| candidate.eq_ignore_ascii_case(key))
-            .map(|(_, value)| value.as_str())
-    }
-}
-
-fn template_scalars(items: &[TemplateItem]) -> TemplateScalars {
-    let mut result = TemplateScalars::default();
-    for item in items {
-        let TemplateItem::Property(property) = item else {
-            continue;
-        };
-        let Some(key) = template_literal(&property.key) else {
-            continue;
-        };
-        let TemplateValue::Scalar(value) = &property.value else {
-            continue;
-        };
-        if let Some(value) = template_literal(value) {
-            result.0.insert(key, value);
-        }
-    }
-    result
-}
-
-fn template_literal(token: &TemplateToken) -> Option<String> {
-    let mut value = String::new();
-    for fragment in &token.fragments {
-        match fragment {
-            TemplateFragment::Literal(text) => value.push_str(text),
-            TemplateFragment::Parameter { .. } => return None,
-        }
-    }
-    Some(value)
-}
-
-fn template_parameters(token: &TemplateToken) -> Vec<String> {
-    token
-        .fragments
-        .iter()
-        .filter_map(|fragment| match fragment {
-            TemplateFragment::Parameter { name, .. } => Some(name.to_ascii_lowercase()),
-            TemplateFragment::Literal(_) => None,
-        })
-        .collect()
-}
-
-fn collect_template_matchers(
+pub(crate) fn scope_allows(
     ir: &RulesIr,
-    facts: &impl SymbolFacts,
-    schema: SchemaId,
-    items: &[TemplateItem],
-    out: &mut BTreeMap<String, Vec<MatcherId>>,
-    cancellation: &CancellationToken,
-    budget: &mut usize,
-) -> Result<(), Cancelled> {
-    let subtypes = ir.subtypes_of(schema, &template_scalars(items));
-    for item in items {
-        cancellation.checkpoint()?;
-        if *budget == 0 {
-            break;
-        }
-        *budget -= 1;
-        match item {
-            TemplateItem::Conditional(conditional) => {
-                collect_template_matchers(
-                    ir,
-                    facts,
-                    schema,
-                    &conditional.items,
-                    out,
-                    cancellation,
-                    budget,
-                )?;
-            }
-            TemplateItem::BareValue(token) => {
-                let Some(matcher) = ir.schema(schema).items else {
-                    continue;
-                };
-                for parameter in template_parameters(token) {
-                    out.entry(parameter).or_default().push(matcher);
-                }
-            }
-            TemplateItem::Property(property) => {
-                let Some(key) = template_literal(&property.key) else {
-                    continue;
-                };
-                let shape = match &property.value {
-                    TemplateValue::Scalar(token) if token.quoted => Shape::Quoted,
-                    TemplateValue::Scalar(_) => Shape::Scalar,
-                    TemplateValue::Block { .. } => Shape::Block,
-                };
-                let mut fields = ir.lookup(schema, &key, shape).collect::<Vec<_>>();
-                if shape == Shape::Quoted {
-                    fields.extend(ir.lookup(schema, &key, Shape::Scalar));
-                }
-                fields.retain(|id| {
-                    ir.gate_holds(ir.field(*id).gate, &subtypes)
-                        && matcher_matches(ir, ir.field(*id).key, &key, facts)
-                });
-                for field_id in fields {
-                    let field = ir.field(field_id);
-                    for parameter in template_parameters(&property.key) {
-                        out.entry(parameter).or_default().push(field.key);
-                    }
-                    match &property.value {
-                        TemplateValue::Scalar(token) => {
-                            let matcher = match field.value {
-                                FieldValue::Scalar(matcher) => Some(matcher),
-                                _ => None,
-                            };
-                            if let Some(matcher) = matcher {
-                                for parameter in template_parameters(token) {
-                                    out.entry(parameter).or_default().push(matcher);
-                                }
-                            }
-                        }
-                        TemplateValue::Block { items, .. } => {
-                            if let Some(child) = ir.child(field_id, schema) {
-                                collect_template_matchers(
-                                    ir,
-                                    facts,
-                                    child,
-                                    items,
-                                    out,
-                                    cancellation,
-                                    budget,
-                                )?;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-trait HirSchemaLookup {
-    fn schema_facts_for_range<'a>(
-        &'a self,
-        hir: &'a HirFile,
-        schema: SchemaId,
-        key: TextRange,
-    ) -> Option<&'a hir::SchemaFact>;
-}
-
-impl HirSchemaLookup for RulesIr {
-    fn schema_facts_for_range<'a>(
-        &'a self,
-        hir: &'a HirFile,
-        schema: SchemaId,
-        key: TextRange,
-    ) -> Option<&'a hir::SchemaFact> {
-        hir.schema_facts()
-            .iter()
-            .filter(|fact| {
-                fact.schema == schema && crate::support::contains(fact.range, key.start())
-            })
-            .min_by_key(|fact| fact.range.len())
-    }
-}
-
-fn scope_allows(ir: &RulesIr, current: &ScopeValue, expected: &[rules::ir::Symbol]) -> bool {
+    current: &ScopeValue,
+    expected: &[rules::ir::Symbol],
+) -> bool {
     match current {
         ScopeValue::Unknown => true,
         ScopeValue::Invalid => false,
@@ -1586,6 +1980,107 @@ fn matcher_key_name(ir: &RulesIr, matcher: MatcherId) -> String {
     }
 }
 
+pub(crate) fn field_context(ir: &RulesIr, schema: SchemaId, field: FieldId) -> String {
+    let origin = ir
+        .provenance_of(field)
+        .map(|origin| ir.strings().resolve(origin.pointer));
+    let name = origin
+        .and_then(|pointer| {
+            pointer
+                .strip_prefix("/schemas/")
+                .or_else(|| pointer.strip_prefix("/mixins/"))
+        })
+        .and_then(|path| path.split('/').next())
+        .unwrap_or_else(|| ir.strings().resolve(ir.schema(schema).name));
+    let name = name
+        .strip_prefix("keys__")
+        .unwrap_or(name)
+        .strip_prefix("type_")
+        .unwrap_or(name.strip_prefix("keys__").unwrap_or(name));
+    let name = name.split("__").next().unwrap_or(name);
+    name.strip_suffix("_body")
+        .or_else(|| name.strip_suffix("_file"))
+        .unwrap_or(name)
+        .to_owned()
+}
+
+fn constant_control_value(
+    ir: &RulesIr,
+    hir: &HirFile,
+    property: &hir::HirProperty,
+) -> Option<bool> {
+    fn evaluate(
+        ir: &RulesIr,
+        hir: &HirFile,
+        property: &hir::HirProperty,
+        depth: usize,
+    ) -> Option<bool> {
+        if depth >= 64 {
+            return None;
+        }
+        let control = hir
+            .field_fact_at(property.key_range)?
+            .fields
+            .iter()
+            .find_map(|id| ir.field(*id).control.as_ref())?;
+        if control.kind == ControlKind::Constant {
+            let value = &property.scalar.as_ref()?.value;
+            return if value.eq_ignore_ascii_case("yes") {
+                Some(true)
+            } else if value.eq_ignore_ascii_case("no") {
+                Some(false)
+            } else {
+                None
+            };
+        }
+        if !matches!(control.kind, ControlKind::Logic | ControlKind::Guard) {
+            return None;
+        }
+        let children = hir
+            .properties()
+            .iter()
+            .filter(|child| {
+                child.path.len() == property.path.len() + 1
+                    && child.path.starts_with(&property.path)
+                    && property.range.start() <= child.range.start()
+                    && child.range.end() <= property.range.end()
+            })
+            .collect::<Vec<_>>();
+        if children.is_empty() {
+            return None;
+        }
+        let op = control
+            .op
+            .map(|op| ir.strings().resolve(op))
+            .unwrap_or("and");
+        let values = children
+            .iter()
+            .map(|child| evaluate(ir, hir, child, depth + 1))
+            .collect::<Vec<_>>();
+        let or = op.eq_ignore_ascii_case("or") || op.eq_ignore_ascii_case("nor");
+        let value = if or && values.contains(&Some(true)) {
+            true
+        } else if !or && values.contains(&Some(false)) {
+            false
+        } else {
+            let values = values.into_iter().collect::<Option<Vec<_>>>()?;
+            if or {
+                values.iter().any(|value| *value)
+            } else {
+                values.iter().all(|value| *value)
+            }
+        };
+        Some(
+            if op.eq_ignore_ascii_case("not") || op.eq_ignore_ascii_case("nor") {
+                !value
+            } else {
+                value
+            },
+        )
+    }
+    evaluate(ir, hir, property, 0)
+}
+
 fn control_lints(
     ir: &RulesIr,
     hir: &HirFile,
@@ -1593,6 +2088,11 @@ fn control_lints(
     cancellation: &CancellationToken,
 ) -> Result<Vec<Diagnostic>, Cancelled> {
     let mut diagnostics = Vec::new();
+    let binding_dependent = |range: TextRange| {
+        hir.parameter_references().iter().any(|reference| {
+            range.start() <= reference.range.start() && reference.range.end() <= range.end()
+        })
+    };
     for property in hir.properties() {
         cancellation.checkpoint()?;
         let Some(fact) = hir.field_fact_at(property.key_range) else {
@@ -1626,17 +2126,35 @@ fn control_lints(
                     diagnostics.push(Diagnostic::new(
                         DiagnosticCode::LogicalContainer,
                         DiagnosticCode::LogicalContainer.severity(),
-                        property.range,
+                        property.key_range,
                         if op.is_some_and(|op| op.eq_ignore_ascii_case("not")) {
-                            "NOT requires exactly one condition".into()
+                            "`NOT` with multiple conditions is true only when none of them hold (an AND of NOTs); it is not \"not all of them hold\". Write `AND = { NOT = { ... } ... }` to state the intended reading".into()
                         } else {
-                            "empty logic container".into()
+                            format!("empty `{}` container is always {}; drop the container or add conditions", property.key, if op.is_some_and(|op| op.eq_ignore_ascii_case("or")) { "false" } else { "true" })
                         },
                     ));
+                }
+                if children.len() == 1
+                    && op.is_some_and(|op| {
+                        op.eq_ignore_ascii_case("or") || op.eq_ignore_ascii_case("and")
+                    })
+                {
+                    diagnostics.push(Diagnostic::new(DiagnosticCode::LogicalContainer, DiagnosticCode::LogicalContainer.severity(), property.key_range,
+                        format!("`{}` with a single condition is equivalent to the condition itself; the wrapper can be removed", property.key)));
                 }
                 let constants = children
                     .iter()
                     .filter_map(|child| {
+                        if !hir.field_fact_at(child.key_range).is_some_and(|fact| {
+                            fact.fields.iter().any(|id| {
+                                ir.field(*id)
+                                    .control
+                                    .as_ref()
+                                    .is_some_and(|control| control.kind == ControlKind::Constant)
+                            })
+                        }) {
+                            return None;
+                        }
                         child.scalar.as_ref().and_then(|scalar| {
                             let value = scalar.value.to_ascii_lowercase();
                             (value == "yes" || value == "no").then_some(value == "yes")
@@ -1652,9 +2170,10 @@ fn control_lints(
                 {
                     Some(true)
                 } else if op.is_some_and(|op| op.eq_ignore_ascii_case("not"))
-                    && constants.len() == 1
+                    && constants.len() == children.len()
+                    && !constants.is_empty()
                 {
-                    Some(!constants[0])
+                    Some(constants.iter().all(|value| !value))
                 } else {
                     None
                 };
@@ -1673,6 +2192,18 @@ fn control_lints(
             ControlKind::Branch | ControlKind::BranchContinue => {
                 if let Some(guard) = control.guard {
                     let guard_name = ir.strings().resolve(guard);
+                    if let Some(guard) = hir.properties().iter().find(|child| {
+                        child.path.len() == property.path.len() + 1
+                            && child.path.starts_with(&property.path)
+                            && property.range.start() <= child.range.start()
+                            && child.range.end() <= property.range.end()
+                            && child.key.eq_ignore_ascii_case(guard_name)
+                    }) && let Some(value) = constant_control_value(ir, hir, guard)
+                    {
+                        diagnostics.push(Diagnostic::new(DiagnosticCode::ConstantCondition, DiagnosticCode::ConstantCondition.severity(), property.key_range,
+                            if value { format!("`{guard_name}` of this `{}` is always true; the branch wrapper is redundant", property.key) }
+                            else { format!("`{guard_name}` of this `{}` is always false; the branch can never run", property.key) }));
+                    }
                     if !hir.properties().iter().any(|child| {
                         child.path.len() == property.path.len() + 1
                             && child.path.starts_with(&property.path)
@@ -1684,7 +2215,20 @@ fn control_lints(
                             DiagnosticCode::MissingLimit,
                             DiagnosticCode::MissingLimit.severity(),
                             property.key_range,
-                            format!("`{}` requires a `{guard_name}` block", property.key),
+                            format!("`{}` without `{guard_name}` executes its body unconditionally; the condition belongs in a `{guard_name}` block", property.key),
+                        ));
+                    }
+                    if !hir.properties().iter().any(|child| {
+                        child.path.len() == property.path.len() + 1
+                            && child.path.starts_with(&property.path)
+                            && property.range.start() <= child.range.start()
+                            && child.range.end() <= property.range.end()
+                    }) {
+                        diagnostics.push(Diagnostic::new(
+                            DiagnosticCode::EmptyBlock,
+                            DiagnosticCode::EmptyBlock.severity(),
+                            property.key_range,
+                            format!("`{}` block has an empty body", property.key),
                         ));
                     }
                 }
@@ -1740,11 +2284,36 @@ fn control_lints(
                         }
                     }
                     if !attached {
+                        attached = hir
+                            .properties()
+                            .iter()
+                            .filter(|parent| {
+                                parent.path.len() + 1 == property.path.len()
+                                    && property.path.starts_with(&parent.path)
+                                    && parent.range.start() <= property.range.start()
+                                    && property.range.end() <= parent.range.end()
+                            })
+                            .any(|parent| {
+                                hir.field_fact_at(parent.key_range).is_some_and(|fact| {
+                                    fact.fields.iter().any(|id| {
+                                        ir.field(*id).control.as_ref().is_some_and(|control| {
+                                            control.kind == ControlKind::Branch
+                                                && control.chain.iter().any(|name| {
+                                                    ir.strings()
+                                                        .resolve(*name)
+                                                        .eq_ignore_ascii_case(&property.key)
+                                                })
+                                        })
+                                    })
+                                })
+                            });
+                    }
+                    if !attached {
                         diagnostics.push(Diagnostic::new(
                             DiagnosticCode::OrphanElse,
                             DiagnosticCode::OrphanElse.severity(),
                             property.key_range,
-                            format!("{} has no preceding branch in its chain", property.key),
+                            format!("orphan `{}`: it must directly follow an `if`/`else_if` block or be nested inside one", property.key),
                         ));
                     }
                 }
@@ -1761,17 +2330,16 @@ fn control_lints(
                                 && child.range.end() <= property.range.end()
                                 && child.key.eq_ignore_ascii_case(ir.strings().resolve(on))
                         })
-                        .and_then(|child| child.scalar.as_ref());
+                        .and_then(|child| child.scalar.as_ref())
+                        .filter(|scalar| !binding_dependent(scalar.range));
                     if let Some(selector) = selector
-                        && let Some(trigger_schema) = ir.schema_by_name("trigger")
+                        && let Some(trigger_schema) = control.selector_schema
                     {
                         let matchers = ir
                             .lookup(trigger_schema, &selector.value, Shape::Scalar)
                             .filter_map(|id| {
                                 let field = ir.field(id);
-                                if !ir.gate_holds(field.gate, &fact.subtypes)
-                                    || !matcher_matches(ir, field.key, &selector.value, facts)
-                                {
+                                if !matcher_matches(ir, field.key, &selector.value, facts) {
                                     return None;
                                 }
                                 match field.value {
@@ -1795,6 +2363,9 @@ fn control_lints(
                                     && child.range.end() <= property.range.end()
                                     && child.scalar.is_none()
                             }) {
+                                if binding_dependent(child.key_range) {
+                                    continue;
+                                }
                                 if !matchers
                                     .iter()
                                     .any(|matcher| ir.scalar_matches(*matcher, &child.key, facts))
@@ -1826,7 +2397,7 @@ fn control_lints(
                         && property.range.start() <= child.range.start()
                         && child.range.end() <= property.range.end()
                 });
-                if !has_children {
+                if property.scalar.is_none() && !has_children {
                     diagnostics.push(Diagnostic::new(
                         DiagnosticCode::EmptyBlock,
                         DiagnosticCode::EmptyBlock.severity(),
@@ -1848,9 +2419,56 @@ mod tests {
     use text::TextSize;
 
     #[test]
+    fn schema_range_index_preserves_linear_boundaries_filters_and_ties() {
+        let ir = game::eu4::first_party_ir().unwrap();
+        let effect = ir.schema_by_name("effect").unwrap();
+        let trigger = ir.schema_by_name("trigger").unwrap();
+        let facts = [
+            (10, 20, effect),
+            (0, 32, trigger),
+            (5, 15, effect),
+            (10, 20, trigger),
+            (10, 10, effect),
+            (21, 25, effect),
+            (5, 15, effect),
+            (32, 32, trigger),
+        ]
+        .map(|(start, end, schema)| hir::SchemaFact {
+            range: TextRange::new(start, end).unwrap(),
+            schema,
+            subtypes: Default::default(),
+            state: ScopeState {
+                root: ScopeValue::Unknown,
+                current: vec![ScopeValue::Unknown],
+                from: Vec::new(),
+                previous: Vec::new(),
+            },
+        });
+        let index = SchemaFactIndex::new(&facts);
+        for position in 0..=33 {
+            for schema in [None, Some(effect), Some(trigger)] {
+                let expected = facts
+                    .iter()
+                    .filter(|fact| {
+                        schema.is_none_or(|schema| fact.schema == schema)
+                            && crate::support::contains(fact.range, position)
+                    })
+                    .min_by_key(|fact| fact.range.len());
+                let actual = index.at(position, schema);
+                assert_eq!(
+                    actual.map(std::ptr::from_ref),
+                    expected.map(std::ptr::from_ref),
+                    "{position} {schema:?}"
+                );
+            }
+        }
+        assert!(SchemaFactIndex::new(&[]).at(0, None).is_none());
+    }
+
+    #[test]
     fn production_diagnostics_and_completion_use_first_party_ir_facts() {
         let ir = game::eu4::first_party_ir().expect("first-party IR");
-        let rules = game::eu4::first_party_rules().expect("first-party rules");
+        let rules = game::eu4::runtime_rules().expect("first-party rules");
         let profile = game::eu4::profile();
         let mut host = AnalysisHost::with_ir(rules, profile, ir);
         let id = DocumentId::new("file:///tmp/common/events/phase4-ir-test.txt");

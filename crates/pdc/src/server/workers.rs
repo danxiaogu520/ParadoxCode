@@ -1839,12 +1839,10 @@ impl LspServer {
             let snapshot = self.host.snapshot();
             let rules = snapshot.rules().clone();
             let ir = snapshot.ir_handle();
-            let current_ir_hash = snapshot.ir_fingerprint().to_owned();
             let profile = snapshot.game_profile().clone();
             let scan_limits = snapshot.scan_limits();
             let preferred_localisation_languages =
                 snapshot.preferred_localisation_languages().to_vec();
-            let current_rule_hash = rules.rule_hash().to_hex();
             let progress_token = format!("pdc-vanilla-{}", progress_nonce());
             let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
                 if self.client_work_done_progress {
@@ -1896,8 +1894,6 @@ impl LspServer {
                     rules,
                     ir,
                     profile,
-                    current_rule_hash,
-                    current_ir_hash,
                     auto_vanilla: auto_vanilla.as_ref(),
                     log: Some(log_ref),
                     progress: progress
@@ -2010,12 +2006,10 @@ impl LspServer {
             let snapshot = self.host.snapshot();
             let rules = snapshot.rules().clone();
             let ir = snapshot.ir_handle();
-            let current_ir_hash = snapshot.ir_fingerprint().to_owned();
             let profile = snapshot.game_profile().clone();
             let scan_limits = snapshot.scan_limits();
             let preferred_localisation_languages =
                 snapshot.preferred_localisation_languages().to_vec();
-            let current_rule_hash = rules.rule_hash().to_hex();
             let progress_token = format!("pdc-dependency-{}", progress_nonce());
             let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
                 if self.client_work_done_progress {
@@ -2060,8 +2054,6 @@ impl LspServer {
                     rules,
                     ir,
                     profile,
-                    current_rule_hash,
-                    current_ir_hash,
                     scan_limits,
                     &preferred_localisation_languages,
                     Some(&log),

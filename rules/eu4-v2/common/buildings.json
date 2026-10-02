@@ -1,15 +1,4 @@
 {
-  "mixins": {
-    "keys__type_building": {
-      "fields": {
-        "cost": {
-          "card": "0..1",
-          "value": "int",
-          "when": null
-        }
-      }
-    }
-  },
   "schemas": {
     "building_body": {
       "fields": {
@@ -24,27 +13,23 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "allow_in_gold_provinces": {
           "card": "0..1",
           "override": true,
-          "value": "'no'",
-          "when": null
+          "value": "'no'"
         },
         "bonus_manufactory": {
           "card": "0..1",
           "doc": "List of trade goods that get an extra production bonus",
           "list": "ref<trade_good>",
-          "override": true,
-          "when": null
+          "override": true
         },
         "bonus_modifier": {
           "body": "modifier",
           "card": "0..1",
-          "override": true,
-          "when": null
+          "override": true
         },
         "build_trigger": {
           "body": "trigger",
@@ -57,33 +42,27 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "cost": {
           "card": "0..1",
           "doc": "cost in $ to build (subject to other modifiers)",
-          "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "government_specific": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "indestructible": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "influencing_fort": {
           "card": "0..1",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "keep_trigger": {
           "body": "trigger",
@@ -96,28 +75,24 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "make_obsolete": {
           "card": "0..1",
           "override": true,
-          "value": "ref<building>",
-          "when": null
+          "value": "ref<building>"
         },
         "manufactory": {
           "card": "0..1",
           "doc": "List of trade goods that get a production bonus",
           "list": "ref<trade_good> | 'all'",
-          "override": true,
-          "when": null
+          "override": true
         },
         "modifier": {
           "body": "modifier",
           "card": "0..1",
           "doc": "Block of modifiers applied while the containing entry is active.",
-          "override": true,
-          "when": null
+          "override": true
         },
         "on_built": {
           "body": "effect",
@@ -130,8 +105,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "on_construction_canceled": {
           "body": "effect",
@@ -143,8 +117,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "on_construction_started": {
           "body": "effect",
@@ -156,8 +129,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "on_destroyed": {
           "body": "effect",
@@ -170,8 +142,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "on_obsolete": {
           "body": "effect",
@@ -184,22 +155,19 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "one_per_country": {
           "card": "0..1",
           "doc": "if yes, only one of these can exist in a country",
           "override": true,
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "onmap": {
           "card": "0..1",
           "doc": "Show as a sprite on the map",
           "override": true,
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "potential": {
           "body": "trigger",
@@ -212,27 +180,21 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "show_separate": {
           "card": "0..1",
           "doc": "Means as a manufactory it will be shown according to the old way",
           "override": true,
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "time": {
           "card": "0..1",
           "doc": "Time in months to build",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         }
-      },
-      "include": [
-        "keys__type_building"
-      ]
+      }
     },
     "building_body__ai_will_do": {
       "fields": {
@@ -240,8 +202,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -258,8 +219,7 @@
       "fields": {
         "cost": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         }
       }
     }

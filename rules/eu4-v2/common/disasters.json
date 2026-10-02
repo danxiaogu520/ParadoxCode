@@ -11,8 +11,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "can_start": {
           "body": "trigger",
@@ -23,8 +22,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "can_stop": {
           "body": "trigger",
@@ -35,8 +33,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "down_progress": {
           "body": "disaster_body__down_progress",
@@ -47,13 +44,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "ended_by_country_breaking_to_rebels": {
           "card": "0..1",
-          "value": "'no'",
-          "when": null
+          "value": "'no'"
         },
         "modifier": {
           "body": "modifier",
@@ -64,38 +59,32 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "on_end": {
           "card": "0..1",
           "doc": "Event fired when the disaster ends (after having officially started).",
-          "value": "ref<event.country>",
-          "when": null
+          "value": "ref<event.country>"
         },
         "on_monthly": {
           "body": "disaster_body__on_monthly",
           "card": "0..1",
-          "doc": "Events triggered monthly after the disaster has fired (i.e. between on_start and on_end).",
-          "when": null
+          "doc": "Events triggered monthly after the disaster has fired (i.e. between on_start and on_end)."
         },
         "on_progress_effect": {
           "body": "effect",
           "card": "0..1",
-          "doc": "triggered monthly when it is ticking up to 100. The progress is saved in a variable that is <disaster key>_progress",
-          "when": null
+          "doc": "triggered monthly when it is ticking up to 100. The progress is saved in a variable that is <disaster key>_progress"
         },
         "on_start": {
           "card": "0..1",
           "doc": "Event fired on the disaster's progress reaching 100 and the disaster officially starting.",
-          "value": "ref<event.country>",
-          "when": null
+          "value": "ref<event.country>"
         },
         "on_start_effect": {
           "body": "effect",
           "card": "0..1",
-          "doc": "Effects executed when the disaster reaches 100% progress and happens.",
-          "when": null
+          "doc": "Effects executed when the disaster reaches 100% progress and happens."
         },
         "potential": {
           "body": "trigger",
@@ -106,8 +95,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "progress": {
           "body": "modifier_rule",
@@ -118,13 +106,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "stability_hit_on_war": {
           "card": "0..1",
-          "value": "int[1..6]",
-          "when": null
+          "value": "int[1..6]"
         }
       }
     },
@@ -134,8 +120,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [
@@ -147,13 +132,11 @@
       "fields": {
         "events": {
           "body": "disaster_body__empty",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "random_events": {
           "body": "disaster_body__on_monthly__random_events",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         }
       }
     },
@@ -165,8 +148,7 @@
         {
           "card": "0..*",
           "key": "scalar",
-          "value": "'0' | ref<event.country>",
-          "when": null
+          "value": "'0' | ref<event.country>"
         }
       ]
     }

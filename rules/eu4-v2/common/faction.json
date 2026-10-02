@@ -5,29 +5,24 @@
         "allow": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Trigger conditions checked when using the entry.",
-          "when": null
+          "doc": "Trigger conditions checked when using the entry."
         },
         "always": {
           "card": "1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "modifier": {
           "body": "modifier",
           "card": "1",
-          "doc": "Block of modifiers applied while the containing entry is active.",
-          "when": null
+          "doc": "Block of modifiers applied while the containing entry is active."
         },
         "monarch_power": {
           "card": "1",
-          "value": "enum<power_categories>",
-          "when": null
+          "value": "enum<power_categories>"
         },
         "triggered_faction_name": {
           "body": "faction_body__triggered_faction_name",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         }
       }
     },
@@ -35,8 +30,7 @@
       "fields": {
         "name": {
           "card": "1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "trigger": {
           "body": "trigger",
@@ -47,8 +41,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     }

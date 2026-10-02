@@ -189,12 +189,7 @@ fn reference_card(
     position: TextSize,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
-    if input.format != parser::FileFormat::Script
-        || !input
-            .profile
-            .game_id
-            .eq_ignore_ascii_case(game::eu4::GAME_ID)
-    {
+    if input.format != parser::FileFormat::Script {
         return Ok(None);
     }
     let semantic = semantic_data_with_cancellation(snapshot, input, cancellation)?;
@@ -219,12 +214,22 @@ fn reference_card(
             }
         }
     }
-    if crate::mission::is_mission_path(input.path.as_ref()) {
+    if crate::mission::is_mission_path(&input.profile, input.path.as_ref()) {
         cancellation.checkpoint()?;
-        let Some(name) = required_mission_at(&input.source, position) else {
+        let Some(name) = required_mission_at(input, position) else {
             return Ok(None);
         };
-        let candidates = symbol_candidates_for_hover(snapshot, "mission", &name, cancellation)?;
+        let candidates = symbol_candidates_for_hover(
+            snapshot,
+            &input
+                .profile
+                .mission_view
+                .as_ref()
+                .expect("declared view")
+                .symbol_kind,
+            &name,
+            cancellation,
+        )?;
         for candidate in &candidates {
             cancellation.checkpoint()?;
             let Some(target) = input_for_location(snapshot, &candidate.location) else {
@@ -248,8 +253,8 @@ fn reference_card(
 /// The `required_missions` member under `position`, if any: bare block
 /// members carry no semantic reference, so the parse model's prerequisite
 /// token ranges are the anchor.
-fn required_mission_at(source: &str, position: TextSize) -> Option<String> {
-    let loaded = game::eu4::mission::parse_file(source);
+fn required_mission_at(input: &ParsedInput, position: TextSize) -> Option<String> {
+    let loaded = game::mission::view(&input.profile)?.parse(&input.source);
     for mission in loaded
         .file
         .trees
@@ -284,16 +289,14 @@ fn mission_card(
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
     if input.format != parser::FileFormat::Script
-        || !input
-            .profile
-            .game_id
-            .eq_ignore_ascii_case(game::eu4::GAME_ID)
-        || !crate::mission::is_mission_path(input.path.as_ref())
+        || !crate::mission::is_mission_path(&input.profile, input.path.as_ref())
     {
         return Ok(None);
     }
     cancellation.checkpoint()?;
-    let loaded = game::eu4::mission::parse_file(&input.source);
+    let loaded = game::mission::view(&input.profile)
+        .expect("mission path has a declared view")
+        .parse(&input.source);
     let Some(mission) = loaded
         .file
         .trees
@@ -316,11 +319,13 @@ fn mission_card_for_reference(
     name: &str,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
-    if !crate::mission::is_mission_path(target.path.as_ref()) {
+    if !crate::mission::is_mission_path(&target.profile, target.path.as_ref()) {
         return Ok(None);
     }
     cancellation.checkpoint()?;
-    let loaded = game::eu4::mission::parse_file(&target.source);
+    let loaded = game::mission::view(&target.profile)
+        .expect("mission path has a declared view")
+        .parse(&target.source);
     let mut by_name = None;
     for mission in loaded
         .file
@@ -345,15 +350,23 @@ fn mission_card_for_reference(
 /// texture, and the fixed node chrome.
 fn mission_card_for_mission(
     snapshot: &AnalysisSnapshot,
-    mission: &game::eu4::mission::Mission,
+    mission: &game::mission::Mission,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
     // The title key comes from the mission's `$_title` binding — the JSON is
     // the single source; an absent binding degrades to no title (the client
     // falls back to the raw id).
     let title_key = snapshot
-        .rules()
-        .localisation_template_key("mission", "name", &mission.id)
+        .localisation_template_key(
+            &snapshot
+                .game_profile()
+                .mission_view
+                .as_ref()
+                .expect("declared view")
+                .symbol_kind,
+            "name",
+            &mission.id,
+        )
         .unwrap_or_default();
     let titles = localisation_values_by_key(snapshot, &[title_key.as_str()], cancellation)?;
     let title = titles.get(&title_key).cloned();
@@ -366,7 +379,14 @@ fn mission_card_for_mission(
     // card declaration, not from this renderer.
     let frame = match snapshot
         .game_profile()
-        .hover_card("mission")
+        .hover_card(
+            &snapshot
+                .game_profile()
+                .mission_view
+                .as_ref()
+                .expect("declared view")
+                .symbol_kind,
+        )
         .and_then(|spec| spec.chrome.get("frame"))
     {
         Some(name) => sprite_asset(snapshot, name, cancellation)?,
@@ -404,12 +424,7 @@ fn icon_card(
     position: TextSize,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
-    if input.format != parser::FileFormat::Script
-        || !input
-            .profile
-            .game_id
-            .eq_ignore_ascii_case(game::eu4::GAME_ID)
-    {
+    if input.format != parser::FileFormat::Script {
         return Ok(None);
     }
     let semantic = semantic_data_with_cancellation(snapshot, input, cancellation)?;
@@ -747,12 +762,7 @@ fn event_card(
     position: TextSize,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
-    if input.format != parser::FileFormat::Script
-        || !input
-            .profile
-            .game_id
-            .eq_ignore_ascii_case(game::eu4::GAME_ID)
-    {
+    if input.format != parser::FileFormat::Script {
         return Ok(None);
     }
     cancellation.checkpoint()?;
@@ -770,12 +780,7 @@ fn event_card_for_reference(
     selection: TextRange,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
-    if target.format != parser::FileFormat::Script
-        || !target
-            .profile
-            .game_id
-            .eq_ignore_ascii_case(game::eu4::GAME_ID)
-    {
+    if target.format != parser::FileFormat::Script {
         return Ok(None);
     }
     let Some(anchor) = card_anchor_for_selection(target, selection.start()) else {
@@ -865,9 +870,7 @@ fn event_card_for_anchor(
         }
         Some(semantics)
     } else {
-        spec.context
-            .as_deref()
-            .map(|context| crate::semantic::construct_field_semantics(snapshot, context))
+        None
     };
     let localisation_value = |field: &str| -> Option<String> {
         field_semantics

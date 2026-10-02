@@ -4,20 +4,17 @@
       "fields": {
         "isolation_value": {
           "card": "1",
-          "value": "int[0..]",
-          "when": null
+          "value": "int[0..]"
         },
         "modifier": {
           "body": "modifier",
           "card": "1",
-          "doc": "Block of modifiers applied while the containing entry is active.",
-          "when": null
+          "doc": "Block of modifiers applied while the containing entry is active."
         },
         "potential": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
-          "when": null
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility."
         }
       }
     }

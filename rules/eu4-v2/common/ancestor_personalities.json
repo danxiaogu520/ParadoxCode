@@ -5,119 +5,96 @@
         "ai_pick_ancestor": {
           "body": "ancestor_personalities_body__ai_pick_ancestor",
           "card": "0..1",
-          "doc": "Each level of skill is worth 50.",
-          "when": null
+          "doc": "Each level of skill is worth 50."
         },
         "alliance_acceptance": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "allow": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Trigger conditions checked when using the entry.",
-          "when": null
+          "doc": "Trigger conditions checked when using the entry."
         },
         "building_budget_multiplier": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "chance": {
           "body": "modifier_rule",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "consort_allow": {
           "body": "ancestor_personalities_body__consort_allow",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "custom_ai_explanation": {
           "card": "0..1",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "different_religion_war_multiplier": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "easy_war_chance_multiplier": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "enemy_strength_multiplier": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "fair_fights": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "gift_chance": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "heathen_ally_acceptance": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "heir_allow": {
           "body": "ancestor_personalities_body__heir_allow",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "heretic_ally_acceptance": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "knowledge_sharing": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "nation_designer_cost": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "other_ai_help_us_multiplier": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "other_ai_peace_term_bonus": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "other_ai_war_chance_multiplier": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "peace_desire": {
           "card": "0..1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "random_insults": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "razing": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "ruler_allow": {
           "body": "ancestor_personalities_body__ruler_allow",
@@ -127,75 +104,142 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "wants_avoid_debase": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "wants_avoid_loans": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "wants_colonies": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "wants_condottieri": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "wants_ecumenical_council": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "wants_excommunicate": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "wants_explorers": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "wants_gold": {
           "card": "0..1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "wants_heathen_land": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "wants_heretic_land": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "wants_land": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "war_chance_multiplier": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "war_priority": {
           "body": "modifier_rule",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         }
-      }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
     },
     "ancestor_personalities_body__ai_pick_ancestor": {
       "fields": {
@@ -203,8 +247,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         }
       },
       "include": [
@@ -216,13 +259,11 @@
         "allow": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Trigger conditions checked when using the entry.",
-          "when": null
+          "doc": "Trigger conditions checked when using the entry."
         },
         "chance": {
           "body": "modifier_rule",
-          "card": "1",
-          "when": null
+          "card": "1"
         }
       }
     },
@@ -231,13 +272,11 @@
         "allow": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Trigger conditions checked when using the entry.",
-          "when": null
+          "doc": "Trigger conditions checked when using the entry."
         },
         "chance": {
           "body": "modifier_rule",
-          "card": "1",
-          "when": null
+          "card": "1"
         }
       }
     },
@@ -246,13 +285,11 @@
         "allow": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Trigger conditions checked when using the entry.",
-          "when": null
+          "doc": "Trigger conditions checked when using the entry."
         },
         "chance": {
           "body": "modifier_rule",
-          "card": "1",
-          "when": null
+          "card": "1"
         }
       }
     }

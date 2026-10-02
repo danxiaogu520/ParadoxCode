@@ -4,38 +4,35 @@
       "fields": {
         "always_visible": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "object": {
           "body": "ambient_object_basis_body__object",
           "card": "1..*",
-          "when": null
+          "def": {
+            "name": "field:name",
+            "type": "ambient_object"
+          }
         },
         "scale": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "time_duration": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "type": {
           "card": "1",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "use_animation": {
           "card": "1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "visible_in_all_map_modes": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         }
       }
     },
@@ -43,23 +40,19 @@
       "fields": {
         "hidden_on_start": {
           "card": "1",
-          "value": "bool",
-          "when": null
+          "value": "bool"
         },
         "name": {
           "card": "1",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "position": {
           "card": "1",
-          "list": "float",
-          "when": null
+          "list": "float"
         },
         "rotation": {
           "card": "1",
-          "list": "float",
-          "when": null
+          "list": "float"
         }
       }
     },
@@ -73,13 +66,11 @@
       "fields": {
         "color": {
           "card": "1",
-          "list": "int",
-          "when": null
+          "list": "int"
         },
         "type": {
           "card": "1",
-          "value": "ref<terrain>",
-          "when": null
+          "value": "ref<terrain>"
         }
       }
     },
@@ -90,71 +81,138 @@
       "fields": {
         "color": {
           "card": "0..1",
-          "list": "int[0..]",
-          "when": null
+          "list": "int[0..]"
         },
         "combat_width": {
           "card": "0..1",
           "doc": "Multiplier to increase or decrease combat width in this terrain",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "cs_only_local_development_cost": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "defence": {
           "card": "0..1",
           "doc": "Addition to defence roll in combat in this terrain",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "inland_sea": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "is_water": {
           "card": "0..1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         },
         "movement_cost": {
           "card": "0..1",
           "doc": "Multiplier to movement time into/out of province with terrain",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "nation_designer_cost_multiplier": {
           "card": "0..1",
           "doc": "Extra cost multiplier when picked in the Nation Designer",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "sound_type": {
           "card": "0..1",
-          "value": "enum<terrain_sound_types>",
-          "when": null
+          "value": "enum<terrain_sound_types>"
         },
         "terrain_override": {
           "card": "0..1",
-          "list": "ref<province_id>",
-          "when": null
+          "list": "ref<province_id>"
         },
         "type": {
           "card": "0..1",
           "doc": "Types are used by the game to apply certain bonuses/maluses on movement/combat etc.",
-          "value": "enum<terrain_types>",
-          "when": null
+          "value": "enum<terrain_types>"
         }
       },
+      "include": [
+        "keys__modifier"
+      ],
       "patterns": [
         {
           "body": "terrain_body__empty",
           "card": "0..*",
-          "key": "scalar",
-          "when": null
+          "key": "scalar"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
         }
       ]
     },
@@ -171,8 +229,7 @@
           "card": "0..*",
           "doc": "province id = rotation in degrees, 0 is pointing right, then ccw",
           "key": "ref<province_id>",
-          "value": "int",
-          "when": null
+          "value": "int"
         }
       ]
     },
@@ -180,13 +237,11 @@
       "fields": {
         "color": {
           "card": "1",
-          "list": "int",
-          "when": null
+          "list": "int"
         },
         "terrain": {
           "card": "1",
-          "value": "ref<terrain>",
-          "when": null
+          "value": "ref<terrain>"
         }
       }
     },

@@ -21,6 +21,12 @@
     "ai_personality": {
       "impl": {
         "Localised": {
+          "become": {
+            "loc": "an_$"
+          },
+          "desc": {
+            "loc": "$_desc"
+          },
           "name": {
             "loc": "$",
             "required": true
@@ -42,7 +48,20 @@
         "ModifierSource": {}
       }
     },
-    "ancestor_personality": {},
+    "ancestor_personality": {
+      "impl": {
+        "Localised": {
+          "desc": {
+            "loc": "desc_ancestor_$_personality"
+          },
+          "name": {
+            "loc": "ancestor_$_personality",
+            "required": true
+          }
+        },
+        "ModifierSource": {}
+      }
+    },
     "area": {
       "impl": {
         "Localised": {
@@ -53,9 +72,7 @@
         }
       },
       "subtypes": {
-        "used": {
-          "when": null
-        }
+        "used": {}
       }
     },
     "aspects_and_blessings": {
@@ -66,27 +83,12 @@
           }
         },
         "Localised": {
+          "desc": {
+            "loc": "desc_$"
+          },
           "name": {
             "loc": "$",
             "required": true
-          }
-        }
-      },
-      "subtypes": {
-        "blessing": {
-          "when": null
-        },
-        "church_aspect": {
-          "impl": {
-            "Localised": {
-              "desc": {
-                "loc": "desc_$",
-                "required": true
-              }
-            }
-          },
-          "when": {
-            "is_blessing": "'no'"
           }
         }
       }
@@ -144,23 +146,11 @@
     "colonial_region": {
       "impl": {
         "Localised": {
+          "name": {
+            "loc": "$"
+          },
           "short": {
             "loc": "short_$"
-          }
-        }
-      },
-      "subtypes": {
-        "settled": {
-          "impl": {
-            "Localised": {
-              "name": {
-                "loc": "$",
-                "required": true
-              }
-            }
-          },
-          "when": {
-            "tax_income": "scalar"
           }
         }
       }
@@ -334,7 +324,210 @@
     "country_file": {},
     "country_flag": {},
     "country_history": {},
-    "country_tag": {},
+    "country_tag": {
+      "builtin": [
+        "F00",
+        "F01",
+        "F02",
+        "F03",
+        "F04",
+        "F05",
+        "F06",
+        "F07",
+        "F08",
+        "F09",
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14",
+        "F15",
+        "F16",
+        "F17",
+        "F18",
+        "F19",
+        "F20",
+        "F21",
+        "F22",
+        "F23",
+        "F24",
+        "F25",
+        "F26",
+        "F27",
+        "F28",
+        "F29",
+        "F30",
+        "F31",
+        "F32",
+        "F33",
+        "F34",
+        "F35",
+        "F36",
+        "F37",
+        "F38",
+        "F39",
+        "F40",
+        "F41",
+        "F42",
+        "F43",
+        "F44",
+        "F45",
+        "F46",
+        "F47",
+        "F48",
+        "F49",
+        "F50",
+        "F51",
+        "F52",
+        "F53",
+        "F54",
+        "F55",
+        "F56",
+        "F57",
+        "F58",
+        "F59",
+        "F60",
+        "F61",
+        "F62",
+        "F63",
+        "F64",
+        "F65",
+        "F66",
+        "F67",
+        "F68",
+        "F69",
+        "F70",
+        "F71",
+        "F72",
+        "F73",
+        "F74",
+        "F75",
+        "F76",
+        "F77",
+        "F78",
+        "F79",
+        "F80",
+        "F81",
+        "F82",
+        "F83",
+        "F84",
+        "F85",
+        "F86",
+        "F87",
+        "F88",
+        "F89",
+        "F90",
+        "F91",
+        "F92",
+        "F93",
+        "F94",
+        "F95",
+        "F96",
+        "F97",
+        "F98",
+        "F99",
+        "T00",
+        "T01",
+        "T02",
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T07",
+        "T08",
+        "T09",
+        "T10",
+        "T11",
+        "T12",
+        "T13",
+        "T14",
+        "T15",
+        "T16",
+        "T17",
+        "T18",
+        "T19",
+        "T20",
+        "T21",
+        "T22",
+        "T23",
+        "T24",
+        "T25",
+        "T26",
+        "T27",
+        "T28",
+        "T29",
+        "T30",
+        "T31",
+        "T32",
+        "T33",
+        "T34",
+        "T35",
+        "T36",
+        "T37",
+        "T38",
+        "T39",
+        "T40",
+        "T41",
+        "T42",
+        "T43",
+        "T44",
+        "T45",
+        "T46",
+        "T47",
+        "T48",
+        "T49",
+        "T50",
+        "T51",
+        "T52",
+        "T53",
+        "T54",
+        "T55",
+        "T56",
+        "T57",
+        "T58",
+        "T59",
+        "T60",
+        "T61",
+        "T62",
+        "T63",
+        "T64",
+        "T65",
+        "T66",
+        "T67",
+        "T68",
+        "T69",
+        "T70",
+        "T71",
+        "T72",
+        "T73",
+        "T74",
+        "T75",
+        "T76",
+        "T77",
+        "T78",
+        "T79",
+        "T80",
+        "T81",
+        "T82",
+        "T83",
+        "T84",
+        "T85",
+        "T86",
+        "T87",
+        "T88",
+        "T89",
+        "T90",
+        "T91",
+        "T92",
+        "T93",
+        "T94",
+        "T95",
+        "T96",
+        "T97",
+        "T98",
+        "T99"
+      ]
+    },
     "cult": {
       "impl": {
         "Localised": {
@@ -370,7 +563,75 @@
         }
       }
     },
-    "custom_attribute": {},
+    "custom_attribute": {
+      "builtin": [
+        "admirals_become_rulers",
+        "allow_banners",
+        "allow_carolean",
+        "allow_cawa",
+        "allow_convert",
+        "allow_draft_transport_ships",
+        "allow_force_tributary",
+        "allow_migration",
+        "allow_normal_conversion",
+        "allow_vassal_alliance",
+        "allow_vassal_war",
+        "block_cultural_union",
+        "boost_income",
+        "can_change_primary_culture",
+        "can_customise_heir",
+        "can_form_trade_league",
+        "can_inherit_personal_unions",
+        "can_remove_idea_group",
+        "can_use_trade_post",
+        "cannot_form_alliances",
+        "claim_states",
+        "dictatorship",
+        "election_on_death",
+        "force_admiral_leader",
+        "force_conversion_gives_global_holy_war_released_modifier",
+        "force_general_leader",
+        "foreign_slave_rulers",
+        "free_city",
+        "free_concentrate_development",
+        "generals_become_rulers",
+        "has_cultural_union",
+        "has_devotion",
+        "has_harem",
+        "has_janissaries",
+        "has_meritocracy",
+        "has_parliament",
+        "has_pashas",
+        "has_term_election",
+        "heir",
+        "heirs_can_be_generals",
+        "is_elective",
+        "is_eligible_for_hre_emperor",
+        "is_trading_city",
+        "lock_level_when_selected",
+        "maintain_dynasty",
+        "mercs_do_not_cost_army_professionalism",
+        "monarchy",
+        "monastic",
+        "native_mechanic",
+        "nomad",
+        "papacy",
+        "queen",
+        "raze_province",
+        "religion",
+        "republic",
+        "republican_name",
+        "revolutionary",
+        "revolutionary_client_state",
+        "royal_marriage",
+        "rulers_can_be_generals",
+        "states_general_mechanic",
+        "tribal",
+        "uses_revolutionary_zeal",
+        "valid_for_nation_designer",
+        "valid_for_new_country"
+      ]
+    },
     "custom_button": {},
     "custom_country_colors": {},
     "custom_gui": {},
@@ -539,18 +800,10 @@
     "event": {
       "resolution": "replace",
       "subtypes": {
-        "country": {
-          "when": null
-        },
-        "mercenary_company": {
-          "when": null
-        },
-        "province": {
-          "when": null
-        },
-        "unit": {
-          "when": null
-        }
+        "country": {},
+        "mercenary_company": {},
+        "province": {},
+        "unit": {}
       }
     },
     "event_modifier": {
@@ -689,18 +942,10 @@
       }
     },
     "government": {
-      "subtypes": {
-        "normal": {
-          "impl": {
-            "Localised": {
-              "name": {
-                "loc": "$_name",
-                "required": true
-              }
-            }
-          },
-          "when": {
-            "basic_reform": "scalar"
+      "impl": {
+        "Localised": {
+          "name": {
+            "loc": "$_name"
           }
         }
       }
@@ -737,37 +982,12 @@
             "loc": "$_gain_modifier",
             "required": true
           },
+          "modifier": {
+            "loc": "monthly_$"
+          },
           "name": {
             "loc": "$",
             "required": true
-          }
-        }
-      },
-      "subtypes": {
-        "base_monthly_growth": {
-          "impl": {
-            "Localised": {
-              "modifier": {
-                "loc": "monthly_$",
-                "required": true
-              }
-            }
-          },
-          "when": {
-            "base_monthly_growth": "scalar"
-          }
-        },
-        "development_scaled_monthly_growth": {
-          "impl": {
-            "Localised": {
-              "modifier": {
-                "loc": "monthly_$",
-                "required": true
-              }
-            }
-          },
-          "when": {
-            "development_scaled_monthly_growth": "scalar"
           }
         }
       }
@@ -788,23 +1008,6 @@
             "loc": "$",
             "required": true
           }
-        }
-      },
-      "subtypes": {
-        "basic": {
-          "when": null
-        },
-        "hardcoded_legacy_government": {
-          "when": {
-            "legacy_equivalent": null,
-            "legacy_government": "'yes'"
-          }
-        },
-        "legacy": {
-          "when": null
-        },
-        "new": {
-          "when": null
         }
       }
     },
@@ -829,11 +1032,6 @@
             "loc": "$",
             "required": true
           }
-        }
-      },
-      "subtypes": {
-        "canal": {
-          "when": null
         }
       }
     },
@@ -906,28 +1104,13 @@
           "name": {
             "loc": "$",
             "required": true
+          },
+          "start": {
+            "loc": "$_start"
           }
         }
       },
-      "resolution": "replace",
-      "subtypes": {
-        "country_idea": {
-          "impl": {
-            "Localised": {
-              "start": {
-                "loc": "$_start",
-                "required": true
-              }
-            }
-          },
-          "when": {
-            "free": "'yes'"
-          }
-        },
-        "selectable": {
-          "when": null
-        }
-      }
+      "resolution": "replace"
     },
     "imperial_incident": {
       "impl": {
@@ -954,103 +1137,36 @@
             "loc": "$_desc",
             "required": true
           },
+          "elector": {
+            "loc": "$_elector"
+          },
+          "elector_desc": {
+            "loc": "desc_$_elector"
+          },
+          "elector_per_prince": {
+            "loc": "$_elector_per_prince"
+          },
+          "emperor": {
+            "loc": "$_emperor"
+          },
+          "emperor_desc": {
+            "loc": "desc_$_emperor"
+          },
+          "emperor_per_prince": {
+            "loc": "$_emperor_per_prince"
+          },
+          "member": {
+            "loc": "$_member"
+          },
+          "member_desc": {
+            "loc": "desc_$_member"
+          },
           "name": {
             "loc": "$_title",
             "required": true
-          }
-        }
-      },
-      "subtypes": {
-        "china": {
-          "when": null
-        },
-        "elector": {
-          "impl": {
-            "Localised": {
-              "elector": {
-                "loc": "$_elector",
-                "required": true
-              },
-              "elector_desc": {
-                "loc": "desc_$_elector"
-              }
-            }
           },
-          "when": {
-            "elector": "scalar"
-          }
-        },
-        "elector_per_prince": {
-          "impl": {
-            "Localised": {
-              "elector_per_prince": {
-                "loc": "$_elector_per_prince",
-                "required": true
-              }
-            }
-          },
-          "when": {
-            "elector_per_prince": "scalar"
-          }
-        },
-        "emperor": {
-          "impl": {
-            "Localised": {
-              "emperor": {
-                "loc": "$_emperor",
-                "required": true
-              },
-              "emperor_desc": {
-                "loc": "desc_$_emperor"
-              }
-            }
-          },
-          "when": {
-            "emperor": "scalar"
-          }
-        },
-        "emperor_per_prince": {
-          "impl": {
-            "Localised": {
-              "emperor_per_prince": {
-                "loc": "$_emperor_per_prince",
-                "required": true
-              }
-            }
-          },
-          "when": {
-            "emperor_per_prince": "scalar"
-          }
-        },
-        "hre": {
-          "when": null
-        },
-        "member": {
-          "impl": {
-            "Localised": {
-              "member": {
-                "loc": "$_member",
-                "required": true
-              },
-              "member_desc": {
-                "loc": "desc_$_member"
-              }
-            }
-          },
-          "when": {
-            "member": "scalar"
-          }
-        },
-        "province": {
-          "impl": {
-            "Localised": {
-              "province": {
-                "loc": "$_province"
-              }
-            }
-          },
-          "when": {
-            "province": "scalar"
+          "province": {
+            "loc": "$_province"
           }
         }
       }
@@ -1198,6 +1314,9 @@
             "loc": "$_desc",
             "required": true
           },
+          "dialog": {
+            "loc": "$_dialog"
+          },
           "title": {
             "loc": "$_title",
             "required": true
@@ -1205,21 +1324,6 @@
           "tooltip": {
             "loc": "$_tooltip",
             "required": true
-          }
-        }
-      },
-      "subtypes": {
-        "require_acceptance": {
-          "impl": {
-            "Localised": {
-              "dialog": {
-                "loc": "$_dialog",
-                "required": true
-              }
-            }
-          },
-          "when": {
-            "require_acceptance": "'yes'"
           }
         }
       }
@@ -1251,7 +1355,16 @@
         }
       }
     },
-    "packentity": {},
+    "packentity": {
+      "impl": {
+        "Localised": {
+          "name": {
+            "loc": "$",
+            "required": true
+          }
+        }
+      }
+    },
     "packorder": {},
     "papal_policy": {
       "impl": {
@@ -1367,9 +1480,7 @@
         }
       },
       "subtypes": {
-        "used": {
-          "when": null
-        }
+        "used": {}
       }
     },
     "province_history": {},
@@ -1405,6 +1516,10 @@
         "Localised": {
           "demand_desc": {
             "loc": "$_desc",
+            "required": true
+          },
+          "name": {
+            "loc": "$",
             "required": true
           }
         }
@@ -1455,26 +1570,15 @@
           "desc": {
             "loc": "$_religion_desc"
           },
+          "harmonized": {
+            "loc": "harmonized_$"
+          },
+          "harmonized_desc": {
+            "loc": "desc_harmonized_$"
+          },
           "name": {
             "loc": "$",
             "required": true
-          }
-        }
-      },
-      "subtypes": {
-        "harmonized": {
-          "impl": {
-            "Localised": {
-              "harmonized": {
-                "loc": "harmonized_$"
-              },
-              "harmonized_desc": {
-                "loc": "desc_harmonized_$"
-              }
-            }
-          },
-          "when": {
-            "harmonized_modifier": "scalar"
           }
         }
       }
@@ -1482,26 +1586,15 @@
     "religion_group": {
       "impl": {
         "Localised": {
+          "harmonized": {
+            "loc": "harmonized_$"
+          },
+          "harmonized_desc": {
+            "loc": "desc_harmonized_$"
+          },
           "name": {
             "loc": "$",
             "required": true
-          }
-        }
-      },
-      "subtypes": {
-        "harmonized": {
-          "impl": {
-            "Localised": {
-              "harmonized": {
-                "loc": "harmonized_$"
-              },
-              "harmonized_desc": {
-                "loc": "desc_harmonized_$"
-              }
-            }
-          },
-          "when": {
-            "harmonized_modifier": "scalar"
           }
         }
       }
@@ -1748,11 +1841,6 @@
             "required": true
           }
         }
-      },
-      "subtypes": {
-        "latent": {
-          "when": null
-        }
       }
     },
     "trade_node": {
@@ -1823,7 +1911,9 @@
       }
     },
     "units_display": {},
-    "variable": {},
+    "variable": {
+      "open": true
+    },
     "war_history": {},
     "wargoal_type": {
       "impl": {

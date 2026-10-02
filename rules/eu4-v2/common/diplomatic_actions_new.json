@@ -1,15 +1,4 @@
 {
-  "mixins": {
-    "keys__type_new_diplomatic_action": {
-      "fields": {
-        "require_acceptance": {
-          "card": "1",
-          "value": "'yes'",
-          "when": null
-        }
-      }
-    }
-  },
   "schemas": {
     "new_diplomatic_action_body": {
       "fields": {
@@ -17,8 +6,7 @@
           "body": "new_diplomatic_action_body__ai_acceptance",
           "card": "0..1",
           "doc": "This works similarly to variable_arithmetic_trigger, but does not support triggers generally. Instead, \"limit\" will be evaluated first and the rest ignored if it isn't passed.",
-          "override": true,
-          "when": null
+          "override": true
         },
         "ai_will_do": {
           "body": "trigger",
@@ -31,26 +19,22 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "alert_index": {
           "card": "0..1",
           "override": true,
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "alert_tooltip": {
           "card": "0..1",
           "override": true,
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "category": {
           "card": "0..*",
           "override": true,
-          "value": "scalar | enum<diplomatic_actions_new>",
-          "when": null
+          "value": "scalar | enum<diplomatic_actions_new>"
         },
         "is_allowed": {
           "body": "trigger",
@@ -62,8 +46,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "is_visible": {
           "body": "trigger",
@@ -75,8 +58,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "on_accept": [
           {
@@ -89,8 +71,7 @@
                 "root": "country",
                 "this": "country"
               }
-            },
-            "when": null
+            }
           },
           {
             "body": "effect",
@@ -102,8 +83,7 @@
                 "root": "country",
                 "this": "country"
               }
-            },
-            "when": null
+            }
           }
         ],
         "on_decline": {
@@ -116,20 +96,14 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "require_acceptance": {
           "card": "0..1",
           "doc": "Can the other side decline? defaults to no",
-          "override": true,
-          "value": "bool",
-          "when": null
+          "value": "bool"
         }
-      },
-      "include": [
-        "keys__type_new_diplomatic_action"
-      ]
+      }
     },
     "new_diplomatic_action_body__ai_acceptance": {
       "fields": {
@@ -142,8 +116,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -151,56 +124,46 @@
       "fields": {
         "change_variable": {
           "body": "new_diplomatic_action_body__ai_acceptance__add_entry__change_variable",
-          "card": "0..*",
-          "when": null
+          "card": "0..*"
         },
         "check_variable": {
           "body": "new_diplomatic_action_body__ai_acceptance__add_entry__check_variable",
-          "card": "0..*",
-          "when": null
+          "card": "0..*"
         },
         "divide_variable": {
           "body": "new_diplomatic_action_body__ai_acceptance__add_entry__divide_variable",
-          "card": "0..*",
-          "when": null
+          "card": "0..*"
         },
         "export_to_variable": {
           "body": "new_diplomatic_action_body__ai_acceptance__add_entry__export_to_variable",
-          "card": "0..*",
-          "when": null
+          "card": "0..*"
         },
         "is_variable_equal": {
           "body": "new_diplomatic_action_body__ai_acceptance__add_entry__is_variable_equal",
-          "card": "0..*",
-          "when": null
+          "card": "0..*"
         },
         "limit": {
           "body": "trigger",
           "card": "0..1",
           "control": {
             "kind": "guard"
-          },
-          "when": null
+          }
         },
         "multiply_variable": {
           "body": "new_diplomatic_action_body__ai_acceptance__add_entry__multiply_variable",
-          "card": "0..*",
-          "when": null
+          "card": "0..*"
         },
         "name": {
           "card": "1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
         },
         "set_variable": {
           "body": "new_diplomatic_action_body__ai_acceptance__add_entry__set_variable",
-          "card": "0..*",
-          "when": null
+          "card": "0..*"
         },
         "subtract_variable": {
           "body": "new_diplomatic_action_body__ai_acceptance__add_entry__subtract_variable",
-          "card": "0..*",
-          "when": null
+          "card": "0..*"
         }
       }
     },
@@ -208,18 +171,15 @@
       "fields": {
         "ai_value": {
           "card": "1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "value": {
           "card": "1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "which": {
           "card": "1",
-          "value": "'ai_value'",
-          "when": null
+          "value": "'ai_value'"
         }
       }
     },
@@ -227,18 +187,15 @@
       "fields": {
         "ai_value": {
           "card": "1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "cardinality": {
           "card": "1",
-          "value": "'2..2'",
-          "when": null
+          "value": "'2..2'"
         },
         "which": {
           "card": "1",
-          "value": "'ai_value' | ref<variable>",
-          "when": null
+          "value": "'ai_value' | ref<variable>"
         }
       }
     },
@@ -246,18 +203,15 @@
       "fields": {
         "ai_value": {
           "card": "1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "value": {
           "card": "1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "which": {
           "card": "1",
-          "value": "'ai_value'",
-          "when": null
+          "value": "'ai_value'"
         }
       }
     },
@@ -266,26 +220,22 @@
         "value": {
           "card": "1",
           "doc": "Seeds `ai_value` with a constant before the arithmetic; vanilla AI acceptance writes `value = 1` here.",
-          "value": "enum<export_to_variable_data> | 'trigger_value:{ref<scripted_trigger>}' | int",
-          "when": null
+          "value": "enum<export_to_variable_data> | 'trigger_value:{enum<numeric_or_bool_trigger>}' | 'variable:{scalar}' | 'modifier:{scalar}' | int"
         },
         "who": {
           "card": "0..1",
-          "value": "scope<country>",
-          "when": null
+          "value": "scope<country>"
         },
         "with": {
           "card": "0..1",
-          "value": "scope<country>",
-          "when": null
+          "value": "scope<country>"
         }
       },
       "patterns": [
         {
           "card": "1",
           "key": "enum<which_varname>",
-          "value": "'ai_value'",
-          "when": null
+          "value": "'ai_value'"
         }
       ]
     },
@@ -293,13 +243,11 @@
       "fields": {
         "cardinality": {
           "card": "1",
-          "value": "'2..2'",
-          "when": null
+          "value": "'2..2'"
         },
         "which": {
           "card": "1",
-          "value": "'ai_value' | ref<variable>",
-          "when": null
+          "value": "'ai_value' | ref<variable>"
         }
       }
     },
@@ -307,18 +255,15 @@
       "fields": {
         "ai_value": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "value": {
           "card": "1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "which": {
           "card": "1",
-          "value": "'ai_value'",
-          "when": null
+          "value": "'ai_value'"
         }
       }
     },
@@ -326,18 +271,15 @@
       "fields": {
         "ai_value": {
           "card": "1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "value": {
           "card": "1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "which": {
           "card": "1",
-          "value": "'ai_value'",
-          "when": null
+          "value": "'ai_value'"
         }
       }
     },
@@ -345,18 +287,15 @@
       "fields": {
         "ai_value": {
           "card": "0..1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "value": {
           "card": "1",
-          "value": "float",
-          "when": null
+          "value": "float"
         },
         "which": {
           "card": "1",
-          "value": "'ai_value'",
-          "when": null
+          "value": "'ai_value'"
         }
       }
     },
@@ -364,8 +303,7 @@
       "fields": {
         "require_acceptance": {
           "card": "1",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
         }
       }
     }

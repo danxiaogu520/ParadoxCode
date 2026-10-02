@@ -56,7 +56,7 @@ fn overlay_definition_open_and_close_relower_other_overlay_references() {
     let definition_path = AbsPath::normalize(&scripted.join("defs.txt"));
     let caller_path = AbsPath::normalize(&events.join("caller.txt"));
     let mut host = AnalysisHost::with_ir(
-        game::eu4::first_party_rules().expect("legacy rules"),
+        game::eu4::runtime_rules().expect("legacy rules"),
         game::eu4::profile(),
         game::eu4::first_party_ir().expect("compiled IR"),
     );
@@ -887,7 +887,7 @@ fn roots_overlay_and_shards_preserve_shadowed_semantic_definitions() {
             .iter()
             .filter(|candidate| candidate.active)
             .count(),
-        1
+        3
     );
     host.open_document(
         DocumentId::new("file:///current/foo.txt"),
@@ -968,21 +968,7 @@ fn declaring_document_edits_move_the_definitions_cache_domain() {
     fs::create_dir_all(&triggers).expect("fixture directory");
     fs::write(triggers.join("base.txt"), "is_ready = { always = yes }\n").expect("trigger fixture");
 
-    // The bootstrap rules carry no semantic model, so the declaring-kind
-    // recognition needs a dynamic-definition descriptor injected here.
-    let mut model = rules::RulesModel::default();
-    model.semantic.type_descriptors.insert(
-        "scripted_trigger".to_owned(),
-        rules::TypeDescriptor {
-            dynamic_definition: Some(rules::DynamicDefinitionDescriptor {
-                body_context: "trigger".to_owned(),
-                enabled: true,
-                ..rules::DynamicDefinitionDescriptor::default()
-            }),
-            ..rules::TypeDescriptor::default()
-        },
-    );
-    let mut host = eu4_host_with(rules::RuleSet::from_model(model));
+    let mut host = eu4_host();
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),

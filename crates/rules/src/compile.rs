@@ -2,7 +2,7 @@
 //! (`docs/rules-language.md` §10).
 //!
 //! [`check`] parses every mini-syntax string with provenance (source file +
-//! JSON pointer + expression-internal column) and then runs the eight
+//! JSON pointer + expression-internal column) and then runs the five
 //! normative semantic checks of §10.1, plus the cross-source duplicate-name
 //! rule of §1. Nothing here lowers to the runtime IR; the pass is the
 //! `rulec check` payload.
@@ -53,14 +53,8 @@ pub enum DiagnosticCode {
     /// Check 4: a formal parameter out of position, more than one parameter
     /// level, or more than 64 instances.
     ParameterError,
-    /// Check 5: a `when`-read field carries `when`/`unless`.
-    SubtypeWhenDependency,
-    /// Check 6: a scope name or link `from` violation.
+    /// Check 5: a scope name or link `from` violation.
     ScopeReferenceError,
-    /// Check 7: a trait `requires` does not hold.
-    UnsatisfiedTraitRequirement,
-    /// Check 8: a type impls one trait twice.
-    DuplicateTraitImpl,
     /// D14 card syntax lint (`0..0`, fixed-length tuples, card disagreement).
     CardLint,
 }
@@ -75,10 +69,7 @@ impl fmt::Display for DiagnosticCode {
             Self::IncludeConflict => "IncludeConflict",
             Self::UnreachableOverload => "UnreachableOverload",
             Self::ParameterError => "ParameterError",
-            Self::SubtypeWhenDependency => "SubtypeWhenDependency",
             Self::ScopeReferenceError => "ScopeReferenceError",
-            Self::UnsatisfiedTraitRequirement => "UnsatisfiedTraitRequirement",
-            Self::DuplicateTraitImpl => "DuplicateTraitImpl",
             Self::CardLint => "CardLint",
         })
     }
@@ -97,21 +88,19 @@ impl fmt::Display for Diagnostic {
     }
 }
 
-/// Runs parsing and the eight semantic checks over merged rule sources.
+/// Runs parsing and the six semantic checks over merged rule sources.
 ///
-/// `sources` is `(source file name, parsed file)` in manifest order. The
+/// `sources` is `(source file name, parsed file)` in normalized relative-path order. The
 /// returned diagnostics are sorted by `(file, pointer, code)` so runs are
 /// deterministic.
 pub fn check(sources: &[(String, RuleFile)]) -> Vec<Diagnostic> {
     let mut checker = Checker::new(sources);
     checker.collect();
+    checker.check_block_forms();
     checker.check_include_conflicts();
     checker.check_unreachable_overloads();
     checker.check_parameters();
-    checker.check_when_dependencies();
     checker.check_scopes();
-    checker.check_traits();
-    checker.check_subtype_gates();
     checker.check_card_disagreement();
     checker.check_undefined_references();
     checker.check_unused_definitions();
@@ -169,12 +158,10 @@ pub(crate) struct SchemaRef {
 pub(crate) enum Actual {
     /// A concrete name.
     Name(String),
-    /// `$name` or `$name.column`.
+    /// `$name`: a formal parameter.
     Param {
         /// The formal parameter name.
         name: String,
-        /// The attribute column read from a matched enum row.
-        column: Option<String>,
     },
 }
 
@@ -224,30 +211,16 @@ struct CallSite {
     callee: String,
     args: Vec<Actual>,
     caller: String,
-    /// Enum name of the site's `map`/`pattern` key expression, when the key
-    /// is `enum<E>`; it gives `$key` its domain.
-    key_enum: Option<String>,
 }
 
-/// One use of a formal parameter (`$name[.column]`).
+/// One use of a formal parameter (`$name`).
 #[derive(Clone, Debug)]
 struct ParamUse {
     name: String,
     at: At,
     /// Formals of the enclosing parameterised schema.
     formals: Vec<String>,
-    /// Whether the use sits under a `map`/`pattern` (where `$key` binds).
-    in_map: bool,
     what: &'static str,
-}
-
-/// One symbol-defining position (`def`).
-#[derive(Clone, Debug)]
-struct DefSite {
-    type_name: String,
-    /// Instance-body schema name, when the position carries a block body.
-    body: Option<String>,
-    at: At,
 }
 
 /// The collected world the checks reason over.
@@ -264,13 +237,8 @@ struct Checker<'a> {
     references: Vec<Reference>,
     calls: Vec<CallSite>,
     params: Vec<ParamUse>,
-    defs: Vec<DefSite>,
     /// Files `root` schema names, for schema reachability.
     root_schemas: Vec<String>,
-    /// `when` conditions per type: (type name, subtype name, field, at).
-    when_reads: Vec<(String, String, String, At)>,
-    /// Field-level `when`/`unless` gates: (body schema, subtype, at).
-    subtype_gates: Vec<(String, String, At)>,
 }
 
 impl<'a> Checker<'a> {
@@ -288,10 +256,7 @@ impl<'a> Checker<'a> {
             references: Vec::new(),
             calls: Vec::new(),
             params: Vec::new(),
-            defs: Vec::new(),
             root_schemas: Vec::new(),
-            when_reads: Vec::new(),
-            subtype_gates: Vec::new(),
         }
     }
 
@@ -316,7 +281,7 @@ impl<'a> Checker<'a> {
                         name: param.name,
                         at: at.clone(),
                         formals: ctx.formals.to_vec(),
-                        in_map: ctx.in_map,
+
                         what: "a type expression",
                     });
                 }
@@ -344,7 +309,7 @@ impl<'a> Checker<'a> {
                             name: name.clone(),
                             at: at.clone(),
                             formals: ctx.formals.to_vec(),
-                            in_map: ctx.in_map,
+
                             what: "a schema argument",
                         });
                     }
@@ -543,7 +508,20 @@ impl<'a> Checker<'a> {
                     );
                 }
                 self.registers.insert(name.clone());
-                let _ = register;
+                if register.chain == Some(true)
+                    && matches!(
+                        register.role,
+                        crate::source::RegisterRole::Root | crate::source::RegisterRole::Current
+                    )
+                {
+                    report(
+                        &mut self.diagnostics,
+                        &at.child("chain"),
+                        DiagnosticCode::ScopeReferenceError,
+                        Severity::Error,
+                        "only previous/from register roles can chain".to_owned(),
+                    );
+                }
             }
             for (name, link) in &scopes.links {
                 let at = base.child("links").child(name);
@@ -641,7 +619,7 @@ impl<'a> Checker<'a> {
                     self.root_schemas.push(name.clone());
                 }
                 Some(RootSpec::Instance(field)) => {
-                    self.collect_field_payload(&at.child("root"), "", &[], false, None, field);
+                    self.collect_field_payload(&at.child("root"), "", &[], field);
                 }
                 None => {}
             }
@@ -701,18 +679,10 @@ impl<'a> Checker<'a> {
                 }
                 SchemaSpec::Map { map } => {
                     self.schemas.insert(name.clone(), def);
-                    let ctx = ParamCtx {
-                        formals: &[],
-                        in_map: true,
-                    };
+                    let ctx = ParamCtx { formals: &[] };
                     let owner = Some(name.as_str());
                     if let Some(parsed) = self.expr(&at.child("map").child("key"), &map.key, &ctx) {
                         self.collect_refs_from_expr(&at.child("map").child("key"), &parsed, owner);
-                        self.collect_def_shorthand(
-                            &at.child("map").child("key"),
-                            &parsed,
-                            map.body.as_deref(),
-                        );
                     }
                     if let Some(value) = &map.value
                         && let Some(parsed) =
@@ -725,13 +695,7 @@ impl<'a> Checker<'a> {
                         );
                     }
                     if let Some(body) = &map.body {
-                        self.collect_body_ref(
-                            &at.child("map").child("body"),
-                            body,
-                            &ctx,
-                            Some(map.key.as_str()),
-                            owner,
-                        );
+                        self.collect_body_ref(&at.child("map").child("body"), body, &ctx, owner);
                     }
                 }
                 SchemaSpec::List { list } => {
@@ -763,7 +727,7 @@ impl<'a> Checker<'a> {
                     at: at.clone(),
                 },
             );
-            self.collect_field_map(&at, name, &[], false, None, &mixin.fields);
+            self.collect_field_map(&at, name, &[], &mixin.fields);
         }
 
         for (name, spec) in &file.types {
@@ -792,27 +756,12 @@ impl<'a> Checker<'a> {
                 self.forbid_params(&at.child("builtin"), builtin, "a builtin member");
             }
             self.collect_trait_impls(&at, &spec.trait_impls);
-            for (subtype_name, subtype) in &spec.subtypes {
-                let subtype_at = at.child("subtypes").child(subtype_name);
-                self.forbid_params(&subtype_at, subtype_name, "a subtype name");
-                self.collect_trait_impls(&subtype_at, &subtype.trait_impls);
-                if let Some(when) = &subtype.when {
-                    for (field, value) in &when.0 {
-                        self.forbid_params(&subtype_at.child("when"), field, "a when field name");
-                        let value_at = subtype_at.child("when").child(field);
-                        if let Some(value) = value
-                            && let Some(parsed) = self.expr(&value_at, value, &ParamCtx::closed())
-                        {
-                            self.collect_refs_from_expr(&value_at, &parsed, None);
-                        }
-                        self.when_reads.push((
-                            name.clone(),
-                            subtype_name.clone(),
-                            field.clone(),
-                            value_at,
-                        ));
-                    }
-                }
+            for subtype_name in spec.subtypes.keys() {
+                self.forbid_params(
+                    &at.child("subtypes").child(subtype_name),
+                    subtype_name,
+                    "a subtype name",
+                );
             }
         }
 
@@ -838,32 +787,6 @@ impl<'a> Checker<'a> {
                     at: at.clone(),
                 },
             );
-            if let Some(requires) = &spec.requires
-                && let Some(include) = &requires.include
-            {
-                self.references.push(Reference {
-                    kind: RefKind::Mixin,
-                    name: include.clone(),
-                    subtype: None,
-                    owner: None,
-                    at: at.child("requires").child("include"),
-                });
-            }
-            for (binding_name, binding) in &spec.bindings {
-                let binding_at = at.child("bindings").child(binding_name);
-                if binding.loc.is_some() == binding.sprite.is_some() {
-                    report(
-                        &mut self.diagnostics,
-                        &binding_at,
-                        DiagnosticCode::Parse,
-                        Severity::Error,
-                        format!(
-                            "trait binding `{binding_name}` must declare exactly one of \
-                             `loc` / `sprite`"
-                        ),
-                    );
-                }
-            }
         }
 
         for (name, spec) in &file.enums {
@@ -894,51 +817,84 @@ impl<'a> Checker<'a> {
                         self.forbid_params(&at.index(index), member, "an enum member");
                     }
                 }
-                EnumSpec::Table { columns, rows } => {
-                    for (column, kind) in columns {
-                        self.forbid_params(
-                            &at.child("columns").child(column),
-                            column,
-                            "a column name",
-                        );
-                        match parse_column(kind) {
-                            Ok((parsed, optional)) => {
-                                if parsed != "scope_type" {
-                                    report_parse(
-                                        &mut self.diagnostics,
-                                        &at.child("columns").child(column),
-                                        None,
-                                        format!(
-                                            "unknown column kind `{parsed}` (expected `scope_type`)"
-                                        ),
-                                    );
-                                }
-                                let _ = optional;
-                            }
-                            Err(failure) => report_parse(
-                                &mut self.diagnostics,
-                                &at.child("columns").child(column),
-                                None,
-                                failure,
-                            ),
-                        }
-                    }
-                    for (row, values) in rows {
-                        self.forbid_params(&at.child("rows").child(row), row, "an enum row name");
-                        for (column, value) in values {
-                            self.forbid_params(
-                                &at.child("rows").child(row).child(column),
-                                value,
-                                "an enum row value",
-                            );
-                        }
-                    }
-                }
             }
         }
     }
 
     /// Collects the fields and patterns of one block schema.
+    fn check_block_forms(&mut self) {
+        for (file, source) in self.sources {
+            for (name, schema) in &source.schemas {
+                if let SchemaSpec::Block(block) = schema {
+                    let at = At {
+                        file: file.clone(),
+                        pointer: join_pointer("/schemas", name),
+                    };
+                    self.check_block_form_specs(&at, block);
+                }
+            }
+        }
+    }
+
+    fn check_block_form_specs(&mut self, at: &At, block: &crate::source::BlockSchema) {
+        for (index, form) in block.forms.iter().enumerate() {
+            let at = at.child("forms").index(index);
+            if form.fields.is_empty() && form.patterns.is_empty() {
+                report_parse(
+                    &mut self.diagnostics,
+                    &at,
+                    None,
+                    "a block form must constrain at least one field or pattern".into(),
+                );
+            }
+            for (key, card) in &form.fields {
+                let at = at.child("fields").child(key);
+                let exists = block
+                    .fields
+                    .keys()
+                    .any(|name| name.eq_ignore_ascii_case(key))
+                    || block.include.iter().any(|name| {
+                        self.mixins.get(name).is_some_and(|mixin| {
+                            mixin
+                                .value
+                                .fields
+                                .keys()
+                                .any(|name| name.eq_ignore_ascii_case(key))
+                        })
+                    });
+                if !exists {
+                    report_parse(
+                        &mut self.diagnostics,
+                        &at,
+                        None,
+                        format!("block form names undeclared field `{key}`"),
+                    );
+                }
+                if let Err(message) = parse_card(card) {
+                    report_parse(&mut self.diagnostics, &at, None, message);
+                }
+            }
+            for (index, card) in &form.patterns {
+                let at = at.child("patterns").child(index);
+                if index
+                    .parse::<usize>()
+                    .ok()
+                    .is_none_or(|index| index >= block.patterns.len())
+                {
+                    report_parse(
+                        &mut self.diagnostics,
+                        &at,
+                        None,
+                        format!("block form names undeclared pattern {index}"),
+                    );
+                }
+                if let Err(message) = parse_card(card) {
+                    report_parse(&mut self.diagnostics, &at, None, message);
+                }
+            }
+        }
+    }
+
     fn collect_schema_fields(
         &mut self,
         at: &At,
@@ -947,21 +903,13 @@ impl<'a> Checker<'a> {
         block: &crate::source::BlockSchema,
     ) {
         let _ = name;
-        self.collect_field_map(at, name, formals, false, None, &block.fields);
+        self.collect_field_map(at, name, formals, &block.fields);
         for (index, pattern) in block.patterns.iter().enumerate() {
             let pattern_at = at.child("patterns").index(index);
-            let ctx = ParamCtx {
-                formals,
-                in_map: true,
-            };
+            let ctx = ParamCtx { formals };
             if let Some(key) = &pattern.key {
                 if let Some(parsed) = self.expr(&pattern_at.child("key"), key, &ctx) {
                     self.collect_refs_from_expr(&pattern_at.child("key"), &parsed, Some(name));
-                    self.collect_def_shorthand(
-                        &pattern_at.child("key"),
-                        &parsed,
-                        pattern.body.as_deref(),
-                    );
                 }
             } else {
                 report(
@@ -972,14 +920,7 @@ impl<'a> Checker<'a> {
                     "a pattern must declare a `key` type expression".to_owned(),
                 );
             }
-            self.collect_field_payload(
-                &pattern_at,
-                name,
-                formals,
-                true,
-                pattern.key.as_deref(),
-                pattern,
-            );
+            self.collect_field_payload(&pattern_at, name, formals, pattern);
         }
         if let Some(items) = &block.items
             && let Some(parsed) = self.expr(&at.child("items"), items, &ParamCtx::closed())
@@ -993,8 +934,6 @@ impl<'a> Checker<'a> {
         at: &At,
         schema: &str,
         formals: &[String],
-        in_map: bool,
-        key_expr: Option<&str>,
         fields: &BTreeMap<String, FieldOverloads>,
     ) {
         for (key, overloads) in fields {
@@ -1008,7 +947,7 @@ impl<'a> Checker<'a> {
                 if indexed {
                     field_at = field_at.index(index);
                 }
-                self.collect_field_payload(&field_at, schema, formals, in_map, key_expr, field);
+                self.collect_field_payload(&field_at, schema, formals, field);
             }
         }
     }
@@ -1020,12 +959,64 @@ impl<'a> Checker<'a> {
         at: &At,
         schema: &str,
         formals: &[String],
-        in_map: bool,
-        key_expr: Option<&str>,
         field: &FieldSpec,
     ) {
-        let ctx = ParamCtx { formals, in_map };
+        let ctx = ParamCtx { formals };
         let owner = (!schema.is_empty()).then_some(schema);
+        if let Some(control) = &field.control {
+            if let Some(selector_schema) = &control.selector_schema {
+                if selector_schema == "self" {
+                    report(
+                        &mut self.diagnostics,
+                        &at.child("control").child("selector_schema"),
+                        DiagnosticCode::Parse,
+                        Severity::Error,
+                        "selector_schema must name a schema explicitly".to_owned(),
+                    );
+                }
+                self.collect_body_ref(
+                    &at.child("control").child("selector_schema"),
+                    selector_schema,
+                    &ctx,
+                    owner,
+                );
+            }
+            if control.kind == crate::source::ControlKind::Switch
+                && (control.on.is_none() || control.selector_schema.is_none())
+            {
+                report(
+                    &mut self.diagnostics,
+                    &at.child("control"),
+                    DiagnosticCode::Parse,
+                    Severity::Error,
+                    "switch control requires on and selector_schema".to_owned(),
+                );
+            } else if control.kind != crate::source::ControlKind::Switch
+                && control.selector_schema.is_some()
+            {
+                report(
+                    &mut self.diagnostics,
+                    &at.child("control"),
+                    DiagnosticCode::Parse,
+                    Severity::Error,
+                    "selector_schema is only valid on switch control".to_owned(),
+                );
+            }
+        }
+        if field
+            .control
+            .as_ref()
+            .is_some_and(|control| control.kind == crate::source::ControlKind::Constant)
+            && field.value.as_deref() != Some("bool")
+        {
+            report(
+                &mut self.diagnostics,
+                &at.child("control"),
+                DiagnosticCode::Parse,
+                Severity::Error,
+                "a constant predicate must have a scalar bool value".to_owned(),
+            );
+        }
         if let Some(key) = &field.key
             && let Some(parsed) = self.expr(&at.child("key"), key, &ctx)
         {
@@ -1036,30 +1027,24 @@ impl<'a> Checker<'a> {
             payload_count += 1;
             if let Some(parsed) = self.expr(&at.child("value"), value, &ctx) {
                 self.collect_refs_from_expr(&at.child("value"), &parsed, owner);
-                self.collect_def_shorthand(&at.child("value"), &parsed, field.body.as_deref());
             }
         }
         if let Some(body) = &field.body {
             payload_count += 1;
-            self.collect_body_ref(&at.child("body"), body, &ctx, key_expr, owner);
+            self.collect_body_ref(&at.child("body"), body, &ctx, owner);
         }
         if let Some(list) = &field.list {
             payload_count += 1;
             if let Some(parsed) = self.expr(&at.child("list"), list, &ctx) {
                 self.collect_refs_from_expr(&at.child("list"), &parsed, owner);
-                self.collect_def_shorthand(&at.child("list"), &parsed, field.body.as_deref());
             }
         }
         if let Some(map) = &field.map {
             payload_count += 1;
             let map_at = at.child("map");
-            let map_ctx = ParamCtx {
-                formals,
-                in_map: true,
-            };
+            let map_ctx = ParamCtx { formals };
             if let Some(parsed) = self.expr(&map_at.child("key"), &map.key, &map_ctx) {
                 self.collect_refs_from_expr(&map_at.child("key"), &parsed, owner);
-                self.collect_def_shorthand(&map_at.child("key"), &parsed, map.body.as_deref());
             }
             if let Some(value) = &map.value
                 && let Some(parsed) = self.expr(&map_at.child("value"), value, &map_ctx)
@@ -1067,7 +1052,7 @@ impl<'a> Checker<'a> {
                 self.collect_refs_from_expr(&map_at.child("value"), &parsed, owner);
             }
             if let Some(body) = &map.body {
-                self.collect_body_ref(&map_at.child("body"), body, &map_ctx, Some(&map.key), owner);
+                self.collect_body_ref(&map_at.child("body"), body, &map_ctx, owner);
             }
             if map.value.is_some() == map.body.is_some() {
                 report(
@@ -1129,15 +1114,6 @@ impl<'a> Checker<'a> {
                         owner: owner.map(ToOwned::to_owned),
                         at: def_at.child("type"),
                     });
-                    self.defs.push(DefSite {
-                        type_name,
-                        body: field.body.as_ref().map(|body| {
-                            parse_schema_ref(body)
-                                .map(|reference| reference.name)
-                                .unwrap_or_default()
-                        }),
-                        at: def_at.clone(),
-                    });
                 }
                 Err(failure) => {
                     report_parse(&mut self.diagnostics, &def_at.child("type"), None, failure)
@@ -1150,24 +1126,10 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        for (cond, label) in [(&field.when, "when"), (&field.unless, "unless")] {
-            if let Some(subtype) = cond {
-                self.forbid_params(&at.child(label), subtype, "a subtype gate");
-                self.subtype_gates
-                    .push((schema.to_owned(), subtype.clone(), at.child(label)));
-            }
-        }
     }
 
     /// Collects the reference and call site of one `body` string.
-    fn collect_body_ref(
-        &mut self,
-        at: &At,
-        raw: &str,
-        ctx: &ParamCtx,
-        key_expr: Option<&str>,
-        owner: Option<&str>,
-    ) {
+    fn collect_body_ref(&mut self, at: &At, raw: &str, ctx: &ParamCtx, owner: Option<&str>) {
         let Some(reference) = self.schema_ref(at, raw, ctx) else {
             return;
         };
@@ -1185,34 +1147,11 @@ impl<'a> Checker<'a> {
                 callee: reference.name.clone(),
                 args: reference.args.clone(),
                 caller: owner.unwrap_or_default().to_owned(),
-                key_enum: key_expr.and_then(enum_name),
             });
         }
     }
 
-    /// Collects `def<T>` shorthand positions of one expression (§4.2): the
-    /// instance body is the enclosing field's `body`, when there is one.
-    fn collect_def_shorthand(&mut self, at: &At, parsed: &Expr, body: Option<&str>) {
-        for alternative in &parsed.alternatives {
-            if let Primary::Def(argument) = alternative
-                && let expr::Argument::Path(segments) = argument
-                && let Some(Segment::Name(type_name)) = segments.first()
-            {
-                let subtype = match segments.get(1) {
-                    Some(Segment::Name(subtype)) => Some(subtype.clone()),
-                    _ => None,
-                };
-                self.defs.push(DefSite {
-                    type_name: type_name.clone(),
-                    body: body.map(ToOwned::to_owned),
-                    at: at.clone(),
-                });
-                let _ = subtype;
-            }
-        }
-    }
-
-    /// Collects the type/enum/schema/trait references of one parsed expression.
+    /// Collects the type/enum/schema references of one parsed expression.
     fn collect_refs_from_expr(&mut self, at: &At, parsed: &Expr, owner: Option<&str>) {
         for alternative in &parsed.alternatives {
             match alternative {
@@ -1234,15 +1173,6 @@ impl<'a> Checker<'a> {
                                 at: at.clone(),
                             });
                         }
-                    }
-                    expr::Argument::Trait(name) => {
-                        self.references.push(Reference {
-                            kind: RefKind::Trait,
-                            name: name.clone(),
-                            subtype: None,
-                            owner: owner.map(ToOwned::to_owned),
-                            at: at.clone(),
-                        });
                     }
                 },
                 Primary::Enum(argument) => {
@@ -1416,16 +1346,11 @@ impl<'a> Checker<'a> {
                 .formals
                 .iter()
                 .any(|formal| formal == &use_site.name);
-            let key_binding = use_site.name == "key" && use_site.in_map;
-            if !known && !key_binding {
-                let reason = if use_site.name == "key" {
-                    "`$key` binds only under a `map` or `pattern`".to_owned()
-                } else {
-                    format!(
-                        "parameter `${}` is not a formal of the enclosing schema ({})",
-                        use_site.name, use_site.what
-                    )
-                };
+            if !known {
+                let reason = format!(
+                    "parameter `${}` is not a formal of the enclosing schema ({})",
+                    use_site.name, use_site.what
+                );
                 report(
                     &mut self.diagnostics,
                     &use_site.at,
@@ -1440,8 +1365,7 @@ impl<'a> Checker<'a> {
 
     /// Check 4c: the 64-instance cap, statically approximated. Each call
     /// site contributes the product of its argument domain sizes; concrete
-    /// names count 1, `$key[.column]` counts the distinct values of the key
-    /// enum, and a forwarded formal counts the caller's instances. Sites with
+    /// names count 1, and a forwarded formal counts the caller's instances. Sites with
     /// unresolvable domains cannot prove an excess and are not counted.
     fn check_instantiation_cap(&mut self) {
         let mut counts: BTreeMap<String, u64> = self
@@ -1455,8 +1379,23 @@ impl<'a> Checker<'a> {
             // sites from the previous round (a fixpoint, not an accumulation).
             let mut next: BTreeMap<String, u64> =
                 counts.keys().map(|name| (name.clone(), 0u64)).collect();
+            let mut concrete_calls = BTreeSet::new();
             for call in &self.calls {
                 if !counts.contains_key(&call.callee) {
+                    continue;
+                }
+                // Repeated concrete tuples lower to the same arena instance,
+                // regardless of how many fields call them.
+                if let Some(arguments) = call
+                    .args
+                    .iter()
+                    .map(|argument| match argument {
+                        Actual::Name(name) => Some(name.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Option<Vec<_>>>()
+                    && !concrete_calls.insert((call.callee.as_str(), arguments))
+                {
                     continue;
                 }
                 let Some(product) = self.call_domain_product(call, &counts) else {
@@ -1492,30 +1431,6 @@ impl<'a> Checker<'a> {
         for argument in &call.args {
             let domain = match argument {
                 Actual::Name(_) => 1u64,
-                Actual::Param { name, column } if name == "key" => {
-                    let enum_name = call.key_enum.as_ref()?;
-                    let enum_members = self.enums.get(enum_name)?;
-                    match enum_members.value {
-                        EnumSpec::Members(members) => {
-                            if column.is_some() {
-                                return None;
-                            }
-                            members.len() as u64
-                        }
-                        EnumSpec::Table { columns, rows } => match column {
-                            Some(column) => {
-                                if !columns.contains_key(column) {
-                                    return None;
-                                }
-                                rows.values()
-                                    .filter_map(|values| values.get(column))
-                                    .collect::<BTreeSet<_>>()
-                                    .len() as u64
-                            }
-                            None => rows.len() as u64,
-                        },
-                    }
-                }
                 Actual::Param { name, .. } => {
                     // A forwarded formal instantiates once per caller instance.
                     let caller = self.schemas.get(&call.caller)?;
@@ -1530,95 +1445,7 @@ impl<'a> Checker<'a> {
         Some(product)
     }
 
-    /// Check 5: `when` dependencies, plus `when` field names under check 1.
-    fn check_when_dependencies(&mut self) {
-        // Instance-body fields per type, from the `def` positions.
-        let mut body_fields: BTreeMap<String, BTreeMap<String, FieldSite>> = BTreeMap::new();
-        for def_site in &self.defs {
-            let Some(body_name) = def_site.body.as_deref() else {
-                continue;
-            };
-            if body_name == "self" {
-                continue;
-            }
-            let Some(schema) = self.schemas.get(body_name) else {
-                continue;
-            };
-            let fields = self.resolved_fields(schema);
-            body_fields
-                .entry(def_site.type_name.clone())
-                .or_default()
-                .extend(fields);
-        }
-        for (type_name, subtype, field_name, at) in &self.when_reads {
-            let Some(fields) = body_fields.get(type_name) else {
-                continue;
-            };
-            let Some(site) = fields.get(field_name) else {
-                report(
-                    &mut self.diagnostics,
-                    at,
-                    DiagnosticCode::UndefinedReference,
-                    Severity::Error,
-                    format!(
-                        "`when` of subtype `{subtype}` reads field `{field_name}`, \
-                         which no def body of type `{type_name}` declares"
-                    ),
-                );
-                continue;
-            };
-            if site.conditional {
-                report(
-                    &mut self.diagnostics,
-                    at,
-                    DiagnosticCode::SubtypeWhenDependency,
-                    Severity::Error,
-                    format!(
-                        "`when` of subtype `{subtype}` reads field `{field_name}`, \
-                         which itself carries `when`/`unless`"
-                    ),
-                );
-            }
-        }
-    }
-
-    /// All exact fields of a schema after mixin expansion, with their
-    /// conditional flag.
-    fn resolved_fields(&self, schema: &SchemaDef<'_>) -> BTreeMap<String, FieldSite> {
-        let mut fields = BTreeMap::new();
-        for (key, overloads) in schema.fields {
-            let list: &[FieldSpec] = match overloads {
-                FieldOverloads::One(field) => std::slice::from_ref(field.as_ref()),
-                FieldOverloads::Many(fields) => fields.as_slice(),
-            };
-            fields.insert(
-                key.clone(),
-                FieldSite {
-                    conditional: list
-                        .iter()
-                        .any(|field| field.when.is_some() || field.unless.is_some()),
-                },
-            );
-        }
-        for mixin_name in schema.include {
-            if let Some(mixin) = self.mixins.get(mixin_name) {
-                for (key, overloads) in &mixin.value.fields {
-                    let list: &[FieldSpec] = match overloads {
-                        FieldOverloads::One(field) => std::slice::from_ref(field.as_ref()),
-                        FieldOverloads::Many(fields) => fields.as_slice(),
-                    };
-                    fields.entry(key.clone()).or_insert(FieldSite {
-                        conditional: list
-                            .iter()
-                            .any(|field| field.when.is_some() || field.unless.is_some()),
-                    });
-                }
-            }
-        }
-        fields
-    }
-
-    /// Check 6: scope names and link `from` lists.
+    /// Check 5: scope names and link `from` lists.
     fn check_scopes(&mut self) {
         let declared = self.scope_types.clone();
         let scope_names = |name: &str| name == "any" || declared.contains(name);
@@ -1779,118 +1606,6 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Checks 7 and 8: trait requirements and duplicate impls.
-    fn check_traits(&mut self) {
-        for (type_name, type_def) in &self.types {
-            // A trait may be implemented at the type level and again per
-            // subtype (§7.3). What must not happen twice is one *binding*: the
-            // type-level template and a subtype template for the same name
-            // would both claim to generate the key.
-            let mut bindings: BTreeMap<(String, String), ()> = BTreeMap::new();
-            for (trait_name, impls) in &type_def.value.trait_impls {
-                for binding in impls.0.keys() {
-                    bindings.insert((trait_name.clone(), binding.clone()), ());
-                }
-            }
-            for (subtype_name, subtype) in &type_def.value.subtypes {
-                for (trait_name, impls) in &subtype.trait_impls {
-                    for binding in impls.0.keys() {
-                        if bindings.contains_key(&(trait_name.clone(), binding.clone())) {
-                            report(
-                                &mut self.diagnostics,
-                                &type_def
-                                    .at
-                                    .child("subtypes")
-                                    .child(subtype_name)
-                                    .child("impl")
-                                    .child(trait_name)
-                                    .child(binding),
-                                DiagnosticCode::DuplicateTraitImpl,
-                                Severity::Error,
-                                format!(
-                                    "type `{type_name}` contributes binding `{binding}` of trait \
-                                     `{trait_name}` twice (type-level and subtype `{subtype_name}`)"
-                                ),
-                            );
-                        }
-                    }
-                }
-            }
-            for trait_name in type_def.value.trait_impls.keys().chain(
-                type_def
-                    .value
-                    .subtypes
-                    .values()
-                    .flat_map(|subtype| subtype.trait_impls.keys()),
-            ) {
-                let Some(required) = self
-                    .traits
-                    .get(trait_name)
-                    .and_then(|trait_def| trait_def.value.requires.as_ref())
-                    .and_then(|requires| requires.include.clone())
-                else {
-                    continue;
-                };
-                for def_site in self.defs.iter().filter(|site| site.type_name == *type_name) {
-                    let Some(body) = def_site.body.as_deref() else {
-                        continue;
-                    };
-                    if body == "self" {
-                        continue;
-                    }
-                    let Some(schema) = self.schemas.get(body) else {
-                        continue;
-                    };
-                    if !schema.include.iter().any(|include| include == &required) {
-                        report(
-                            &mut self.diagnostics,
-                            &def_site.at,
-                            DiagnosticCode::UnsatisfiedTraitRequirement,
-                            Severity::Error,
-                            format!(
-                                "type `{type_name}` impls `{trait_name}`, which requires \
-                                 include `{required}` on its def body schema `{body}`"
-                            ),
-                        );
-                    }
-                }
-            }
-        }
-    }
-
-    /// Field-level `when`/`unless` gates name subtypes of the types whose
-    /// def positions use the gated field's schema (check 1).
-    fn check_subtype_gates(&mut self) {
-        for (schema_name, subtype, at) in &self.subtype_gates {
-            let def_types = self
-                .defs
-                .iter()
-                .filter(|site| site.body.as_deref() == Some(schema_name.as_str()))
-                .map(|site| site.type_name.clone())
-                .collect::<Vec<_>>();
-            if def_types.is_empty() {
-                continue;
-            }
-            for type_name in def_types {
-                let defined = self
-                    .types
-                    .get(&type_name)
-                    .is_some_and(|type_def| type_def.value.subtypes.contains_key(subtype));
-                if !defined {
-                    report(
-                        &mut self.diagnostics,
-                        at,
-                        DiagnosticCode::UndefinedReference,
-                        Severity::Error,
-                        format!(
-                            "subtype gate `{subtype}` is not defined on type `{type_name}`                              (the def type of schema `{schema_name}`)"
-                        ),
-                    );
-                }
-            }
-        }
-    }
-
     /// Check 1 (errors): every collected reference must resolve.
     fn check_undefined_references(&mut self) {
         for reference in &self.references {
@@ -1968,16 +1683,7 @@ impl<'a> Checker<'a> {
         for schema in self.schemas.values() {
             used_mixins.extend(schema.include.iter().cloned());
         }
-        for trait_def in self.traits.values() {
-            if let Some(include) = trait_def
-                .value
-                .requires
-                .as_ref()
-                .and_then(|requires| requires.include.clone())
-            {
-                used_mixins.insert(include);
-            }
-        }
+
         let used_types = self
             .references
             .iter()
@@ -2055,23 +1761,14 @@ impl<'a> Checker<'a> {
     }
 }
 
-/// One resolved exact field, for the `when` dependency check.
-struct FieldSite {
-    conditional: bool,
-}
-
 /// Parameter scope of one walk position.
 struct ParamCtx<'a> {
     formals: &'a [String],
-    in_map: bool,
 }
 
 impl ParamCtx<'static> {
     fn closed() -> Self {
-        Self {
-            formals: &[],
-            in_map: false,
-        }
+        Self { formals: &[] }
     }
 }
 
@@ -2103,7 +1800,6 @@ pub(crate) fn first_name(argument: &expr::Argument) -> Option<String> {
                 Segment::Param(_) => None,
             })
         }
-        expr::Argument::Trait(name) => Some(name.clone()),
     }
 }
 
@@ -2157,17 +1853,6 @@ fn union_shape(parsed: &Expr) -> Result<(), &'static str> {
     } else {
         Ok(())
     }
-}
-
-/// The `enum<E>` name of a map/pattern key expression, when it is one.
-pub(crate) fn enum_name(raw: &str) -> Option<String> {
-    let parsed = expr::parse(raw).ok()?;
-    for alternative in &parsed.alternatives {
-        if let Primary::Enum(argument) = alternative {
-            return first_name(argument);
-        }
-    }
-    None
 }
 
 /// The first `$name` spelled in a raw string, if any.
@@ -2253,16 +1938,11 @@ pub(crate) fn parse_schema_ref(raw: &str) -> Result<SchemaRef, String> {
             return Err(format!("schema `{name}` has an empty argument"));
         }
         if let Some(parameter) = argument.strip_prefix('$') {
-            let (name, column) = match parameter.split_once('.') {
-                Some((name, column)) => (name, Some(column)),
-                None => (parameter, None),
-            };
-            if !is_ident(name) || column.is_some_and(|column| !is_ident(column)) {
+            if !is_ident(parameter) {
                 return Err(format!("`{argument}` is not a schema argument"));
             }
             args.push(Actual::Param {
-                name: name.to_owned(),
-                column: column.map(ToOwned::to_owned),
+                name: parameter.to_owned(),
             });
         } else if is_ident(argument) {
             args.push(Actual::Name(argument.to_owned()));
@@ -2330,20 +2010,6 @@ pub(crate) fn parse_def_type(raw: &str) -> Result<(String, Option<String>), Stri
     }
 }
 
-/// Parses `scope_type` or `scope_type?`.
-pub(crate) fn parse_column(raw: &str) -> Result<(String, bool), String> {
-    let raw = raw.trim();
-    let (kind, optional) = match raw.strip_suffix('?') {
-        Some(kind) => (kind.trim(), true),
-        None => (raw, false),
-    };
-    if is_ident(kind) {
-        Ok((kind.to_owned(), optional))
-    } else {
-        Err(format!("`{raw}` is not a column declaration"))
-    }
-}
-
 fn is_ident(raw: &str) -> bool {
     let mut chars = raw.chars();
     matches!(chars.next(), Some(first) if first.is_ascii_alphabetic() || first == '_')
@@ -2386,8 +2052,6 @@ fn field_structure_eq(left: &FieldSpec, right: &FieldSpec) -> bool {
         && left.card == right.card
         && left.scope == right.scope
         && left.def == right.def
-        && left.when == right.when
-        && left.unless == right.unless
         && left.control == right.control
 }
 
@@ -2472,102 +2136,266 @@ mod tests {
     /// The examples of `docs/rules-language.md` folded into one fully
     /// referenced document: it must produce zero diagnostics.
     const CLEAN: &str = r#"{
-      "files": {
-        "events":           { "path": "events", "ext": "txt", "root": "events_file" },
-        "scripted_effects": { "path": "common/scripted_effects", "ext": "txt", "root": "scripted_effects_file" },
-        "on_actions":       { "path": "common/on_actions", "ext": "txt", "root": "on_actions_file" }
-      },
-      "schemas": {
-        "events_file": { "fields": {
-          "country_event": {
-            "def": { "type": "event.country", "name": "field:id" },
-            "scope": { "set": { "root": "country", "this": "country" } },
-            "body": "event_body", "card": "0..*"
-          }
-        }},
-        "event_body": {
-          "include": ["gated"],
-          "fields": {
-            "id":                 { "value": "scalar", "card": "1" },
-            "title":              { "value": "loc", "card": "0..1" },
-            "is_triggered_only":  { "value": "bool", "card": "0..1" },
-            "mean_time_to_happen": { "body": "mtth", "card": "0..1", "unless": "triggered" },
-            "option":             { "body": "event_option", "card": "0..*" },
-            "picture":            { "value": "ref<sprite> | enum<pictures>", "card": "0..*" }
-          }
-        },
-        "event_option": { "fields": {
-          "name":     { "value": "loc", "card": "0..1" },
-          "ai_chance": { "body": "mtth", "card": "0..1" }
-        }},
-        "mtth": { "fields": {
-          "days":   { "value": "int[0..]", "card": "0..1" },
-          "factor": { "value": "float", "card": "0..1" }
-        }},
-        "scripted_effects_file": { "map": { "key": "def<scripted_effect>", "body": "effect" } },
-        "effect": {
-          "fields": {
-            "add_prestige":  { "value": "int", "card": "0..*" },
-            "if":            { "body": "self", "card": "0..*", "control": { "kind": "branch", "guard": "limit", "chain": ["else"] } },
-            "else":          { "body": "self", "card": "0..*", "control": { "kind": "branch_continue" } },
-            "limit":         { "body": "trigger", "card": "0..1", "control": { "kind": "guard" } },
-            "hidden_effect": { "body": "self", "card": "0..*", "control": { "kind": "transparent" } }
+  "files": {
+    "events": {
+      "path": "events",
+      "ext": "txt",
+      "root": "events_file"
+    },
+    "scripted_effects": {
+      "path": "common/scripted_effects",
+      "ext": "txt",
+      "root": "scripted_effects_file"
+    },
+    "on_actions": {
+      "path": "common/on_actions",
+      "ext": "txt",
+      "root": "on_actions_file"
+    }
+  },
+  "schemas": {
+    "events_file": {
+      "fields": {
+        "country_event": {
+          "def": {
+            "type": "event.country",
+            "name": "field:id"
           },
-          "patterns": [ { "key": "link", "body": "self", "card": "0..*" } ]
-        },
-        "trigger": {
-          "fields": {
-            "always":              { "value": "bool", "card": "0..1" },
-            "has_country_modifier": { "value": "ref<event_modifier>", "card": "0..1" }
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
           },
-          "patterns": [ { "key": "link", "body": "self", "card": "0..*" } ]
-        },
-        "on_actions_file": { "map": { "key": "enum<on_actions>", "body": "on_action_body<$key.scope>" } },
-        "on_action_body<S>": { "fields": {
-          "events": { "list": "ref<event.$S>", "card": "0..*" }
-        }}
-      },
-      "mixins": {
-        "gated": { "fields": { "potential": { "body": "trigger", "card": "0..1" } } }
-      },
-      "types": {
-        "event": {
-          "resolution": "replace",
-          "subtypes": {
-            "country":  {},
-            "province": {},
-            "triggered": { "when": { "is_triggered_only": "'yes'" } }
-          }
-        },
-        "scripted_effect": {
-          "resolution": "replace",
-          "impl": { "Callable": { "body": "effect" } }
-        },
-        "event_modifier": {},
-        "sprite": {}
-      },
-      "traits": {
-        "Callable": { "params": { "body": "schema" }, "capabilities": ["replacement"] }
-      },
-      "enums": {
-        "pictures": ["one", "two"],
-        "on_actions": {
-          "columns": { "scope": "scope_type" },
-          "rows": {
-            "on_startup":                     { "scope": "country" },
-            "on_province_religion_converted": { "scope": "province" }
-          }
-        }
-      },
-      "scopes": {
-        "types":     ["country", "province"],
-        "registers": { "root": {}, "this": {}, "prev": { "chain": true }, "from": { "chain": true } },
-        "links": {
-          "owner":   { "from": ["province"], "to": "country" },
-          "capital": { "from": ["country"],  "to": "province" }
+          "body": "event_body",
+          "card": "0..*"
         }
       }
-    }"#;
+    },
+    "event_body": {
+      "include": [
+        "gated"
+      ],
+      "fields": {
+        "id": {
+          "value": "scalar",
+          "card": "1"
+        },
+        "title": {
+          "value": "loc",
+          "card": "0..1"
+        },
+        "is_triggered_only": {
+          "value": "bool",
+          "card": "0..1"
+        },
+        "mean_time_to_happen": {
+          "body": "mtth",
+          "card": "0..1"
+        },
+        "option": {
+          "body": "event_option",
+          "card": "0..*"
+        },
+        "picture": {
+          "value": "ref<sprite> | enum<pictures>",
+          "card": "0..*"
+        }
+      }
+    },
+    "event_option": {
+      "fields": {
+        "name": {
+          "value": "loc",
+          "card": "0..1"
+        },
+        "ai_chance": {
+          "body": "mtth",
+          "card": "0..1"
+        }
+      }
+    },
+    "mtth": {
+      "fields": {
+        "days": {
+          "value": "int[0..]",
+          "card": "0..1"
+        },
+        "factor": {
+          "value": "float",
+          "card": "0..1"
+        }
+      }
+    },
+    "scripted_effects_file": {
+      "map": {
+        "key": "def<scripted_effect>",
+        "body": "effect"
+      }
+    },
+    "effect": {
+      "fields": {
+        "add_prestige": {
+          "value": "int",
+          "card": "0..*"
+        },
+        "if": {
+          "body": "self",
+          "card": "0..*",
+          "control": {
+            "kind": "branch",
+            "guard": "limit",
+            "chain": [
+              "else"
+            ]
+          }
+        },
+        "else": {
+          "body": "self",
+          "card": "0..*",
+          "control": {
+            "kind": "branch_continue"
+          }
+        },
+        "limit": {
+          "body": "trigger",
+          "card": "0..1",
+          "control": {
+            "kind": "guard"
+          }
+        },
+        "hidden_effect": {
+          "body": "self",
+          "card": "0..*",
+          "control": {
+            "kind": "transparent"
+          }
+        }
+      },
+      "patterns": [
+        {
+          "key": "link",
+          "body": "self",
+          "card": "0..*"
+        }
+      ]
+    },
+    "trigger": {
+      "fields": {
+        "always": {
+          "value": "bool",
+          "card": "0..1"
+        },
+        "has_country_modifier": {
+          "value": "ref<event_modifier>",
+          "card": "0..1"
+        }
+      },
+      "patterns": [
+        {
+          "key": "link",
+          "body": "self",
+          "card": "0..*"
+        }
+      ]
+    },
+    "on_actions_file": {
+      "patterns": [
+        {"key": "enum<on_actions_country>", "body": "on_action_body<country>", "card": "0..*"},
+        {"key": "enum<on_actions_province>", "body": "on_action_body<province>", "card": "0..*"}
+      ]
+    },
+    "on_action_body<S>": {
+      "fields": {
+        "events": {
+          "list": "ref<event.$S>",
+          "card": "0..*"
+        }
+      }
+    }
+  },
+  "mixins": {
+    "gated": {
+      "fields": {
+        "potential": {
+          "body": "trigger",
+          "card": "0..1"
+        }
+      }
+    }
+  },
+  "types": {
+    "event": {
+      "resolution": "replace",
+      "subtypes": {
+        "country": {},
+        "province": {},
+        "triggered": {}
+      }
+    },
+    "scripted_effect": {
+      "resolution": "replace",
+      "impl": {
+        "Callable": {
+          "body": "effect"
+        }
+      }
+    },
+    "event_modifier": {},
+    "sprite": {}
+  },
+  "traits": {
+    "Callable": {}
+  },
+  "enums": {
+    "pictures": [
+      "one",
+      "two"
+    ],
+    "on_actions_country": [
+      "on_startup"
+    ],
+    "on_actions_province": [
+      "on_province_religion_converted"
+    ]
+  },
+  "scopes": {
+    "types": [
+      "country",
+      "province"
+    ],
+    "registers": {
+      "root": {
+        "role": "root"
+      },
+      "this": {
+        "role": "current"
+      },
+      "prev": {
+        "role": "previous",
+        "chain": true
+      },
+      "from": {
+        "role": "from",
+        "chain": true
+      }
+    },
+    "links": {
+      "owner": {
+        "from": [
+          "province"
+        ],
+        "to": "country"
+      },
+      "capital": {
+        "from": [
+          "country"
+        ],
+        "to": "province"
+      }
+    }
+  }
+}"#;
 
     fn run(sources: &[(&str, &str)]) -> Vec<Diagnostic> {
         let parsed = sources
@@ -2691,6 +2519,141 @@ mod tests {
     }
 
     #[test]
+    fn register_chaining_depends_on_role_instead_of_spelling() {
+        for role in ["root", "current", "previous", "from"] {
+            let source = format!(
+                r#"{{"scopes":{{"registers":{{"arbitrary":{{"role":"{role}","chain":true}}}}}}}}"#
+            );
+            let diagnostics = run(&[("registers.json", &source)]);
+            assert_eq!(
+                errors(&diagnostics),
+                if matches!(role, "root" | "current") {
+                    vec![DiagnosticCode::ScopeReferenceError]
+                } else {
+                    vec![]
+                },
+                "{role}: {diagnostics:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn switch_control_requires_an_explicit_resolvable_selector_schema() {
+        for (control, expected) in [
+            (
+                r#"{"kind":"switch","on":"selector","selector_schema":"predicates"}"#,
+                None,
+            ),
+            (
+                r#"{"kind":"switch","on":"selector"}"#,
+                Some(DiagnosticCode::Parse),
+            ),
+            (
+                r#"{"kind":"switch","selector_schema":"predicates"}"#,
+                Some(DiagnosticCode::Parse),
+            ),
+            (
+                r#"{"kind":"switch","on":"selector","selector_schema":"missing"}"#,
+                Some(DiagnosticCode::UndefinedReference),
+            ),
+            (
+                r#"{"kind":"switch","on":"selector","selector_schema":"self"}"#,
+                Some(DiagnosticCode::Parse),
+            ),
+            (
+                r#"{"kind":"transparent","selector_schema":"predicates"}"#,
+                Some(DiagnosticCode::Parse),
+            ),
+        ] {
+            let source = serde_json::json!({
+                "files": {"f": {"path": "events", "root": "effect"}},
+                "schemas": {
+                    "predicates": {"fields": {"fixed": {"value": "bool"}}},
+                    "effect": {"fields": {"dispatch": {
+                        "body": "self",
+                        "control": serde_json::from_str::<serde_json::Value>(control).unwrap()
+                    }}}
+                }
+            })
+            .to_string();
+            let diagnostics = run(&[("control.json", &source)]);
+            assert_eq!(
+                errors(&diagnostics),
+                expected.into_iter().collect::<Vec<_>>(),
+                "{control}: {diagnostics:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn constant_control_requires_a_scalar_boolean_predicate() {
+        let valid = run(&[(
+            "constant.json",
+            r#"{"schemas":{"predicate":{"fields":{
+            "fixed":{"value":"bool","control":{"kind":"constant"}}
+        }}}}"#,
+        )]);
+        assert!(errors(&valid).is_empty(), "{valid:?}");
+        for payload in [r#""value":"int""#, r#""body":"self""#] {
+            let source = format!(
+                r#"{{"schemas":{{"predicate":{{"fields":{{"fixed":{{{payload},"control":{{"kind":"constant"}}}}}}}}}}}}"#
+            );
+            let invalid = run(&[("constant.json", &source)]);
+            assert!(
+                invalid
+                    .iter()
+                    .any(|item| item.severity == Severity::Error
+                        && item.pointer.ends_with("/control")),
+                "{invalid:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn block_forms_reject_missing_targets_invalid_bounds_and_empty_branches() {
+        let diagnostics = run(&[(
+            "forms.json",
+            r#"{
+            "files": {"test": {"path":"test", "root":"s"}},
+            "schemas": {"s": {
+                "fields": {"x": {"value":"int", "card":"0..1"}},
+                "patterns": [{"key":"scalar", "value":"int", "card":"0..1"}],
+                "forms": [
+                    {"fields":{"missing":"1"}},
+                    {"patterns":{"1":"1"}},
+                    {"fields":{"x":"2..1"}},
+                    {}
+                ]
+            }}
+        }"#,
+        )]);
+        let errors = diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.severity == Severity::Error)
+            .collect::<Vec<_>>();
+        assert_eq!(errors.len(), 4, "{diagnostics:#?}");
+        assert!(
+            errors
+                .iter()
+                .all(|diagnostic| diagnostic.code == DiagnosticCode::Parse
+                    && diagnostic.pointer.starts_with("/schemas/s/forms/"))
+        );
+    }
+
+    #[test]
+    fn block_forms_resolve_case_insensitive_included_fields() {
+        let diagnostics = run(&[(
+            "forms.json",
+            r#"{
+            "files": {"test": {"path":"test", "root":"s"}},
+            "schemas": {"s": {"include":["shared"], "forms":[{"fields":{"X":"1"}}]}},
+            "mixins": {"shared": {"fields":{"x":{"value":"int","card":"0..1"}}}}
+        }"#,
+        )]);
+        assert!(errors(&diagnostics).is_empty(), "{diagnostics:#?}");
+    }
+
+    #[test]
     fn parse_errors_report_expression_columns() {
         let diagnostics = run(&[(
             "core.json",
@@ -2728,13 +2691,13 @@ mod tests {
               "files": { "e": { "path": "e", "ext": "txt", "root": "events_file" } },
               "schemas": {
                 "events_file": { "include": ["missing_mixin"], "fields": {
-                  "a": { "value": "ref<missing_type> | enum<missing_enum> | ref<impl MissingTrait>" },
+                  "a": { "value": "ref<missing_type> | enum<missing_enum>" },
                   "b": { "body": "missing_schema" },
                   "c": { "def": { "type": "known.missing_subtype" }, "value": "scalar" }
                 }},
                 "known": { "fields": { "z": { "value": "bool" } } }
               },
-              "types": { "known": {} }
+              "types": { "known": {"impl":{"MissingTrait":{}}} }
             }"#,
         )]);
         assert_eq!(
@@ -2852,7 +2815,7 @@ mod tests {
               "schemas": {
                 "free": {
                   "fields": {
-                    "a": { "value": "$key.scope" },
+                    "a": { "value": "$key" },
                     "b": { "value": "scalar", "scope": { "push": "$S" } }
                   }
                 },
@@ -2875,19 +2838,12 @@ mod tests {
 
     #[test]
     fn instantiation_cap_is_enforced() {
-        let members = (0..65)
-            .map(|index| format!("\"m{index}\""))
+        let fields = (0..65)
+            .map(|index| format!("\"f{index}\": {{\"body\": \"boxed<m{index}>\"}}"))
             .collect::<Vec<_>>()
-            .join(", ");
+            .join(",");
         let source = format!(
-            r#"{{
-              "files": {{ "big": {{ "path": "x", "ext": "txt", "root": "big_file" }} }},
-              "schemas": {{
-                "big_file": {{ "map": {{ "key": "enum<big>", "body": "boxed<$key>" }} }},
-                "boxed<S>": {{ "fields": {{ "x": {{ "value": "scalar" }} }} }}
-              }},
-              "enums": {{ "big": [ {members} ] }}
-            }}"#
+            r#"{{"files":{{"big":{{"path":"x","ext":"txt","root":"big_file"}}}},"schemas":{{"big_file":{{"fields":{{{fields}}}}},"boxed<S>":{{"fields":{{"x":{{"value":"scalar"}}}}}}}}}}"#
         );
         let diagnostics = run(&[("core.json", &source)]);
         assert_eq!(
@@ -2903,76 +2859,16 @@ mod tests {
     }
 
     #[test]
-    fn when_dependencies_are_enforced() {
-        let gated = run(&[(
-            "core.json",
-            r#"{
-              "files": { "e": { "path": "e", "ext": "txt", "root": "events_file" } },
-              "schemas": {
-                "events_file": { "fields": {
-                  "country_event": { "def": { "type": "event", "name": "field:id" }, "body": "event_body" }
-                }},
-                "event_body": { "fields": {
-                  "id": { "value": "scalar" },
-                  "is_triggered_only": { "value": "bool", "unless": "triggered" }
-                }}
-              },
-              "types": { "event": { "subtypes": {
-                "triggered": { "when": { "is_triggered_only": "'yes'" } }
-              }}}
-            }"#,
-        )]);
-        assert_eq!(
-            errors(&gated),
-            vec![DiagnosticCode::SubtypeWhenDependency],
-            "{gated:?}"
+    fn repeated_concrete_calls_share_one_instance_for_the_cap() {
+        let fields = (0..100)
+            .map(|index| format!("\"f{index}\": {{\"body\": \"boxed<scalar>\"}}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        let source = format!(
+            r#"{{"files":{{"test":{{"path":"x","ext":"txt","root":"root"}}}},"schemas":{{"root":{{"fields":{{{fields}}}}},"boxed<S>":{{"fields":{{"value":{{"value":"$S"}}}}}}}}}}"#
         );
-
-        let missing = run(&[(
-            "core.json",
-            r#"{
-              "files": { "e": { "path": "e", "ext": "txt", "root": "events_file" } },
-              "schemas": {
-                "events_file": { "fields": {
-                  "country_event": { "def": { "type": "event", "name": "field:id" }, "body": "event_body" }
-                }},
-                "event_body": { "fields": { "id": { "value": "scalar" } } }
-              },
-              "types": { "event": { "subtypes": {
-                "triggered": { "when": { "not_a_field": "'yes'" } }
-              }}}
-            }"#,
-        )]);
-        assert_eq!(
-            errors(&missing),
-            vec![DiagnosticCode::UndefinedReference],
-            "{missing:?}"
-        );
-    }
-
-    #[test]
-    fn subtype_gates_must_name_defined_subtypes() {
-        let diagnostics = run(&[(
-            "core.json",
-            r#"{
-              "files": { "e": { "path": "e", "ext": "txt", "root": "events_file" } },
-              "schemas": {
-                "events_file": { "fields": {
-                  "country_event": { "def": { "type": "event", "name": "field:id" }, "body": "event_body" }
-                }},
-                "event_body": { "fields": {
-                  "id": { "value": "scalar" },
-                  "x": { "value": "bool", "unless": "ghost" }
-                }}
-              },
-              "types": { "event": { "subtypes": { "triggered": {} } } }
-            }"#,
-        )]);
-        assert_eq!(
-            errors(&diagnostics),
-            vec![DiagnosticCode::UndefinedReference],
-            "{diagnostics:?}"
-        );
+        let diagnostics = run(&[("core.json", &source)]);
+        assert!(errors(&diagnostics).is_empty(), "{diagnostics:?}");
     }
 
     #[test]
@@ -2980,22 +2876,56 @@ mod tests {
         let diagnostics = run(&[(
             "core.json",
             r#"{
-              "schemas": {
-                "s": { "fields": {
-                  "a": { "value": "bool", "scope": { "in": ["nowhere"], "push": "any",
-                          "set": { "ghost": "country", "root": "nowhere" } } }
-                }}
-              },
-              "scopes": {
-                "types": ["country", "any", "country"],
-                "registers": { "root": {} },
-                "links": {
-                  "empty":  { "from": [], "to": "country" },
-                  "stray":  { "from": ["nowhere"], "to": "country" }
-                },
-                "compat": [ { "actual": "nowhere", "expected": "country" } ]
-              }
-            }"#,
+  "schemas": {
+    "s": {
+      "fields": {
+        "a": {
+          "value": "bool",
+          "scope": {
+            "in": [
+              "nowhere"
+            ],
+            "push": "any",
+            "set": {
+              "ghost": "country",
+              "root": "nowhere"
+            }
+          }
+        }
+      }
+    }
+  },
+  "scopes": {
+    "types": [
+      "country",
+      "any",
+      "country"
+    ],
+    "registers": {
+      "root": {
+        "role": "root"
+      }
+    },
+    "links": {
+      "empty": {
+        "from": [],
+        "to": "country"
+      },
+      "stray": {
+        "from": [
+          "nowhere"
+        ],
+        "to": "country"
+      }
+    },
+    "compat": [
+      {
+        "actual": "nowhere",
+        "expected": "country"
+      }
+    ]
+  }
+}"#,
         )]);
         assert_eq!(
             errors(&diagnostics),
@@ -3009,66 +2939,6 @@ mod tests {
                 DiagnosticCode::ScopeReferenceError,
                 DiagnosticCode::DuplicateName,
             ],
-            "{diagnostics:?}"
-        );
-    }
-
-    #[test]
-    fn trait_requirements_hold_at_def_positions() {
-        let source = |include: &str| {
-            format!(
-                r#"{{
-                  "files": {{ "b": {{ "path": "b", "ext": "txt", "root": "buildings_file" }} }},
-                  "schemas": {{
-                    "buildings_file": {{ "map": {{ "key": "def<building>", "body": "building_body" }} }},
-                    "building_body": {{ "include": [ "{include}" ], "fields": {{
-                      "cost": {{ "value": "int" }}
-                    }} }}
-                  }},
-                  "mixins": {{ "modifier_block": {{ "fields": {{ "modifier": {{ "value": "bool" }} }} }} }},
-                  "types": {{ "building": {{ "impl": {{ "ModifierSource": {{}} }} }} }},
-                  "traits": {{ "ModifierSource": {{ "requires": {{ "include": "modifier_block" }} }} }}
-                }}"#
-            )
-        };
-        let satisfied = run(&[("core.json", &source("modifier_block"))]);
-        assert_eq!(errors(&satisfied), Vec::new(), "{satisfied:?}");
-
-        let unsatisfied = run(&[("core.json", &source("other_block"))]);
-        assert_eq!(
-            errors(&unsatisfied),
-            vec![
-                DiagnosticCode::UndefinedReference,
-                DiagnosticCode::UnsatisfiedTraitRequirement,
-            ],
-            "{unsatisfied:?}"
-        );
-    }
-
-    #[test]
-    fn duplicate_trait_impls_are_errors() {
-        let diagnostics = run(&[(
-            "core.json",
-            r#"{
-              "files": { "e": { "path": "e", "ext": "txt", "root": "events_file" } },
-              "schemas": {
-                "events_file": { "fields": {
-                  "country_event": { "def": { "type": "event", "name": "field:id" }, "body": "event_body" }
-                }},
-                "event_body": { "fields": { "id": { "value": "scalar" } } }
-              },
-              "types": { "event": {
-                "impl": { "Localised": { "name": { "loc": "$" } } },
-                "subtypes": { "country": { "impl": { "Localised": {
-                  "name": { "loc": "$_country" }
-                } } } }
-              }},
-              "traits": { "Localised": {} }
-            }"#,
-        )]);
-        assert_eq!(
-            errors(&diagnostics),
-            vec![DiagnosticCode::DuplicateTraitImpl],
             "{diagnostics:?}"
         );
     }
@@ -3118,15 +2988,14 @@ mod tests {
                 "both":  { "map": { "key": "scalar", "value": "bool", "body": "s" } },
                 "neither": { "map": { "key": "scalar" } }
               }}},
-              "traits": {
-                "T": { "bindings": {
-                  "both": { "loc": "{x}", "sprite": "{x}" },
-                  "neither": {}
-                }}
-              }
+              "traits": {"T": {}},
+              "types": {"test": {"impl": {"T": {
+                "both": {"loc": "$", "sprite": "$"},
+                "neither": {}
+              }}}}
             }"#,
         )]);
-        // Two `map` payloads and two trait bindings are each malformed.
+        // Two `map` payloads and two type implementation bindings are each malformed.
         assert_eq!(
             errors(&diagnostics),
             vec![

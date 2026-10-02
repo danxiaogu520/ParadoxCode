@@ -1,16 +1,6 @@
 {
   "traits": {
-    "Callable": {
-      "capabilities": [
-        "replacement",
-        "condition",
-        "dynamic_key",
-        "opaque_text"
-      ],
-      "params": {
-        "body": "schema"
-      }
-    },
+    "Callable": {},
     "HasIcon": {},
     "Localised": {},
     "ModifierSource": {}

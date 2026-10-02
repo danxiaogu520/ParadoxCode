@@ -10,13 +10,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "icon": {
           "card": "1",
-          "value": "int[1..6]",
-          "when": null
+          "value": "int[1..6]"
         }
       }
     },
@@ -26,8 +24,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [

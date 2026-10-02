@@ -1,106 +1,30 @@
 //! Dynamic-definition hovers: call-site parameters and callable signatures.
 
 use super::render::{HoverModel, code_span};
-use super::rules::semantic_value_hover_label;
-use crate::completion::{
-    HoverCaller, dynamic_parameter_owner, replay_parameter_sites_for_hover,
-    semantic_completion_context_with_cancellation,
-};
-use crate::dynamic_rules::{
-    DynamicParameterRow, DynamicRuleRow, dynamic_rule_row, dynamic_rule_row_by_name,
-};
 use crate::support::{ParsedInput, contains};
 use crate::types::{CancellationToken, Cancelled};
 use engine::AnalysisSnapshot;
 use text::TextSize;
-
-/// Hover for an argument key at a dynamic call site (`stable = { AMT = 1 }`):
-/// resolves the definition's parameter row so the hover shows the parameter
-/// contract instead of the generic property rows behind the parameter enum.
-pub(crate) fn dynamic_invocation_parameter_hover(
-    snapshot: &AnalysisSnapshot,
-    input: &ParsedInput,
-    position: TextSize,
-    cancellation: &CancellationToken,
-) -> Result<Option<HoverModel>, Cancelled> {
-    let Some(context) =
-        semantic_completion_context_with_cancellation(snapshot, input, position, cancellation)?
-    else {
-        return Ok(None);
-    };
-    let Some(property) = context.property.as_ref() else {
-        return Ok(None);
-    };
-    if !contains(property.key_range, position) {
-        return Ok(None);
-    }
-    let Some(invocation) = context.container_property.as_ref() else {
-        return Ok(None);
-    };
-    let Some((owner_kind, owner_name, caller_scope)) =
-        dynamic_parameter_owner(snapshot, &context, property, invocation)
-    else {
-        return Ok(None);
-    };
-    let Some(row) = crate::dynamic_rules::dynamic_rule_row(snapshot, &owner_kind, &owner_name)
-    else {
-        return Ok(None);
-    };
-    let Some(parameter) = row
-        .parameters
-        .iter()
-        .find(|parameter| parameter.name.eq_ignore_ascii_case(&property.key))
-    else {
-        return Ok(None);
-    };
-    // Presence follows the invocation-form model (activation scoping when the
-    // definition lowered to a template), so the hover agrees with the snippet
-    // tabstops instead of the looser indexed `required` flag.
-    let effectively_required =
-        parameter_presence_required(snapshot, &owner_kind, &owner_name, &parameter.name)
-            .unwrap_or(parameter.required);
-    let mut model = HoverModel::new(format!(
-        "### parameter {} of scripted {}",
-        code_span(&parameter.name),
-        code_span(&row.name),
-    ));
-    let mut section = format!(
-        "- Presence: `{}`",
-        if effectively_required {
-            "required"
-        } else {
-            "optional"
-        },
-    );
-    if let Some(contract) = parameter_contract_lines(
-        snapshot,
-        &row,
-        parameter,
-        Some(&HoverCaller {
-            invocation,
-            target: property,
-            scope: caller_scope,
-        }),
-    ) {
-        section.push('\n');
-        section.push_str(&contract);
-    }
-    model.push_section(section);
-    Ok(Some(model))
-}
 
 /// Callable argument keys are tied to the IR reference selected at the call.
 pub(crate) fn ir_invocation_parameter_hover(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     position: TextSize,
-) -> Option<HoverModel> {
-    let hir = input.hir.as_deref()?;
-    let argument = hir
+    cancellation: &CancellationToken,
+) -> Result<Option<HoverModel>, Cancelled> {
+    cancellation.checkpoint()?;
+    let Some(hir) = input.hir.as_deref() else {
+        return Ok(None);
+    };
+    let Some(argument) = hir
         .properties()
         .iter()
-        .find(|property| contains(property.key_range, position))?;
-    let invocation = hir
+        .find(|property| contains(property.key_range, position))
+    else {
+        return Ok(None);
+    };
+    let Some(invocation) = hir
         .properties()
         .iter()
         .filter(|property| {
@@ -108,31 +32,57 @@ pub(crate) fn ir_invocation_parameter_hover(
                 && property.range.end() >= argument.range.end()
                 && property.path.len() + 1 == argument.path.len()
         })
-        .min_by_key(|property| property.range.len())?;
-    let reference = hir
+        .min_by_key(|property| property.range.len())
+    else {
+        return Ok(None);
+    };
+    let Some(reference) = hir
         .references()
         .iter()
-        .find(|reference| reference.range == invocation.key_range)?;
-    let summary =
-        crate::semantic::dynamic_definition_summary(snapshot, &reference.kind, &reference.name)?;
-    let parameter = summary
+        .find(|reference| reference.range == invocation.key_range)
+    else {
+        return Ok(None);
+    };
+    let Some(summary) =
+        crate::semantic::dynamic_definition_summary(snapshot, &reference.kind, &reference.name)
+    else {
+        return Ok(None);
+    };
+    let Some(parameter) = summary
         .parameters
         .iter()
-        .find(|parameter| parameter.name.eq_ignore_ascii_case(&argument.key))?;
+        .find(|parameter| parameter.name.eq_ignore_ascii_case(&argument.key))
+    else {
+        return Ok(None);
+    };
     let mut model = HoverModel::new(format!(
         "### parameter {} of scripted {}",
         code_span(&parameter.name),
         code_span(&summary.name)
     ));
-    model.push_section(format!(
+    let mut section = format!(
         "- Presence: `{}`",
-        if parameter.required {
+        if crate::dynamic_rules::parameter_effectively_required(snapshot, &summary, parameter) {
             "required"
         } else {
             "optional"
         }
-    ));
-    Some(model)
+    );
+    let sites = crate::ir_callable::parameter_sites(
+        snapshot,
+        &reference.kind,
+        &reference.name,
+        &parameter.name,
+        &crate::ir_callable::invocation_bindings(hir, invocation),
+        crate::ir_callable::invocation_state(hir, invocation),
+        cancellation,
+    )?;
+    if let Some(lines) = ir_parameter_contract_lines(snapshot, &summary, &parameter.name, &sites) {
+        section.push('\n');
+        section.push_str(&lines);
+    }
+    model.push_section(section);
+    Ok(Some(model))
 }
 
 /// Shared contract lines for a dynamic parameter at its definition site:
@@ -144,108 +94,134 @@ pub(crate) fn dynamic_parameter_contract_lines(
     owner_kind: Option<&str>,
     owner_name: &str,
     parameter_name: &str,
+    cancellation: &CancellationToken,
+) -> Result<Option<String>, Cancelled> {
+    cancellation.checkpoint()?;
+
+    let summary = if let Some(kind) = owner_kind {
+        crate::semantic::dynamic_definition_summary(snapshot, kind, owner_name)
+    } else {
+        snapshot.ir().types.iter().find_map(|info| {
+            let kind = snapshot.ir().strings().resolve(info.name);
+            crate::semantic::dynamic_definition_type(snapshot, kind)
+                .then(|| crate::semantic::dynamic_definition_summary(snapshot, kind, owner_name))
+                .flatten()
+        })
+    };
+    let Some(summary) = summary else {
+        return Ok(None);
+    };
+    let sites = crate::ir_callable::definition_parameter_sites(
+        snapshot,
+        &summary.kind,
+        owner_name,
+        parameter_name,
+        cancellation,
+    )?;
+    Ok(ir_parameter_contract_lines(
+        snapshot,
+        &summary,
+        parameter_name,
+        &sites,
+    ))
+}
+
+fn ir_parameter_contract_lines(
+    snapshot: &AnalysisSnapshot,
+    summary: &engine::DynamicDefinitionSummary,
+    parameter: &str,
+    sites: &[crate::ir_callable::ParameterSite],
 ) -> Option<String> {
-    let row = owner_kind
-        .and_then(|kind| dynamic_rule_row(snapshot, kind, owner_name))
-        .or_else(|| dynamic_rule_row_by_name(snapshot, owner_name))?;
-    let parameter = row
+    use crate::ir_callable::Domain;
+    summary
         .parameters
         .iter()
-        .find(|parameter| parameter.name.eq_ignore_ascii_case(parameter_name))?;
-    parameter_contract_lines(snapshot, &row, parameter, None)
-}
-
-/// Contract lines for one dynamic parameter, rendered from the same replayed
-/// site rows completion consumes: payload nature, dispatch, forwarding
-/// edges, and the value constraints the definition's usage sites imply.
-/// Constraint labels are self-contained code spans and must not be wrapped
-/// again.
-fn parameter_contract_lines(
-    snapshot: &AnalysisSnapshot,
-    row: &DynamicRuleRow,
-    parameter: &DynamicParameterRow,
-    caller: Option<&HoverCaller<'_>>,
-) -> Option<String> {
-    let replayed = replay_parameter_sites_for_hover(snapshot, row, parameter, caller);
+        .find(|item| item.name.eq_ignore_ascii_case(parameter))?;
     let mut lines = Vec::new();
-    if parameter.quoted_script {
+    if sites
+        .iter()
+        .any(|site| matches!(site.domain, Domain::Payload { .. }))
+    {
         lines.push(
-            "- Payload: quoted script (the caller's raw text is spliced into the body)".to_owned(),
+            "- Payload: quoted script (the caller's raw text is spliced into the body)".into(),
         );
     }
-    if parameter.used_in_key {
-        lines.push("- Dispatch: rendered as a statement key in the body".to_owned());
-    }
-    for (prefix, suffix) in key_render_forms(&replayed) {
-        lines.push(format!(
-            "- Renders as statement key `{prefix}…{suffix}` in the body"
-        ));
-    }
-    for edge in &parameter.forwarded_to {
-        let target = match &edge.parameter {
-            Some(name) => format!("`{}` (parameter `{}`)", edge.name, name),
-            None => format!("`{}` (rendered parameter key)", edge.name),
-        };
-        lines.push(format!("- Forwarded to scripted {target}"));
-    }
-    if !replayed.values.is_empty() {
-        let rendered = replayed
-            .values
-            .iter()
-            .map(|site| {
-                site.matchers
-                    .iter()
-                    .map(semantic_value_hover_label)
-                    .collect::<Vec<_>>()
-                    .join(" or ")
-            })
-            .collect::<Vec<_>>()
-            .join("; ");
-        lines.push(format!(
-            "- Inferred value constraints (per usage site): {rendered}"
-        ));
-    }
-    for site in &replayed.affixed {
-        let expected = site
-            .matchers
-            .iter()
-            .map(semantic_value_hover_label)
-            .collect::<Vec<_>>()
-            .join(" or ");
-        lines.push(format!(
-            "- Renders as `{}…{}` at its usage site, where the value must be {expected}",
-            site.prefix, site.suffix
-        ));
-    }
-    if replayed.values.is_empty()
-        && replayed.affixed.is_empty()
-        && replayed.key_renders.is_empty()
-        && replayed.quoted_scripts.is_empty()
-        && parameter.forwarded_to.is_empty()
-        && !parameter.quoted_script
-        && !parameter.used_in_key
+    if sites
+        .iter()
+        .any(|site| matches!(site.domain, Domain::Key { .. }))
     {
-        lines.push("- Inferred value constraints: none".to_owned());
+        lines.push("- Dispatch: rendered as a statement key in the body".into());
     }
-    (!lines.is_empty()).then(|| lines.join("\n"))
+    let mut values = Vec::new();
+    for site in sites {
+        match &site.domain {
+            Domain::Value(matchers) => {
+                let expected = matchers
+                    .iter()
+                    .map(|id| ir_parameter_value_label(snapshot.ir(), *id))
+                    .collect::<Vec<_>>()
+                    .join(" or ");
+                let rendered = site
+                    .rendered_value(parameter, "…")
+                    .unwrap_or_else(|| "…".into());
+                if rendered == "…" {
+                    values.push(expected);
+                } else {
+                    lines.push(format!("- Renders as `{rendered}` at its usage site, where the value must be {expected}"));
+                }
+            }
+            Domain::Key { .. } => {
+                if let Some(rendered) = site.rendered_value(parameter, "…")
+                    && rendered != "…"
+                {
+                    lines.push(format!(
+                        "- Renders as statement key `{rendered}` in the body"
+                    ));
+                }
+            }
+            Domain::Payload { .. } | Domain::Unresolved => {}
+        }
+    }
+    if !values.is_empty() {
+        lines.push(format!(
+            "- Inferred value constraints (per usage site): {}",
+            values.join("; ")
+        ));
+    }
+    if lines.is_empty() {
+        lines.push("- Inferred value constraints: none".into());
+    }
+    Some(lines.join("\n"))
 }
 
-/// Distinct literal affix pairs of replayed key-render sites (`set_$KIND$_policy`
-/// yields `set_…_policy`); wildcard renders (both affixes empty) are covered by
-/// the generic dispatch line.
-fn key_render_forms(replayed: &crate::completion::ReplayedSites) -> Vec<(String, String)> {
-    let mut forms = Vec::new();
-    for site in &replayed.key_renders {
-        if site.prefix.is_empty() && site.suffix.is_empty() {
-            continue;
+fn ir_parameter_value_label(ir: &rules::ir::RulesIr, id: rules::ir::MatcherId) -> String {
+    match ir.matcher(id) {
+        rules::ir::Matcher::Ref(rules::ir::RefTarget::Type { type_id, .. }) => {
+            let info = ir.type_info(*type_id);
+            let examples = info
+                .builtin
+                .iter()
+                .take(8)
+                .map(|value| code_span(ir.strings().resolve(*value)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!(
+                "symbol type `{}`{}",
+                ir.strings().resolve(info.name),
+                if examples.is_empty() {
+                    String::new()
+                } else {
+                    format!(" (including {examples})")
+                }
+            )
         }
-        if !forms.iter().any(|(prefix, suffix): &(String, String)| {
-            prefix.eq_ignore_ascii_case(&site.prefix) && suffix.eq_ignore_ascii_case(&site.suffix)
-        }) {
-            forms.push((site.prefix.clone(), site.suffix.clone()));
-        }
+        rules::ir::Matcher::Union(items) => items
+            .iter()
+            .map(|id| ir_parameter_value_label(ir, *id))
+            .collect::<Vec<_>>()
+            .join(" or "),
+        _ => crate::ir_semantic::describe(ir, id),
     }
-    forms
 }
 
 /// Renders the `#### Callable signature` section for a dynamic definition symbol hover.
@@ -264,11 +240,7 @@ pub(crate) fn dynamic_signature_hover(
         _ => "named parameter block".to_owned(),
     };
     let required_presence = |parameter: &engine::DynamicParameterSignature| {
-        if snapshot.ir().schemas.is_empty() {
-            crate::dynamic_rules::parameter_effectively_required(snapshot, summary, parameter)
-        } else {
-            parameter.required
-        }
+        crate::dynamic_rules::parameter_effectively_required(snapshot, summary, parameter)
     };
     let required = summary
         .parameters

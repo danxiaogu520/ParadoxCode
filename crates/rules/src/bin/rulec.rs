@@ -3,9 +3,11 @@
 //!
 //! Subcommands:
 //!
-//! - `rulec check <source-dir>`: parse the rules sources listed by the
-//!   directory's `manifest.json` and run the compile-time semantic checks
+//! - `rulec check <source-dir>`: recursively parse the rule sources under the
+//!   directory and run the compile-time semantic checks
 //!   (§10.1), printing one diagnostic per line. Exits non-zero on errors.
+//! - `rulec fmt <source-dir> [--check] [--expanded]`: format source files,
+//!   optionally expanding defaults or checking without writing.
 //! - `rulec schema [--output PATH]`: write the JSON Schema of the source
 //!   language (§10.2) for editor completion and validation.
 
@@ -25,6 +27,7 @@ fn main() -> ExitCode {
     };
     match command.as_str() {
         "check" => run_check(&arguments.collect::<Vec<_>>()),
+        "fmt" => run_format(&arguments.collect::<Vec<_>>()),
         "schema" => run_schema(&arguments.collect::<Vec<_>>()),
         "--help" | "-h" | "help" => {
             println!("{}", usage());
@@ -43,10 +46,84 @@ fn usage() -> String {
          \n\
          Commands:\n\
          \x20 check <source-dir>      parse and semantically check a rules source directory\n\
+         \x20 fmt <source-dir> [--check] [--expanded]\n\
+         \x20                        format sources or check their canonical form\n\
          \x20 schema [--output PATH]  write the rules-language JSON Schema\n\
          \x20                        (default {DEFAULT_SCHEMA_PATH})\n\
          \x20 help                   show this help"
     )
+}
+
+fn run_format(arguments: &[String]) -> ExitCode {
+    let mut source_dir = None;
+    let mut expanded = false;
+    let mut check = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--expanded" if !expanded => expanded = true,
+            "--check" if !check => check = true,
+            "--help" | "-h" => {
+                println!("{}", usage());
+                return ExitCode::SUCCESS;
+            }
+            other if !other.starts_with('-') && source_dir.is_none() => {
+                source_dir = Some(PathBuf::from(other))
+            }
+            other => {
+                eprintln!("rulec fmt: unexpected argument `{other}`\n\n{}", usage());
+                return ExitCode::from(2);
+            }
+        }
+    }
+    let Some(source_dir) = source_dir else {
+        eprintln!("rulec fmt: missing <source-dir>\n\n{}", usage());
+        return ExitCode::from(2);
+    };
+    let prepare = || -> Result<Vec<(PathBuf, String)>, String> {
+        let sources =
+            rules::bundle::load_directory(&source_dir).map_err(|error| error.to_string())?;
+        let mut changes = Vec::new();
+        for (name, source) in sources.files {
+            let path = source_dir.join(name);
+            let formatted =
+                rules::format::render(&source, expanded).map_err(|error| error.to_string())?;
+            let current = std::fs::read_to_string(&path)
+                .map_err(|error| format!("{}: {error}", path.display()))?;
+            if current != formatted {
+                changes.push((path, formatted));
+            }
+        }
+        Ok(changes)
+    };
+    let changes = match prepare() {
+        Ok(changes) => changes,
+        Err(error) => {
+            eprintln!("rulec fmt: {error}");
+            return ExitCode::from(1);
+        }
+    };
+    for (path, formatted) in &changes {
+        if check {
+            println!("needs formatting: {}", path.display());
+        } else if let Err(error) = std::fs::write(path, formatted) {
+            eprintln!("rulec fmt: {}: {error}", path.display());
+            return ExitCode::from(1);
+        }
+    }
+    println!(
+        "rulec fmt: {} file(s) {}",
+        changes.len(),
+        if check {
+            "need formatting"
+        } else {
+            "formatted"
+        }
+    );
+    if check && !changes.is_empty() {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
+    }
 }
 
 fn run_check(arguments: &[String]) -> ExitCode {
@@ -70,7 +147,7 @@ fn run_check(arguments: &[String]) -> ExitCode {
         eprintln!("rulec check: missing <source-dir>\n\n{}", usage());
         return ExitCode::from(2);
     };
-    let (sources, manifest_identity) = match load_sources(&source_dir) {
+    let (sources, package_identity) = match load_sources(&source_dir) {
         Ok(loaded) => loaded,
         Err(failure) => {
             eprintln!("rulec check: {failure}");
@@ -98,14 +175,9 @@ fn run_check(arguments: &[String]) -> ExitCode {
             diagnostic.message
         );
     }
-    let identity = match (
-        &manifest_identity.game_id,
-        &manifest_identity.target_game_version,
-    ) {
-        (Some(game), Some(version)) => format!(" ({game} {version})"),
-        (Some(game), None) => format!(" ({game})"),
-        (None, Some(version)) => format!(" ({version})"),
-        (None, None) => String::new(),
+    let identity = match &package_identity.target_game_version {
+        Some(version) => format!(" ({} {version})", package_identity.game_id),
+        None => format!(" ({})", package_identity.game_id),
     };
     println!(
         "rulec check{identity}: {} file(s), {} error(s), {} warning(s)",
@@ -120,34 +192,12 @@ fn run_check(arguments: &[String]) -> ExitCode {
     }
 }
 
-/// The `manifest.json` of a rules source directory: the file list plus
-/// identity metadata. Tooling configuration, not language.
-#[derive(Debug, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-struct SourceManifest {
-    #[serde(default)]
-    game_id: Option<String>,
-    #[serde(default)]
-    target_game_version: Option<String>,
-    files: Vec<String>,
-}
+/// Package identity from game.json, separate from the rule language.
+type SourceIdentity = rules::bundle::PackageIdentity;
 
-fn load_sources(source_dir: &Path) -> Result<(Vec<(String, RuleFile)>, SourceManifest), String> {
-    let manifest_path = source_dir.join("manifest.json");
-    let manifest_text = std::fs::read_to_string(&manifest_path)
-        .map_err(|error| format!("{}: {error}", manifest_path.display()))?;
-    let manifest: SourceManifest = serde_json::from_str(&manifest_text)
-        .map_err(|error| format!("{}: {error}", manifest_path.display()))?;
-    let mut sources = Vec::with_capacity(manifest.files.len());
-    for name in &manifest.files {
-        let path = source_dir.join(name);
-        let text = std::fs::read_to_string(&path)
-            .map_err(|error| format!("{}: {error}", path.display()))?;
-        let file: RuleFile =
-            serde_json::from_str(&text).map_err(|error| format!("{}: {error}", path.display()))?;
-        sources.push((name.clone(), file));
-    }
-    Ok((sources, manifest))
+fn load_sources(source_dir: &Path) -> Result<(Vec<(String, RuleFile)>, SourceIdentity), String> {
+    let loaded = rules::bundle::load_directory(source_dir).map_err(|error| error.to_string())?;
+    Ok((loaded.files, loaded.identity))
 }
 
 fn run_schema(arguments: &[String]) -> ExitCode {

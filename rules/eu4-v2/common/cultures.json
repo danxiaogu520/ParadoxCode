@@ -11,28 +11,23 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "dynasty_names": {
           "card": "0..1",
-          "list": "scalar",
-          "when": null
+          "list": "scalar"
         },
         "female_names": {
           "card": "0..1",
-          "list": "scalar",
-          "when": null
+          "list": "scalar"
         },
         "graphical_culture": {
           "card": "0..1",
-          "value": "enum<graphical_cultures>",
-          "when": null
+          "value": "enum<graphical_cultures>"
         },
         "male_names": {
           "card": "0..1",
-          "list": "scalar",
-          "when": null
+          "list": "scalar"
         },
         "province": {
           "body": "modifier",
@@ -43,22 +38,19 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "second_graphical_culture": {
           "card": "0..1",
           "doc": "muslimgfx (fallback if the first does not exist)",
-          "value": "enum<graphical_cultures>",
-          "when": null
+          "value": "enum<graphical_cultures>"
         }
       },
       "patterns": [
         {
           "body": "culture_group_body__culture",
           "card": "0..*",
-          "key": "def<culture>",
-          "when": null
+          "key": "def<culture>"
         }
       ]
     },
@@ -73,33 +65,27 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "dynasty_names": {
           "card": "0..1",
-          "list": "scalar",
-          "when": null
+          "list": "scalar"
         },
         "female_names": {
           "card": "0..1",
-          "list": "scalar",
-          "when": null
+          "list": "scalar"
         },
         "graphical_culture": {
           "card": "0..1",
-          "value": "enum<graphical_cultures>",
-          "when": null
+          "value": "enum<graphical_cultures>"
         },
         "male_names": {
           "card": "0..1",
-          "list": "scalar",
-          "when": null
+          "list": "scalar"
         },
         "primary": {
           "card": "0..1",
-          "value": "enum<country_tags>",
-          "when": null
+          "value": "ref<country_tag>"
         },
         "province": {
           "body": "modifier",
@@ -110,13 +96,11 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "second_graphical_culture": {
           "card": "0..1",
-          "value": "enum<graphical_cultures>",
-          "when": null
+          "value": "enum<graphical_cultures>"
         }
       }
     },

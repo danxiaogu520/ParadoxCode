@@ -12,50 +12,42 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "cost": {
           "card": "1",
           "doc": "Cost in meritocracy of enacting the decree",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "duration": {
           "card": "1",
           "doc": "Duration in days of the modifier of the decree",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "effect": {
           "body": "effect",
           "card": "1",
-          "doc": "Effects to run when the decree is enacted",
-          "when": null
+          "doc": "Effects to run when the decree is enacted"
         },
         "modifier": {
           "body": "modifier",
           "card": "1",
-          "doc": "Modifiers active during the duration of the decree",
-          "when": null
+          "doc": "Modifiers active during the duration of the decree"
         },
         "potential": {
           "body": "trigger",
           "card": "1",
-          "doc": "If false the decree will not appear",
-          "when": null
+          "doc": "If false the decree will not appear"
         },
         "removed_effect": {
           "body": "effect",
           "card": "1",
-          "doc": "Effects to run when the decree is expired",
-          "when": null
+          "doc": "Effects to run when the decree is expired"
         },
         "trigger": {
           "body": "trigger",
           "card": "1",
-          "doc": "If false you will not be able to take the decree",
-          "when": null
+          "doc": "If false you will not be able to take the decree"
         }
       }
     },
@@ -65,8 +57,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [

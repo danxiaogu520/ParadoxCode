@@ -11,26 +11,355 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
-      }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
     },
     "leader_personality_body__allow": {
       "fields": {
+        "AND": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "AND"
+          },
+          "doc": "Evaluates to true when every trigger inside the block is true.",
+          "override": true
+        },
+        "NOT": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "NOT"
+          },
+          "doc": "Evaluates to true when the trigger inside the block is false.",
+          "override": true
+        },
+        "OR": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "OR"
+          },
+          "doc": "Evaluates to true when at least one trigger inside the block is true.",
+          "override": true
+        },
+        "else": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "branch_continue"
+          },
+          "doc": "Follows if/else_if; executes when no previous branch ran.",
+          "override": true
+        },
+        "exclude_from_progress": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Excludes the triggers inside for the trigger counter in the UI, used in Age Objeciives.",
+          "override": true
+        },
+        "hidden_trigger": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Hides the enclosed conditions so that they are still required but cannot be seen by human players.",
+          "override": true
+        },
         "is_admiral": {
           "card": "0..1",
           "override": true,
-          "value": "bool",
-          "when": null
+          "value": "bool"
+        },
+        "scope_field": {
+          "body": "trigger",
+          "card": "0..*",
+          "override": true
+        },
+        "this": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Switches the block's scope to the current scope; block contents are triggers.",
+          "override": true
         }
       },
       "include": [
         "keys__trigger"
+      ],
+      "patterns": [
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the country tags listed /Europa Universalis IV/common/country_tags",
+          "key": "ref<country_tag>",
+          "scope": {
+            "push": "country"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has hired an advisor of the specified type which has at least level X.",
+          "key": "ref<advisor_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[1..5]"
+        },
+        {
+          "body": "trigger__area_used",
+          "card": "0..*",
+          "doc": "Refers to the areas listed /Europa Universalis IV/map/areas.txt",
+          "key": "ref<area.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X buildings from the specified building type.",
+          "key": "ref<building>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__colonial_region",
+          "card": "0..*",
+          "doc": "Refers to any colonial region found in /Europa Universalis IV/common/colonial_regions/",
+          "key": "ref<colonial_region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__continent",
+          "card": "0..*",
+          "doc": "Refers to any continent found in /Europa Universalis IV/map/continent.txt",
+          "key": "ref<continent>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X ideas from the specified idea group.",
+          "key": "ref<idea_group>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[0..8]"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the support for the specified institution in the province is at least X.",
+          "key": "ref<institution>",
+          "scope": {
+            "in": [
+              "province"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "body": "trigger__province_group_used",
+          "card": "0..*",
+          "doc": "Refers to the province_group listed /Europa Universalis IV/map/provincegroup.txt",
+          "key": "ref<province_group.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<province_id>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__region",
+          "card": "0..*",
+          "doc": "Refers to any region found in /Europa Universalis IV/map/region.txt",
+          "key": "ref<region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has a tolerance of at least X of the specified religion. Note: No correct localisation.",
+          "key": "ref<religion>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "card": "0..*",
+          "key": "ref<scripted_trigger>",
+          "value": "bool"
+        },
+        {
+          "body": "trigger__scripted_trigger",
+          "card": "0..*",
+          "key": "ref<scripted_trigger>"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X vassals.",
+          "key": "ref<subject_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__superregion",
+          "card": "0..*",
+          "doc": "Refers to any superregion found in /Europa Universalis IV/map/superregion.txt",
+          "key": "ref<superregion>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__trade_company",
+          "card": "0..*",
+          "doc": "Refers to any trade company found in /Europa Universalis IV/common/trade_companies//",
+          "key": "ref<trade_company>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X provinces producing the specified trade good.",
+          "key": "ref<trade_good>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Scopes to the province, which is also a trade node (defined in common/tradenodes)",
+          "key": "ref<trade_node>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "key": "link"
+        }
       ]
     },
     "ruler_personality_body": {
       "fields": {
+        "alliance_acceptance": {
+          "card": "0..1",
+          "value": "int"
+        },
         "allow": {
           "body": "trigger",
           "card": "0..1",
@@ -40,8 +369,11 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
+        },
+        "building_budget_multiplier": {
+          "card": "0..1",
+          "value": "float"
         },
         "chance": {
           "body": "modifier_rule",
@@ -51,44 +383,197 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "consort_allow": {
           "body": "ruler_personality_body__consort_allow",
-          "card": "0..1",
-          "when": null
+          "card": "0..1"
         },
         "custom_ai_explanation": {
           "card": "0..1",
-          "value": "loc",
-          "when": null
+          "value": "loc"
+        },
+        "different_religion_war_multiplier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "easy_war_chance_multiplier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "enemy_strength_multiplier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "fair_fights": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "gift_chance": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "heathen_ally_acceptance": {
+          "card": "0..1",
+          "value": "int"
         },
         "heir_allow": {
           "body": "ruler_personality_body__heir_allow",
+          "card": "0..1"
+        },
+        "heretic_ally_acceptance": {
           "card": "0..1",
-          "when": null
+          "value": "int"
         },
         "immortal": {
           "card": "0..1",
-          "value": "'1'",
-          "when": null
+          "value": "'1'"
+        },
+        "knowledge_sharing": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "lower_autonomy": {
+          "card": "0..1",
+          "value": "'yes'"
         },
         "nation_designer_cost": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
+        },
+        "other_ai_help_us_multiplier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "other_ai_peace_term_bonus": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "other_ai_war_chance_multiplier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "peace_desire": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "random_insults": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "random_troop_moves": {
+          "card": "0..1",
+          "doc": "\"Often indistinguishable from a bug\"",
+          "value": "'yes'"
+        },
+        "razing": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "royal_marriage_acceptance": {
+          "card": "0..1",
+          "value": "int"
         },
         "ruler_allow": {
           "body": "ruler_personality_body__ruler_allow",
+          "card": "0..1"
+        },
+        "send_warning_desire": {
           "card": "0..1",
-          "when": null
+          "value": "int"
         },
         "static": {
           "card": "0..1",
           "doc": "Makes nation_designer_cost not scale with age etc.",
-          "value": "'yes'",
-          "when": null
+          "value": "'yes'"
+        },
+        "trade_league_acceptance": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "underestimate_ae": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_avoid_debase": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_avoid_loans": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_avoid_ugly_borders": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_betray_allies": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_colonies": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_condottieri": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_debase": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_disclose_attack": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_ecumenical_council": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_excommunicate": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_explorers": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_gold": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_heathen_land": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_heretic_land": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_land": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_loans": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_sell_provinces": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_threaten_war": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_to_appoint_cardinals_in_his_own_land": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "war_chance_multiplier": {
+          "card": "0..1",
+          "value": "float"
         },
         "war_priority": {
           "body": "modifier_rule",
@@ -98,10 +583,90 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
-      }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
     },
     "ruler_personality_body__consort_allow": {
       "fields": {
@@ -114,8 +679,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "chance": {
           "body": "modifier_rule",
@@ -125,8 +689,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -141,8 +704,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "chance": {
           "body": "modifier_rule",
@@ -152,8 +714,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -168,8 +729,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "chance": {
           "body": "modifier_rule",
@@ -179,8 +739,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     }

@@ -1,4 +1,6 @@
-Cardinality Error 16..16 `option` must occur at least 1 time
-InvalidValue Error 54..59 expected yes or no
-UnknownKey Error 61..68 unknown key `mystery`
-MissingLimit Warning 90..92 `if` requires a `limit` block
+Cardinality Error 0..13 this block is missing required key `option`
+InvalidValue Error 54..59 invalid value `maybe` for `is_triggered_only`
+  expected: yes or no
+UnknownKey Error 61..68 unknown key `mystery` in an `event` definition
+Cardinality Error 90..92 this block is missing required key `limit`
+MissingLimit Warning 90..92 `if` without `limit` executes its body unconditionally; the condition belongs in a `limit` block

@@ -56,7 +56,7 @@ fn main() {
     }
 
     let mut host = AnalysisHost::with_profile(
-        eu4::first_party_rules().expect("first-party rules"),
+        eu4::runtime_rules().expect("first-party rules"),
         eu4::profile(),
     );
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(

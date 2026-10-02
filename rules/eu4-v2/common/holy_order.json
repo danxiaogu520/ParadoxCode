@@ -10,34 +10,28 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "color": {
           "card": "1",
-          "list": "int[0..]",
-          "when": null
+          "list": "int[0..]"
         },
         "cost": {
           "card": "1",
-          "value": "int",
-          "when": null
+          "value": "int"
         },
         "cost_type": {
           "card": "1",
-          "value": "enum<holy_order_cost_types>",
-          "when": null
+          "value": "enum<holy_order_cost_types>"
         },
         "icon": {
           "card": "1",
-          "value": "ref<sprite>",
-          "when": null
+          "value": "ref<sprite>"
         },
         "localization": {
           "card": "1",
           "doc": "The right hand side must have localisation for $_short and $_full",
-          "value": "scalar",
-          "when": null
+          "value": "scalar"
         },
         "modifier": {
           "body": "modifier",
@@ -48,8 +42,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "per_province_abandon_effect": {
           "body": "effect",
@@ -59,8 +52,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "per_province_effect": {
           "body": "effect",
@@ -70,8 +62,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "trigger": {
           "body": "trigger",
@@ -82,8 +73,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         }
       }
     },
@@ -93,8 +83,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [

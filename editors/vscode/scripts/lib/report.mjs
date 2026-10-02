@@ -13,8 +13,10 @@ import { REPOSITORY_ROOT } from './options.mjs';
 export const MAX_REPORTED_TOOL_ERRORS = 256;
 const MAX_SCAN_DEPTH = 64;
 
-function firstPartyRuleMetadata() {
-  const manifestPath = join(REPOSITORY_ROOT, 'rules', 'manifest.json');
+export function firstPartyRuleMetadata(selectedManifest) {
+  const manifestPath = selectedManifest
+    ? resolve(selectedManifest)
+    : join(REPOSITORY_ROOT, 'rules', 'ir-manifest.json');
   try {
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
     return {
@@ -23,6 +25,9 @@ function firstPartyRuleMetadata() {
       target_game_version: manifest.target_game_version ?? null,
       manifest_rule_hash: manifest.rule_hash ?? null,
       semantic_rule_count: manifest.semantic_rule_count ?? null,
+      schema_count: manifest.schema_count ?? null,
+      field_count: manifest.field_count ?? null,
+      matcher_count: manifest.matcher_count ?? null,
       file_category_count: manifest.file_category_count ?? null,
     };
   } catch (error) {
@@ -86,9 +91,9 @@ export function baseReport(options, files, skippedSymlinks, omittedSymlinks, dep
     inputs: {
       game: 'eu4',
       rules: {
-        authority: 'embedded first-party rules/eu4 JSON source',
+        authority: 'embedded first-party rules',
         external_source: false,
-        ...firstPartyRuleMetadata(),
+        ...firstPartyRuleMetadata(options.rulesManifest),
       },
       mode: options.vanillaSource ? 'vanilla-source' : 'project',
       source: options.source,

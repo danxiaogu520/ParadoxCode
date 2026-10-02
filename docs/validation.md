@@ -102,7 +102,7 @@ Release succeeds.
 Use the sweep when a change can alter workspace-wide diagnostics, symbolization, indexing, or rule
 interpretation. It is normally expected for changes to:
 
-- `rules/eu4/` or the rule compiler/matcher;
+- `rules/eu4-v2/` or the rule compiler/matcher;
 - diagnostic emission, resolution, scopes, dynamic definitions, or file classification;
 - parsers or HIR lowering in ways that can affect existing game files;
 - Vanilla cache construction or workspace-wide query behavior.
@@ -116,13 +116,16 @@ Build the exact binary first and pass it explicitly:
 cargo build --locked --release -p pdc --bin paradoxcode
 node editors/vscode/scripts/sweep.mjs \
   --server target/release/paradoxcode.exe \
+  --rules-manifest rules/ir-manifest.json \
   --vanilla-source "C:/path/to/Europa Universalis IV" \
   --label local-change
 ```
 
 The sweep refuses implicit server discovery and fails if the selected binary's active embedded
 rules hash differs from the checkout manifest. Its summary records the binary SHA-256, version,
-Git commit, and dirty-worktree state. `--previous <summary.json>` reports diagnostic and performance
+Git commit, and dirty-worktree state. The default manifest is `rules/ir-manifest.json`; use
+`--rules-manifest rules/manifest.json` when auditing a legacy baseline binary.
+`--previous <summary.json>` reports diagnostic and performance
 drift but does not turn that drift into a repository or release gate.
 
 Do not commit or upload the generated reports. Record only a short human conclusion in the pull

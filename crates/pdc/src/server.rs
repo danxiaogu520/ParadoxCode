@@ -854,8 +854,7 @@ impl LspServer {
         rules: RuleSet,
         profile: GameProfile,
     ) -> Result<Self, LspError> {
-        if profile.game_id == game::eu4::GAME_ID {
-            let ir = game::eu4::first_party_ir()?;
+        if let Some(ir) = game::compiled_ir(&profile)? {
             Self::try_new_with_ir(
                 options,
                 RuleSet::from_ir_catalog(&ir),

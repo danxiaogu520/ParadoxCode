@@ -21,13 +21,8 @@ serde_json = "1"
 schemars = "1"
 sha2 = "0.11"
 
-[[bin]]
-name = "bake"
-path = "src/bin/bake.rs"
-
-[[bin]]
-name = "flag-audit"
-path = "src/bin/flag-audit.rs"
+[dev-dependencies]
+tempfile = "3"
 
 [[bin]]
 name = "rulec"

@@ -8,8 +8,7 @@
           "doc": "Values at 100 Absolutism",
           "scope": {
             "push": "province"
-          },
-          "when": null
+          }
         },
         "target_province_weights": {
           "body": "center_of_revolution_conversion_body__target_province_weights",
@@ -21,8 +20,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "zeal_modifiers": {
           "body": "modifier",
@@ -30,8 +28,7 @@
           "doc": "Values at 100 Revolutionary Zeal",
           "scope": {
             "push": "country"
-          },
-          "when": null
+          }
         }
       }
     },
@@ -41,8 +38,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [

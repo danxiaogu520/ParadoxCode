@@ -11,8 +11,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "allow": {
           "body": "trigger",
@@ -23,19 +22,16 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "color": {
           "card": "1",
-          "list": "int[0..255]",
-          "when": null
+          "list": "int[0..255]"
         },
         "modifier": {
           "body": "modifier",
           "card": "1",
-          "doc": "Block of modifiers applied while the containing entry is active.",
-          "when": null
+          "doc": "Block of modifiers applied while the containing entry is active."
         },
         "notify_trigger": {
           "body": "trigger",
@@ -47,8 +43,7 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "on_state_edict_enacted": {
           "body": "effect",
@@ -60,8 +55,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "on_state_edict_revoked": {
           "body": "effect",
@@ -73,8 +67,7 @@
               "root": "province",
               "this": "province"
             }
-          },
-          "when": null
+          }
         },
         "potential": {
           "body": "trigger",
@@ -85,14 +78,12 @@
               "root": "country",
               "this": "country"
             }
-          },
-          "when": null
+          }
         },
         "years_to_notify": {
           "card": "0..1",
           "doc": "How many years the edict needs to be active to show an alert",
-          "value": "int",
-          "when": null
+          "value": "int"
         }
       }
     },
@@ -102,8 +93,7 @@
           "card": "1",
           "doc": "Base weight multiplier in the enclosing weight/AI block.",
           "override": true,
-          "value": "float",
-          "when": null
+          "value": "float"
         }
       },
       "include": [

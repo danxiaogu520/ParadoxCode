@@ -82,6 +82,18 @@ impl AnalysisSnapshot {
         &self.ir
     }
 
+    /// Resolves a declared localisation template from the active IR.
+    #[must_use]
+    pub fn localisation_template_key(
+        &self,
+        type_name: &str,
+        binding_name: &str,
+        instance: &str,
+    ) -> Option<String> {
+        self.ir
+            .localisation_template_key(type_name, binding_name, instance)
+    }
+
     /// Shared immutable arena for background index workers.
     #[must_use]
     pub fn ir_handle(&self) -> Arc<RulesIr> {

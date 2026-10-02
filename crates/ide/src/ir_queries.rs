@@ -1,11 +1,27 @@
 //! Workspace facts for schema lowering, independent of completion preferences.
 use engine::{AnalysisSnapshot, DocumentSource};
-use rules::ir::{Symbol, SymbolFacts, TraitId, TypeId};
+use rules::ir::{Symbol, SymbolFacts, TypeId};
 
 pub(crate) struct SnapshotSymbolFacts<'a> {
     pub(crate) snapshot: &'a AnalysisSnapshot,
 }
 impl SymbolFacts for SnapshotSymbolFacts<'_> {
+    fn replacement_template(
+        &self,
+        type_id: TypeId,
+        name: &str,
+    ) -> Option<std::sync::Arc<rules::replacement::Template>> {
+        let kind = self
+            .snapshot
+            .ir()
+            .strings
+            .resolve(self.snapshot.ir().type_info(type_id).name);
+        crate::semantic::resolve_dynamic_definition(self.snapshot, kind, name)?
+            .summary
+            .template
+            .map(std::sync::Arc::new)
+    }
+
     fn type_member(&self, type_id: TypeId, name: &str) -> bool {
         let snapshot = self.snapshot;
         let ir = snapshot.ir();
@@ -49,6 +65,7 @@ impl SymbolFacts for SnapshotSymbolFacts<'_> {
                         == Some(definition.file_id)
                 })
             })
+            || template_member(snapshot, kind, name)
     }
     fn type_subtype_member(&self, type_id: TypeId, subtype: Symbol, name: &str) -> bool {
         let snapshot = self.snapshot;
@@ -106,26 +123,80 @@ impl SymbolFacts for SnapshotSymbolFacts<'_> {
                     })
             })
     }
-    fn trait_impl_member(&self, trait_id: TraitId, name: &str) -> bool {
-        let ir = self.snapshot.ir();
-        ir.types.iter().any(|info| {
-            let Some(id) = ir.type_by_name(ir.strings.resolve(info.name)) else {
-                return false;
-            };
-            (info
-                .trait_impls
-                .iter()
-                .any(|implementation| implementation.trait_id == trait_id)
-                && self.type_member(id, name))
-                || info.subtypes.iter().any(|subtype| {
-                    subtype
-                        .trait_impls
-                        .iter()
-                        .any(|implementation| implementation.trait_id == trait_id)
-                        && self.type_subtype_member(id, subtype.name, name)
-                })
+}
+
+/// Scalar `def<T>` sites inside parameterised scripts can name runtime
+/// expansions. Retain their reachable name patterns without inventing literal
+/// definitions or falling back to a game-specific write-command table.
+fn template_member(snapshot: &AnalysisSnapshot, kind: &str, name: &str) -> bool {
+    type Templates = std::collections::BTreeMap<
+        String,
+        std::collections::BTreeMap<engine::SourceFileId, engine::FlagWriteIndex>,
+    >;
+    let revision = snapshot.revision();
+    const KEY: &str = "ir-symbol-templates";
+    let templates = snapshot
+        .query_cache()
+        .get::<Templates>(revision, KEY)
+        .unwrap_or_else(|| {
+            let mut templates = Templates::new();
+            for (definition, active) in snapshot.index().definition_identities() {
+                if active && definition.name.contains('$') {
+                    templates
+                        .entry(definition.kind.to_ascii_lowercase())
+                        .or_default()
+                        .entry(definition.file_id)
+                        .or_default()
+                        .record(&definition.name);
+                }
+            }
+            let templates = std::sync::Arc::new(templates);
+            snapshot.query_cache().insert(
+                revision,
+                // Only immutable index patterns are cached. Overlay patterns
+                // and hidden files are evaluated against the current snapshot.
+                engine::CacheDomain::Index,
+                KEY.to_owned(),
+                templates.clone(),
+            );
+            templates
+        });
+    let overlays = snapshot
+        .documents()
+        .values()
+        .filter(|document| document.source() == DocumentSource::Overlay)
+        .collect::<Vec<_>>();
+    let hidden = overlays
+        .iter()
+        .filter_map(|document| {
+            document
+                .path()
+                .and_then(|path| snapshot.source_file_id_for_path(path))
         })
-    }
+        .collect::<std::collections::BTreeSet<_>>();
+    templates
+        .get(&kind.to_ascii_lowercase())
+        .is_some_and(|files| {
+            files.iter().any(|(file, patterns)| {
+                !hidden.contains(file)
+                    && patterns.membership(name) != engine::FlagWriteMembership::Unknown
+            })
+        })
+        || overlays
+            .iter()
+            .filter_map(|document| document.hir())
+            .any(|hir| {
+                hir.definitions()
+                    .iter()
+                    .filter(|definition| {
+                        definition.kind.eq_ignore_ascii_case(kind) && definition.name.contains('$')
+                    })
+                    .any(|definition| {
+                        let mut pattern = engine::FlagWriteIndex::default();
+                        pattern.record(&definition.name);
+                        pattern.membership(name) != engine::FlagWriteMembership::Unknown
+                    })
+            })
 }
 
 /// Modifier applications use the referenced type's schema and retained attributes.
