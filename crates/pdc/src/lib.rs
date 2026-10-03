@@ -16,7 +16,7 @@ mod uri;
 mod vanilla;
 mod workspace;
 
-pub use game::eu4::{INSTALL_DESCRIPTOR, first_party_rules, profile};
+pub use game::{INSTALL_DESCRIPTOR, first_party_ir, profile, runtime_rules};
 
 pub use initialize::{AutoVanillaConfiguration, InitializeOptions};
 pub use protocol::LspError;

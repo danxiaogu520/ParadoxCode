@@ -1,21 +1,9 @@
 //! Semantic-rule hovers: property keys, scalar values, documentation, and provenance hints.
 
-use std::collections::BTreeSet;
-
 use super::render::{HoverModel, code_span};
-use crate::completion::{
-    SemanticCompletionRule, semantic_completion_context_with_cancellation,
-    semantic_rules_for_completion,
-};
-use crate::messages::numeric_bounds;
-use crate::semantic::{
-    semantic_child_scope, semantic_key_matches, semantic_property_matches,
-    semantic_rule_key_matches, semantic_scope_allows,
-};
-use crate::support::{ParsedInput, contains, truncate_hover_text};
+use crate::support::{ParsedInput, contains};
 use crate::types::{CancellationToken, Cancelled};
 use engine::{AnalysisSnapshot, SourceRootKind};
-use rules::{KeyMatcher, RuleShape, ValueMatcher};
 use text::TextSize;
 
 pub(crate) fn semantic_rule_hover_at(
@@ -25,47 +13,7 @@ pub(crate) fn semantic_rule_hover_at(
     word: &str,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverModel>, Cancelled> {
-    let Some(context) =
-        semantic_completion_context_with_cancellation(snapshot, input, position, cancellation)?
-    else {
-        return Ok(None);
-    };
-    let Some(property) = context.property.as_ref() else {
-        return Ok(None);
-    };
-    if !contains(property.key_range, position) {
-        return Ok(None);
-    }
-    let candidates = semantic_rules_for_completion(snapshot, &context)
-        .into_iter()
-        .filter(|candidate| {
-            !matches!(candidate.rule.shape, RuleShape::LeafValue)
-                && semantic_rule_key_matches(
-                    snapshot,
-                    candidate.rule,
-                    candidate.parent_path,
-                    &property.key,
-                )
-        })
-        .collect::<Vec<_>>();
-    if candidates.is_empty() {
-        return Ok(None);
-    }
-    let mut model = HoverModel::new(semantic_rule_hover_title(word, &candidates, ""));
-    model.extend_sections(semantic_rule_hover_for_candidates(
-        snapshot,
-        word,
-        &candidates,
-    ));
-    append_typed_localisation_section(
-        snapshot,
-        word,
-        &candidates,
-        RuleHoverPosition::Key,
-        &mut model,
-        cancellation,
-    )?;
-    Ok(Some(model))
+    ir_field_hover(snapshot, input, position, word, true, cancellation)
 }
 
 pub(crate) fn semantic_value_hover_at(
@@ -75,168 +23,7 @@ pub(crate) fn semantic_value_hover_at(
     word: &str,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverModel>, Cancelled> {
-    let Some(context) =
-        semantic_completion_context_with_cancellation(snapshot, input, position, cancellation)?
-    else {
-        return Ok(None);
-    };
-    // A quoted scalar the cursor sits inside is folded into `container_property`
-    // (with `property` empty) and the property key is appended to the parent
-    // path; the rule governing the value itself lives one level up.
-    let Some(property) = [
-        context.property.as_ref(),
-        context.container_property.as_ref(),
-    ]
-    .into_iter()
-    .flatten()
-    .find(|property| {
-        property
-            .scalar
-            .as_ref()
-            .is_some_and(|(_, range)| contains(*range, position))
-    }) else {
-        return Ok(None);
-    };
-    let Some((value, value_range)) = property.scalar.as_ref() else {
-        return Ok(None);
-    };
-    if !contains(*value_range, position) {
-        return Ok(None);
-    }
-    let mut rule_context = context.clone();
-    if rule_context
-        .parent_path
-        .last()
-        .is_some_and(|segment| segment.eq_ignore_ascii_case(&property.key))
-    {
-        rule_context.parent_path.pop();
-    }
-    let candidates = semantic_rules_for_completion(snapshot, &rule_context)
-        .into_iter()
-        .filter(|candidate| {
-            matches!(candidate.rule.shape, RuleShape::Leaf)
-                && semantic_rule_key_matches(
-                    snapshot,
-                    candidate.rule,
-                    candidate.parent_path,
-                    &property.key,
-                )
-                && candidate
-                    .rule
-                    .operator
-                    .as_deref()
-                    .is_none_or(|operator| property.operator.as_deref() == Some(operator))
-        })
-        .collect::<Vec<_>>();
-    if candidates.is_empty() {
-        return Ok(None);
-    }
-    let accepted = candidates.iter().any(|candidate| {
-        semantic_scope_allows(candidate.rule, candidate.scope)
-            && semantic_property_matches(snapshot, candidate.rule, property, candidate.scope)
-    });
-    let mut model = HoverModel::new(semantic_rule_hover_title(word, &candidates, " value"));
-    model.push_section(format!(
-        "- property: `{}`\n- value: `{}`\n- validation: `{}`",
-        property.key,
-        value,
-        if accepted {
-            "accepted"
-        } else {
-            "does not match"
-        },
-    ));
-    if candidates
-        .iter()
-        .any(|candidate| matches!(candidate.rule.value, ValueMatcher::TexturePath))
-    {
-        model.push_section(texture_resolution_section(snapshot, value));
-    }
-    model.extend_sections(semantic_rule_hover_for_candidates(
-        snapshot,
-        word,
-        &candidates,
-    ));
-    append_typed_localisation_section(
-        snapshot,
-        word,
-        &candidates,
-        RuleHoverPosition::Value,
-        &mut model,
-        cancellation,
-    )?;
-    Ok(Some(model))
-}
-
-/// Which side of a rule the hovered word sits on: the property key (block
-/// keys, scope links) or the scalar value.
-#[derive(Clone, Copy)]
-enum RuleHoverPosition {
-    Key,
-    Value,
-}
-
-/// Appends a localisation-preview section to a rule hover when the word is
-/// governed by `Type` matchers that agree on one workspace kind
-/// (`area.used` scope links, typed scalar values).  A `Type` match already
-/// implies the token resolved against that kind's indexed definitions, so the
-/// preview needs no further resolution gate — only a displayable kind and a
-/// key that actually resolves.
-fn append_typed_localisation_section(
-    snapshot: &AnalysisSnapshot,
-    word: &str,
-    candidates: &[SemanticCompletionRule<'_, '_>],
-    position: RuleHoverPosition,
-    model: &mut HoverModel,
-    cancellation: &CancellationToken,
-) -> Result<(), Cancelled> {
-    let Some(kind) = agreed_typed_kind(candidates, position) else {
-        return Ok(());
-    };
-    if !crate::localisation::kind_is_localisation_displayable(snapshot, &kind) {
-        return Ok(());
-    }
-    let rows =
-        crate::localisation::typed_name_localisation_previews(snapshot, &kind, word, cancellation)?;
-    if !rows.is_empty() {
-        model.has_localisation_preview = true;
-        model.push_section(crate::localisation::localisation_preview_section(&rows));
-    }
-    Ok(())
-}
-
-/// The one workspace kind every `Type`-matched candidate agrees on, using the
-/// matcher for the hovered position.  Disagreement means the word has several
-/// typed interpretations; the preview must not guess between them, mirroring
-/// the typed-reference convention in HIR lowering.
-fn agreed_typed_kind(
-    candidates: &[SemanticCompletionRule<'_, '_>],
-    position: RuleHoverPosition,
-) -> Option<String> {
-    let mut kinds = BTreeSet::new();
-    for candidate in candidates {
-        let type_name = match position {
-            RuleHoverPosition::Key => match &candidate.rule.key {
-                KeyMatcher::Type(type_name) => Some(type_name.as_str()),
-                _ => None,
-            },
-            RuleHoverPosition::Value => match &candidate.rule.value {
-                ValueMatcher::Type(type_name) => Some(type_name.as_str()),
-                _ => None,
-            },
-        };
-        if let Some(type_name) = type_name {
-            let base = type_name
-                .split_once('.')
-                .map_or(type_name, |(base, _)| base);
-            kinds.insert(base.to_owned());
-        }
-    }
-    if kinds.len() == 1 {
-        kinds.into_iter().next()
-    } else {
-        None
-    }
+    ir_field_hover(snapshot, input, position, word, false, cancellation)
 }
 
 /// Provenance for a `texture_path` value hover: the resolved absolute path,
@@ -269,33 +56,6 @@ fn texture_resolution_section(snapshot: &AnalysisSnapshot, value: &str) -> Strin
     }
 }
 
-/// Hover title in the symbol-hover pattern: the rule-context category (or
-/// nothing when candidates disagree or carry no context). `suffix` marks
-/// value-position hovers (`### Effect value \`my_flag\``).
-fn semantic_rule_hover_title(
-    word: &str,
-    candidates: &[SemanticCompletionRule<'_, '_>],
-    suffix: &str,
-) -> String {
-    let Some(shared) = shared_rule_context(candidates) else {
-        return format!("### {}", code_span(word));
-    };
-    format!(
-        "### {}{suffix} {}",
-        semantic_context_category(&shared),
-        code_span(word)
-    )
-}
-
-/// The one context every candidate agrees on, when they agree.
-fn shared_rule_context(candidates: &[SemanticCompletionRule<'_, '_>]) -> Option<String> {
-    let first = candidates.first()?.rule.context.clone();
-    candidates
-        .iter()
-        .all(|candidate| candidate.rule.context.eq_ignore_ascii_case(&first))
-        .then_some(first)
-}
-
 /// Display category for a rule context: the three command namespaces keep
 /// their canonical names; everything else humanizes the context identifier
 /// (compound `root:` contexts use their tail segment). Callers that cannot
@@ -320,614 +80,256 @@ pub(crate) fn semantic_context_category(context: &str) -> String {
     }
 }
 
-/// Renders the hover sections for every distinct meaning of the matched candidates.
-///
-/// Sections are returned unrendered so callers embed them into their own hover model; the
-/// candidate slice is never empty at the call sites (both hover entry points gate on it).
-///
-/// Candidates split into value types (rendered under `#### Allowed value types`,
-/// renamed from "Possible meanings" because the entries describe accepted value
-/// shapes) and scope links (block keys that re-target the scope — not value
-/// types), whose transitions render in the ambient `#### Scope` table instead.
-/// Value types group by valid scopes because a key may carry different value
-/// domains per scope (`add_claim` takes a province in country scope and a tag
-/// in province scope).
-pub(crate) fn semantic_rule_hover_for_candidates(
+fn ir_field_hover(
     snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: TextSize,
     word: &str,
-    candidates: &[SemanticCompletionRule<'_, '_>],
-) -> Vec<String> {
-    // Stable rule ids and source provenance identify declarations, not necessarily distinct
-    // meanings.  The first-party source can repeat one semantic rule for many generated members;
-    // keep those rows explainable in diagnostics, but do not render the same hover 226 times.
-    let mut unique_candidates: Vec<&SemanticCompletionRule<'_, '_>> =
-        Vec::with_capacity(candidates.len());
-    for candidate in candidates {
-        if !unique_candidates
+    key: bool,
+    cancellation: &CancellationToken,
+) -> Result<Option<HoverModel>, Cancelled> {
+    let Some(hir) = input.hir.as_deref() else {
+        return Ok(None);
+    };
+    let fact = if key {
+        // Quoted-script key facts already carry ranges mapped into the
+        // containing document, even though the outer property list is flat.
+        hir.field_facts()
             .iter()
-            .any(|known| semantic_hover_candidate_equivalent(known, candidate))
-        {
-            unique_candidates.push(candidate);
-        }
-    }
-    let candidates = unique_candidates.as_slice();
-    let (value_typed, scope_links): (Vec<_>, Vec<_>) = candidates
-        .iter()
-        .partition(|candidate| !is_scope_link_rule(candidate.rule));
-
-    let mut sections = Vec::new();
-    if value_typed.len() > 1 {
-        let shared_documentation = shared_semantic_hover_documentation(&value_typed);
-        sections.extend(grouped_allowed_value_types_sections(
-            snapshot,
-            &value_typed,
-            shared_documentation.is_none(),
-            value_typed.len(),
-        ));
-        if let Some(documentation) = shared_documentation {
-            sections.push(format!(
-                "#### Documentation\n\n{}",
-                truncate_documentation(&documentation)
-            ));
-        }
-    } else if let Some(candidate) = value_typed.first() {
-        sections.push(semantic_hover_candidate_details(snapshot, candidate).join("\n"));
-        let cardinality = semantic_hover_cardinality_details(candidate.rule);
-        if !cardinality.is_empty() {
-            sections.push(format!("#### Constraints\n\n{}", cardinality.join("\n")));
-        }
-        if !candidate.rule.documentation.is_empty() {
-            sections.push(format!(
-                "#### Documentation\n\n{}",
-                truncate_documentation(&candidate.rule.documentation)
-            ));
-        }
-    } else if let Some(candidate) = scope_links.first() {
-        // A pure scope link has no value shape to describe; its scope
-        // requirements stay visible as details and its transition renders in
-        // the Scope table below.
-        let details = semantic_hover_scope_link_details(candidate);
-        if !details.is_empty() {
-            sections.push(details.join("\n"));
-        }
-        let cardinality = semantic_hover_cardinality_details(candidate.rule);
-        if !cardinality.is_empty() {
-            sections.push(format!("#### Constraints\n\n{}", cardinality.join("\n")));
-        }
-        if !candidate.rule.documentation.is_empty() {
-            sections.push(format!(
-                "#### Documentation\n\n{}",
-                truncate_documentation(&candidate.rule.documentation)
-            ));
-        }
-    }
-    if let Some(scope) = ambient_scope_section(snapshot, word, candidates, &scope_links) {
-        sections.push(scope);
-    }
-    sections
-}
-
-/// A block rule that re-targets the scope (`owner = { … }`): its hover entry
-/// is a scope transition, not a value type.
-fn is_scope_link_rule(rule: &rules::SemanticRule) -> bool {
-    matches!(rule.shape, RuleShape::Node)
-        && (rule.push_scope.is_some() || !rule.replace_scope.is_empty())
-}
-
-/// One value entry of the grouped `Allowed value types` section: the accepted
-/// shape plus the scopes it is valid in. `extras` hold facts that only this
-/// entry carries (documentation, a scope transition, cardinality the other
-/// candidates do not share) and render as sub-bullets.
-struct AllowedValueEntry {
-    scopes: Vec<String>,
-    available_here: bool,
-    label: String,
-    extras: Vec<String>,
-}
-
-/// Renders the multi-candidate value section grouped by valid scopes, so a key
-/// whose value domain differs per scope reads as one line per scope
-/// (`- \`country\`: scope \`province\`, type \`province_id\``). Unrestricted
-/// rules form an implicit "any scope" group whose prefix is dropped when it is
-/// the only group. Cardinality shared by every candidate hoists into a
-/// `#### Constraints` section, mirroring the single-candidate path.
-fn grouped_allowed_value_types_sections(
-    snapshot: &AnalysisSnapshot,
-    candidates: &[&SemanticCompletionRule<'_, '_>],
-    include_documentation: bool,
-    entry_count: usize,
-) -> Vec<String> {
-    let cardinalities = candidates
-        .iter()
-        .map(|candidate| semantic_hover_cardinality_details(candidate.rule))
-        .collect::<Vec<_>>();
-    let shared_cardinality = (!cardinalities.is_empty()
-        && cardinalities.iter().all(|lines| !lines.is_empty())
-        && cardinalities.windows(2).all(|pair| pair[0] == pair[1]))
-    .then(|| cardinalities.first().cloned().unwrap_or_default());
-
-    let entries = candidates
-        .iter()
-        .zip(cardinalities)
-        .map(|(candidate, cardinality)| {
-            let mut extras = Vec::new();
-            if shared_cardinality.is_none() {
-                extras.extend(cardinality);
-            }
-            // Value-typed rules re-targeting the scope would have partitioned
-            // as scope links; a transparent wrapper that kept its value shape
-            // still reports its transition here.
-            if (candidate.rule.push_scope.is_some() || !candidate.rule.replace_scope.is_empty())
-                && {
-                    let child_scope =
-                        semantic_child_scope(snapshot, candidate.scope, candidate.rule);
-                    !candidate
-                        .scope
-                        .current
-                        .eq_ignore_ascii_case(&child_scope.current)
-                }
-            {
-                let child_scope = semantic_child_scope(snapshot, candidate.scope, candidate.rule);
-                extras.push(format!(
-                    "- scope transition: `{}` → `{}`",
-                    candidate.scope.current, child_scope.current
-                ));
-            }
-            if include_documentation && !candidate.rule.documentation.is_empty() {
-                extras.push(format!(
-                    "- documentation: {}",
-                    truncate_documentation(&candidate.rule.documentation)
-                ));
-            }
-            AllowedValueEntry {
-                scopes: candidate.rule.allowed_scopes.clone(),
-                available_here: semantic_scope_allows(candidate.rule, candidate.scope),
-                label: semantic_rule_hover_value_label(candidate.rule),
-                extras,
-            }
-        })
-        .collect::<Vec<_>>();
-
-    // Group by scope declaration and availability; the ambient scope is shared
-    // by every candidate of one hover, so the unavailable suffix names it once.
-    let mut groups: Vec<(Vec<String>, bool, Vec<&AllowedValueEntry>)> = Vec::new();
-    for entry in &entries {
-        let group = groups.iter_mut().find(|(scopes, available, _)| {
-            *available == entry.available_here && *scopes == entry.scopes
-        });
-        match group {
-            Some((_, _, members)) => members.push(entry),
-            None => groups.push((entry.scopes.clone(), entry.available_here, vec![entry])),
-        }
-    }
-    groups.sort_by_key(|(_, available, _)| !*available);
-
-    let ambient = candidates
-        .first()
-        .map(|candidate| candidate.scope.current.clone())
-        .unwrap_or_default();
-    let mut lines = Vec::new();
-    for (scopes, available_here, members) in &groups {
-        let mut distinct = Vec::new();
-        for entry in members {
-            if !distinct.iter().any(|known: &&AllowedValueEntry| {
-                known.label == entry.label && known.extras == entry.extras
-            }) {
-                distinct.push(entry);
-            }
-        }
-        let mut line = String::from("- ");
-        if !scopes.is_empty() {
-            let allowed = scopes
-                .iter()
-                .map(|scope| format!("`{scope}`"))
-                .collect::<Vec<_>>()
-                .join(", ");
-            line.push_str(&allowed);
-            line.push_str(": ");
-        }
-        line.push_str(
-            &distinct
-                .iter()
-                .map(|entry| entry.label.as_str())
-                .collect::<Vec<_>>()
-                .join(", "),
-        );
-        if !available_here {
-            line.push_str(&format!(" (unavailable in current scope `{ambient}`)"));
-        }
-        for entry in &distinct {
-            for extra in &entry.extras {
-                line.push_str(&format!("\n  {extra}"));
-            }
-        }
-        lines.push(line);
-    }
-
-    let mut sections = vec![format!(
-        "#### Allowed value types ({entry_count})\n\n{}",
-        lines.join("\n")
-    )];
-    if let Some(cardinality) = shared_cardinality {
-        sections.push(format!("#### Constraints\n\n{}", cardinality.join("\n")));
-    }
-    sections
-}
-
-fn semantic_hover_candidate_details(
-    snapshot: &AnalysisSnapshot,
-    candidate: &SemanticCompletionRule<'_, '_>,
-) -> Vec<String> {
-    let rule = candidate.rule;
-    let mut details = vec![format!(
-        "- value: {}",
-        semantic_rule_hover_value_label(rule)
-    )];
-    if !rule.allowed_scopes.is_empty() {
-        details.push(semantic_hover_scope_line(candidate));
-    }
-    if (rule.push_scope.is_some() || !rule.replace_scope.is_empty()) && {
-        let child_scope = semantic_child_scope(snapshot, candidate.scope, rule);
-        !candidate
-            .scope
-            .current
-            .eq_ignore_ascii_case(&child_scope.current)
-    } {
-        // Non-link blocks can still carry a scope transition (transparent
-        // wrappers re-target registers); value-shaped candidates keep the
-        // inline line because the Scope table only lists scope links.
-        let child_scope = semantic_child_scope(snapshot, candidate.scope, rule);
-        details.push(format!(
-            "- scope transition: `{}` → `{}`",
-            candidate.scope.current, child_scope.current
-        ));
-    }
-    details
-}
-
-/// The `valid scopes` line, or the unavailable variant when the ambient
-/// scope is not among them.
-fn semantic_hover_scope_line(candidate: &SemanticCompletionRule<'_, '_>) -> String {
-    let allowed = candidate
-        .rule
-        .allowed_scopes
-        .iter()
-        .map(|scope| format!("`{scope}`"))
-        .collect::<Vec<_>>()
-        .join(", ");
-    if semantic_scope_allows(candidate.rule, candidate.scope) {
-        format!("- valid scopes: {allowed}")
+            .find(|fact| contains(fact.range, position))
     } else {
-        format!(
-            "- unavailable in current scope `{}`; valid scopes: {allowed}",
-            candidate.scope.current
-        )
-    }
-}
-
-fn semantic_hover_scope_link_details(candidate: &SemanticCompletionRule<'_, '_>) -> Vec<String> {
-    candidate
-        .rule
-        .allowed_scopes
-        .is_empty()
-        .then(Vec::new)
-        .unwrap_or_else(|| vec![semantic_hover_scope_line(candidate)])
-}
-
-/// The ambient scope table: where the hovered statement sits (current scope
-/// and the root/prev/from registers) and where each scope-link candidate
-/// re-targets. Skipped entirely when nothing beyond an unknown scope is
-/// known, so degraded contexts do not grow noise lines.
-fn ambient_scope_section(
-    snapshot: &AnalysisSnapshot,
-    word: &str,
-    candidates: &[&SemanticCompletionRule<'_, '_>],
-    scope_links: &[&SemanticCompletionRule<'_, '_>],
-) -> Option<String> {
-    let scope = &candidates.first()?.scope;
-    // `any` registers are unknown placeholders (an untracked root, an unused
-    // FROM); rendering them would only add noise lines.
-    let known = |value: &str| !value.eq_ignore_ascii_case("any");
-    let mut lines = vec![format!("- here: `{}`", scope.current)];
-    if known(&scope.root) && !scope.root.eq_ignore_ascii_case(&scope.current) {
-        lines.push(format!("- root: `{}`", scope.root));
-    }
-    if let Some(previous) = scope.previous.last().filter(|value| known(value)) {
-        lines.push(format!("- prev: `{previous}`"));
-    }
-    if let Some(from) = scope.from.last().filter(|value| known(value)) {
-        lines.push(format!("- from: `{from}`"));
-    }
-    for candidate in scope_links {
-        let child_scope = semantic_child_scope(snapshot, candidate.scope, candidate.rule);
-        let mut line = format!("- `{}` enters `{}`", word, child_scope.current);
-        if !candidate.rule.allowed_scopes.is_empty() {
-            let allowed = candidate
-                .rule
-                .allowed_scopes
-                .iter()
-                .map(|scope| format!("`{scope}`"))
-                .collect::<Vec<_>>()
-                .join(", ");
-            line.push_str(&format!(" (from {allowed})"));
-        }
-        lines.push(line);
-    }
-    let ambient_known = known(&scope.current)
-        || scope.previous.iter().any(|value| known(value))
-        || scope.from.iter().any(|value| known(value));
-    (ambient_known || !scope_links.is_empty())
-        .then(|| format!("#### Scope\n\n{}", lines.join("\n")))
-}
-
-fn semantic_hover_cardinality_details(rule: &rules::SemanticRule) -> Vec<String> {
-    let mut details = Vec::new();
-    if rule.required {
-        details.push("- required".to_owned());
-    }
-    // `min_occurs = 1` is the generator's default for scalar keys and aliases;
-    // surfacing it contradicts the unenforced `required` flag and repeats the
-    // same noise `max_occurs = 1` already suppresses.  Real floors (>= 2,
-    // diagnostics-enforced) stay visible.
-    if let Some(min) = rule.min_occurs.filter(|min| *min > 1) {
-        details.push(format!("- at least {min}"));
-    }
-    if let Some(max) = rule.max_occurs.filter(|max| *max != 1) {
-        details.push(format!("- at most {max}"));
-    }
-    details
-}
-
-fn shared_semantic_hover_documentation(
-    candidates: &[&SemanticCompletionRule<'_, '_>],
-) -> Option<Vec<String>> {
-    let first = candidates.first()?.rule.documentation.clone();
-    (!first.is_empty()
-        && candidates
+        hir.properties()
             .iter()
-            .all(|candidate| candidate.rule.documentation == first))
-    .then_some(first)
-}
-
-fn semantic_rule_hover_value_label(rule: &rules::SemanticRule) -> String {
-    match rule.shape {
-        RuleShape::Node => "block".to_owned(),
-        RuleShape::QuotedScript => "quoted script".to_owned(),
-        RuleShape::ValueClause => "value clause".to_owned(),
-        RuleShape::Leaf | RuleShape::LeafValue => semantic_value_hover_label(&rule.value),
+            .find(|property| {
+                property
+                    .scalar
+                    .as_ref()
+                    .is_some_and(|scalar| contains(scalar.range, position))
+            })
+            .and_then(|property| hir.field_fact_at(property.key_range))
+    };
+    let Some(fact) = fact else {
+        return Ok(None);
+    };
+    let ir = snapshot.ir();
+    if fact.fields.is_empty() {
+        return Ok(None);
     }
-}
-
-fn semantic_hover_candidate_equivalent(
-    left: &SemanticCompletionRule<'_, '_>,
-    right: &SemanticCompletionRule<'_, '_>,
-) -> bool {
-    // Rule-level equivalence ignores declaration provenance (id, alternative_id, source_file,
-    // line); see `SemanticRule::semantic_equivalent`.
-    left.parent_path == right.parent_path
-        && left.scope == right.scope
-        && left.rule.semantic_equivalent(right.rule)
-}
-
-/// Renders a value-matcher description. Some labels embed their own inline code
-/// spans (for example ``dynamic value set `country_flag` ``), so callers must
-/// not wrap the result in another code span — the nested backticks would break
-/// apart in the rendered Markdown.
-pub(crate) fn semantic_value_hover_label(matcher: &ValueMatcher) -> String {
-    match matcher {
-        ValueMatcher::AnyScalar => "any scalar".to_owned(),
-        ValueMatcher::Exact(value) => format!("exact `{value}`"),
-        ValueMatcher::Bool => "bool (`yes` / `no`)".to_owned(),
-        ValueMatcher::Int { min, max } => semantic_numeric_hover_label("integer", *min, *max),
-        ValueMatcher::Float { min, max } => {
-            semantic_numeric_hover_label("float", min.as_deref(), max.as_deref())
-        }
-        ValueMatcher::Date => "date (`YYYY.MM.DD`)".to_owned(),
-        ValueMatcher::Type(value) => format!("symbol type `{value}`"),
-        ValueMatcher::Enum(value) => format!("enum `{value}`"),
-        ValueMatcher::Scope(value) => value
-            .as_deref()
-            .map_or_else(|| "scope".to_owned(), |value| format!("scope `{value}`")),
-        ValueMatcher::Localisation => "localisation key".to_owned(),
-        ValueMatcher::Filepath => "filepath".to_owned(),
-        ValueMatcher::TexturePath => "texture path".to_owned(),
-        ValueMatcher::Dynamic(value) => format!("dynamic value `{value}`"),
-        ValueMatcher::DynamicSet(value) => format!("dynamic value set `{value}`"),
-        ValueMatcher::TypedPrefix {
-            prefix, context, ..
-        } => {
-            format!("`{prefix}` + numeric or bool `{context}`")
-        }
-        ValueMatcher::Opaque(value) => format!("opaque `{value}`"),
-    }
-}
-
-pub(crate) fn semantic_numeric_hover_label<T: std::fmt::Display>(
-    kind: &str,
-    min: Option<T>,
-    max: Option<T>,
-) -> String {
-    format!("{kind}{}", numeric_bounds(min, max).label_suffix())
-}
-
-pub(crate) fn semantic_rule_documentation(
-    snapshot: &AnalysisSnapshot,
-    key: &str,
-) -> Option<String> {
-    // The lookup is a pure function of the immutable rules model but scans every semantic rule
-    // per known-key hover; memoize per revision. The matcher is case-insensitive, so the cache
-    // key is normalized rather than verbatim.
-    let revision = snapshot.revision();
-    let cache_key = format!("hover-rule-documentation:{}", key.to_ascii_lowercase());
-    if let Some(cached) = snapshot
-        .query_cache()
-        .get::<Option<String>>(revision, &cache_key)
-    {
-        return (*cached).clone();
-    }
-    let documentation = semantic_rule_documentation_uncached(snapshot, key);
-    snapshot.query_cache().insert(
-        revision,
-        engine::CacheDomain::Index,
-        cache_key,
-        std::sync::Arc::new(documentation.clone()),
-    );
-    documentation
-}
-
-fn semantic_rule_documentation_uncached(snapshot: &AnalysisSnapshot, key: &str) -> Option<String> {
-    let mut rules = snapshot
-        .rules()
-        .model()
-        .semantic
-        .rules
-        .iter()
-        .filter(|rule| match &rule.key {
-            KeyMatcher::Exact(expected) => expected.eq_ignore_ascii_case(key),
-            _ => false,
+    let property_key = if key {
+        word
+    } else {
+        hir.properties()
+            .iter()
+            .find(|property| {
+                property
+                    .scalar
+                    .as_ref()
+                    .is_some_and(|scalar| contains(scalar.range, position))
+            })
+            .map_or(word, |property| property.key.as_str())
+    };
+    let mut fields = ir
+        .lookup(
+            fact.schema,
+            property_key,
+            ir.shape(fact.fields[0]).unwrap_or(rules::ir::Shape::Scalar),
+        )
+        .filter(|id| {
+            matches!(ir.matcher(ir.field(*id).key), rules::ir::Matcher::Literal(value)
+                if ir.strings().resolve(*value).eq_ignore_ascii_case(property_key))
         })
         .collect::<Vec<_>>();
-    rules.sort_by_key(|rule| (&rule.context, &rule.parent_path, &rule.id));
-    let rule = rules.into_iter().find(|rule| {
-        !rule.documentation.is_empty()
-            || rule.required
-            || rule.min_occurs.is_some_and(|min| min > 0)
-            || rule.max_occurs.is_some_and(|max| max != 1)
-            || !rule.allowed_scopes.is_empty()
-    })?;
-    semantic_rule_documentation_for_rule(rule)
-}
-
-/// The display category for a known key's rule family, when its exact-key
-/// rules agree on one context. Memoized per revision alongside the
-/// documentation lookup because it scans the same rule list.
-pub(crate) fn semantic_rule_key_category(snapshot: &AnalysisSnapshot, key: &str) -> Option<String> {
-    let revision = snapshot.revision();
-    let cache_key = format!("hover-rule-category:{}", key.to_ascii_lowercase());
-    if let Some(cached) = snapshot
-        .query_cache()
-        .get::<Option<String>>(revision, &cache_key)
-    {
-        return (*cached).clone();
+    if fields.is_empty() {
+        fields = fact.fields.clone();
     }
-    let mut contexts = snapshot
-        .rules()
-        .model()
-        .semantic
-        .rules
+    let schema_name = ir.strings().resolve(ir.schema(fact.schema).name);
+    let context = schema_name.split("__").next().unwrap_or(schema_name);
+    let context = context
+        .strip_suffix("_body")
+        .or_else(|| context.strip_suffix("_file"))
+        .unwrap_or(context);
+    let mut model = HoverModel::new(format!(
+        "### {}{} {}",
+        semantic_context_category(context),
+        if key { "" } else { " value" },
+        code_span(word)
+    ));
+    let state = hir
+        .schema_facts()
         .iter()
-        .filter(|rule| match &rule.key {
-            KeyMatcher::Exact(expected) => expected.eq_ignore_ascii_case(key),
-            _ => false,
-        })
-        .map(|rule| rule.context.clone())
-        .collect::<Vec<_>>();
-    contexts.sort();
-    contexts.dedup();
-    let category = (contexts.len() == 1)
-        .then(|| {
-            contexts
-                .first()
-                .map(|context| semantic_context_category(context))
-        })
-        .flatten();
-    snapshot.query_cache().insert(
-        revision,
-        engine::CacheDomain::Index,
-        cache_key,
-        std::sync::Arc::new(category.clone()),
-    );
-    category
-}
-
-/// Renders first-party documentation lines, truncating the total so a pathological declaration
-/// cannot produce an unbounded tooltip.
-fn truncate_documentation(documentation: &[String]) -> String {
-    const MAX_DOCUMENTATION_CHARS: usize = 1_200;
-    let mut rendered = String::new();
-    let mut overflow = false;
-    for line in documentation {
-        let line = truncate_hover_text(line);
-        if rendered.chars().count() + line.chars().count() > MAX_DOCUMENTATION_CHARS {
-            overflow = true;
-            break;
-        }
-        if !rendered.is_empty() {
-            rendered.push_str("  \n");
-        }
-        rendered.push_str(&line);
-    }
-    if overflow || rendered.chars().count() > MAX_DOCUMENTATION_CHARS {
-        rendered.push_str("  \n…");
-    }
-    rendered
-}
-
-pub(crate) fn semantic_rule_documentation_for_rule(rule: &rules::SemanticRule) -> Option<String> {
-    let mut sections = Vec::new();
-    if !rule.documentation.is_empty() {
-        sections.push(format!(
-            "#### Documentation\n\n{}",
-            truncate_documentation(&rule.documentation)
-        ));
-    }
-
-    let mut constraints = Vec::new();
-    if rule.required {
-        constraints.push("- required".to_owned());
-    }
-    if let Some(min) = rule.min_occurs.filter(|min| *min > 1) {
-        constraints.push(format!("- at least {min}"));
-    }
-    if let Some(max) = rule.max_occurs.filter(|max| *max != 1) {
-        constraints.push(format!("- at most {max}"));
-    }
-    if !rule.allowed_scopes.is_empty() {
-        constraints.push(format!(
-            "- scopes: {}",
-            rule.allowed_scopes
-                .iter()
-                .map(|scope| format!("`{scope}`"))
-                .collect::<Vec<_>>()
-                .join(", ")
-        ));
-    }
-    if !constraints.is_empty() {
-        sections.push(format!("#### Constraints\n\n{}", constraints.join("\n")));
-    }
-
-    (!sections.is_empty()).then(|| sections.join("\n\n"))
-}
-
-/// Describes which non-exact first-party matcher family covers a property key. Used by the
-/// hover fallback so keys matched through type members, enums, or dates still get provenance
-/// instead of silently returning no tooltip. Open-ended matchers (`AnyScalar`, `Dynamic`) are
-/// deliberately excluded: they accept every key and would otherwise manufacture tooltips for
-/// genuinely unknown properties.
-pub(crate) fn semantic_pattern_rule_hint(
-    snapshot: &AnalysisSnapshot,
-    word: &str,
-) -> Option<String> {
-    let model = &snapshot.rules().model().semantic;
-    let mut families: BTreeSet<&'static str> = BTreeSet::new();
-    for rule in &model.rules {
-        let family = match &rule.key {
-            KeyMatcher::Exact(_) | KeyMatcher::AnyScalar | KeyMatcher::Dynamic(_) => continue,
-            KeyMatcher::Type(_) => "a workspace member of its declared type",
-            KeyMatcher::Template { .. } => "a member of its declared template domain",
-            KeyMatcher::Enum(_) => "a member of a first-party enum",
-            KeyMatcher::Date => "a campaign date",
-            KeyMatcher::Int { .. } => "an integer key",
+        .filter(|parent| parent.schema == fact.schema && contains(parent.range, fact.range.start()))
+        .min_by_key(|parent| parent.range.len())
+        .map(|parent| &parent.state);
+    let current = state.and_then(|state| state.current.first());
+    let scope_name = |value: &hir::ScopeValue| match value {
+        hir::ScopeValue::Known(scopes) => scopes
+            .iter()
+            .map(|value| value.as_ref())
+            .collect::<Vec<_>>()
+            .join(" or "),
+        hir::ScopeValue::Unknown => "any".into(),
+        hir::ScopeValue::Invalid => "invalid".into(),
+    };
+    let mut values = Vec::new();
+    let mut documents = Vec::new();
+    let mut scopes = Vec::new();
+    for id in &fields {
+        cancellation.checkpoint()?;
+        let field = ir.field(*id);
+        let value = match field.value {
+            rules::ir::FieldValue::Scalar(matcher) => crate::ir_semantic::describe(ir, matcher),
+            rules::ir::FieldValue::Block(schema) | rules::ir::FieldValue::Quoted(schema) => {
+                format!("a `{}` block", ir.strings.resolve(ir.schema(schema).name))
+            }
+            rules::ir::FieldValue::SelfBlock => format!(
+                "a `{}` block",
+                ir.strings.resolve(ir.schema(fact.schema).name)
+            ),
         };
-        if semantic_key_matches(snapshot, &rule.key, word) {
-            families.insert(family);
+        let allowed = field.scope.as_ref().map(|scope| &scope.scopes_in);
+        let available = current.is_none_or(|current| {
+            allowed.is_none_or(|scopes| {
+                scopes.is_empty() || crate::ir_semantic::scope_allows(ir, current, scopes)
+            })
+        });
+        if key || available {
+            if fields.len() == 1
+                && let rules::ir::FieldValue::Scalar(matcher) = field.value
+                && let rules::ir::Matcher::Union(alternatives) = ir.matcher(matcher)
+            {
+                values.extend(alternatives.iter().map(|matcher| {
+                    (
+                        crate::ir_semantic::describe(ir, *matcher),
+                        allowed,
+                        available,
+                    )
+                }));
+            } else {
+                values.push((value, allowed, available));
+            }
+        }
+        if let Some(doc) = field.doc {
+            documents.push(ir.strings.resolve(doc).to_owned());
+        }
+        if field.deprecated {
+            model.push_section("Deprecated".to_owned());
+        }
+        if let Some(origin) = ir.provenance_of(*id) {
+            model.push_section(format!(
+                "Source: `{}` `{}`",
+                ir.strings.resolve(origin.file),
+                ir.strings.resolve(origin.pointer)
+            ));
+        }
+        if let Some(state) = state {
+            let next = hir::transition_ir_scope(ir, state.clone(), field.scope.as_ref(), word);
+            if next.current != state.current
+                || field
+                    .scope
+                    .as_ref()
+                    .is_some_and(|scope| scope.push.is_some() || !scope.set.is_empty())
+            {
+                let target = next
+                    .current
+                    .first()
+                    .map_or_else(|| "any".into(), scope_name);
+                scopes.push(format!("- `{word}` enters `{target}`"));
+            }
+        }
+        if !key
+            && matches!(field.value, rules::ir::FieldValue::Scalar(matcher)
+            if matches!(ir.matcher(matcher), rules::ir::Matcher::Path(_)))
+        {
+            let value = hir
+                .properties()
+                .iter()
+                .filter_map(|property| property.scalar.as_ref())
+                .find(|scalar| contains(scalar.range, position))
+                .map_or(word, |scalar| scalar.value.as_str());
+            model.push_section(texture_resolution_section(snapshot, value));
         }
     }
-    if families.is_empty() {
-        return None;
+    if !key
+        && let Some(scalar) = hir
+            .properties()
+            .iter()
+            .filter_map(|property| property.scalar.as_ref())
+            .find(|scalar| contains(scalar.range, position))
+        && !fields.iter().any(|id| match ir.field(*id).value {
+            rules::ir::FieldValue::Scalar(matcher) => match state {
+                Some(state) => crate::ir_semantic::matcher_matches_with_state(
+                    snapshot,
+                    ir,
+                    matcher,
+                    &scalar.value,
+                    &crate::ir_queries::SnapshotSymbolFacts { snapshot },
+                    state,
+                ),
+                None => crate::ir_semantic::matcher_matches_in_snapshot(
+                    snapshot,
+                    ir,
+                    matcher,
+                    &scalar.value,
+                    &crate::ir_queries::SnapshotSymbolFacts { snapshot },
+                ),
+            },
+            _ => true,
+        })
+    {
+        model.push_section("The current value does not match an allowed value type.".into());
     }
-    Some(format!(
-        "- matched by first-party rules as {}",
-        families.into_iter().collect::<Vec<_>>().join(" / ")
-    ))
+    values.sort_by(|left, right| left.0.cmp(&right.0));
+    values.dedup();
+    let count = values.len();
+    let lines = values
+        .into_iter()
+        .map(|(value, allowed, available)| {
+            let scopes = allowed.filter(|scopes| !scopes.is_empty()).map(|scopes| {
+                scopes
+                    .iter()
+                    .map(|scope| code_span(ir.strings().resolve(*scope)))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            });
+            match scopes {
+                Some(scopes) if !available => format!(
+                    "- {value}; unavailable in current scope `{}`; valid scopes: {scopes}",
+                    current.map_or_else(|| "any".into(), scope_name)
+                ),
+                Some(scopes) => format!("- value: {value}\n- valid scopes: {scopes}"),
+                None => format!("- value: {value}"),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    model.sections.insert(
+        0,
+        if count > 1 {
+            format!("#### Allowed value types ({count})\n\n{lines}")
+        } else {
+            lines
+        },
+    );
+    documents.sort();
+    documents.dedup();
+    for document in documents {
+        let document = document.lines().collect::<Vec<_>>().join("  \n");
+        model.push_section(format!("#### Documentation\n\n{document}"));
+    }
+    if let Some(current) = current {
+        let here = scope_name(current);
+        if here != "any" || !scopes.is_empty() {
+            scopes.sort();
+            scopes.dedup();
+            model.push_section(format!(
+                "#### Scope\n\n- here: `{here}`{}",
+                if scopes.is_empty() {
+                    String::new()
+                } else {
+                    format!("\n{}", scopes.join("\n"))
+                }
+            ));
+        }
+    }
+    Ok(Some(model))
 }

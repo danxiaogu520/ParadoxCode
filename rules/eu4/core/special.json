@@ -1,0 +1,1070 @@
+{
+  "mixins": {
+    "keys__modifier_rule": {
+      "fields": {
+        "modifier": {
+          "body": "modifier_rule__modifier",
+          "card": "0..*"
+        }
+      }
+    }
+  },
+  "schemas": {
+    "ability": {
+      "fields": {
+        "auto_explore_adjacent_to_colony": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "can_fabricate_for_vassals": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "cb_on_overseas": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "cb_on_primitives": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "cb_on_religious_enemies": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "idea_claim_colonies": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "may_convert_territories": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "may_establish_frontier": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "may_explore": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "may_not_reduce_inflation": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "may_perform_slave_raid": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "may_perform_slave_raid_on_same_religion": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "may_recruit_female_generals": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "no_religion_penalty": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "reduced_stab_impacts": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "sea_repair": {
+          "card": "0..1",
+          "value": "'yes'"
+        }
+      }
+    },
+    "alert_definition": {
+      "fields": {
+        "category": {
+          "card": "1",
+          "doc": "Alert severity: HIGH, MEDIUM, LOW, or DISABLED.",
+          "value": "enum<alert_level>"
+        }
+      }
+    },
+    "alerts_definitions": {
+      "patterns": [
+        {
+          "body": "alert_definition",
+          "card": "0..*",
+          "key": "scalar"
+        }
+      ]
+    },
+    "alerts_icon": {
+      "patterns": [
+        {
+          "card": "0..1",
+          "key": "enum<alert_level>",
+          "value": "scalar"
+        }
+      ]
+    },
+    "alerts_sound": {
+      "patterns": [
+        {
+          "card": "0..1",
+          "key": "enum<alert_level>",
+          "value": "scalar"
+        }
+      ]
+    },
+    "flagship_modifier": {
+      "fields": {
+        "admiral_skill_gain_modifier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "barrage_cost_in_fleet_modifier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "blockade_impact_on_siege_in_fleet_modifier": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "cannons_for_hunting_pirates_in_fleet": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "exploration_mission_range_in_fleet_modifier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "flagship_durability": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "flagship_morale": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "flagship_naval_engagement_modifier": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "landing_penalty": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "morale_in_fleet_modifier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "movement_speed_in_fleet_modifier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "movement_speed_onto_off_boat_modifier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "naval_attrition_in_fleet_modifier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "naval_maintenance_flagship_modifier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "naval_tradition_in_fleet_modifier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "number_of_cannons_flagship_modifier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "prestige_from_battles_in_fleet_modifier": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "privateering_efficiency_in_fleet_modifier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "trade_power_in_fleet_modifier": {
+          "card": "0..1",
+          "value": "float"
+        }
+      }
+    },
+    "imperial_incident_option": {
+      "fields": {
+        "factor": {
+          "card": "0..1",
+          "value": "float[-10000.0..10000.0]"
+        },
+        "modifier": {
+          "body": "imperial_incident_option_modifier",
+          "card": "0..*",
+          "doc": "Conditional weighting block for an imperial incident option."
+        }
+      },
+      "include": [
+        "keys__trigger"
+      ],
+      "patterns": [
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the country tags listed /Europa Universalis IV/common/country_tags",
+          "key": "ref<country_tag>",
+          "scope": {
+            "push": "country"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has hired an advisor of the specified type which has at least level X.",
+          "key": "ref<advisor_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[1..5]"
+        },
+        {
+          "body": "trigger__area_used",
+          "card": "0..*",
+          "doc": "Refers to the areas listed /Europa Universalis IV/map/areas.txt",
+          "key": "ref<area.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X buildings from the specified building type.",
+          "key": "ref<building>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__colonial_region",
+          "card": "0..*",
+          "doc": "Refers to any colonial region found in /Europa Universalis IV/common/colonial_regions/",
+          "key": "ref<colonial_region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__continent",
+          "card": "0..*",
+          "doc": "Refers to any continent found in /Europa Universalis IV/map/continent.txt",
+          "key": "ref<continent>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X ideas from the specified idea group.",
+          "key": "ref<idea_group>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[0..8]"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the support for the specified institution in the province is at least X.",
+          "key": "ref<institution>",
+          "scope": {
+            "in": [
+              "province"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "body": "trigger__province_group_used",
+          "card": "0..*",
+          "doc": "Refers to the province_group listed /Europa Universalis IV/map/provincegroup.txt",
+          "key": "ref<province_group.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<province_id>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__region",
+          "card": "0..*",
+          "doc": "Refers to any region found in /Europa Universalis IV/map/region.txt",
+          "key": "ref<region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has a tolerance of at least X of the specified religion. Note: No correct localisation.",
+          "key": "ref<religion>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "card": "0..*",
+          "key": "ref<scripted_trigger>",
+          "value": "bool"
+        },
+        {
+          "body": "trigger__scripted_trigger",
+          "card": "0..*",
+          "key": "ref<scripted_trigger>"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X vassals.",
+          "key": "ref<subject_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__superregion",
+          "card": "0..*",
+          "doc": "Refers to any superregion found in /Europa Universalis IV/map/superregion.txt",
+          "key": "ref<superregion>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__trade_company",
+          "card": "0..*",
+          "doc": "Refers to any trade company found in /Europa Universalis IV/common/trade_companies//",
+          "key": "ref<trade_company>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X provinces producing the specified trade good.",
+          "key": "ref<trade_good>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Scopes to the province, which is also a trade node (defined in common/tradenodes)",
+          "key": "ref<trade_node>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "key": "link"
+        }
+      ]
+    },
+    "imperial_incident_option_modifier": {
+      "fields": {
+        "factor": {
+          "card": "0..1",
+          "doc": "Weight multiplier inside an imperial incident option modifier.",
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__trigger"
+      ],
+      "patterns": [
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the country tags listed /Europa Universalis IV/common/country_tags",
+          "key": "ref<country_tag>",
+          "scope": {
+            "push": "country"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has hired an advisor of the specified type which has at least level X.",
+          "key": "ref<advisor_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[1..5]"
+        },
+        {
+          "body": "trigger__area_used",
+          "card": "0..*",
+          "doc": "Refers to the areas listed /Europa Universalis IV/map/areas.txt",
+          "key": "ref<area.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X buildings from the specified building type.",
+          "key": "ref<building>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__colonial_region",
+          "card": "0..*",
+          "doc": "Refers to any colonial region found in /Europa Universalis IV/common/colonial_regions/",
+          "key": "ref<colonial_region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__continent",
+          "card": "0..*",
+          "doc": "Refers to any continent found in /Europa Universalis IV/map/continent.txt",
+          "key": "ref<continent>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X ideas from the specified idea group.",
+          "key": "ref<idea_group>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[0..8]"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the support for the specified institution in the province is at least X.",
+          "key": "ref<institution>",
+          "scope": {
+            "in": [
+              "province"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "body": "trigger__province_group_used",
+          "card": "0..*",
+          "doc": "Refers to the province_group listed /Europa Universalis IV/map/provincegroup.txt",
+          "key": "ref<province_group.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<province_id>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__region",
+          "card": "0..*",
+          "doc": "Refers to any region found in /Europa Universalis IV/map/region.txt",
+          "key": "ref<region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has a tolerance of at least X of the specified religion. Note: No correct localisation.",
+          "key": "ref<religion>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "card": "0..*",
+          "key": "ref<scripted_trigger>",
+          "value": "bool"
+        },
+        {
+          "body": "trigger__scripted_trigger",
+          "card": "0..*",
+          "key": "ref<scripted_trigger>"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X vassals.",
+          "key": "ref<subject_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__superregion",
+          "card": "0..*",
+          "doc": "Refers to any superregion found in /Europa Universalis IV/map/superregion.txt",
+          "key": "ref<superregion>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__trade_company",
+          "card": "0..*",
+          "doc": "Refers to any trade company found in /Europa Universalis IV/common/trade_companies//",
+          "key": "ref<trade_company>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X provinces producing the specified trade good.",
+          "key": "ref<trade_good>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Scopes to the province, which is also a trade node (defined in common/tradenodes)",
+          "key": "ref<trade_node>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "key": "link"
+        }
+      ]
+    },
+    "modifier_rule": {
+      "fields": {
+        "modifier": {
+          "body": "modifier_rule__modifier",
+          "card": "0..*"
+        }
+      }
+    },
+    "modifier_rule__modifier": {
+      "fields": {
+        "AND": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "AND"
+          },
+          "doc": "Evaluates to true when every trigger inside the block is true.",
+          "override": true
+        },
+        "NOT": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "NOT"
+          },
+          "doc": "Evaluates to true when the trigger inside the block is false.",
+          "override": true
+        },
+        "OR": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "OR"
+          },
+          "doc": "Evaluates to true when at least one trigger inside the block is true.",
+          "override": true
+        },
+        "else": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "branch_continue"
+          },
+          "doc": "Follows if/else_if; executes when no previous branch ran.",
+          "override": true
+        },
+        "exclude_from_progress": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Excludes the triggers inside for the trigger counter in the UI, used in Age Objeciives.",
+          "override": true
+        },
+        "factor": {
+          "card": "1",
+          "override": true,
+          "value": "float"
+        },
+        "hidden_trigger": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Hides the enclosed conditions so that they are still required but cannot be seen by human players.",
+          "override": true
+        },
+        "scope_field": {
+          "body": "trigger",
+          "card": "0..*",
+          "override": true
+        },
+        "this": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Switches the block's scope to the current scope; block contents are triggers.",
+          "override": true
+        }
+      },
+      "include": [
+        "keys__trigger"
+      ],
+      "patterns": [
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the country tags listed /Europa Universalis IV/common/country_tags",
+          "key": "ref<country_tag>",
+          "scope": {
+            "push": "country"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has hired an advisor of the specified type which has at least level X.",
+          "key": "ref<advisor_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[1..5]"
+        },
+        {
+          "body": "trigger__area_used",
+          "card": "0..*",
+          "doc": "Refers to the areas listed /Europa Universalis IV/map/areas.txt",
+          "key": "ref<area.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X buildings from the specified building type.",
+          "key": "ref<building>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__colonial_region",
+          "card": "0..*",
+          "doc": "Refers to any colonial region found in /Europa Universalis IV/common/colonial_regions/",
+          "key": "ref<colonial_region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__continent",
+          "card": "0..*",
+          "doc": "Refers to any continent found in /Europa Universalis IV/map/continent.txt",
+          "key": "ref<continent>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X ideas from the specified idea group.",
+          "key": "ref<idea_group>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[0..8]"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the support for the specified institution in the province is at least X.",
+          "key": "ref<institution>",
+          "scope": {
+            "in": [
+              "province"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "body": "trigger__province_group_used",
+          "card": "0..*",
+          "doc": "Refers to the province_group listed /Europa Universalis IV/map/provincegroup.txt",
+          "key": "ref<province_group.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<province_id>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__region",
+          "card": "0..*",
+          "doc": "Refers to any region found in /Europa Universalis IV/map/region.txt",
+          "key": "ref<region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has a tolerance of at least X of the specified religion. Note: No correct localisation.",
+          "key": "ref<religion>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "card": "0..*",
+          "key": "ref<scripted_trigger>",
+          "value": "bool"
+        },
+        {
+          "body": "trigger__scripted_trigger",
+          "card": "0..*",
+          "key": "ref<scripted_trigger>"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X vassals.",
+          "key": "ref<subject_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__superregion",
+          "card": "0..*",
+          "doc": "Refers to any superregion found in /Europa Universalis IV/map/superregion.txt",
+          "key": "ref<superregion>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__trade_company",
+          "card": "0..*",
+          "doc": "Refers to any trade company found in /Europa Universalis IV/common/trade_companies//",
+          "key": "ref<trade_company>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X provinces producing the specified trade good.",
+          "key": "ref<trade_good>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Scopes to the province, which is also a trade node (defined in common/tradenodes)",
+          "key": "ref<trade_node>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "key": "link"
+        }
+      ]
+    },
+    "personality_modifier": {
+      "fields": {
+        "alliance_acceptance": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "building_budget_multiplier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "different_religion_war_multiplier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "easy_war_chance_multiplier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "enemy_strength_multiplier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "fair_fights": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "gift_chance": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "heathen_ally_acceptance": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "heretic_ally_acceptance": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "knowledge_sharing": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "lower_autonomy": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "other_ai_help_us_multiplier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "other_ai_peace_term_bonus": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "other_ai_war_chance_multiplier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "peace_desire": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "random_insults": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "random_troop_moves": {
+          "card": "0..1",
+          "doc": "\"Often indistinguishable from a bug\"",
+          "value": "'yes'"
+        },
+        "razing": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "royal_marriage_acceptance": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "send_warning_desire": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "trade_league_acceptance": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "underestimate_ae": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_avoid_debase": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_avoid_loans": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_avoid_ugly_borders": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_betray_allies": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_colonies": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_condottieri": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_debase": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_disclose_attack": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_ecumenical_council": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_excommunicate": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_explorers": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_gold": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_heathen_land": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_heretic_land": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_land": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_loans": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_sell_provinces": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_threaten_war": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "wants_to_appoint_cardinals_in_his_own_land": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "war_chance_multiplier": {
+          "card": "0..1",
+          "value": "float"
+        }
+      }
+    },
+    "units_display_entry": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base display factor for a unit type or modifier.",
+          "value": "scalar"
+        },
+        "modifier": {
+          "body": "units_display_modifier",
+          "card": "0..*"
+        }
+      }
+    },
+    "units_display_modifier": {
+      "fields": {
+        "OR": {
+          "body": "trigger",
+          "card": "0..1",
+          "control": {
+            "kind": "logic",
+            "op": "OR"
+          }
+        },
+        "factor": {
+          "card": "1",
+          "value": "scalar"
+        }
+      },
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Unit display modifiers may use arbitrary trigger clauses.",
+          "key": "scalar",
+          "value": "scalar"
+        }
+      ]
+    }
+  }
+}

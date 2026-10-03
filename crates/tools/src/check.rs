@@ -327,7 +327,7 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     }
 
     // Rule source metadata.
-    let rules_manifest = root.join("rules/eu4/manifest.json");
+    let rules_manifest = root.join("rules/eu4/game.json");
     if rules_manifest.is_file()
         && let Ok(text) = fs::read_to_string(&rules_manifest)
         && let Ok(manifest) = serde_json::from_str::<serde_json::Value>(&text)
@@ -551,110 +551,42 @@ pub fn check_editor_syntax_parity(root: &Path) -> Vec<CheckResult> {
     results
 }
 
-/// Validates first-party source compilation and the generated rule manifest.
+/// Validates checked IR baking and reproducibility of the active package.
 pub fn check_release_artifact(root: &Path) -> Vec<CheckResult> {
-    let mut results = Vec::new();
-    let source_path = root.join("rules/eu4");
-    let manifest_path = root.join("rules/manifest.json");
+    check_ir_artifact(root)
+}
 
-    results.push(check(
-        source_path.is_dir(),
-        "rules source",
-        "rules/eu4 source directory is missing",
-    ));
-    if !source_path.is_dir() || !manifest_path.is_file() {
-        results.push(CheckResult::fail(
-            "rules manifest",
-            "rules/manifest.json or rules/eu4 is missing",
-        ));
-        return results;
-    }
-
-    let Ok(manifest_text) = fs::read_to_string(&manifest_path) else {
-        results.push(CheckResult::fail(
-            "rules manifest",
-            "cannot read rules/manifest.json",
-        ));
-        return results;
-    };
-    let Ok(expected_manifest) =
-        serde_json::from_str::<rules::rulec::ArtifactManifest>(&manifest_text)
-    else {
-        results.push(CheckResult::fail(
-            "rules manifest",
-            "invalid rules/manifest.json",
-        ));
-        return results;
-    };
-
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or_default();
-    let temporary_directory = std::env::temp_dir().join(format!(
-        "paradoxcode-release-rules-{}-{nonce}",
-        std::process::id()
-    ));
-    if let Err(error) = fs::create_dir_all(&temporary_directory) {
-        results.push(CheckResult::fail(
-            "rules source compilation",
-            format!("cannot create temporary validation directory: {error}"),
-        ));
-        return results;
-    }
-    let generated_manifest_path = temporary_directory.join("manifest.json");
-    match rules::rulec::compile(&source_path, &generated_manifest_path) {
-        Ok(generated_manifest) => {
-            results.push(CheckResult::pass("rules source compilation"));
-            results.push(check(
-                generated_manifest == expected_manifest,
-                "rules manifest reproducibility",
-                format!(
-                    "generated rule manifest differs from rules/manifest.json: generated hash {}",
-                    generated_manifest.rule_hash
-                ),
-            ));
-            match game::eu4::first_party_rules() {
-                Ok(embedded) => {
-                    let (_, source_model) = match rules::rulec::load_source(&source_path) {
-                        Ok(loaded) => loaded,
-                        Err(error) => {
-                            results.push(CheckResult::fail(
-                                "embedded rules validation",
-                                error.to_string(),
-                            ));
-                            let _ = fs::remove_dir_all(&temporary_directory);
-                            return results;
-                        }
-                    };
-                    let source_rules = rules::RuleSet::from_model(source_model);
-                    results.push(check(
-                        embedded == source_rules,
-                        "embedded rules match source",
-                        "embedded first-party JSON bundle differs from the compiled source",
-                    ));
-                    results.push(check(
-                        source_rules.game_id() == generated_manifest.game_id
-                            && source_rules.game_id() == "eu4",
-                        "rules game_id",
-                        format!("game/profile mismatch: {} vs eu4", source_rules.game_id()),
-                    ));
-                }
-                Err(error) => results.push(CheckResult::fail(
-                    "embedded rules validation",
-                    error.to_string(),
-                )),
-            }
+/// Validates the checked IR manifest against source and the build-time payload.
+fn check_ir_artifact(root: &Path) -> Vec<CheckResult> {
+    let expected = fs::read(root.join("rules/ir-manifest.json"))
+        .map_err(|error| error.to_string())
+        .and_then(|bytes| {
+            serde_json::from_slice::<rules::bake::ArtifactManifest>(&bytes)
+                .map_err(|error| error.to_string())
+        });
+    let generated = rules::bake::compile(&root.join("rules/eu4"));
+    let (expected, generated) = match (expected, generated) {
+        (Ok(expected), Ok(generated)) => (expected, generated),
+        (Err(error), _) | (_, Err(error)) => {
+            return vec![CheckResult::fail("checked IR source compilation", error)];
         }
-        Err(error) => {
-            results.push(CheckResult::fail(
-                "rules source compilation",
-                error.to_string(),
-            ));
-        }
+    };
+    let mut results = vec![check(
+        generated.manifest == expected,
+        "IR manifest reproducibility",
+        "rules/ir-manifest.json differs from the checked source",
+    )];
+    match game::eu4::first_party_ir() {
+        Ok(embedded) => results.push(check(
+            embedded.fingerprint() == generated.manifest.rule_hash,
+            "embedded IR matches checked source",
+            "the build-time embedded IR differs from the checked source",
+        )),
+        Err(error) => results.push(CheckResult::fail(
+            "embedded IR matches checked source",
+            error.to_string(),
+        )),
     }
-    let _ = fs::remove_dir_all(&temporary_directory);
-
     results
 }
 

@@ -1,0 +1,49 @@
+{
+  "schemas": {
+    "center_of_revolution_conversion_body": {
+      "fields": {
+        "revolution_province_modifiers": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Values at 100 Absolutism",
+          "scope": {
+            "push": "province"
+          }
+        },
+        "target_province_weights": {
+          "body": "center_of_revolution_conversion_body__target_province_weights",
+          "card": "1",
+          "doc": "FROM = center of revolution",
+          "scope": {
+            "set": {
+              "from": "province",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "zeal_modifiers": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Values at 100 Revolutionary Zeal",
+          "scope": {
+            "push": "country"
+          }
+        }
+      }
+    },
+    "center_of_revolution_conversion_body__target_province_weights": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    }
+  }
+}

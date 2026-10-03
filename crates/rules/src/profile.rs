@@ -1,6 +1,63 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+/// Facts for the supported mission view; capability presence is explicit, independent of game id.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileMissionViewSpec {
+    /// Logical paths served by this view.
+    pub path: ProfileTextMatcher,
+    /// Node symbol namespace for workspace references and localisation bindings.
+    pub symbol_kind: String,
+    /// Tree-level field spellings.
+    pub tree_fields: ProfileMissionTreeFields,
+    /// Node-level field spellings.
+    pub node_fields: ProfileMissionNodeFields,
+    /// Stable tree field role order used when writing a tree.
+    pub tree_field_order: Vec<String>,
+    /// Stable node field role order used when writing a node.
+    pub node_field_order: Vec<String>,
+}
+/// Field spellings for a mission view, declared by its game package.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileMissionTreeFields {
+    /// Script key for this field role.
+    pub slot: String,
+    /// Script key for this field role.
+    pub generic: String,
+    /// Script key for this field role.
+    pub ai: String,
+    /// Script key for this field role.
+    pub has_country_shield: String,
+    /// Script key for this field role.
+    pub potential: String,
+    /// Script key for this field role.
+    pub potential_on_load: String,
+}
+/// Field spellings for a mission view, declared by its game package.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileMissionNodeFields {
+    /// Script key for this field role.
+    pub icon: String,
+    /// Script key for this field role.
+    #[serde(rename = "type")]
+    pub node_type: String,
+    /// Script key for this field role.
+    pub provinces_to_highlight: String,
+    /// Script key for this field role.
+    pub required_missions: String,
+    /// Script key for this field role.
+    pub position: String,
+    /// Script key for this field role.
+    pub completed_by: String,
+    /// Script key for this field role.
+    pub trigger: String,
+    /// Script key for this field role.
+    pub effect: String,
+}
+
 /// Text encoding policy selected by a game profile for source files.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -301,12 +358,44 @@ pub struct ProfileHoverCardSpec {
     pub sprite_probes: BTreeMap<String, String>,
 }
 
+/// Installation recognition facts; platform discovery itself remains game independent.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileInstallSpec {
+    /// Human-readable installation name.
+    pub display_name: String,
+    /// Executable markers relative to an installation root.
+    pub executable_paths: ProfileExecutablePaths,
+    /// Directories required below an installation root.
+    pub validation_directories: Vec<String>,
+    /// Directory names used by launcher and common-location discovery.
+    pub installation_directory_names: Vec<String>,
+    /// Optional Steam application identity.
+    #[serde(default)]
+    pub steam_app_id: Option<u32>,
+}
+
+/// Executable markers for each supported discovery platform.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileExecutablePaths {
+    /// Windows executable markers.
+    pub windows: Vec<String>,
+    /// Linux executable markers.
+    pub linux: Vec<String>,
+    /// macOS executable markers.
+    pub macos: Vec<String>,
+}
+
 /// Data-only game-specific interpretation selected by the composition root.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct GameProfile {
     /// Stable identity shared with the selected rules artifact.
     pub game_id: String,
+    /// Installation recognition data, independent of script-language semantics.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub install: Option<ProfileInstallSpec>,
     /// Source text encoding policy used before parser input is materialized.
     pub source_encoding: SourceEncoding,
     /// Logical directory whitelist used for source-root discovery.
@@ -446,6 +535,9 @@ pub struct GameProfile {
     /// never drift apart. An empty map keeps hover cards out entirely.
     #[serde(default)]
     pub hover_cards: BTreeMap<String, ProfileHoverCardSpec>,
+    /// Optional mission-view capability and its game facts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mission_view: Option<ProfileMissionViewSpec>,
 }
 
 /// Exact-key lookup accelerator over a game profile's ordered rule lists.
@@ -610,6 +702,7 @@ impl GameProfile {
     pub fn empty(game_id: impl Into<String>) -> Self {
         Self {
             game_id: game_id.into(),
+            install: None,
             source_encoding: SourceEncoding::Utf8,
             key_index: std::sync::OnceLock::new(),
             scan_roots: Vec::new(),
@@ -647,6 +740,7 @@ impl GameProfile {
             enum_extra_members: BTreeMap::new(),
             root_entry_specs: BTreeMap::new(),
             hover_cards: BTreeMap::new(),
+            mission_view: None,
         }
     }
 

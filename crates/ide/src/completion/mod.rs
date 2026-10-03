@@ -2,20 +2,11 @@ use crate::support::*;
 use crate::types::*;
 use engine::{AnalysisSnapshot, DocumentId};
 use parser::FileFormat;
-use parser::encode_quoted_script_text;
 use text::{TextRange, TextSize};
 
-mod candidates;
-mod context;
-mod dynamic_constraints;
+mod ir;
 mod support;
 
-pub(crate) use candidates::*;
-pub(crate) use context::*;
-pub(crate) use dynamic_constraints::{
-    HoverCaller, ReplayedSites, dynamic_parameter_owner, infer_dynamic_quoted_payload_sites,
-    infer_dynamic_quoted_script_constraints, replay_parameter_sites_for_hover,
-};
 pub(crate) use support::*;
 
 /// Computes key, value, localisation, and symbol completion.
@@ -62,122 +53,8 @@ pub fn complete_with_cancellation(
             items,
         });
     }
-    let replacement_range = word_range(&input.source, position);
-    let prefix = input
-        .source_text(replacement_range)
-        .unwrap_or_default()
-        .to_owned();
-    let default_value_context = completion_value_context(&input, position);
-    let mut items = Vec::<RankedCompletionItem>::new();
-    let mut member_cache = CompletionMemberCache::default();
-    let semantic_context =
-        semantic_completion_context_with_cancellation(snapshot, &input, position, cancellation)?;
-    // Texture paths contain slashes, which the word-range prefix cannot span;
-    // a dedicated entry point replaces from the scalar's opening quote.
-    if let Some(context) = semantic_context.as_ref()
-        && let Some(items) =
-            texture_path_completion(snapshot, &input, position, context, cancellation)?
-    {
-        return Ok(CompletionResult {
-            revision: snapshot.revision(),
-            items,
-        });
-    }
-    let value_context = if semantic_context
-        .as_ref()
-        .is_some_and(|context| semantic_root_entry_uses_bare_values(snapshot, context))
-    {
-        false
-    } else if semantic_context.as_ref().is_some_and(|context| {
-        context.property.is_none() && context.embedded_value_context.is_none()
-    }) {
-        // The value branch below requires a property; without one it is a no-op, so the
-        // line heuristic can only misfire here (a single-line block's last `=` sits after
-        // its `{` even when the cursor starts a new statement).
-        false
-    } else {
-        semantic_context
-            .as_ref()
-            .and_then(|context| context.embedded_value_context)
-            .unwrap_or(default_value_context)
-    };
-    if let Some(context) = semantic_context.as_ref() {
-        cancellation.checkpoint()?;
-        if value_context {
-            if let Some(property) = context.property.as_ref() {
-                let inferred = add_inferred_dynamic_value_items(InferredDynamicCompletionInput {
-                    snapshot,
-                    context,
-                    property,
-                    member_cache: &mut member_cache,
-                    items: &mut items,
-                    replacement_range,
-                    prefix: &prefix,
-                    cancellation,
-                })?;
-                if !inferred {
-                    add_semantic_value_items(
-                        snapshot,
-                        context,
-                        property,
-                        &mut member_cache,
-                        &mut items,
-                        replacement_range,
-                        &prefix,
-                        cancellation,
-                    )?;
-                }
-            }
-        } else {
-            let insert_assignment = context
-                .property
-                .as_ref()
-                .is_none_or(|property| property.operator.is_none());
-            // A type-instance wrapper such as `country_decisions = { … }` accepts only
-            // free-form instance names; the wrapped type's keys must not be offered there.
-            // A wrapper with a closed instance-key vocabulary (spriteTypes accepting
-            // spriteType and siblings) completes that vocabulary instead.
-            if !context.wrapper_container {
-                add_semantic_key_items_ranked(
-                    snapshot,
-                    context,
-                    &mut member_cache,
-                    &mut items,
-                    replacement_range,
-                    &prefix,
-                    insert_assignment,
-                    cancellation,
-                )?;
-            } else if let Some(wrapper_keys) =
-                closed_wrapper_key_completion_context(snapshot, context)
-            {
-                add_semantic_key_items_ranked(
-                    snapshot,
-                    &wrapper_keys,
-                    &mut member_cache,
-                    &mut items,
-                    replacement_range,
-                    &prefix,
-                    insert_assignment,
-                    cancellation,
-                )?;
-            }
-        }
-    } else if !value_context {
-        // No rule-backed container covers the cursor and no file-root entry context exists
-        // (for example an empty missions file, whose root series names are free-form).
-    } else {
-        // A bare `key = ` at the document root with no entry context: nothing to offer.
-    }
-    let mut items = finalize_completion_items(items);
-    if let Some(context) = semantic_context.as_ref() {
-        for _ in 0..context.quoted_depth {
-            for item in &mut items {
-                item.insert_text = encode_quoted_script_text(&item.insert_text);
-            }
-        }
-    }
-    cancellation.checkpoint()?;
+    let items =
+        ir::try_ir_completion(snapshot, &input, position, cancellation)?.unwrap_or_default();
     Ok(CompletionResult {
         revision: snapshot.revision(),
         items,
@@ -272,30 +149,19 @@ pub fn completion(
     complete(snapshot, document, position)
 }
 
-/// Re-derives the documentation for a completion item that carries `resolve_data` without
-/// re-running the completion query. Items without `resolve_data` resolve to themselves.
+/// Resolves documentation from the active compiled field.
 #[must_use]
 pub fn completion_resolve(snapshot: &AnalysisSnapshot, item: &CompletionItem) -> CompletionItem {
-    let Some(id) = item
+    let mut resolved = item.clone();
+    if let Some(index) = item
         .resolve_data
         .as_deref()
-        .and_then(|data| data.strip_prefix("rule:"))
-    else {
-        return item.clone();
-    };
-    let Some(rule) = snapshot
-        .rules()
-        .model()
-        .semantic
-        .rules
-        .iter()
-        .find(|rule| rule.id == id)
-    else {
-        return item.clone();
-    };
-    let mut resolved = item.clone();
-    if !rule.documentation.is_empty() {
-        resolved.documentation = Some(rule.documentation.join("\n"));
+        .and_then(|s| s.strip_prefix("ir-field:"))
+        .and_then(|s| s.parse::<usize>().ok())
+        && let Some(field) = snapshot.ir().fields.get(index)
+        && let Some(doc) = field.doc
+    {
+        resolved.documentation = Some(snapshot.ir().strings().resolve(doc).to_owned());
     }
     resolved
 }

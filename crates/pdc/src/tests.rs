@@ -22,3 +22,5 @@ mod request_adapter;
 mod transcode_requests;
 mod transport_lifecycle;
 mod workspace_vanilla;
+
+mod ir_runtime;

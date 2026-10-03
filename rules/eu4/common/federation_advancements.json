@@ -1,0 +1,212 @@
+{
+  "schemas": {
+    "federation_advancements_body": {
+      "fields": {
+        "ai_chance": {
+          "body": "federation_advancements_body__ai_chance",
+          "card": "1",
+          "doc": "AI weighting block for options: factor = base relative weight."
+        },
+        "can_pick": {
+          "body": "trigger",
+          "card": "1"
+        },
+        "effect": {
+          "body": "federation_advancements_body__effect",
+          "card": "0..1",
+          "doc": "Block of effects executed by the containing entry."
+        },
+        "gfx": {
+          "card": "1",
+          "value": "ref<sprite>"
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "0..1",
+          "doc": "Block of modifiers applied while the containing entry is active.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        }
+      }
+    },
+    "federation_advancements_body__ai_chance": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "value": "int"
+        }
+      }
+    },
+    "federation_advancements_body__effect": {
+      "fields": {
+        "custom_tooltip": {
+          "card": "0..1",
+          "override": true,
+          "value": "loc"
+        },
+        "else": {
+          "body": "effect",
+          "card": "0..*",
+          "control": {
+            "kind": "branch_continue"
+          },
+          "doc": "Follows if/else_if; executes when no previous branch ran.",
+          "override": true
+        },
+        "hidden_effect": {
+          "body": "effect",
+          "card": "0..*",
+          "control": {
+            "kind": "transparent"
+          },
+          "doc": "Hides the enclosed effects from appearing as tooltips",
+          "override": true
+        },
+        "scope_field": {
+          "body": "effect",
+          "card": "0..*",
+          "override": true
+        },
+        "this": {
+          "body": "effect",
+          "card": "0..*",
+          "doc": "Switches the block's scope to the current scope; block contents are effects.",
+          "override": true
+        }
+      },
+      "include": [
+        "keys__effect"
+      ],
+      "patterns": [
+        {
+          "body": "effect",
+          "card": "0..*",
+          "doc": "Refers to the country tags listed /Europa Universalis IV/common/country_tags",
+          "key": "ref<country_tag>",
+          "scope": {
+            "push": "country"
+          }
+        },
+        {
+          "body": "effect__area_used",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<area.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect__colonial_region",
+          "card": "0..*",
+          "doc": "Refers to any colonial region found in /Europa Universalis IV/common/colonial_regions/",
+          "key": "ref<colonial_region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect__continent",
+          "card": "0..*",
+          "doc": "Refers to any continent found in /Europa Universalis IV/map/continent.txt",
+          "key": "ref<continent>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect__province_group_used",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<province_group.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<province_id>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Spawns the defined rebel type in the current province scope. Rebel types found in /Europa Universalis IV/common/rebel_types/*.txt.",
+          "key": "ref<rebel_type>",
+          "scope": {
+            "in": [
+              "province"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "effect__region",
+          "card": "0..*",
+          "doc": "Refers to any region found in /Europa Universalis IV/map/region.txt",
+          "key": "ref<region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "key": "ref<scripted_effect>",
+          "value": "'yes'"
+        },
+        {
+          "body": "effect__scripted_effect",
+          "card": "0..*",
+          "doc": "The scripted effect will draw the value of the right clause via $left_clause$.",
+          "key": "ref<scripted_effect>"
+        },
+        {
+          "body": "effect__superregion",
+          "card": "0..*",
+          "doc": "Refers to any superregion found in /Europa Universalis IV/map/superregion.txt",
+          "key": "ref<superregion>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect__trade_company",
+          "card": "0..*",
+          "doc": "Refers to any trade company found in /Europa Universalis IV/common/trade_companies/",
+          "key": "ref<trade_company>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "effect",
+          "card": "0..*",
+          "doc": "Scopes to the province, which is also a trade node (defined in common/tradenodes)",
+          "key": "ref<trade_node>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "In country scope, spawns a specific unit (e.g. \"british_redcoat\") for the current scope in the defined province scope. In province scope, spawns a specific unit in the current province scope for the defined country scope. Units can be found in /Europa Universalis IV/common/units/*.txt.",
+          "key": "ref<unit_type>",
+          "value": "scope<province> | ref<province_id> | scope<country> | ref<country_tag>"
+        },
+        {
+          "body": "effect",
+          "card": "0..*",
+          "key": "link"
+        }
+      ]
+    }
+  }
+}

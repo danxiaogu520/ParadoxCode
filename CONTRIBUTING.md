@@ -26,7 +26,7 @@ LSP layer, or editor extensions.
 
 ## Prerequisites
 
-- Rust **1.98 or newer** (see `.github/workflows/ci.yml` for the enforced MSRV).
+- Rust **1.88 or newer** (see `.github/workflows/ci.yml` for the enforced MSRV).
 - Node.js **24 LTS** for the VS Code extension.
 - Git. There are no commit hooks. Run focused checks while developing and the affected local gate
   groups before pushing. CI owns clean-checkout platform, MSRV, dependency-policy, typo, and
@@ -66,22 +66,15 @@ build runs in parallel with Windows tests and clippy. Branch protection requires
 `Conclusion` aggregate rather than every individual job. External advisory databases and optimized
 benchmarks are scheduled audits rather than unrelated-PR blockers.
 
-Validate the first-party EU4 rule source and regenerate its release manifest with `bake`:
+Validate the first-party EU4 rule source and regenerate its IR manifest:
 
 ```bash
-cargo run -p rules --bin bake -- build \
+cargo run -p rules --bin bake-ir -- build \
   --source rules/eu4 \
-  --manifest rules/manifest.json
+  --manifest rules/ir-manifest.json
 ```
 
-Cross-check scripted flag names against a real game installation with `flag-audit`: it
-derives the flag key table from the rule sources (`--source`), parses every script file
-under the game directory (`--game`), and reports written/read/engine-seeded flags — the
-inputs behind the unknown-flag diagnostic:
-
-```bash
-cargo run -p rules --bin flag-audit -- --source rules/eu4 --game /path/to/eu4
-```
+Compilation checks run before either output is written; invalid sources cannot replace a valid artifact.
 
 A whole-Project diagnostic pass against a local Vanilla index is available through
 `node editors/vscode/scripts/diagnose.mjs` (or `npm --prefix editors/vscode run
@@ -109,7 +102,7 @@ Convert every discovered defect into a minimal repository-owned regression fixtu
 | --- | --- |
 | `crates/` | Rust parser, rules, HIR, workspace, analysis, formatter, LSP, and CLI crates |
 | `editors/vscode/` | VS Code extension with server bootstrap and mission-tree preview |
-| `rules/` | Authoritative first-party EU4 rule source (`rules/eu4/*.json`) |
+| `rules/` | Authoritative first-party EU4 rule source (`rules/eu4/**/*.json`) |
 | `fuzz/` | Parser, edit, formatter, and HIR fuzz targets |
 | `crates/tools/` | Cross-platform repository, release, and quality-gate tooling |
 
@@ -172,11 +165,11 @@ These are the invariants the repository enforces; please keep them in mind in ev
   resource and time bounds.
 - **Syntax errors never block analysis.** Parsers produce loss-aware CSTs even on malformed input;
   unrecognized constructs lower to `Unknown*` nodes instead of panicking.
-- **One authoritative rule source.** `rules/eu4/*.json` is the only rule authority; binaries
-  compile the embedded bundle straight into the in-memory rule set. `.cwt` files are never rule
+- **One authoritative rule source.** `rules/eu4/` is the only rule authority; builds
+  check and compile the source into an embedded RulesIr artifact. Runtime semantics read that IR. `.cwt` files are never rule
   input, and the runtime accepts no external rule paths.
-- **`rule_hash` is content-based.** It hashes canonical logical content, not source byte layout,
-  so it is unaffected by formatting, fragment ordering, or import order.
+- **`rule_hash` is content-based.** It hashes the compiled arena, strings, provenance and profile
+  deterministically. Formatting changes do not alter its value.
 
 ### Testing guidance
 

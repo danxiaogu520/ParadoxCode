@@ -3,10 +3,10 @@ use text::AbsPath;
 
 #[test]
 fn symbol_hover_does_not_materialize_the_full_workspace() {
-    let (host, id) = snapshot("country_event = { id = hover.1 }\nevent = hover.1\n");
+    let text = "country_event = { id = hover.1 }\ncountry_event = { immediate = { country_event = { id = hover.1 } } }\n";
+    let (host, id) = snapshot(text);
     let snapshot = host.snapshot();
-    let position = u32::try_from("country_event = { id = hover.1 }\nevent = ".len() + 1)
-        .expect("reference offset");
+    let position = u32::try_from(text.rfind("hover.1").unwrap() + 1).expect("reference offset");
 
     crate::ALL_SEMANTICS_CALLS.with(|calls| calls.set(0));
     let hover = hover(&snapshot, &id, position).expect("symbol hover");
@@ -27,17 +27,15 @@ fn semantic_hover_descends_into_quoted_script_with_mapped_range() {
     let start = u32::try_from(text.find("foo").expect("inner key")).expect("offset");
     let snapshot = host.snapshot();
     let input = input_for_document(&snapshot, &id).expect("input");
-    let context = semantic_completion_context(&snapshot, &input, start + 1)
-        .unwrap_or_else(|| panic!("missing quoted semantic context"));
-    assert_eq!(
-        context
-            .property
-            .as_ref()
-            .map(|property| property.key.as_ref()),
-        Some("foo"),
-        "{context:?}"
-    );
-
+    let fact = input
+        .hir
+        .as_ref()
+        .unwrap()
+        .field_facts()
+        .iter()
+        .find(|f| f.range.start() <= start + 1 && start + 1 < f.range.end())
+        .expect("quoted field fact");
+    assert_eq!(fact.range, TextRange::new(start, start + 3).unwrap());
     let hover = hover(&snapshot, &id, start + 1).expect("quoted semantic hover");
 
     assert!(hover.contents.contains("### Trigger `foo`"), "{hover:?}");
@@ -69,7 +67,7 @@ fn symbol_hover_explains_active_and_shadowed_source_roots() {
         .expect("event definition");
     }
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![
         SourceRoot {
             id: SourceRootId::new(1),
@@ -88,7 +86,8 @@ fn symbol_hover_explains_active_and_shadowed_source_roots() {
     ]));
     host.refresh_source_roots().expect("scan source roots");
     let id = DocumentId::new("file:///tmp/events/reference.txt");
-    let text = "event = shared.1\n";
+    let text =
+        "country_event = { id = caller.1 immediate = { country_event = { id = shared.1 } } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open reference");
     let position = u32::try_from(text.find("shared.1").expect("reference") + 1).expect("position");
@@ -108,7 +107,7 @@ fn symbol_hover_explains_active_and_shadowed_source_roots() {
 #[test]
 fn semantic_hover_explains_scope_transition() {
     let (host, id) = {
-        let mut host = eu4_host(game::eu4::first_party_rules().expect("load first-party rules"));
+        let mut host = eu4_host(game::eu4::runtime_rules().expect("load first-party rules"));
         let id = DocumentId::new("file:///tmp/events/scope-hover.txt");
         host.open_document(
             id.clone(),
@@ -142,7 +141,7 @@ fn decision_hover_skips_type_instance_wrapper() {
         "  }\n",
         "}\n",
     );
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/common/decisions/hover.txt");
     host.open_document(
         id.clone(),
@@ -188,26 +187,9 @@ fn hover_ignores_unknown_property_and_plain_text() {
 
 #[test]
 fn semantic_hover_keeps_multiple_matching_rule_meanings() {
-    let mut model = game::eu4::bootstrap_model();
-    for (id, value) in [
-        ("fixture:trigger:choice-bool", ValueMatcher::Bool),
-        (
-            "fixture:trigger:choice-int",
-            ValueMatcher::Int {
-                min: Some(1),
-                max: Some(3),
-            },
-        ),
-    ] {
-        model.semantic.rules.push(SemanticRule {
-            id: id.to_owned(),
-            operator: Some("=".to_owned()),
-            value,
-            max_occurs: Some(1),
-            ..semantic_rule("trigger", "choice")
-        });
-    }
-    let mut host = eu4_host(RuleSet::from_model(model));
+    let mut host = fixture_host(
+        serde_json::json!({"schemas": {"trigger": {"fields": {"choice": [{"value": "bool", "card": "0..1"}, {"value": "int[1..3]", "card": "0..1"}]}}}}),
+    );
     let id = DocumentId::new("file:///tmp/choice.txt");
     let text = "trigger = { choice = yes }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
@@ -216,55 +198,15 @@ fn semantic_hover_keeps_multiple_matching_rule_meanings() {
     let hover = hover(&host.snapshot(), &id, position).expect("ambiguous rule hover");
     assert!(hover.contents.contains("#### Allowed value types (2)"));
     assert!(!hover.contents.contains("##### Candidate 1"));
-    assert!(
-        hover
-            .contents
-            .contains("- bool (`yes` / `no`), integer in [1, 3]")
-    );
+    assert!(hover.contents.contains("yes or no"));
+    assert!(hover.contents.contains("integer from 1 to 3"));
 }
 
 #[test]
 fn semantic_hover_groups_value_types_by_scope() {
-    let mut model = game::eu4::bootstrap_model();
-    for (id, value, scopes, min_occurs) in [
-        (
-            "fixture:trigger:choice-bool",
-            ValueMatcher::Bool,
-            vec!["country".to_owned()],
-            Some(2),
-        ),
-        (
-            "fixture:trigger:choice-tag",
-            ValueMatcher::Exact("fallback".to_owned()),
-            vec!["province".to_owned()],
-            None,
-        ),
-    ] {
-        model.semantic.rules.push(SemanticRule {
-            id: id.to_owned(),
-            context: "trigger".to_owned(),
-            parent_path: Vec::new(),
-            key: KeyMatcher::Exact("choice".to_owned()),
-            operator: Some("=".to_owned()),
-            value,
-            shape: RuleShape::Leaf,
-            child_context: None,
-            alternative_id: None,
-            severity: None,
-            required: false,
-            deprecated: false,
-            documentation: Vec::new(),
-            allowed_scopes: scopes,
-            push_scope: None,
-            replace_scope: Vec::new(),
-            min_occurs,
-            strict_min: true,
-            max_occurs: Some(1),
-            source_file: "fixture.semantic".to_owned(),
-            line: 1,
-        });
-    }
-    let mut host = eu4_host(RuleSet::from_model(model));
+    let mut host = fixture_host(
+        serde_json::json!({"schemas": {"trigger": {"fields": {"choice": [{"value": "bool", "card": "2..*", "scope": {"in": ["country"]}}, {"value": "'fallback'", "card": "0..1", "scope": {"in": ["province"]}}]}}}}),
+    );
     let id = DocumentId::new("file:///tmp/choice.txt");
     let text = "trigger = { choice = yes }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
@@ -272,17 +214,17 @@ fn semantic_hover_groups_value_types_by_scope() {
     let position = u32::try_from(text.find("choice").expect("choice") + 1).expect("position");
     let hover = hover(&host.snapshot(), &id, position).expect("scope-split rule hover");
     assert!(
-        hover
-            .contents
-            .contains("- `country`: bool (`yes` / `no`)\n  - at least 2"),
+        hover.contents.contains("valid scopes: `country`"),
         "{}",
         hover.contents
     );
     assert!(
-        hover.contents.contains("- `province`: exact `fallback`"),
+        hover.contents.contains("valid scopes: `province`"),
         "{}",
         hover.contents
     );
+    assert!(hover.contents.contains("yes or no"));
+    assert!(hover.contents.contains("`fallback`"));
     // The bare `trigger` block carries no tracked scope, so nothing may be
     // reported as unavailable here.
     assert!(
@@ -294,7 +236,7 @@ fn semantic_hover_groups_value_types_by_scope() {
 
 #[test]
 fn semantic_hover_marks_scope_mismatched_value_groups_unavailable() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("load first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("load first-party rules"));
     let id = DocumentId::new("file:///tmp/events/add_claim_hover.txt");
     let text = "country_event = { immediate = { add_claim = 123 } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
@@ -302,27 +244,27 @@ fn semantic_hover_marks_scope_mismatched_value_groups_unavailable() {
     let position =
         u32::try_from(text.find("add_claim").expect("add_claim key") + 1).expect("position");
     let hover = hover(&host.snapshot(), &id, position).expect("add_claim semantic hover");
+
+    assert!(
+        hover.contents.contains("Allowed value types (2)"),
+        "{}",
+        hover.contents
+    );
     assert!(
         hover
             .contents
-            .contains("- `country`: scope `province`, symbol type `province_id`"),
+            .contains("a `province` scope or a `province_id` instance"),
         "{}",
         hover.contents
     );
-    assert!(
-        hover.contents.contains(
-            "- `province`: scope `country`, enum `country_tags` (unavailable in current scope `country`)",
-        ),
-        "{}",
-        hover.contents
-    );
+    assert!(hover.contents.contains("a `country` scope or a `country_tag` instance; unavailable in current scope `country`; valid scopes: `province`"), "{}", hover.contents);
 }
 
 #[test]
 fn semantic_hover_collapses_repeated_first_party_rule_rows() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("load first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("load first-party rules"));
     let id = DocumentId::new("file:///tmp/common/on_actions/hover.txt");
-    let text = "on_action = { events = { test_event = { } } }\n";
+    let text = "on_startup = { events = { test_event.1 } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open on_action fixture");
     let position =
@@ -334,14 +276,9 @@ fn semantic_hover_collapses_repeated_first_party_rule_rows() {
 
 #[test]
 fn semantic_hover_preserves_rule_detail_line_breaks() {
-    let mut model = game::eu4::bootstrap_model();
-    model.semantic.rules.push(SemanticRule {
-        value: ValueMatcher::Bool,
-        documentation: vec!["first line".to_owned(), "second line".to_owned()],
-        max_occurs: Some(1),
-        ..semantic_rule("trigger", "documented")
-    });
-    let mut host = eu4_host(RuleSet::from_model(model));
+    let mut host = fixture_host(
+        serde_json::json!({"schemas": {"trigger": {"fields": {"documented": {"value": "bool", "doc": "First line\nSecond line"}}}}}),
+    );
     let id = DocumentId::new("file:///tmp/documented.txt");
     let text = "trigger = { documented = yes }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
@@ -352,9 +289,9 @@ fn semantic_hover_preserves_rule_detail_line_breaks() {
     assert!(
         hover
             .contents
-            .contains("#### Documentation\n\nfirst line  \nsecond line")
+            .contains("#### Documentation\n\nFirst line  \nSecond line")
     );
-    assert!(hover.contents.contains("first line  \nsecond line"));
+    assert!(hover.contents.contains("First line  \nSecond line"));
 }
 
 #[test]
@@ -377,7 +314,7 @@ fn localisation_hover_shows_the_resolved_short_text() {
 
 #[test]
 fn hover_prefers_nonempty_localisation_preview_over_empty_sibling() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -419,7 +356,7 @@ fn hover_prefers_nonempty_localisation_preview_over_empty_sibling() {
 
 #[test]
 fn localisation_values_by_key_resolve_english_preferred_titles() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.open_document(
         DocumentId::new("file:///tmp/localisation/l_english/test_l_english.yml"),
         1,
@@ -486,7 +423,7 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
 
     // Vanilla runs through the same cache-installed path the LSP uses, which is
     // what retains its localisation previews for the derived text lookup.
-    let mut vanilla_host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut vanilla_host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
@@ -495,7 +432,7 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
     vanilla_host.refresh_source_roots().expect("scan Vanilla");
     let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build Vanilla cache");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -547,7 +484,7 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
     // order at that moment — mirroring the LSP, which fixes preferences at initialize
     // before the Vanilla cache install. The French pass therefore installs a second cache
     // into a host that already prefers French.
-    let mut french_host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut french_host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     french_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -629,7 +566,7 @@ fn localisation_values_by_key_apply_the_layer_then_read_order_total_order() {
     )
     .expect("current last-read french");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![
         SourceRoot {
             id: SourceRootId::new(1),
@@ -684,7 +621,7 @@ fn localisation_values_by_key_apply_the_layer_then_read_order_total_order() {
 
 #[test]
 fn custom_tooltip_hover_shows_localisation_preview_inside_mission_effects() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -724,7 +661,7 @@ fn custom_tooltip_hover_shows_localisation_preview_inside_mission_effects() {
 
 #[test]
 fn typed_symbol_hover_shows_definition_localisation_preview() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -752,7 +689,8 @@ fn typed_symbol_hover_shows_definition_localisation_preview() {
     )
     .expect("open event");
     let use_id = DocumentId::new("file:///tmp/events/use.txt");
-    let use_text = "event = test.1\n";
+    let use_text =
+        "country_event = { id = caller.1 immediate = { country_event = { id = test.1 } } }\n";
     host.open_document(
         use_id.clone(),
         1,
@@ -774,7 +712,7 @@ fn typed_symbol_hover_shows_definition_localisation_preview() {
 
 #[test]
 fn optional_type_localisation_hover_shows_existing_preview() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -783,7 +721,7 @@ fn optional_type_localisation_hover_shows_existing_preview() {
     host.open_document(
         DocumentId::new("file:///tmp/localisation/test.yml"),
         1,
-        "l_english:\nregion_one:0 \"Region One\"\n".to_owned(),
+        "l_english:\nregion_one:0 \"Region One\"\nshort_region_one:0 \"Region One\"\n".to_owned(),
         Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/localisation/test.yml",
         ))),
@@ -804,7 +742,7 @@ fn optional_type_localisation_hover_shows_existing_preview() {
         u32::try_from(source.find("region_one").expect("region name") + 1).expect("position");
     let result = hover(&host.snapshot(), &definition, position).expect("region hover");
     assert!(
-        result.contents.contains("| name | Region One |"),
+        result.contents.contains("| short | Region One |"),
         "optional type mappings should contribute existing localisation previews: {}",
         result.contents
     );
@@ -812,7 +750,7 @@ fn optional_type_localisation_hover_shows_existing_preview() {
 
 #[test]
 fn same_name_type_localisation_hover_shows_existing_preview() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -850,7 +788,7 @@ fn same_name_type_localisation_hover_shows_existing_preview() {
 
 #[test]
 fn scope_link_rule_hover_shows_typed_localisation_preview() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -897,7 +835,7 @@ fn scope_link_rule_hover_shows_typed_localisation_preview() {
 
 #[test]
 fn bound_kind_hover_shows_every_template_preview() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -913,7 +851,7 @@ fn bound_kind_hover_shows_every_template_preview() {
     )
     .expect("open localisation");
     let definition = DocumentId::new("file:///tmp/common/colonial_regions/test.txt");
-    let source = "region_two = { }\n";
+    let source = "region_two = { tax_income = 1 }\n";
     host.open_document(
         definition.clone(),
         1,
@@ -932,79 +870,6 @@ fn bound_kind_hover_shows_every_template_preview() {
         "every resolvable binding template should contribute a labelled preview row: {}",
         result.contents
     );
-}
-
-#[test]
-fn cache_only_optional_type_hover_shows_existing_preview() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("ide-optional-hover-{nonce}"));
-    let vanilla = root.join("vanilla");
-    let current = root.join("current");
-    std::fs::create_dir_all(vanilla.join("common/colonial_regions")).expect("Vanilla directory");
-    std::fs::create_dir_all(vanilla.join("localisation")).expect("Vanilla localisation directory");
-    std::fs::create_dir_all(current.join("events")).expect("Current directory");
-    std::fs::write(
-        vanilla.join("common/colonial_regions/test.txt"),
-        "region_one = { }\n",
-    )
-    .expect("Vanilla colonial region");
-    std::fs::write(
-        vanilla.join("localisation/test_l_english.yml"),
-        "l_english:\nregion_one:0 \"Region One\"\n",
-    )
-    .expect("Vanilla localisation");
-
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
-    let mut profile = game::eu4::profile();
-    profile.references.insert(
-        0,
-        rules::ProfileReferenceRule {
-            key: ProfileTextMatcher::insensitive(ProfileMatchMode::Exact, "custom_region"),
-            kind: "colonial_region".to_owned(),
-            excluded_keys: Vec::new(),
-            excluded_paths: Vec::new(),
-        },
-    );
-    let mut vanilla_host = AnalysisHost::with_profile(rules.clone(), profile.clone());
-    vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-        SourceRootId::new(0),
-        SourceRootKind::Vanilla,
-        AbsPath::normalize(&vanilla),
-    )]));
-    vanilla_host
-        .refresh_source_roots()
-        .expect("scan Vanilla for cache");
-    let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build Vanilla cache");
-
-    let mut host = AnalysisHost::with_profile(rules, profile);
-    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-        SourceRootId::new(1),
-        SourceRootKind::Project,
-        AbsPath::normalize(&current),
-    )]));
-    host.install_index_cache(cache)
-        .expect("install Vanilla cache");
-    let document = DocumentId::new("file:///current/events/use.txt");
-    let text = "trigger = { custom_region = region_one }\n";
-    host.open_document(
-        document.clone(),
-        1,
-        text.to_owned(),
-        Some(AbsPath::normalize(&current.join("events/use.txt"))),
-    )
-    .expect("open use");
-    let position =
-        u32::try_from(text.find("region_one").expect("region reference") + 1).expect("position");
-    let result = hover(&host.snapshot(), &document, position).expect("cached hover");
-    assert!(
-        result.contents.contains("| Region One |"),
-        "cache-only optional mappings should contribute existing previews: {}",
-        result.contents
-    );
-    std::fs::remove_dir_all(root).expect("cleanup");
 }
 
 #[test]
@@ -1082,7 +947,7 @@ fn dynamic_parameter_hovers_and_payload_arguments_are_diagnosable() {
     );
     fs::write(effects.join("00_hover.txt"), definitions_body).expect("definitions");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1187,7 +1052,7 @@ fn signature_hover_groups_parameters_by_activation_scoping() {
     );
     fs::write(effects.join("00_signature.txt"), definitions_body).expect("definitions");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1268,7 +1133,7 @@ fn affixed_value_parameter_hover_names_the_render_and_expected_domain() {
     let definitions_body = "spawn_reb_host = { spawn_rebels = { type = $RT$_rebels } }\n";
     fs::write(effects.join("00_affixed.txt"), definitions_body).expect("definitions");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1317,7 +1182,7 @@ fn dynamic_parameter_hover_replays_bindings_aware_sites() {
     );
     fs::write(effects.join("00_replay.txt"), definitions_body).expect("definitions");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1473,7 +1338,7 @@ fn event_hover_previews_only_explicit_title_keys() {
     )
     .expect("localisation keys");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1612,7 +1477,7 @@ fn semantic_hover_infers_modifier_kind_from_workspace_membership() {
         "  }\n",
         "}\n",
     );
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1697,7 +1562,7 @@ fn texturefile_value_hover_reports_resolution_provenance() {
     std::fs::create_dir_all(root.join("gfx/interface")).expect("gfx directory");
     std::fs::write(root.join("gfx/interface/health.dds"), b"").expect("texture");
     let text = "spriteTypes = {\n\tspriteType = {\n\t\tname = \"GFX_test\"\n\t\ttexturefile = \"gfx/interface/health.tga\"\n\t}\n\tspriteType = {\n\t\tname = \"GFX_gone\"\n\t\ttexturefile = \"gfx/interface/gone.dds\"\n\t}\n}\n";
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1743,30 +1608,31 @@ fn texturefile_value_hover_reports_resolution_provenance() {
 
 #[test]
 fn event_field_semantics_come_from_the_baked_rules() {
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let host = eu4_host(rules);
     let snapshot = host.snapshot();
-    let semantics = crate::semantic::construct_field_semantics(&snapshot, "root:event");
-    assert!(
-        semantics
-            .localisation_fields
-            .iter()
-            .any(|field| field.eq_ignore_ascii_case("title"))
-            && semantics
-                .localisation_fields
-                .iter()
-                .any(|field| field.eq_ignore_ascii_case("desc")),
-        "title and desc stay typed as localisation keys: {:?}",
-        semantics.localisation_fields
-    );
-    assert!(
-        semantics
-            .sprite_fields
-            .iter()
-            .any(|field| field.eq_ignore_ascii_case("picture")),
-        "picture stays typed as a sprite name: {:?}",
-        semantics.sprite_fields
-    );
+
+    fn contains(ir: &rules::ir::RulesIr, id: rules::ir::MatcherId, kind: &str) -> bool {
+        match ir.matcher(id) {
+            rules::ir::Matcher::Loc => kind == "localisation",
+            rules::ir::Matcher::Ref(rules::ir::RefTarget::Type { type_id, .. }) => {
+                ir.strings().resolve(ir.type_info(*type_id).name) == kind
+            }
+            rules::ir::Matcher::Union(items) => items.iter().any(|id| contains(ir, *id, kind)),
+            _ => false,
+        }
+    }
+    let ir = snapshot.ir();
+    let schema = ir.schema_by_name("event_body").expect("event body schema");
+    for (key, kind) in [
+        ("title", "localisation"),
+        ("desc", "localisation"),
+        ("picture", "sprite"),
+    ] {
+        assert!(ir.lookup(schema, key, rules::ir::Shape::Scalar).any(|id| {
+                matches!(ir.field(id).value, rules::ir::FieldValue::Scalar(matcher) if contains(ir, matcher, kind))
+            }), "{key} must retain its compiled {kind} matcher");
+    }
 }
 
 #[test]
@@ -1797,18 +1663,6 @@ fn event_card_reads_fields_probe_and_chrome_from_declarations() {
     // `label` as a localisation key, plus a card declaration whose context,
     // probe prefix, and chrome sprite are all invented for this test: nothing
     // about the card may come from the renderer's knowledge of vanilla events.
-    let mut model = game::eu4::first_party_rules()
-        .expect("first-party rules")
-        .model()
-        .clone();
-    model.semantic.rules.push(SemanticRule {
-        value: ValueMatcher::Type("sprite".to_owned()),
-        ..semantic_rule("root:custom_ctx", "banner")
-    });
-    model.semantic.rules.push(SemanticRule {
-        value: ValueMatcher::Localisation,
-        ..semantic_rule("root:custom_ctx", "label")
-    });
     let mut profile = game::eu4::profile();
     profile.hover_cards.insert(
         "event".to_owned(),
@@ -1819,7 +1673,11 @@ fn event_card_reads_fields_probe_and_chrome_from_declarations() {
             sprite_probes: std::iter::once(("banner".to_owned(), "MOD_".to_owned())).collect(),
         },
     );
-    let mut host = AnalysisHost::with_profile(RuleSet::from_model(model), profile);
+    let mut host = eu4_fixture_host(
+        "event_body",
+        serde_json::json!({"banner":{"value":"ref<sprite>"},"label":{"value":"loc"}}),
+        profile,
+    );
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Vanilla,

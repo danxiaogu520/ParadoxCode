@@ -1,0 +1,48 @@
+{
+  "schemas": {
+    "golden_bull_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "golden_bull_body__ai_will_do",
+          "card": "1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it."
+        },
+        "mechanics": {
+          "card": "0..1",
+          "list": "enum<golden_bull_mechanics>"
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "0..1",
+          "doc": "Block of modifiers applied while the containing entry is active."
+        },
+        "potential": {
+          "body": "trigger",
+          "card": "0..1",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility."
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply."
+        }
+      }
+    },
+    "golden_bull_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "golden_bull_body__mechanics": {
+      "items": "enum<golden_bull_mechanics>"
+    }
+  }
+}

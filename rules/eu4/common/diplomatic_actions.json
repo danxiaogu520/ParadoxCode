@@ -1,0 +1,72 @@
+{
+  "schemas": {
+    "diplomatic_action_body": {
+      "fields": {
+        "condition": {
+          "body": "diplomatic_action_body__condition",
+          "card": "0..*",
+          "doc": "A diplomatic action can have any number of condition blocks, each with its own tooltip, potential and allow section."
+        },
+        "effect": {
+          "body": "effect",
+          "card": "0..1",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "pre_effect": {
+          "body": "effect",
+          "card": "0..1",
+          "doc": "do this before the peace is enforced, or there is no war enemy country",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        }
+      }
+    },
+    "diplomatic_action_body__condition": {
+      "fields": {
+        "allow": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Determines if the action is valid or not. ROOT = actor, FROM = target",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "potential": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Determines if the trigger is applicable or not. ROOT = actor, FROM = target",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "tooltip": {
+          "card": "0..1",
+          "control": {
+            "kind": "display_only"
+          },
+          "value": "loc"
+        }
+      }
+    }
+  }
+}

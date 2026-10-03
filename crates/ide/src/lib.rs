@@ -11,11 +11,12 @@ mod dynamic_rules;
 mod hover;
 mod hover_card;
 mod inlay;
-mod lints;
+mod ir_callable;
+mod ir_queries;
+mod ir_semantic;
 mod localisation;
 mod messages;
 mod mission;
-mod modifier_scope;
 mod navigation;
 mod quick_fix;
 mod quoted_script;
@@ -54,6 +55,11 @@ pub use resolution::localisation_values_by_key;
 pub use semantic_tokens::{
     semantic_tokens, semantic_tokens_in_range_with_cancellation, semantic_tokens_with_cancellation,
 };
+/// Describes a compiled matcher for the protocol rule browser.
+pub fn ir_matcher_description(ir: &rules::ir::RulesIr, matcher: rules::ir::MatcherId) -> String {
+    ir_semantic::describe(ir, matcher)
+}
+
 pub use types::{
     AnalysisResult, CancellationToken, Cancelled, CompletionItem, CompletionKind, CompletionResult,
     Diagnostic, DiagnosticCertainty, DiagnosticCode, DiagnosticProvenance, DiagnosticTag,
@@ -65,21 +71,8 @@ pub use types::{
 // These crate-visible re-exports keep the existing in-crate test and helper paths stable while
 // allowing the implementation to live in responsibility-oriented modules.
 #[cfg(test)]
-pub(crate) use completion::semantic_completion_context;
-#[cfg(test)]
-pub(crate) use completion::{
-    CompletionMemberCache, SemanticCompletionContext, add_semantic_key_items,
-    scope_expression_candidates,
-};
-#[cfg(test)]
 pub(crate) use resolution::ALL_SEMANTICS_CALLS;
 #[cfg(test)]
-pub(crate) use semantic::{
-    SemanticTransitionInput, parameter_names_for_owner, repeated_scope_register_depth,
-    resolve_scope_expression_context, scope_context_from_hir, semantic_child_scope,
-    semantic_root_context, semantic_selected_alternative, semantic_selected_transition,
-};
-#[cfg(test)]
-pub(crate) use support::{ScopeContext, ScriptProperty, input_for_document};
+pub(crate) use support::input_for_document;
 #[cfg(test)]
 mod tests;

@@ -1,0 +1,674 @@
+{
+  "schemas": {
+    "bitmap_font_body": {
+      "fields": {
+        "border_color": {
+          "card": "0..1",
+          "doc": "Text outline colour as an ARGB hex literal.",
+          "value": "scalar"
+        },
+        "color": {
+          "card": "0..1",
+          "doc": "Default text colour as an ARGB hex literal, such as 0xffffffff.",
+          "value": "scalar"
+        },
+        "effect": {
+          "card": "0..1",
+          "doc": "Whether the font's shader effect is enabled.",
+          "value": "bool"
+        },
+        "name": {
+          "card": "1",
+          "doc": "Font name referenced from .gui files via font = \"...\".",
+          "value": "scalar"
+        },
+        "path": {
+          "card": "0..1",
+          "doc": "Font file stem under gfx/fonts, without extension: path = \"gfx/fonts/vic_36\".",
+          "value": "path"
+        },
+        "textcolors": {
+          "body": "bitmap_font_body__textcolors",
+          "card": "0..1",
+          "doc": "Per-colour-code font variants: the G, R, Y (and optionally H, T) blocks override the font used for each localisation colour code."
+        }
+      }
+    },
+    "bitmap_font_body__empty": {},
+    "bitmap_font_body__textcolors": {
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "scalar",
+          "value": "scalar"
+        },
+        {
+          "body": "bitmap_font_body__empty",
+          "card": "0..*",
+          "key": "scalar"
+        }
+      ]
+    },
+    "object_body": {
+      "fields": {
+        "animation": {
+          "body": "object_body__animation",
+          "card": "0..*",
+          "doc": "Animation clip bound to a pdxmesh: animation = { id = \"idle_01\" type = \"gfx/models/x.anim\" }."
+        },
+        "cull_distance": {
+          "card": "0..1",
+          "doc": "Camera distance beyond which the object stops rendering (values may carry an f suffix).",
+          "value": "scalar"
+        },
+        "effect": {
+          "card": "0..1",
+          "doc": "Shader effect for the object, a gfx/FX/*.lua file.",
+          "value": "path<gfx>"
+        },
+        "file": {
+          "card": "0..1",
+          "doc": "Mesh file of a pdxmesh object, such as gfx/models/Units/x.mesh.",
+          "value": "path<gfx>"
+        },
+        "linewidth": {
+          "card": "0..1",
+          "doc": "Stroke width of a LineChartType chart.",
+          "value": "int[1..]"
+        },
+        "meshsettings": {
+          "body": "object_body__meshsettings",
+          "card": "0..*",
+          "doc": "Per-mesh material overrides for a pdxmesh."
+        },
+        "name": {
+          "card": "1",
+          "doc": "Object name. pdxmesh names are referenced by map ambient objects via their type blocks.",
+          "value": "scalar"
+        },
+        "normal": {
+          "card": "0..1",
+          "doc": "Normal-map texture of an arrowType map arrow.",
+          "value": "path<gfx>"
+        },
+        "scale": {
+          "card": "0..1",
+          "doc": "Uniform scale applied to the object.",
+          "value": "float"
+        },
+        "size": [
+          {
+            "card": "0..1",
+            "doc": "Diameter in pixels of a PieChartType chart.",
+            "value": "int[1..]"
+          },
+          {
+            "body": "object_body__size",
+            "card": "0..1",
+            "doc": "Pixel size block of a LineChartType chart: size = { x = 152 y = 40 }."
+          }
+        ],
+        "specular": {
+          "card": "0..1",
+          "doc": "Specular texture of an arrowType map arrow.",
+          "value": "path<gfx>"
+        },
+        "speed": {
+          "card": "0..1",
+          "doc": "Scroll speed of an animatedmaptext label.",
+          "value": "float"
+        },
+        "textblock": {
+          "body": "object_body__textblock",
+          "card": "0..*",
+          "doc": "Rendered text of an animatedmaptext label: font, colour, and position settings."
+        },
+        "texture": {
+          "card": "0..1",
+          "doc": "Diffuse texture of an arrowType map arrow.",
+          "value": "path<gfx>"
+        },
+        "texturefile": {
+          "card": "0..1",
+          "doc": "Texture of a tradeRouteType, relative to the game or mod root.",
+          "value": "path<gfx>"
+        },
+        "texturefile1": {
+          "card": "0..1",
+          "doc": "First texture of a tradeRouteType arrow.",
+          "value": "path<gfx>"
+        },
+        "texturefile2": {
+          "card": "0..1",
+          "doc": "Second texture of a tradeRouteType arrow.",
+          "value": "path<gfx>"
+        },
+        "texturefile3": {
+          "card": "0..1",
+          "doc": "Third texture of a tradeRouteType arrow.",
+          "value": "path<gfx>"
+        },
+        "type": {
+          "card": "0..1",
+          "doc": "Particle-system name played by a pdxparticle object.",
+          "value": "scalar"
+        }
+      }
+    },
+    "object_body__animation": {
+      "fields": {
+        "id": {
+          "card": "0..1",
+          "doc": "Animation clip name referenced by the mesh's .anim metadata.",
+          "value": "scalar"
+        },
+        "type": {
+          "card": "0..1",
+          "doc": "Animation clip bound to the state id: a shared clip name such as polearm_onehanded_attack_animation or seagulls_idle, resolved from the compiled unit animation set rather than a loose file path.",
+          "value": "scalar"
+        }
+      }
+    },
+    "object_body__empty": {},
+    "object_body__meshsettings": {
+      "fields": {
+        "index": {
+          "card": "0..1",
+          "doc": "Zero-based mesh index the settings apply to.",
+          "value": "int[0..]"
+        },
+        "name": {
+          "card": "0..1",
+          "doc": "Name of the sub-mesh the settings apply to.",
+          "value": "scalar"
+        },
+        "shader": {
+          "card": "0..1",
+          "doc": "Shader name used to render the sub-mesh.",
+          "value": "scalar"
+        },
+        "shader_file": {
+          "card": "0..1",
+          "doc": "Shader source file for the sub-mesh.",
+          "value": "path<gfx>"
+        },
+        "texture_diffuse": {
+          "card": "0..1",
+          "doc": "Diffuse texture override for the sub-mesh, a bare file name resolved relative to the mesh's own directory rather than the game root.",
+          "value": "path"
+        },
+        "texture_normal": {
+          "card": "0..1",
+          "doc": "Normal-map texture override for the sub-mesh, a bare file name resolved relative to the mesh's own directory rather than the game root.",
+          "value": "path"
+        },
+        "texture_specular": {
+          "card": "0..1",
+          "doc": "Specular texture override for the sub-mesh, a bare file name resolved relative to the mesh's own directory rather than the game root.",
+          "value": "path"
+        }
+      }
+    },
+    "object_body__size": {
+      "fields": {
+        "x": {
+          "card": "0..1",
+          "doc": "Width in pixels.",
+          "value": "int"
+        },
+        "y": {
+          "card": "0..1",
+          "doc": "Height in pixels.",
+          "value": "int"
+        }
+      }
+    },
+    "object_body__textblock": {
+      "fields": {
+        "color": {
+          "body": "object_body__textblock__color",
+          "card": "0..*",
+          "doc": "Text colour as an RGB float block: color = { 1.0 1.0 0.0 }."
+        },
+        "font": {
+          "card": "0..*",
+          "doc": "Bitmap font name, declared by a bitmapfont block in an interface .gfx file.",
+          "value": "ref<bitmap_font>"
+        },
+        "format": {
+          "card": "0..*",
+          "doc": "Text alignment within the block; vanilla uses centre.",
+          "value": "scalar"
+        },
+        "position": {
+          "body": "object_body__textblock__position",
+          "card": "0..*",
+          "doc": "Pixel position of the text block: position = { x = 0 y = 0 }."
+        },
+        "size": {
+          "body": "object_body__textblock__position",
+          "card": "0..*",
+          "doc": "Pixel dimensions, size = { x = 256 y = 64 }."
+        },
+        "text": {
+          "card": "0..*",
+          "doc": "Localisation-rendered text of the label.",
+          "value": "scalar"
+        }
+      },
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "scalar",
+          "value": "scalar"
+        },
+        {
+          "body": "object_body__empty",
+          "card": "0..*",
+          "key": "scalar"
+        }
+      ]
+    },
+    "object_body__textblock__color": {
+      "items": "float"
+    },
+    "object_body__textblock__position": {
+      "fields": {
+        "x": {
+          "card": "0..*",
+          "doc": "Horizontal pixel offset.",
+          "value": "int"
+        },
+        "y": {
+          "card": "0..*",
+          "doc": "Vertical pixel offset.",
+          "value": "int"
+        }
+      }
+    },
+    "sprite_body": {
+      "fields": {
+        "alphamaskfile": {
+          "card": "0..1",
+          "doc": "Alpha mask texture blended over the sprite (used by the diplomacy overlay icons).",
+          "override": true,
+          "value": "path<gfx>"
+        },
+        "alwaystransparent": {
+          "card": "0..1",
+          "doc": "Marks the texture as fully transparent so the engine skips per-pixel transparency handling.",
+          "override": true,
+          "value": "bool"
+        },
+        "animation": {
+          "body": "sprite_body__animation",
+          "card": "0..*",
+          "doc": "Overlay animation played over the sprite texture (rotating or scrolling effects).",
+          "override": true
+        },
+        "animation_rate_fps": {
+          "card": "0..1",
+          "doc": "Playback speed of a frameAnimatedSpriteType, in frames per second.",
+          "override": true,
+          "value": "int[1..]"
+        },
+        "bordersize": {
+          "body": "sprite_body__bordersize",
+          "card": "0..1",
+          "doc": "Corner border thickness of a corneredTileSpriteType: borderSize = { x = 2 y = 2 }.",
+          "override": true
+        },
+        "clicksound": {
+          "card": "0..1",
+          "doc": "Sound played when the sprite is clicked as a button.",
+          "override": true,
+          "value": "enum<interface_click_sound>"
+        },
+        "color": {
+          "body": "sprite_body__empty",
+          "card": "0..1",
+          "doc": "Progress bar fill colour as an RGB float block: color = { 0.0 0.5 0.0 }.",
+          "override": true
+        },
+        "colortwo": {
+          "body": "sprite_body__empty",
+          "card": "0..1",
+          "doc": "Progress bar background colour as an RGB float block.",
+          "override": true
+        },
+        "effectfile": {
+          "card": "0..1",
+          "doc": "GUI shader effect driving the sprite's button states, named after a gfx/FX shader such as buttonstate. The engine resolves the compiled shader by name, so the historical .lua spelling of these references no longer exists on disk even in vanilla.",
+          "override": true,
+          "value": "path"
+        },
+        "horizontal": {
+          "card": "0..1",
+          "doc": "Whether a progress bar fills horizontally instead of vertically.",
+          "override": true,
+          "value": "bool"
+        },
+        "legacy_lazy_load": {
+          "card": "0..1",
+          "doc": "Legacy flag restoring the pre-lazy-loading texture lifetime for the sprite.",
+          "override": true,
+          "value": "bool"
+        },
+        "loadtype": {
+          "card": "0..1",
+          "doc": "When the texture is loaded: FRONTEND sprites load for the main menu, INGAME sprites load with a campaign.",
+          "override": true,
+          "value": "enum<sprite_load_type>"
+        },
+        "looping": {
+          "card": "0..1",
+          "doc": "Whether a frameAnimatedSpriteType restarts after the last frame.",
+          "override": true,
+          "value": "bool"
+        },
+        "name": {
+          "card": "1",
+          "doc": "Sprite name. All sprite kinds share one lookup namespace: GUI elements, mission icons, and event pictures reference this name regardless of the defining block kind.",
+          "override": true,
+          "value": "scalar"
+        },
+        "noofframes": {
+          "card": "0..1",
+          "doc": "Number of frames stacked vertically in the texture; the engine crops the sprite to one frame and advances on demand.",
+          "override": true,
+          "value": "int[1..]"
+        },
+        "norefcount": {
+          "card": "0..1",
+          "doc": "Keeps the texture permanently loaded by skipping reference counting.",
+          "override": true,
+          "value": "bool"
+        },
+        "overlay_frames_per_row": {
+          "card": "0..1",
+          "doc": "Columns in the overlay frame grid of a masked shield.",
+          "override": true,
+          "value": "int[1..]"
+        },
+        "overlay_rows": {
+          "card": "0..1",
+          "doc": "Rows in the overlay frame grid of a masked shield.",
+          "override": true,
+          "value": "int[1..]"
+        },
+        "pause_on_loop": {
+          "card": "0..1",
+          "doc": "Seconds a frameAnimatedSpriteType rests on the last frame before looping.",
+          "override": true,
+          "value": "float"
+        },
+        "play_on_show": {
+          "card": "0..1",
+          "doc": "Whether a frameAnimatedSpriteType starts playing when its window becomes visible.",
+          "override": true,
+          "value": "bool"
+        },
+        "severity": {
+          "card": "0..1",
+          "value": "'warning'"
+        },
+        "size": {
+          "body": "sprite_body__size",
+          "card": "0..1",
+          "doc": "Pixel size block of a cornered tile sprite: size = { x = 10 y = 10 }.",
+          "override": true
+        },
+        "texturefile": {
+          "card": "0..1",
+          "doc": "Path of the texture file, relative to the game or mod root. Forward and back slashes are both accepted; the file must exist (a .tga reference may fall back to a shipped .dds).",
+          "override": true,
+          "value": "path<gfx>"
+        },
+        "texturefile1": {
+          "card": "0..1",
+          "doc": "First texture of a progress bar or masked shield: the fill texture revealed as the bar advances.",
+          "override": true,
+          "value": "path<gfx>"
+        },
+        "texturefile2": {
+          "card": "0..1",
+          "doc": "Second texture of a progress bar or masked shield: the background texture being masked.",
+          "override": true,
+          "value": "path<gfx>"
+        },
+        "texturefile3": {
+          "card": "0..1",
+          "doc": "Third texture of a masked shield or trade route: the overlay texture blended on top.",
+          "override": true,
+          "value": "path<gfx>"
+        },
+        "transparencecheck": {
+          "card": "0..1",
+          "doc": "Whether the engine tests the texture for transparent pixels (disable for full-frame textures).",
+          "override": true,
+          "value": "bool"
+        }
+      }
+    },
+    "sprite_body__animation": {
+      "fields": {
+        "animationblendmode": {
+          "card": "0..1",
+          "doc": "Blend mode used when drawing the animation over the sprite.",
+          "value": "'overlay'"
+        },
+        "animationdelay": {
+          "card": "0..1",
+          "doc": "Seconds the animation waits before starting.",
+          "value": "float"
+        },
+        "animationframes": {
+          "card": "0..1",
+          "doc": "Frame numbers used by the animation, written as a list.",
+          "list": "int[1..]"
+        },
+        "animationlooping": {
+          "card": "0..1",
+          "doc": "Whether the animation restarts after its last frame.",
+          "value": "bool"
+        },
+        "animationmaskfile": {
+          "card": "0..1",
+          "doc": "Mask restricting where the animation texture is drawn.",
+          "value": "path<gfx>"
+        },
+        "animationrotation": {
+          "card": "0..1",
+          "doc": "Rotations per second applied to the animation texture.",
+          "value": "float"
+        },
+        "animationrotationoffset": {
+          "body": "sprite_body__animation__xy",
+          "card": "0..1",
+          "doc": "Rotation origin in texture coordinates: x and y."
+        },
+        "animationtexturefile": {
+          "card": "0..1",
+          "doc": "Texture scrolled or rotated over the sprite by the animation.",
+          "value": "path<gfx>"
+        },
+        "animationtexturescale": {
+          "body": "sprite_body__animation__xy",
+          "card": "0..1",
+          "doc": "Texture scale along x and y."
+        },
+        "animationtime": {
+          "card": "0..1",
+          "doc": "Duration of one scrolling or rotating animation cycle of the animated overlay, in seconds.",
+          "value": "float[0.0..]"
+        },
+        "animationtype": {
+          "card": "0..1",
+          "doc": "Motion of the animated overlay: scrolling (the vanilla default), rotating, or pulsing.",
+          "value": "scalar"
+        }
+      }
+    },
+    "sprite_body__animation__xy": {
+      "fields": {
+        "x": {
+          "card": "1",
+          "value": "float"
+        },
+        "y": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "sprite_body__bordersize": {
+      "fields": {
+        "x": {
+          "card": "0..1",
+          "doc": "Horizontal border thickness in pixels.",
+          "value": "int"
+        },
+        "y": {
+          "card": "0..1",
+          "doc": "Vertical border thickness in pixels.",
+          "value": "int"
+        }
+      }
+    },
+    "sprite_body__color": {
+      "items": "float"
+    },
+    "sprite_body__colortwo": {
+      "items": "float"
+    },
+    "sprite_body__empty": {},
+    "sprite_body__size": {
+      "fields": {
+        "x": {
+          "card": "0..1",
+          "doc": "Width in pixels.",
+          "value": "int"
+        },
+        "y": {
+          "card": "0..1",
+          "doc": "Height in pixels.",
+          "value": "int"
+        }
+      }
+    },
+    "sprite_file": {
+      "fields": {
+        "2-bitmapfonts": {
+          "body": "interface_file__2_bitmapfonts",
+          "card": "0..1"
+        },
+        "bitmapfonts": {
+          "body": "interface_file__bitmapfonts",
+          "card": "0..*",
+          "doc": "Wrapper block containing bitmap font definitions."
+        },
+        "objectTypes": {
+          "body": "interface_file__objectTypes",
+          "card": "0..1",
+          "doc": "Wrapper block containing engine object definitions (pdxmesh, arrows, particles, map text, charts)."
+        },
+        "spriteTypes": {
+          "body": "sprite_file__spriteTypes",
+          "card": "0..*",
+          "doc": "Wrapper block containing all sprite definitions (spriteType, textSpriteType, progress bars, shields, animated sprites)."
+        }
+      }
+    },
+    "sprite_file__empty": {},
+    "wrapper_bitmap_font": {
+      "fields": {
+        "bitmapfont": {
+          "body": "wrapper_bitmap_font__empty",
+          "card": "0..*",
+          "doc": "Bitmap font definition: name plus texture atlas path and colour tables."
+        }
+      }
+    },
+    "wrapper_bitmap_font__empty": {},
+    "wrapper_object": {
+      "fields": {
+        "LineChartType": {
+          "body": "wrapper_object__empty",
+          "card": "0..*",
+          "doc": "Line chart object sized in pixels with a line width."
+        },
+        "PieChartType": {
+          "body": "wrapper_object__empty",
+          "card": "0..*",
+          "doc": "Pie chart object sized in pixels."
+        },
+        "animatedmaptext": {
+          "body": "wrapper_object__empty",
+          "card": "0..*",
+          "doc": "Floating map text label with a scroll speed and one or more textblock style blocks."
+        },
+        "arrowType": {
+          "body": "wrapper_object__empty",
+          "card": "0..*",
+          "doc": "Map arrow object: texture, normal, and specular maps plus the arrow shader effect."
+        },
+        "pdxmesh": {
+          "body": "wrapper_object__empty",
+          "card": "0..*",
+          "doc": "Mesh object referencing a .mesh file with optional animations and texture overrides."
+        },
+        "pdxparticle": {
+          "body": "wrapper_object__empty",
+          "card": "0..*",
+          "doc": "Particle system object driven by a named particle type."
+        },
+        "tradeRouteType": {
+          "body": "wrapper_object__empty",
+          "card": "0..*",
+          "doc": "Trade route object: arrow texture set and a cull distance."
+        }
+      }
+    },
+    "wrapper_object__empty": {},
+    "wrapper_sprite": {
+      "fields": {
+        "corneredTileSpriteType": {
+          "body": "wrapper_sprite__empty",
+          "card": "0..*",
+          "doc": "Tiled sprite whose corners stay fixed while edges and centre stretch (size and bordersize)."
+        },
+        "cursor_offset": {
+          "body": "wrapper_sprite__empty",
+          "card": "0..1",
+          "doc": "Global cursor hotspot offset for every edit box: cursor_offset = { -5 -4 }."
+        },
+        "frameAnimatedSpriteType": {
+          "body": "wrapper_sprite__empty",
+          "card": "0..*",
+          "doc": "Frame-by-frame animated sprite (animation_rate_fps, looping, play_on_show, pause_on_loop)."
+        },
+        "maskedShieldType": {
+          "body": "wrapper_sprite__empty",
+          "card": "0..*",
+          "doc": "Shield sprite masking texturefile with an overlay grid (texturefile3, overlay_frames_per_row, overlay_rows)."
+        },
+        "progressbartype": {
+          "body": "wrapper_sprite__empty",
+          "card": "0..*",
+          "doc": "Progress bar sprite: texturefile1 fill over texturefile2 background, coloured through color and colortwo."
+        },
+        "spriteType": {
+          "body": "wrapper_sprite__empty",
+          "card": "0..*",
+          "doc": "Plain sprite: one texture file with optional frame slicing and load behaviour."
+        },
+        "textSpriteType": {
+          "body": "wrapper_sprite__empty",
+          "card": "0..*",
+          "doc": "Sprite whose texture is rendered behind dynamic text (names, numbers)."
+        }
+      }
+    },
+    "wrapper_sprite__empty": {}
+  }
+}

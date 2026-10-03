@@ -21,12 +21,13 @@ use crate::SourceFile;
 
 /// Current on-disk syntax-tree cache schema.
 ///
+/// v7 records the analyzer build stamp and invalidates frontends after any build update.
 /// v6: the CST moved from a nested node tree to the flat `SyntaxTree` arena, changing the
 /// postcard wire format of `ParsedFileCache`; older entries are ordinary misses.
-pub const CURRENT_PARSE_CACHE_SCHEMA_VERSION: u32 = 6;
+pub const CURRENT_PARSE_CACHE_SCHEMA_VERSION: u32 = 7;
 
 const MAX_PARSE_CACHE_BYTES: u64 = 64 * 1024 * 1024;
-const CACHE_NAMESPACE: &[u8] = b"paradoxcode/parse-cache/v6\0";
+const CACHE_NAMESPACE: &[u8] = b"paradoxcode/parse-cache/v7\0";
 static WRITE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 /// A user-local directory containing independent syntax-tree cache entries.
@@ -38,6 +39,7 @@ pub struct ParseCache {
 #[derive(Debug, Deserialize, Serialize)]
 struct ParseCacheEntry {
     schema_version: u32,
+    build_id: String,
     format: FileFormat,
     source_sha256: [u8; 32],
     parsed: ParsedFileCache,
@@ -121,6 +123,7 @@ impl ParseCache {
             return None;
         }
         if entry.schema_version != CURRENT_PARSE_CACHE_SCHEMA_VERSION
+            || entry.build_id != env!("PDC_ANALYZER_BUILD_ID")
             || entry.format != format
             || entry.source_sha256 != digest(source)
             || entry.parsed.format != format
@@ -145,6 +148,7 @@ impl ParseCache {
         }
         let entry = ParseCacheEntry {
             schema_version: CURRENT_PARSE_CACHE_SCHEMA_VERSION,
+            build_id: env!("PDC_ANALYZER_BUILD_ID").to_owned(),
             format,
             source_sha256: digest(source),
             parsed: parsed.cache_data(),
@@ -292,6 +296,31 @@ mod tests {
                 .is_none()
         );
         fs::remove_dir_all(directory).expect("cleanup");
+    }
+
+    #[test]
+    fn a_previous_analyzer_build_is_a_cache_miss() {
+        let directory = test_directory("stale-build");
+        let cache = ParseCache::new(directory.join("parse-cache"));
+        let file = file(&directory);
+        let source = "a = { b = yes }";
+        let parsed = parser::parse(FileFormat::Script, source);
+        cache
+            .store(&file, FileFormat::Script, source, &parsed)
+            .unwrap();
+        let path = cache.entry_path(&file);
+        let bytes =
+            zstd::bulk::decompress(&fs::read(&path).unwrap(), MAX_PARSE_CACHE_BYTES as usize)
+                .unwrap();
+        let (mut entry, _) = postcard::take_from_bytes::<ParseCacheEntry>(&bytes).unwrap();
+        entry.build_id = "previous-build".to_owned();
+        fs::write(
+            path,
+            zstd::bulk::compress(&postcard::to_allocvec(&entry).unwrap(), 3).unwrap(),
+        )
+        .unwrap();
+        assert!(cache.load(&file, FileFormat::Script, source).is_none());
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

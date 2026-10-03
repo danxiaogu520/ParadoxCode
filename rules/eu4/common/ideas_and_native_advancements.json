@@ -1,0 +1,787 @@
+{
+  "schemas": {
+    "customideas_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "customideas_body__ai_will_do",
+          "card": "0..1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it."
+        },
+        "auto_explore_adjacent_to_colony": {
+          "card": "0..1",
+          "override": true,
+          "value": "'yes'"
+        },
+        "category": {
+          "card": "0..1",
+          "value": "enum<power_categories>"
+        },
+        "cb_on_primitives": {
+          "card": "0..1",
+          "override": true,
+          "value": "'yes'"
+        },
+        "chance": {
+          "body": "customideas_body__chance",
+          "card": "0..1",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "default": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "enabled": {
+          "body": "trigger",
+          "card": "0..1",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "extra_manpower_at_religious_war": {
+          "card": "0..1",
+          "override": true,
+          "value": "'yes'"
+        },
+        "idea_claim_colonies": {
+          "card": "0..1",
+          "override": true,
+          "value": "'yes'"
+        },
+        "important": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "level_cost_1": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "level_cost_10": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "level_cost_2": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "level_cost_3": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "level_cost_4": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "level_cost_5": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "level_cost_6": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "level_cost_7": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "level_cost_8": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "level_cost_9": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "max_level": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "may_establish_frontier": {
+          "card": "0..1",
+          "override": true,
+          "value": "'yes'"
+        },
+        "may_explore": {
+          "card": "0..1",
+          "override": true,
+          "value": "'yes'"
+        },
+        "may_not_reduce_inflation": {
+          "card": "0..1",
+          "override": true,
+          "value": "'yes'"
+        },
+        "may_perform_slave_raid": {
+          "card": "0..1",
+          "override": true,
+          "value": "'yes'"
+        },
+        "no_religion_penalty": {
+          "card": "0..1",
+          "override": true,
+          "value": "'yes'"
+        },
+        "reduced_stab_impacts": {
+          "card": "0..1",
+          "override": true,
+          "value": "'yes'"
+        }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
+    },
+    "customideas_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "customideas_body__chance": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "value": "float"
+        },
+        "modifier": {
+          "body": "customideas_body__chance__modifier",
+          "card": "0..*",
+          "doc": "Block of modifiers applied while the containing entry is active."
+        }
+      }
+    },
+    "customideas_body__chance__modifier": {
+      "fields": {
+        "AND": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "AND"
+          },
+          "doc": "Evaluates to true when every trigger inside the block is true.",
+          "override": true
+        },
+        "NOT": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "NOT"
+          },
+          "doc": "Evaluates to true when the trigger inside the block is false.",
+          "override": true
+        },
+        "OR": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "OR"
+          },
+          "doc": "Evaluates to true when at least one trigger inside the block is true.",
+          "override": true
+        },
+        "else": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "branch_continue"
+          },
+          "doc": "Follows if/else_if; executes when no previous branch ran.",
+          "override": true
+        },
+        "exclude_from_progress": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Excludes the triggers inside for the trigger counter in the UI, used in Age Objeciives.",
+          "override": true
+        },
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float"
+        },
+        "hidden_trigger": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Hides the enclosed conditions so that they are still required but cannot be seen by human players.",
+          "override": true
+        },
+        "scope_field": {
+          "body": "trigger",
+          "card": "0..*",
+          "override": true
+        },
+        "this": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Switches the block's scope to the current scope; block contents are triggers.",
+          "override": true
+        }
+      },
+      "include": [
+        "keys__trigger"
+      ],
+      "patterns": [
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the country tags listed /Europa Universalis IV/common/country_tags",
+          "key": "ref<country_tag>",
+          "scope": {
+            "push": "country"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has hired an advisor of the specified type which has at least level X.",
+          "key": "ref<advisor_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[1..5]"
+        },
+        {
+          "body": "trigger__area_used",
+          "card": "0..*",
+          "doc": "Refers to the areas listed /Europa Universalis IV/map/areas.txt",
+          "key": "ref<area.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X buildings from the specified building type.",
+          "key": "ref<building>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__colonial_region",
+          "card": "0..*",
+          "doc": "Refers to any colonial region found in /Europa Universalis IV/common/colonial_regions/",
+          "key": "ref<colonial_region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__continent",
+          "card": "0..*",
+          "doc": "Refers to any continent found in /Europa Universalis IV/map/continent.txt",
+          "key": "ref<continent>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X ideas from the specified idea group.",
+          "key": "ref<idea_group>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[0..8]"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the support for the specified institution in the province is at least X.",
+          "key": "ref<institution>",
+          "scope": {
+            "in": [
+              "province"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "body": "trigger__province_group_used",
+          "card": "0..*",
+          "doc": "Refers to the province_group listed /Europa Universalis IV/map/provincegroup.txt",
+          "key": "ref<province_group.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<province_id>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__region",
+          "card": "0..*",
+          "doc": "Refers to any region found in /Europa Universalis IV/map/region.txt",
+          "key": "ref<region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has a tolerance of at least X of the specified religion. Note: No correct localisation.",
+          "key": "ref<religion>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "card": "0..*",
+          "key": "ref<scripted_trigger>",
+          "value": "bool"
+        },
+        {
+          "body": "trigger__scripted_trigger",
+          "card": "0..*",
+          "key": "ref<scripted_trigger>"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X vassals.",
+          "key": "ref<subject_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__superregion",
+          "card": "0..*",
+          "doc": "Refers to any superregion found in /Europa Universalis IV/map/superregion.txt",
+          "key": "ref<superregion>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__trade_company",
+          "card": "0..*",
+          "doc": "Refers to any trade company found in /Europa Universalis IV/common/trade_companies//",
+          "key": "ref<trade_company>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X provinces producing the specified trade good.",
+          "key": "ref<trade_good>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Scopes to the province, which is also a trade node (defined in common/tradenodes)",
+          "key": "ref<trade_node>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "key": "link"
+        }
+      ]
+    },
+    "idea_group_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "idea_group_body__ai_will_do",
+          "card": "0..1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "override": true
+        },
+        "bonus": {
+          "body": "idea_group_body__bonus",
+          "card": "1",
+          "override": true
+        },
+        "category": {
+          "card": "0..1",
+          "value": "enum<power_categories>"
+        },
+        "effect": {
+          "body": "effect",
+          "card": "0..1",
+          "doc": "Block of effects executed by the containing entry.",
+          "override": true
+        },
+        "free": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "important": {
+          "card": "0..1",
+          "override": true,
+          "value": "'yes'"
+        },
+        "removed_effect": {
+          "body": "effect",
+          "card": "0..1",
+          "override": true
+        },
+        "start": {
+          "body": "modifier",
+          "card": "0..1",
+          "override": true
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "0..1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        }
+      },
+      "patterns": [
+        {
+          "body": "idea_group_body__idea",
+          "card": "0..7",
+          "key": "def<idea>",
+          "override": true
+        }
+      ]
+    },
+    "idea_group_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "idea_group_body__bonus": {
+      "fields": {
+        "effect": {
+          "body": "effect",
+          "card": "0..1",
+          "doc": "Block of effects executed by the containing entry.",
+          "override": true
+        },
+        "removed_effect": {
+          "body": "effect",
+          "card": "0..1",
+          "override": true
+        }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
+    },
+    "idea_group_body__idea": {
+      "fields": {
+        "effect": {
+          "body": "effect",
+          "card": "0..1",
+          "doc": "Block of effects executed by the containing entry.",
+          "override": true
+        },
+        "removed_effect": {
+          "body": "effect",
+          "card": "0..1",
+          "override": true
+        }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
+    },
+    "idea_group_type_body": {
+      "fields": {
+        "category": {
+          "card": "0..1",
+          "value": "scalar"
+        },
+        "free": {
+          "card": "0..1",
+          "value": "'yes'"
+        }
+      }
+    }
+  }
+}

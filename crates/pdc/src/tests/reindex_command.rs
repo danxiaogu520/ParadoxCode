@@ -267,7 +267,11 @@ fn validate_workspace_filters_open_document_severity_overrides() {
     let events = root.join("events");
     fs::create_dir_all(&events).expect("events directory");
     let source = events.join("open-invalid.txt");
-    fs::write(&source, "scope = nowhere\n").expect("invalid source");
+    fs::write(
+        &source,
+        "country_event = { id = fixture.1 option = {} trigger = { is_year = tomorrow } }\n",
+    )
+    .expect("invalid source");
     let uri = canonical_uri(&source);
     let input = frames([
         json!({
@@ -288,7 +292,7 @@ fn validate_workspace_filters_open_document_severity_overrides() {
                 "uri":uri,
                 "languageId":"eu4",
                 "version":1,
-                "text":"scope = nowhere\n"
+                "text":"country_event = { id = fixture.1 option = {} trigger = { is_year = tomorrow } }\n"
             }
         }}),
         json!({

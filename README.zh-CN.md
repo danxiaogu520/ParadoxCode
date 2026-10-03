@@ -108,7 +108,7 @@ rules + game -> engine / ide
 
 ## 从源码构建
 
-前置条件：**Rust 1.98 或更新版本**，以及 **Node.js 24 LTS**（用于 VS Code 扩展工具链）。
+前置条件：**Rust 1.88 或更新版本**，以及 **Node.js 24 LTS**（用于 VS Code 扩展工具链）。
 
 ```bash
 git clone https://github.com/danxiaogu520/ParadoxCode.git
@@ -127,21 +127,20 @@ cargo tools gates
 
 默认的 `all` 代表默认确定性本地分组（优化后的 `perf` 仍需显式运行），不代表已经具备发布资格。Pull Request CI 负责干净检出与跨平台覆盖，分支保护将其 `Conclusion` 聚合作为唯一合并权威。依赖漏洞数据库与优化 benchmark 作为定时审计运行，避免外部状态变化阻塞无关 PR。完整的本地反馈、合并门禁、定时审计、发布门禁和人工验收职责见 [docs/validation.md](docs/validation.md)。
 
-使用 `bake` 校验开发者维护的第一方规则源并重新生成发布 manifest：
+校验开发者维护的第一方规则源并重新生成 IR manifest：
 
 ```bash
-cargo run -p rules --bin bake -- build \
+cargo run -p rules --bin bake-ir -- build \
   --source rules/eu4 \
-  --manifest rules/manifest.json
+  --manifest rules/ir-manifest.json
 ```
 
-官方 `paradoxcode` 二进制内嵌第一方 JSON 规则源，启动时直接编译进内存规则集；不存在持久化的规则工件。
+官方 `paradoxcode` 二进制内嵌构建时检查并编译的 RulesIr 工件，启动时解码并恢复查询索引。
+生产语义直接读取 IR。
 
-EU4 规则源按职责拆分：`catalog/` 保存文件类别、符号描述符与规范化记录，`semantic/` 按
-effect、trigger、modifier、on_action 以及 event、decision、mission、history 等目录语义组织规则，
-`types/`、`values/`、`localisation/` 保存支撑表，`profile/` 保存 EU4 的扫描路径、符号、作用域、
-动态值和语义继承配置。`rules/eu4/manifest.json` 显式列出全部片段；编译器把它们合并成一个
-逻辑模型，profile 与语义规则共同参与同一个规范 `rule_hash`。
+`rules/eu4/` 按游戏领域组织规则，共享 schema、类型、trait、作用域和修正位于 `core/`。
+`game.json` 声明包身份及游戏配置；普通 JSON 文件递归发现并按规范化路径顺序合并。
+IR 指纹覆盖编译后的 arena、字符串表、溯源及 profile。
 
 `paradoxcode` 要求现代 LSP 客户端在 initialize 请求中提供至少一个 `workspaceFolders` 条目。仅发送已弃用
 `rootUri` 的旧客户端不受支持，并会收到 `INVALID_PARAMS`；请升级编辑器或语言客户端。
@@ -174,7 +173,7 @@ node editors/vscode/scripts/diagnose.mjs \
 | --- | --- |
 | `crates/text` | 文本、范围、位置与路径原语 |
 | `crates/parser` | 损失感知解析器与规范化格式化器 |
-| `crates/rules` | 泛型规则 schema、运行时与第一方编译器（`bake`） |
+| `crates/rules` | 泛型规则 schema、运行时与第一方编译器（`rulec`、`bake-ir`） |
 | `crates/game` | EU4 profile：游戏发现、本地配置与 EU4 任务模型 |
 | `crates/vfs` | 源根、工作区扫描与稳定的文档数据模型 |
 | `crates/hir` | 规则感知的语义降阶（定义、作用域、模板） |
@@ -184,11 +183,11 @@ node editors/vscode/scripts/diagnose.mjs \
 | `crates/pdc` | 语言服务器 crate：LSP 生命周期与协议边界（以 `paradoxcode` 二进制形式发布） |
 | `crates/tools` | 仓库工具链（`check`、`release`、缓存构建），供 CI 与维护者使用 |
 | `editors/vscode/` | VS Code 扩展：服务器引导、引导流程、任务树预览 |
-| `rules/eu4/` | 权威第一方 EU4 规则树（catalog、semantic、支撑表与 profile） |
+| `rules/eu4/` | 权威第一方 EU4 RulesIr 规则源 |
 | `fuzz/` | 解析、编辑、格式化与 HIR 模糊测试目标 |
 
-当前第一方 EU4 规则面向游戏版本 **1.37.5**（8,525 条语义规则、121 个文件类别、2,667 个符号描述符）。
-`rules/manifest.json` 记录 schema/source 版本、规范 `rule_hash` 与工件校验和。
+当前第一方 EU4 规则面向游戏版本 **1.37.5**。
+`rules/ir-manifest.json` 记录源版本、编译后的 `rule_hash` 及 arena 大小。
 
 ## 发布
 

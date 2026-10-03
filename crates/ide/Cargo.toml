@@ -43,4 +43,5 @@ name = "scripted_localisation"
 harness = false
 
 [dev-dependencies]
+serde_json = "1.0"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }

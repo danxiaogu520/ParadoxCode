@@ -38,19 +38,15 @@ pub(crate) fn file_uri_string(path: &std::path::Path) -> String {
 }
 
 pub(crate) fn eu4_server(options: InitializeOptions) -> Result<LspServer, LspError> {
-    LspServer::try_new_with_rules(
-        options,
-        game::eu4::first_party_rules()?,
-        game::eu4::profile(),
-    )
+    LspServer::try_new_production(options, game::eu4::runtime_rules()?, game::eu4::profile())
 }
 
-/// An analysis host with the embedded first-party rules — the standard base for
-/// Vanilla-cache fixtures that build or compare `IndexCache` snapshots.
 pub(crate) fn first_party_host() -> AnalysisHost {
-    AnalysisHost::with_profile(
-        game::eu4::first_party_rules().expect("embedded rules"),
-        game::eu4::profile(),
+    let ir = game::eu4::first_party_ir().expect("embedded IR");
+    AnalysisHost::with_ir(
+        rules::RuleSet::from_ir_catalog(&ir),
+        ir.game.profile.clone(),
+        ir,
     )
 }
 
@@ -236,8 +232,7 @@ pub(crate) fn stale_cache_fixture(container: &std::path::Path) -> std::path::Pat
     let vanilla = dunce::canonicalize(&vanilla).expect("canonical Vanilla directory");
     let cache_path = container.join("vanilla.pdcindex");
 
-    let bootstrap_rules = game::eu4::bootstrap_rules();
-    let mut stale_host = AnalysisHost::with_profile(bootstrap_rules, game::eu4::profile());
+    let mut stale_host = first_party_host();
     stale_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
@@ -246,6 +241,13 @@ pub(crate) fn stale_cache_fixture(container: &std::path::Path) -> std::path::Pat
     stale_host.refresh_source_roots().expect("scan Vanilla");
     let stale_cache = IndexCache::from_snapshot(&stale_host.snapshot()).expect("stale cache");
     stale_cache.save(&cache_path).expect("save stale cache");
+    rusqlite::Connection::open(&cache_path)
+        .unwrap()
+        .execute(
+            "UPDATE metadata SET value = ?1 WHERE key = 'build_id'",
+            [b"previous-analyzer-build".as_slice()],
+        )
+        .unwrap();
     cache_path
 }
 
@@ -258,8 +260,7 @@ pub(crate) fn valid_cache_fixture(container: &std::path::Path) -> std::path::Pat
     let vanilla = dunce::canonicalize(&vanilla).expect("canonical Vanilla directory");
     let cache_path = container.join("vanilla.pdcindex");
 
-    let rules = game::eu4::first_party_rules().expect("embedded rules");
-    let mut host = AnalysisHost::with_profile(rules, game::eu4::profile());
+    let mut host = first_party_host();
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,

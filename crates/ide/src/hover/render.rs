@@ -28,10 +28,6 @@ impl HoverModel {
         self.sections.push(section);
     }
 
-    pub(crate) fn extend_sections(&mut self, sections: impl IntoIterator<Item = String>) {
-        self.sections.extend(sections);
-    }
-
     /// Renders the title and sections joined by blank lines.
     pub(crate) fn render(&self) -> String {
         std::iter::once(self.title.as_str())

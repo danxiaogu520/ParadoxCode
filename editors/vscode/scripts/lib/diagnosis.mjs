@@ -70,7 +70,15 @@ export async function handshake(client, options) {
   client.notify('initialized', {});
   const vanillaStarted = Date.now();
   const vanillaMessage = await waitForVanillaReady(client, options.timeoutMs);
-  console.error(`Vanilla cache ready in ${Date.now() - vanillaStarted} ms`);
+  console.error(`Vanilla cache progress finished in ${Date.now() - vanillaStarted} ms`);
+  if (options.vanillaSource) {
+    const summary = await client.request('pdc/workspaceSummary', undefined, options.fileTimeoutMs);
+    const expectedRoot = resolve(options.vanillaSource);
+    if (!summary?.roots?.some((root) => root.kind === 'vanilla' && resolve(root.path) === expectedRoot)
+        || !summary?.fileCounts?.total) {
+      throw new LspProtocolError(`The selected Vanilla source was not indexed; build its cache before running the audit. Vanilla progress result: ${vanillaMessage}`);
+    }
+  }
   return vanillaMessage;
 }
 
@@ -87,6 +95,7 @@ export async function connectClient(options) {
 async function waitForVanillaReady(client, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let started = false;
+  let progressToken;
   let lastReportedPercentage = -10;
   while (true) {
     const remaining = deadline - Date.now();
@@ -96,10 +105,12 @@ async function waitForVanillaReady(client, timeoutMs) {
     if (message.method !== '$/progress') continue;
     const value = message.params?.value;
     const progressText = `${value?.title || ''} ${value?.message || ''}`.toLowerCase();
-    if (value?.kind === 'begin' && progressText.includes('vanilla')) {
+    if (!started && value?.kind === 'begin' && progressText.includes('vanilla')) {
       started = true;
+      progressToken = message.params.token;
       console.error(value.message || 'Vanilla cache loading started');
     }
+    if (!started || message.params?.token !== progressToken) continue;
     if (
       started &&
       value?.kind === 'report' &&
@@ -109,7 +120,7 @@ async function waitForVanillaReady(client, timeoutMs) {
       lastReportedPercentage = value.percentage;
       console.error(value.message || `Vanilla cache loading: ${value.percentage}%`);
     }
-    if (started && value?.kind === 'end') return value.message || 'Vanilla cache loading completed';
+    if (value?.kind === 'end') return value.message || 'Vanilla cache loading completed';
   }
 }
 

@@ -1,34 +1,43 @@
 //! Game-independent PDX rules runtime and first-party compiler.
 //!
-//! This crate owns the normalized runtime model, validation, the canonical logical hash, and
-//! the first-party rule compiler (`bake`). Rules ship as the embedded JSON source bundle and
-//! are compiled straight into the in-memory query indexes; there is no persisted rules
-//! artifact.
+//! This crate owns rules validation, the canonical logical hash, the typed IR, and the
+//! first-party artifact compiler (`bake`). Production rules are checked and lowered at build
+//! time, then embedded as a deterministic IR artifact.
 
-pub mod rulec;
+/// Checked, deterministic Rules IR artifacts for build-time embedding.
+pub mod bake;
 
-mod canonical;
+/// Rules-v2 language front end (see `docs/rules-language.md`): the type-expression
+/// mini-syntax, the source model, and the compile-time semantic checks used by
+/// the production IR compiler.
+pub mod bundle;
+pub mod compile;
+pub mod expr;
+pub mod format;
+pub mod ir;
+pub mod lower;
+pub mod replacement;
+pub mod source;
+
+mod catalog;
+mod hash;
 mod matcher;
-mod model;
 mod profile;
 mod runtime;
 
-pub use canonical::RuleHash;
-pub use matcher::{FileMatcher, KeyMatcher, TemplateParameter, TypedPrefixOperand, ValueMatcher};
-pub use model::{
-    DynamicDefinitionDescriptor, DynamicDefinitionUsage, FileCategory, FileResolutionPolicy,
-    ParserKind, RuleRecord, RuleShape, RulesModel, SemanticModel, SemanticRule, SymbolBinding,
-    SymbolBindingCondition, SymbolDescriptor, SymbolResolutionPolicy, TypeDescriptor,
-    TypeRootScope, entry_wrapper_reroutes,
-};
+pub use catalog::{FileCategory, FileResolutionPolicy, ParserKind};
+pub use hash::RuleHash;
+pub use matcher::FileMatcher;
 pub use profile::{
     GameProfile, ProfileConditionalDefinitionRule, ProfileContainerDefinitionRule,
-    ProfileContainerValueDefinitionRule, ProfileDefinitionRule, ProfileHoverCardSpec,
-    ProfileMatchMode, ProfileMemberNameSuffixRule, ProfileReferenceRule, ProfileRootEntryInsertion,
-    ProfileRootEntrySource, ProfileRootEntrySpec, ProfileRootScopeRule, ProfileScopeCompatibility,
-    ProfileTextMatcher, ProfileTokenDefinitionRule, ProfileValueDefinitionRule, SourceEncoding,
+    ProfileContainerValueDefinitionRule, ProfileDefinitionRule, ProfileExecutablePaths,
+    ProfileHoverCardSpec, ProfileInstallSpec, ProfileMatchMode, ProfileMemberNameSuffixRule,
+    ProfileMissionNodeFields, ProfileMissionTreeFields, ProfileMissionViewSpec,
+    ProfileReferenceRule, ProfileRootEntryInsertion, ProfileRootEntrySource, ProfileRootEntrySpec,
+    ProfileRootScopeRule, ProfileScopeCompatibility, ProfileTextMatcher,
+    ProfileTokenDefinitionRule, ProfileValueDefinitionRule, SourceEncoding,
 };
 pub use runtime::{RuleSet, RulesError};
 
 #[cfg(test)]
-mod tests;
+mod catalog_tests;

@@ -2,6 +2,219 @@ use super::*;
 use text::AbsPath;
 
 #[test]
+fn ir_parameterized_symbol_membership_and_links_survive_cache_and_overlay_masking() {
+    use ::index::IndexSymbolFacts;
+    use rules::ir::SymbolFacts;
+    let root = temp_root("ir-parameterized-symbols");
+    fs::create_dir_all(root.join("common/scripted_effects")).unwrap();
+    fs::create_dir_all(root.join("events")).unwrap();
+    let writer = root.join("common/scripted_effects/defs.txt");
+    fs::write(&writer, "writer = { set_country_flag = PREFIX_$name$_END save_event_target_as = TARGET_$name$_END }").unwrap();
+    fs::write(root.join("events/use.txt"), "country_event = { id = patterns.1 trigger = { has_country_flag = PREFIX_alpha_END } immediate = { event_target:TARGET_alpha_END = { set_country_flag = linked_pattern_flag } } }").unwrap();
+    let ir = game::eu4::first_party_ir().unwrap();
+    let mut host = AnalysisHost::with_ir(
+        rules::RuleSet::from_ir_catalog(&ir),
+        ir.game.profile.clone(),
+        ir.clone(),
+    );
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Vanilla,
+        AbsPath::normalize(&fs::canonicalize(&root).unwrap()),
+    )]));
+    host.refresh_source_roots().unwrap();
+    let assert_patterns = |index: &WorkspaceIndex| {
+        let facts = IndexSymbolFacts::new(&ir, index, &[]);
+        for (kind, name) in [
+            ("country_flag", "PREFIX_alpha_END"),
+            ("event_target", "TARGET_alpha_END"),
+        ] {
+            assert!(facts.type_member(ir.type_by_name(kind).unwrap(), name));
+            if !ir.type_info(ir.type_by_name(kind).unwrap()).open {
+                assert!(!facts.type_member(ir.type_by_name(kind).unwrap(), "unrelated_name"));
+            }
+        }
+        assert!(
+            index
+                .references_iter()
+                .any(|(_, reference)| reference.kind.as_ref() == "event_target"
+                    && reference.name.as_ref() == "TARGET_alpha_END")
+        );
+    };
+    assert_patterns(host.snapshot().index());
+    let path = root.join("cache.pdcindex");
+    IndexCache::from_snapshot(&host.snapshot())
+        .unwrap()
+        .save(&path)
+        .unwrap();
+    let cache = IndexCache::load(&path).unwrap();
+    assert_patterns(cache.index());
+    let original_file = cache
+        .index()
+        .active_definition("scripted_effect", "writer")
+        .unwrap()
+        .file_id;
+    let id = DocumentId::new(format!("file://{}", writer.display()));
+    host.open_document(
+        id.clone(),
+        1,
+        "writer = { }".into(),
+        Some(AbsPath::normalize(&writer)),
+    )
+    .unwrap();
+    let snapshot = host.snapshot();
+    let overlays = vec![std::sync::Arc::new(
+        snapshot.document(&id).unwrap().hir().unwrap().clone(),
+    )];
+    let hidden = std::collections::BTreeSet::from([original_file]);
+    let facts = IndexSymbolFacts::with_overlay_files(&ir, cache.index(), &overlays, &hidden);
+    assert!(!facts.type_member(ir.type_by_name("country_flag").unwrap(), "PREFIX_alpha_END"));
+    drop(snapshot);
+    host.close_document(&id).unwrap();
+    assert_patterns(host.snapshot().index());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn ir_callable_payload_symbols_and_dependent_links_survive_cache_roundtrip() {
+    let root = temp_root("ir-payload-symbols");
+    fs::create_dir_all(root.join("common/scripted_effects")).unwrap();
+    fs::create_dir_all(root.join("events")).unwrap();
+    fs::write(
+        root.join("common/scripted_effects/defs.txt"),
+        "writer = { $payload$ tooltip = { $payload$ } } reader = { if = { limit = { tag = $country$ } } }",
+    )
+    .unwrap();
+    fs::write(root.join("events/defs.txt"), "country_event = { id = payload.1 immediate = { writer = { payload = \"set_country_flag = payload_flag save_event_target_as = payload_target\" } reader = { country = FRA } } }").unwrap();
+    fs::write(root.join("events/use.txt"), format!("# {}\ncountry_event = {{ id = payload.2 trigger = {{ has_country_flag = payload_flag }} immediate = {{ event_target:payload_target = {{ set_country_flag = linked_flag }} }} }}", "padding ".repeat(40_000))).unwrap();
+    for i in 0..40 {
+        fs::write(root.join(format!("events/batch_{i}.txt")), format!(
+            "country_event = {{ id = batch.{i} trigger = {{ has_country_flag = payload_flag }} }}",
+        )).unwrap();
+    }
+    let ir = game::eu4::first_party_ir().unwrap();
+    let rules = rules::RuleSet::from_ir_catalog(&ir);
+    let mut host = AnalysisHost::with_ir(rules.clone(), ir.game.profile.clone(), ir.clone());
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Vanilla,
+        AbsPath::normalize(&fs::canonicalize(&root).unwrap()),
+    )]));
+    let mut serial_host = host.clone();
+    let serial_limits = WorkspaceScanLimits {
+        max_workers: 1,
+        ..WorkspaceScanLimits::default()
+    };
+    serial_host
+        .refresh_source_roots_with_limits(serial_limits)
+        .unwrap();
+    host.refresh_source_roots().unwrap();
+    assert_eq!(host.snapshot().index(), serial_host.snapshot().index());
+    let assert_symbols = |index: &WorkspaceIndex| {
+        for (kind, name) in [
+            ("country_flag", "payload_flag"),
+            ("event_target", "payload_target"),
+            ("country_flag", "linked_flag"),
+        ] {
+            assert_eq!(
+                index
+                    .definitions_iter()
+                    .filter(|def| def.kind.as_ref() == kind && def.name.as_ref() == name)
+                    .count(),
+                1,
+                "{kind}:{name}"
+            );
+        }
+        assert!(
+            index
+                .references_iter()
+                .any(|(_, reference)| reference.kind.as_ref() == "country_flag"
+                    && reference.name.as_ref() == "payload_flag")
+        );
+        assert!(
+            index
+                .references_iter()
+                .any(|(_, reference)| reference.kind.as_ref() == "event_target"
+                    && reference.name.as_ref() == "payload_target")
+        );
+        assert_eq!(
+            index
+                .references_iter()
+                .filter(|(_, reference)| reference.kind.as_ref() == "country_tag"
+                    && reference.name.as_ref() == "FRA")
+                .count(),
+            1
+        );
+    };
+    assert_symbols(host.snapshot().index());
+    // Compare the optimized dependency replay against a full rebuild of every
+    // file on every pass. The payload target unlocks a definition in another
+    // file, so this also exercises propagation beyond the first replay.
+    let snapshot = host.snapshot();
+    let files = snapshot.source_files();
+    let mut full = WorkspaceIndex::from_shards(files.values().map(|file| {
+        ::index::build_file_state_with_ir(
+            file,
+            fs::read_to_string(&file.physical_path).unwrap(),
+            1,
+            &rules,
+            &ir.game.profile,
+            &ir,
+            None,
+        )
+        .shard_handle()
+    }));
+    for pass in 0..32 {
+        let facts = ::index::IndexSymbolFacts::new(&ir, &full, &[]);
+        let rebuilt = WorkspaceIndex::from_shards(files.values().map(|file| {
+            ::index::build_file_state_with_ir_and_facts(
+                file,
+                fs::read_to_string(&file.physical_path).unwrap(),
+                1,
+                &rules,
+                &ir.game.profile,
+                &ir,
+                &facts,
+                None,
+            )
+            .shard_handle()
+        }));
+        let stable = full
+            .shards
+            .iter()
+            .all(|(id, shard)| shard.same_symbol_facts(&rebuilt.shards[id]));
+        full = rebuilt;
+        if stable {
+            break;
+        }
+        assert!(pass < 31, "reference replay must stabilize");
+    }
+    assert_eq!(snapshot.index().shards, full.shards);
+    drop(snapshot);
+    let path = root.join("cache.pdcindex");
+    IndexCache::from_snapshot(&host.snapshot())
+        .unwrap()
+        .save(&path)
+        .unwrap();
+    let cache = IndexCache::load(&path).unwrap();
+    assert_symbols(cache.index());
+    let refreshed = cache
+        .refresh_with_ir(&rules, &ir.game.profile, &ir)
+        .unwrap();
+    assert_symbols(refreshed.index());
+    fs::write(
+        root.join("common/scripted_effects/defs.txt"),
+        "writer = { custom_tooltip = $payload$ }",
+    )
+    .unwrap();
+    let refreshed = refreshed
+        .refresh_with_ir(&rules, &ir.game.profile, &ir)
+        .unwrap();
+    assert!(!refreshed.index().definitions_iter().any(|def| def.name.as_ref() == "payload_flag" || def.name.as_ref() == "payload_target"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn previous_cache_schema_is_rejected_before_table_loading() {
     let root = temp_root("old-schema-cache");
     let vanilla = root.join("vanilla");
@@ -12,7 +225,7 @@ fn previous_cache_schema_is_rejected_before_table_loading() {
     )
     .expect("schema fixture");
 
-    let mut host = eu4_host_with(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host_with(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
@@ -56,7 +269,7 @@ fn vanilla_cache_preserves_dynamic_definition_references_without_hir() {
     )
     .expect("dynamic call");
 
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut host = eu4_host_with(rules);
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
@@ -127,6 +340,114 @@ fn vanilla_cache_preserves_dynamic_definition_references_without_hir() {
 }
 
 #[test]
+fn ir_workspace_scan_resolves_cross_file_dynamic_calls_from_candidate_definitions() {
+    let root = temp_root("ir-cross-file-ref");
+    let project = root.join("project");
+    fs::create_dir_all(project.join("common/scripted_effects")).expect("definitions directory");
+    fs::create_dir_all(project.join("events")).expect("events directory");
+    fs::write(
+        project.join("common/scripted_effects/defs.txt"),
+        "indexed_effect = { add_treasury = 1 }\n",
+    )
+    .expect("write dynamic definition");
+    fs::write(
+        project.join("events/use.txt"),
+        "country_event = { immediate = { indexed_effect = { } } }\n",
+    )
+    .expect("write dynamic call");
+
+    let rules = game::eu4::runtime_rules().expect("first-party legacy rules");
+    let ir = game::eu4::first_party_ir().expect("first-party rules IR");
+    let mut host = AnalysisHost::with_ir(rules, game::eu4::profile(), ir);
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Project,
+        AbsPath::normalize(&fs::canonicalize(&project).expect("canonical project root")),
+    )]));
+    host.refresh_source_roots()
+        .expect("scan with two-pass IR lowering");
+    let snapshot = host.snapshot();
+    assert!(
+        snapshot
+            .index()
+            .definitions_with_state("scripted_effect", "indexed_effect")
+            .iter()
+            .any(|(_, active)| *active),
+        "shards={:?}",
+        snapshot
+            .index()
+            .shards
+            .iter()
+            .map(|(id, shard)| (
+                *id,
+                shard
+                    .definitions
+                    .iter()
+                    .map(|d| (d.kind.as_ref(), d.name.as_ref(), d.active))
+                    .collect::<Vec<_>>()
+            ))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        snapshot.index().references_iter().any(|(_, reference)| {
+            reference.kind.as_ref() == "scripted_effect"
+                && reference.name.as_ref() == "indexed_effect"
+        }),
+        "second-pass HIR should resolve the call against first-pass definitions; refs={:?}",
+        snapshot
+            .index()
+            .references_iter()
+            .map(|(_, reference)| (reference.kind.as_ref(), reference.name.as_ref()))
+            .collect::<Vec<_>>()
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn ir_cache_refresh_relower_unchanged_references_after_definition_appears() {
+    let root = temp_root("ir-cache-cross-file-ref");
+    let project = root.join("project");
+    fs::create_dir_all(project.join("common/scripted_effects")).expect("definitions directory");
+    fs::create_dir_all(project.join("events")).expect("events directory");
+    fs::write(
+        project.join("events/use.txt"),
+        "country_event = { immediate = { newly_added_effect = { } } }\n",
+    )
+    .expect("write call before definition");
+    let rules = game::eu4::runtime_rules().expect("first-party legacy rules");
+    let ir = game::eu4::first_party_ir().expect("first-party rules IR");
+    let mut host = AnalysisHost::with_ir(rules.clone(), game::eu4::profile(), ir.clone());
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Project,
+        AbsPath::normalize(&fs::canonicalize(&project).expect("canonical project root")),
+    )]));
+    host.refresh_source_roots().expect("initial scan");
+    let cache = IndexCache::from_snapshot(&host.snapshot()).expect("cache before definition");
+    assert!(!cache.index().references_iter().any(|(_, reference)| {
+        reference.kind.as_ref() == "scripted_effect"
+            && reference.name.as_ref() == "newly_added_effect"
+    }));
+
+    fs::write(
+        project.join("common/scripted_effects/new.txt"),
+        "newly_added_effect = { add_treasury = 1 }\n",
+    )
+    .expect("write new definition");
+    let refreshed = cache
+        .refresh_with_ir(&rules, &game::eu4::profile(), &ir)
+        .expect("refresh rebuilds cross-file facts");
+    assert!(
+        refreshed.index().references_iter().any(|(_, reference)| {
+            reference.kind.as_ref() == "scripted_effect"
+                && reference.name.as_ref() == "newly_added_effect"
+        }),
+        "unchanged call file must be re-lowered after workspace definitions change"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn definition_attribute_summaries_survive_live_and_cached_indexing() {
     let root = temp_root("attr-cache");
     let vanilla = root.join("vanilla");
@@ -138,7 +459,7 @@ fn definition_attribute_summaries_survive_live_and_cached_indexing() {
     )
     .expect("event modifier");
 
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut host = eu4_host_with(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
@@ -185,7 +506,7 @@ fn corrupted_navigation_position_is_rejected_without_symbol_table_scans() {
     )
     .expect("vanilla event");
 
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut host = eu4_host_with(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
@@ -233,7 +554,7 @@ fn refreshed_cache_reindexes_changed_files_and_drops_deleted_ones() {
     )
     .expect("definition fixture");
 
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut host = eu4_host_with(rules.clone());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
@@ -261,7 +582,11 @@ fn refreshed_cache_reindexes_changed_files_and_drops_deleted_ones() {
     .expect("added fixture");
     let loaded = IndexCache::load(&cache_path).expect("load cache");
     let refreshed = loaded
-        .refresh(&rules, &game::eu4::profile())
+        .refresh_with_ir(
+            &rules,
+            &game::eu4::profile(),
+            &game::eu4::first_party_ir().unwrap(),
+        )
         .expect("refresh");
     assert_eq!(refreshed.metadata().indexed_files, 3);
     assert_ne!(
@@ -331,7 +656,11 @@ fn refreshed_cache_reindexes_changed_files_and_drops_deleted_ones() {
     );
     // A refresh with no changes reproduces the same tree fingerprint.
     let refreshed_again = refreshed
-        .refresh(&rules, &game::eu4::profile())
+        .refresh_with_ir(
+            &rules,
+            &game::eu4::profile(),
+            &game::eu4::first_party_ir().unwrap(),
+        )
         .expect("idempotent refresh");
     assert_eq!(
         refreshed_again.metadata().source_fingerprint,
@@ -345,7 +674,7 @@ fn refreshed_cache_reindexes_changed_files_and_drops_deleted_ones() {
 }
 
 #[test]
-fn refresh_rejects_stale_rules_and_mismatched_games() {
+fn refresh_rejects_stale_builds_and_mismatched_games() {
     let root = temp_root("refresh-reject");
     let vanilla = root.join("vanilla");
     fs::create_dir_all(vanilla.join("events")).expect("event directory");
@@ -368,15 +697,38 @@ fn refresh_rejects_stale_rules_and_mismatched_games() {
     cache.save(&cache_path).expect("save cache");
     let loaded = IndexCache::load(&cache_path).expect("load cache");
 
-    let first_party = game::eu4::first_party_rules().expect("first-party rules");
-    assert_ne!(
-        first_party.rule_hash().to_hex(),
-        loaded.metadata().rule_hash,
-        "bootstrap and first-party rules must differ for this test"
+    // Hashes are report identity only; a build stamp alone decides cache compatibility.
+    let database = rusqlite::Connection::open(&cache_path).unwrap();
+    for key in ["rule_hash", "ir_hash"] {
+        database
+            .execute(
+                "UPDATE metadata SET value = ?1 WHERE key = ?2",
+                rusqlite::params![b"report-only".as_slice(), key],
+            )
+            .unwrap();
+    }
+    let compatible = IndexCache::load(&cache_path).unwrap();
+    assert!(
+        compatible
+            .refresh(&bootstrap, &game::eu4::profile())
+            .is_ok()
     );
+    database
+        .execute(
+            "UPDATE metadata SET value = ?1 WHERE key = 'build_id'",
+            [b"previous-build".as_slice()],
+        )
+        .unwrap();
+    drop(database);
+    let compatible = IndexCache::load(&cache_path).unwrap();
     assert!(matches!(
-        loaded.refresh(&first_party, &game::eu4::profile()),
-        Err(IndexCacheError::RuleHashMismatch { .. })
+        compatible.refresh(&bootstrap, &game::eu4::profile()),
+        Err(IndexCacheError::BuildMismatch { .. })
+    ));
+    let mut fresh_host = eu4_host_with(bootstrap);
+    assert!(matches!(
+        fresh_host.install_index_cache(compatible),
+        Err(IndexCacheError::BuildMismatch { .. })
     ));
     assert!(matches!(
         loaded.refresh(&RuleSet::empty(), &game::eu4::profile()),
@@ -740,7 +1092,7 @@ fn build_dependency_cache(
         SourceRootKind::Dependency,
         AbsPath::normalize(&dependency_path),
     );
-    let mut builder = eu4_host_with(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut builder = eu4_host_with(game::eu4::runtime_rules().expect("first-party rules"));
     builder.apply_change(WorkspaceChange::SetSourceRoots(vec![
         dependency_root.clone(),
     ]));
@@ -776,7 +1128,7 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
     assert_eq!(loaded.source_root().kind, SourceRootKind::Dependency);
 
     // Install into a workspace where the dependency root is configured but not scanned.
-    let mut host = eu4_host_with(game::eu4::first_party_rules().unwrap());
+    let mut host = eu4_host_with(game::eu4::runtime_rules().unwrap());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![
         dependency_root.clone(),
     ]));
@@ -831,7 +1183,7 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
 #[test]
 fn batch_dependency_cache_install_rebuilds_the_workspace_index_once() {
     let root = temp_root("batch-dependency-cache");
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut caches = Vec::new();
     for (id, name) in [(1_u32, "first"), (2_u32, "second")] {
         let dependency = root.join(name);
@@ -912,7 +1264,7 @@ fn dependency_index_cache_rejects_an_unrelated_configured_root() {
     // The configured root claims the same id but a different directory.
     let other = root.join("other");
     fs::create_dir_all(&other).expect("other directory");
-    let mut host = eu4_host_with(game::eu4::first_party_rules().unwrap());
+    let mut host = eu4_host_with(game::eu4::runtime_rules().unwrap());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(7),
         SourceRootKind::Dependency,
@@ -939,7 +1291,7 @@ fn lazy_reference_load_serves_skipped_kinds_from_disk() {
     .expect("event definition");
     fs::write(
         vanilla.join("common/scripted_effects/fixture.txt"),
-        "effect_a = { fire_event = vanilla.1 }\n",
+        "effect_a = { country_event = { id = vanilla.1 } }\n",
     )
     .expect("dynamic definition with a call site");
 
@@ -1020,6 +1372,56 @@ fn lazy_reference_load_serves_skipped_kinds_from_disk() {
         "lazy store plus materialized dynamic references must reconstruct the full set"
     );
     fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn ir_catalog_lazy_cache_retains_callable_references_for_the_call_graph() {
+    let root = temp_root("ir-callable-cache");
+    fs::create_dir_all(root.join("common/scripted_effects")).unwrap();
+    fs::create_dir_all(root.join("events")).unwrap();
+    fs::write(
+        root.join("common/scripted_effects/test.txt"),
+        "cached_effect = { add_prestige = 1 }",
+    )
+    .unwrap();
+    fs::write(
+        root.join("events/test.txt"),
+        "country_event = { id = cache.1 title = cache.title immediate = { cached_effect = yes } }",
+    )
+    .unwrap();
+    let ir = game::eu4::first_party_ir().unwrap();
+    let rules = rules::RuleSet::from_ir_catalog(&ir);
+    let mut host = AnalysisHost::with_ir(rules.clone(), ir.game.profile.clone(), ir);
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Vanilla,
+        AbsPath::normalize(&fs::canonicalize(&root).unwrap()),
+    )]));
+    host.refresh_source_roots().unwrap();
+    let cache_path = root.join("vanilla.pdcindex");
+    IndexCache::from_snapshot(&host.snapshot())
+        .unwrap()
+        .save(&cache_path)
+        .unwrap();
+    let cache = IndexCache::load_cancellable_for_install_with_progress(
+        &cache_path,
+        &WorkspaceScanToken::new(),
+        None,
+        Some(&rules),
+        &[],
+    )
+    .unwrap();
+    assert!(cache.index().references_iter().any(|(_, reference)| {
+        reference.kind.as_ref() == "scripted_effect" && reference.name.as_ref() == "cached_effect"
+    }));
+    assert!(
+        !cache
+            .index()
+            .references_iter()
+            .any(|(_, reference)| { reference.kind.as_ref() == "localisation" }),
+        "non-callable references remain lazy"
+    );
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]

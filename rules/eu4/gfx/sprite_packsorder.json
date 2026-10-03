@@ -1,0 +1,23 @@
+{
+  "schemas": {
+    "packorder_body": {
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "enum<spritepacks>",
+          "value": "int"
+        },
+        {
+          "card": "0..*",
+          "key": "ref<packentity>",
+          "value": "int"
+        },
+        {
+          "card": "0..*",
+          "key": "scalar",
+          "value": "int"
+        }
+      ]
+    }
+  }
+}

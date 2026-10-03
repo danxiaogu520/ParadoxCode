@@ -1,0 +1,108 @@
+{
+  "schemas": {
+    "sprite_pack_body": {
+      "fields": {
+        "available_for_custom_nation": {
+          "card": "0..1",
+          "value": "bool"
+        },
+        "continents": {
+          "card": "0..1",
+          "list": "ref<continent>"
+        },
+        "country_trigger": {
+          "body": "trigger",
+          "card": "1",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "graphical_cultures": {
+          "card": "0..1",
+          "list": "enum<graphical_cultures>"
+        },
+        "sprite_artillery": {
+          "body": "sprite_pack_body__sprite_artillery",
+          "card": "0..1"
+        },
+        "sprite_cavalry": {
+          "body": "sprite_pack_body__sprite_cavalry",
+          "card": "0..1"
+        },
+        "sprite_infantry": {
+          "body": "sprite_pack_body__sprite_infantry",
+          "card": "0..1"
+        }
+      }
+    },
+    "sprite_pack_body__continents": {
+      "items": "ref<continent>"
+    },
+    "sprite_pack_body__graphical_cultures": {
+      "items": "enum<graphical_cultures>"
+    },
+    "sprite_pack_body__sprite_artillery": {
+      "fields": {
+        "0": {
+          "card": "0..1",
+          "value": "scalar | enum<builtin_dlc>"
+        },
+        "1": {
+          "card": "0..1",
+          "value": "scalar | enum<builtin_dlc>"
+        },
+        "2": {
+          "card": "0..1",
+          "value": "scalar | enum<builtin_dlc>"
+        },
+        "3": {
+          "card": "0..1",
+          "value": "scalar | enum<builtin_dlc>"
+        }
+      }
+    },
+    "sprite_pack_body__sprite_cavalry": {
+      "fields": {
+        "0": {
+          "card": "0..1",
+          "value": "scalar | enum<builtin_dlc>"
+        },
+        "1": {
+          "card": "0..1",
+          "value": "scalar | enum<builtin_dlc>"
+        },
+        "2": {
+          "card": "0..1",
+          "value": "scalar | enum<builtin_dlc>"
+        },
+        "3": {
+          "card": "0..1",
+          "value": "scalar | enum<builtin_dlc>"
+        }
+      }
+    },
+    "sprite_pack_body__sprite_infantry": {
+      "fields": {
+        "0": {
+          "card": "0..1",
+          "value": "scalar | enum<builtin_dlc>"
+        },
+        "1": {
+          "card": "0..1",
+          "value": "scalar | enum<builtin_dlc>"
+        },
+        "2": {
+          "card": "0..1",
+          "value": "scalar | enum<builtin_dlc>"
+        },
+        "3": {
+          "card": "0..1",
+          "value": "scalar | enum<builtin_dlc>"
+        }
+      }
+    }
+  }
+}

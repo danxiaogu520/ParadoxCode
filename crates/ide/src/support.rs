@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use engine::{AnalysisSnapshot, DocumentId, DocumentSource, ParsedSource, SourceFileId};
 use hir::HirFile;
-use hir::lower_with_profile;
-use parser::{CstKind, CstNode, FileFormat, ParsedFile, QuotedScript, parse};
+use hir::lower_shared_with_ir_and_facts;
+use parser::{CstKind, CstNode, FileFormat, ParsedFile, parse};
 use rules::{GameProfile, ParserKind};
 use text::{LogicalPath, TextRange, TextSize};
 
@@ -35,11 +35,6 @@ impl ParsedInput {
         self.source.get(start..end)
     }
 }
-#[derive(Clone, Debug)]
-pub(crate) struct PropertyInfo {
-    pub(crate) key: String,
-    pub(crate) value: Option<(String, TextRange)>,
-}
 
 pub(crate) fn input_for_document(
     snapshot: &AnalysisSnapshot,
@@ -66,7 +61,25 @@ pub(crate) fn input_for_document(
     let parsed = match parsed {
         ParsedSource::Text(parsed) => ParsedContent::Text(Arc::clone(parsed)),
     };
-    let hir = document.hir_handle();
+    let hir = if let Some(hir) = document
+        .hir_handle()
+        .filter(|hir| !hir.depends_on_symbol_facts())
+    {
+        Some(hir)
+    } else if !snapshot.ir().schemas.is_empty() {
+        let ParsedContent::Text(parsed) = &parsed;
+        path.as_ref().map(|path| {
+            lower_for_snapshot(
+                snapshot,
+                Arc::clone(parsed),
+                path,
+                Some(&format!("ir-hir:{}", id.as_str())),
+                true,
+            )
+        })
+    } else {
+        document.hir_handle()
+    };
     let profile = snapshot.game_profile_handle();
     Some(ParsedInput {
         document: Some(id.clone()),
@@ -84,6 +97,46 @@ pub(crate) fn input_for_source_file(
     snapshot: &AnalysisSnapshot,
     id: SourceFileId,
 ) -> Option<ParsedInput> {
+    source_file_input(snapshot, id, true)
+}
+
+/// Borrows an existing interactive frontend but does not retain a new HIR for
+/// a diagnostics-only workspace sweep.
+pub(crate) fn diagnostic_input_for_source_file(
+    snapshot: &AnalysisSnapshot,
+    id: SourceFileId,
+) -> Option<ParsedInput> {
+    source_file_input(snapshot, id, false)
+}
+
+fn source_file_input(
+    snapshot: &AnalysisSnapshot,
+    id: SourceFileId,
+    retain_frontend: bool,
+) -> Option<ParsedInput> {
+    let mut input = syntax_input_for_source_file(snapshot, id)?;
+    let state = snapshot.file_state(id)?;
+    let ParsedContent::Text(parsed) = &input.parsed;
+    input.hir = if snapshot.ir().schemas.is_empty() && state.parsed().is_some() {
+        state.hir_handle()
+    } else {
+        Some(lower_for_snapshot(
+            snapshot,
+            Arc::clone(parsed),
+            input.path.as_ref()?,
+            Some(&format!("ir-hir:file:{}", id.get())),
+            retain_frontend,
+        ))
+    };
+    Some(input)
+}
+
+/// Loads the same live source and syntax as semantic queries, without lowering
+/// HIR for consumers that only inspect the property tree.
+pub(crate) fn syntax_input_for_source_file(
+    snapshot: &AnalysisSnapshot,
+    id: SourceFileId,
+) -> Option<ParsedInput> {
     let file = snapshot.source_files().get(&id)?;
     let state = snapshot.file_state(id)?;
     if let Some(ParsedSource::Text(parsed)) = state.parsed() {
@@ -94,18 +147,14 @@ pub(crate) fn input_for_source_file(
             format: parsed.format(),
             source: state.source_handle(),
             parsed: ParsedContent::Text(Arc::clone(parsed)),
-            hir: state.hir_handle(),
+            hir: None,
             profile: snapshot.game_profile_handle(),
         });
     }
     // The scan may evict CST/HIR frontends after background validation to
     // bound resident memory; the source text stays in the file state, so the
     // tree is reparsed transiently for this one query.
-    let format = match snapshot.rules().classify(&file.logical_path)?.parser {
-        ParserKind::Script => FileFormat::Script,
-        ParserKind::Localisation => FileFormat::Localisation,
-        ParserKind::Asset | ParserKind::SyntaxOnly => return None,
-    };
+    let format = format_for_path(snapshot, &file.logical_path)?;
     let source = state.source_handle();
     // Consult the persistent parse cache before reparsing: entries are
     // validated against the live source hash, and loading beats reparsing
@@ -115,12 +164,6 @@ pub(crate) fn input_for_source_file(
         .parse_cache()
         .and_then(|cache| cache.load(file, format, &source))
         .map_or_else(|| Arc::new(parse(format, &source)), Arc::new);
-    let hir = Arc::new(lower_with_profile(
-        (*parsed).clone(),
-        &file.logical_path,
-        snapshot.rules(),
-        snapshot.game_profile(),
-    ));
     Some(ParsedInput {
         document: None,
         file: Some(id),
@@ -128,7 +171,7 @@ pub(crate) fn input_for_source_file(
         format,
         source,
         parsed: ParsedContent::Text(parsed),
-        hir: Some(hir),
+        hir: None,
         profile: snapshot.game_profile_handle(),
     })
 }
@@ -138,18 +181,16 @@ pub(crate) fn input_for_text(
     path: &LogicalPath,
     text: &str,
 ) -> Option<ParsedInput> {
-    let format = match snapshot.rules().classify(path)?.parser {
-        ParserKind::Script => FileFormat::Script,
-        ParserKind::Localisation => FileFormat::Localisation,
-        ParserKind::Asset | ParserKind::SyntaxOnly => return None,
-    };
+    let format = format_for_path(snapshot, path)?;
     let source = Arc::<str>::from(text);
     let parsed = Arc::new(parse(format, &source));
-    let hir = Arc::new(lower_with_profile(
-        (*parsed).clone(),
+    let hir = Arc::new(lower_shared_with_ir_and_facts(
+        Arc::clone(&parsed),
         path,
         snapshot.rules(),
         snapshot.game_profile(),
+        snapshot.ir(),
+        &crate::ir_queries::SnapshotSymbolFacts { snapshot },
     ));
     let file = snapshot
         .source_files()
@@ -168,6 +209,54 @@ pub(crate) fn input_for_text(
     })
 }
 
+fn lower_for_snapshot(
+    snapshot: &AnalysisSnapshot,
+    syntax: Arc<ParsedFile>,
+    path: &LogicalPath,
+    cache_key: Option<&str>,
+    retain_frontend: bool,
+) -> Arc<HirFile> {
+    if let Some(key) = cache_key
+        && let Some(cached) = snapshot
+            .query_cache()
+            .get::<HirFile>(snapshot.revision(), key)
+    {
+        return cached;
+    }
+    let hir = Arc::new(lower_shared_with_ir_and_facts(
+        syntax,
+        path,
+        snapshot.rules(),
+        snapshot.game_profile(),
+        snapshot.ir(),
+        &crate::ir_queries::SnapshotSymbolFacts { snapshot },
+    ));
+    if retain_frontend && let Some(key) = cache_key {
+        snapshot.query_cache().insert(
+            snapshot.revision(),
+            engine::CacheDomain::Frontends,
+            key.to_owned(),
+            Arc::clone(&hir),
+        );
+    }
+    hir
+}
+
+fn format_for_path(snapshot: &AnalysisSnapshot, path: &LogicalPath) -> Option<FileFormat> {
+    if !snapshot.ir().files.is_empty() {
+        return match snapshot.ir().file_rule(path)?.1.parser {
+            rules::ir::DocumentParser::Script => Some(FileFormat::Script),
+            rules::ir::DocumentParser::Localisation => Some(FileFormat::Localisation),
+            _ => None,
+        };
+    }
+    match snapshot.rules().classify(path)?.parser {
+        ParserKind::Script => Some(FileFormat::Script),
+        ParserKind::Localisation => Some(FileFormat::Localisation),
+        _ => None,
+    }
+}
+
 pub(crate) fn logical_path(snapshot: &AnalysisSnapshot, path: &Path) -> Option<LogicalPath> {
     snapshot
         .source_roots()
@@ -175,253 +264,59 @@ pub(crate) fn logical_path(snapshot: &AnalysisSnapshot, path: &Path) -> Option<L
         .filter_map(|root| path.strip_prefix(&root.path).ok())
         .filter_map(|relative| LogicalPath::parse(&relative.to_string_lossy()).ok())
         .min_by_key(|path| path.as_str().len())
+        .or_else(|| {
+            snapshot
+                .rules()
+                .logical_path_for_uri(&path.to_string_lossy())
+        })
         .or_else(|| LogicalPath::parse(&path.to_string_lossy()).ok())
         .or_else(|| {
             path.file_name()
                 .and_then(|name| LogicalPath::parse(&name.to_string_lossy()).ok())
         })
 }
-/// A script property tree built for one analysis query.
-///
-/// Keys, operators, scalars, and bare values are interned `Arc<str>` handles: the same
-/// spellings recur thousands of times per workspace, and validation clones property paths
-/// and scope registers on every transition, so shared allocations keep those clones at
-/// reference-count cost.
+/// Structural properties used by the callable cycle graph.
 #[derive(Clone, Debug)]
 pub(crate) struct ScriptProperty {
-    pub(crate) key: std::sync::Arc<str>,
+    pub(crate) key: Arc<str>,
     pub(crate) key_range: TextRange,
-    pub(crate) range: TextRange,
-    pub(crate) operator: Option<std::sync::Arc<str>>,
-    pub(crate) scalar: Option<(std::sync::Arc<str>, TextRange)>,
-    pub(crate) quoted: bool,
-    pub(crate) quoted_source: Option<QuotedScalarSource>,
-    pub(crate) block_range: Option<TextRange>,
+    pub(crate) scalar: Option<(Arc<str>, TextRange)>,
     pub(crate) block: Vec<ScriptProperty>,
-    pub(crate) bare_values: Vec<(std::sync::Arc<str>, TextRange)>,
 }
 
-#[derive(Clone, Debug)]
-pub(crate) struct QuotedScalarSource {
-    source: Arc<str>,
-    source_offsets: QuotedScalarOffsets,
-}
-
-#[derive(Clone, Debug)]
-enum QuotedScalarOffsets {
-    /// Top-level CST offsets map directly into the document and need no per-byte allocation.
-    Direct { start: TextSize, len: TextSize },
-    /// Secondary CST offsets compose through the enclosing quoted Script source map.
-    Mapped(Arc<[TextSize]>),
-}
-
-impl QuotedScalarSource {
-    pub(crate) fn source(&self) -> &str {
-        &self.source
-    }
-
-    fn map_offset(&self, offset: TextSize) -> Option<TextSize> {
-        match &self.source_offsets {
-            QuotedScalarOffsets::Direct { start, len } if offset <= *len => {
-                start.checked_add(offset)
-            }
-            QuotedScalarOffsets::Direct { .. } => None,
-            QuotedScalarOffsets::Mapped(offsets) => {
-                offsets.get(usize::try_from(offset).ok()?).copied()
-            }
-        }
-    }
-
-    pub(crate) fn map_decoded_range(
-        &self,
-        script: &QuotedScript,
-        range: TextRange,
-    ) -> Option<TextRange> {
-        let relative = script.source_map().decoded_range(range)?;
-        TextRange::new(
-            self.map_offset(relative.start())?,
-            self.map_offset(relative.end())?,
-        )
-    }
-
-    pub(crate) fn decoded_position(
-        &self,
-        script: &QuotedScript,
-        position: TextSize,
-    ) -> Option<TextSize> {
-        let local = match &self.source_offsets {
-            QuotedScalarOffsets::Direct { start, len } => {
-                usize::try_from(position.saturating_sub(*start).min(*len)).ok()?
-            }
-            QuotedScalarOffsets::Mapped(offsets) => offsets
-                .partition_point(|candidate| *candidate <= position)
-                .saturating_sub(1),
-        };
-        script
-            .source_map()
-            .source_offset(u32::try_from(local).ok()?)
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct ScopeContext {
-    pub(crate) profile: Arc<GameProfile>,
-    pub(crate) root: Arc<str>,
-    pub(crate) current: Arc<str>,
-    pub(crate) from: Vec<Arc<str>>,
-    pub(crate) previous: Vec<Arc<str>>,
-}
-
-impl ScopeContext {
-    pub(crate) fn new(profile: Arc<GameProfile>) -> Self {
-        Self {
-            profile,
-            root: engine::intern_shard_string("any"),
-            current: engine::intern_shard_string("any"),
-            from: Vec::new(),
-            previous: Vec::new(),
-        }
-    }
-}
 pub(crate) fn script_properties(input: &ParsedInput, parent: CstNode<'_>) -> Vec<ScriptProperty> {
     let ParsedContent::Text(parsed) = &input.parsed;
-    script_properties_mapped(parsed, parent, Some, true)
-}
-
-pub(crate) fn script_bare_values(
-    input: &ParsedInput,
-    parent: CstNode<'_>,
-) -> Vec<(std::sync::Arc<str>, TextRange)> {
-    let ParsedContent::Text(parsed) = &input.parsed;
-    script_bare_values_mapped(parsed, parent, Some)
-}
-
-pub(crate) fn quoted_script_container(
-    script: &QuotedScript,
-    origin: &QuotedScalarSource,
-) -> (Vec<ScriptProperty>, Vec<(std::sync::Arc<str>, TextRange)>) {
-    let parsed = script.parsed();
-    let map = |offset| {
-        let relative = script.source_map().decoded_offset(offset)?;
-        origin.map_offset(relative)
-    };
-    (
-        script_properties_mapped(parsed, parsed.root(), map, false),
-        script_bare_values_mapped(parsed, parsed.root(), map),
-    )
-}
-
-fn script_properties_mapped(
-    parsed: &ParsedFile,
-    parent: CstNode<'_>,
-    map_offset: impl Copy + Fn(TextSize) -> Option<TextSize>,
-    direct_offsets: bool,
-) -> Vec<ScriptProperty> {
-    let map_range =
-        |range: TextRange| TextRange::new(map_offset(range.start())?, map_offset(range.end())?);
     parent
         .children()
         .filter(|node| node.kind() == CstKind::Property)
         .filter_map(|node| {
-            let key_node = node.children().find(|child| child.kind() == CstKind::Key)?;
-            let key = engine::intern_shard_string(parsed.text(key_node.range())?.trim());
-            let key_range = map_range(key_node.range())?;
-            let value = node.children().find(|child| child.kind() == CstKind::Value);
-            let block_node = value.and_then(|value| {
-                value
-                    .children()
-                    .find(|child| child.kind() == CstKind::Block)
-            });
-            let block = block_node.map_or_else(Vec::new, |block| {
-                script_properties_mapped(parsed, block, map_offset, direct_offsets)
-            });
-            let bare_values = block_node.map_or_else(Vec::new, |block| {
-                script_bare_values_mapped(parsed, block, map_offset)
-            });
-            let operator = node
+            let key = node.children().find(|child| child.kind() == CstKind::Key)?;
+            let block = node
                 .children()
-                .find(|child| child.kind() == CstKind::Operator)
-                .and_then(|child| parsed.text(child.range()))
-                .map(engine::intern_shard_string);
-            let scalar_node = property_scalar_node(node);
-            let scalar = scalar_node.and_then(|scalar| {
+                .find(|child| child.kind() == CstKind::Value)
+                .and_then(|value| {
+                    value
+                        .children()
+                        .find(|child| child.kind() == CstKind::Block)
+                });
+            let scalar = property_scalar_node(node).and_then(|scalar| {
                 let raw = parsed.text(scalar.range())?.trim();
                 let value = raw
                     .strip_prefix('"')
                     .and_then(|value| value.strip_suffix('"'))
                     .unwrap_or(raw);
-                Some((
-                    engine::intern_shard_string(value),
-                    map_range(scalar.range())?,
-                ))
+                Some((engine::intern_shard_string(value), scalar.range()))
             });
-            let quoted_source = scalar_node
-                .filter(|scalar| scalar.kind() == CstKind::QuotedString)
-                .and_then(|scalar| {
-                    let source = Arc::<str>::from(parsed.text(scalar.range())?);
-                    // A quoted token found in a decoded secondary CST is still the raw token for
-                    // that Script layer. Retaining it verbatim lets the next descent decode exactly
-                    // one additional layer; re-encoding here would introduce a spurious layer.
-                    let source_offsets = if direct_offsets {
-                        QuotedScalarOffsets::Direct {
-                            start: scalar.range().start(),
-                            len: scalar.range().len(),
-                        }
-                    } else {
-                        let start = usize::try_from(scalar.range().start()).ok()?;
-                        let len = usize::try_from(scalar.range().len()).ok()?;
-                        let offsets = (0..=len)
-                            .map(|offset| {
-                                map_offset(u32::try_from(start.checked_add(offset)?).ok()?)
-                            })
-                            .collect::<Option<Vec<_>>>()?;
-                        QuotedScalarOffsets::Mapped(offsets.into())
-                    };
-                    Some(QuotedScalarSource {
-                        source,
-                        source_offsets,
-                    })
-                });
             Some(ScriptProperty {
-                key,
-                key_range,
-                range: map_range(node.range())?,
-                operator,
+                key: engine::intern_shard_string(parsed.text(key.range())?.trim()),
+                key_range: key.range(),
                 scalar,
-                quoted: scalar_node.is_some_and(|scalar| scalar.kind() == CstKind::QuotedString),
-                quoted_source,
-                block_range: block_node.and_then(|block| map_range(block.range())),
-                block,
-                bare_values,
+                block: block.map_or_else(Vec::new, |block| script_properties(input, block)),
             })
         })
         .collect()
 }
 
-fn script_bare_values_mapped(
-    parsed: &ParsedFile,
-    parent: CstNode<'_>,
-    map_offset: impl Copy + Fn(TextSize) -> Option<TextSize>,
-) -> Vec<(std::sync::Arc<str>, TextRange)> {
-    parent
-        .children()
-        .filter(|child| matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString))
-        .filter_map(|child| {
-            let raw = parsed.text(child.range())?.trim();
-            let value = raw
-                .strip_prefix('"')
-                .and_then(|value| value.strip_suffix('"'))
-                .unwrap_or(raw);
-            Some((
-                engine::intern_shard_string(value),
-                TextRange::new(
-                    map_offset(child.range().start())?,
-                    map_offset(child.range().end())?,
-                )?,
-            ))
-        })
-        .collect()
-}
 fn property_scalar_node(node: CstNode<'_>) -> Option<CstNode<'_>> {
     node.children()
         .find(|child| child.kind() == CstKind::Value)?
@@ -429,20 +324,6 @@ fn property_scalar_node(node: CstNode<'_>) -> Option<CstNode<'_>> {
         .find(|child| matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString))
 }
 
-pub(crate) fn properties(input: &ParsedInput) -> Vec<PropertyInfo> {
-    input.hir.as_deref().map_or_else(Vec::new, |hir| {
-        hir.properties()
-            .iter()
-            .map(|property| PropertyInfo {
-                key: property.key.clone(),
-                value: property
-                    .scalar
-                    .as_ref()
-                    .map(|scalar| (scalar.value.clone(), scalar.range)),
-            })
-            .collect()
-    })
-}
 pub(crate) fn local_location(input: &ParsedInput, range: TextRange) -> Location {
     Location {
         document: input.document.clone(),
@@ -508,12 +389,6 @@ pub(crate) fn same_location(left: &Location, right: &Location) -> bool {
         && left.file == right.file
         && left.path == right.path
         && left.range == right.range
-}
-
-/// Caps a hover text at 240 characters so pathological content cannot produce an unbounded
-/// tooltip. Consumed by hover documentation lines.
-pub(crate) fn truncate_hover_text(value: &str) -> String {
-    truncate_text(value, 240)
 }
 
 /// Same bounding for localisation previews, which carry full event and description texts;

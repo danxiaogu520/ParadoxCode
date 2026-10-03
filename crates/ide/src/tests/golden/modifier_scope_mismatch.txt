@@ -33,7 +33,7 @@ diagnostics:
 - code=UnknownLocalisationKey severity=Warning certainty=certain range=203..219
   message: unknown localisation key `opt_bad_province`
 - code=ModifierScopeMismatch severity=Information certainty=certain range=260..272
-  message: modifier `province_mod` applies unexpected province-class attributes (local_unrest, local_defensiveness) in country scope
+  message: modifier `province_mod` applies province-class attributes (local_unrest, local_defensiveness) in country scope
 - code=UnknownLocalisationKey severity=Warning certainty=certain range=318..324
   message: unknown localisation key `opt_ok`
 - code=UnknownLocalisationKey severity=Warning certainty=certain range=422..431

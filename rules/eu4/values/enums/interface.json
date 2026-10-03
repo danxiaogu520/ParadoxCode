@@ -1,9 +1,0 @@
-{
-  "sprite_load_type": [
-    "FRONTEND",
-    "INGAME"
-  ],
-  "interface_click_sound": [
-    "click"
-  ]
-}

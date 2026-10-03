@@ -33,6 +33,7 @@ Required:
 Options:
   --vanilla-cache PATH       Vanilla .pdcindex (also PDC_DIAGNOSTIC_VANILLA_CACHE)
   --server PATH              paradoxcode executable (explicit path must exist; auto-detected from target/{debug,release} only when omitted)
+  --rules-manifest PATH      identity manifest for the selected server (default: rules/ir-manifest.json)
   --workspace PATH           LSP workspace root (default: parent of --mod)
   --output DIR               report directory (default: ${DEFAULT_OUTPUT_DIR})
   --timeout-ms N             overall server timeout (default: ${DEFAULT_TIMEOUT_MS})
@@ -144,6 +145,7 @@ export function parseArgs(argv) {
     ['--vanilla-cache', 'vanillaCache'],
     ['--vanilla', 'vanillaCache'],
     ['--server', 'server'],
+    ['--rules-manifest', 'rulesManifest'],
     ['--workspace', 'workspace'],
     ['--output', 'output'],
     ['--timeout-ms', 'timeoutMs'],

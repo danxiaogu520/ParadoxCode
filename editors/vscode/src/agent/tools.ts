@@ -500,7 +500,6 @@ interface RuleSearchEntry {
     shape?: unknown;
     allowedScopes?: unknown;
     deprecated?: unknown;
-    required?: unknown;
     documentation?: unknown;
 }
 
@@ -545,7 +544,6 @@ export async function runRules(
             : 'any';
         const flags = [
             rule.deprecated === true ? 'deprecated' : undefined,
-            rule.required === true ? 'required' : undefined,
         ].filter(Boolean);
         const documentation = trimToUndefined(String(rule.documentation ?? ''));
         const docPart = documentation ? ` — ${collapseWhitespace(documentation)}` : '';

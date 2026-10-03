@@ -1,0 +1,70 @@
+{
+  "schemas": {
+    "incident_body": {
+      "fields": {
+        "frame": {
+          "card": "1",
+          "value": "int"
+        },
+        "immediate_effect": {
+          "body": "effect",
+          "card": "1",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "mean_time_to_happen": {
+          "body": "incident_body__mean_time_to_happen",
+          "card": "1",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "potential": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "variable_initial": {
+          "card": "1",
+          "value": "int"
+        }
+      }
+    },
+    "incident_body__mean_time_to_happen": {
+      "fields": {
+        "months": {
+          "card": "1",
+          "override": true,
+          "value": "int"
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    }
+  }
+}

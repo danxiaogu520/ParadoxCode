@@ -1,12 +1,61 @@
+use super::scope::property_children;
 use super::{
     HirParameterReferenceKind, HirReferenceOrigin, ScopeState, ScopeValue, TemplateFragment,
-    TemplateItem, TemplateValue, lower, lower_with_profile, property_children,
-    resolve_scope_expression, semantic_root_context,
+    TemplateItem, TemplateValue, is_ir_scope_link, lower, lower_shared_with_ir,
+    transition_ir_scope,
 };
-use game::eu4::{bootstrap_rules, first_party_rules, profile};
+use game::eu4::{bootstrap_rules, first_party_ir, profile, runtime_rules};
 use parser::{FileFormat, parse};
-use rules::{GameProfile, KeyMatcher, RuleSet, RuleShape, SemanticRule, ValueMatcher};
+use rules::{GameProfile, RuleSet};
+use std::sync::Arc;
 use text::{LogicalPath, TextRange};
+
+#[test]
+fn ir_symbol_fact_dependencies_include_missing_members_and_callable_templates() {
+    let ir = first_party_ir().unwrap();
+    let rules = RuleSet::from_ir_catalog(&ir);
+    for (path, format, source, dependency) in [
+        (
+            "localisation/test_l_english.yml",
+            FileFormat::Localisation,
+            "l_english:\n key:0 \"value\"\n",
+            false,
+        ),
+        (
+            "events/test.txt",
+            FileFormat::Script,
+            "country_event = { id = test.1 immediate = { add_prestige = 1 } }",
+            false,
+        ),
+        (
+            "events/test.txt",
+            FileFormat::Script,
+            "country_event = { id = test.1 trigger = { religion = missing_religion } }",
+            true,
+        ),
+        (
+            "events/test.txt",
+            FileFormat::Script,
+            "country_event = { id = test.1 immediate = { missing_effect = { payload = yes } } }",
+            true,
+        ),
+        (
+            "events/test.txt",
+            FileFormat::Script,
+            "country_event = { id = test.1 immediate = { event_target:missing_target = { add_prestige = 1 } } }",
+            true,
+        ),
+    ] {
+        let hir = lower_shared_with_ir(
+            Arc::new(parse(format, source)),
+            &LogicalPath::parse(path).unwrap(),
+            &rules,
+            &ir.game.profile,
+            &ir,
+        );
+        assert_eq!(hir.depends_on_symbol_facts(), dependency, "{source}");
+    }
+}
 
 #[test]
 fn lowering_retains_property_paths_scalars_and_top_level_identity() {
@@ -40,18 +89,361 @@ fn lowering_retains_property_paths_scalars_and_top_level_identity() {
 }
 
 #[test]
-fn shared_type_paths_use_the_top_level_key_filter() {
-    let rules = first_party_rules().expect("first-party rules");
-    let path = LogicalPath::parse("common/estate_crown_land/00_interactions.txt").expect("path");
+fn range_properties_match_full_scan_for_repeated_and_nested_blocks() {
+    let source = "root = { child = yes root = { child = no } } root = { child = maybe } broken = {";
+    let hir = lower(parse(FileFormat::Script, source), &RuleSet::empty());
+    for property in hir.properties() {
+        for range in [
+            property.range,
+            property.key_range,
+            property.value_range.unwrap_or(property.range),
+        ] {
+            let expected = hir
+                .properties()
+                .iter()
+                .filter(|candidate| {
+                    range.start() <= candidate.range.start() && candidate.range.end() <= range.end()
+                })
+                .map(|candidate| candidate.key_range)
+                .collect::<Vec<_>>();
+            let actual = hir
+                .properties_in_range(range)
+                .map(|candidate| candidate.key_range)
+                .collect::<Vec<_>>();
+            assert_eq!(actual, expected, "{range:?}");
+            assert_eq!(
+                hir.property_at_key_range(range).map(std::ptr::from_ref),
+                hir.properties()
+                    .iter()
+                    .find(|property| property.key_range == range)
+                    .map(std::ptr::from_ref),
+                "exact key {range:?}"
+            );
+        }
+    }
+}
 
-    assert_eq!(
-        semantic_root_context(&rules, Some(&path), "interaction").as_deref(),
-        Some("type:estate_interaction")
+#[test]
+fn ir_lowering_tracks_schema_fields_for_events_on_actions_decisions_and_dynamic_defs() {
+    let rules = runtime_rules().expect("first-party rules");
+    let ir = first_party_ir().expect("first-party IR");
+    let cases = [
+        (
+            "events/test.txt",
+            "country_event = { id = test.1 title = test_title option = { name = option_title } trigger = { always = yes } }",
+            "country_event",
+        ),
+        (
+            "common/on_actions/test.txt",
+            "on_yearly_pulse = { events = { 1 = test.1 } random_events = { 1 = 0 2 = test.2 } }",
+            "on_yearly_pulse",
+        ),
+        (
+            "decisions/test.txt",
+            "country_decisions = { test_decision = { potential = { always = yes } effect = { add_prestige = 1 } } }",
+            "country_decisions",
+        ),
+        (
+            "common/scripted_effects/test.txt",
+            "test_effect = { add_prestige = $AMOUNT$ }",
+            "test_effect",
+        ),
+    ];
+    for (path, source, first_key) in cases {
+        let path = LogicalPath::parse(path).expect("logical path");
+        let hir = lower_shared_with_ir(
+            Arc::new(parse(FileFormat::Script, source)),
+            &path,
+            &rules,
+            &profile(),
+            &ir,
+        );
+        assert!(hir.uses_ir());
+        assert!(!hir.schema_facts().is_empty(), "{path}");
+        let property = hir
+            .properties()
+            .iter()
+            .find(|property| property.key == first_key)
+            .expect("root property");
+        assert!(
+            hir.field_fact_at(property.key_range).is_some(),
+            "{path} {first_key}"
+        );
+        if path.as_str() == "events/test.txt" {
+            assert!(
+                hir.definitions()
+                    .iter()
+                    .any(|definition| definition.kind.eq_ignore_ascii_case("event"))
+            );
+            let event_body = property.value_range.expect("event body range");
+            assert!(
+                hir.schema_at(event_body.start())
+                    .is_some_and(|fact| !fact.subtypes.is_empty())
+            );
+            assert!(hir.definition_attributes().iter().any(|attributes| {
+                attributes.kind.eq_ignore_ascii_case("event")
+                    && attributes
+                        .subtypes
+                        .iter()
+                        .any(|subtype| subtype.eq_ignore_ascii_case("country"))
+            }));
+            assert!(hir.references().iter().any(|reference| {
+                reference.kind.eq_ignore_ascii_case("localisation")
+                    && reference.name == "test_title"
+            }));
+            assert!(hir.references().iter().any(|reference| {
+                reference.kind.eq_ignore_ascii_case("localisation")
+                    && reference.name == "option_title"
+            }));
+        }
+        if path.as_str() == "common/on_actions/test.txt" {
+            assert!(
+                hir.references()
+                    .iter()
+                    .any(|reference| reference.kind.eq_ignore_ascii_case("event")),
+                "{:?}",
+                hir.references()
+            );
+            assert!(
+                !hir.references()
+                    .iter()
+                    .any(|reference| reference.name == "0"
+                        && reference.kind.eq_ignore_ascii_case("event"))
+            );
+            assert!(
+                hir.references()
+                    .iter()
+                    .any(|reference| reference.name == "test.2"
+                        && reference.subtype.as_deref() == Some("country"))
+            );
+        }
+    }
+    let path = LogicalPath::parse("common/scripted_effects/test.txt").expect("logical path");
+    let hir = lower_shared_with_ir(
+        Arc::new(parse(FileFormat::Script, cases[3].1)),
+        &path,
+        &rules,
+        &profile(),
+        &ir,
     );
-    assert_eq!(
-        semantic_root_context(&rules, Some(&path), "bonus").as_deref(),
-        Some("type:estate_crown_land_bonus")
+    assert!(
+        hir.dynamic_templates()
+            .iter()
+            .any(|template| template.name == "test_effect")
     );
+    let path = LogicalPath::parse("localisation/events_l_english.yml").expect("logical path");
+    let hir = lower_shared_with_ir(
+        Arc::new(parse(
+            FileFormat::Localisation,
+            "l_english:\n test_key:0 \"Text\"\n",
+        )),
+        &path,
+        &rules,
+        &profile(),
+        &ir,
+    );
+    assert!(hir.uses_ir());
+    assert!(
+        hir.definitions()
+            .iter()
+            .any(|definition| definition.kind.as_ref() == "localisation"
+                && definition.name == "test_key")
+    );
+}
+
+#[test]
+fn ir_scope_transitions_update_root_this_registers_and_respect_link_from_scopes() {
+    let ir = first_party_ir().expect("first-party IR");
+    let sym = |name: &str| {
+        ir.strings()
+            .lookup_folded(name)
+            .unwrap_or_else(|| panic!("missing IR symbol {name}"))
+    };
+    let mut state = ScopeState::initial(ScopeValue::known_single("country"));
+    let effect = rules::ir::ScopeEffect {
+        set: vec![
+            (sym("root"), sym("province")),
+            (sym("this"), sym("province")),
+            (sym("from"), sym("unit")),
+            (sym("prev"), sym("province")),
+        ]
+        .into_boxed_slice(),
+        ..rules::ir::ScopeEffect::default()
+    };
+    state = super::ir_lowering::transition_state(&ir, state, Some(&effect), "noop");
+    assert_eq!(state.root, ScopeValue::known_single("province"));
+    assert_eq!(state.current[0], ScopeValue::known_single("province"));
+    assert_eq!(state.from[0], ScopeValue::known_single("unit"));
+    assert_eq!(state.previous[0], ScopeValue::known_single("province"));
+
+    let starting_country = ScopeState::initial(ScopeValue::known_single("country"));
+    let traversed =
+        super::ir_lowering::transition_state(&ir, starting_country, None, "capital_scope");
+    assert_eq!(traversed.current[0], ScopeValue::known_single("province"));
+    assert_eq!(traversed.previous[0], ScopeValue::known_single("country"));
+
+    let province = ScopeState::initial(ScopeValue::known_single("province"));
+    let owner_link = super::ir_lowering::transition_state(&ir, province, None, "owner");
+    assert_eq!(owner_link.current[0], ScopeValue::known_single("country"));
+    assert!(ir.scope_matches(Some(sym("province")), "province"));
+    assert!(!ir.scope_matches(Some(sym("province")), "trade_node"));
+
+    let starting_province = ScopeState::initial(ScopeValue::known_single("province"));
+    let rejected =
+        super::ir_lowering::transition_state(&ir, starting_province.clone(), None, "capital_scope");
+    assert_eq!(rejected, starting_province);
+    assert!(super::ir_lowering::link_or_register_matches(
+        &ir,
+        "fromfromfrom"
+    ));
+    assert!(!super::ir_lowering::link_or_register_matches(
+        &ir,
+        "fromgarbage"
+    ));
+}
+
+#[test]
+fn ir_scope_register_roles_work_with_arbitrary_declared_spellings() {
+    let mut ir = (*first_party_ir().unwrap()).clone();
+    for register in &mut ir.scopes.registers {
+        let name = match register.role {
+            rules::source::RegisterRole::Root => "origin",
+            rules::source::RegisterRole::Current => "here",
+            rules::source::RegisterRole::Previous => "prior_scope",
+            rules::source::RegisterRole::From => "caller",
+        };
+        register.name = ir.strings.intern_folded(name);
+    }
+    let mut state = ScopeState::initial(ScopeValue::known_single("country"));
+    state.root = ScopeValue::known_single("province");
+    state.previous = vec![
+        ScopeValue::known_single("country"),
+        ScopeValue::known_single("unit"),
+    ];
+    state.from = vec![
+        ScopeValue::known_single("province"),
+        ScopeValue::known_single("advisor"),
+    ];
+    assert_eq!(transition_ir_scope(&ir, state.clone(), None, "HERE"), state);
+    for (name, expected) in [
+        ("ORIGIN", "province"),
+        ("prior_scope_prior_scope", "unit"),
+        ("CALLERCALLER", "advisor"),
+    ] {
+        assert_eq!(
+            transition_ir_scope(&ir, state.clone(), None, name).current[0],
+            ScopeValue::known_single(expected)
+        );
+    }
+    assert!(!is_ir_scope_link(&ir, "ROOT"));
+    assert!(!is_ir_scope_link(&ir, "FROMFROM"));
+    assert!(!is_ir_scope_link(&ir, "caller_bad"));
+    let effect = rules::ir::ScopeEffect {
+        set: vec![(
+            ir.strings.lookup_folded("origin").unwrap(),
+            ir.strings.lookup_folded("advisor").unwrap(),
+        )]
+        .into_boxed_slice(),
+        ..Default::default()
+    };
+    assert_eq!(
+        transition_ir_scope(&ir, state, Some(&effect), "noop").root,
+        ScopeValue::known_single("advisor")
+    );
+}
+
+#[test]
+fn ir_schema_fragment_keeps_its_root_schema_fact() {
+    let ir = first_party_ir().expect("first-party IR");
+    let schema = ir.schema_by_name("trigger").expect("trigger schema");
+    let parsed = Arc::new(parse(FileFormat::Script, "always = yes"));
+    let range = parsed.root().range();
+    let hir = super::lower_ir_schema(
+        Arc::clone(&parsed),
+        &ir,
+        schema,
+        rules::ir::SubtypeSet::default(),
+        ScopeState::initial(ScopeValue::Unknown),
+        &rules::ir::NoSymbolFacts,
+    );
+    assert!(
+        hir.schema_facts()
+            .iter()
+            .any(|fact| { fact.range == range && fact.schema == schema })
+    );
+    assert!(
+        hir.schema_at(range.start())
+            .is_some_and(|fact| fact.schema == schema)
+    );
+}
+
+#[test]
+fn ir_file_instance_seeds_root_scope_before_lowering_history_effects() {
+    let ir = first_party_ir().expect("first-party IR");
+    let rules = RuleSet::from_ir_catalog(&ir);
+    for (path, expected) in [
+        ("history/countries/ZZZ - Test.txt", "country"),
+        ("history/provinces/1 - Test.txt", "province"),
+    ] {
+        let hir = lower_shared_with_ir(
+            Arc::new(parse(
+                FileFormat::Script,
+                "1444.11.11 = { add_prestige = 1 }",
+            )),
+            &LogicalPath::parse(path).unwrap(),
+            &rules,
+            &ir.game.profile,
+            &ir,
+        );
+        let root = hir
+            .schema_facts()
+            .iter()
+            .find(|fact| fact.range.start() == 0)
+            .expect("file root fact");
+        assert_eq!(
+            root.state.root,
+            ScopeValue::known_single(expected),
+            "{path}"
+        );
+        assert_eq!(
+            root.state.current[0],
+            ScopeValue::known_single(expected),
+            "{path}"
+        );
+        assert!(
+            hir.scope_facts()
+                .iter()
+                .all(|fact| { fact.state.root == ScopeValue::known_single(expected) }),
+            "{path}"
+        );
+    }
+}
+
+#[test]
+fn shared_type_paths_use_the_top_level_key_filter() {
+    let ir = first_party_ir().unwrap();
+    let catalog = RuleSet::from_ir_catalog(&ir);
+    let path = LogicalPath::parse("common/estate_crown_land/00_interactions.txt").unwrap();
+    let hir = lower_shared_with_ir(
+        Arc::new(parse(
+            FileFormat::Script,
+            "interaction = { test_interaction = {} } bonus = { test_bonus = {} }",
+        )),
+        &path,
+        &catalog,
+        &ir.game.profile,
+        &ir,
+    );
+    let names: Vec<_> = hir
+        .schema_facts()
+        .iter()
+        .map(|fact| ir.strings().resolve(ir.schema(fact.schema).name))
+        .collect();
+    assert!(
+        names.iter().any(|name| name.contains("interaction")),
+        "{names:?}"
+    );
+    assert!(names.iter().any(|name| name.contains("bonus")), "{names:?}");
 }
 
 #[test]
@@ -135,13 +527,13 @@ fn quoted_string_values_are_not_localisation_references() {
             concat!(
                 "country_event = { id = a.1 option = { ",
                 "name = option_a ",
-                "custom_tooltip = \" \" ",
+                "custom_tooltip = \"\" ",
                 "custom_tooltip = tooltip_key ",
                 "} }\n",
             ),
         ),
         &path,
-        &first_party_rules().expect("first-party rules"),
+        &runtime_rules().expect("first-party rules"),
         &profile(),
     );
     let localisation = hir
@@ -166,7 +558,7 @@ fn required_type_localisation_templates_expand_from_dynamic_members() {
             "series = { mission_one = { potential = { always = yes } } }\n",
         ),
         &path,
-        &first_party_rules().expect("first-party rules"),
+        &runtime_rules().expect("first-party rules"),
         &profile(),
     );
     let derived = hir
@@ -180,25 +572,37 @@ fn required_type_localisation_templates_expand_from_dynamic_members() {
 }
 
 #[test]
-fn subtype_conditions_gate_type_localisation_templates() {
-    let path = LogicalPath::parse("common/ideas/subtypes.txt").expect("logical path");
-    let hir = lower_with_profile(
-        parse(
+fn ir_display_bindings_do_not_depend_on_structural_flags() {
+    let path = LogicalPath::parse("common/ideas/all.txt").unwrap();
+    let ir = first_party_ir().unwrap();
+    let rules = RuleSet::from_ir_catalog(&ir);
+    let hir = lower_shared_with_ir(
+        Arc::new(parse(
             FileFormat::Script,
-            "country_idea = { free = yes }\nother_idea = { free = no }\n",
-        ),
+            "country_idea = { free = yes } other_idea = { free = no }",
+        )),
         &path,
-        &first_party_rules().expect("first-party rules"),
+        &rules,
         &profile(),
+        &ir,
     );
-    let derived = hir
+    let display = hir
+        .binding_references_for_hover()
+        .iter()
+        .map(|reference| reference.name.as_str())
+        .collect::<Vec<_>>();
+    let required = hir
         .references()
         .iter()
-        .filter(|reference| reference.origin == HirReferenceOrigin::DerivedLocalisation)
-        .map(|reference| reference.name.as_ref())
+        .map(|reference| reference.name.as_str())
         .collect::<Vec<_>>();
-    assert!(derived.contains(&"country_idea_start"));
-    assert!(!derived.contains(&"other_idea_start"));
+    for name in ["country_idea_start", "other_idea_start"] {
+        assert!(display.contains(&name), "{display:?}");
+        assert!(
+            !required.contains(&name),
+            "optional display bindings must not become mandatory: {required:?}"
+        );
+    }
 }
 
 #[test]
@@ -213,7 +617,7 @@ fn required_self_bindings_reach_the_diagnostics_set() {
             "nordic = { male_names = { } swedish = { } }\n",
         ),
         &path,
-        &first_party_rules().expect("first-party rules"),
+        &runtime_rules().expect("first-party rules"),
         &profile(),
     );
     let required = hir
@@ -238,7 +642,7 @@ fn unbound_types_carry_no_implicit_localisation() {
     let hir = lower_with_profile(
         parse(FileFormat::Script, "on_startup = { effect = { } }\n"),
         &path,
-        &first_party_rules().expect("first-party rules"),
+        &runtime_rules().expect("first-party rules"),
         &profile(),
     );
     let derived = hir
@@ -255,7 +659,7 @@ fn unbound_types_carry_no_implicit_localisation() {
 
 #[test]
 fn sprite_bindings_expand_template_and_semantic_fields() {
-    let rules = first_party_rules().expect("first-party rules");
+    let rules = runtime_rules().expect("first-party rules");
 
     // aspects_and_blessings: the GFX_$ template binding generates the sprite
     // name from the aspect's own name (hover path; the binding is not
@@ -299,107 +703,6 @@ fn sprite_bindings_expand_template_and_semantic_fields() {
                 && reference.name == "GFX_my_building"
         }),
         "the required GFX_$ template must reach the diagnostics reference set"
-    );
-
-    // A semantic sprite binding (one that names a source field) associates
-    // the field value with the instance and enters the lowered set. Vanilla
-    // keeps no binding of this shape, so the model is built here.
-    let path = LogicalPath::parse("common/event_modifiers/test.txt").expect("logical path");
-    let mut model = rules.model().clone();
-    model.semantic.sprite_bindings.push(rules::SymbolBinding {
-        type_name: "event_modifier".to_owned(),
-        name: "picture".to_owned(),
-        key: None,
-        required: true,
-        subtype: None,
-        condition: None,
-        field: Some("picture".to_owned()),
-    });
-    let rules = RuleSet::from_model(model);
-    let hir = lower_with_profile(
-        parse(FileFormat::Script, "my_mod = { picture = my_mod_icon }\n"),
-        &path,
-        &rules,
-        &profile(),
-    );
-    let derived = hir
-        .references()
-        .iter()
-        .filter(|reference| reference.origin == HirReferenceOrigin::DerivedSprite)
-        .map(|reference| reference.name.as_ref())
-        .collect::<Vec<_>>();
-    assert!(
-        derived.contains(&"my_mod_icon"),
-        "the required semantic icon binding must associate the field value"
-    );
-}
-
-#[test]
-fn typed_sprite_references_shadow_derived_sprite_duplicates() {
-    // The dedup backstop: if the schema ever grows a typed sprite rule for a
-    // field that also carries a semantic icon binding, the lowered set keeps
-    // the typed reference and drops the derived duplicate so one fault
-    // reports once. Vanilla keeps no binding of this shape, so both sides
-    // are synthesized here.
-    let path = LogicalPath::parse("common/event_modifiers/test.txt").expect("logical path");
-    let mut model = first_party_rules()
-        .expect("first-party rules")
-        .model()
-        .clone();
-    model.semantic.sprite_bindings.push(rules::SymbolBinding {
-        type_name: "event_modifier".to_owned(),
-        name: "picture".to_owned(),
-        key: None,
-        required: true,
-        subtype: None,
-        condition: None,
-        field: Some("picture".to_owned()),
-    });
-    model.semantic.rules.push(SemanticRule {
-        id: "test:event_modifier:picture".to_owned(),
-        context: "root:event_modifier".to_owned(),
-        parent_path: Vec::new(),
-        key: KeyMatcher::Exact("picture".to_owned()),
-        operator: None,
-        value: ValueMatcher::Type("sprite".to_owned()),
-        shape: RuleShape::Leaf,
-        child_context: None,
-        alternative_id: None,
-        severity: None,
-        required: false,
-        deprecated: false,
-        documentation: Vec::new(),
-        allowed_scopes: Vec::new(),
-        push_scope: None,
-        replace_scope: Vec::new(),
-        min_occurs: None,
-        strict_min: true,
-        max_occurs: None,
-        source_file: "semantic-rules.json".to_owned(),
-        line: 1,
-    });
-    let rules = RuleSet::from_model(model);
-    let hir = lower_with_profile(
-        parse(
-            FileFormat::Script,
-            "golden_mod = { picture = golden_icon }\n",
-        ),
-        &path,
-        &rules,
-        &GameProfile::empty(rules.game_id()),
-    );
-    let derived = hir
-        .references()
-        .iter()
-        .filter(|reference| reference.origin == HirReferenceOrigin::DerivedSprite)
-        .map(|reference| reference.name.as_ref())
-        .collect::<Vec<_>>();
-    assert!(!derived.contains(&"golden_icon"));
-    assert!(
-        hir.references().iter().any(|reference| {
-            reference.kind.as_ref() == "sprite" && reference.name == "golden_icon"
-        }),
-        "the typed sprite reference remains"
     );
 }
 
@@ -542,7 +845,7 @@ fn profile_lowering_associates_local_parameter_definitions_and_uses() {
 
 #[test]
 fn dynamic_lowering_keeps_body_context_calls_and_local_parameter_uses() {
-    let rules = first_party_rules().expect("first-party rules");
+    let rules = runtime_rules().expect("first-party rules");
     let path = LogicalPath::parse("common/scripted_effects/rewrite.txt").expect("logical path");
     let source = concat!(
         "apply_effect = { value = yes }\n",
@@ -555,7 +858,7 @@ fn dynamic_lowering_keeps_body_context_calls_and_local_parameter_uses() {
     let hir = lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile());
 
     assert!(hir.references().iter().any(|reference| {
-        reference.origin == HirReferenceOrigin::DynamicDefinition
+        reference.origin == HirReferenceOrigin::SemanticTyped
             && reference.kind.as_ref() == "scripted_effect"
             && reference.name == "apply_effect"
     }));
@@ -609,11 +912,11 @@ fn dynamic_lowering_keeps_body_context_calls_and_local_parameter_uses() {
     let trigger_root = trigger_hir
         .scope_facts()
         .iter()
-        .find(|fact| fact.parent_path.is_empty())
-        .expect("trigger root fact");
+        .find(|fact| fact.context == "trigger")
+        .expect("trigger body fact");
     assert_eq!(trigger_root.context, "trigger");
     assert!(trigger_hir.references().iter().any(|reference| {
-        reference.origin == HirReferenceOrigin::DynamicDefinition
+        reference.origin == HirReferenceOrigin::SemanticTyped
             && reference.kind.as_ref() == "scripted_trigger"
             && reference.name == "apply_trigger"
     }));
@@ -621,7 +924,7 @@ fn dynamic_lowering_keeps_body_context_calls_and_local_parameter_uses() {
 
 #[test]
 fn dynamic_templates_preserve_order_conditionals_and_token_fragments() {
-    let rules = first_party_rules().expect("first-party rules");
+    let rules = runtime_rules().expect("first-party rules");
     let path = LogicalPath::parse("common/scripted_effects/template.txt").expect("logical path");
     let source = concat!(
         "wrapper = { ",
@@ -700,7 +1003,7 @@ fn dynamic_templates_preserve_order_conditionals_and_token_fragments() {
 
 #[test]
 fn dynamic_templates_skip_syntax_damaged_owners() {
-    let rules = first_party_rules().expect("first-party rules");
+    let rules = runtime_rules().expect("first-party rules");
     let path = LogicalPath::parse("common/scripted_effects/broken.txt").expect("logical path");
     let hir = lower_with_profile(
         parse(FileFormat::Script, "broken = { add_prestige = $VALUE$\n"),
@@ -713,7 +1016,7 @@ fn dynamic_templates_skip_syntax_damaged_owners() {
 
 #[test]
 fn dynamic_lowering_retains_scalar_candidates_for_signature_resolution() {
-    let rules = first_party_rules().expect("first-party rules");
+    let rules = runtime_rules().expect("first-party rules");
     let path =
         LogicalPath::parse("common/scripted_effects/value_matchers.txt").expect("logical path");
     let source = "wrapper = { apply_effect = no apply_effect = yes }\n";
@@ -748,7 +1051,7 @@ fn dynamic_lowering_retains_scalar_candidates_for_signature_resolution() {
         .references()
         .iter()
         .filter(|reference| {
-            reference.origin == HirReferenceOrigin::DynamicDefinition
+            reference.origin == HirReferenceOrigin::SemanticTyped
                 && reference.kind.as_ref() == "scripted_effect"
                 && reference.name == "apply_effect"
         })
@@ -767,39 +1070,10 @@ fn dynamic_lowering_retains_scalar_candidates_for_signature_resolution() {
 }
 
 #[test]
-fn dynamic_lowering_rejects_non_scalar_block_matchers() {
-    let original_rules = first_party_rules().expect("first-party rules");
-    let mut model = original_rules.model().clone();
-    for rule in &mut model.semantic.rules {
-        if matches!(&rule.key, KeyMatcher::Type(type_name) if type_name == "scripted_effect")
-            && matches!(rule.shape, RuleShape::Node | RuleShape::ValueClause)
-        {
-            rule.value = ValueMatcher::Exact("not-a-block-value".to_owned());
-        }
-    }
-    let rules = RuleSet::from_model(model);
-    let path =
-        LogicalPath::parse("common/scripted_effects/block_matcher.txt").expect("logical path");
-    let hir = lower_with_profile(
-        parse(FileFormat::Script, "wrapper = { apply_effect = { } }\n"),
-        &path,
-        &rules,
-        &profile(),
-    );
-
-    assert!(!hir.references().iter().any(|reference| {
-        reference.origin == HirReferenceOrigin::DynamicDefinition
-            && reference.kind.as_ref() == "scripted_effect"
-            && reference.name == "apply_effect"
-    }));
-}
-
-#[test]
 fn profile_aware_lowering_produces_shared_typed_definitions_and_references() {
     let rules = bootstrap_rules();
     let path = LogicalPath::parse("events/profile_hir.txt").expect("logical path");
-    let source =
-        "country_event = { id = profile.1 title = profile_title set_country_flag = seen }\n";
+    let source = "country_event = { id = profile.1 title = profile_title immediate = { set_country_flag = seen } }\n";
 
     let hir = lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile());
 
@@ -821,28 +1095,37 @@ fn profile_aware_lowering_produces_shared_typed_definitions_and_references() {
 
 #[test]
 fn profile_aware_lowering_indexes_definitions_inside_quoted_effect_arguments() {
-    let rules = bootstrap_rules();
-    let path = LogicalPath::parse("missions/quoted_effect.txt").expect("logical path");
-    let source = "mission = { first_effect = \"set_country_flag = embedded_flag\" }\n";
-
-    let hir = lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile());
+    let file=serde_json::from_value(serde_json::json!({"types":{"flag":{}},"files":{"fixture":{"path":"missions","ext":"txt","root":"root"}},"schemas":{"root":{"fields":{"execute":{"value":"quoted<effect>","card":"1"}}},"effect":{"fields":{"set_flag":{"value":"def<flag>","card":"0..*"}}}}})).unwrap();
+    let ir = rules::lower::lower(
+        &[("fixture.json".to_owned(), file)],
+        rules::ir::GameConfig {
+            profile: GameProfile::empty("fixture"),
+        },
+    )
+    .unwrap();
+    let source = "execute = \"set_flag = embedded_flag\"";
+    let hir = lower_shared_with_ir(
+        Arc::new(parse(FileFormat::Script, source)),
+        &LogicalPath::parse("missions/quoted.txt").unwrap(),
+        &RuleSet::from_ir_catalog(&ir),
+        &ir.game.profile,
+        &ir,
+    );
     let definition = hir
         .definitions()
         .iter()
-        .find(|definition| {
-            definition.kind.as_ref() == "country_flag" && definition.name == "embedded_flag"
-        })
-        .expect("embedded flag definition");
+        .find(|definition| definition.kind.as_ref() == "flag" && definition.name == "embedded_flag")
+        .unwrap();
     assert_eq!(
-        &source[usize::try_from(definition.selection_range.start()).expect("start")
-            ..usize::try_from(definition.selection_range.end()).expect("end")],
+        &source[definition.selection_range.start() as usize
+            ..definition.selection_range.end() as usize],
         "embedded_flag"
     );
 }
 
 #[test]
 fn first_party_semantic_localisation_rules_produce_references_without_profile_shorthand() {
-    let rules = first_party_rules().expect("first-party rules");
+    let rules = runtime_rules().expect("first-party rules");
     let path = LogicalPath::parse("events/semantic_hir.txt").expect("logical path");
     let hir = lower_with_profile(
         parse(
@@ -855,7 +1138,7 @@ fn first_party_semantic_localisation_rules_produce_references_without_profile_sh
     );
 
     assert!(hir.references().iter().any(|reference| {
-        reference.origin == HirReferenceOrigin::Semantic
+        reference.origin == HirReferenceOrigin::SemanticTyped
             && reference.kind.as_ref() == "localisation"
             && reference.name == "semantic_title"
     }));
@@ -863,7 +1146,7 @@ fn first_party_semantic_localisation_rules_produce_references_without_profile_sh
 
 #[test]
 fn first_party_typed_values_produce_workspace_symbol_references() {
-    let rules = first_party_rules().expect("first-party rules");
+    let rules = runtime_rules().expect("first-party rules");
     let path = LogicalPath::parse("events/typed_reference.txt").expect("logical path");
     let source = concat!(
         "country_event = { id = declared.1 }\n",
@@ -887,7 +1170,7 @@ fn first_party_typed_values_produce_workspace_symbol_references() {
 
 #[test]
 fn scope_facts_descend_through_dynamic_mission_blocks() {
-    let rules = first_party_rules().expect("embedded rules");
+    let rules = runtime_rules().expect("embedded rules");
     let path = LogicalPath::parse("missions/dynamic_scope_hir.txt").expect("logical path");
     let hir = lower_with_profile(
         parse(
@@ -923,7 +1206,7 @@ fn identity_only_profile_does_not_create_game_specific_typed_facts() {
     let source = "country_event = { id = profile.1 title = profile_title }\n";
     let profile = GameProfile::empty(rules.game_id());
 
-    let hir = lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile);
+    let hir = super::lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile);
 
     assert!(hir.definitions().is_empty());
     assert!(
@@ -935,7 +1218,7 @@ fn identity_only_profile_does_not_create_game_specific_typed_facts() {
 
 #[test]
 fn profile_lowering_caches_semantic_root_context_and_initial_scope() {
-    let rules = first_party_rules().expect("embedded rules");
+    let rules = runtime_rules().expect("embedded rules");
     let path = LogicalPath::parse("events/scope_hir.txt").expect("logical path");
     let hir = lower_with_profile(
         parse(
@@ -947,8 +1230,12 @@ fn profile_lowering_caches_semantic_root_context_and_initial_scope() {
         &profile(),
     );
 
-    let fact = hir.scope_facts().first().expect("semantic root scope fact");
-    assert_eq!(fact.context, "type:event");
+    let fact = hir
+        .scope_facts()
+        .iter()
+        .find(|fact| fact.context == "event_body")
+        .expect("event scope fact");
+    assert_eq!(fact.context, "event_body");
     assert_eq!(
         fact.state.root,
         ScopeValue::known(vec!["country".to_owned()])
@@ -957,8 +1244,11 @@ fn profile_lowering_caches_semantic_root_context_and_initial_scope() {
         fact.state.current,
         vec![ScopeValue::known(vec!["country".to_owned()])]
     );
-    assert_eq!(fact.state.from, vec![ScopeValue::Unknown]);
-    assert_eq!(hir.scope_fact(fact.range, "TYPE:EVENT"), Some(fact));
+    assert!(
+        fact.state.from.is_empty(),
+        "event FROM is not declared until a caller seeds it"
+    );
+    assert_eq!(hir.scope_fact(fact.range, "EVENT_BODY"), Some(fact));
     let tax = hir
         .properties()
         .iter()
@@ -998,7 +1288,7 @@ fn profile_lowering_caches_semantic_root_context_and_initial_scope() {
 
 #[test]
 fn on_action_lowering_seeds_distinct_root_this_and_from_registers() {
-    let rules = first_party_rules().expect("embedded rules");
+    let rules = runtime_rules().expect("embedded rules");
     let path = LogicalPath::parse("common/on_actions/mercenary.txt").expect("logical path");
     let hir = lower_with_profile(
         parse(
@@ -1010,8 +1300,12 @@ fn on_action_lowering_seeds_distinct_root_this_and_from_registers() {
         &profile(),
     );
 
-    let fact = hir.scope_facts().first().expect("on_action scope fact");
-    assert_eq!(fact.context, "type:on_action");
+    let fact = hir
+        .scope_facts()
+        .iter()
+        .find(|fact| fact.state.root == ScopeValue::known_single("mercenary_company"))
+        .expect("on_action scope fact");
+    assert!(fact.context.starts_with("on_action"));
     assert_eq!(
         fact.state.root,
         ScopeValue::known(vec!["mercenary_company".to_owned()])
@@ -1028,7 +1322,7 @@ fn on_action_lowering_seeds_distinct_root_this_and_from_registers() {
 
 #[test]
 fn equivalent_rule_alternatives_share_one_cached_transition() {
-    let rules = first_party_rules().expect("embedded rules");
+    let rules = runtime_rules().expect("embedded rules");
     let path = LogicalPath::parse("events/alternative_scope_hir.txt").expect("logical path");
     let hir = lower_with_profile(
         parse(
@@ -1079,10 +1373,9 @@ fn equivalent_rule_alternatives_share_one_cached_transition() {
         .find(|fact| fact.range == days.key_range)
         .expect("the child key statically eliminates the modifier-rule transition");
     assert_eq!(
-        days_fact.context, "type:event",
-        "the rules for `days` keep the event mean-time path"
+        days_fact.state.current.first(),
+        Some(&ScopeValue::known(vec!["country".to_owned()]))
     );
-    assert_eq!(days_fact.parent_path, ["mean_time_to_happen"]);
 
     let modifier = lower_with_profile(
         parse(
@@ -1107,78 +1400,22 @@ fn equivalent_rule_alternatives_share_one_cached_transition() {
         .iter()
         .find(|fact| fact.range == modifier_property.key_range)
         .expect("the child key statically eliminates the event mean-time transition");
-    assert_eq!(modifier_fact.context, "modifier_rule");
-    assert!(modifier_fact.parent_path.is_empty());
+    assert_eq!(
+        modifier_fact.state.current.first(),
+        Some(&ScopeValue::known(vec!["country".to_owned()]))
+    );
 
-    let empty = lower_with_profile(
-        parse(
-            FileFormat::Script,
-            "country_event = { mean_time_to_happen = { } }\n",
-        ),
-        &path,
-        &rules,
-        &profile(),
-    );
-    let empty_index = empty
-        .properties()
-        .iter()
-        .position(|property| property.key == "mean_time_to_happen")
-        .expect("empty ambiguous block");
-    let children = super::property_children(empty.properties());
-    let candidates = rules
-        .exact_semantic_rules("mean_time_to_happen")
-        .filter(|rule| {
-            rule.context == "root:event"
-                && rule.parent_path.is_empty()
-                && matches!(rule.shape, RuleShape::Node)
-        })
-        .collect::<Vec<_>>();
     assert!(
-        super::statically_selected_transition(super::StaticTransitionInput {
-            matching: &candidates,
-            properties: empty.properties(),
-            property_children: &children,
-            property_index: empty_index,
-            rules: &rules,
-            context: "type:event",
-            parent_path: &[],
-            transparent: false,
-        })
-        .is_none(),
-        "an empty block must not guess between conflicting transitions"
-    );
-}
-
-#[test]
-fn workspace_backed_child_keys_never_eliminate_a_transition_during_lowering() {
-    let rules = first_party_rules().expect("embedded rules");
-    assert!(
-        super::child_key_may_match(
-            &rules,
-            "root:game_age",
-            &["abilities".to_owned()],
-            "workspace_defined_ability",
-        ),
-        "a type matcher can be satisfied by a later workspace definition"
-    );
-    assert!(
-        super::child_key_may_match(
-            &rules,
-            "root:government_reform",
-            &["custom_attributes".to_owned()],
-            "workspace_defined_attribute",
-        ),
-        "a dynamic matcher can be satisfied by a later workspace value set"
-    );
-    assert!(
-        !super::child_key_may_match(&rules, "modifier_rule", &[], "workspace_defined_ability",),
-        "a context with only exact alternatives can still be ruled out"
+        modifier
+            .schema_facts()
+            .iter()
+            .any(|fact| ir_schema_name(fact.schema).contains("mean_time_to_happen"))
     );
 }
 
 #[test]
 fn skipped_type_roots_still_cache_descendant_scope_facts() {
-    let rules = first_party_rules().expect("embedded rules");
+    let rules = runtime_rules().expect("embedded rules");
     let path = LogicalPath::parse("common/on_actions/scope_hir.txt").expect("logical path");
     let hir = lower_with_profile(
         parse(
@@ -1208,74 +1445,8 @@ fn skipped_type_roots_still_cache_descendant_scope_facts() {
 }
 
 #[test]
-fn replace_scope_resolves_static_links_into_register_values() {
-    assert_eq!(
-        super::repeated_scope_register_depth("fromfrom", "from"),
-        Some(1)
-    );
-    assert_eq!(
-        super::repeated_scope_register_depth("previous_owner", "previous"),
-        None
-    );
-
-    let rules = first_party_rules().expect("embedded rules");
-    let path = LogicalPath::parse("common/buildings/scope_hir.txt").expect("logical path");
-    let hir = lower_with_profile(
-        parse(
-            FileFormat::Script,
-            concat!(
-                "test_building = { ",
-                "on_built = { cossack_infantry = FROM }",
-                " }\n",
-            ),
-        ),
-        &path,
-        &rules,
-        &profile(),
-    );
-
-    let command = hir
-        .properties()
-        .iter()
-        .find(|property| property.key == "cossack_infantry")
-        .expect("nested effect");
-    let fact = hir
-        .scope_fact(command.key_range, "effect")
-        .expect("effect scope fact");
-    assert_eq!(
-        fact.state.current.first(),
-        Some(&ScopeValue::known(vec!["province".to_owned()]))
-    );
-    assert_eq!(
-        fact.state.from.first(),
-        Some(&ScopeValue::known(vec!["country".to_owned()]))
-    );
-
-    let province = ScopeValue::known(vec!["province".to_owned()]);
-    let state = ScopeState::initial(province.clone());
-    assert_eq!(
-        resolve_scope_expression(&state, "OwNeR.CAPITAL_SCOPE", &rules, &profile()),
-        province
-    );
-    assert_eq!(
-        resolve_scope_expression(&state, "owner.missing_link", &rules, &profile()),
-        ScopeValue::Unknown
-    );
-
-    let mut invalid_register_rule = rules.model().semantic.rules[0].clone();
-    invalid_register_rule.push_scope = None;
-    invalid_register_rule.replace_scope = vec![
-        ("from_owner".to_owned(), "country".to_owned()),
-        ("previous_owner".to_owned(), "country".to_owned()),
-    ];
-    let unchanged = super::child_scope_state(&state, &invalid_register_rule, &rules, &profile());
-    assert!(unchanged.from.is_empty());
-    assert!(unchanged.previous.is_empty());
-}
-
-#[test]
 fn mission_trigger_boolean_containers_still_extract_scripted_references() {
-    let rules = first_party_rules().expect("embedded rules");
+    let rules = runtime_rules().expect("embedded rules");
     let path = LogicalPath::parse("missions/probe_scratch.txt").expect("logical path");
     // Real-world shape from a mod missions file: the scripted trigger sits under
     // trigger > OR > num_of_owned_provinces_with. Boolean containers (AND/OR/NOT)
@@ -1378,4 +1549,87 @@ fn unterminated_block_cascades_keep_nested_properties_and_bounded_errors() {
             .all(|unknown| unknown.range.end() <= u32::try_from(source.len()).unwrap_or(u32::MAX)),
         "no recovery construct may point past the source"
     );
+}
+
+#[test]
+fn ir_callable_presence_uses_declared_branch_and_guard_keys() {
+    let mut ir = (*first_party_ir().unwrap()).clone();
+    for (old, new) in [("if", "choose"), ("limit", "guard")] {
+        let old = ir.strings.lookup_folded(old).unwrap();
+        let new = ir.strings.intern_folded(new);
+        for matcher in &mut ir.matchers {
+            if matches!(matcher, rules::ir::Matcher::Literal(name) if *name == old) {
+                *matcher = rules::ir::Matcher::Literal(new);
+            }
+        }
+        for schema in &mut ir.schemas {
+            if let Some(fields) = schema.exact.remove(&old) {
+                schema.exact.insert(new, fields);
+            }
+        }
+        for field in &mut ir.fields {
+            if let Some(control) = &mut field.control
+                && control.guard == Some(old)
+            {
+                control.guard = Some(new);
+            }
+        }
+    }
+    let source =
+        "test_effect = { choose = { guard = { always = $GATE$ } add_prestige = $AMOUNT$ } }";
+    let path = LogicalPath::parse("common/scripted_effects/presence.txt").unwrap();
+    let hir = lower_shared_with_ir(
+        Arc::new(parse(FileFormat::Script, source)),
+        &path,
+        &RuleSet::from_ir_catalog(&ir),
+        &ir.game.profile,
+        &ir,
+    );
+    let owner = hir
+        .definitions()
+        .iter()
+        .find(|definition| definition.name == "test_effect")
+        .unwrap()
+        .range;
+    assert!(hir.parameter_is_required(owner, "GATE"));
+    assert!(!hir.parameter_is_required(owner, "AMOUNT"));
+}
+
+fn lower_with_profile(
+    parsed: parser::ParsedFile,
+    path: &LogicalPath,
+    catalog: &RuleSet,
+    profile: &GameProfile,
+) -> super::HirFile {
+    if profile.game_id == "eu4" {
+        let ir = first_party_ir().unwrap();
+        super::lower_shared_with_ir_and_facts(
+            Arc::new(parsed),
+            path,
+            catalog,
+            profile,
+            &ir,
+            &FixtureMembers { ir: &ir },
+        )
+    } else {
+        super::lower_with_profile(parsed, path, catalog, profile)
+    }
+}
+
+fn ir_schema_name(schema: rules::ir::SchemaId) -> String {
+    let ir = first_party_ir().unwrap();
+    ir.strings().resolve(ir.schema(schema).name).to_owned()
+}
+
+struct FixtureMembers<'a> {
+    ir: &'a rules::ir::RulesIr,
+}
+impl rules::ir::SymbolFacts for FixtureMembers<'_> {
+    fn type_member(&self, ty: rules::ir::TypeId, name: &str) -> bool {
+        match self.ir.strings().resolve(self.ir.type_info(ty).name) {
+            "scripted_effect" => ["apply_effect", "on_mercenary_recruited_effect"].contains(&name),
+            "scripted_trigger" => matches!(name, "has_fort_building_trigger" | "apply_trigger"),
+            _ => false,
+        }
+    }
 }

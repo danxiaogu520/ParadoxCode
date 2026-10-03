@@ -46,7 +46,7 @@ fn text_diagnostics_analyzes_caller_supplied_files_without_opening_overlays() {
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"pdc/textDiagnostics","params":{"files":[
-            {"path":"events/invalid.txt","text":"country_event = { id = text.1 scope = nowhere }\n"},
+            {"path":"events/invalid.txt","text":"country_event = { id = text.1 trigger = { always = maybe } }\n"},
             {"path":"events/valid.txt","text":"country_event = { id = text.2 }\n"}
         ]}}),
         json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
@@ -605,6 +605,23 @@ fn workspace_summary_reports_identity_roots_and_zone_counts() {
             .as_u64()
             .is_some_and(|count| count >= 4)
     );
+    let symbols = &summary["result"]["symbols"];
+    assert_eq!(
+        symbols["definitions"]["scripted_effect"].as_u64(),
+        Some(2),
+        "per-kind definition counts cover the fixture: {summary}"
+    );
+    assert!(
+        symbols["definitions"]["event"]
+            .as_u64()
+            .is_some_and(|count| count >= 2)
+    );
+    assert!(
+        symbols["references"]["scripted_effect"]
+            .as_u64()
+            .is_some_and(|count| count >= 1),
+        "per-kind reference counts cover the caller: {summary}"
+    );
 
     let rejected = responses
         .iter()
@@ -851,7 +868,7 @@ fn workspace_diagnostics_batches_indexed_disk_files_without_opening_overlays() {
     fs::create_dir_all(&events).expect("events directory");
     fs::write(
         events.join("a.txt"),
-        "country_event = { id = batch.1 scope = nowhere }\n",
+        "country_event = { id = batch.1 trigger = { always = maybe } }\n",
     )
     .expect("first source");
     fs::write(events.join("b.txt"), "country_event = { id = batch.2 }\n").expect("second source");
@@ -1101,19 +1118,20 @@ fn memory_transport_delegates_phase5_requests_to_analysis() {
     let file_path = events_dir.join("phase5.txt");
     fs::write(&file_path, "").expect("create placeholder file");
     let uri = canonical_uri(&file_path);
-    let text = "country_event = { id = test.1 }\nevent = test.1\nscope = nowhere\n";
+    let text = "country_event = { id = test.1 }\ncountry_event = { id = caller.1 trigger = { is_year = tomorrow } immediate = { country_event = { id = test.1 } } }\n";
+    let reference_column = text.lines().nth(1).unwrap().find("test.1").unwrap() + 1;
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":19}}}),
-        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8}}}),
-        json!({"jsonrpc":"2.0","id":4,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8}}}),
-        json!({"jsonrpc":"2.0","id":5,"method":"textDocument/references","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8},"context":{"includeDeclaration":true}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":reference_column}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":reference_column}}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"textDocument/references","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":reference_column},"context":{"includeDeclaration":true}}}),
         json!({"jsonrpc":"2.0","id":6,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":uri}}}),
         json!({"jsonrpc":"2.0","id":7,"method":"workspace/symbol","params":{"query":"test"}}),
-        json!({"jsonrpc":"2.0","id":9,"method":"textDocument/prepareRename","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8}}}),
-        json!({"jsonrpc":"2.0","id":10,"method":"textDocument/rename","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8},"newName":"renamed.1"}}),
+        json!({"jsonrpc":"2.0","id":9,"method":"textDocument/prepareRename","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":reference_column}}}),
+        json!({"jsonrpc":"2.0","id":10,"method":"textDocument/rename","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":reference_column},"newName":"renamed.1"}}),
         json!({"jsonrpc":"2.0","id":8,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
     ]);
@@ -1155,8 +1173,7 @@ fn memory_transport_delegates_phase5_requests_to_analysis() {
             .map(Vec::len),
         Some(2)
     );
-    // With embedded EU4 rules, top-level keys (country_event, event, scope) all
-    // produce document symbols — richer than the identity-only baseline.
+    // Declared event instances contribute document symbols through IR bindings.
     assert!(
         responses
             .iter()
@@ -1442,7 +1459,7 @@ fn inlay_hints_expose_rule_proven_scope_transitions() {
 fn code_actions_expose_rule_backed_enum_suggestions() {
     let (root, root_uri) = temp_workspace_dir();
     let uri = format!("{root_uri}/map/terrain.txt");
-    let text = "terrain = { type = foresst }\n";
+    let text = "categories = { demo = { type = foresst } }\n";
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -1479,8 +1496,14 @@ fn code_actions_expose_rule_backed_enum_suggestions() {
     assert_eq!(edits.len(), 1);
     assert_eq!(edits[0].new_text, "\"forest\"");
     assert_eq!(edits[0].range.start.line, 0);
-    assert_eq!(edits[0].range.start.character, 19);
-    assert_eq!(edits[0].range.end.character, 26);
+    assert_eq!(
+        edits[0].range.start.character as usize,
+        text.find("foresst").unwrap()
+    );
+    assert_eq!(
+        edits[0].range.end.character as usize,
+        text.find("foresst").unwrap() + "foresst".len()
+    );
     fs::remove_dir_all(root).expect("cleanup");
 }
 
@@ -1496,7 +1519,7 @@ fn memory_transport_preserves_hir_disambiguated_mixed_context_completion() {
         "country_event = {\n",
         "  mean_time_to_happen = {\n",
         "    modifier = {\n",
-        "      factor = 0.5\n",
+        "       # factor not assigned yet\n",
         "      \n",
         "      always = maybe\n",
         "    }\n",
@@ -1677,7 +1700,7 @@ fn memory_transport_resolves_completion_items_by_data() {
         "country_event = {\n",
         "  mean_time_to_happen = {\n",
         "    modifier = {\n",
-        "      factor = 0.5\n",
+        "       # factor not assigned yet\n",
         "      \n",
         "      always = maybe\n",
         "    }\n",
@@ -1710,7 +1733,7 @@ fn memory_transport_resolves_completion_items_by_data() {
         .expect("rule item");
     let data = factor["data"].as_str().expect("resolve data");
     assert!(
-        data.starts_with("rule:"),
+        data.starts_with("ir-field:"),
         "rule-backed items must carry a rule id: {data}"
     );
 
@@ -1845,7 +1868,11 @@ fn memory_transport_rename_covers_project_disk_references() {
     let references_path = root.join("events/references.txt");
     fs::create_dir_all(target_path.parent().expect("target parent")).expect("directories");
     fs::write(&target_path, "country_event = { id = cross.1 }\n").expect("target");
-    fs::write(&references_path, "event = cross.1\n").expect("reference");
+    fs::write(
+        &references_path,
+        "country_event = { id = caller.1 immediate = { country_event = { id = cross.1 } } }\n",
+    )
+    .expect("reference");
     let target_uri = canonical_uri(&target_path);
     let references_uri = canonical_uri(&references_path);
     let root_uri = canonical_uri(&dunce::canonicalize(&root).expect("canonical root"));
@@ -2217,7 +2244,7 @@ country_event = {\n\
 \tis_triggered_only = yes\n\
 \toption = {\n\
 \t\tname = \"demo_event.1.a\"\n\
-\t\teffect = { event = demo_event.2 }\n\
+\t\tcountry_event = { id = demo_event.2 }\n\
 \t}\n\
 \toption = {\n\
 \t\tname = \"demo_event.1.b\"\n\
@@ -2244,7 +2271,7 @@ country_event = {\n\
         json!({"jsonrpc":"2.0","id":3,"method":"pdc/hoverCard","params":{"textDocument":{"uri":event_uri},"position":{"line":15,"character":5}}}),
         // On the `demo_event.2` reference inside the option effect: the
         // referenced event's card.
-        json!({"jsonrpc":"2.0","id":4,"method":"pdc/hoverCard","params":{"textDocument":{"uri":event_uri},"position":{"line":9,"character":24}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"pdc/hoverCard","params":{"textDocument":{"uri":event_uri},"position":{"line":9,"character":event_text.lines().nth(9).unwrap().find("demo_event.2").unwrap() + 1}}}),
         // On the `id` value inside the first block: nothing cardable.
         json!({"jsonrpc":"2.0","id":5,"method":"pdc/hoverCard","params":{"textDocument":{"uri":event_uri},"position":{"line":2,"character":6}}}),
         // On the root scalar: nothing cardable.

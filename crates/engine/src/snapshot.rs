@@ -4,11 +4,12 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use rules::ir::RulesIr;
 use rules::{FileResolutionPolicy, GameProfile, RuleSet};
 use text::{AbsPath, LogicalPath, TextRange};
 
 use crate::query_cache::SnapshotQueryCache;
-use index::prepare_document_snapshot;
+use index::prepare_document_snapshot_with_ir;
 use index::{DocumentSnapshot, FileState, PreparedDocument};
 use index::{LocalisationPreviewMap, Reference, WorkspaceIndex};
 use vfs::scan::root_priority;
@@ -28,6 +29,8 @@ pub fn localisation_preview_target_language(preferred: &[String]) -> &str {
 pub struct AnalysisSnapshot {
     pub(crate) revision: u64,
     pub(crate) rules: Arc<RuleSet>,
+    pub(crate) ir: Arc<RulesIr>,
+    pub(crate) ir_fingerprint: Arc<str>,
     pub(crate) profile: Arc<GameProfile>,
     pub(crate) roots: Arc<[SourceRoot]>,
     pub(crate) workspace_root: Option<AbsPath>,
@@ -67,6 +70,40 @@ impl AnalysisSnapshot {
     #[must_use]
     pub fn rules(&self) -> &RuleSet {
         &self.rules
+    }
+
+    /// Returns the immutable rules-v2 IR used for this snapshot.
+    ///
+    /// Consumers migrate onto this module by module
+    /// (`docs/rules-redesign.md` §6 phase 4); it is empty until the
+    /// composition root installs one.
+    #[must_use]
+    pub fn ir(&self) -> &RulesIr {
+        &self.ir
+    }
+
+    /// Resolves a declared localisation template from the active IR.
+    #[must_use]
+    pub fn localisation_template_key(
+        &self,
+        type_name: &str,
+        binding_name: &str,
+        instance: &str,
+    ) -> Option<String> {
+        self.ir
+            .localisation_template_key(type_name, binding_name, instance)
+    }
+
+    /// Shared immutable arena for background index workers.
+    #[must_use]
+    pub fn ir_handle(&self) -> Arc<RulesIr> {
+        Arc::clone(&self.ir)
+    }
+
+    /// Stable content identity of this snapshot's immutable arena.
+    #[must_use]
+    pub fn ir_fingerprint(&self) -> &str {
+        &self.ir_fingerprint
     }
 
     /// Texture-catalog invalidation generation captured by this snapshot.
@@ -149,9 +186,10 @@ impl AnalysisSnapshot {
             return None;
         }
         Some(PreparedDocument {
-            document: prepare_document_snapshot(
+            document: prepare_document_snapshot_with_ir(
                 self.rules.as_ref(),
                 self.profile.as_ref(),
+                self.ir.as_ref(),
                 &self.roots,
                 document.clone(),
             ),

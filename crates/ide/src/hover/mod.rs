@@ -8,12 +8,9 @@ mod render;
 mod rules;
 mod symbol;
 
-pub(crate) use rules::semantic_pattern_rule_hint;
-pub(crate) use symbol::known_keys;
-
 use self::render::{HoverModel, code_span};
 use crate::resolution::{local_parameter_target, semantic_data, symbol_candidates_for_hover};
-use crate::support::{ParsedInput, contains, input_for_document, word_range};
+use crate::support::{contains, input_for_document, word_range};
 use crate::types::{CancellationToken, Cancelled, Hover, uncancelled};
 use engine::{AnalysisSnapshot, DocumentId};
 use text::TextSize;
@@ -101,8 +98,13 @@ pub fn hover_with_cancellation(
             },
         );
         if let Some(owner) = owner_name
-            && let Some(contract) =
-                dynamic::dynamic_parameter_contract_lines(snapshot, None, owner, &definition.name)
+            && let Some(contract) = dynamic::dynamic_parameter_contract_lines(
+                snapshot,
+                owner_kind,
+                owner,
+                &definition.name,
+                cancellation,
+            )?
         {
             section.push('\n');
             section.push_str(&contract);
@@ -157,6 +159,23 @@ pub fn hover_with_cancellation(
         return Ok(None);
     }
     let semantic = semantic_data(snapshot, &input);
+    // A generated binding may share a definition's selection range. Hovering
+    // the declaration still describes its owning type and all its bindings.
+    if let Some(definition) = semantic.definitions.iter().find(|definition| {
+        definition.document.as_ref() == Some(document)
+            && contains(definition.symbol.selection_range, position)
+    }) {
+        return Ok(Some(
+            symbol::hover_for_symbol(
+                snapshot,
+                &definition.kind,
+                &definition.name,
+                range,
+                cancellation,
+            )?
+            .into_hover_with_range(range),
+        ));
+    }
     let mut references = semantic.references.iter().filter(|reference| {
         reference.document.as_ref() == Some(document) && contains(reference.range, position)
     });
@@ -180,25 +199,10 @@ pub fn hover_with_cancellation(
         }
         return Ok(Some(best.into_hover_with_range(range)));
     }
-    if let Some(definition) = semantic.definitions.iter().find(|definition| {
-        definition.document.as_ref() == Some(document)
-            && contains(definition.symbol.selection_range, position)
-    }) {
-        return Ok(Some(
-            symbol::hover_for_symbol(
-                snapshot,
-                &definition.kind,
-                &definition.name,
-                range,
-                cancellation,
-            )?
-            .into_hover_with_range(range),
-        ));
-    }
     cancellation.checkpoint()?;
-    if let Some(model) =
-        dynamic::dynamic_invocation_parameter_hover(snapshot, &input, position, cancellation)?
-    {
+    let parameter_hover =
+        dynamic::ir_invocation_parameter_hover(snapshot, &input, position, cancellation)?;
+    if let Some(model) = parameter_hover {
         return Ok(Some(model.into_hover_with_range(range)));
     }
     if let Some(model) =
@@ -211,44 +215,8 @@ pub fn hover_with_cancellation(
     {
         return Ok(Some(model.into_hover_with_range(range)));
     }
-    if is_property_key_at(&input, position) {
-        if known_keys(snapshot)
-            .iter()
-            .any(|key| key.eq_ignore_ascii_case(&word))
-        {
-            let mut model = HoverModel::new(known_key_hover_title(snapshot, &word));
-            if let Some(details) = rules::semantic_rule_documentation(snapshot, &word) {
-                model.push_section(details);
-            }
-            return Ok(Some(model.into_hover_with_range(range)));
-        }
-        // The key may still be covered by a non-exact first-party matcher (type member, enum
-        // member, date, or dynamic set). Surface that provenance instead of returning nothing.
-        if let Some(hint) = semantic_pattern_rule_hint(snapshot, &word) {
-            let mut model = HoverModel::new(format!("### {}", code_span(&word)));
-            model.push_section(hint);
-            return Ok(Some(model.into_hover_with_range(range)));
-        }
-    }
+
     // Do not manufacture a tooltip for every bare word in a script or comment.  A hover is only
     // useful when the parser/HIR/rules have established a semantic role for the token.
     Ok(None)
-}
-
-pub(crate) fn is_property_key_at(input: &ParsedInput, position: TextSize) -> bool {
-    input.hir.as_deref().is_some_and(|hir| {
-        hir.properties()
-            .iter()
-            .any(|property| contains(property.key_range, position))
-    })
-}
-
-/// Title for the known-key fallback hover: the category of the rule family
-/// covering the key, or the bare symbol-hover pattern when no category is
-/// established (mixed contexts or none).
-fn known_key_hover_title(snapshot: &AnalysisSnapshot, word: &str) -> String {
-    rules::semantic_rule_key_category(snapshot, word).map_or_else(
-        || format!("### {}", code_span(word)),
-        |category| format!("### {category} {}", code_span(word)),
-    )
 }

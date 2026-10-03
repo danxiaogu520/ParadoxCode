@@ -17,7 +17,7 @@
 //! row directly above or directly above in the same column are flagged as
 //! warnings (`illegal-edge-placement`): the game cannot render them cleanly.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use text::TextRange;
 
@@ -171,77 +171,30 @@ pub fn validate_with_universe_ids(
 
 /// File-wide cycle detection over the full mission graph (cross-tree edges count).
 fn find_cycles(file: &MissionFile, diagnostics: &mut Vec<Diagnostic>) {
-    let ids = file.mission_ids();
-    // mission id -> prerequisite ids that exist somewhere in the file.
-    let mut index: HashMap<&str, Vec<&str>> = HashMap::new();
-    for (mission_id, (_, mission)) in &ids {
-        for required in &mission.required {
-            if ids.contains_key(required.as_str()) {
-                index.entry(mission_id).or_default().push(required);
-            }
-        }
-    }
-
-    #[derive(Clone, Copy, PartialEq)]
-    enum Mark {
-        Visiting,
-        Done,
-    }
-    let mut marks: HashMap<&str, Mark> = HashMap::new();
-    let mut stack: Vec<&str> = Vec::new();
-
-    fn visit<'a>(
-        node: &'a str,
-        index: &HashMap<&'a str, Vec<&'a str>>,
-        marks: &mut HashMap<&'a str, Mark>,
-        stack: &mut Vec<&'a str>,
-        diagnostics: &mut Vec<Diagnostic>,
-        mission_of: &HashMap<&str, (&MissionTree, &super::model::Mission)>,
-    ) {
-        match marks.get(node) {
-            Some(Mark::Done) => return,
-            Some(Mark::Visiting) => {
-                let start = stack.iter().position(|n| *n == node).unwrap_or(0);
-                let cycle: Vec<&str> = stack[start..].to_vec();
-                let mut message = format!("mission dependency cycle: {}", cycle.join(" -> "));
-                // Close the loop on the mission the cycle re-enters.
-                message.push_str(&format!(" -> {node}"));
-                let (tree, mission) = mission_of.get(node).copied().expect("node is in the graph");
-                diagnostics.push(Diagnostic {
-                    severity: Severity::Error,
-                    code: "dependency-cycle",
-                    message,
-                    range: mission.id_range,
-                    tree: tree.id.clone(),
-                    mission: Some(mission.id.clone()),
-                });
-                return;
-            }
-            None => {}
-        }
-        marks.insert(node, Mark::Visiting);
-        stack.push(node);
-        if let Some(nexts) = index.get(node) {
-            for next in nexts {
-                visit(next, index, marks, stack, diagnostics, mission_of);
-            }
-        }
-        stack.pop();
-        marks.insert(node, Mark::Done);
-    }
-
-    let mission_of: HashMap<&str, (&MissionTree, &super::model::Mission)> =
-        file.mission_ids().into_iter().collect();
-    // Visit in file order so which cycle member carries the diagnostic is
-    // stable across runs (HashMap iteration is not).
-    let all_ids: Vec<&str> = file
+    let nodes = file
         .trees
         .iter()
         .flat_map(|tree| tree.missions.iter())
-        .map(|mission| mission.id.as_str())
-        .collect();
-    for id in all_ids {
-        visit(id, &index, &mut marks, &mut stack, diagnostics, &mission_of);
+        .map(|mission| {
+            (
+                mission.id.as_str(),
+                mission.required.iter().map(String::as_str).collect(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let graph = engine::structure::DependencyGraph::new(&nodes);
+    let mission_of = file.mission_ids();
+    for cycle in graph.cycles() {
+        let id = cycle[0];
+        let (tree, mission) = mission_of[id];
+        diagnostics.push(Diagnostic {
+            severity: Severity::Error,
+            code: "dependency-cycle",
+            message: format!("mission dependency cycle: {}", cycle.join(" -> ")),
+            range: mission.id_range,
+            tree: tree.id.clone(),
+            mission: Some(mission.id.clone()),
+        });
     }
 }
 

@@ -1010,6 +1010,7 @@ the game clamps this to the nearest column"
             context: Some("internal-context".to_owned()),
             source_file: Some("internal.json".to_owned()),
             source_line: Some(7),
+            source_pointer: None,
         });
         let values = diagnostic_values_for_text(vec![diagnostic], &LineIndex::new("x"), "x");
         let value = serde_json::to_value(&values[0]).expect("diagnostic JSON");

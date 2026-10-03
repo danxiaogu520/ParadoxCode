@@ -2,7 +2,6 @@ use crate::resolution::*;
 use crate::support::*;
 use crate::types::*;
 use engine::{AnalysisSnapshot, DocumentId, DocumentSource};
-use rules::SymbolResolutionPolicy;
 use text::TextSize;
 
 /// Resolves the symbol at a position. Ambiguous and unresolved references deliberately return no
@@ -54,7 +53,7 @@ pub fn definition_with_cancellation(
     };
     Ok(match resolution {
         Resolution::Unique(definition) => vec![definition_selection_location(&definition)],
-        Resolution::Ambiguous | Resolution::Missing => Vec::new(),
+        Resolution::Missing => Vec::new(),
     })
 }
 
@@ -638,24 +637,12 @@ pub(crate) fn rename_target(
     // Renaming one of several same-priority duplicates would strand the others
     // under the old name, so duplicates stay unrenamable even though resolution
     // itself now follows the later-definition-wins rule.
-    let mut candidates = symbol_candidates(snapshot, &all, &kind, &name);
-    let policy = symbol_resolution_policy(snapshot, &kind);
-    let definition = if matches!(
-        policy,
-        SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique
-    ) {
-        match candidates.len() {
-            0 => return Err(RenameError::Unresolved.into()),
-            1 => candidates.pop().expect("one candidate"),
-            _ => return Err(RenameError::Ambiguous.into()),
-        }
-    } else {
-        let mut ordered = retain_highest_and_order(candidates);
-        match ordered.len() {
-            0 => return Err(RenameError::Unresolved.into()),
-            1 => ordered.pop().expect("one candidate"),
-            _ => return Err(RenameError::Ambiguous.into()),
-        }
+    let candidates = symbol_candidates(snapshot, &all, &kind, &name);
+    let mut ordered = retain_highest_and_order(candidates);
+    let definition = match ordered.len() {
+        0 => return Err(RenameError::Unresolved.into()),
+        1 => ordered.pop().expect("one candidate"),
+        _ => return Err(RenameError::Ambiguous.into()),
     };
     if !writable_location(snapshot, &definition.location) {
         return Err(RenameError::ReadOnly.into());
@@ -675,15 +662,6 @@ pub(crate) fn check_rename_conflict(
     new_name: &str,
     cancellation: &CancellationToken,
 ) -> Result<(), RenameFailure> {
-    let policy = snapshot
-        .rules()
-        .model()
-        .symbol_descriptors
-        .iter()
-        .find(|descriptor| descriptor.kind_id.eq_ignore_ascii_case(&target.kind))
-        .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| {
-            descriptor.resolution
-        });
     for definition in &all.definitions {
         cancellation
             .checkpoint()
@@ -695,11 +673,8 @@ pub(crate) fn check_rename_conflict(
             continue;
         }
         let priority = definition_priority(snapshot, definition);
-        let conflict = match policy {
-            SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique => true,
-            SymbolResolutionPolicy::ReplaceBySymbol => priority >= target.definition.priority,
-        };
-        if conflict {
+        // A same-or-higher-priority definition of the new name would shadow the renamed one.
+        if priority >= target.definition.priority {
             return Err(RenameError::Conflict.into());
         }
     }
@@ -715,11 +690,8 @@ pub(crate) fn check_rename_conflict(
             continue;
         }
         let priority = definition_priority_for_file(snapshot, definition.file_id);
-        let conflict = match policy {
-            SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique => true,
-            SymbolResolutionPolicy::ReplaceBySymbol => priority >= target.definition.priority,
-        };
-        if conflict {
+        // A same-or-higher-priority definition of the new name would shadow the renamed one.
+        if priority >= target.definition.priority {
             return Err(RenameError::Conflict.into());
         }
     }

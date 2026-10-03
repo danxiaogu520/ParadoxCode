@@ -114,6 +114,16 @@ pub fn render_mission_block(mission: &Mission, style: &WriteStyle) -> String {
 /// Renders one tree as a full `id = { ... }` block.
 #[must_use]
 pub fn render_tree(tree: &MissionTree, style: &WriteStyle) -> String {
+    render_tree_with_spec(tree, style, super::view_spec())
+}
+
+/// Writes a tree using package field spellings and declared role order.
+#[must_use]
+pub fn render_tree_with_spec(
+    tree: &MissionTree,
+    style: &WriteStyle,
+    spec: &rules::ProfileMissionViewSpec,
+) -> String {
     let mut out = String::new();
     out.push_str(&tree.id);
     out.push_str(" = {");
@@ -125,35 +135,53 @@ pub fn render_tree(tree: &MissionTree, style: &WriteStyle) -> String {
     let ind1 = style.indent_text(1);
     let ind2 = style.indent_text(2);
 
-    scalar_field(&mut out, &ind1, "slot", &tree.slot.to_string(), style);
-    scalar_field(
-        &mut out,
-        &ind1,
+    let fields = &spec.tree_fields;
+    let mut rendered = Vec::new();
+    let mut add_scalar = |role: &str, key: &str, value: String| {
+        let mut chunk = String::new();
+        scalar_field(&mut chunk, &ind1, key, &value, style);
+        rendered.push((role.to_owned(), chunk));
+    };
+    add_scalar("slot", &fields.slot, tree.slot.to_string());
+    add_scalar(
         "generic",
-        if tree.generic { "yes" } else { "no" },
-        style,
+        &fields.generic,
+        if tree.generic { "yes" } else { "no" }.to_owned(),
     );
-    if let Some(ai) = tree.ai {
-        scalar_field(&mut out, &ind1, "ai", if ai { "yes" } else { "no" }, style);
-    }
-    if let Some(block) = &tree.potential_on_load {
-        block_field(&mut out, &ind1, "potential_on_load", block, style);
-    }
-    if let Some(block) = &tree.potential {
-        block_field(&mut out, &ind1, "potential", block, style);
-    }
-    if let Some(shield) = tree.has_country_shield {
-        scalar_field(
-            &mut out,
-            &ind1,
-            "has_country_shield",
-            if shield { "yes" } else { "no" },
-            style,
+    if let Some(value) = tree.ai {
+        add_scalar(
+            "ai",
+            &fields.ai,
+            if value { "yes" } else { "no" }.to_owned(),
         );
     }
-    for field in &tree.unknown {
-        raw_field(&mut out, &ind1, field, style);
+    if let Some(value) = tree.has_country_shield {
+        add_scalar(
+            "has_country_shield",
+            &fields.has_country_shield,
+            if value { "yes" } else { "no" }.to_owned(),
+        );
     }
+    for (role, key, value) in [
+        (
+            "potential_on_load",
+            &fields.potential_on_load,
+            &tree.potential_on_load,
+        ),
+        ("potential", &fields.potential, &tree.potential),
+    ] {
+        if let Some(value) = value {
+            let mut chunk = String::new();
+            block_field(&mut chunk, &ind1, key, value, style);
+            rendered.push((role.to_owned(), chunk));
+        }
+    }
+    for field in &tree.unknown {
+        let mut chunk = String::new();
+        raw_field(&mut chunk, &ind1, field, style);
+        rendered.push((String::new(), chunk));
+    }
+    engine::structure::write_ordered_fields(&mut out, &mut rendered, &spec.tree_field_order);
     if !tree.missions.is_empty() && style.spacing == BlockSpacing::Spacious {
         blank_line(&mut out, &ind1, style);
     }
@@ -161,7 +189,7 @@ pub fn render_tree(tree: &MissionTree, style: &WriteStyle) -> String {
         if i > 0 && style.spacing == BlockSpacing::Spacious {
             blank_line(&mut out, &ind1, style);
         }
-        render_mission(&mut out, &ind1, &ind2, mission, style);
+        render_mission_with_spec(&mut out, &ind1, &ind2, mission, style, spec);
     }
 
     out.push('}');
@@ -177,53 +205,82 @@ fn render_mission(
     mission: &Mission,
     style: &WriteStyle,
 ) {
+    render_mission_with_spec(
+        out,
+        ind_mission,
+        ind_field,
+        mission,
+        style,
+        super::view_spec(),
+    );
+}
+
+fn render_mission_with_spec(
+    out: &mut String,
+    ind_mission: &str,
+    ind_field: &str,
+    mission: &Mission,
+    style: &WriteStyle,
+    spec: &rules::ProfileMissionViewSpec,
+) {
     out.push_str(ind_mission);
     out.push_str(&mission.id);
     out.push_str(" = {");
     out.push_str(style.newline);
 
-    if let Some(icon) = &mission.icon {
-        scalar_field(out, ind_field, "icon", icon, style);
-    }
-    let mut required = String::from("required_missions = {");
+    let fields = &spec.node_fields;
+    let mut rendered = Vec::new();
+    let mut add_scalar = |role: &str, key: &str, value: Option<String>| {
+        if let Some(value) = value {
+            let mut chunk = String::new();
+            scalar_field(&mut chunk, ind_field, key, &value, style);
+            rendered.push((role.to_owned(), chunk));
+        }
+    };
+    add_scalar("icon", &fields.icon, mission.icon.clone());
+    add_scalar(
+        "position",
+        &fields.position,
+        mission.position.map(|value| value.to_string()),
+    );
+    add_scalar(
+        "completed_by",
+        &fields.completed_by,
+        mission.completed_by.clone(),
+    );
+    add_scalar("type", &fields.node_type, mission.mission_type.clone());
+    let mut required = format!("{ind_field}{} = {{", fields.required_missions);
     for id in &mission.required {
         required.push(' ');
         required.push_str(id);
     }
     required.push_str(" }");
-    out.push_str(ind_field);
-    out.push_str(&required);
-    out.push_str(style.newline);
-    if let Some(position) = mission.position {
-        scalar_field(out, ind_field, "position", &position.to_string(), style);
-    }
-    if let Some(completed_by) = &mission.completed_by {
-        scalar_field(out, ind_field, "completed_by", completed_by, style);
-    }
-    if let Some(mission_type) = &mission.mission_type {
-        scalar_field(out, ind_field, "type", mission_type, style);
-    }
-    if let Some(block) = &mission.provinces_to_highlight {
-        if style.spacing == BlockSpacing::Spacious {
-            blank_line(out, ind_field, style);
+    required.push_str(style.newline);
+    rendered.push(("required_missions".to_owned(), required));
+    for (role, key, value) in [
+        (
+            "provinces_to_highlight",
+            &fields.provinces_to_highlight,
+            &mission.provinces_to_highlight,
+        ),
+        ("trigger", &fields.trigger, &mission.trigger),
+        ("effect", &fields.effect, &mission.effect),
+    ] {
+        if let Some(value) = value {
+            let mut chunk = String::new();
+            if style.spacing == BlockSpacing::Spacious {
+                blank_line(&mut chunk, ind_field, style);
+            }
+            block_field(&mut chunk, ind_field, key, value, style);
+            rendered.push((role.to_owned(), chunk));
         }
-        block_field(out, ind_field, "provinces_to_highlight", block, style);
-    }
-    if let Some(block) = &mission.trigger {
-        if style.spacing == BlockSpacing::Spacious {
-            blank_line(out, ind_field, style);
-        }
-        block_field(out, ind_field, "trigger", block, style);
-    }
-    if let Some(block) = &mission.effect {
-        if style.spacing == BlockSpacing::Spacious {
-            blank_line(out, ind_field, style);
-        }
-        block_field(out, ind_field, "effect", block, style);
     }
     for field in &mission.unknown {
-        raw_field(out, ind_field, field, style);
+        let mut chunk = String::new();
+        raw_field(&mut chunk, ind_field, field, style);
+        rendered.push((String::new(), chunk));
     }
+    engine::structure::write_ordered_fields(out, &mut rendered, &spec.node_field_order);
 
     out.push_str(ind_mission);
     out.push('}');
@@ -265,12 +322,5 @@ fn blank_line(out: &mut String, indent: &str, style: &WriteStyle) {
 /// was loaded from.
 #[must_use]
 pub fn apply_tree_edit(source: &str, span: TextRange, rendered: &str) -> String {
-    let start = span.start() as usize;
-    let end = span.end() as usize;
-    debug_assert!(source.get(start..end).is_some(), "tree span out of bounds");
-    let mut out = String::with_capacity(source.len() + rendered.len());
-    out.push_str(&source[..start]);
-    out.push_str(rendered);
-    out.push_str(&source[end..]);
-    out
+    engine::structure::replace_block(source, span, rendered)
 }

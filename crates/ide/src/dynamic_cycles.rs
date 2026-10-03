@@ -21,8 +21,8 @@ use text::TextRange;
 
 use crate::semantic::{dynamic_definition_type, probe_query_cache, resolve_dynamic_definition};
 use crate::support::{
-    ParsedContent, ParsedInput, ScriptProperty, input_for_document, input_for_source_file,
-    script_properties,
+    ParsedContent, ParsedInput, ScriptProperty, input_for_document, script_properties,
+    syntax_input_for_source_file,
 };
 use crate::types::{CancellationToken, Cancelled, Diagnostic, DiagnosticCode};
 
@@ -340,7 +340,7 @@ fn collect_call_site_bindings(
             let mut fresh = CallSiteBindings::new();
             for (file, indices) in by_file {
                 cancellation.checkpoint()?;
-                let Some(input) = input_for_source_file(snapshot, file) else {
+                let Some(input) = syntax_input_for_source_file(snapshot, file) else {
                     continue;
                 };
                 let properties = root_properties(&input);

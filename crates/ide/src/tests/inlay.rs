@@ -4,7 +4,7 @@ use super::support::*;
 
 #[test]
 fn scope_hints_use_rule_proven_transitions_and_skip_ambient_blocks() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/inlay.txt");
     host.open_document(
         id.clone(),
@@ -42,7 +42,7 @@ fn nested_history_and_on_action_blocks_get_scope_hints_from_inherited_context() 
             "province",
         ),
     ] {
-        let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+        let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
         let id = DocumentId::new(format!("file://{path}"));
         host.open_document(
             id.clone(),

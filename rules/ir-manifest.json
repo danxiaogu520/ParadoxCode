@@ -1,0 +1,10 @@
+{
+  "source_format_version": 13,
+  "game_id": "eu4",
+  "target_game_version": "1.37.5",
+  "rule_hash": "c82f078ed894a5cd6c7416292599e55d87e0a4a6363eb06542cbb901443e6eea",
+  "schema_count": 1235,
+  "field_count": 13055,
+  "matcher_count": 4167,
+  "file_category_count": 138
+}

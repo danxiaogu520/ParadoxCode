@@ -6,7 +6,7 @@ use text::AbsPath;
 
 #[test]
 fn script_unencodable_code_points_follow_profile_rules() {
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     // In the script profile, the CP1252-mapped Š is a single byte and allowed…
     let script = DocumentId::new("file:///tmp/transcode/history.txt");
     host.open_document(
@@ -64,7 +64,7 @@ fn legacy_escape_variant_script_files_get_a_hint() {
             })
             .collect()
     };
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
 
     let canonical = format!(
         "name = \"{}\"\n",
@@ -144,7 +144,7 @@ fn scoped_shaped_text_is_not_mixed_encoding() {
     .expect("encode");
     let text =
         format!("# \u{6CE8}\u{91CA}\r\nname = \"{escaped}\"\r\ntitle = \"\u{5E1D}\u{56FD}\"\r\n");
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = open_script(&mut host, "scoped.txt", text);
     let codes = transcode_codes(&host, &id);
     assert!(
@@ -159,7 +159,7 @@ fn scoped_shaped_text_is_not_mixed_encoding() {
 fn marker_outside_strings_is_a_mixed_error() {
     // A marker in code position (outside quotes and comments) anchors the
     // mixed-encoding error at itself.
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = open_script(
         &mut host,
         "damaged.txt",
@@ -180,7 +180,7 @@ fn marker_outside_strings_is_a_mixed_error() {
 fn in_span_orphan_markers_report_as_repairable_warnings() {
     // A marker with no payload inside a string is an orphan, not damage: the
     // scoped path passes it through and reports it for manual repair.
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = open_script(
         &mut host,
         "orphan.txt",
@@ -198,7 +198,7 @@ fn in_span_orphan_markers_report_as_repairable_warnings() {
 fn unencodable_code_points_outside_strings_are_not_flagged() {
     // Scoped saving keeps everything outside strings verbatim, so a refusal
     // only applies inside a quoted span.
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = open_script(
         &mut host,
         "comment-emoji.txt",

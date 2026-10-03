@@ -49,7 +49,7 @@ git_state_json() {
     '{rev: $rev, branch: $branch, dirty: $dirty}'
 }
 
-rule_hash() { jq -r '.rule_hash' "$REPO_ROOT/rules/manifest.json"; }
+rule_hash() { jq -r '.rule_hash' "${PDC_PERF_RULES_MANIFEST:-$REPO_ROOT/rules/ir-manifest.json}"; }
 
 # vanilla 原始安装位置（搬运来源；与 PDC_VANILLA_SOURCE 不同，后者可能已指向 data/ 副本）
 vanilla_origin() {

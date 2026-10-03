@@ -418,14 +418,15 @@ fn build_cache(
     label: &str,
 ) -> Result<String, CliError> {
     let started = Instant::now();
-    let rules = game::eu4::first_party_rules()?;
-    let profile = rules.profile().clone();
+    let ir = game::eu4::first_party_ir()?;
+    let rules = rules::RuleSet::from_ir_catalog(&ir);
+    let profile = ir.game.profile.clone();
     // An existing validated cache is refreshed in place: only files whose content fingerprint
     // changed are reindexed. Any load or refresh failure (missing file, stale rules, corrupt
     // data) falls back to a full scan and rebuild.
     if let Ok(existing) =
         IndexCache::load_cancellable_for_install(output, &WorkspaceScanToken::new())
-        && let Ok(cache) = existing.refresh(&rules, &profile)
+        && let Ok(cache) = existing.refresh_with_ir(&rules, &profile, &ir)
     {
         let save_started = Instant::now();
         cache.save(output)?;
@@ -440,7 +441,7 @@ fn build_cache(
             cache.metadata().rule_hash
         ));
     }
-    let mut host = AnalysisHost::with_profile(rules, profile);
+    let mut host = AnalysisHost::with_ir(rules, profile, ir);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![root]));
     let scan_started = Instant::now();
     let report = host.refresh_source_roots()?;

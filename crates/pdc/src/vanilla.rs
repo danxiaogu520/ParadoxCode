@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 
 use engine::{
     AnalysisHost, IndexCache, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
@@ -13,6 +14,7 @@ use lsp_types::{
     DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, GlobPattern, OneOf, Registration,
     RegistrationParams, RelativePattern, Uri, WatchKind,
 };
+use rules::ir::RulesIr;
 use rules::{GameProfile, RuleSet};
 use serde_json::{Value, json};
 use text::AbsPath;
@@ -29,8 +31,8 @@ use crate::{
 pub(crate) struct IndexCacheLoadRequest<'a> {
     pub(crate) path: &'a Path,
     pub(crate) rules: RuleSet,
+    pub(crate) ir: Arc<RulesIr>,
     pub(crate) profile: GameProfile,
-    pub(crate) current_rule_hash: String,
     pub(crate) auto_vanilla: Option<&'a AutoVanillaConfiguration>,
     pub(crate) log: Option<&'a (dyn Fn(&str) + Sync)>,
     pub(crate) progress: Option<&'a (dyn Fn(usize, usize) + Sync)>,
@@ -41,6 +43,7 @@ pub(crate) struct IndexCacheLoadRequest<'a> {
 
 struct VanillaIndexContext<'a> {
     rules: &'a RuleSet,
+    ir: Arc<RulesIr>,
     profile: &'a GameProfile,
     auto_vanilla: Option<&'a AutoVanillaConfiguration>,
     discovery_options: &'a DiscoveryOptions,
@@ -63,8 +66,8 @@ pub(crate) fn run_index_cache_load_with_options(
     let IndexCacheLoadRequest {
         path,
         rules,
+        ir,
         profile,
-        current_rule_hash,
         auto_vanilla,
         log,
         progress,
@@ -74,6 +77,7 @@ pub(crate) fn run_index_cache_load_with_options(
     } = request;
     let context = VanillaIndexContext {
         rules: &rules,
+        ir: Arc::clone(&ir),
         profile: &profile,
         auto_vanilla,
         discovery_options,
@@ -139,22 +143,21 @@ pub(crate) fn run_index_cache_load_with_options(
                 loaded.index().position_ranges().len(),
             ));
         }
-        if loaded.metadata().rule_hash == current_rule_hash {
+        if loaded.metadata().build_id == engine::ANALYZER_BUILD_ID {
             if let Some(log) = log {
-                log(&format!(
-                    "Vanilla cache phase: active rules hash matches ({current_rule_hash}); no rebuild required"
-                ));
+                log("Vanilla cache phase: analyzer build matches; no rebuild required");
             }
             return Ok((
                 loaded,
                 format!("Vanilla symbols loaded from {}", path.display()),
             ));
         }
-        let stale_hash = loaded.metadata().rule_hash.clone();
+        let stale_build = &loaded.metadata().build_id;
+        let current_build = engine::ANALYZER_BUILD_ID;
         let source = loaded.source_root().path.clone();
         if let Some(log) = log {
             log(&format!(
-                "Vanilla cache {} is stale (rules hash {stale_hash} != {current_rule_hash}); regenerating from {}",
+                "Vanilla cache {} is stale (analyzer build {stale_build} != {current_build}); regenerating from {}",
                 path.display(),
                 source.display()
             ));
@@ -165,13 +168,12 @@ pub(crate) fn run_index_cache_load_with_options(
             Ok(cache) => Ok((
                 cache,
                 format!(
-                    "Vanilla cache was regenerated for the active rules hash {current_rule_hash} and loaded from {}",
+                    "Vanilla cache was regenerated for the active analyzer build {current_build} and loaded from {}",
                     path.display()
                 ),
             )),
-            Err(error) => Ok((
-                loaded,
-                format!("{error}; using the existing cache built with rules hash {stale_hash}"),
+            Err(error) => Err(format!(
+                "{error}; refusing to install the Vanilla cache because its analyzer build is stale (cached {stale_build}, active {current_build})"
             )),
         }
     })();
@@ -313,6 +315,7 @@ fn build_cache_from_source(
 ) -> Result<IndexCache, String> {
     let mut host = cache_build_host(
         context.rules,
+        Arc::clone(&context.ir),
         context.profile,
         context.auto_vanilla,
         context.scan_limits,
@@ -384,11 +387,12 @@ fn build_cache_from_source(
 /// output is source-dependent only and can safely be reused across that rebuild.
 fn cache_build_host(
     rules: &RuleSet,
+    ir: Arc<RulesIr>,
     profile: &GameProfile,
     auto_vanilla: Option<&AutoVanillaConfiguration>,
     scan_limits: WorkspaceScanLimits,
 ) -> AnalysisHost {
-    let mut host = AnalysisHost::with_profile(rules.clone(), profile.clone());
+    let mut host = AnalysisHost::with_ir(rules.clone(), profile.clone(), ir);
     host.set_scan_limits(scan_limits);
     let Some(auto_vanilla) = auto_vanilla else {
         return host;
@@ -533,6 +537,7 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
     run_auto_vanilla_setup_with_options_and_limits(
         auto_vanilla,
         rules,
+        Arc::new(RulesIr::empty()),
         profile,
         log,
         progress,
@@ -549,6 +554,7 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
 pub(crate) fn run_auto_vanilla_setup_with_options_and_limits(
     auto_vanilla: &AutoVanillaConfiguration,
     rules: RuleSet,
+    ir: Arc<RulesIr>,
     profile: GameProfile,
     log: Option<&(dyn Fn(&str) + Sync)>,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
@@ -671,7 +677,13 @@ pub(crate) fn run_auto_vanilla_setup_with_options_and_limits(
             ));
         }
 
-        let mut host = cache_build_host(&rules, &profile, Some(auto_vanilla), scan_limits);
+        let mut host = cache_build_host(
+            &rules,
+            Arc::clone(&ir),
+            &profile,
+            Some(auto_vanilla),
+            scan_limits,
+        );
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(0),
             SourceRootKind::Vanilla,
