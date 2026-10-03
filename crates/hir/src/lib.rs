@@ -6,6 +6,7 @@ use parser::ParsedFile;
 use rules::{GameProfile, RuleSet};
 use text::LogicalPath;
 
+pub mod analysis;
 pub mod callable;
 mod collector;
 mod ir_lowering;
@@ -198,7 +199,18 @@ pub fn lower_ir_schema<F: rules::ir::SymbolFacts>(
         &parameter_references,
         &ir_facts.callable_kinds,
     );
+    let mut analysis_coverage = ir_facts.analysis_coverage.clone();
+    if callable_definitions.iter().any(|definition| {
+        !dynamic_templates
+            .iter()
+            .any(|template| template.definition_range == definition.range)
+    }) {
+        analysis_coverage
+            .limits
+            .insert(analysis::AnalysisLimit::UnavailableTemplate);
+    }
     HirFile {
+        analysis_coverage,
         syntax,
         scope: Scope::Unknown,
         properties: collected.properties,
@@ -296,7 +308,18 @@ fn lower_shared_impl(
         &parameter_references,
         &facts.callable_kinds,
     );
+    let mut analysis_coverage = facts.analysis_coverage.clone();
+    if callable_definitions.iter().any(|definition| {
+        !dynamic_templates
+            .iter()
+            .any(|template| template.definition_range == definition.range)
+    }) {
+        analysis_coverage
+            .limits
+            .insert(analysis::AnalysisLimit::UnavailableTemplate);
+    }
     HirFile {
+        analysis_coverage,
         syntax,
         scope: Scope::Unknown,
         properties: collected.properties,

@@ -1,4 +1,5 @@
 //! Binding-aware replacement replay shared by indexing and IDE queries.
+use crate::analysis::{Analysis, AnalysisCoverage, AnalysisLimit, ResidualReason};
 use crate::{ScopeState, TemplateFragment, TemplateItem, TemplateToken, TemplateValue};
 use rules::ir::{FieldValue, Matcher, MatcherId, SchemaId, Shape};
 use std::collections::{BTreeMap, BTreeSet};
@@ -41,7 +42,7 @@ pub fn parameter_sites<E>(
     bindings: &BTreeMap<String, String>,
     state: ScopeState,
     checkpoint: &mut dyn FnMut() -> Result<(), E>,
-) -> Result<Vec<ParameterSite>, E> {
+) -> Result<Analysis<Vec<ParameterSite>>, E> {
     parameter_sites_with(
         ir, facts, kind, name, parameter, bindings, state, false, checkpoint,
     )
@@ -60,7 +61,7 @@ pub fn parameter_symbol_sites<E>(
     bindings: &BTreeMap<String, String>,
     state: ScopeState,
     checkpoint: &mut dyn FnMut() -> Result<(), E>,
-) -> Result<Vec<ParameterSite>, E> {
+) -> Result<Analysis<Vec<ParameterSite>>, E> {
     parameter_sites_with(
         ir, facts, kind, name, parameter, bindings, state, true, checkpoint,
     )
@@ -77,7 +78,7 @@ fn parameter_sites_with<E>(
     state: ScopeState,
     include_display_only: bool,
     checkpoint: &mut dyn FnMut() -> Result<(), E>,
-) -> Result<Vec<ParameterSite>, E> {
+) -> Result<Analysis<Vec<ParameterSite>>, E> {
     let environment = bindings
         .iter()
         .filter(|(key, _)| !key.eq_ignore_ascii_case(parameter))
@@ -93,6 +94,7 @@ fn parameter_sites_with<E>(
         facts,
         parameter,
         checkpoint,
+        coverage: AnalysisCoverage::default(),
         sites: Vec::new(),
         missing: BTreeSet::new(),
         visiting: BTreeSet::new(),
@@ -111,7 +113,10 @@ fn parameter_sites_with<E>(
             .collect(),
         state,
     )?;
-    Ok(replay.sites)
+    Ok(Analysis {
+        value: replay.sites,
+        coverage: replay.coverage,
+    })
 }
 
 /// Inspects every definition-side branch before invocation bindings are known.
@@ -123,12 +128,13 @@ pub fn definition_parameter_sites<E>(
     name: &str,
     parameter: &str,
     checkpoint: &mut dyn FnMut() -> Result<(), E>,
-) -> Result<Vec<ParameterSite>, E> {
+) -> Result<Analysis<Vec<ParameterSite>>, E> {
     let mut replay = Replay {
         ir,
         facts,
         parameter,
         checkpoint,
+        coverage: AnalysisCoverage::default(),
         sites: Vec::new(),
         missing: BTreeSet::new(),
         visiting: BTreeSet::new(),
@@ -149,7 +155,10 @@ pub fn definition_parameter_sites<E>(
             previous: Vec::new(),
         },
     )?;
-    Ok(replay.sites)
+    Ok(Analysis {
+        value: replay.sites,
+        coverage: replay.coverage,
+    })
 }
 
 /// Collects substitutions that remain unbound in active invocation branches.
@@ -162,7 +171,7 @@ pub fn missing_parameters<E>(
     bindings: &BTreeMap<String, String>,
     state: ScopeState,
     checkpoint: &mut dyn FnMut() -> Result<(), E>,
-) -> Result<BTreeSet<String>, E> {
+) -> Result<Analysis<BTreeSet<String>>, E> {
     let env = bindings
         .iter()
         .map(|(key, value)| {
@@ -177,6 +186,7 @@ pub fn missing_parameters<E>(
         facts,
         parameter: "",
         checkpoint,
+        coverage: AnalysisCoverage::default(),
         sites: Vec::new(),
         missing: BTreeSet::new(),
         visiting: BTreeSet::new(),
@@ -186,7 +196,10 @@ pub fn missing_parameters<E>(
         origin: (String::new(), String::new()),
     };
     replay.call(kind, name, &env, &bindings.keys().cloned().collect(), state)?;
-    Ok(replay.missing)
+    Ok(Analysis {
+        value: replay.missing,
+        coverage: replay.coverage,
+    })
 }
 
 type Environment = BTreeMap<String, Vec<TemplateFragment>>;
@@ -196,6 +209,7 @@ struct Replay<'a, E> {
     facts: &'a dyn rules::ir::SymbolFacts,
     parameter: &'a str,
     checkpoint: &'a mut dyn FnMut() -> Result<(), E>,
+    coverage: AnalysisCoverage,
     sites: Vec<ParameterSite>,
     missing: BTreeSet<String>,
     visiting: BTreeSet<(String, String)>,
@@ -217,6 +231,11 @@ impl<E> Replay<'_, E> {
         (self.checkpoint)()?;
         let key = (kind.to_ascii_lowercase(), name.to_ascii_lowercase());
         if self.visiting.len() >= 32 || !self.visiting.insert(key.clone()) {
+            self.coverage.limits.insert(if self.visiting.len() >= 32 {
+                AnalysisLimit::CallDepth
+            } else {
+                AnalysisLimit::RecursiveState
+            });
             for fragments in env.values() {
                 self.add(
                     Domain::Unresolved,
@@ -240,6 +259,10 @@ impl<E> Replay<'_, E> {
                 self.required_substitutions(&template.items, env, active, &mut budget)?;
             }
             self.walk(schema, &template.items, env, active, state, None)?;
+        } else {
+            self.coverage
+                .limits
+                .insert(AnalysisLimit::UnavailableTemplate);
         }
         self.origin = previous_origin;
         self.visiting.remove(&key);
@@ -258,6 +281,7 @@ impl<E> Replay<'_, E> {
         for item in items {
             (self.checkpoint)()?;
             if *budget == 0 {
+                self.coverage.limits.insert(AnalysisLimit::Nodes);
                 break;
             }
             *budget -= 1;
@@ -327,6 +351,7 @@ impl<E> Replay<'_, E> {
         for item in items {
             (self.checkpoint)()?;
             if self.budget == 0 {
+                self.coverage.limits.insert(AnalysisLimit::Nodes);
                 break;
             }
             self.budget -= 1;
@@ -364,6 +389,7 @@ impl<E> Replay<'_, E> {
                         _ => Shape::Scalar,
                     };
                     let Some(key) = literal(&token) else {
+                        self.coverage.residuals.insert(ResidualReason::DynamicKey);
                         let domain = if shape == Shape::Block
                             && let Some(matchers) = switch_cases
                         {

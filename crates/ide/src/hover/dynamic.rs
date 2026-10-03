@@ -77,6 +77,13 @@ pub(crate) fn ir_invocation_parameter_hover(
         crate::ir_callable::invocation_state(hir, invocation),
         cancellation,
     )?;
+    model.coverage.merge(&sites.coverage);
+    if !sites.coverage.is_complete() {
+        section.push_str(&format!(
+            "\n- Analysis incomplete: {}",
+            sites.coverage.limit_description()
+        ));
+    }
     if let Some(lines) = ir_parameter_contract_lines(snapshot, &summary, &parameter.name, &sites) {
         section.push('\n');
         section.push_str(&lines);
@@ -95,7 +102,7 @@ pub(crate) fn dynamic_parameter_contract_lines(
     owner_name: &str,
     parameter_name: &str,
     cancellation: &CancellationToken,
-) -> Result<Option<String>, Cancelled> {
+) -> Result<Option<hir::analysis::Analysis<String>>, Cancelled> {
     cancellation.checkpoint()?;
 
     let summary = if let Some(kind) = owner_kind {
@@ -118,12 +125,18 @@ pub(crate) fn dynamic_parameter_contract_lines(
         parameter_name,
         cancellation,
     )?;
-    Ok(ir_parameter_contract_lines(
-        snapshot,
-        &summary,
-        parameter_name,
-        &sites,
-    ))
+    let coverage = sites.coverage.clone();
+    let mut lines = ir_parameter_contract_lines(snapshot, &summary, parameter_name, &sites);
+    if !coverage.is_complete() {
+        let line = format!("- Analysis incomplete: {}", coverage.limit_description());
+        if let Some(lines) = &mut lines {
+            lines.push('\n');
+            lines.push_str(&line);
+        } else {
+            lines = Some(line);
+        }
+    }
+    Ok(lines.map(|value| hir::analysis::Analysis { value, coverage }))
 }
 
 fn ir_parameter_contract_lines(

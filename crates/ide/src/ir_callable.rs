@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use engine::AnalysisSnapshot;
+use hir::analysis::Analysis;
 use hir::{ScopeState, TemplateFragment, TemplateToken};
 use rules::ir::{FieldId, Matcher, MatcherId};
 
@@ -215,8 +216,10 @@ fn field_allowed(snapshot: &AnalysisSnapshot, id: FieldId, state: &ScopeState) -
     })
 }
 
-fn map_sites(sites: Vec<hir::callable::ParameterSite>) -> Vec<ParameterSite> {
-    sites
+fn map_sites(sites: Analysis<Vec<hir::callable::ParameterSite>>) -> Analysis<Vec<ParameterSite>> {
+    let coverage = sites.coverage;
+    let value = sites
+        .value
         .into_iter()
         .map(|site| ParameterSite {
             origin: site.origin,
@@ -224,7 +227,8 @@ fn map_sites(sites: Vec<hir::callable::ParameterSite>) -> Vec<ParameterSite> {
             token: site.token,
             state: site.state,
         })
-        .collect()
+        .collect();
+    Analysis { value, coverage }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -236,7 +240,7 @@ pub(crate) fn parameter_sites(
     bindings: &BTreeMap<String, String>,
     state: ScopeState,
     cancellation: &CancellationToken,
-) -> Result<Vec<ParameterSite>, Cancelled> {
+) -> Result<Analysis<Vec<ParameterSite>>, Cancelled> {
     hir::callable::parameter_sites(
         snapshot.ir(),
         &WorkspaceFacts { snapshot },
@@ -255,7 +259,7 @@ pub(crate) fn definition_parameter_sites(
     name: &str,
     parameter: &str,
     cancellation: &CancellationToken,
-) -> Result<Vec<ParameterSite>, Cancelled> {
+) -> Result<Analysis<Vec<ParameterSite>>, Cancelled> {
     hir::callable::definition_parameter_sites(
         snapshot.ir(),
         &WorkspaceFacts { snapshot },
@@ -275,7 +279,7 @@ pub(crate) fn parameter_symbol_sites(
     bindings: &BTreeMap<String, String>,
     state: ScopeState,
     cancellation: &CancellationToken,
-) -> Result<Vec<ParameterSite>, Cancelled> {
+) -> Result<Analysis<Vec<ParameterSite>>, Cancelled> {
     hir::callable::parameter_symbol_sites(
         snapshot.ir(),
         &WorkspaceFacts { snapshot },
@@ -295,7 +299,7 @@ pub(crate) fn missing_parameters(
     bindings: &BTreeMap<String, String>,
     state: ScopeState,
     cancellation: &CancellationToken,
-) -> Result<BTreeSet<String>, Cancelled> {
+) -> Result<Analysis<BTreeSet<String>>, Cancelled> {
     hir::callable::missing_parameters(
         snapshot.ir(),
         &WorkspaceFacts { snapshot },

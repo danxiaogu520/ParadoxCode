@@ -99,6 +99,8 @@ pub(crate) fn uncancelled<T>(result: Result<T, Cancelled>) -> T {
 pub enum DiagnosticCode {
     /// Syntax diagnostics from a format-specific parser.
     Syntax,
+    /// A bounded semantic query did not finish; this is not a source syntax error.
+    AnalysisIncomplete,
     /// A property key is not accepted by the current semantic context.
     UnknownKey,
     /// A localisation key reference has no definition in the workspace or
@@ -167,6 +169,7 @@ impl DiagnosticCode {
     /// Every diagnostic category emitted by the analysis layer, in stable wire order.
     pub const ALL: &'static [Self] = &[
         Self::Syntax,
+        Self::AnalysisIncomplete,
         Self::UnknownKey,
         Self::UnknownLocalisationKey,
         Self::AmbiguousDefinition,
@@ -205,6 +208,7 @@ impl DiagnosticCode {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Syntax => "SyntaxError",
+            Self::AnalysisIncomplete => "AnalysisIncomplete",
             Self::UnknownKey => "UnknownKey",
             Self::UnknownLocalisationKey => "UnknownLocalisationKey",
             Self::AmbiguousDefinition => "AmbiguousDefinition",
@@ -234,6 +238,7 @@ impl DiagnosticCode {
     #[must_use]
     pub const fn severity(self) -> Severity {
         match self {
+            Self::AnalysisIncomplete => Severity::Information,
             // An unknown key is silently ignored by the game, so the authored line is
             // ineffective code; it is an error once the surrounding context is known.
             Self::UnknownKey => Severity::Error,
@@ -665,6 +670,8 @@ pub struct CompletionResult {
     pub revision: u64,
     /// Replacement-aware candidates.
     pub items: Vec<CompletionItem>,
+    /// Coverage of the requested candidate/semantic query.
+    pub coverage: hir::analysis::AnalysisCoverage,
 }
 
 /// Hover information returned by the query layer.
@@ -674,6 +681,8 @@ pub struct Hover {
     pub contents: String,
     /// Token range that produced the hover.
     pub range: Option<TextRange>,
+    /// Coverage of the constraints explained by this hover.
+    pub coverage: hir::analysis::AnalysisCoverage,
 }
 
 /// One source-ranged semantic token produced by the editor-neutral highlighting query.
@@ -838,6 +847,8 @@ impl std::fmt::Display for RenameError {
 /// A fully analysed file snapshot.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FileAnalysis {
+    /// Coverage of generated facts and diagnostic queries for this file.
+    pub coverage: hir::analysis::AnalysisCoverage,
     /// Snapshot revision used by the query.
     pub revision: u64,
     /// Open document identity, if this is an overlay query.

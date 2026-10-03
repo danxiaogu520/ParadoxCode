@@ -10,6 +10,7 @@ VS Code's own transparent-encoding diagnostics are described alongside the serve
 | Code | Registry default severity |
 | --- | --- |
 | [SyntaxError](#syntaxerror) | Error |
+| [AnalysisIncomplete](#analysisincomplete) | Information |
 | [UnknownKey](#unknownkey) | Error |
 | [UnknownLocalisationKey](#unknownlocalisationkey) | Warning |
 | [AmbiguousDefinition](#ambiguousdefinition) | Warning |
@@ -51,6 +52,12 @@ The script file could not be parsed: an unclosed block or string, a stray
 delimiter, or an operator without a value.
 The range covers the incomplete construct (for a missing value, the `key =`
 that never received one).
+
+## AnalysisIncomplete
+
+Template analysis stopped at a resource or recovery boundary. The message names the unfinished
+work; already proven errors remain visible. This information does not declare the script invalid
+or claim that unchecked statements passed. Completion and hover retain the same coverage state.
 
 ## UnknownKey
 

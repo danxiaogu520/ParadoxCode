@@ -3,6 +3,7 @@ use crate::quoted_script::{QuotedScriptParse, QuotedScriptSession};
 use crate::support::{ParsedContent, ParsedInput, word_range};
 use crate::types::{CancellationToken, Cancelled, CompletionItem, CompletionKind};
 use engine::AnalysisSnapshot;
+use hir::analysis::{Analysis, AnalysisCoverage, AnalysisLimit};
 use parser::{CstKind, CstNode, QuotedScript, encode_quoted_script_text};
 use rules::ir::{FieldId, FieldValue, Matcher, MatcherId, RefTarget, Shape};
 use std::collections::BTreeSet;
@@ -13,8 +14,10 @@ pub(crate) fn try_ir_completion(
     input: &ParsedInput,
     position: TextSize,
     cancellation: &CancellationToken,
-) -> Result<Option<Vec<CompletionItem>>, Cancelled> {
-    try_ir_completion_inner(snapshot, input, position, cancellation, 0)
+) -> Result<Option<Analysis<Vec<CompletionItem>>>, Cancelled> {
+    let mut coverage = AnalysisCoverage::default();
+    let items = try_ir_completion_inner(snapshot, input, position, cancellation, 0, &mut coverage)?;
+    Ok(items.map(|value| Analysis { value, coverage }))
 }
 
 fn try_ir_completion_inner(
@@ -23,9 +26,11 @@ fn try_ir_completion_inner(
     position: TextSize,
     cancellation: &CancellationToken,
     depth: usize,
+    coverage: &mut AnalysisCoverage,
 ) -> Result<Option<Vec<CompletionItem>>, Cancelled> {
     cancellation.checkpoint()?;
     if depth >= 8 {
+        coverage.limits.insert(AnalysisLimit::ConsumptionDepth);
         return Ok(Some(Vec::new()));
     }
     if !ir_semantic::has_ir_schema(snapshot, input) {
@@ -39,7 +44,7 @@ fn try_ir_completion_inner(
         return Ok(Some(items));
     }
     let (local_source, local_position, quoted_layers) =
-        completion_coordinates(input, position, cancellation)?;
+        completion_coordinates(input, position, cancellation, coverage)?;
     let local_replacement = word_range(&local_source, local_position);
     let prefix = local_source
         .get(
@@ -82,6 +87,7 @@ fn try_ir_completion_inner(
                 local_position,
                 cancellation,
                 depth + 1,
+                coverage,
             )?
             .unwrap_or_default();
             for item in &mut items {
@@ -136,6 +142,7 @@ fn try_ir_completion_inner(
             cancellation,
         )?;
         {
+            coverage.merge(&constraints.coverage);
             if !quoted_layers.is_empty() {
                 for site in &constraints {
                     let crate::ir_callable::Domain::Payload { schema, .. } = site.domain else {
@@ -163,6 +170,7 @@ fn try_ir_completion_inner(
                         local_position,
                         cancellation,
                         depth + 1,
+                        coverage,
                     )? {
                         for mut item in nested {
                             item.replacement_range =
@@ -618,6 +626,7 @@ fn completion_coordinates(
     input: &ParsedInput,
     position: TextSize,
     cancellation: &CancellationToken,
+    coverage: &mut AnalysisCoverage,
 ) -> Result<CompletionCoordinates, Cancelled> {
     let mut source = input.source.to_string();
     let mut local_position = position;
@@ -636,7 +645,11 @@ fn completion_coordinates(
         };
         let script = match session.parse(raw, layers.len())? {
             QuotedScriptParse::Parsed(script) => script,
-            QuotedScriptParse::Opaque | QuotedScriptParse::Limited(_) => break,
+            QuotedScriptParse::Opaque => break,
+            QuotedScriptParse::Limited(reason) => {
+                coverage.limits.insert(reason.analysis_limit());
+                break;
+            }
         };
         let relative = local_position.saturating_sub(node.range().start());
         let Some(decoded) = script.source_map().source_offset(relative) else {

@@ -97,6 +97,7 @@ pub fn hover_with_cancellation(
                 "required/inferred"
             },
         );
+        let mut coverage = hir::analysis::AnalysisCoverage::default();
         if let Some(owner) = owner_name
             && let Some(contract) = dynamic::dynamic_parameter_contract_lines(
                 snapshot,
@@ -107,9 +108,11 @@ pub fn hover_with_cancellation(
             )?
         {
             section.push('\n');
-            section.push_str(&contract);
+            section.push_str(&contract.value);
+            coverage.merge(&contract.coverage);
         }
         let mut model = HoverModel::new(format!("### parameter {}", code_span(&definition.name)));
+        model.coverage = coverage;
         model.push_section(section);
         return Ok(Some(model.into_hover_with_range(reference.name_range)));
     }

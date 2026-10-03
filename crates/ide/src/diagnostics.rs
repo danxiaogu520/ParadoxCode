@@ -69,7 +69,21 @@ fn file_analysis(
     semantic: SemanticFile,
     diagnostics: Vec<Diagnostic>,
 ) -> FileAnalysis {
+    let mut coverage = input
+        .hir
+        .as_ref()
+        .map(|hir| hir.analysis_coverage().clone())
+        .unwrap_or_default();
+    if diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.code == DiagnosticCode::AnalysisIncomplete)
+    {
+        coverage
+            .limits
+            .insert(hir::analysis::AnalysisLimit::DependentQuery);
+    }
     FileAnalysis {
+        coverage,
         revision: snapshot.revision(),
         document: input.document.clone(),
         file: input.file,

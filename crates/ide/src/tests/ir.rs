@@ -15,6 +15,75 @@ fn host() -> AnalysisHost {
 }
 
 #[test]
+fn ir_template_limits_are_visible_to_diagnostics_completion_and_hover() {
+    let mut host = host();
+    let mut definitions = String::new();
+    for depth in 0..40 {
+        definitions.push_str(&format!(
+            "limit_chain{depth} = {{ limit_chain{} = {{ N = $N$ }} }}\n",
+            depth + 1
+        ));
+    }
+    definitions
+        .push_str("limit_chain40 = { add_prestige = $N$ }\nshort_limit = { add_prestige = $N$ }\n");
+    open(
+        &mut host,
+        "common/scripted_effects/limits.txt",
+        &definitions,
+    );
+    let source = "country_event = { id = limits.1 immediate = { limit_chain0 = { N = wrong } short_limit = { N = wrong } } }";
+    let id = open(&mut host, "events/limits.txt", source);
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results
+            .iter()
+            .any(|d| d.code == DiagnosticCode::AnalysisIncomplete),
+        "{results:?}"
+    );
+    assert!(
+        results
+            .iter()
+            .any(|d| d.code == DiagnosticCode::InvalidValue && d.message.contains("short_limit")),
+        "a known rejection survives incomplete work: {results:?}"
+    );
+    let position = source.find("N = wrong").unwrap() as u32;
+    let items = complete(&host.snapshot(), &id, position + 9);
+    assert!(!items.coverage.is_complete());
+    let hover = hover(&host.snapshot(), &id, position).expect("parameter hover");
+    assert!(!hover.coverage.is_complete());
+    assert!(hover.contents.contains("Analysis incomplete"));
+}
+
+#[test]
+fn ir_template_node_limit_retains_an_early_rejection() {
+    let mut host = host();
+    let definition = format!(
+        "large_limit = {{ set_emperor = $P$ {} }}",
+        "log = $P$ ".repeat(17000)
+    );
+    open(
+        &mut host,
+        "common/scripted_effects/node-limit.txt",
+        &definition,
+    );
+    let source = "country_event = { id = limits.2 immediate = { large_limit = { P = wrong } } }";
+    let id = open(&mut host, "events/node-limit.txt", source);
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results
+            .iter()
+            .any(|d| d.code == DiagnosticCode::InvalidValue),
+        "{results:?}"
+    );
+    assert!(
+        results
+            .iter()
+            .any(|d| d.code == DiagnosticCode::AnalysisIncomplete),
+        "{results:?}"
+    );
+}
+
+#[test]
 fn ir_disk_diagnostics_release_temporary_frontends_and_reuse_interactive_ones() {
     use engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
     use text::{AbsPath, LogicalPath};

@@ -12,6 +12,7 @@ use crate::{
 };
 
 pub(super) struct IrFacts {
+    pub analysis_coverage: crate::analysis::AnalysisCoverage,
     pub retain_validation_facts: bool,
     pub symbol_facts_dependency: std::cell::Cell<bool>,
     pub schema_facts: Vec<SchemaFact>,
@@ -49,6 +50,7 @@ pub(super) fn lower(
 ) -> IrFacts {
     let children = crate::scope::property_children(props);
     let mut out = IrFacts {
+        analysis_coverage: Default::default(),
         retain_validation_facts,
         symbol_facts_dependency: std::cell::Cell::new(false),
         schema_facts: vec![],
@@ -228,6 +230,7 @@ pub(super) fn lower_schema_fragment<F: SymbolFacts>(
     let bare_values = collected.bare_values;
     let children = crate::scope::property_children(&props);
     let mut out = IrFacts {
+        analysis_coverage: Default::default(),
         retain_validation_facts: true,
         symbol_facts_dependency: std::cell::Cell::new(false),
         schema_facts: vec![SchemaFact {
@@ -806,6 +809,7 @@ fn lower_callable_arguments(
             &mut || Ok(()),
         )
         .expect("infallible checkpoint");
+        out.analysis_coverage.merge(&sites.coverage);
         let mut payloads = Vec::new();
         let definitions = out.definitions.len();
         let references = out.references.len();

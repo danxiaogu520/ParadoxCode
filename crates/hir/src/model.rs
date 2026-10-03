@@ -298,6 +298,7 @@ pub enum HirReferenceOrigin {
 /// A lowered file handle.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HirFile {
+    pub(super) analysis_coverage: crate::analysis::AnalysisCoverage,
     pub(super) syntax: Arc<ParsedFile>,
     pub(super) scope: Scope,
     pub(super) properties: Vec<HirProperty>,
@@ -321,6 +322,11 @@ pub struct HirFile {
 }
 
 impl HirFile {
+    /// Coverage of generated semantic facts and represented Template declarations.
+    pub fn analysis_coverage(&self) -> &crate::analysis::AnalysisCoverage {
+        &self.analysis_coverage
+    }
+
     /// Whether lowering consulted workspace symbols, including missing symbols.
     /// Files without such reads can reuse their shard during symbol-fact replay.
     #[must_use]

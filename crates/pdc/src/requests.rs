@@ -1369,8 +1369,8 @@ impl SnapshotRequestContext {
             .document(&id)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
         self.ensure_active()?;
-        let (completion_items, is_incomplete) =
-            bounded_results(result.items, MAX_COMPLETION_RESULTS);
+        let (completion_items, truncated) = bounded_results(result.items, MAX_COMPLETION_RESULTS);
+        let is_incomplete = truncated || !result.coverage.is_complete();
         let items = completion_items
             .into_iter()
             .enumerate()

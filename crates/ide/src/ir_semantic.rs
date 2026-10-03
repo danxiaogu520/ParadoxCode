@@ -1232,6 +1232,13 @@ fn schema_diagnostics_at_depth(
             cancellation,
             callable_depth,
         )?);
+    } else {
+        diagnostics.push(Diagnostic::new(
+            DiagnosticCode::AnalysisIncomplete,
+            Severity::Information,
+            hir.syntax().root().range(),
+            "Template consumption exceeded the analysis depth limit".to_owned(),
+        ));
     }
     for diagnostic in &mut diagnostics {
         if diagnostic.provenance.is_some() || diagnostic.code == DiagnosticCode::UnknownKey {
@@ -1477,7 +1484,7 @@ fn quoted_schema_diagnostics(
             QuotedScriptParse::Limited(reason) => {
                 let range = map_quoted_range(scalar.range, layers).unwrap_or(scalar.range);
                 out.push(Diagnostic::new(
-                    crate::DiagnosticCode::Syntax,
+                    crate::DiagnosticCode::AnalysisIncomplete,
                     crate::Severity::Warning,
                     range,
                     reason.message().to_owned(),
@@ -1646,6 +1653,14 @@ fn callable_argument_diagnostics(
                     state.clone(),
                     cancellation,
                 )?;
+                if !sites.coverage.is_complete() {
+                    diagnostics.push(Diagnostic::new(
+                        DiagnosticCode::AnalysisIncomplete,
+                        Severity::Information,
+                        argument.key_range,
+                        sites.coverage.limit_description(),
+                    ));
+                }
                 if !scalar.quoted
                     && sites.iter().any(|site| {
                         matches!(site.domain, crate::ir_callable::Domain::Payload { .. })
@@ -1664,7 +1679,16 @@ fn callable_argument_diagnostics(
                         source.get(scalar.range.start() as usize..scalar.range.end() as usize)
                     {
                         let mut session = QuotedScriptSession::new(cancellation);
-                        if let QuotedScriptParse::Parsed(script) = session.parse(raw, depth)? {
+                        let parsed_payload = session.parse(raw, depth)?;
+                        if let QuotedScriptParse::Limited(reason) = &parsed_payload {
+                            diagnostics.push(Diagnostic::new(
+                                DiagnosticCode::AnalysisIncomplete,
+                                Severity::Information,
+                                scalar.range,
+                                reason.message().to_owned(),
+                            ));
+                        }
+                        if let QuotedScriptParse::Parsed(script) = parsed_payload {
                             // Syntax belongs to the payload itself, independent of schema
                             // overloads or the number of sites that consume this argument.
                             for error in script.parsed().errors() {
@@ -1849,6 +1873,14 @@ fn callable_argument_diagnostics(
             state,
             cancellation,
         )?;
+        if !active.coverage.is_complete() {
+            diagnostics.push(Diagnostic::new(
+                DiagnosticCode::AnalysisIncomplete,
+                Severity::Information,
+                property.key_range,
+                active.coverage.limit_description(),
+            ));
+        }
         let missing = unconditional
             .iter()
             .chain(active.iter())

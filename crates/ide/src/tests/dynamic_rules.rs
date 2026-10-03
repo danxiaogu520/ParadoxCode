@@ -27,7 +27,7 @@ fn ir_sites(
     snapshot: &AnalysisSnapshot,
     owner: &str,
     parameter: &str,
-) -> Vec<crate::ir_callable::ParameterSite> {
+) -> hir::analysis::Analysis<Vec<crate::ir_callable::ParameterSite>> {
     crate::ir_callable::definition_parameter_sites(
         snapshot,
         "scripted_effect",

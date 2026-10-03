@@ -691,6 +691,14 @@ target/template-after/tools audit diff \
 
 用户指定的 `data/vanilla` 用于源码调查、索引与分析器基线，本次工作按没有游戏运行入口的条件推进。后续可用静态语料和可信的公开资料补充证据，并将具体不确定性写入支持契约；不能要求用户取得运行入口才能继续工程工作。若将来获得可靠的引擎证据，再用自有样例修订相应语义，并按发布版本约定使缓存失效；当前保留的 unverified 标记不改变既有冻结基线的身份或观察结果。
 
+## 实施进度
+
+阶段 0 的自有参照、工具和计划以 `13f9630` 提交。阶段 1 已实现 editor-neutral `AnalysisCoverage`/残余状态、带覆盖的参数查询、独立的 AnalysisIncomplete 信息诊断，以及补全/hover/FileAnalysis 的覆盖透传；quoted 查询限额与无法表示的 Template 不再被静默视为完整结果。`pdc/analyzerInfo` 已补入实际请求路由。
+
+阶段 1 验证：core-fast/policy 通过，全工作区 1,009 项测试通过，workspace/all-targets/all-features Clippy 通过；自有长链、低节点预算和确定错误保留回归通过。重新构建的 Vanilla 基线为 8,670 文件、11,453 条诊断，其中新增 34 条 AnalysisIncomplete 信息，错误数量仍为 8,324；成对审计没有新增/移除错误身份。真实 LSP 的 12 个状态已复跑，长链补全的 isIncomplete 可观察；参数 key hover 的覆盖和限制说明有自有回归断言。原始证据保存在 ignored `target/performance-results/template-phase1/`。
+
+阶段 1 仍使用原有遍历及其深度/节点上限，新增提示是明确的过渡状态；阶段 2 必须用共享图和显式任务栈实际检查长链末端，再更新相应 owned 期望，不能只隐藏提示。阶段 2 至 6 尚未验收。
+
 ## 实施顺序与 PR 出口
 
 每一步单独可审阅。开发期间可有内部比较开关；最终删除旧生产路径，避免长期维护两份动态语义。未达到该步出口的 PR 保持 draft，不用“基础测试通过”代替功能和语义验收。

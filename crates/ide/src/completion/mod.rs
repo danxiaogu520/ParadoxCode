@@ -34,6 +34,7 @@ pub fn complete_with_cancellation(
     cancellation.checkpoint()?;
     let Some(input) = input_for_document(snapshot, document) else {
         return Ok(CompletionResult {
+            coverage: Default::default(),
             revision: snapshot.revision(),
             items: Vec::new(),
         });
@@ -43,21 +44,27 @@ pub fn complete_with_cancellation(
     // only requests originating in the localisation document stay quiet.
     if input.format == FileFormat::Localisation {
         return Ok(CompletionResult {
+            coverage: Default::default(),
             revision: snapshot.revision(),
             items: Vec::new(),
         });
     }
     if let Some(items) = dynamic_parameter_completion(snapshot, &input, position, cancellation)? {
         return Ok(CompletionResult {
+            coverage: Default::default(),
             revision: snapshot.revision(),
             items,
         });
     }
-    let items =
-        ir::try_ir_completion(snapshot, &input, position, cancellation)?.unwrap_or_default();
+    let result = ir::try_ir_completion(snapshot, &input, position, cancellation)?;
+    let (items, coverage) = result.map_or_else(
+        || (Vec::new(), Default::default()),
+        |result| (result.value, result.coverage),
+    );
     Ok(CompletionResult {
         revision: snapshot.revision(),
         items,
+        coverage,
     })
 }
 

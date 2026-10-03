@@ -139,6 +139,7 @@ pub(crate) fn is_snapshot_request(method: &str) -> bool {
             | "pdc/symbolSearch"
             | "pdc/symbolReferences"
             | "pdc/workspaceSummary"
+            | "pdc/analyzerInfo"
     )
 }
 
