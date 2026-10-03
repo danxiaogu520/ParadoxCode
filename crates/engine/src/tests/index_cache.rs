@@ -76,7 +76,7 @@ fn ir_parameterized_symbol_membership_and_links_survive_cache_and_overlay_maskin
 }
 
 #[test]
-fn ir_callable_payload_symbols_and_dependent_links_survive_cache_roundtrip() {
+fn ir_template_payload_symbols_and_dependent_links_survive_cache_roundtrip() {
     let root = temp_root("ir-payload-symbols");
     fs::create_dir_all(root.join("common/scripted_effects")).unwrap();
     fs::create_dir_all(root.join("events")).unwrap();
@@ -1389,8 +1389,8 @@ fn lazy_reference_load_serves_skipped_kinds_from_disk() {
 }
 
 #[test]
-fn ir_catalog_lazy_cache_retains_callable_references_for_the_call_graph() {
-    let root = temp_root("ir-callable-cache");
+fn ir_catalog_lazy_cache_retains_template_references_for_the_call_graph() {
+    let root = temp_root("ir-template-cache");
     fs::create_dir_all(root.join("common/scripted_effects")).unwrap();
     fs::create_dir_all(root.join("events")).unwrap();
     fs::write(
@@ -1433,7 +1433,7 @@ fn ir_catalog_lazy_cache_retains_callable_references_for_the_call_graph() {
             .index()
             .references_iter()
             .any(|(_, reference)| { reference.kind.as_ref() == "localisation" }),
-        "non-callable references remain lazy"
+        "non-template references remain lazy"
     );
     fs::remove_dir_all(root).unwrap();
 }

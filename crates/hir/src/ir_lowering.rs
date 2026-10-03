@@ -22,7 +22,7 @@ pub(super) struct IrFacts {
     pub references: Vec<HirReference>,
     pub binding_references: Vec<HirReference>,
     pub definition_attributes: Vec<crate::DefinitionAttributes>,
-    pub callable_kinds: std::collections::BTreeSet<String>,
+    pub template_kinds: std::collections::BTreeSet<String>,
     pub runtime_parameter_guards: Vec<(TextRange, Option<TextRange>)>,
 }
 struct FactsRef<'a>(Option<&'a dyn SymbolFacts>, &'a std::cell::Cell<bool>);
@@ -60,7 +60,7 @@ pub(super) fn lower(
         references: vec![],
         binding_references: vec![],
         definition_attributes: vec![],
-        callable_kinds: callable_kinds(ir),
+        template_kinds: template_kinds(ir),
         runtime_parameter_guards: Vec::new(),
     };
     let unknown = ScopeState::initial(ScopeValue::Unknown);
@@ -193,8 +193,8 @@ fn merge_attribute_summaries(attributes: &mut Vec<crate::DefinitionAttributes>) 
     *attributes = merged;
 }
 
-fn callable_kinds(ir: &RulesIr) -> std::collections::BTreeSet<String> {
-    let Some(callable) = ir.trait_by_name("Callable") else {
+fn template_kinds(ir: &RulesIr) -> std::collections::BTreeSet<String> {
+    let Some(template) = ir.trait_by_name("Template") else {
         return Default::default();
     };
     ir.types
@@ -202,7 +202,7 @@ fn callable_kinds(ir: &RulesIr) -> std::collections::BTreeSet<String> {
         .filter(|ty| {
             ty.trait_impls
                 .iter()
-                .any(|implementation| implementation.trait_id == callable)
+                .any(|implementation| implementation.trait_id == template)
         })
         .map(|ty| ir.strings().resolve(ty.name).to_ascii_lowercase())
         .collect()
@@ -217,13 +217,13 @@ fn subtype_names_from_set(ir: &RulesIr, ty: TypeId, set: &SubtypeSet) -> Vec<std
         .collect()
 }
 
-pub(super) fn lower_schema_fragment<F: SymbolFacts>(
+pub(super) fn lower_schema_fragment(
     ir: &RulesIr,
     syntax: &ParsedFile,
     schema: SchemaId,
     subtypes: SubtypeSet,
     state: ScopeState,
-    facts: &F,
+    facts: &dyn SymbolFacts,
 ) -> IrFacts {
     let collected = crate::collector::collect(syntax);
     let props = collected.properties;
@@ -245,7 +245,7 @@ pub(super) fn lower_schema_fragment<F: SymbolFacts>(
         references: vec![],
         binding_references: vec![],
         definition_attributes: vec![],
-        callable_kinds: callable_kinds(ir),
+        template_kinds: template_kinds(ir),
         runtime_parameter_guards: Vec::new(),
     };
     let path = LogicalPath::parse("").expect("empty fragment path");
@@ -314,17 +314,12 @@ fn descend(
     }
     for index in indices {
         let p = &props[index];
-        let shape = if p.scalar.as_ref().is_some_and(|scalar| scalar.quoted) {
-            Shape::Quoted
-        } else if p.scalar.is_some() {
+        let shape = if p.scalar.is_some() {
             Shape::Scalar
         } else {
             Shape::Block
         };
-        let mut candidates = ir.lookup(schema, &p.key, shape).collect::<Vec<_>>();
-        if shape == Shape::Quoted {
-            candidates.extend(ir.lookup(schema, &p.key, Shape::Scalar));
-        }
+        let candidates = ir.lookup(schema, &p.key, shape).collect::<Vec<_>>();
         let exact_candidates = candidates
             .iter()
             .copied()
@@ -423,7 +418,7 @@ fn descend(
             && shape == Shape::Block
             && !crate::parameters::delimited_parameters(&p.key, p.key_range, '$').is_empty()
             && out.definitions.iter().any(|definition| {
-                out.callable_kinds
+                out.template_kinds
                     .contains(&definition.kind.to_ascii_lowercase())
                     && definition.range.start() <= p.range.start()
                     && p.range.end() <= definition.range.end()
@@ -608,68 +603,15 @@ fn descend(
                 {
                     collect_matcher_refs(ir, matcher, &s.value, s.range, facts, out);
                 }
-                if s.quoted {
-                    let instance_def = field
-                        .def
-                        .as_ref()
-                        .map(|def| (def.type_id, def.subtype))
-                        .or_else(|| match ir.matcher(field.key) {
-                            Matcher::Def { type_id, subtype } => Some((*type_id, *subtype)),
-                            _ => None,
-                        });
-                    let quoted_state =
-                        transition_state(ir, state.clone(), field.scope.as_ref(), &p.key);
-                    lower_quoted(
-                        ir,
-                        source,
-                        s.range,
-                        matcher,
-                        path,
-                        &quoted_state,
-                        &subtypes,
-                        instance_def,
-                        facts,
-                        out,
-                        seen,
-                    );
-                }
-            }
-            if let (Some(scalar), rules::ir::FieldValue::Quoted(quoted_schema)) =
-                (&p.scalar, field.value)
-                && scalar.quoted
-            {
-                let instance_def = field
-                    .def
-                    .as_ref()
-                    .map(|def| (def.type_id, def.subtype))
-                    .or_else(|| match ir.matcher(field.key) {
-                        Matcher::Def { type_id, subtype } => Some((*type_id, *subtype)),
-                        _ => None,
-                    });
-                let quoted_state =
-                    transition_state(ir, state.clone(), field.scope.as_ref(), &p.key);
-                lower_quoted_schema(
-                    ir,
-                    source,
-                    scalar.range,
-                    quoted_schema,
-                    path,
-                    &quoted_state,
-                    &subtypes,
-                    instance_def,
-                    facts,
-                    out,
-                    seen,
-                );
             }
             if p.scalar.is_none()
-                && let Some(kind) = crate::callable::callable_kind(ir, field.key)
+                && let Some(kind) = crate::template::template_kind(ir, field.key)
             {
-                // The first pass has no workspace facts yet. Missing callable
+                // The first pass has no workspace facts yet. Missing template
                 // templates must still schedule a replay once definitions exist.
                 out.symbol_facts_dependency.set(true);
                 if let Some(facts) = facts {
-                    lower_callable_arguments(
+                    lower_template_arguments(
                         ir,
                         source,
                         path,
@@ -688,7 +630,6 @@ fn descend(
                 Some(branch_self_schema.unwrap_or(schema))
             } else {
                 ir.child(id, schema)
-                    .or_else(|| quoted_schema(ir, field.value))
             } {
                 if p.scalar.as_ref().is_some_and(|scalar| scalar.quoted) {
                     continue;
@@ -765,7 +706,7 @@ fn descend(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn lower_callable_arguments(
+fn lower_template_arguments(
     ir: &RulesIr,
     source: &ParsedFile,
     path: &LogicalPath,
@@ -782,12 +723,21 @@ fn lower_callable_arguments(
         .iter()
         .filter_map(|index| {
             let property = &props[*index];
-            property
-                .scalar
-                .as_ref()
-                .map(|scalar| (property.key.to_ascii_lowercase(), scalar.value.clone()))
+            property.scalar.as_ref().map(|scalar| {
+                (
+                    property.key.to_ascii_lowercase(),
+                    crate::template::binding_value(source, scalar),
+                )
+            })
         })
         .collect();
+    let inputs = crate::template::BindingInputs {
+        values: bindings,
+        present: children
+            .iter()
+            .map(|index| props[*index].key.to_ascii_lowercase())
+            .collect(),
+    };
     for (ordinal, index) in children.iter().enumerate() {
         let argument = &props[*index];
         let Some(scalar) = argument.scalar.as_ref() else {
@@ -798,14 +748,15 @@ fn lower_callable_arguments(
         }) {
             continue;
         }
-        let sites = crate::callable::parameter_symbol_sites::<std::convert::Infallible>(
+        let sites = crate::template::parameter_sites_with_inputs::<std::convert::Infallible>(
             ir,
             facts,
             kind,
             name,
             &argument.key,
-            &bindings,
+            &inputs,
             state.clone(),
+            true,
             &mut || Ok(()),
         )
         .expect("infallible checkpoint");
@@ -815,7 +766,7 @@ fn lower_callable_arguments(
         let references = out.references.len();
         let bindings = out.binding_references.len();
         for site in sites {
-            let crate::callable::Domain::Payload { schema, .. } = site.domain else {
+            let crate::template::Domain::Payload { schema, .. } = site.domain else {
                 collect_parameter_references(ir, &site, &argument.key, scalar, facts, out);
                 continue;
             };
@@ -868,7 +819,7 @@ fn lower_callable_arguments(
 
 fn collect_parameter_references(
     ir: &RulesIr,
-    site: &crate::callable::ParameterSite,
+    site: &crate::template::ParameterSite,
     parameter: &str,
     scalar: &HirScalar,
     facts: &dyn SymbolFacts,
@@ -897,8 +848,8 @@ fn collect_parameter_references(
     };
     let range = TextRange::new(0, end).expect("rendered token range");
     let matchers = match &site.domain {
-        crate::callable::Domain::Value(matchers) => matchers.clone(),
-        crate::callable::Domain::Key { schema, shape } => ir
+        crate::template::Domain::Value(matchers) => matchers.clone(),
+        crate::template::Domain::Key { schema, shape } => ir
             .lookup(*schema, &value, *shape)
             .map(|id| ir.field(id).key)
             .collect(),
@@ -959,8 +910,8 @@ fn matcher_contains_definition(ir: &RulesIr, id: MatcherId) -> bool {
     match ir.matcher(id) {
         Matcher::Def { .. } => true,
         Matcher::Union(items) => items.iter().any(|item| matcher_contains_definition(ir, *item)),
-        Matcher::Template(parts) => parts.iter().any(
-            |part| matches!(part, rules::ir::TemplatePart::Hole(m) if matcher_contains_definition(ir, *m)),
+        Matcher::Pattern(parts) => parts.iter().any(
+            |part| matches!(part, rules::ir::PatternPart::Hole(m) if matcher_contains_definition(ir, *m)),
         ),
         _ => false,
     }
@@ -980,52 +931,6 @@ fn dedup_payload_references(references: &mut Vec<HirReference>, previous: usize)
     });
 }
 
-fn quoted_schema(ir: &RulesIr, value: rules::ir::FieldValue) -> Option<SchemaId> {
-    match value {
-        rules::ir::FieldValue::Quoted(schema) => Some(schema),
-        rules::ir::FieldValue::Scalar(matcher) => quoted_matcher_schema(ir, matcher),
-        _ => None,
-    }
-}
-fn quoted_matcher_schema(ir: &RulesIr, id: MatcherId) -> Option<SchemaId> {
-    match ir.matcher(id) {
-        Matcher::Quoted(schema) => Some(*schema),
-        Matcher::Union(items) => items
-            .iter()
-            .find_map(|item| quoted_matcher_schema(ir, *item)),
-        _ => None,
-    }
-}
-#[allow(clippy::too_many_arguments)]
-fn lower_quoted(
-    ir: &RulesIr,
-    source: &ParsedFile,
-    range: TextRange,
-    matcher: MatcherId,
-    path: &LogicalPath,
-    state: &ScopeState,
-    subtypes: &SubtypeSet,
-    instance_def: Option<(TypeId, Option<rules::ir::Symbol>)>,
-    facts: Option<&dyn SymbolFacts>,
-    out: &mut IrFacts,
-    seen: &mut std::collections::BTreeSet<(u32, u32)>,
-) {
-    if let Some(schema) = quoted_matcher_schema(ir, matcher) {
-        lower_quoted_schema(
-            ir,
-            source,
-            range,
-            schema,
-            path,
-            state,
-            subtypes,
-            instance_def,
-            facts,
-            out,
-            seen,
-        );
-    }
-}
 #[allow(clippy::too_many_arguments)]
 fn lower_quoted_schema(
     ir: &RulesIr,
@@ -1273,7 +1178,7 @@ fn matcher_accepts_key(
         Matcher::Date => {
             key.split('.').count() == 3 && key.split('.').all(|part| part.parse::<u32>().is_ok())
         }
-        Matcher::Template(parts) => template_value_holes(ir, parts, key).is_some_and(|holes| {
+        Matcher::Pattern(parts) => pattern_value_holes(ir, parts, key).is_some_and(|holes| {
             holes.into_iter().all(|(matcher, start, end)| {
                 matcher_accepts_key(ir, matcher, &key[start..end], facts, out)
             })
@@ -1314,8 +1219,7 @@ fn matcher_accepts_key(
 
         Matcher::Scope(scope) => ir.scope_matches(*scope, key),
         Matcher::Link => link_or_register_matches(ir, key),
-        Matcher::Quoted(_)
-        | Matcher::Opaque
+        Matcher::Opaque
         | Matcher::Loc
         | Matcher::Path(_)
         | Matcher::Bool
@@ -1343,14 +1247,14 @@ fn matcher_value_priority(ir: &RulesIr, matcher: MatcherId) -> u8 {
         _ => 1,
     }
 }
-fn template_key_matches(ir: &RulesIr, parts: &[rules::ir::TemplatePart], key: &str) -> bool {
-    if let [rules::ir::TemplatePart::Text(text)] = parts {
+fn template_key_matches(ir: &RulesIr, parts: &[rules::ir::PatternPart], key: &str) -> bool {
+    if let [rules::ir::PatternPart::Text(text)] = parts {
         return key.eq_ignore_ascii_case(ir.strings().resolve(*text));
     }
     let mut cursor = 0;
     for (index, part) in parts.iter().enumerate() {
         match part {
-            rules::ir::TemplatePart::Text(text) => {
+            rules::ir::PatternPart::Text(text) => {
                 let literal = ir.strings().resolve(*text);
                 let offset = if index == 0 {
                     if !key[cursor..]
@@ -1368,10 +1272,10 @@ fn template_key_matches(ir: &RulesIr, parts: &[rules::ir::TemplatePart], key: &s
                 };
                 cursor += offset + literal.len();
             }
-            rules::ir::TemplatePart::Hole(_) => {
+            rules::ir::PatternPart::Hole(_) => {
                 if index + 1 == parts.len() {
                     cursor = key.len();
-                } else if let rules::ir::TemplatePart::Text(next) = parts[index + 1] {
+                } else if let rules::ir::PatternPart::Text(next) = parts[index + 1] {
                     let needle = ir.strings().resolve(next);
                     let Some(offset) = find_ascii_case_insensitive(&key[cursor..], needle) else {
                         return false;
@@ -1703,8 +1607,8 @@ fn collect_matcher_refs(
                 collect_branch_references(ir, refs[0], value, range, facts, out);
             }
         }
-        Matcher::Template(parts) => {
-            if let Some(holes) = template_value_holes(ir, parts, value) {
+        Matcher::Pattern(parts) => {
+            if let Some(holes) = pattern_value_holes(ir, parts, value) {
                 for (matcher, start, end) in holes {
                     collect_matcher_refs(
                         ir,
@@ -1722,7 +1626,7 @@ fn collect_matcher_refs(
             for segment in value.split('.') {
                 let segment_range = subrange(range, value, offset, offset + segment.len());
                 for link in &ir.scopes.links {
-                    if let Some(holes) = template_value_holes(ir, &link.pattern, segment) {
+                    if let Some(holes) = pattern_value_holes(ir, &link.pattern, segment) {
                         for (matcher, start, end) in holes {
                             collect_matcher_refs(
                                 ir,
@@ -1754,17 +1658,17 @@ fn definitely_non_reference(ir: &RulesIr, id: MatcherId, value: &str) -> bool {
         Matcher::Scope(expected)=>ir.scope_matches(*expected,value)||link_or_register_matches(ir,value),
         Matcher::Link=>link_or_register_matches(ir,value),
         Matcher::Opaque|Matcher::Path(_)|Matcher::Def{..}=>true,
-        Matcher::Template(parts)=>template_value_holes(ir,parts,value).is_some()&&!parts.iter().any(|part|matches!(part,rules::ir::TemplatePart::Hole(m) if matcher_has_reference(ir,*m))),
+        Matcher::Pattern(parts)=>pattern_value_holes(ir,parts,value).is_some()&&!parts.iter().any(|part|matches!(part,rules::ir::PatternPart::Hole(m) if matcher_has_reference(ir,*m))),
         Matcher::Union(items)=>items.iter().any(|item|definitely_non_reference(ir,*item,value)),
-        Matcher::Ref(_)|Matcher::Quoted(_)=>false,
+        Matcher::Ref(_)=>false,
     }
 }
 fn matcher_has_reference(ir: &RulesIr, id: MatcherId) -> bool {
     match ir.matcher(id) {
         Matcher::Ref(_) | Matcher::Loc => true,
         Matcher::Union(items) => items.iter().any(|item| matcher_has_reference(ir, *item)),
-        Matcher::Template(parts) => parts.iter().any(
-            |part| matches!(part,rules::ir::TemplatePart::Hole(m) if matcher_has_reference(ir,*m)),
+        Matcher::Pattern(parts) => parts.iter().any(
+            |part| matches!(part,rules::ir::PatternPart::Hole(m) if matcher_has_reference(ir,*m)),
         ),
         _ => false,
     }
@@ -1780,8 +1684,8 @@ fn matcher_has_typed_reference(ir: &RulesIr, id: MatcherId) -> bool {
     match ir.matcher(id) {
         Matcher::Ref(_) => true,
         Matcher::Union(items) => items.iter().any(|item| matcher_has_typed_reference(ir, *item)),
-        Matcher::Template(parts) => parts.iter().any(
-            |part| matches!(part, rules::ir::TemplatePart::Hole(m) if matcher_has_typed_reference(ir, *m)),
+        Matcher::Pattern(parts) => parts.iter().any(
+            |part| matches!(part, rules::ir::PatternPart::Hole(m) if matcher_has_typed_reference(ir, *m)),
         ),
         _ => false,
     }
@@ -1796,7 +1700,7 @@ fn branch_reference_matches(
     match ir.matcher(id) {
         Matcher::Ref(_) => reference_matches(ir, id, value, facts, out),
         Matcher::Loc => true,
-        Matcher::Template(parts) => template_value_holes(ir, parts, value).is_some_and(|holes| {
+        Matcher::Pattern(parts) => pattern_value_holes(ir, parts, value).is_some_and(|holes| {
             holes.iter().any(|(matcher, start, end)| {
                 matcher_has_reference(ir, *matcher)
                     && branch_reference_matches(ir, *matcher, &value[*start..*end], facts, out)
@@ -1818,8 +1722,8 @@ fn collect_branch_references(
 ) {
     match ir.matcher(id) {
         Matcher::Ref(_) | Matcher::Loc => collect_matcher_refs(ir, id, value, range, facts, out),
-        Matcher::Template(parts) => {
-            if let Some(holes) = template_value_holes(ir, parts, value) {
+        Matcher::Pattern(parts) => {
+            if let Some(holes) = pattern_value_holes(ir, parts, value) {
                 for (matcher, start, end) in holes {
                     if matcher_has_reference(ir, matcher) {
                         collect_branch_references(
@@ -1884,16 +1788,16 @@ fn reference_matches(
         }
     }
 }
-fn template_value_holes(
+fn pattern_value_holes(
     ir: &RulesIr,
-    parts: &[rules::ir::TemplatePart],
+    parts: &[rules::ir::PatternPart],
     value: &str,
 ) -> Option<Vec<(MatcherId, usize, usize)>> {
     let mut cursor = 0;
     let mut holes = Vec::new();
     for (index, part) in parts.iter().enumerate() {
         match part {
-            rules::ir::TemplatePart::Text(text) => {
+            rules::ir::PatternPart::Text(text) => {
                 let literal = ir.strings().resolve(*text);
                 let tail = value.get(cursor..)?;
                 let offset = tail
@@ -1904,9 +1808,9 @@ fn template_value_holes(
                 }
                 cursor += offset + literal.len();
             }
-            rules::ir::TemplatePart::Hole(matcher) => {
+            rules::ir::PatternPart::Hole(matcher) => {
                 let start = cursor;
-                let end = if let Some(rules::ir::TemplatePart::Text(next)) = parts.get(index + 1) {
+                let end = if let Some(rules::ir::PatternPart::Text(next)) = parts.get(index + 1) {
                     let needle = ir.strings().resolve(*next);
                     let offset = value
                         .get(cursor..)?
@@ -1976,14 +1880,14 @@ fn add_bindings(ir: &RulesIr, ty: TypeId, name: &str, range: TextRange, out: &mu
 #[cfg(test)]
 mod template_key_tests {
     use super::*;
-    use rules::ir::TemplatePart;
+    use rules::ir::PatternPart;
 
-    fn reference_match(ir: &RulesIr, parts: &[TemplatePart], key: &str) -> bool {
+    fn reference_match(ir: &RulesIr, parts: &[PatternPart], key: &str) -> bool {
         let folded = key.to_ascii_lowercase();
         let mut cursor = 0;
         for (index, part) in parts.iter().enumerate() {
             match part {
-                TemplatePart::Text(text) => {
+                PatternPart::Text(text) => {
                     let literal = ir.strings().resolve(*text).to_ascii_lowercase();
                     let Some(offset) = folded[cursor..].find(&literal) else {
                         return false;
@@ -1993,10 +1897,10 @@ mod template_key_tests {
                     }
                     cursor += offset + literal.len();
                 }
-                TemplatePart::Hole(_) => {
+                PatternPart::Hole(_) => {
                     if index + 1 == parts.len() {
                         cursor = key.len();
-                    } else if let TemplatePart::Text(next) = parts[index + 1] {
+                    } else if let PatternPart::Text(next) = parts[index + 1] {
                         let literal = ir.strings().resolve(next).to_ascii_lowercase();
                         let Some(offset) = folded[cursor..].find(&literal) else {
                             return false;
@@ -2018,7 +1922,7 @@ mod template_key_tests {
             .iter()
             .flat_map(|link| link.pattern.iter())
             .find_map(|part| {
-                if let TemplatePart::Hole(matcher) = part {
+                if let PatternPart::Hole(matcher) = part {
                     Some(*matcher)
                 } else {
                     None
@@ -2034,24 +1938,24 @@ mod template_key_tests {
             .map(|link| link.pattern.to_vec())
             .collect::<Vec<_>>();
         patterns.extend([
-            vec![TemplatePart::Text(foo)],
+            vec![PatternPart::Text(foo)],
             vec![
-                TemplatePart::Text(prefix),
-                TemplatePart::Hole(hole),
-                TemplatePart::Text(suffix),
+                PatternPart::Text(prefix),
+                PatternPart::Hole(hole),
+                PatternPart::Text(suffix),
             ],
-            vec![TemplatePart::Hole(hole), TemplatePart::Text(accented)],
+            vec![PatternPart::Hole(hole), PatternPart::Text(accented)],
             vec![
-                TemplatePart::Text(empty),
-                TemplatePart::Hole(hole),
-                TemplatePart::Text(empty),
+                PatternPart::Text(empty),
+                PatternPart::Hole(hole),
+                PatternPart::Text(empty),
             ],
-            vec![TemplatePart::Text(foo), TemplatePart::Text(bar)],
+            vec![PatternPart::Text(foo), PatternPart::Text(bar)],
             vec![
-                TemplatePart::Hole(hole),
-                TemplatePart::Text(suffix),
-                TemplatePart::Hole(hole),
-                TemplatePart::Text(accented),
+                PatternPart::Hole(hole),
+                PatternPart::Text(suffix),
+                PatternPart::Hole(hole),
+                PatternPart::Text(accented),
             ],
         ]);
         let keys = [

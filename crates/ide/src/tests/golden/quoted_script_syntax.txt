@@ -1,15 +1,14 @@
 // case: quoted_script_syntax
 // input:
-//   trigger = { embedded = "
+//   trigger = { embedded = { BODY = "
 //    foo = maybe
 //    broken = {
-//   " }
+//   " } }
 //   
 diagnostics:
-- code=InvalidValue severity=Error certainty=certain range=32..37
-  message: invalid value `maybe` for `foo`
-  expected: yes or no
-- code=UnknownKey severity=Error certainty=certain range=39..45
-  message: unknown key `broken`
-- code=SyntaxError severity=Error certainty=certain range=48..50
+- code=InvalidValue severity=Error certainty=certain range=41..46
+  message: Template `embedded`: value of `foo` does not satisfy its rule
+- code=UnknownKey severity=Error certainty=certain range=48..54
+  message: Template `embedded`: unknown key `broken`
+- code=SyntaxError severity=Error certainty=certain range=57..59
   message: script block is missing `}`

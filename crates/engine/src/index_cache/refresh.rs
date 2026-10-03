@@ -259,7 +259,7 @@ pub(super) fn refresh_cancellable(
     })
 }
 
-/// Rebuild until cross-file symbol facts stabilize, including symbols introduced by Callable
+/// Rebuild until cross-file symbol facts stabilize, including symbols introduced by Template
 /// payloads. Unchanged files must not retain references from an earlier candidate index.
 fn refresh_with_ir_full(
     cache: &IndexCache,

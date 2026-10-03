@@ -6,13 +6,13 @@
 //   honest = { add_prestige = 1 }
 //   
 diagnostics:
-- code=DynamicDefinitionCycle severity=Error certainty=certain range=0..4
-  message: dynamic definition `ping` is part of a definition cycle: ping -> pong -> ping
+- code=DynamicDefinitionCycle severity=Information certainty=unresolved range=0..4
+  message: Template `ping` analysis repeats a binding/scope state with no arguments; expansion remains unknown
 - code=AnalysisIncomplete severity=Information certainty=certain range=9..13
   message: Template analysis retained an unresolved recursive state
-- code=DynamicDefinitionCycle severity=Error certainty=certain range=22..26
-  message: dynamic definition `pong` is part of a definition cycle: pong -> ping -> pong
+- code=DynamicDefinitionCycle severity=Information certainty=unresolved range=22..26
+  message: Template `pong` analysis repeats a binding/scope state with no arguments; expansion remains unknown
 - code=AnalysisIncomplete severity=Information certainty=certain range=31..35
   message: Template analysis retained an unresolved recursive state
-- code=DynamicDefinitionCycle severity=Error certainty=certain range=44..53
-  message: dynamic definition `loop_self` is part of a definition cycle: loop_self -> loop_self
+- code=DynamicDefinitionCycle severity=Information certainty=unresolved range=44..53
+  message: Template `loop_self` analysis repeats a binding/scope state with no arguments; expansion remains unknown

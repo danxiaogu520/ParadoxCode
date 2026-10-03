@@ -203,6 +203,11 @@ pub fn hover_with_cancellation(
         return Ok(Some(best.into_hover_with_range(range)));
     }
     cancellation.checkpoint()?;
+    if let Some(model) =
+        rules::template_consumption_hover(snapshot, &input, position, &word, cancellation)?
+    {
+        return Ok(Some(model.into_hover_with_range(range)));
+    }
     let parameter_hover =
         dynamic::ir_invocation_parameter_hover(snapshot, &input, position, cancellation)?;
     if let Some(model) = parameter_hover {

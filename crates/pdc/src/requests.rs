@@ -1401,7 +1401,10 @@ impl SnapshotRequestContext {
                     } else {
                         InsertTextFormat::PLAIN_TEXT
                     }),
-                    data: item.resolve_data.map(Value::String),
+                    data: item.template_evidence.map_or_else(||item.resolve_data.clone().map(Value::String), |evidence|
+                        Some(serde_json::json!({"template":{
+                            "validation":match evidence.validation {ide::TemplateValidation::Valid=>"valid",ide::TemplateValidation::Invalid=>"invalid",ide::TemplateValidation::Unknown=>"unknown"},
+                            "witness":evidence.witness,"revision":result.revision},"resolve":item.resolve_data}))),
                     text_edit: Some(CompletionTextEdit::Edit(TextEdit {
                         range: range_to_lsp(
                             document.line_index(),
@@ -1430,10 +1433,15 @@ impl SnapshotRequestContext {
         let data = params
             .data
             .as_ref()
-            .and_then(Value::as_str)
+            .and_then(|value| {
+                value
+                    .as_str()
+                    .or_else(|| value.get("resolve").and_then(Value::as_str))
+            })
             .unwrap_or_default()
             .to_owned();
         let item = ide::CompletionItem {
+            template_evidence: None,
             label: params.label.clone(),
             kind: CompletionKind::Key,
             detail: String::new(),

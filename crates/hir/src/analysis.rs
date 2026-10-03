@@ -23,6 +23,8 @@ pub enum AnalysisLimit {
     Output,
     /// A consumer depends on a separately reported unfinished semantic query.
     DependentQuery,
+    /// Binding-dependent syntax needs a broader text parse before its structure is known.
+    StructuralRecovery,
 }
 
 impl AnalysisLimit {
@@ -38,6 +40,7 @@ impl AnalysisLimit {
             Self::ConsumptionDepth => "Template consumption exceeded the analysis depth limit",
             Self::Output => "Template result projection exceeded its output budget",
             Self::DependentQuery => "A related Template query did not complete",
+            Self::StructuralRecovery => "Template syntax requires binding-dependent recovery",
         }
     }
 }

@@ -122,8 +122,8 @@ lexical rules are normative:
 |---|---|
 | `scalar` | Any scalar |
 | `'yes'` | Constant |
-| `'monthly_{ref<government_mechanic_power>}'` | Template |
-| `'{ref<estate strip_prefix estate_>}_loyalty_modifier'` | Template whose hole strips an affix from the member name (`estate_burghers` → `burghers`); the affix is declared on the reference |
+| `'monthly_{ref<government_mechanic_power>}'` | Text pattern |
+| `'{ref<estate strip_prefix estate_>}_loyalty_modifier'` | Text pattern whose hole strips an affix from the member name (`estate_burghers` → `burghers`); the affix is declared on the reference |
 | `int[1..10]` `float[0..]` `bool` `date` | Scalar types; bounds are always numbers |
 | `loc` | Localisation key |
 | `path` `path<gfx>` | File path; `<…>` is a path category |
@@ -132,17 +132,16 @@ lexical rules are normative:
 | `enum<country_tags>` | Enum member |
 | `scope<country>` `scope<any>` | Scope expression (register, link, tag, …) |
 | `link` | Key position only: any scope link / register / prefix link (§8) |
-| `quoted<trigger>` | Quoted string whose content is parsed as a schema |
 | `opaque` | Unchecked text |
 | `a\|b` | Union, tried in written order |
 
 Semantic conventions:
 
 - Keys and symbol names are case-insensitive everywhere in the language.
-- All branches of a union MUST have the same shape. Scalar-shaped branches and
-  quoted-script (`quoted<…>`) branches are distinct shapes and MUST NOT be
-  mixed. Shape variation of a block is expressed with field-array overloads
-  (§3), never with a union.
+- Type-expression unions describe scalar values. Quoted values remain scalars.
+  Script text is interpreted only when a Template use consumes it as a script
+  fragment; ordinary fields cannot request a secondary script parse. Shape
+  variation between scalar and block uses field-array overloads (§3).
 
 ## 3. Schemas
 
@@ -404,7 +403,7 @@ changing Rust, because the runtime must understand its semantics:
   "Localised":      {},                                   // bindings come from the impl
   "HasIcon":        {},                                   // bindings come from the impl
   "ModifierSource": {},
-  "Callable":       {}
+  "Template":       {}
 },
 "types": {
   "decision": { "impl": { "Localised": {
@@ -419,7 +418,7 @@ changing Rust, because the runtime must understand its semantics:
   "building":        { "impl": { "Localised": { "name": { "loc": "building_$", "required": true } },
                                  "HasIcon": { "icon": { "sprite": "GFX_$", "required": true } },
                                  "ModifierSource": {} } },
-  "scripted_effect": { "impl": { "Callable": { "body": "effect" } }, "resolution": "replace" }
+  "scripted_effect": { "impl": { "Template": { "body": "effect" } }, "resolution": "replace" }
 }
 ```
 
@@ -435,15 +434,15 @@ changing Rust, because the runtime must understand its semantics:
   type expressions.
 - `impl` is declared on the type and applies to every instance.
 - `Localised`/`HasIcon` replace `bindings/localisation.json` and
-  `bindings/sprite.json`; `Callable` replaces `dynamic_definition` and
+  `bindings/sprite.json`; `Template` replaces `dynamic_definition` and
   `token_definitions` (its `$param$` arguments are handled uniformly by
-  `Callable`); `ModifierSource` replaces the 22 `type:X → [modifier]` rows of
+  `Template`); `ModifierSource` replaces the 22 `type:X → [modifier]` rows of
   profile `semantic_context_inheritance`. Modifier diagnostics consult its type
   implementations directly. References name concrete types and optional explicit
-  subtypes. A `Callable` implementation supplies the body schema; its trait
+  subtypes. A `Template` implementation supplies the body schema; its trait
   identity enables scripted-call argument processing and replay.
 
-Callable arguments substitute text before runtime branches execute. Every
+Template arguments substitute text before runtime branches execute. Every
 `$param$` occurrence outside a `[[param] ... ]` activation chunk is required,
 including occurrences embedded in a word such as `PREFIX_$param$_END` and
 occurrences inside ordinary `if`/`else` blocks. Activation chunks are selected
@@ -455,7 +454,7 @@ call to make omission valid. Presentation-only blocks do not exempt textual
 substitutions from this requirement.
 
 Symbol indexing records syntactic writes and references inside presentation-only
-blocks, including quoted Callable payloads. These declarations support navigation
+blocks, including quoted Template payloads. These declarations support navigation
 and rename; they do not imply that the preview executes. Scalar scope alternatives
 match only actual scope expressions and must not suppress other typed references.
 An enum fallback also retains navigation when an earlier reference branch resolves
@@ -512,7 +511,7 @@ flat data at compile time; the runtime does no dynamic dispatch.
 - `scope_completions` is derived from registers + types and is no longer
   written by hand.
 - A `THIS = { ... }` block keeps the current scope. It does not erase scope
-  constraints or push another previous-scope entry. In a Callable body,
+  constraints or push another previous-scope entry. In a Template body,
   `add_prestige = 1 THIS = { change_province_name = "X" }` therefore has a
   conflicting country/province entry requirement.
 

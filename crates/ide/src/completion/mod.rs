@@ -101,6 +101,7 @@ fn dynamic_parameter_completion(
         }
         let label = format!("${}$", parameter.name);
         items.push(CompletionItem {
+            template_evidence: None,
             label: label.clone(),
             kind: CompletionKind::DynamicParameter,
             detail: if value_context {

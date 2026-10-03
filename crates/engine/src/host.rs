@@ -1149,7 +1149,7 @@ impl AnalysisHost {
         let priorities = source_priorities(&self.roots, &files);
         index.resolve_priorities_cancellable(&priorities, cancellation)?;
         if !self.ir.files.is_empty() {
-            // First-pass HIR discovers ordinary definitions. Callable payloads can introduce
+            // First-pass HIR discovers ordinary definitions. Template payloads can introduce
             // further symbols; replay until the exact symbol facts stabilize so references
             // in other files see them before committing the new workspace.
             let overlays = self

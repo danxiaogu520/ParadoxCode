@@ -135,7 +135,7 @@ fn semantic_data_with_cancellation_uncached(
     }
     for reference in hir.references() {
         cancellation.checkpoint()?;
-        if !ir_reference_is_callable(snapshot, hir, reference) {
+        if !ir_reference_is_template(snapshot, hir, reference) {
             continue;
         }
         data.references.push(ReferenceInternal {
@@ -161,7 +161,7 @@ fn collect_quoted_semantics(
         return Ok(());
     }
 
-    collect_ir_callable_payload_semantics(
+    collect_ir_template_payload_semantics(
         snapshot,
         input,
         data,
@@ -179,7 +179,7 @@ fn collect_quoted_semantics(
     Ok(())
 }
 
-fn collect_ir_callable_payload_semantics(
+fn collect_ir_template_payload_semantics(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     data: &mut SemanticFile,
@@ -195,7 +195,7 @@ fn collect_ir_callable_payload_semantics(
             continue;
         };
         let Some(kind) = fact.fields.iter().find_map(|id| {
-            crate::ir_callable::callable_kind(snapshot.ir(), snapshot.ir().field(*id).key)
+            crate::ir_template::template_kind(snapshot.ir(), snapshot.ir().field(*id).key)
         }) else {
             continue;
         };
@@ -211,21 +211,21 @@ fn collect_ir_callable_payload_semantics(
         if arguments.peek().is_none() {
             continue;
         }
-        let bindings = crate::ir_callable::invocation_bindings(hir, invocation);
+        let bindings = crate::ir_template::invocation_bindings(hir, invocation);
         for argument in arguments {
             let scalar = argument.scalar.as_ref().expect("quoted argument");
-            let sites = crate::ir_callable::parameter_symbol_sites(
+            let sites = crate::ir_template::parameter_symbol_sites(
                 snapshot,
                 &kind,
                 &invocation.key,
                 &argument.key,
                 &bindings,
-                crate::ir_callable::invocation_state(hir, invocation),
+                crate::ir_template::invocation_state(hir, invocation),
                 session.cancellation(),
             )?;
             if !sites
                 .iter()
-                .any(|site| matches!(site.domain, crate::ir_callable::Domain::Payload { .. }))
+                .any(|site| matches!(site.domain, crate::ir_template::Domain::Payload { .. }))
             {
                 continue;
             }
@@ -238,7 +238,7 @@ fn collect_ir_callable_payload_semantics(
             let definition_start = data.definitions.len();
             let reference_start = data.references.len();
             for site in sites {
-                let crate::ir_callable::Domain::Payload { schema, .. } = site.domain else {
+                let crate::ir_template::Domain::Payload { schema, .. } = site.domain else {
                     continue;
                 };
                 let fragment = hir::lower_ir_schema(
@@ -263,7 +263,7 @@ fn collect_ir_callable_payload_semantics(
                     ));
                 }
                 for reference in nested.hir.as_deref().unwrap().references() {
-                    if !ir_reference_is_callable(
+                    if !ir_reference_is_template(
                         snapshot,
                         nested.hir.as_deref().unwrap(),
                         reference,
@@ -279,7 +279,7 @@ fn collect_ir_callable_payload_semantics(
                         path: input.path.clone(),
                     });
                 }
-                collect_ir_callable_payload_semantics(snapshot, &nested, data, session, depth + 1)?;
+                collect_ir_template_payload_semantics(snapshot, &nested, data, session, depth + 1)?;
             }
             let map = |range| {
                 script
@@ -311,7 +311,7 @@ fn collect_ir_callable_payload_semantics(
 /// malformed. Navigation must apply the same scalar form and required-argument
 /// checks as diagnostics, using the actual compiled field rather than a legacy
 /// type descriptor.
-fn ir_reference_is_callable(
+fn ir_reference_is_template(
     snapshot: &AnalysisSnapshot,
     hir: &HirFile,
     reference: &HirReference,
@@ -327,7 +327,7 @@ fn ir_reference_is_callable(
         .fields
         .iter()
         .filter(|id| {
-            crate::ir_callable::callable_kind(ir, ir.field(**id).key)
+            crate::ir_template::template_kind(ir, ir.field(**id).key)
                 .is_some_and(|kind| kind.eq_ignore_ascii_case(&reference.kind))
         })
         .collect::<Vec<_>>();
@@ -344,7 +344,7 @@ fn ir_reference_is_callable(
         return false;
     }
     let scalar = property.scalar.as_ref().unwrap();
-    let state = crate::ir_callable::invocation_state(hir, property);
+    let state = crate::ir_template::invocation_state(hir, property);
     fields.into_iter().any(|id| match ir.field(*id).value {
         rules::ir::FieldValue::Scalar(matcher) => crate::ir_semantic::matcher_matches_with_state(
             snapshot,

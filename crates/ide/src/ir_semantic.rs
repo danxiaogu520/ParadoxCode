@@ -8,10 +8,9 @@ use crate::types::{CancellationToken, Cancelled, Diagnostic, DiagnosticCode, Sev
 use crate::{semantic::effective_workspace_member_names, support::ParsedInput};
 use engine::AnalysisSnapshot;
 use hir::{HirFile, ScopeState, ScopeValue};
-use parser::QuotedScript;
 use rules::ir::{
-    FieldId, FieldValue, Matcher, MatcherId, RefTarget, RulesIr, SchemaId, Shape, SymbolFacts,
-    TemplatePart, TypeId,
+    FieldId, FieldValue, Matcher, MatcherId, PatternPart, RefTarget, RulesIr, SchemaId, Shape,
+    SymbolFacts, TypeId,
 };
 use rules::source::{ControlKind, Severity as RuleSeverity};
 use std::collections::{BTreeMap, BTreeSet};
@@ -41,40 +40,7 @@ pub(crate) fn matcher_matches(
     value: &str,
     facts: &impl SymbolFacts,
 ) -> bool {
-    match ir.matcher(matcher) {
-        Matcher::Link => hir::is_ir_scope_link(ir, value),
-        Matcher::Def { .. } => !value.is_empty(),
-        Matcher::Union(alternatives) => alternatives
-            .iter()
-            .any(|alternative| matcher_matches(ir, *alternative, value, facts)),
-        Matcher::Ref(RefTarget::Type {
-            type_id,
-            subtype,
-            strip_prefix,
-        }) => {
-            if strip_prefix.is_some_and(|prefix| {
-                value
-                    .get(..ir.strings().resolve(prefix).len())
-                    .is_some_and(|head| head.eq_ignore_ascii_case(ir.strings().resolve(prefix)))
-            }) {
-                return false;
-            }
-            let is_member = |candidate: &str| {
-                subtype.map_or_else(
-                    || facts.type_member(*type_id, candidate),
-                    |subtype| facts.type_subtype_member(*type_id, subtype, candidate),
-                )
-            };
-            is_member(value)
-                || strip_prefix.is_some_and(|prefix| {
-                    let mut candidate = ir.strings().resolve(prefix).to_owned();
-                    candidate.push_str(value);
-                    is_member(&candidate)
-                })
-        }
-        Matcher::Template(parts) => matcher_template_matches(ir, parts, value, facts),
-        _ => ir.scalar_matches(matcher, value, facts),
-    }
+    hir::checking::scalar_matches(ir, matcher, value, facts)
 }
 
 pub(crate) fn matcher_matches_in_snapshot(
@@ -84,66 +50,29 @@ pub(crate) fn matcher_matches_in_snapshot(
     value: &str,
     facts: &impl SymbolFacts,
 ) -> bool {
-    match ir.matcher(matcher) {
-        Matcher::Path(Some(category))
-            if ir.strings().resolve(*category).eq_ignore_ascii_case("gfx") =>
-        {
-            snapshot.resolve_texture_path(value).is_some()
-        }
-        Matcher::Union(alternatives) => alternatives.iter().any(|alternative| {
-            matcher_matches_in_snapshot(snapshot, ir, *alternative, value, facts)
-        }),
-        _ => matcher_matches(ir, matcher, value, facts),
-    }
+    let state = ScopeState::initial(ScopeValue::Unknown);
+    matcher_matches_with_state(snapshot, ir, matcher, value, facts, &state)
 }
 
 pub(crate) fn matcher_matches_with_state(
-    snapshot: &AnalysisSnapshot,
+    _snapshot: &AnalysisSnapshot,
     ir: &RulesIr,
     matcher: MatcherId,
     value: &str,
     facts: &impl SymbolFacts,
     state: &ScopeState,
 ) -> bool {
-    match ir.matcher(matcher) {
-        Matcher::Scope(expected) => {
-            scope_expression_allowed(ir, snapshot, value, *expected, Some(state))
-        }
-        Matcher::Link => scope_expression_allowed(ir, snapshot, value, None, Some(state)),
-        Matcher::Union(alternatives) => alternatives.iter().any(|alternative| {
-            matcher_matches_with_state(snapshot, ir, *alternative, value, facts, state)
-        }),
-        _ => matcher_matches_in_snapshot(snapshot, ir, matcher, value, facts),
-    }
+    hir::checking::scalar_validation(ir, matcher, value, state, facts)
+        != hir::analysis::Validation::Invalid
 }
 
-pub(crate) fn matcher_template_matches(
+pub(crate) fn matcher_pattern_matches(
     ir: &RulesIr,
-    parts: &[TemplatePart],
+    parts: &[PatternPart],
     value: &str,
     facts: &impl SymbolFacts,
 ) -> bool {
-    let Some((first, rest)) = parts.split_first() else {
-        return value.is_empty();
-    };
-    match first {
-        TemplatePart::Text(text) => {
-            let text = ir.strings().resolve(*text);
-            value.len() >= text.len()
-                && value.is_char_boundary(text.len())
-                && value[..text.len()].eq_ignore_ascii_case(text)
-                && matcher_template_matches(ir, rest, &value[text.len()..], facts)
-        }
-        TemplatePart::Hole(hole) => value
-            .char_indices()
-            .map(|(index, _)| index)
-            .skip(1)
-            .chain(std::iter::once(value.len()))
-            .any(|end| {
-                matcher_matches(ir, *hole, &value[..end], facts)
-                    && matcher_template_matches(ir, rest, &value[end..], facts)
-            }),
-    }
+    hir::checking::pattern_matches(ir, parts, value, facts)
 }
 
 /// Human-readable description of a complete IR matcher.
@@ -151,7 +80,7 @@ pub(crate) fn describe(ir: &RulesIr, matcher: MatcherId) -> String {
     match ir.matcher(matcher) {
         Matcher::Scalar => "any scalar".into(),
         Matcher::Literal(value) => format!("`{}`", ir.strings().resolve(*value)),
-        Matcher::Template(parts) => format!("template `{}`", template_text(ir, parts)),
+        Matcher::Pattern(parts) => format!("template `{}`", pattern_text(ir, parts)),
         Matcher::Int { min, max } => describe_range("integer", *min, *max),
         Matcher::Float { min, max } => describe_range("number", *min, *max),
         Matcher::Bool => "yes or no".into(),
@@ -184,10 +113,6 @@ pub(crate) fn describe(ir: &RulesIr, matcher: MatcherId) -> String {
         Matcher::Scope(None) => "a scope or scope link".into(),
         Matcher::Scope(Some(scope)) => format!("a `{}` scope", ir.strings().resolve(*scope)),
         Matcher::Link => "a scope link or register".into(),
-        Matcher::Quoted(schema) => format!(
-            "a quoted script using `{}`",
-            ir.strings().resolve(ir.schema(*schema).name)
-        ),
         Matcher::Opaque => "text".into(),
         Matcher::Union(alternatives) => {
             let mut descriptions = alternatives
@@ -241,9 +166,9 @@ pub(crate) fn spellings_with_state(
             .filter(|link| {
                 link.pattern
                     .iter()
-                    .all(|part| matches!(part, TemplatePart::Text(_)))
+                    .all(|part| matches!(part, PatternPart::Text(_)))
             })
-            .map(|link| template_text(ir, &link.pattern))
+            .map(|link| pattern_text(ir, &link.pattern))
             .collect::<Vec<_>>();
         let expected = match ir.matcher(matcher) {
             Matcher::Scope(expected) => *expected,
@@ -279,83 +204,7 @@ fn scope_expression_allowed(
     expected: Option<rules::ir::Symbol>,
     state: Option<&ScopeState>,
 ) -> bool {
-    if name.contains('.') {
-        let Some(mut chained) = state.cloned() else {
-            return hir::is_ir_scope_link(ir, name);
-        };
-        let segments = name.split('.').collect::<Vec<_>>();
-        for (index, segment) in segments.iter().enumerate() {
-            if !scope_expression_allowed(
-                ir,
-                snapshot,
-                segment,
-                if index + 1 == segments.len() {
-                    expected
-                } else {
-                    None
-                },
-                Some(&chained),
-            ) {
-                return false;
-            }
-            chained = hir::transition_ir_scope(ir, chained, None, segment);
-        }
-        return true;
-    }
-    let current = state.and_then(|state| state.current.first());
-    if let Some(link) = ir.scopes.links.iter().find(|link| {
-        matcher_template_matches(ir, &link.pattern, name, &WorkspaceFacts { snapshot })
-    }) {
-        let target_ok = expected.is_none_or(|expected| match link.to {
-            rules::ir::ScopeRef::Any => true,
-            rules::ir::ScopeRef::Type(actual) => ir.scopes_compatible(actual, expected),
-        });
-        return target_ok
-            && current.is_none_or(|current| {
-                matches!(current, ScopeValue::Unknown)
-                    || link.from.iter().any(|from| match (from, current) {
-                        (rules::ir::ScopeRef::Any, _) => true,
-                        (rules::ir::ScopeRef::Type(expected), ScopeValue::Known(names)) => {
-                            names.iter().any(|name| {
-                                ir.strings()
-                                    .lookup_folded(name)
-                                    .is_some_and(|actual| ir.scopes_compatible(actual, *expected))
-                            })
-                        }
-                        _ => false,
-                    })
-            });
-    }
-    if let Some(expected) = expected {
-        if ir
-            .strings()
-            .lookup_folded(name)
-            .is_some_and(|actual| ir.scopes_compatible(actual, expected))
-        {
-            return true;
-        }
-        return ir.scopes.register(ir.strings(), name).is_some()
-            && state.is_none_or(|state| scope_state_register_matches(ir, state, name, expected));
-    }
-    ir.scope_matches(None, name) || ir.scopes.register(ir.strings(), name).is_some()
-}
-
-fn scope_state_register_matches(
-    ir: &RulesIr,
-    state: &ScopeState,
-    register: &str,
-    expected: rules::ir::Symbol,
-) -> bool {
-    let value = hir::ir_scope_register_value(ir, state, register);
-    value.is_none_or(|value| match value {
-        ScopeValue::Unknown => true,
-        ScopeValue::Invalid => false,
-        ScopeValue::Known(names) => names.iter().any(|name| {
-            ir.strings()
-                .lookup_folded(name)
-                .is_some_and(|name| ir.scopes_compatible(name, expected))
-        }),
-    })
+    hir::checking::scope_expression_allowed(ir, name, expected, state, &WorkspaceFacts { snapshot })
 }
 
 fn spellings_into(
@@ -367,7 +216,7 @@ fn spellings_into(
 ) {
     match ir.matcher(matcher) {
         Matcher::Literal(value) => out.push(ir.strings().resolve(*value).to_owned()),
-        Matcher::Template(parts) => template_spellings(ir, parts, snapshot, prefix, out),
+        Matcher::Pattern(parts) => pattern_spellings(ir, parts, snapshot, prefix, out),
         Matcher::Bool => out.extend(["yes".into(), "no".into()]),
         Matcher::Date => {}
         Matcher::Enum { id } => {
@@ -464,15 +313,14 @@ fn spellings_into(
         | Matcher::Int { .. }
         | Matcher::Float { .. }
         | Matcher::Path(_)
-        | Matcher::Quoted(_)
         | Matcher::Opaque => {}
         Matcher::Link => out.extend(scope_link_and_register_names(ir, snapshot)),
     }
 }
 
-fn template_spellings(
+fn pattern_spellings(
     ir: &RulesIr,
-    parts: &[TemplatePart],
+    parts: &[PatternPart],
     snapshot: &AnalysisSnapshot,
     prefix: &str,
     out: &mut Vec<String>,
@@ -480,8 +328,8 @@ fn template_spellings(
     let mut variants = vec![String::new()];
     for part in parts {
         let options = match part {
-            TemplatePart::Text(text) => vec![ir.strings().resolve(*text).to_owned()],
-            TemplatePart::Hole(matcher) => {
+            PatternPart::Text(text) => vec![ir.strings().resolve(*text).to_owned()],
+            PatternPart::Hole(matcher) => {
                 let mut values = Vec::new();
                 spellings_into(ir, *matcher, snapshot, "", &mut values);
                 values.sort_by_key(|value| value.to_ascii_lowercase());
@@ -540,8 +388,8 @@ fn scope_link_spellings(
     let mut names = vec![String::new()];
     for part in link.pattern.iter() {
         let options = match part {
-            TemplatePart::Text(text) => vec![ir.strings().resolve(*text).to_owned()],
-            TemplatePart::Hole(matcher) => {
+            PatternPart::Text(text) => vec![ir.strings().resolve(*text).to_owned()],
+            PatternPart::Hole(matcher) => {
                 let mut options = Vec::new();
                 match ir.matcher(*matcher) {
                     Matcher::Scope(scope) => options.extend(
@@ -605,12 +453,12 @@ fn describe_range<T: std::fmt::Display>(name: &str, min: Option<T>, max: Option<
     }
 }
 
-fn template_text(ir: &RulesIr, parts: &[TemplatePart]) -> String {
+fn pattern_text(ir: &RulesIr, parts: &[PatternPart]) -> String {
     parts
         .iter()
         .map(|part| match part {
-            TemplatePart::Text(text) => ir.strings().resolve(*text).to_owned(),
-            TemplatePart::Hole(_) => "{…}".into(),
+            PatternPart::Text(text) => ir.strings().resolve(*text).to_owned(),
+            PatternPart::Hole(_) => "{…}".into(),
         })
         .collect()
 }
@@ -649,17 +497,8 @@ pub(crate) fn diagnostics(
     if ir.schemas.is_empty() || file_rule.parser != rules::ir::DocumentParser::Script {
         return Ok(Vec::new());
     }
-    let mut diagnostics = schema_diagnostics(snapshot, hir, cancellation)?;
-    let mut session = QuotedScriptSession::new(cancellation);
-    quoted_schema_diagnostics(
-        snapshot,
-        hir,
-        cancellation,
-        &mut session,
-        &mut Vec::new(),
-        &mut diagnostics,
-    )?;
-    Ok(diagnostics)
+
+    schema_diagnostics(snapshot, hir, cancellation)
 }
 
 fn schema_diagnostics(
@@ -792,14 +631,14 @@ fn schema_diagnostics_at_depth(
     snapshot: &AnalysisSnapshot,
     hir: &HirFile,
     cancellation: &CancellationToken,
-    callable_depth: usize,
+    template_depth: usize,
     partial_root: bool,
 ) -> Result<Vec<Diagnostic>, Cancelled> {
     let ir = snapshot.ir();
     let facts = WorkspaceFacts { snapshot };
     let schema_index = SchemaFactIndex::new(hir.schema_facts());
     let mut diagnostics = Vec::new();
-    let callable_arguments = callable_argument_key_ranges(snapshot, hir, cancellation)?;
+    let template_arguments = template_argument_key_ranges(snapshot, hir, cancellation)?;
     let mut direct_counts =
         BTreeMap::<(TextRange, FieldId), BTreeMap<String, (u32, TextRange)>>::new();
     let mut unbound_keys = BTreeSet::new();
@@ -836,7 +675,7 @@ fn schema_diagnostics_at_depth(
             }
             continue;
         }
-        if callable_arguments.contains(&property.key_range) {
+        if template_arguments.contains(&property.key_range) {
             continue;
         }
         let Some(field_fact) = hir.field_fact_at(property.key_range) else {
@@ -857,7 +696,6 @@ fn schema_diagnostics_at_depth(
                 let expected = match ir.shape(id) {
                     Some(Shape::Scalar) => "a scalar value",
                     Some(Shape::Block) => "a block",
-                    Some(Shape::Quoted) => "a quoted script",
                     None => "the declared value shape",
                 };
                 diagnostics.push(field_diagnostic(
@@ -888,7 +726,7 @@ fn schema_diagnostics_at_depth(
                     DiagnosticCode::UnknownKey,
                     DiagnosticCode::UnknownKey.severity(),
                     property.key_range,
-                    misplaced_callable_key(snapshot, field_fact.schema, &property.key)
+                    misplaced_template_key(snapshot, field_fact.schema, &property.key)
                         .unwrap_or_else(|| {
                             format!(
                                 "unknown key `{}`{}{}",
@@ -1225,12 +1063,12 @@ fn schema_diagnostics_at_depth(
         }
     }
     diagnostics.extend(control_lints(ir, hir, &facts, cancellation)?);
-    if callable_depth < 8 {
-        diagnostics.extend(callable_argument_diagnostics(
+    if template_depth < 8 {
+        diagnostics.extend(template_argument_diagnostics(
             snapshot,
             hir,
             cancellation,
-            callable_depth,
+            template_depth,
         )?);
     } else {
         diagnostics.push(Diagnostic::new(
@@ -1260,10 +1098,10 @@ fn schema_diagnostics_at_depth(
     Ok(diagnostics)
 }
 
-fn callable_context(snapshot: &AnalysisSnapshot, schema: SchemaId) -> Option<&str> {
+fn template_context(snapshot: &AnalysisSnapshot, schema: SchemaId) -> Option<&str> {
     let ir = snapshot.ir();
     ir.fields(schema).into_iter().find_map(|id| {
-        let kind = crate::ir_callable::callable_kind(ir, ir.field(id).key)?;
+        let kind = crate::ir_template::template_kind(ir, ir.field(id).key)?;
         snapshot.rules().dynamic_definition_context(&kind)
     })
 }
@@ -1274,7 +1112,7 @@ fn unknown_key_context(
     schema: SchemaId,
     property: &hir::HirProperty,
 ) -> String {
-    if let Some(context) = callable_context(snapshot, schema) {
+    if let Some(context) = template_context(snapshot, schema) {
         return format!(" in {} `{context}` block", indefinite_article(context));
     }
     hir.definitions()
@@ -1301,13 +1139,13 @@ fn indefinite_article(name: &str) -> &'static str {
     }
 }
 
-fn misplaced_callable_key(
+fn misplaced_template_key(
     snapshot: &AnalysisSnapshot,
     schema: SchemaId,
     key: &str,
 ) -> Option<String> {
     let ir = snapshot.ir();
-    let current = callable_context(snapshot, schema)?;
+    let current = template_context(snapshot, schema)?;
     for ty in &ir.types {
         let name = ir.strings().resolve(ty.name);
         let Some(other) = snapshot.rules().dynamic_definition_context(name) else {
@@ -1438,149 +1276,17 @@ fn field_diagnostic(
     diagnostic
 }
 
-fn quoted_schema_diagnostics(
-    snapshot: &AnalysisSnapshot,
-    hir: &HirFile,
-    cancellation: &CancellationToken,
-    session: &mut QuotedScriptSession<'_>,
-    layers: &mut Vec<(text::TextSize, QuotedScript)>,
-    out: &mut Vec<Diagnostic>,
-) -> Result<(), Cancelled> {
-    let ir = snapshot.ir();
-    let facts = WorkspaceFacts { snapshot };
-    let source = hir.syntax().source();
-    for property in hir.properties() {
-        cancellation.checkpoint()?;
-        let Some(scalar) = property.scalar.as_ref().filter(|scalar| scalar.quoted) else {
-            continue;
-        };
-        let Some(field_fact) = hir.field_fact_at(property.key_range) else {
-            continue;
-        };
-        let mut schemas = Vec::new();
-        for field_id in &field_fact.fields {
-            match ir.field(*field_id).value {
-                FieldValue::Quoted(schema) => schemas.push(schema),
-                FieldValue::Scalar(matcher) => {
-                    collect_quoted_matcher_schemas(ir, matcher, &mut schemas)
-                }
-                _ => {}
-            }
-        }
-        schemas.sort_unstable();
-        schemas.dedup();
-        if schemas.is_empty() {
-            continue;
-        }
-        let Some(raw) = source.get(
-            usize::try_from(scalar.range.start()).unwrap_or(source.len())
-                ..usize::try_from(scalar.range.end()).unwrap_or(source.len()),
-        ) else {
-            continue;
-        };
-        let script = match session.parse(raw, layers.len())? {
-            QuotedScriptParse::Parsed(script) => script,
-            QuotedScriptParse::Opaque => continue,
-            QuotedScriptParse::Limited(reason) => {
-                let range = map_quoted_range(scalar.range, layers).unwrap_or(scalar.range);
-                out.push(Diagnostic::new(
-                    crate::DiagnosticCode::AnalysisIncomplete,
-                    crate::Severity::Warning,
-                    range,
-                    reason.message().to_owned(),
-                ));
-                continue;
-            }
-        };
-        let parent = hir
-            .schema_facts()
-            .iter()
-            .filter(|fact| {
-                fact.schema == field_fact.schema
-                    && crate::support::contains(fact.range, property.key_range.start())
-            })
-            .min_by_key(|fact| fact.range.len());
-        let Some(parent) = parent else {
-            continue;
-        };
-        let state = parent.state.clone();
-        for schema in schemas {
-            cancellation.checkpoint()?;
-            let fragment = hir::lower_ir_schema(
-                std::sync::Arc::new(script.parsed().clone()),
-                ir,
-                schema,
-                field_fact.subtypes.clone(),
-                state.clone(),
-                &facts,
-            );
-            layers.push((scalar.range.start(), script.clone()));
-            let mut nested = schema_diagnostics(snapshot, &fragment, cancellation)?;
-            nested.extend(
-                script
-                    .parsed()
-                    .errors()
-                    .iter()
-                    .map(crate::diagnostics::diagnostic_from_syntax),
-            );
-            for diagnostic in &mut nested {
-                if let Some(mapped) = map_quoted_range(diagnostic.range, layers) {
-                    diagnostic.range = mapped;
-                }
-                for fix in &mut diagnostic.fixes {
-                    if let Some(mapped) = map_quoted_range(fix.range, layers) {
-                        fix.range = mapped;
-                        for _ in layers.iter() {
-                            fix.new_text = parser::encode_quoted_script_text(&fix.new_text);
-                        }
-                    }
-                }
-            }
-            out.extend(nested);
-            quoted_schema_diagnostics(snapshot, &fragment, cancellation, session, layers, out)?;
-            layers.pop();
-        }
-    }
-    Ok(())
-}
-
-fn collect_quoted_matcher_schemas(ir: &RulesIr, matcher: MatcherId, out: &mut Vec<SchemaId>) {
-    match ir.matcher(matcher) {
-        Matcher::Quoted(schema) => out.push(*schema),
-        Matcher::Union(alternatives) => {
-            for alternative in alternatives {
-                collect_quoted_matcher_schemas(ir, *alternative, out);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn map_quoted_range(
-    mut range: TextRange,
-    layers: &[(text::TextSize, QuotedScript)],
-) -> Option<TextRange> {
-    for (token_start, script) in layers.iter().rev() {
-        let relative = script.source_map().decoded_range(range)?;
-        range = TextRange::new(
-            token_start.checked_add(relative.start())?,
-            token_start.checked_add(relative.end())?,
-        )?;
-    }
-    Some(range)
-}
-
-/// Checks parameter bindings on blocks invoking a symbol backed by the IR's `Callable` trait.
+/// Checks parameter bindings on blocks invoking a symbol backed by the IR's `Template` trait.
 /// The signature comes from HIR's definition/parameter facts; no legacy semantic rule table is
 /// consulted on the IR path.
-fn callable_argument_diagnostics(
+fn template_argument_diagnostics(
     snapshot: &AnalysisSnapshot,
     hir: &HirFile,
     cancellation: &CancellationToken,
     depth: usize,
 ) -> Result<Vec<Diagnostic>, Cancelled> {
     let ir = snapshot.ir();
-    let Some(callable) = ir.trait_by_name("Callable") else {
+    let Some(template) = ir.trait_by_name("Template") else {
         return Ok(Vec::new());
     };
     let mut diagnostics = Vec::new();
@@ -1592,13 +1298,13 @@ fn callable_argument_diagnostics(
         let Some(kind) = field_fact.fields.iter().find_map(|field_id| {
             let field = ir.field(*field_id);
             let mut type_ids = Vec::new();
-            callable_targets(ir, field.key, &mut type_ids);
+            template_targets(ir, field.key, &mut type_ids);
             type_ids.into_iter().find_map(|type_id| {
                 let info = ir.type_info(type_id);
                 let implements = info
                     .trait_impls
                     .iter()
-                    .any(|implementation| implementation.trait_id == callable);
+                    .any(|implementation| implementation.trait_id == template);
                 implements.then(|| ir.strings().resolve(info.name).to_owned())
             })
         }) else {
@@ -1623,8 +1329,7 @@ fn callable_argument_diagnostics(
         else {
             continue;
         };
-        let bindings = crate::ir_callable::invocation_bindings(hir, property);
-        let state = crate::ir_callable::invocation_state(hir, property);
+        let state = crate::ir_template::invocation_state(hir, property);
         let child_path_len = property.path.len() + 1;
         let arguments = hir
             .properties_in_range(property.range)
@@ -1635,6 +1340,47 @@ fn callable_argument_diagnostics(
                     && child.range.end() <= property.range.end()
             })
             .collect::<Vec<_>>();
+        if crate::ir_template::needs_body_analysis(&summary)
+            && let Some(body) =
+                crate::ir_template::analyse_body(snapshot, hir, property, None, cancellation)?
+        {
+            if !body.coverage.is_complete() {
+                diagnostics.push(Diagnostic::new(
+                    DiagnosticCode::AnalysisIncomplete,
+                    Severity::Information,
+                    property.key_range,
+                    body.coverage.limit_description(),
+                ));
+            }
+            for evidence in &body.evidence {
+                if evidence.kind == hir::checking::IssueKind::Syntax {
+                    let dependencies = crate::ir_template::evidence_dependencies(&body, evidence);
+                    let already_in_payload = arguments.iter().any(|argument| {
+                        dependencies.contains(&argument.key.to_ascii_lowercase())
+                            && argument.scalar.as_ref().is_some_and(|scalar| {
+                                scalar.quoted
+                                    && hir
+                                        .syntax()
+                                        .text(scalar.range)
+                                        .and_then(parser::parse_quoted_script)
+                                        .is_some_and(|script| !script.parsed().errors().is_empty())
+                            })
+                    });
+                    if already_in_payload {
+                        continue;
+                    }
+                }
+                let code = constraint_code(evidence.kind);
+                let range =
+                    crate::ir_template::project_evidence_range(&body, evidence, hir, property);
+                diagnostics.push(Diagnostic::new(
+                    code,
+                    severity(evidence.severity),
+                    range,
+                    format!("Template `{}`: {}", summary.name, evidence.explanation),
+                ));
+            }
+        }
         let mut counts = BTreeMap::<String, u32>::new();
         for (argument_index, argument) in arguments.iter().enumerate() {
             cancellation.checkpoint()?;
@@ -1644,13 +1390,13 @@ fn callable_argument_diagnostics(
                 later.key.eq_ignore_ascii_case(&argument.key) && later.scalar.is_some()
             });
             if let Some(scalar) = argument.scalar.as_ref().filter(|_| !shadowed) {
-                let sites = crate::ir_callable::parameter_sites(
+                let sites = crate::ir_template::parameter_sites_at(
                     snapshot,
+                    hir,
+                    property,
                     &kind,
                     &property.key,
                     &argument.key,
-                    &bindings,
-                    state.clone(),
                     cancellation,
                 )?;
                 if !sites.coverage.is_complete() {
@@ -1663,7 +1409,7 @@ fn callable_argument_diagnostics(
                 }
                 if !scalar.quoted
                     && sites.iter().any(|site| {
-                        matches!(site.domain, crate::ir_callable::Domain::Payload { .. })
+                        matches!(site.domain, crate::ir_template::Domain::Payload { .. })
                     })
                 {
                     diagnostics.push(Diagnostic::new(DiagnosticCode::InvalidValue, Severity::Warning,
@@ -1671,7 +1417,7 @@ fn callable_argument_diagnostics(
                 }
                 if scalar.quoted
                     && sites.iter().any(|site| {
-                        matches!(site.domain, crate::ir_callable::Domain::Payload { .. })
+                        matches!(site.domain, crate::ir_template::Domain::Payload { .. })
                     })
                 {
                     let source = hir.syntax().source();
@@ -1706,68 +1452,70 @@ fn callable_argument_diagnostics(
                                     diagnostics.push(diagnostic);
                                 }
                             }
-                            let mut usages: Vec<(
-                                &crate::ir_callable::ParameterSite,
-                                Vec<Vec<Diagnostic>>,
-                            )> = Vec::new();
-                            for site in &sites {
-                                let crate::ir_callable::Domain::Payload { schema, complete } =
-                                    site.domain
-                                else {
-                                    continue;
-                                };
-                                let fragment = hir::lower_ir_schema(
-                                    std::sync::Arc::new(script.parsed().clone()),
-                                    ir,
-                                    schema,
-                                    Default::default(),
-                                    site.state.clone(),
-                                    &WorkspaceFacts { snapshot },
-                                );
-                                let diagnostics = schema_diagnostics_at_depth(
-                                    snapshot,
-                                    &fragment,
-                                    cancellation,
-                                    depth + 1,
-                                    !complete,
-                                )?;
-                                if let Some((_, alternatives)) =
-                                    usages.iter_mut().find(|(other, _)| {
-                                        other.origin == site.origin
-                                            && other.token.range == site.token.range
-                                            && other.state == site.state
-                                    })
-                                {
-                                    alternatives.push(diagnostics);
-                                } else {
-                                    usages.push((site, vec![diagnostics]));
-                                }
-                            }
-                            // Overloads at one usage are alternatives. Distinct usages all
-                            // interpret the payload, so each must accept its statements.
-                            let mut emitted = BTreeSet::new();
-                            for (_, alternatives) in usages {
-                                let Some(first) = alternatives.first() else {
-                                    continue;
-                                };
-                                for diagnostic in first {
-                                    if alternatives.iter().all(|group| {
-                                        group.iter().any(|candidate| {
-                                            candidate.code == diagnostic.code
-                                                && candidate.range == diagnostic.range
+                            if !crate::ir_template::needs_body_analysis(&summary) {
+                                let mut usages: Vec<(
+                                    &crate::ir_template::ParameterSite,
+                                    Vec<Vec<Diagnostic>>,
+                                )> = Vec::new();
+                                for site in &sites {
+                                    let crate::ir_template::Domain::Payload { schema, complete } =
+                                        site.domain
+                                    else {
+                                        continue;
+                                    };
+                                    let fragment = hir::lower_ir_schema(
+                                        std::sync::Arc::new(script.parsed().clone()),
+                                        ir,
+                                        schema,
+                                        Default::default(),
+                                        site.state.clone(),
+                                        &WorkspaceFacts { snapshot },
+                                    );
+                                    let diagnostics = schema_diagnostics_at_depth(
+                                        snapshot,
+                                        &fragment,
+                                        cancellation,
+                                        depth + 1,
+                                        !complete,
+                                    )?;
+                                    if let Some((_, alternatives)) =
+                                        usages.iter_mut().find(|(other, _)| {
+                                            other.origin == site.origin
+                                                && other.token.range == site.token.range
+                                                && other.state == site.state
                                         })
-                                    }) && emitted.insert((diagnostic.code, diagnostic.range))
                                     {
-                                        let mut diagnostic = diagnostic.clone();
-                                        if let Some(relative) =
-                                            script.source_map().decoded_range(diagnostic.range)
-                                            && let Some(range) = TextRange::new(
-                                                scalar.range.start() + relative.start(),
-                                                scalar.range.start() + relative.end(),
-                                            )
+                                        alternatives.push(diagnostics);
+                                    } else {
+                                        usages.push((site, vec![diagnostics]));
+                                    }
+                                }
+                                // Overloads at one usage are alternatives. Distinct usages all
+                                // interpret the payload, so each must accept its statements.
+                                let mut emitted = BTreeSet::new();
+                                for (_, alternatives) in usages {
+                                    let Some(first) = alternatives.first() else {
+                                        continue;
+                                    };
+                                    for diagnostic in first {
+                                        if alternatives.iter().all(|group| {
+                                            group.iter().any(|candidate| {
+                                                candidate.code == diagnostic.code
+                                                    && candidate.range == diagnostic.range
+                                            })
+                                        }) && emitted.insert((diagnostic.code, diagnostic.range))
                                         {
-                                            diagnostic.range = range;
-                                            diagnostics.push(diagnostic);
+                                            let mut diagnostic = diagnostic.clone();
+                                            if let Some(relative) =
+                                                script.source_map().decoded_range(diagnostic.range)
+                                                && let Some(range) = TextRange::new(
+                                                    scalar.range.start() + relative.start(),
+                                                    scalar.range.start() + relative.end(),
+                                                )
+                                            {
+                                                diagnostic.range = range;
+                                                diagnostics.push(diagnostic);
+                                            }
                                         }
                                     }
                                 }
@@ -1781,7 +1529,7 @@ fn callable_argument_diagnostics(
                     .collect::<Vec<_>>();
                 if !invalid.is_empty() {
                     let key_site = invalid.iter().find_map(|site| match site.domain {
-                        crate::ir_callable::Domain::Key { schema, .. } => Some(schema),
+                        crate::ir_template::Domain::Key { schema, .. } => Some(schema),
                         _ => None,
                     });
                     let reason = key_site.map_or_else(
@@ -1810,7 +1558,13 @@ fn callable_argument_diagnostics(
                         ),
                     ));
                 }
-            } else if argument.scalar.is_none() {
+            } else if argument.scalar.is_none()
+                && argument.value_range.is_some_and(|range| {
+                    hir.syntax()
+                        .text(range)
+                        .is_some_and(|text| text.trim_start().starts_with('{'))
+                })
+            {
                 diagnostics.push(Diagnostic::new(
                     DiagnosticCode::InvalidValue,
                     DiagnosticCode::InvalidValue.severity(),
@@ -1865,13 +1619,14 @@ fn callable_argument_diagnostics(
             })
             .map(|parameter| parameter.name.clone())
             .collect::<Vec<_>>();
-        let active = crate::ir_callable::missing_parameters(
-            snapshot,
+        let active = hir::template::missing_parameters_with_inputs(
+            snapshot.ir(),
+            &WorkspaceFacts { snapshot },
             &kind,
             &property.key,
-            &bindings,
+            &crate::ir_template::invocation_inputs(hir, property),
             state,
-            cancellation,
+            &mut || cancellation.checkpoint(),
         )?;
         if !active.coverage.is_complete() {
             diagnostics.push(Diagnostic::new(
@@ -1884,7 +1639,7 @@ fn callable_argument_diagnostics(
         let missing = unconditional
             .iter()
             .chain(active.iter())
-            .filter(|name| !bindings.keys().any(|key| key.eq_ignore_ascii_case(name)))
+            .filter(|name| !counts.keys().any(|key| key.eq_ignore_ascii_case(name)))
             .cloned()
             .collect::<std::collections::BTreeSet<_>>();
         if !missing.is_empty() {
@@ -1920,13 +1675,13 @@ fn callable_argument_diagnostics(
     Ok(diagnostics)
 }
 
-fn callable_argument_key_ranges(
+fn template_argument_key_ranges(
     snapshot: &AnalysisSnapshot,
     hir: &HirFile,
     cancellation: &CancellationToken,
 ) -> Result<std::collections::BTreeSet<TextRange>, Cancelled> {
     let ir = snapshot.ir();
-    let Some(callable) = ir.trait_by_name("Callable") else {
+    let Some(template) = ir.trait_by_name("Template") else {
         return Ok(Default::default());
     };
     let mut ranges = std::collections::BTreeSet::new();
@@ -1941,13 +1696,13 @@ fn callable_argument_key_ranges(
         };
         let kind = field_fact.fields.iter().find_map(|field_id| {
             let mut targets = Vec::new();
-            callable_targets(ir, ir.field(*field_id).key, &mut targets);
+            template_targets(ir, ir.field(*field_id).key, &mut targets);
             targets.into_iter().find_map(|type_id| {
                 let info = ir.type_info(type_id);
                 let implements = info
                     .trait_impls
                     .iter()
-                    .any(|implementation| implementation.trait_id == callable);
+                    .any(|implementation| implementation.trait_id == template);
                 implements.then(|| ir.strings().resolve(info.name).to_owned())
             })
         });
@@ -1963,7 +1718,7 @@ fn callable_argument_key_ranges(
             continue;
         }
         // Ambiguous definitions have no reliable signature. Keep their
-        // argument block open and let Callable validation use a signature
+        // argument block open and let Template validation use a signature
         // only when one is available.
         invocation_paths.insert(invocation.path.as_slice());
     }
@@ -1982,14 +1737,14 @@ fn callable_argument_key_ranges(
     Ok(ranges)
 }
 
-fn callable_targets(ir: &RulesIr, matcher: MatcherId, out: &mut Vec<TypeId>) {
+fn template_targets(ir: &RulesIr, matcher: MatcherId, out: &mut Vec<TypeId>) {
     match ir.matcher(matcher) {
         Matcher::Ref(RefTarget::Type { type_id, .. }) | Matcher::Def { type_id, .. } => {
             out.push(*type_id)
         }
         Matcher::Union(alternatives) => {
             for alternative in alternatives {
-                callable_targets(ir, *alternative, out);
+                template_targets(ir, *alternative, out);
             }
         }
         _ => {}
@@ -2053,412 +1808,46 @@ pub(crate) fn field_context(ir: &RulesIr, schema: SchemaId, field: FieldId) -> S
         .to_owned()
 }
 
-fn constant_control_value(
-    ir: &RulesIr,
-    hir: &HirFile,
-    property: &hir::HirProperty,
-) -> Option<bool> {
-    fn evaluate(
-        ir: &RulesIr,
-        hir: &HirFile,
-        property: &hir::HirProperty,
-        depth: usize,
-    ) -> Option<bool> {
-        if depth >= 64 {
-            return None;
-        }
-        let control = hir
-            .field_fact_at(property.key_range)?
-            .fields
-            .iter()
-            .find_map(|id| ir.field(*id).control.as_ref())?;
-        if control.kind == ControlKind::Constant {
-            let value = &property.scalar.as_ref()?.value;
-            return if value.eq_ignore_ascii_case("yes") {
-                Some(true)
-            } else if value.eq_ignore_ascii_case("no") {
-                Some(false)
-            } else {
-                None
-            };
-        }
-        if !matches!(control.kind, ControlKind::Logic | ControlKind::Guard) {
-            return None;
-        }
-        let children = hir
-            .properties()
-            .iter()
-            .filter(|child| {
-                child.path.len() == property.path.len() + 1
-                    && child.path.starts_with(&property.path)
-                    && property.range.start() <= child.range.start()
-                    && child.range.end() <= property.range.end()
-            })
-            .collect::<Vec<_>>();
-        if children.is_empty() {
-            return None;
-        }
-        let op = control
-            .op
-            .map(|op| ir.strings().resolve(op))
-            .unwrap_or("and");
-        let values = children
-            .iter()
-            .map(|child| evaluate(ir, hir, child, depth + 1))
-            .collect::<Vec<_>>();
-        let or = op.eq_ignore_ascii_case("or") || op.eq_ignore_ascii_case("nor");
-        let value = if or && values.contains(&Some(true)) {
-            true
-        } else if !or && values.contains(&Some(false)) {
-            false
-        } else {
-            let values = values.into_iter().collect::<Option<Vec<_>>>()?;
-            if or {
-                values.iter().any(|value| *value)
-            } else {
-                values.iter().all(|value| *value)
-            }
-        };
-        Some(
-            if op.eq_ignore_ascii_case("not") || op.eq_ignore_ascii_case("nor") {
-                !value
-            } else {
-                value
-            },
-        )
-    }
-    evaluate(ir, hir, property, 0)
-}
-
 fn control_lints(
     ir: &RulesIr,
     hir: &HirFile,
     facts: &impl SymbolFacts,
     cancellation: &CancellationToken,
 ) -> Result<Vec<Diagnostic>, Cancelled> {
-    let mut diagnostics = Vec::new();
-    let binding_dependent = |range: TextRange| {
-        hir.parameter_references().iter().any(|reference| {
-            range.start() <= reference.range.start() && reference.range.end() <= range.end()
-        })
-    };
-    for property in hir.properties() {
-        cancellation.checkpoint()?;
-        let Some(fact) = hir.field_fact_at(property.key_range) else {
-            continue;
-        };
-        let Some(field) = fact.fields.first().map(|field| ir.field(*field)) else {
-            continue;
-        };
-        let Some(control) = &field.control else {
-            continue;
-        };
-        match control.kind {
-            ControlKind::Logic => {
-                let children = hir
-                    .properties()
-                    .iter()
-                    .filter(|child| {
-                        child.path.len() == property.path.len() + 1
-                            && child.path.starts_with(&property.path)
-                            && property.range.start() <= child.range.start()
-                            && child.range.end() <= property.range.end()
-                    })
-                    .collect::<Vec<_>>();
-                let op = control.op.map(|op| ir.strings().resolve(op));
-                let invalid_count = if op.is_some_and(|op| op.eq_ignore_ascii_case("not")) {
-                    children.len() != 1
-                } else {
-                    children.is_empty()
-                };
-                if invalid_count {
-                    diagnostics.push(Diagnostic::new(
-                        DiagnosticCode::LogicalContainer,
-                        DiagnosticCode::LogicalContainer.severity(),
-                        property.key_range,
-                        if op.is_some_and(|op| op.eq_ignore_ascii_case("not")) {
-                            "`NOT` with multiple conditions is true only when none of them hold (an AND of NOTs); it is not \"not all of them hold\". Write `AND = { NOT = { ... } ... }` to state the intended reading".into()
-                        } else {
-                            format!("empty `{}` container is always {}; drop the container or add conditions", property.key, if op.is_some_and(|op| op.eq_ignore_ascii_case("or")) { "false" } else { "true" })
-                        },
-                    ));
-                }
-                if children.len() == 1
-                    && op.is_some_and(|op| {
-                        op.eq_ignore_ascii_case("or") || op.eq_ignore_ascii_case("and")
-                    })
-                {
-                    diagnostics.push(Diagnostic::new(DiagnosticCode::LogicalContainer, DiagnosticCode::LogicalContainer.severity(), property.key_range,
-                        format!("`{}` with a single condition is equivalent to the condition itself; the wrapper can be removed", property.key)));
-                }
-                let constants = children
-                    .iter()
-                    .filter_map(|child| {
-                        if !hir.field_fact_at(child.key_range).is_some_and(|fact| {
-                            fact.fields.iter().any(|id| {
-                                ir.field(*id)
-                                    .control
-                                    .as_ref()
-                                    .is_some_and(|control| control.kind == ControlKind::Constant)
-                            })
-                        }) {
-                            return None;
-                        }
-                        child.scalar.as_ref().and_then(|scalar| {
-                            let value = scalar.value.to_ascii_lowercase();
-                            (value == "yes" || value == "no").then_some(value == "yes")
-                        })
-                    })
-                    .collect::<Vec<_>>();
-                let constant = if op.is_some_and(|op| op.eq_ignore_ascii_case("and"))
-                    && constants.contains(&false)
-                {
-                    Some(false)
-                } else if op.is_some_and(|op| op.eq_ignore_ascii_case("or"))
-                    && constants.contains(&true)
-                {
-                    Some(true)
-                } else if op.is_some_and(|op| op.eq_ignore_ascii_case("not"))
-                    && constants.len() == children.len()
-                    && !constants.is_empty()
-                {
-                    Some(constants.iter().all(|value| !value))
-                } else {
-                    None
-                };
-                if let Some(value) = constant {
-                    diagnostics.push(Diagnostic::new(
-                        DiagnosticCode::ConstantCondition,
-                        DiagnosticCode::ConstantCondition.severity(),
-                        property.range,
-                        format!(
-                            "this logic container is always {}",
-                            if value { "true" } else { "false" }
-                        ),
-                    ));
-                }
-            }
-            ControlKind::Branch | ControlKind::BranchContinue => {
-                if let Some(guard) = control.guard {
-                    let guard_name = ir.strings().resolve(guard);
-                    if let Some(guard) = hir.properties().iter().find(|child| {
-                        child.path.len() == property.path.len() + 1
-                            && child.path.starts_with(&property.path)
-                            && property.range.start() <= child.range.start()
-                            && child.range.end() <= property.range.end()
-                            && child.key.eq_ignore_ascii_case(guard_name)
-                    }) && let Some(value) = constant_control_value(ir, hir, guard)
-                    {
-                        diagnostics.push(Diagnostic::new(DiagnosticCode::ConstantCondition, DiagnosticCode::ConstantCondition.severity(), property.key_range,
-                            if value { format!("`{guard_name}` of this `{}` is always true; the branch wrapper is redundant", property.key) }
-                            else { format!("`{guard_name}` of this `{}` is always false; the branch can never run", property.key) }));
-                    }
-                    if !hir.properties().iter().any(|child| {
-                        child.path.len() == property.path.len() + 1
-                            && child.path.starts_with(&property.path)
-                            && property.range.start() <= child.range.start()
-                            && child.range.end() <= property.range.end()
-                            && child.key.eq_ignore_ascii_case(guard_name)
-                    }) {
-                        diagnostics.push(Diagnostic::new(
-                            DiagnosticCode::MissingLimit,
-                            DiagnosticCode::MissingLimit.severity(),
-                            property.key_range,
-                            format!("`{}` without `{guard_name}` executes its body unconditionally; the condition belongs in a `{guard_name}` block", property.key),
-                        ));
-                    }
-                    if !hir.properties().iter().any(|child| {
-                        child.path.len() == property.path.len() + 1
-                            && child.path.starts_with(&property.path)
-                            && property.range.start() <= child.range.start()
-                            && child.range.end() <= property.range.end()
-                    }) {
-                        diagnostics.push(Diagnostic::new(
-                            DiagnosticCode::EmptyBlock,
-                            DiagnosticCode::EmptyBlock.severity(),
-                            property.key_range,
-                            format!("`{}` block has an empty body", property.key),
-                        ));
-                    }
-                }
-                if control.kind == ControlKind::BranchContinue {
-                    let parent_path = property
-                        .path
-                        .get(..property.path.len().saturating_sub(1))
-                        .unwrap_or(&[]);
-                    let container = hir
-                        .schema_at(property.key_range.start())
-                        .map(|fact| fact.range);
-                    let mut previous = hir
-                        .properties()
-                        .iter()
-                        .filter(|sibling| {
-                            sibling.path.len() == property.path.len()
-                                && sibling.path.get(..sibling.path.len().saturating_sub(1))
-                                    == Some(parent_path)
-                                && sibling.range.end() <= property.range.start()
-                                && container.is_none_or(|container| {
-                                    container.start() <= sibling.range.start()
-                                        && sibling.range.end() <= container.end()
-                                })
-                        })
-                        .collect::<Vec<_>>();
-                    previous.sort_by_key(|sibling| std::cmp::Reverse(sibling.range.start()));
-                    let mut attached = false;
-                    for sibling in previous {
-                        let previous_control = hir
-                            .field_fact_at(sibling.key_range)
-                            .and_then(|fact| fact.fields.first())
-                            .and_then(|id| ir.field(*id).control.as_ref());
-                        match previous_control {
-                            Some(previous)
-                                if matches!(
-                                    previous.kind,
-                                    ControlKind::Branch | ControlKind::BranchContinue
-                                ) =>
-                            {
-                                if !previous.chain.is_empty() {
-                                    attached = previous.chain.iter().any(|key| {
-                                        ir.strings()
-                                            .resolve(*key)
-                                            .eq_ignore_ascii_case(&property.key)
-                                    });
-                                    break;
-                                }
-                                if previous.kind == ControlKind::Branch {
-                                    break;
-                                }
-                            }
-                            _ => break,
-                        }
-                    }
-                    if !attached {
-                        attached = hir
-                            .properties()
-                            .iter()
-                            .filter(|parent| {
-                                parent.path.len() + 1 == property.path.len()
-                                    && property.path.starts_with(&parent.path)
-                                    && parent.range.start() <= property.range.start()
-                                    && property.range.end() <= parent.range.end()
-                            })
-                            .any(|parent| {
-                                hir.field_fact_at(parent.key_range).is_some_and(|fact| {
-                                    fact.fields.iter().any(|id| {
-                                        ir.field(*id).control.as_ref().is_some_and(|control| {
-                                            control.kind == ControlKind::Branch
-                                                && control.chain.iter().any(|name| {
-                                                    ir.strings()
-                                                        .resolve(*name)
-                                                        .eq_ignore_ascii_case(&property.key)
-                                                })
-                                        })
-                                    })
-                                })
-                            });
-                    }
-                    if !attached {
-                        diagnostics.push(Diagnostic::new(
-                            DiagnosticCode::OrphanElse,
-                            DiagnosticCode::OrphanElse.severity(),
-                            property.key_range,
-                            format!("orphan `{}`: it must directly follow an `if`/`else_if` block or be nested inside one", property.key),
-                        ));
-                    }
-                }
-            }
-            ControlKind::Switch => {
-                if let Some(on) = control.on {
-                    let selector = hir
-                        .properties()
-                        .iter()
-                        .find(|child| {
-                            child.path.len() == property.path.len() + 1
-                                && child.path.starts_with(&property.path)
-                                && property.range.start() <= child.range.start()
-                                && child.range.end() <= property.range.end()
-                                && child.key.eq_ignore_ascii_case(ir.strings().resolve(on))
-                        })
-                        .and_then(|child| child.scalar.as_ref())
-                        .filter(|scalar| !binding_dependent(scalar.range));
-                    if let Some(selector) = selector
-                        && let Some(trigger_schema) = control.selector_schema
-                    {
-                        let matchers = ir
-                            .lookup(trigger_schema, &selector.value, Shape::Scalar)
-                            .filter_map(|id| {
-                                let field = ir.field(id);
-                                if !matcher_matches(ir, field.key, &selector.value, facts) {
-                                    return None;
-                                }
-                                match field.value {
-                                    FieldValue::Scalar(matcher) => Some(matcher),
-                                    _ => None,
-                                }
-                            })
-                            .collect::<Vec<_>>();
-                        if matchers.is_empty() {
-                            diagnostics.push(Diagnostic::new(
-                                DiagnosticCode::InvalidValue,
-                                DiagnosticCode::InvalidValue.severity(),
-                                selector.range,
-                                format!("unknown scalar trigger `{}`", selector.value),
-                            ));
-                        } else {
-                            for child in hir.properties().iter().filter(|child| {
-                                child.path.len() == property.path.len() + 1
-                                    && child.path.starts_with(&property.path)
-                                    && property.range.start() <= child.range.start()
-                                    && child.range.end() <= property.range.end()
-                                    && child.scalar.is_none()
-                            }) {
-                                if binding_dependent(child.key_range) {
-                                    continue;
-                                }
-                                if !matchers
-                                    .iter()
-                                    .any(|matcher| ir.scalar_matches(*matcher, &child.key, facts))
-                                {
-                                    diagnostics.push(Diagnostic::new(
-                                        DiagnosticCode::InvalidValue,
-                                        DiagnosticCode::InvalidValue.severity(),
-                                        child.key_range,
-                                        format!(
-                                            "expected {} for `{}` branch",
-                                            matchers
-                                                .iter()
-                                                .map(|matcher| describe(ir, *matcher))
-                                                .collect::<Vec<_>>()
-                                                .join(" or "),
-                                            selector.value
-                                        ),
-                                    ));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            ControlKind::Guard | ControlKind::DisplayOnly => {
-                let has_children = hir.properties().iter().any(|child| {
-                    child.path.len() == property.path.len() + 1
-                        && child.path.starts_with(&property.path)
-                        && property.range.start() <= child.range.start()
-                        && child.range.end() <= property.range.end()
-                });
-                if property.scalar.is_none() && !has_children {
-                    diagnostics.push(Diagnostic::new(
-                        DiagnosticCode::EmptyBlock,
-                        DiagnosticCode::EmptyBlock.severity(),
-                        property.range,
-                        format!("{} has an empty body", property.key),
-                    ));
-                }
-            }
-            _ => {}
-        }
+    hir::checking::control_lints(ir, hir, facts, None, &mut || cancellation.checkpoint()).map(
+        |evidence| {
+            evidence
+                .into_iter()
+                .map(diagnostic_from_constraint)
+                .collect()
+        },
+    )
+}
+
+fn diagnostic_from_constraint(evidence: hir::checking::ConstraintEvidence) -> Diagnostic {
+    let code = constraint_code(evidence.kind);
+    Diagnostic::new(
+        code,
+        severity(evidence.severity),
+        evidence.range,
+        evidence.explanation,
+    )
+}
+
+fn constraint_code(kind: hir::checking::IssueKind) -> DiagnosticCode {
+    use hir::checking::IssueKind;
+    match kind {
+        IssueKind::Syntax => DiagnosticCode::Syntax,
+        IssueKind::Key => DiagnosticCode::UnknownKey,
+        IssueKind::Value => DiagnosticCode::InvalidValue,
+        IssueKind::Scope => DiagnosticCode::WrongScope,
+        IssueKind::Cardinality => DiagnosticCode::Cardinality,
+        IssueKind::OrphanElse => DiagnosticCode::OrphanElse,
+        IssueKind::LogicalContainer => DiagnosticCode::LogicalContainer,
+        IssueKind::ConstantCondition => DiagnosticCode::ConstantCondition,
+        IssueKind::MissingLimit => DiagnosticCode::MissingLimit,
+        IssueKind::EmptyBlock => DiagnosticCode::EmptyBlock,
     }
-    Ok(diagnostics)
 }
 
 #[cfg(test)]
@@ -2560,26 +1949,26 @@ mod tests {
             value_completion.items
         );
 
-        let callable_definition =
-            DocumentId::new("file:///tmp/common/scripted_effects/phase4-callable.txt");
+        let template_definition =
+            DocumentId::new("file:///tmp/common/scripted_effects/phase4-template.txt");
         host.open_document(
-            callable_definition,
+            template_definition,
             1,
-            "phase4_callable = { add_prestige = $AMOUNT$ }".to_owned(),
+            "phase4_template = { add_prestige = $AMOUNT$ }".to_owned(),
             None,
         )
-        .expect("open Callable definition");
-        let call_source = "country_event = { id = phase4.call immediate = { phase4_callable = {  } } option = { name = phase4.option } }";
-        let call_id = DocumentId::new("file:///tmp/common/events/phase4-callable-site.txt");
+        .expect("open Template definition");
+        let call_source = "country_event = { id = phase4.call immediate = { phase4_template = {  } } option = { name = phase4.option } }";
+        let call_id = DocumentId::new("file:///tmp/common/events/phase4-template-site.txt");
         host.open_document(call_id.clone(), 2, call_source.to_owned(), None)
-            .expect("open Callable invocation");
+            .expect("open Template invocation");
         let call_diagnostics = crate::diagnostics::diagnostics(&host.snapshot(), &call_id);
         assert!(
             call_diagnostics.iter().any(|diagnostic| {
                 diagnostic.code == DiagnosticCode::Cardinality
                     && diagnostic.message.contains("AMOUNT")
             }),
-            "required Callable parameter should be diagnosed: {call_diagnostics:#?}"
+            "required Template parameter should be diagnosed: {call_diagnostics:#?}"
         );
 
         let valid_id = DocumentId::new("file:///tmp/common/events/phase4-valid-event.txt");

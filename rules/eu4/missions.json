@@ -61,30 +61,17 @@
           "card": "0..1",
           "value": "date"
         },
-        "effect": [
-          {
-            "body": "effect",
-            "card": "1",
-            "doc": "This is what you get after you finished your mission.",
-            "scope": {
-              "set": {
-                "root": "country",
-                "this": "country"
-              }
+        "effect": {
+          "body": "effect",
+          "card": "1",
+          "doc": "This is what you get after you finished your mission.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
             }
-          },
-          {
-            "card": "0..1",
-            "doc": "Quoted Script form of a mission completion effect.",
-            "scope": {
-              "set": {
-                "root": "country",
-                "this": "country"
-              }
-            },
-            "value": "quoted<effect>"
           }
-        ],
+        },
         "icon": {
           "card": "1",
           "value": "ref<sprite>"
@@ -107,30 +94,17 @@
           "card": "0..1",
           "list": "ref<mission>"
         },
-        "trigger": [
-          {
-            "body": "mission_series_body__mission__trigger",
-            "card": "1",
-            "doc": "What you need to complete the mission, displayed for mission tooltip",
-            "scope": {
-              "set": {
-                "root": "country",
-                "this": "country"
-              }
+        "trigger": {
+          "body": "mission_series_body__mission__trigger",
+          "card": "1",
+          "doc": "What you need to complete the mission, displayed for mission tooltip",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
             }
-          },
-          {
-            "card": "0..1",
-            "doc": "Quoted Script form of a mission completion trigger.",
-            "scope": {
-              "set": {
-                "root": "country",
-                "this": "country"
-              }
-            },
-            "value": "quoted<trigger>"
           }
-        ]
+        }
       }
     },
     "mission_series_body__mission__ai_weight": {

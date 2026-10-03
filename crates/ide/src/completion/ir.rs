@@ -122,7 +122,7 @@ fn try_ir_completion_inner(
             })
     });
     let mut items = Vec::new();
-    if let Some((invocation, summary)) = callable_invocation_at(ir, snapshot, hir, position)
+    if let Some((invocation, summary)) = template_invocation_at(ir, snapshot, hir, position)
         && let Some(property) = value_property.filter(|property| {
             property.path.len() == invocation.path.len() + 1
                 && property.path.starts_with(&invocation.path)
@@ -132,20 +132,20 @@ fn try_ir_completion_inner(
                     .any(|parameter| parameter.name.eq_ignore_ascii_case(&property.key))
         })
     {
-        let constraints = crate::ir_callable::parameter_sites(
+        let constraints = crate::ir_template::parameter_sites_at(
             snapshot,
+            hir,
+            invocation,
             &summary.kind,
             &summary.name,
             &property.key,
-            &crate::ir_callable::invocation_bindings(hir, invocation),
-            crate::ir_callable::invocation_state(hir, invocation),
             cancellation,
         )?;
         {
             coverage.merge(&constraints.coverage);
             if !quoted_layers.is_empty() {
                 for site in &constraints {
-                    let crate::ir_callable::Domain::Payload { schema, .. } = site.domain else {
+                    let crate::ir_template::Domain::Payload { schema, .. } = site.domain else {
                         continue;
                     };
                     let parsed = std::sync::Arc::new(parser::parse(
@@ -181,9 +181,13 @@ fn try_ir_completion_inner(
                     }
                 }
             }
-            append_callable_value_items(
+            append_template_value_items(
                 snapshot,
                 &constraints,
+                hir,
+                invocation,
+                &summary,
+                coverage,
                 replacement_range,
                 prefix,
                 &property.key,
@@ -199,7 +203,7 @@ fn try_ir_completion_inner(
         }
     }
     if value_property.is_none()
-        && let Some((_, summary)) = callable_invocation_at(ir, snapshot, hir, position)
+        && let Some((_, summary)) = template_invocation_at(ir, snapshot, hir, position)
     {
         for parameter in &summary.parameters {
             cancellation.checkpoint()?;
@@ -211,6 +215,7 @@ fn try_ir_completion_inner(
                 continue;
             }
             items.push(CompletionItem {
+                template_evidence: None,
                 label: parameter.name.clone(),
                 kind: CompletionKind::DynamicParameter,
                 detail: "parameter".into(),
@@ -336,6 +341,7 @@ fn try_ir_completion_inner(
                     continue;
                 };
                 items.push(CompletionItem {
+                    template_evidence: None,
                     label: label.clone(),
                     kind: matcher_kind(ir.matcher(matcher)),
                     detail: ir_semantic::describe(ir, matcher),
@@ -371,8 +377,8 @@ fn try_ir_completion_inner(
                 let Some(rank) = prefix_rank(&label, prefix) else {
                     continue;
                 };
-                let callable_kind = crate::ir_callable::callable_kind(ir, matcher);
-                if let Some(kind) = &callable_kind
+                let template_kind = crate::ir_template::template_kind(ir, matcher);
+                if let Some(kind) = &template_kind
                     && let Some(crate::dynamic_contracts::ScopeContract::Scopes(expected)) =
                         contracts.contract(kind, &label)
                     && let Some(current) = state.current.first()
@@ -426,8 +432,9 @@ fn try_ir_completion_inner(
                     label_text
                 };
                 items.push(CompletionItem {
+                    template_evidence: None,
                     label: label.clone(),
-                    kind: if callable_kind.is_some() {
+                    kind: if template_kind.is_some() {
                         CompletionKind::DynamicDefinition
                     } else if matches!(ir.matcher(matcher), Matcher::Literal(_)) {
                         CompletionKind::Key
@@ -482,44 +489,106 @@ fn try_ir_completion_inner(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn append_callable_value_items(
+fn append_template_value_items(
     snapshot: &AnalysisSnapshot,
-    sites: &[crate::ir_callable::ParameterSite],
+    sites: &[crate::ir_template::ParameterSite],
+    source: &hir::HirFile,
+    invocation: &hir::HirProperty,
+    summary: &engine::DynamicDefinitionSummary,
+    coverage: &mut AnalysisCoverage,
     replacement_range: TextRange,
     prefix: &str,
     parameter: &str,
     cancellation: &CancellationToken,
     items: &mut Vec<CompletionItem>,
 ) -> Result<(), Cancelled> {
-    // An unrestricted scalar site has no spellings to enumerate. Collect the other
-    // sites' spellings before intersecting constraints, regardless of source order.
-    let mut candidates = BTreeSet::new();
-    for site in sites {
-        cancellation.checkpoint()?;
-        candidates.extend(site.candidates(snapshot, parameter, prefix));
+    let mut connected = sites.to_vec();
+    let mut inputs = crate::ir_template::invocation_inputs(source, invocation);
+    inputs.values.remove(&parameter.to_ascii_lowercase());
+    for related in summary.parameters.iter().filter(|related| {
+        !related.name.eq_ignore_ascii_case(parameter)
+            && !inputs
+                .values
+                .contains_key(&related.name.to_ascii_lowercase())
+    }) {
+        let other = crate::ir_template::parameter_sites_for_inputs(
+            snapshot,
+            &summary.kind,
+            &summary.name,
+            &related.name,
+            &inputs,
+            crate::ir_template::invocation_state(source, invocation),
+            cancellation,
+        )?;
+        coverage.merge(&other.coverage);
+        connected.extend(other.value);
     }
-    for label in candidates {
+    let sites = connected.as_slice();
+    let relations = crate::ir_template::relational_candidates(
+        snapshot,
+        sites,
+        parameter,
+        prefix,
+        cancellation,
+    )?;
+    coverage.merge(&relations.coverage);
+    let mut emitted = BTreeSet::new();
+    for mut witness in relations {
         cancellation.checkpoint()?;
-        if !sites
-            .iter()
-            .all(|site| site.accepts_candidate(snapshot, parameter, &label))
-        {
+        let Some(label) = witness.get(&parameter.to_ascii_lowercase()).cloned() else {
             continue;
-        }
+        };
         let Some(rank) = prefix_rank(&label, prefix) else {
             continue;
         };
+        let mut checked = crate::ir_template::validate_candidate(
+            snapshot,
+            source,
+            invocation,
+            summary,
+            parameter,
+            &witness,
+            cancellation,
+        )?;
+        let scalar_unknown = sites.iter().any(|site| {
+            !matches!(site.domain, crate::ir_template::Domain::Payload { .. })
+                && site.witness_validation(snapshot, &witness) == hir::analysis::Validation::Unknown
+        });
+        if scalar_unknown && checked.value == hir::analysis::Validation::Valid {
+            checked.value = hir::analysis::Validation::Unknown;
+            checked
+                .coverage
+                .residuals
+                .insert(hir::analysis::ResidualReason::Binding);
+        }
+        coverage.merge(&checked.coverage);
+        if checked.value == hir::analysis::Validation::Invalid {
+            continue;
+        }
+        witness.remove(&parameter.to_ascii_lowercase());
+        if !emitted.insert((label.clone(), witness.clone())) {
+            continue;
+        }
+        let conditions = witness
+            .iter()
+            .map(|(name, value)| format!("`{name}` = `{value}`"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let detail = if !conditions.is_empty() {
+            format!("requires {conditions}")
+        } else if checked.value == hir::analysis::Validation::Unknown {
+            format!("unresolved value for Template parameter `{parameter}`")
+        } else {
+            format!("value for Template parameter `{parameter}`")
+        };
         items.push(CompletionItem {
+            template_evidence: Some(crate::types::TemplateCompletionEvidence {
+                validation: checked.value,
+                witness,
+            }),
             label: label.clone(),
             kind: CompletionKind::Value,
-            detail: if sites
-                .iter()
-                .all(|site| matches!(site.domain, crate::ir_callable::Domain::Unresolved))
-            {
-                "scope".to_owned()
-            } else {
-                format!("value for Callable parameter `{parameter}`")
-            },
+            detail,
             documentation: None,
             replacement_range,
             insert_text: label,
@@ -531,13 +600,13 @@ fn append_callable_value_items(
     Ok(())
 }
 
-fn callable_invocation_at<'a>(
+fn template_invocation_at<'a>(
     ir: &rules::ir::RulesIr,
     snapshot: &AnalysisSnapshot,
     hir: &'a hir::HirFile,
     position: TextSize,
 ) -> Option<(&'a hir::HirProperty, engine::DynamicDefinitionSummary)> {
-    let callable = ir.trait_by_name("Callable")?;
+    let template = ir.trait_by_name("Template")?;
     hir.properties()
         .iter()
         .filter(|property| property.scalar.is_none() && contains(property.range, position))
@@ -554,7 +623,7 @@ fn callable_invocation_at<'a>(
                 (info
                     .trait_impls
                     .iter()
-                    .any(|implementation| implementation.trait_id == callable))
+                    .any(|implementation| implementation.trait_id == template))
                 .then(|| ir.strings().resolve(info.name).to_owned())
             })?;
             if hir.definitions().iter().any(|definition| {
@@ -607,6 +676,7 @@ fn path_value_completion(
         for label in labels {
             cancellation.checkpoint()?;
             items.push(CompletionItem {
+                template_evidence: None,
                 insert_text: label.to_owned(),
                 label: label.to_owned(),
                 kind,
@@ -707,6 +777,7 @@ fn append_value_items(
             continue;
         };
         items.push(CompletionItem {
+            template_evidence: None,
             label: label.clone(),
             kind: matcher_kind(ir.matcher(matcher)),
             detail: if let Matcher::Ref(RefTarget::Type { type_id, .. }) = ir.matcher(matcher)
@@ -767,17 +838,16 @@ fn key_insert_text(
         return label.to_owned();
     }
     match shape {
-        Some(Shape::Block) => callable_snippet(snapshot, ir, matcher, label)
+        Some(Shape::Block) => template_snippet(snapshot, ir, matcher, label)
             .unwrap_or_else(|| format!("{label} = {{\n\t$0\n}}")),
-        Some(Shape::Quoted) => format!("{label} = \"\n\t$0\n\""),
         Some(Shape::Scalar) => {
-            callable_snippet(snapshot, ir, matcher, label).unwrap_or_else(|| format!("{label} = "))
+            template_snippet(snapshot, ir, matcher, label).unwrap_or_else(|| format!("{label} = "))
         }
         None => format!("{label} = "),
     }
 }
 
-fn callable_snippet(
+fn template_snippet(
     snapshot: &AnalysisSnapshot,
     ir: &rules::ir::RulesIr,
     matcher: MatcherId,
@@ -786,12 +856,12 @@ fn callable_snippet(
     let rules::ir::Matcher::Ref(RefTarget::Type { type_id, .. }) = ir.matcher(matcher) else {
         return None;
     };
-    let callable = ir.trait_by_name("Callable")?;
+    let template = ir.trait_by_name("Template")?;
     let info = ir.type_info(*type_id);
     if !info
         .trait_impls
         .iter()
-        .any(|implementation| implementation.trait_id == callable)
+        .any(|implementation| implementation.trait_id == template)
     {
         return None;
     }

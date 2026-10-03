@@ -98,7 +98,7 @@ fn resolve_dynamic_definition_uncached(
         let ty = ir.type_info(ir.type_by_name(owner_kind)?);
         ty.trait_impls
             .iter()
-            .filter(|implementation| Some(implementation.trait_id) == ir.trait_by_name("Callable"))
+            .filter(|implementation| Some(implementation.trait_id) == ir.trait_by_name("Template"))
             .find_map(|implementation| {
                 implementation
                     .arguments
@@ -447,7 +447,7 @@ pub(crate) fn dynamic_definition_type(snapshot: &AnalysisSnapshot, type_name: &s
         ir.type_info(id)
             .trait_impls
             .iter()
-            .any(|implementation| Some(implementation.trait_id) == ir.trait_by_name("Callable"))
+            .any(|implementation| Some(implementation.trait_id) == ir.trait_by_name("Template"))
     })
 }
 

@@ -1,4 +1,6 @@
 //! Rule-aware, game-independent semantic lowering boundary.
+//!
+//! Template contracts and query responsibilities are documented in `crates/hir/TEMPLATES.md`.
 
 use std::sync::Arc;
 
@@ -7,13 +9,16 @@ use rules::{GameProfile, RuleSet};
 use text::LogicalPath;
 
 pub mod analysis;
-pub mod callable;
+pub mod checking;
 mod collector;
 mod ir_lowering;
 mod model;
 mod parameters;
 mod scope;
-mod templates;
+pub mod template;
+mod template_lowering;
+pub mod template_relations;
+pub mod template_text;
 
 pub use model::*;
 fn range_within(inner: text::TextRange, outer: text::TextRange) -> bool {
@@ -163,22 +168,22 @@ pub fn ir_scope_register_value<'a>(
 /// Ranges are local to `syntax`; callers that embed the fragment can map them
 /// back to their containing token with the parser source map.
 #[must_use]
-pub fn lower_ir_schema<F: rules::ir::SymbolFacts>(
+pub fn lower_ir_schema(
     syntax: Arc<ParsedFile>,
     ir: &rules::ir::RulesIr,
     schema: rules::ir::SchemaId,
     subtypes: rules::ir::SubtypeSet,
     state: ScopeState,
-    facts: &F,
+    facts: &dyn rules::ir::SymbolFacts,
 ) -> HirFile {
     let collected = collector::collect(&syntax);
     let ir_facts = ir_lowering::lower_schema_fragment(ir, &syntax, schema, subtypes, state, facts);
-    let callable_definitions = ir_facts
+    let template_definitions = ir_facts
         .definitions
         .iter()
         .filter(|definition| {
             ir_facts
-                .callable_kinds
+                .template_kinds
                 .contains(&definition.kind.to_ascii_lowercase())
         })
         .cloned()
@@ -190,17 +195,17 @@ pub fn lower_ir_schema<F: rules::ir::SymbolFacts>(
         None,
         &RuleSet::empty(),
         None,
-        Some(&callable_definitions),
+        Some(&template_definitions),
     );
-    let dynamic_templates = templates::lower_dynamic_templates_ir(
+    let dynamic_templates = template_lowering::lower_dynamic_templates_ir(
         &syntax,
         &ir_facts.definitions,
         &collected.parameter_conditionals,
         &parameter_references,
-        &ir_facts.callable_kinds,
+        &ir_facts.template_kinds,
     );
     let mut analysis_coverage = ir_facts.analysis_coverage.clone();
-    if callable_definitions.iter().any(|definition| {
+    if template_definitions.iter().any(|definition| {
         !dynamic_templates
             .iter()
             .any(|template| template.definition_range == definition.range)
@@ -282,12 +287,12 @@ fn lower_shared_impl(
         left.0 == right.0 && left.1.name == right.1.name && left.1.range == right.1.range
     });
     let references = seen.into_iter().map(|(_, reference)| reference).collect();
-    let callable_definitions = facts
+    let template_definitions = facts
         .definitions
         .iter()
         .filter(|definition| {
             facts
-                .callable_kinds
+                .template_kinds
                 .contains(&definition.kind.to_ascii_lowercase())
         })
         .cloned()
@@ -299,17 +304,17 @@ fn lower_shared_impl(
         logical_path,
         &RuleSet::empty(),
         profile,
-        Some(&callable_definitions),
+        Some(&template_definitions),
     );
-    let dynamic_templates = templates::lower_dynamic_templates_ir(
+    let dynamic_templates = template_lowering::lower_dynamic_templates_ir(
         &syntax,
         &facts.definitions,
         &collected.parameter_conditionals,
         &parameter_references,
-        &facts.callable_kinds,
+        &facts.template_kinds,
     );
     let mut analysis_coverage = facts.analysis_coverage.clone();
-    if callable_definitions.iter().any(|definition| {
+    if template_definitions.iter().any(|definition| {
         !dynamic_templates
             .iter()
             .any(|template| template.definition_range == definition.range)

@@ -15,7 +15,7 @@ fn host() -> AnalysisHost {
 }
 
 #[test]
-fn ir_template_limits_are_visible_to_diagnostics_completion_and_hover() {
+fn ir_template_long_chain_is_complete_in_diagnostics_completion_and_hover() {
     let mut host = host();
     let mut definitions = String::new();
     for depth in 0..40 {
@@ -37,49 +37,94 @@ fn ir_template_limits_are_visible_to_diagnostics_completion_and_hover() {
     assert!(
         results
             .iter()
-            .any(|d| d.code == DiagnosticCode::AnalysisIncomplete),
+            .all(|d| d.code != DiagnosticCode::AnalysisIncomplete),
         "{results:?}"
     );
     assert!(
         results
             .iter()
-            .any(|d| d.code == DiagnosticCode::InvalidValue && d.message.contains("short_limit")),
+            .any(|d| d.code == DiagnosticCode::InvalidValue && d.message.contains("limit_chain0")),
         "a known rejection survives incomplete work: {results:?}"
     );
     let position = source.find("N = wrong").unwrap() as u32;
     let items = complete(&host.snapshot(), &id, position + 9);
-    assert!(!items.coverage.is_complete());
+    assert!(items.coverage.is_complete());
     let hover = hover(&host.snapshot(), &id, position).expect("parameter hover");
-    assert!(!hover.coverage.is_complete());
-    assert!(hover.contents.contains("Analysis incomplete"));
+    assert!(hover.coverage.is_complete());
+    assert!(hover.contents.contains("number"), "{}", hover.contents);
 }
 
 #[test]
 fn ir_template_node_limit_retains_an_early_rejection() {
     let mut host = host();
-    let definition = format!(
-        "large_limit = {{ set_emperor = $P$ {} }}",
-        "log = $P$ ".repeat(17000)
-    );
     open(
         &mut host,
         "common/scripted_effects/node-limit.txt",
-        &definition,
+        "large_limit = { set_emperor = $P$ log = $P$ log = $P$ log = $P$ }",
     );
-    let source = "country_event = { id = limits.2 immediate = { large_limit = { P = wrong } } }";
-    let id = open(&mut host, "events/node-limit.txt", source);
-    let results = diagnostics(&host.snapshot(), &id);
+    let snapshot = host.snapshot();
+    let sites = crate::ir_template::parameter_sites_with_budget(
+        &snapshot,
+        "scripted_effect",
+        "large_limit",
+        "P",
+        &std::collections::BTreeMap::from([("P".into(), "wrong".into())]),
+        hir::ScopeState::initial(hir::ScopeValue::known_single("country")),
+        2,
+        &crate::CancellationToken::new(),
+    )
+    .unwrap();
+    assert!(!sites.coverage.is_complete());
     assert!(
-        results
+        sites
             .iter()
-            .any(|d| d.code == DiagnosticCode::InvalidValue),
-        "{results:?}"
+            .any(|site| !site.accepts(&snapshot, "P", "wrong")),
+        "known rejection survives: {sites:?}"
+    );
+}
+
+#[test]
+fn ir_template_key_completion_checks_the_selected_body_scope() {
+    let mut host = host();
+    open(
+        &mut host,
+        "common/scripted_effects/body-scope.txt",
+        "body_scope = { $TARGET$ = { add_base_tax = 1 } }",
+    );
+    let source =
+        "country_event = { id = structure.1 immediate = { body_scope = { TARGET = cap } } }";
+    let id = open(&mut host, "events/body-scope.txt", source);
+    let position = source.find("TARGET = cap").unwrap() as u32 + 12;
+    let items = complete(&host.snapshot(), &id, position).items;
+    assert!(
+        items.iter().any(|item| item.label == "capital"),
+        "{items:?}"
     );
     assert!(
-        results
+        !items
             .iter()
-            .any(|d| d.code == DiagnosticCode::AnalysisIncomplete),
-        "{results:?}"
+            .any(|item| item.label == "capital.owner" || item.label == "capital.controller"),
+        "country-target branches reject province effects: {items:?}"
+    );
+}
+
+#[test]
+fn ir_template_splice_validates_the_whole_parent_container() {
+    let mut host = host();
+    open(
+        &mut host,
+        "common/scripted_effects/parent-container.txt",
+        "parent_container = { if = { limit = { always = yes } $BODY$ } }",
+    );
+    let source = "country_event = { id = structure.2 immediate = { parent_container = { BODY = \"limit = { always = yes } add_prestige = 1\" } } }";
+    let id = open(&mut host, "events/parent-container.txt", source);
+    let issues = diagnostics(&host.snapshot(), &id);
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue.code == DiagnosticCode::Cardinality
+                && issue.message.contains("Template `parent_container`")),
+        "fixed and inserted limit count together: {issues:?}"
     );
 }
 
@@ -1453,7 +1498,7 @@ fn open(host: &mut AnalysisHost, path: &str, source: &str) -> DocumentId {
 }
 
 #[test]
-fn ir_callable_quoted_payload_reports_parser_errors_at_argument() {
+fn ir_template_quoted_payload_reports_parser_errors_at_argument() {
     let mut host = host();
     open(
         &mut host,
@@ -1503,7 +1548,7 @@ fn ir_callable_quoted_payload_reports_parser_errors_at_argument() {
 }
 
 #[test]
-fn ir_callable_value_completion_is_independent_of_usage_order() {
+fn ir_template_value_completion_is_independent_of_usage_order() {
     let mut host = host();
     open(
         &mut host,
@@ -1570,7 +1615,7 @@ fn ir_spliced_payloads_do_not_repeat_the_enclosing_guard_requirement() {
             d.code,
             DiagnosticCode::Cardinality | DiagnosticCode::UnknownKey | DiagnosticCode::InvalidValue
         )),
-        "the outer limit is already provided by the callable: {items:#?}"
+        "the outer limit is already provided by the template: {items:#?}"
     );
     let invalid = open(
         &mut host,
@@ -2402,7 +2447,7 @@ fn ir_iterators_preserve_their_trigger_and_effect_vocabularies() {
 }
 
 #[test]
-fn ir_callable_this_retains_the_callers_current_scope() {
+fn ir_template_this_retains_the_callers_current_scope() {
     let mut host = host();
     let id = open(
         &mut host,
@@ -2469,7 +2514,7 @@ fn ir_register_blocks_enter_the_selected_register_scope() {
 }
 
 #[test]
-fn ir_callable_embedded_substitutions_require_bindings() {
+fn ir_template_embedded_substitutions_require_bindings() {
     let mut host = host();
     open(
         &mut host,
@@ -2527,7 +2572,7 @@ fn ir_logic_constant_lints_require_a_declared_constant_predicate() {
 }
 
 #[test]
-fn ir_callable_quoted_payload_references_navigate_and_rename() {
+fn ir_template_quoted_payload_references_navigate_and_rename() {
     let mut host = host();
     open(
         &mut host,
@@ -2877,7 +2922,7 @@ fn ir_completion_keeps_case_collisions_with_different_value_shapes() {
 }
 
 #[test]
-fn ir_callable_value_overloads_use_the_callers_current_scope() {
+fn ir_template_value_overloads_use_the_callers_current_scope() {
     let mut host = host();
     open(
         &mut host,
@@ -2921,7 +2966,7 @@ fn ir_callable_value_overloads_use_the_callers_current_scope() {
 }
 
 #[test]
-fn ir_callable_payload_symbols_enter_hir_and_follow_overlay_signature_changes() {
+fn ir_template_payload_symbols_enter_hir_and_follow_overlay_signature_changes() {
     let mut host = host();
     let writer = open(
         &mut host,
@@ -3311,24 +3356,24 @@ fn ir_nested_definitions_and_quoted_ranges_use_actual_source_shape() {
         hir.definitions()
     );
     let values = diagnostics(&snapshot, &id);
-    let start = source.find("maybe").unwrap() as u32;
+    for name in ["trigger", "effect"] {
+        assert!(
+            values
+                .iter()
+                .any(|value| value.code == DiagnosticCode::InvalidValue
+                    && value.message.contains(&format!("`{name}` expects a block"))),
+            "{values:#?}"
+        );
+    }
     assert!(
-        values
+        !hir.references()
             .iter()
-            .any(|value| value.code == DiagnosticCode::InvalidValue
-                && value.range.start() == start
-                && value.range.end() == start + 5),
-        "{values:#?}"
-    );
-    let position = source.find("add_prestige").unwrap() as u32 + 3;
-    assert!(
-        hover(&snapshot, &id, position).is_some(),
-        "quoted rule hover"
+            .any(|reference| reference.name == "add_prestige")
     );
 }
 
 #[test]
-fn ir_empty_rhs_and_callable_parameters_complete() {
+fn ir_empty_rhs_and_template_parameters_complete() {
     let mut host = host();
     let source = "country_event = { id = phase4.1 is_triggered_only =  }";
     let id = open(&mut host, "events/rhs.txt", source);
@@ -3610,7 +3655,7 @@ fn ir_file_containers_expose_nested_technology_and_custom_idea_definitions() {
 }
 
 #[test]
-fn ir_inherited_effect_schemas_keep_scope_and_callable_patterns() {
+fn ir_inherited_effect_schemas_keep_scope_and_template_patterns() {
     let mut host = host();
     open(
         &mut host,
@@ -3683,7 +3728,7 @@ fn ir_queries_respect_cancellation() {
 }
 
 #[test]
-fn ir_callable_arguments_follow_definition_value_constraints() {
+fn ir_template_arguments_follow_definition_value_constraints() {
     let mut host = host();
     open(
         &mut host,

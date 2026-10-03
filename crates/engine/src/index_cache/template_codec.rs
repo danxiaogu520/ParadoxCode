@@ -19,6 +19,8 @@ struct Range([u32; 2]);
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct EncodedTemplate {
+    #[serde(default)]
+    source: String,
     kind: String,
     name: String,
     definition_range: Range,
@@ -29,6 +31,7 @@ struct EncodedTemplate {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 enum Item {
+    Recover(Token),
     Property(Property),
     BareValue(Token),
     Conditional(Conditional),
@@ -179,7 +182,9 @@ fn validate_items_ranges(items: &[TemplateItem], owner: TextRange) -> Result<(),
                     }
                 }
             }
-            TemplateItem::BareValue(token) => validate_token_range(token, owner)?,
+            TemplateItem::BareValue(token) | TemplateItem::Recover(token) => {
+                validate_token_range(token, owner)?
+            }
             TemplateItem::Conditional(conditional) => {
                 require_range(conditional.range, owner)?;
                 validate_items_ranges(&conditional.items, owner)?;
@@ -212,6 +217,7 @@ fn require_range(range: TextRange, owner: TextRange) -> Result<(), IndexCacheErr
 impl From<&Template> for EncodedTemplate {
     fn from(template: &Template) -> Self {
         Self {
+            source: template.source.to_string(),
             kind: template.kind.as_ref().to_owned(),
             name: template.name.clone(),
             definition_range: template.definition_range.into(),
@@ -224,14 +230,18 @@ impl From<&Template> for EncodedTemplate {
 impl EncodedTemplate {
     fn into_model(self, budget: &mut Budget) -> Result<Template, IndexCacheError> {
         budget.node()?;
+        budget.text(&self.source)?;
         budget.text(&self.kind)?;
         budget.text(&self.name)?;
+        let items = decode_items(self.items, budget)?;
         Ok(Template {
+            source: Arc::from(self.source),
+            program: Arc::new(rules::replacement::TemplateProgram::compile(&items)),
             kind: Arc::from(self.kind),
             name: self.name,
             definition_range: decode_range(self.definition_range)?,
             body_range: decode_range(self.body_range)?,
-            items: decode_items(self.items, budget)?,
+            items: Arc::from(items),
         })
     }
 }
@@ -251,6 +261,7 @@ impl Item {
         budget.node()?;
         match self {
             Self::Property(property) => Ok(TemplateItem::Property(property.into_model(budget)?)),
+            Self::Recover(token) => Ok(TemplateItem::Recover(token.into_model(budget)?)),
             Self::BareValue(token) => Ok(TemplateItem::BareValue(token.into_model(budget)?)),
             Self::Conditional(conditional) => {
                 Ok(TemplateItem::Conditional(conditional.into_model(budget)?))
@@ -340,6 +351,7 @@ impl From<&TemplateItem> for Item {
     fn from(item: &TemplateItem) -> Self {
         match item {
             TemplateItem::Property(property) => Self::Property(property.into()),
+            TemplateItem::Recover(token) => Self::Recover(Token::from(token)),
             TemplateItem::BareValue(token) => Self::BareValue(token.into()),
             TemplateItem::Conditional(conditional) => Self::Conditional(conditional.into()),
         }

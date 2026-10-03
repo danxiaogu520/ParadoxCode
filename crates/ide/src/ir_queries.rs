@@ -6,6 +6,28 @@ pub(crate) struct SnapshotSymbolFacts<'a> {
     pub(crate) snapshot: &'a AnalysisSnapshot,
 }
 impl SymbolFacts for SnapshotSymbolFacts<'_> {
+    fn asset_member(&self, category: &str, name: &str) -> Option<bool> {
+        category
+            .eq_ignore_ascii_case("gfx")
+            .then(|| self.snapshot.resolve_texture_path(name).is_some())
+    }
+    fn template_memo(&self) -> Option<std::sync::Arc<rules::replacement::TemplateMemo>> {
+        const KEY: &str = "template:semantic-memo";
+        let cache = self.snapshot.query_cache();
+        let revision = self.snapshot.revision();
+        if let Some(value) = cache.get::<rules::replacement::TemplateMemo>(revision, KEY) {
+            return Some(value);
+        }
+        let value = std::sync::Arc::new(rules::replacement::TemplateMemo::default());
+        cache.insert(
+            revision,
+            engine::CacheDomain::Documents,
+            KEY.to_owned(),
+            value.clone(),
+        );
+        Some(value)
+    }
+
     fn replacement_template(
         &self,
         type_id: TypeId,

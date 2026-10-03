@@ -1,6 +1,6 @@
 # Template 语义与分析重设计方案
 
-2026 年 10 月 4 日修订。状态：实施提案；共享分析核心尚未接入生产。实现分支：`codex/template-redesign`。
+2026 年 10 月 4 日修订。状态：实施中；共享程序、关系反解和结构检查切片已接入，完整阶段出口仍在验收。实现分支：`codex/template-redesign`。
 
 早期复核基线为 `cbd6c6a`，并计入 `c25f4f8` 的 scripted 参数诊断与补全修复；本轮补全与消费契约复核基于 `2f2b93e` 的源码及工作区提案。本文替代原提案；统一概念名为 `Template`，辅助接口的具体签名在实施 PR 中确定。源码事实、设计决定和需要游戏实验确认的行为分别列明；本文不把分析器的现有行为当作 EU4 引擎规范。
 
@@ -80,16 +80,16 @@
 
 这些是项目明确采用的支持范围，实施不再等待“是否要统一或删除入口”的二次决定。EU4 文本替换、解码和终止细节仍需阶段零证据；未知游戏细节不改变上述命名与消费边界。
 
-## 当前实现事实
+## 重构前实现事实（冻结基线）
 
-以下入口在修订时按源码核对。后续实施重新检查相邻代码，不依赖固定行号。
+以下入口记录方案修订时的旧实现，用于迁移核对；当前实现进度见后文，不把此表当作最新生产状态。
 
 | 入口 | 当前职责与仍需替换的行为 |
 | --- | --- |
 | [rules/replacement.rs](crates/rules/src/replacement.rs) | 定义共享的源范围 token、参数片段、property、Block 和参数存在条件树 |
-| [hir/templates.rs](crates/hir/src/templates.rs) | 从 CST 构造 Template；定义范围内存在 parser 错误时跳过整份定义，遇到不能表示的节点也放弃 |
-| [hir/callable.rs](crates/hir/src/callable.rs) | 按绑定遍历使用位置与缺失实参；有调用深度、遍历预算和仅按名字的访问保护；限制没有形成可供所有消费者检查的完成状态 |
-| [ide/ir_callable.rs](crates/ide/src/ir_callable.rs) | 把使用位置解释为 matcher、动态键和 payload 域；未解析域可被保守接受，不等于完成验证 |
+| [hir/templates.rs](crates/hir/src/template_lowering.rs) | 从 CST 构造 Template；定义范围内存在 parser 错误时跳过整份定义，遇到不能表示的节点也放弃 |
+| [hir/callable.rs](crates/hir/src/template.rs) | 按绑定遍历使用位置与缺失实参；有调用深度、遍历预算和仅按名字的访问保护；限制没有形成可供所有消费者检查的完成状态 |
+| [ide/ir_callable.rs](crates/ide/src/ir_template.rs) | 把使用位置解释为 matcher、动态键和 payload 域；未解析域可被保守接受，不等于完成验证 |
 | [ide/ir_semantic.rs](crates/ide/src/ir_semantic.rs) | 进行普通 IR 和调用实参诊断；本次修复将 quoted payload parser 错误映射到实参，按 payload 报一次 |
 | [ide/completion/ir.rs](crates/ide/src/completion/ir.rs) | 本次修复汇集各使用位置可枚举的候选、去重后按全部现有约束过滤；quoted 内容仍有专用递归查询 |
 | [ide/dynamic_rules.rs](crates/ide/src/dynamic_rules.rs) | 供 hover、snippet 等使用的参数必填推导；转发被视为 activation-scoped，仍与调用诊断的文本替换要求分离 |
@@ -699,6 +699,14 @@ target/template-after/tools audit diff \
 
 阶段 1 仍使用原有遍历及其深度/节点上限，新增提示是明确的过渡状态；阶段 2 必须用共享图和显式任务栈实际检查长链末端，再更新相应 owned 期望，不能只隐藏提示。阶段 2 至 6 尚未验收。
 
+阶段 2/3/4 的实现切片已接入：trait/API 统一为 Template，静态 matcher 改名 Pattern；共享不可变 arena 与显式任务栈替代原递归 replay，10,000 层调用回归抵达末端约束；Recover 保留受损定义，BindingInputs 区分存在与已知值。有限字符串反解支持同参数重复使用，多未知量先共享自然连接见证再投影候选；独立穷举参照现在实际对照 IDE 输出。候选 DTO/LSP data 保留验证状态、条件见证和 revision，参数 key/value hover 使用绑定查询。
+
+普通 quoted 构造、matcher/value/shape 与 mission quoted 重载已删除。Template 的结构路径按实例化整容器检查；共享标量、scope 与控制检查已接入，逐层 quote 字节映射保留精确来源，重复 payload 不再重复语义诊断。原 SCC 名字周期检查已删除，定义提示来自共享查询的实际绑定/scope 状态，作为 Information/Unresolved，不断言引擎错误。源码格式升至 14，工作区及扩展版本升至 0.5.0，为语义和缓存布局变化建立新的持久化兼容身份。
+
+这些是已经实现的切片，不代表阶段 2–6 的最终出口通过。剩余重点包括完整 Block 重载的后续状态关联、统一定义 scope 摘要、生成事实工作队列与撤销、所有编辑消费者的覆盖/精度契约、细化缓存依赖和混合负载，以及 fresh Vanilla/真实 LSP/配对性能最终验收。当前证据与开发日志保留在 ignored target 下；尚未完成的出口不能以局部测试替代。
+
+本切片验证：`tools gates core-fast policy` 通过，工作区 1,016 项 Rust 测试及 94 项 policy 检查通过；workspace/all-targets/all-features Clippy 通过。自有有限关系参照通过实际 IDE 候选集合对照；Present Hole、受损定义、10,000 层任务栈、整块字段计数、嵌套引号精确范围与共享控制检查回归通过。release server/tools 已冻结在 ignored `target/performance-results/template-foundation/frozen/`，正式配对性能及完整 Vanilla 行为审计仍待最终核心收敛后完成。
+
 ## 实施顺序与 PR 出口
 
 每一步单独可审阅。开发期间可有内部比较开关；最终删除旧生产路径，避免长期维护两份动态语义。未达到该步出口的 PR 保持 draft，不用“基础测试通过”代替功能和语义验收。
@@ -721,7 +729,7 @@ target/template-after/tools audit diff \
 
 `Callable` → `Template`、字面量 matcher → `Pattern`、mission quoted 重载移除和通用 quoted 规则接口删除都是本次必做事项，按上述阶段分 PR 审阅，在默认切换前全部完成。内部图实现的性能比较与规则范围变化分别报告；行为 PR 必须解释被移除入口造成的 Vanilla 差异。不能把统一名称或消费边界继续留作核心验收后的可选工作。
 
-迁移清单按功能确认替代关系：[dynamic_rules](crates/ide/src/dynamic_rules.rs) 的 presence、[dynamic_contracts](crates/ide/src/dynamic_contracts.rs) 的 scope、[dynamic_cycles](crates/ide/src/dynamic_cycles.rs) 的 cycle、[hir::callable](crates/hir/src/callable.rs) 的 replay、[ir_callable](crates/ide/src/ir_callable.rs) 的参数域，以及 ir_semantic/completion/hover/ir_lowering 的专用遍历。逐一核对 [IDE 公共查询](crates/ide/src/lib.rs)、[结果 DTO](crates/ide/src/types.rs)与 [LSP 适配](crates/pdc/src/requests.rs)，包括导航、修复、tokens、inlay、symbols 和 resolve 的 Template 分支。已经退役的 `dynamic_constraints` 不再次列入工作；普通静态字面量模式、Block 检查和 source-map 工具按独立职责保留。
+迁移清单按功能确认替代关系：[dynamic_rules](crates/ide/src/dynamic_rules.rs) 的 presence、[dynamic_contracts](crates/ide/src/dynamic_contracts.rs) 的 scope、[dynamic_cycles](crates/ide/src/dynamic_cycles.rs) 的 cycle、[hir::callable](crates/hir/src/template.rs) 的 replay、[ir_callable](crates/ide/src/ir_template.rs) 的参数域，以及 ir_semantic/completion/hover/ir_lowering 的专用遍历。逐一核对 [IDE 公共查询](crates/ide/src/lib.rs)、[结果 DTO](crates/ide/src/types.rs)与 [LSP 适配](crates/pdc/src/requests.rs)，包括导航、修复、tokens、inlay、symbols 和 resolve 的 Template 分支。已经退役的 `dynamic_constraints` 不再次列入工作；普通静态字面量模式、Block 检查和 source-map 工具按独立职责保留。
 
 每个行为 PR 先运行 focused owned tests 和 [贡献指南](CONTRIBUTING.md#validation)要求的受影响 gate。语义/规则/index 改变时执行 [tools audit](crates/tools/README.md#diagnostics-and-semantic-evidence) 的完整本地 Vanilla 对照；性能 PR 使用 [perf 工具](crates/tools/README.md#performance-measurements) 留下配对数据，结果和游戏来源留在 ignored target 下。更新 [规则语言](crates/rules/LANGUAGE.md)、[诊断指南](crates/ide/DIAGNOSTICS.md)、[服务器与缓存指南](crates/pdc/README.md)及生成视图，并通过 `tools documentation check`。仓库已完成的 RulesIr 迁移与历史验收见 [PR #141](https://github.com/danxiaogu520/ParadoxCode/pull/141)，本提案不恢复已删除的阶段日志作为当前权威。
 
@@ -737,4 +745,4 @@ target/template-after/tools audit diff \
 - [Z3 字符串理论说明](https://microsoft.github.io/z3guide/docs/theories/Strings/)：通用字符串求解也有完备性边界；本方案优先使用调用特化、有限候选反解和有界关系求解，不把引入 SMT 视为全部覆盖或稳定延迟的证明。
 - [LSP 3.17 completion](https://github.com/microsoft/language-server-protocol/blob/gh-pages/_specifications/lsp/3.17/language/completion.md) 与 [WorkspaceEdit](https://github.com/microsoft/language-server-protocol/blob/gh-pages/_specifications/lsp/3.17/types/workspaceEdit.md)：用于约束结果适配、resolve 与版本化编辑；协议的列表完成标记不代替核心语义证明。
 
-本次修订尚未实施新核心或完成其性能验收；本轮测量冻结的是重构前基线。项目支持契约、自有参照及逐目标覆盖构成工程验收依据，游戏运行证据缺失不作为推进前置条件。未采用的解释保留局部残余状态与证据属性，不冒充确定的引擎行为，也不提前承诺全部输入都能完整、线性且无损地分析。
+新核心的程序、关系与结构切片已实施；完整消费者迁移及最终性能出口尚未验收。阶段 0 的测量冻结的是重构前基线。项目支持契约、自有参照及逐目标覆盖构成工程验收依据，游戏运行证据缺失不作为推进前置条件。未采用的解释保留局部残余状态与证据属性，不冒充确定的引擎行为，也不提前承诺全部输入都能完整、线性且无损地分析。

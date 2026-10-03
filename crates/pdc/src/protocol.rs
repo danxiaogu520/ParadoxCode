@@ -618,7 +618,7 @@ pub(crate) fn completion_kind(kind: CompletionKind) -> CompletionItemKind {
     match kind {
         CompletionKind::Key => CompletionItemKind::PROPERTY,
         CompletionKind::Command => CompletionItemKind::METHOD,
-        // LSP has no dedicated dynamic-definition kind; scripted definitions are callable functions.
+        // LSP has no dedicated dynamic-definition kind; scripted definitions are template functions.
         CompletionKind::DynamicDefinition => CompletionItemKind::FUNCTION,
         CompletionKind::Value => CompletionItemKind::VALUE,
         CompletionKind::EnumMember => CompletionItemKind::ENUM_MEMBER,

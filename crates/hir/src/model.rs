@@ -16,7 +16,7 @@ pub enum Scope {
 }
 
 /// A conservative set of possible game scopes.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ScopeValue {
     /// One or more statically known scope spellings. The list is shared
     /// (`ScopeState` clones once per scope fact, so the spellings themselves
@@ -48,7 +48,7 @@ impl ScopeValue {
 }
 
 /// Persistent scope registers at one semantic location.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ScopeState {
     /// Scope at the semantic root.
     pub root: ScopeValue,
@@ -61,7 +61,7 @@ pub struct ScopeState {
 }
 
 impl ScopeState {
-    pub(crate) fn initial(scope: ScopeValue) -> Self {
+    pub fn initial(scope: ScopeValue) -> Self {
         Self {
             root: scope.clone(),
             current: vec![scope],

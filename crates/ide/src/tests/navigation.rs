@@ -263,7 +263,7 @@ fn dynamic_calls_resolve_scalar_and_block_forms_with_overlay_priority() {
         Some(definition_id.clone())
     );
     let scalar_hover = hover(&snapshot, &use_id, scalar_position).expect("dynamic signature hover");
-    assert!(scalar_hover.contents.contains("#### Callable signature"));
+    assert!(scalar_hover.contents.contains("#### Template signature"));
     assert!(scalar_hover.contents.contains("named parameter block"));
     assert!(
         scalar_hover

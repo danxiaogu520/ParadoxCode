@@ -33,6 +33,7 @@ pub struct IndexSymbolFacts<'a> {
     index: &'a crate::WorkspaceIndex,
     overlays: &'a [Arc<HirFile>],
     excluded_file_ids: Option<&'a BTreeSet<SourceFileId>>,
+    template_memo: Arc<rules::replacement::TemplateMemo>,
     templates: OnceLock<BTreeMap<String, crate::FlagWriteIndex>>,
 }
 
@@ -48,6 +49,7 @@ impl<'a> IndexSymbolFacts<'a> {
             index,
             overlays,
             excluded_file_ids: None,
+            template_memo: Arc::new(Default::default()),
             templates: OnceLock::new(),
         }
     }
@@ -64,6 +66,7 @@ impl<'a> IndexSymbolFacts<'a> {
             index,
             overlays,
             excluded_file_ids: Some(excluded_file_ids),
+            template_memo: Arc::new(Default::default()),
             templates: OnceLock::new(),
         }
     }
@@ -164,6 +167,10 @@ impl<'a> IndexSymbolFacts<'a> {
 }
 
 impl rules::ir::SymbolFacts for IndexSymbolFacts<'_> {
+    fn template_memo(&self) -> Option<Arc<rules::replacement::TemplateMemo>> {
+        Some(self.template_memo.clone())
+    }
+
     fn replacement_template(
         &self,
         type_id: rules::ir::TypeId,

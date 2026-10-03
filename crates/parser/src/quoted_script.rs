@@ -77,6 +77,18 @@ impl QuotedScriptSourceMap {
 /// while the user is editing; in that case the remainder of `source` is treated as the payload.
 #[must_use]
 pub fn parse_quoted_script(source: &str) -> Option<QuotedScript> {
+    let (decoded, source_map) = decode_quoted_script(source)?;
+    let closed = source.ends_with('"') && !closing_quote_is_escaped(source);
+    Some(QuotedScript {
+        parsed: parse(FileFormat::Script, &decoded),
+        source_map,
+        closed,
+    })
+}
+
+/// Decodes one quoted carrier and its byte map without allocating a secondary CST.
+#[must_use]
+pub fn decode_quoted_script(source: &str) -> Option<(String, QuotedScriptSourceMap)> {
     let payload = source.strip_prefix('"')?;
     let closed = source.ends_with('"') && !closing_quote_is_escaped(source);
     let payload = if closed {
@@ -85,11 +97,7 @@ pub fn parse_quoted_script(source: &str) -> Option<QuotedScript> {
         payload
     };
     let (decoded, source_map) = decode_payload(payload, source.len())?;
-    Some(QuotedScript {
-        parsed: parse(FileFormat::Script, &decoded),
-        source_map,
-        closed,
-    })
+    Some((decoded, source_map))
 }
 
 /// Encodes text for insertion into an existing quoted Script payload.

@@ -11,9 +11,9 @@ mod dynamic_rules;
 mod hover;
 mod hover_card;
 mod inlay;
-mod ir_callable;
 mod ir_queries;
 mod ir_semantic;
+mod ir_template;
 mod localisation;
 mod messages;
 mod mission;
@@ -59,6 +59,8 @@ pub use semantic_tokens::{
 pub fn ir_matcher_description(ir: &rules::ir::RulesIr, matcher: rules::ir::MatcherId) -> String {
     ir_semantic::describe(ir, matcher)
 }
+
+pub use hir::analysis::Validation as TemplateValidation;
 
 pub use types::{
     AnalysisResult, CancellationToken, Cancelled, CompletionItem, CompletionKind, CompletionResult,

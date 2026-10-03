@@ -488,7 +488,7 @@ fn sort_position_entries(
     entries
 }
 
-/// One parameter in the callable signature of a dynamic definition definition.
+/// One parameter in the template signature of a dynamic definition definition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DynamicParameterSignature {
     /// Parameter spelling as inferred from the definition body.
@@ -497,7 +497,7 @@ pub struct DynamicParameterSignature {
     pub required: bool,
 }
 
-/// Indexed callable metadata derived from one scripted effect or trigger definition.
+/// Indexed template metadata derived from one scripted effect or trigger definition.
 ///
 /// The optional template is normalized, source-ranged semantic IR. It contains neither source
 /// text nor CST pointers, so the same representation can drive live-workspace and cache-only
@@ -651,7 +651,7 @@ pub struct FileIndexShard {
     pub definitions: Vec<Definition>,
     /// References in source order.
     pub references: Vec<Reference>,
-    /// Callable signatures and normalized templates for dynamic definition definitions in this file.
+    /// Template signatures and normalized templates for dynamic definition definitions in this file.
     pub dynamic_definitions: Vec<DynamicDefinitionSummary>,
     /// Retained attribute-key summaries for definitions whose profile rule
     /// asked for them.
@@ -925,7 +925,7 @@ impl WorkspaceIndex {
             .map_or(&[], |shard| shard.references.as_slice())
     }
 
-    /// Returns the callable summary belonging to the uniquely active dynamic definition.
+    /// Returns the template summary belonging to the uniquely active dynamic definition.
     #[must_use]
     pub fn active_dynamic_definition(
         &self,

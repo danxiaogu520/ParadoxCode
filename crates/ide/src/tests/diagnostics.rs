@@ -187,7 +187,7 @@ fn scope_target_failures_use_distinct_categories() {
 
 #[test]
 fn quoted_script_diagnostics_reuse_semantic_validation_with_exact_ranges() {
-    let text = "trigger = { embedded = \"\n foo = maybe\n unknown = yes\n\" }\n";
+    let text = "trigger = { embedded = { BODY = \"\n foo = maybe\n unknown = yes\n\" } }\n";
     let (host, id) = quoted_script_snapshot(text);
     let diagnostics = diagnostics(&host.snapshot(), &id);
     let invalid = diagnostics
@@ -210,19 +210,25 @@ fn quoted_script_diagnostics_reuse_semantic_validation_with_exact_ranges() {
 
 #[test]
 fn quoted_script_diagnostics_map_nested_escapes_and_recovered_syntax() {
-    let text = "trigger = { embedded = \"nested = \\\"foo = maybe\\\"\nbroken = {\" }\n";
+    let text = "trigger = { embedded = { BODY = \"nested = { BODY = \\\"foo = maybe\\\" }\nbroken = {\" } }\n";
     let (host, id) = quoted_script_snapshot(text);
     let diagnostics = diagnostics(&host.snapshot(), &id);
-    assert!(diagnostics.iter().any(|item| {
-        item.code == DiagnosticCode::InvalidValue
-            && item.range.start()
-                == u32::try_from(text.find("maybe").expect("maybe")).expect("offset")
-    }));
-    assert!(diagnostics.iter().any(|item| {
-        item.code == DiagnosticCode::Syntax
-            && item.range.start()
-                >= u32::try_from(text.find("broken").expect("broken")).expect("offset")
-    }));
+    assert!(
+        diagnostics.iter().any(|item| {
+            item.code == DiagnosticCode::InvalidValue
+                && item.range.start()
+                    == u32::try_from(text.find("maybe").expect("maybe")).expect("offset")
+        }),
+        "{diagnostics:?}"
+    );
+    assert!(
+        diagnostics.iter().any(|item| {
+            item.code == DiagnosticCode::Syntax
+                && item.range.start()
+                    >= u32::try_from(text.find("broken").expect("broken")).expect("offset")
+        }),
+        "{diagnostics:?}"
+    );
 }
 
 #[test]
@@ -733,7 +739,7 @@ fn cached_runtime_branch_dynamic_recomputes_optional_parameters_from_the_templat
 }
 
 #[test]
-fn first_party_mission_trigger_and_effect_accept_quoted_script_forms() {
+fn first_party_mission_trigger_and_effect_reject_quoted_script_forms() {
     let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -759,30 +765,24 @@ fn first_party_mission_trigger_and_effect_accept_quoted_script_forms() {
 
     let diagnostics = diagnostics(&host.snapshot(), &id);
 
-    for key in ["definitely_unknown_trigger", "definitely_unknown_effect"] {
-        let start = u32::try_from(text.find(key).expect("inner key")).expect("offset");
-        assert!(
-            diagnostics.iter().any(|diagnostic| {
-                diagnostic.code == DiagnosticCode::UnknownKey && diagnostic.range.start() == start
-            }),
-            "missing quoted mission diagnostic for {key}: {diagnostics:?}"
-        );
-    }
     assert!(
-        diagnostics.iter().all(|diagnostic| {
-            diagnostic.code != DiagnosticCode::InvalidValue
-                || (!contains_text_range(text, diagnostic.range, "trigger")
-                    && !contains_text_range(text, diagnostic.range, "effect"))
-        }),
-        "quoted mission containers must not be rejected as node values: {diagnostics:?}"
+        !diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::UnknownKey
+                && ["definitely_unknown_trigger", "definitely_unknown_effect"]
+                    .iter()
+                    .any(|key| diagnostic.range.start() == text.find(key).unwrap() as u32)),
+        "{diagnostics:?}"
     );
-}
-
-fn contains_text_range(text: &str, range: TextRange, needle: &str) -> bool {
-    let start = usize::try_from(range.start()).unwrap_or(text.len());
-    let end = usize::try_from(range.end()).unwrap_or(text.len());
-    text.get(start..end)
-        .is_some_and(|slice| slice.contains(needle))
+    assert_eq!(
+        diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue
+                && diagnostic.message.contains("block"))
+            .count(),
+        2,
+        "{diagnostics:?}"
+    );
 }
 
 #[test]
@@ -1852,7 +1852,7 @@ fn dynamic_definitions_activate_conditionals_and_report_cycles() {
         definition_results.iter().any(|diagnostic| {
             diagnostic.code == DiagnosticCode::DynamicDefinitionCycle
                 && diagnostic.message.contains("`first`")
-                && diagnostic.message.contains("first -> second -> first")
+                && diagnostic.message.contains("binding/scope state")
         }),
         "the cycle must be reported at the participating definitions: {definition_results:?}"
     );
@@ -1860,7 +1860,7 @@ fn dynamic_definitions_activate_conditionals_and_report_cycles() {
         definition_results.iter().any(|diagnostic| {
             diagnostic.code == DiagnosticCode::DynamicDefinitionCycle
                 && diagnostic.message.contains("`second`")
-                && diagnostic.message.contains("second -> first -> second")
+                && diagnostic.message.contains("binding/scope state")
         }),
         "both participants report the rotated cycle walk: {definition_results:?}"
     );
@@ -1954,7 +1954,7 @@ fn vanilla_cache_only_dynamic_row_records_unknown_body_statement() {
     // The persisted template is enough to derive the body finding without the
     // original source; publishing definition-site findings is P3.
     let snapshot = host.snapshot();
-    let sites = crate::ir_callable::definition_parameter_sites(
+    let sites = crate::ir_template::definition_parameter_sites(
         &snapshot,
         "scripted_effect",
         "cached_dynamic",
@@ -4006,7 +4006,7 @@ fn dynamic_cycles_are_reported_at_definition_sites() {
     assert!(
         cycles.iter().any(|diagnostic| {
             diagnostic.message.contains("`ping`")
-                && diagnostic.message.contains("ping -> pong -> ping")
+                && diagnostic.message.contains("binding/scope state")
                 && diagnostic.range.start() == ping_offset
         }),
         "mutual recursion must be reported at the definition site: {cycles:?}"
@@ -4028,7 +4028,7 @@ fn dynamic_cycles_are_reported_at_definition_sites() {
         u32::try_from(definition_text.find("loop_self = ").expect("self")).expect("u32");
     assert!(
         cycles.iter().any(|diagnostic| {
-            diagnostic.message.contains("loop_self -> loop_self")
+            diagnostic.message.contains("binding/scope state")
                 && diagnostic.range.start() == self_offset
         }),
         "self-recursion must be reported at the definition site: {cycles:?}"
@@ -4036,10 +4036,10 @@ fn dynamic_cycles_are_reported_at_definition_sites() {
     let dispatch_offset =
         u32::try_from(definition_text.find("dispatch = ").expect("dispatch")).expect("u32");
     assert!(
-        cycles.iter().any(|diagnostic| {
+        !cycles.iter().any(|diagnostic| {
             diagnostic.message.contains("`dispatch`") && diagnostic.range.start() == dispatch_offset
         }),
-        "the parameter-bound dispatch cycle must close through call-site bindings: {cycles:?}"
+        "an unbound dispatch has no proven recursive concrete state: {cycles:?}"
     );
     assert!(
         !cycles
@@ -5176,4 +5176,19 @@ fn genuine_in_file_duplicates_still_warn_with_twin_overlays_open() {
     assert_eq!(shadows[0].range.start(), second_name);
     assert!(shadows[0].message.contains("shadows an earlier definition"));
     std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn template_present_editing_hole_activates_guard_without_becoming_a_missing_key() {
+    let (mut host, id) = quoted_script_snapshot("trigger = { guarded = { P = } }");
+    host.open_document(
+        DocumentId::new("file:///tmp/guarded-template.txt"),
+        1,
+        "__templates = { guarded = { [[P] foo = $Q$ ] } }".to_owned(),
+        None,
+    )
+    .unwrap();
+    let values = diagnostics(&host.snapshot(), &id);
+    assert!(values.iter().any(|value|value.code==DiagnosticCode::Cardinality && value.message.contains("`Q`")),"{values:?}");
+    assert!(!values.iter().any(|value|value.code==DiagnosticCode::Cardinality && value.message.contains("`P`")),"{values:?}");
 }

@@ -428,7 +428,7 @@ pub struct SubtypeSpec {}
 ///
 /// `Localised` and `HasIcon` take one [`BindingSpec`] per binding they
 /// contribute, because the binding set is per-type data rather than a fixed
-/// trait shape; the other built-ins take plain strings (`Callable`'s `body`).
+/// trait shape; the other built-ins take plain strings (`Template`'s `body`).
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(transparent)]
 pub struct ImplSpec(pub BTreeMap<String, ImplValue>);
@@ -437,7 +437,7 @@ pub struct ImplSpec(pub BTreeMap<String, ImplValue>);
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum ImplValue {
-    /// A plain argument value (`Callable`'s `body` schema name).
+    /// A plain argument value (`Template`'s `body` schema name).
     Text(String),
     /// One localisation or sprite binding contributed by the impl.
     Binding(BindingSpec),
@@ -667,7 +667,7 @@ mod tests {
   "traits": {
     "Localised": {},
     "ModifierSource": {},
-    "Callable": {}
+    "Template": {}
   },
   "enums": {
     "dlc_event_pictures": [

@@ -262,7 +262,6 @@ impl DiagnosticCode {
             | Self::UnknownTexturePath
             | Self::Cardinality
             | Self::WrongScope
-            | Self::DynamicDefinitionCycle
             // An illegal mission dependency never loads the way the author intends.
             | Self::InvalidDependency
             // An empty contract means the definition is unusable in every
@@ -273,7 +272,7 @@ impl DiagnosticCode {
             // The game still loads cross-class modifier applications, so the
             // scope class of the applied attributes is recorded as information
             // rather than rejected.
-            Self::ModifierScopeMismatch => Severity::Information,
+            Self::ModifierScopeMismatch | Self::DynamicDefinitionCycle => Severity::Information,
             // The game renders the readable text as mojibake, but the master
             // tree convention keeps readable sources on purpose; only files on
             // the release path are flagged, and the file still loads.
@@ -618,6 +617,8 @@ pub struct Symbol {
 /// A completion item returned by the editor-neutral query layer.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompletionItem {
+    /// Template validation and the shared conditional binding witness, when applicable.
+    pub template_evidence: Option<TemplateCompletionEvidence>,
     /// Label shown to the user.
     pub label: String,
     /// Stable broad item kind.
@@ -636,6 +637,15 @@ pub struct CompletionItem {
     pub deprecated: bool,
     /// Opaque token used by `completionItem/resolve` to re-derive documentation on demand.
     pub resolve_data: Option<String>,
+}
+
+/// Evidence for one Template completion proposal. A witness excludes the edited parameter.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TemplateCompletionEvidence {
+    /// Valid, rejected, or unresolved under the current specialization.
+    pub validation: hir::analysis::Validation,
+    /// Other bindings that must be supplied for this proposal to satisfy all usage sites.
+    pub witness: std::collections::BTreeMap<String, String>,
 }
 
 /// Broad completion item categories independent of LSP enum values.

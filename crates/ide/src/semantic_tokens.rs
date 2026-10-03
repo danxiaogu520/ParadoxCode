@@ -142,7 +142,7 @@ pub(crate) fn static_semantic_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<
 
 fn semantic_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
     let mut keys = (*static_semantic_keys(snapshot)).clone();
-    // Completion classifies workspace-defined dynamic definitions as callable functions. Reuse the
+    // Completion classifies workspace-defined dynamic definitions as template functions. Reuse the
     // same effective (overlay-aware and source-priority-aware) member view for source coloring so
     // a definition does not switch back to the generic property color after insertion.
     let dynamic_types = {

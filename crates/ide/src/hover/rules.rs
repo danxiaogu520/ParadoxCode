@@ -6,6 +6,88 @@ use crate::types::{CancellationToken, Cancelled};
 use engine::{AnalysisSnapshot, SourceRootKind};
 use text::TextSize;
 
+/// Projects only actual Template script consumptions into ordinary rule hover.
+pub(crate) fn template_consumption_hover(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: TextSize,
+    word: &str,
+    cancellation: &CancellationToken,
+) -> Result<Option<HoverModel>, Cancelled> {
+    let Some(source) = input.hir.as_deref() else {
+        return Ok(None);
+    };
+    for argument in source.properties().iter().filter(|argument| {
+        argument
+            .scalar
+            .as_ref()
+            .is_some_and(|scalar| scalar.quoted && contains(scalar.range, position))
+    }) {
+        let scalar = argument.scalar.as_ref().expect("quoted scalar");
+        let Some(invocation) = source
+            .properties()
+            .iter()
+            .filter(|parent| {
+                parent.path.len() + 1 == argument.path.len()
+                    && parent.range.start() <= argument.range.start()
+                    && argument.range.end() <= parent.range.end()
+            })
+            .min_by_key(|parent| parent.range.len())
+        else {
+            continue;
+        };
+        let Some(body) =
+            crate::ir_template::analyse_body(snapshot, source, invocation, None, cancellation)?
+        else {
+            continue;
+        };
+        let Some(raw) = source.syntax().text(scalar.range) else {
+            continue;
+        };
+        let Some(script) = parser::parse_quoted_script(raw) else {
+            continue;
+        };
+        let Some(offset) = script
+            .source_map()
+            .source_offset(position - scalar.range.start())
+        else {
+            continue;
+        };
+        for piece in &body.rendered.pieces {
+            let Some(mapping) = &piece.binding_source else {
+                continue;
+            };
+            if !mapping.parameter.eq_ignore_ascii_case(&argument.key) {
+                continue;
+            }
+            let index = mapping
+                .offsets
+                .partition_point(|boundary| *boundary <= offset)
+                .saturating_sub(1);
+            if mapping.offsets.get(index) != Some(&offset) {
+                continue;
+            }
+            let generated = piece.range.start() + index as u32;
+            let mut fragment = input.clone();
+            fragment.source = body.hir.syntax().source_handle();
+            fragment.parsed =
+                crate::support::ParsedContent::Text(std::sync::Arc::new(body.hir.syntax().clone()));
+            fragment.hir = Some(std::sync::Arc::new(body.hir.clone()));
+            let mut result =
+                ir_field_hover(snapshot, &fragment, generated, word, true, cancellation)?;
+            if result.is_none() {
+                result = ir_field_hover(snapshot, &fragment, generated, word, false, cancellation)?;
+            }
+            if let Some(mut model) = result {
+                model.coverage.merge(&body.coverage);
+                model.push_section(format!("- Consumed by Template `{}`", invocation.key));
+                return Ok(Some(model));
+            }
+        }
+    }
+    Ok(None)
+}
+
 pub(crate) fn semantic_rule_hover_at(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
@@ -178,7 +260,7 @@ fn ir_field_hover(
         let field = ir.field(*id);
         let value = match field.value {
             rules::ir::FieldValue::Scalar(matcher) => crate::ir_semantic::describe(ir, matcher),
-            rules::ir::FieldValue::Block(schema) | rules::ir::FieldValue::Quoted(schema) => {
+            rules::ir::FieldValue::Block(schema) => {
                 format!("a `{}` block", ir.strings.resolve(ir.schema(schema).name))
             }
             rules::ir::FieldValue::SelfBlock => format!(

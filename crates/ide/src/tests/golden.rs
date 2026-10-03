@@ -821,7 +821,7 @@ fn golden_gfx_sprite_semantics() {
 
 #[test]
 fn golden_quoted_script_syntax() {
-    let text = "trigger = { embedded = \"\n foo = maybe\n broken = {\n\" }\n";
+    let text = "trigger = { embedded = { BODY = \"\n foo = maybe\n broken = {\n\" } }\n";
     let (host, id) = quoted_script_snapshot(text);
     assert_golden("quoted_script_syntax", text, &analyze_text(&host, &id));
 }

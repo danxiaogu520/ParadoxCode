@@ -13,14 +13,14 @@ pub(super) fn lower_dynamic_templates_ir(
     definitions: &[HirDefinition],
     conditionals: &[HirParameterConditional],
     references: &[HirParameterReference],
-    callable_kinds: &std::collections::BTreeSet<String>,
+    template_kinds: &std::collections::BTreeSet<String>,
 ) -> Vec<Template> {
     lower_templates(
         syntax,
         definitions,
         conditionals,
         references,
-        callable_kinds,
+        template_kinds,
     )
 }
 
@@ -29,17 +29,12 @@ fn lower_templates(
     definitions: &[HirDefinition],
     conditionals: &[HirParameterConditional],
     references: &[HirParameterReference],
-    callable_kinds: &std::collections::BTreeSet<String>,
+    template_kinds: &std::collections::BTreeSet<String>,
 ) -> Vec<Template> {
     let mut templates = Vec::new();
     for definition in definitions {
-        let enabled = callable_kinds.contains(&definition.kind.to_ascii_lowercase());
-        if !enabled
-            || syntax.errors().iter().any(|error| {
-                error.range.start() >= definition.range.start()
-                    && error.range.end() <= definition.range.end()
-            })
-        {
+        let enabled = template_kinds.contains(&definition.kind.to_ascii_lowercase());
+        if !enabled {
             continue;
         }
         let Some(owner) = find_node(syntax.root(), CstKind::Property, definition.range) else {
@@ -57,11 +52,13 @@ fn lower_templates(
             continue;
         };
         templates.push(Template {
+            source: std::sync::Arc::from(syntax.text(block.range()).unwrap_or("")),
             kind: definition.kind.clone(),
             name: definition.name.clone(),
             definition_range: definition.range,
             body_range: block.range(),
-            items,
+            program: std::sync::Arc::new(rules::replacement::TemplateProgram::compile(&items)),
+            items: std::sync::Arc::from(items),
         });
     }
     templates.sort_by_key(|template| template.definition_range.start());
@@ -77,12 +74,15 @@ fn template_items<'t>(
     let mut items = Vec::new();
     for node in nodes {
         match node.kind() {
-            CstKind::Property => items.push(TemplateItem::Property(template_property(
-                syntax,
-                node,
-                conditionals,
-                references,
-            )?)),
+            CstKind::Property => {
+                if let Some(property) = template_property(syntax, node, conditionals, references) {
+                    items.push(TemplateItem::Property(property));
+                } else {
+                    items.push(TemplateItem::Recover(template_token(
+                        syntax, node, references,
+                    )?));
+                }
+            }
             CstKind::BareValue | CstKind::QuotedString => {
                 items.push(TemplateItem::BareValue(template_token(
                     syntax, node, references,
@@ -118,7 +118,9 @@ fn template_items<'t>(
             | CstKind::LocalisationKey
             | CstKind::Version
             | CstKind::LocalisationString
-            | CstKind::UnquotedValue => return None,
+            | CstKind::UnquotedValue => items.push(TemplateItem::Recover(template_token(
+                syntax, node, references,
+            )?)),
         }
     }
     Some(items)

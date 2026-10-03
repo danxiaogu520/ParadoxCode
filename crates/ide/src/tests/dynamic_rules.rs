@@ -27,8 +27,8 @@ fn ir_sites(
     snapshot: &AnalysisSnapshot,
     owner: &str,
     parameter: &str,
-) -> hir::analysis::Analysis<Vec<crate::ir_callable::ParameterSite>> {
-    crate::ir_callable::definition_parameter_sites(
+) -> hir::analysis::Analysis<Vec<crate::ir_template::ParameterSite>> {
+    crate::ir_template::definition_parameter_sites(
         snapshot,
         "scripted_effect",
         owner,
@@ -142,7 +142,7 @@ fn dynamic_rows_flag_param_key_dispatch() {
     assert_eq!(sites.len(), 1);
     assert!(matches!(
         sites[0].domain,
-        crate::ir_callable::Domain::Key { .. }
+        crate::ir_template::Domain::Key { .. }
     ));
     assert_eq!(
         crate::dynamic_contracts::dynamic_contract(&snapshot, "scripted_effect", "dispatcher"),
@@ -234,7 +234,7 @@ fn site_rows_record_value_site_position_transitions_and_scopes() {
         sites[0].state.current.first(),
         Some(&hir::ScopeValue::known_single("province"))
     );
-    let crate::ir_callable::Domain::Value(matchers) = &sites[0].domain else {
+    let crate::ir_template::Domain::Value(matchers) = &sites[0].domain else {
         panic!("value domain")
     };
     assert!(matchers.iter().any(|matcher| matches!(
@@ -264,7 +264,7 @@ fn site_rows_mark_structural_sub_blocks_and_keep_them_out_of_legacy_sites() {
         );
         assert!(matches!(
             sites[0].domain,
-            crate::ir_callable::Domain::Value(_)
+            crate::ir_template::Domain::Value(_)
         ));
         assert!(!sites[0].accepts(&snapshot, parameter, "missing_country"));
     }
@@ -278,7 +278,7 @@ fn site_rows_record_key_render_affixes() {
     assert_eq!(sites.len(), 1);
     assert!(matches!(
         sites[0].domain,
-        crate::ir_callable::Domain::Key { .. }
+        crate::ir_template::Domain::Key { .. }
     ));
     assert_eq!(
         sites[0].rendered_value("CMD", "add_prestige").as_deref(),
@@ -300,7 +300,7 @@ fn site_rows_record_bare_payload_quoted_sites() {
     assert_eq!(sites.len(), 1);
     assert!(matches!(
         sites[0].domain,
-        crate::ir_callable::Domain::Payload { .. }
+        crate::ir_template::Domain::Payload { .. }
     ));
 }
 
@@ -354,7 +354,7 @@ fn site_rows_stamp_conditional_guards() {
         from: vec![],
         previous: vec![],
     };
-    let absent = crate::ir_callable::parameter_sites(
+    let absent = crate::ir_template::parameter_sites(
         &snapshot,
         "scripted_effect",
         "guarded",
@@ -366,7 +366,7 @@ fn site_rows_stamp_conditional_guards() {
     .unwrap();
     assert!(absent.is_empty());
     let bound = std::collections::BTreeMap::from([("SCALE".into(), "yes".into())]);
-    let present = crate::ir_callable::parameter_sites(
+    let present = crate::ir_template::parameter_sites(
         &snapshot,
         "scripted_effect",
         "guarded",

@@ -1,4 +1,4 @@
-//! Dynamic-definition hovers: call-site parameters and callable signatures.
+//! Dynamic-definition hovers: call-site parameters and template signatures.
 
 use super::render::{HoverModel, code_span};
 use crate::support::{ParsedInput, contains};
@@ -6,7 +6,7 @@ use crate::types::{CancellationToken, Cancelled};
 use engine::AnalysisSnapshot;
 use text::TextSize;
 
-/// Callable argument keys are tied to the IR reference selected at the call.
+/// Template argument keys and scalar values share the call's binding-aware evidence.
 pub(crate) fn ir_invocation_parameter_hover(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
@@ -17,11 +17,13 @@ pub(crate) fn ir_invocation_parameter_hover(
     let Some(hir) = input.hir.as_deref() else {
         return Ok(None);
     };
-    let Some(argument) = hir
-        .properties()
-        .iter()
-        .find(|property| contains(property.key_range, position))
-    else {
+    let Some(argument) = hir.properties().iter().find(|property| {
+        contains(property.key_range, position)
+            || property
+                .scalar
+                .as_ref()
+                .is_some_and(|scalar| contains(scalar.range, position))
+    }) else {
         return Ok(None);
     };
     let Some(invocation) = hir
@@ -68,13 +70,13 @@ pub(crate) fn ir_invocation_parameter_hover(
             "optional"
         }
     );
-    let sites = crate::ir_callable::parameter_sites(
+    let sites = crate::ir_template::parameter_sites_at(
         snapshot,
+        hir,
+        invocation,
         &reference.kind,
         &reference.name,
         &parameter.name,
-        &crate::ir_callable::invocation_bindings(hir, invocation),
-        crate::ir_callable::invocation_state(hir, invocation),
         cancellation,
     )?;
     model.coverage.merge(&sites.coverage);
@@ -87,6 +89,33 @@ pub(crate) fn ir_invocation_parameter_hover(
     if let Some(lines) = ir_parameter_contract_lines(snapshot, &summary, &parameter.name, &sites) {
         section.push('\n');
         section.push_str(&lines);
+    }
+    if let Some(scalar) = &argument.scalar {
+        let rejected = sites
+            .iter()
+            .any(|site| !site.accepts(snapshot, &parameter.name, &scalar.value));
+        let witness = std::collections::BTreeMap::from([(
+            parameter.name.to_ascii_lowercase(),
+            scalar.value.to_string(),
+        )]);
+        let body = crate::ir_template::validate_candidate(
+            snapshot,
+            hir,
+            invocation,
+            &summary,
+            &parameter.name,
+            &witness,
+            cancellation,
+        )?;
+        model.coverage.merge(&body.coverage);
+        let status = if rejected || body.value == hir::analysis::Validation::Invalid {
+            "invalid"
+        } else if !model.coverage.is_known() || body.value == hir::analysis::Validation::Unknown {
+            "unknown"
+        } else {
+            "valid"
+        };
+        section.push_str(&format!("\n- Current binding: `{status}`"));
     }
     model.push_section(section);
     Ok(Some(model))
@@ -118,7 +147,7 @@ pub(crate) fn dynamic_parameter_contract_lines(
     let Some(summary) = summary else {
         return Ok(None);
     };
-    let sites = crate::ir_callable::definition_parameter_sites(
+    let sites = crate::ir_template::definition_parameter_sites(
         snapshot,
         &summary.kind,
         owner_name,
@@ -143,9 +172,9 @@ fn ir_parameter_contract_lines(
     snapshot: &AnalysisSnapshot,
     summary: &engine::DynamicDefinitionSummary,
     parameter: &str,
-    sites: &[crate::ir_callable::ParameterSite],
+    sites: &[crate::ir_template::ParameterSite],
 ) -> Option<String> {
-    use crate::ir_callable::Domain;
+    use crate::ir_template::Domain;
     summary
         .parameters
         .iter()
@@ -237,7 +266,7 @@ fn ir_parameter_value_label(ir: &rules::ir::RulesIr, id: rules::ir::MatcherId) -
     }
 }
 
-/// Renders the `#### Callable signature` section for a dynamic definition symbol hover.
+/// Renders the `#### Template signature` section for a dynamic definition symbol hover.
 ///
 /// The invocation form matches the completion snippet's model: scalar only
 /// for parameterless definitions, otherwise a named parameter block. Required
@@ -277,7 +306,7 @@ pub(crate) fn dynamic_signature_hover(
     if summary.parameters.is_empty() {
         lines.push("- Parameters: none".to_owned());
     }
-    format!("#### Callable signature\n\n{}", lines.join("\n"))
+    format!("#### Template signature\n\n{}", lines.join("\n"))
 }
 
 /// Presence of one parameter of a resolved dynamic definition under the

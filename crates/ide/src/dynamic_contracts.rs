@@ -184,7 +184,7 @@ pub(crate) fn dynamic_call_site_diagnostics(
         {
             for id in &field_fact.fields {
                 if let Some(kind) =
-                    crate::ir_callable::callable_kind(snapshot.ir(), snapshot.ir().field(*id).key)
+                    crate::ir_template::template_kind(snapshot.ir(), snapshot.ir().field(*id).key)
                 {
                     dynamic_kind = Some(kind);
                 } else {
@@ -447,7 +447,9 @@ impl<'a> ContractInference<'a> {
             TemplateItem::Conditional(conditional) => {
                 return self.ir_items(schema, &conditional.items);
             }
-            TemplateItem::BareValue(_) => return ScopeContract::Unconstrained,
+            TemplateItem::BareValue(_) | TemplateItem::Recover(_) => {
+                return ScopeContract::Unconstrained;
+            }
             TemplateItem::Property(property) => property,
         };
         let Some(key) = single_literal(&property.key) else {
@@ -455,13 +457,9 @@ impl<'a> ContractInference<'a> {
         };
         let shape = match &property.value {
             TemplateValue::Block { .. } => Shape::Block,
-            TemplateValue::Scalar(token) if token.quoted => Shape::Quoted,
             _ => Shape::Scalar,
         };
         let mut fields = ir.lookup(schema, key, shape).collect::<Vec<_>>();
-        if shape == Shape::Quoted {
-            fields.extend(ir.lookup(schema, key, Shape::Scalar));
-        }
         let exact = fields.iter().copied().filter(|id| matches!(ir.matcher(ir.field(*id).key), Matcher::Literal(symbol) if ir.strings().resolve(*symbol).eq_ignore_ascii_case(key))).collect::<Vec<_>>();
         if !exact.is_empty() {
             fields = exact;
@@ -479,7 +477,7 @@ impl<'a> ContractInference<'a> {
         let mut alternatives = Vec::new();
         for id in fields {
             let field = ir.field(id);
-            if let Some(kind) = crate::ir_callable::callable_kind(ir, field.key) {
+            if let Some(kind) = crate::ir_template::template_kind(ir, field.key) {
                 if let Some(resolved) = resolve_dynamic_definition(self.snapshot, &kind, key) {
                     alternatives.push(self.contract_of(&resolved));
                 }
@@ -489,7 +487,7 @@ impl<'a> ContractInference<'a> {
             // statements inside them do not constrain the definition's entry scope.
             if matches!(ir.matcher(field.key), Matcher::Link) {
                 if let Some(link) = ir.scopes.links.iter().find(|link| {
-                    crate::ir_semantic::matcher_template_matches(
+                    crate::ir_semantic::matcher_pattern_matches(
                         ir,
                         &link.pattern,
                         key.split('.').next().unwrap_or(key),
@@ -532,7 +530,7 @@ impl<'a> ContractInference<'a> {
                 .is_none_or(|effect| effect.push.is_none() && effect.set.is_empty())
             {
                 let child = match field.value {
-                    FieldValue::Block(child) | FieldValue::Quoted(child) => Some(child),
+                    FieldValue::Block(child) => Some(child),
                     FieldValue::SelfBlock => Some(schema),
                     _ => None,
                 };
@@ -559,6 +557,7 @@ impl<'a> ContractInference<'a> {
 
 fn template_dispatches(items: &[TemplateItem]) -> bool {
     items.iter().any(|item| match item {
+        TemplateItem::Recover(_) => true,
         TemplateItem::Conditional(conditional) => template_dispatches(&conditional.items),
         TemplateItem::Property(property) => {
             token_has_parameter(&property.key)

@@ -19,7 +19,8 @@ pub use cst::{
     CstChildren, CstKind, CstNode, SyntaxError, SyntaxErrorKind, SyntaxToken, SyntaxTree, TokenKind,
 };
 pub use quoted_script::{
-    QuotedScript, QuotedScriptSourceMap, encode_quoted_script_text, parse_quoted_script,
+    QuotedScript, QuotedScriptSourceMap, decode_quoted_script, encode_quoted_script_text,
+    parse_quoted_script,
 };
 
 /// One of the reusable Paradox text frontends.

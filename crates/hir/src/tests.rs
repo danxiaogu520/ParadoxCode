@@ -11,7 +11,7 @@ use std::sync::Arc;
 use text::{LogicalPath, TextRange};
 
 #[test]
-fn ir_symbol_fact_dependencies_include_missing_members_and_callable_templates() {
+fn ir_symbol_fact_dependencies_include_missing_members_and_template_templates() {
     let ir = first_party_ir().unwrap();
     let rules = RuleSet::from_ir_catalog(&ir);
     for (path, format, source, dependency) in [
@@ -1002,7 +1002,7 @@ fn dynamic_templates_preserve_order_conditionals_and_token_fragments() {
 }
 
 #[test]
-fn dynamic_templates_skip_syntax_damaged_owners() {
+fn dynamic_templates_retain_syntax_damaged_owners() {
     let rules = runtime_rules().expect("first-party rules");
     let path = LogicalPath::parse("common/scripted_effects/broken.txt").expect("logical path");
     let hir = lower_with_profile(
@@ -1011,7 +1011,15 @@ fn dynamic_templates_skip_syntax_damaged_owners() {
         &rules,
         &profile(),
     );
-    assert!(hir.dynamic_templates().is_empty());
+    assert_eq!(hir.dynamic_templates().len(), 1);
+    assert!(!hir.syntax().errors().is_empty());
+    assert!(
+        hir.dynamic_templates()[0]
+            .program
+            .parameters
+            .iter()
+            .any(|name| name.eq_ignore_ascii_case("value"))
+    );
 }
 
 #[test]
@@ -1094,8 +1102,8 @@ fn profile_aware_lowering_produces_shared_typed_definitions_and_references() {
 }
 
 #[test]
-fn profile_aware_lowering_indexes_definitions_inside_quoted_effect_arguments() {
-    let file=serde_json::from_value(serde_json::json!({"types":{"flag":{}},"files":{"fixture":{"path":"missions","ext":"txt","root":"root"}},"schemas":{"root":{"fields":{"execute":{"value":"quoted<effect>","card":"1"}}},"effect":{"fields":{"set_flag":{"value":"def<flag>","card":"0..*"}}}}})).unwrap();
+fn ordinary_quoted_scalars_do_not_index_script_definitions() {
+    let file=serde_json::from_value(serde_json::json!({"types":{"flag":{}},"files":{"fixture":{"path":"missions","ext":"txt","root":"root"}},"schemas":{"root":{"fields":{"execute":{"value":"scalar","card":"1"}}},"effect":{"fields":{"set_flag":{"value":"def<flag>","card":"0..*"}}}}})).unwrap();
     let ir = rules::lower::lower(
         &[("fixture.json".to_owned(), file)],
         rules::ir::GameConfig {
@@ -1111,15 +1119,10 @@ fn profile_aware_lowering_indexes_definitions_inside_quoted_effect_arguments() {
         &ir.game.profile,
         &ir,
     );
-    let definition = hir
-        .definitions()
-        .iter()
-        .find(|definition| definition.kind.as_ref() == "flag" && definition.name == "embedded_flag")
-        .unwrap();
-    assert_eq!(
-        &source[definition.selection_range.start() as usize
-            ..definition.selection_range.end() as usize],
-        "embedded_flag"
+    assert!(
+        !hir.definitions()
+            .iter()
+            .any(|definition| definition.kind.as_ref() == "flag")
     );
 }
 
@@ -1552,7 +1555,7 @@ fn unterminated_block_cascades_keep_nested_properties_and_bounded_errors() {
 }
 
 #[test]
-fn ir_callable_presence_uses_declared_branch_and_guard_keys() {
+fn ir_template_presence_uses_declared_branch_and_guard_keys() {
     let mut ir = (*first_party_ir().unwrap()).clone();
     for (old, new) in [("if", "choose"), ("limit", "guard")] {
         let old = ir.strings.lookup_folded(old).unwrap();

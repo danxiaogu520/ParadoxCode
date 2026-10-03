@@ -18,7 +18,7 @@ VS Code's own transparent-encoding diagnostics are described alongside the serve
 | [UnknownTexturePath](#unknowntexturepath) | Error |
 | [Cardinality](#cardinality) | Error |
 | [WrongScope](#wrongscope) | Error |
-| [DynamicDefinitionCycle](#dynamicdefinitioncycle) | Error |
+| [DynamicDefinitionCycle](#dynamicdefinitioncycle) | Information |
 | [InvalidDependency](#invaliddependency) | Error |
 | [LogicalContainer](#logicalcontainer) | Warning |
 | [ConstantCondition](#constantcondition) | Warning |
@@ -126,8 +126,11 @@ command to change the current scope first.
 
 ## DynamicDefinitionCycle
 
-Scripted triggers/effects form an invocation cycle. The message lists the
-cycle path; break it by removing one edge.
+The shared Template query revisited the same binding and scope state when analysing
+this definition with no supplied arguments. This is an informational, unresolved
+analysis result. A potential name-only call cycle does not prove that every
+invocation recurses: guards and argument changes can make concrete calls finite.
+Inspect the actual call's AnalysisIncomplete evidence for its own bindings.
 
 ## InvalidDependency
 
