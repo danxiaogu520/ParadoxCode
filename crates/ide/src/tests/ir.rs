@@ -1384,6 +1384,83 @@ fn open(host: &mut AnalysisHost, path: &str, source: &str) -> DocumentId {
 }
 
 #[test]
+fn ir_callable_quoted_payload_reports_parser_errors_at_argument() {
+    let mut host = host();
+    open(
+        &mut host,
+        "common/scripted_effects/quoted-syntax.txt",
+        "splice = { $body$ $body$ }",
+    );
+    for (index, payload) in [
+        "if = { limit = { always = yes } add_prestige = 1",
+        "add_prestige =",
+        "log = \"界\" if = { limit = { always = yes } add_prestige = 1",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let raw = format!("\"{}\"", parser::encode_quoted_script_text(payload));
+        let source = format!(
+            "country_event = {{ id = syntax.{index} immediate = {{ splice = {{ body = {raw} }} }} }}"
+        );
+        let id = open(
+            &mut host,
+            &format!("events/quoted-syntax-{index}.txt"),
+            &source,
+        );
+        let script = parser::parse_quoted_script(&raw).expect("quoted payload");
+        assert!(!script.parsed().errors().is_empty(), "malformed fixture");
+        let start = source.find(&raw).unwrap() as u32;
+        let expected = script
+            .parsed()
+            .errors()
+            .iter()
+            .map(|error| {
+                let relative = script.source_map().decoded_range(error.range).unwrap();
+                text::TextRange::new(start + relative.start(), start + relative.end()).unwrap()
+            })
+            .collect::<Vec<_>>();
+        let values = diagnostics(&host.snapshot(), &id);
+        let actual = values
+            .iter()
+            .filter(|diagnostic| diagnostic.code == DiagnosticCode::Syntax)
+            .map(|diagnostic| diagnostic.range)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            actual, expected,
+            "each parser error is projected once: {values:?}"
+        );
+    }
+}
+
+#[test]
+fn ir_callable_value_completion_is_independent_of_usage_order() {
+    let mut host = host();
+    open(
+        &mut host,
+        "common/scripted_effects/completion-order.txt",
+        "scalar_first = { log = $p$ set_emperor = $p$ } \
+         bool_first = { set_emperor = $p$ log = $p$ } \
+         repeated = { log = $p$ set_emperor = $p$ set_emperor = $p$ } \
+         incompatible = { set_emperor = $p$ add_prestige = $p$ }",
+    );
+    for name in ["scalar_first", "bool_first", "repeated", "incompatible"] {
+        let source = format!(
+            "country_event = {{ id = completion.{name} immediate = {{ {name} = {{ p = y }} }} }}"
+        );
+        let id = open(&mut host, &format!("events/completion-{name}.txt"), &source);
+        let position = source.find("p = y").unwrap() as u32 + "p = y".len() as u32;
+        let items = complete(&host.snapshot(), &id, position).items;
+        let yes = items.iter().filter(|item| item.label == "yes").count();
+        assert_eq!(
+            yes,
+            usize::from(name != "incompatible"),
+            "all usage constraints still filter distinct candidates: {name}: {items:?}"
+        );
+    }
+}
+
+#[test]
 fn ir_quoted_payload_must_be_valid_at_every_distinct_usage() {
     let mut host = host();
     open(

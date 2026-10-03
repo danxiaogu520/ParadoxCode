@@ -1665,6 +1665,23 @@ fn callable_argument_diagnostics(
                     {
                         let mut session = QuotedScriptSession::new(cancellation);
                         if let QuotedScriptParse::Parsed(script) = session.parse(raw, depth)? {
+                            // Syntax belongs to the payload itself, independent of schema
+                            // overloads or the number of sites that consume this argument.
+                            for error in script.parsed().errors() {
+                                cancellation.checkpoint()?;
+                                let mut diagnostic =
+                                    crate::diagnostics::diagnostic_from_syntax(error);
+                                if let Some(relative) =
+                                    script.source_map().decoded_range(diagnostic.range)
+                                    && let Some(range) = TextRange::new(
+                                        scalar.range.start() + relative.start(),
+                                        scalar.range.start() + relative.end(),
+                                    )
+                                {
+                                    diagnostic.range = range;
+                                    diagnostics.push(diagnostic);
+                                }
+                            }
                             let mut usages: Vec<(
                                 &crate::ir_callable::ParameterSite,
                                 Vec<Vec<Diagnostic>>,
