@@ -42,4 +42,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: cargo run --locked -p tools -- ci autosync
+        run: |
+          if [[ -f crates/tools/src/ci.rs ]]; then
+            cargo run --locked -p tools -- ci autosync
+          else
+            # Bootstrap the migration with the legacy script already trusted on main.
+            # Do not execute PR-head code with AUTOMERGE_TOKEN.
+            bootstrap_script="${RUNNER_TEMP}/pr-autosync-bootstrap.sh"
+            git show HEAD:.github/workflows/pr-autosync.yml |
+              sed -n '/^        run: |$/,$p' |
+              sed '1d;s/^          //' > "$bootstrap_script"
+            test -s "$bootstrap_script"
+            bash "$bootstrap_script"
+          fi

@@ -1124,7 +1124,6 @@ dependencies = [
  "flate2",
  "game",
  "ide",
- "parser",
  "pdc",
  "regex",
  "rules",
@@ -1137,7 +1136,6 @@ dependencies = [
  "tempfile",
  "text",
  "toml",
- "url",
  "zip",
 ]
 

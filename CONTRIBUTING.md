@@ -49,7 +49,7 @@ dependencies, rather than implying that the workspace is a single linear chain.
 | [engine](crates/engine/src/lib.rs) | `hir`, `index`, `parser`, `rules`, `text`, `transcode`, `vfs` |
 | [ide](crates/ide/src/lib.rs) | `engine`, `game`, `hir`, `parser`, `rules`, `text`, `transcode`, `vfs` |
 | [pdc](crates/pdc/src/lib.rs) | `engine`, `game`, `ide`, `parser`, `rules`, `text`, `transcode` |
-| [tools](crates/tools/src/lib.rs) | `engine`, `game`, `ide`, `parser`, `pdc`, `rules`, `text` |
+| [tools](crates/tools/src/lib.rs) | `engine`, `game`, `ide`, `pdc`, `rules`, `text` |
 <!-- generated:crate-dependencies:end -->
 
 Keep user-facing protocol conversion in `pdc`, VS Code UI in the extension, and

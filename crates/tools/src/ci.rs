@@ -37,6 +37,31 @@ fn gh_json(arguments: &[&str]) -> Result<Value, String> {
     serde_json::from_str(&gh(arguments)?).map_err(|e| e.to_string())
 }
 
+fn unpack_typos(bytes: &[u8], destination: &Path) -> Result<(), String> {
+    let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(bytes));
+    for entry in archive.entries().map_err(|error| error.to_string())? {
+        let mut entry = entry.map_err(|error| error.to_string())?;
+        let path = entry.path().map_err(|error| error.to_string())?;
+        let mut components = path
+            .components()
+            .filter(|component| *component != std::path::Component::CurDir);
+        let is_binary = components.next()
+            == Some(std::path::Component::Normal(std::ffi::OsStr::new("typos")))
+            && components.next().is_none()
+            && entry.header().entry_type().is_file();
+        if is_binary {
+            if let Some(parent) = destination.parent() {
+                fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+            }
+            entry
+                .unpack(destination)
+                .map_err(|error| error.to_string())?;
+            return Ok(());
+        }
+    }
+    Err("typos archive missing binary".into())
+}
+
 pub fn conclusions(input: &Value) -> Result<(), String> {
     let jobs = input
         .as_object()
@@ -489,30 +514,7 @@ pub fn execute(group: &str, arguments: &[String]) -> Result<String, String> {
 
                 let archive=process::capture(process::command("curl").args(["-LsSf",&format!("https://github.com/crate-ci/typos/releases/download/{version}/typos-{version}-x86_64-unknown-linux-musl.tar.gz")]))?;
 
-                let mut archive =
-                    tar::Archive::new(flate2::read::GzDecoder::new(archive.stdout.as_slice()));
-
-                let mut found = false;
-
-                for entry in archive.entries().map_err(|e| e.to_string())? {
-                    let mut entry = entry.map_err(|e| e.to_string())?;
-
-                    if entry.path().map_err(|e| e.to_string())?.as_ref() == Path::new("typos") {
-                        if let Some(parent) = binary.parent() {
-                            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-                        }
-
-                        entry.unpack(&binary).map_err(|e| e.to_string())?;
-
-                        found = true;
-
-                        break;
-                    }
-                }
-
-                if !found {
-                    return Err("typos archive missing binary".into());
-                }
+                unpack_typos(&archive.stdout, &binary)?;
             }
 
             process::run(process::command(binary).current_dir(&root))?;
@@ -528,6 +530,57 @@ pub fn execute(group: &str, arguments: &[String]) -> Result<String, String> {
 mod tests {
 
     use super::*;
+
+    fn typos_archive(path: &str, entry_type: tar::EntryType) -> Vec<u8> {
+        let mut builder = tar::Builder::new(Vec::new());
+        let mut header = tar::Header::new_gnu();
+        header.set_size(4);
+        header.set_mode(0o755);
+        header.set_entry_type(entry_type);
+        // Preserve the archive's leading ./ instead of normalizing the fixture path.
+        header.as_mut_bytes()[..path.len()].copy_from_slice(path.as_bytes());
+        if entry_type.is_symlink() {
+            header.set_link_name("elsewhere").unwrap();
+        }
+        header.set_cksum();
+        builder.append(&header, b"test".as_slice()).unwrap();
+        let tar = builder.into_inner().unwrap();
+        let mut gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        gzip.write_all(&tar).unwrap();
+        gzip.finish().unwrap()
+    }
+
+    #[test]
+    fn typos_installer_extracts_direct_and_dot_prefixed_binary() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("bin/typos");
+        for path in ["typos", "./typos"] {
+            unpack_typos(&typos_archive(path, tar::EntryType::Regular), &destination).unwrap();
+            assert_eq!(fs::read(&destination).unwrap(), b"test");
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                assert_ne!(
+                    fs::metadata(&destination).unwrap().permissions().mode() & 0o111,
+                    0
+                );
+            }
+            fs::remove_file(&destination).unwrap();
+        }
+    }
+
+    #[test]
+    fn typos_installer_rejects_nested_paths_and_symbolic_links() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("typos");
+        for (path, kind) in [
+            ("bin/typos", tar::EntryType::Regular),
+            ("./typos", tar::EntryType::Symlink),
+        ] {
+            assert!(unpack_typos(&typos_archive(path, kind), &destination).is_err());
+            assert!(!destination.exists());
+        }
+    }
 
     #[test]
     fn failure_cancelled_and_missing_states_are_not_success() {
