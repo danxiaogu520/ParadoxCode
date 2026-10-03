@@ -139,17 +139,17 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     ));
 
     // CWT prohibition in rules.
-    let rule_source = root.join("rules/eu4-v2");
+    let rule_source = root.join("rules/eu4");
     if rule_source.is_dir() {
         let cwt_found = contains_extension_recursive(&rule_source, "cwt");
         results.push(check(
             !cwt_found,
-            "no CWT in rules/eu4-v2",
+            "no CWT in rules/eu4",
             "CWT files are prohibited in the authoritative rule source",
         ));
     } else {
         results.push(CheckResult::fail(
-            "rules/eu4-v2 directory",
+            "rules/eu4 directory",
             "first-party EU4 rule source is missing",
         ));
     }
@@ -327,7 +327,7 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     }
 
     // Rule source metadata.
-    let rules_manifest = root.join("rules/eu4-v2/game.json");
+    let rules_manifest = root.join("rules/eu4/game.json");
     if rules_manifest.is_file()
         && let Ok(text) = fs::read_to_string(&rules_manifest)
         && let Ok(manifest) = serde_json::from_str::<serde_json::Value>(&text)
@@ -564,7 +564,7 @@ fn check_ir_artifact(root: &Path) -> Vec<CheckResult> {
             serde_json::from_slice::<rules::bake::ArtifactManifest>(&bytes)
                 .map_err(|error| error.to_string())
         });
-    let generated = rules::bake::compile(&root.join("rules/eu4-v2"));
+    let generated = rules::bake::compile(&root.join("rules/eu4"));
     let (expected, generated) = match (expected, generated) {
         (Ok(expected), Ok(generated)) => (expected, generated),
         (Err(error), _) | (_, Err(error)) => {

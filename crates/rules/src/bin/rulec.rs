@@ -1,4 +1,4 @@
-//! `rulec` — the rules-v2 source compiler front end (see
+//! `rulec` — the rule-source compiler front end (see
 //! `docs/rules-language.md` §10.3).
 //!
 //! Subcommands:

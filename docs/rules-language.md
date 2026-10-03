@@ -46,7 +46,7 @@ The directory layout is organised by game domain; the shared parts live in
 `core/`:
 
 ```
-rules/eu4-v2/
+rules/eu4/
   game.json              # package identity; install, filesystem scan, hover_cards, fallback_keys
   core/
     scopes.json          # scopes section

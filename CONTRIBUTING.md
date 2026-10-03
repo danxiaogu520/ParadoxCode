@@ -70,7 +70,7 @@ Validate the first-party EU4 rule source and regenerate its IR manifest:
 
 ```bash
 cargo run -p rules --bin bake-ir -- build \
-  --source rules/eu4-v2 \
+  --source rules/eu4 \
   --manifest rules/ir-manifest.json
 ```
 
@@ -102,7 +102,7 @@ Convert every discovered defect into a minimal repository-owned regression fixtu
 | --- | --- |
 | `crates/` | Rust parser, rules, HIR, workspace, analysis, formatter, LSP, and CLI crates |
 | `editors/vscode/` | VS Code extension with server bootstrap and mission-tree preview |
-| `rules/` | Authoritative first-party EU4 rule source (`rules/eu4-v2/**/*.json`) |
+| `rules/` | Authoritative first-party EU4 rule source (`rules/eu4/**/*.json`) |
 | `fuzz/` | Parser, edit, formatter, and HIR fuzz targets |
 | `crates/tools/` | Cross-platform repository, release, and quality-gate tooling |
 
@@ -165,7 +165,7 @@ These are the invariants the repository enforces; please keep them in mind in ev
   resource and time bounds.
 - **Syntax errors never block analysis.** Parsers produce loss-aware CSTs even on malformed input;
   unrecognized constructs lower to `Unknown*` nodes instead of panicking.
-- **One authoritative rule source.** `rules/eu4-v2/` is the only rule authority; builds
+- **One authoritative rule source.** `rules/eu4/` is the only rule authority; builds
   check and compile the source into an embedded RulesIr artifact. Runtime semantics read that IR. `.cwt` files are never rule
   input, and the runtime accepts no external rule paths.
 - **`rule_hash` is content-based.** It hashes the compiled arena, strings, provenance and profile

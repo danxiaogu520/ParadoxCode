@@ -194,14 +194,14 @@ Validate the developer-maintained first-party rule source and regenerate its IR 
 
 ```bash
 cargo run -p rules --bin bake-ir -- build \
-  --source rules/eu4-v2 \
+  --source rules/eu4 \
   --manifest rules/ir-manifest.json
 ```
 
 Official `paradoxcode` binaries embed a checked, compiled RulesIr artifact generated at build time.
 Startup decodes that artifact and restores its query indexes. Runtime semantics read the IR.
 
-The EU4 source in `rules/eu4-v2/` is grouped by game domain, with shared schemas, types, traits,
+The EU4 source in `rules/eu4/` is grouped by game domain, with shared schemas, types, traits,
 scopes and modifiers in `core/`. `game.json` declares package identity and the data-only game
 configuration. Regular JSON files are discovered recursively and merged in normalized path order.
 The IR fingerprint covers the compiled arena, strings, provenance and profile.
@@ -312,7 +312,7 @@ change the automation threshold. Use `--help` for all options.
 | `crates/pdc` | The language-server crate: LSP lifecycle and protocol boundary (ships as the `paradoxcode` binary) |
 | `crates/tools` | Repository tooling (`check`, `release`, cache building) for CI and maintainers |
 | `editors/vscode/` | VS Code extension: server bootstrap, walkthrough, mission-tree preview |
-| `rules/eu4-v2/` | Authoritative first-party EU4 RulesIr source |
+| `rules/eu4/` | Authoritative first-party EU4 RulesIr source |
 | `fuzz/` | Parser, edit, formatter, and HIR fuzz targets |
 
 The current first-party EU4 rules target game version **1.37.5**. The generated

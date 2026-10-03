@@ -69,7 +69,7 @@ mod tests {
 
     #[test]
     fn first_party_bake_is_reproducible_and_round_trips() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4-v2");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4");
         let first = compile(&root).expect("bake");
         let second = compile(&root).expect("rebake");
         assert_eq!(first.manifest, second.manifest);

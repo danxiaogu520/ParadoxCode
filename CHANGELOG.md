@@ -8,6 +8,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 - 最低 Rust 版本降至 1.88，开发文档与 MSRV CI 同步；checkpoint 原子计数兼容最低版本和 Rust 1.99 的弃用检查。
+- 第一方 EU4 规则源统一位于 `rules/eu4`，构建、校验、测试与文档入口同步更名。
 - 删除旧规则模型、编译模块、规则源和兼容语义消费者，生产语义统一读取 RulesIr；迁移保留的行为夹具，并修复引号脚本补全及缓存名称定位。
 - 修复 EU4 叛军需求和教廷行动的本地化绑定遗漏，恢复祖先性格描述的可选展示；嵌套字段的颜色分量不再被索引为省份引用。
 - EU4 贸易节点的执行作用域全面并入 `province`，同步规则值域、寄存器、链接、诊断和补全；节点符号引用与导航保留。
@@ -49,7 +50,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   independently spelled fields keep their own origin. IR-level tests cover def
   collection (including a `def` on a `map` key and mixin provenance), subtype
   predicates, monomorphisation and the `link` pattern; a corpus test lowers
-  `rules/eu4-v2` whole (1,224 schemas, 9,673 fields, 3,894 matchers) and pins
+  `rules/eu4` whole (1,224 schemas, 9,673 fields, 3,894 matchers) and pins
   the `on_actions` group distribution. Nothing consumes the IR yet: the switch
   is still the one cut.
 - Phase 2 of the rules redesign lands as `rules-migrate` (in `crates/tools`,
@@ -60,9 +61,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the 1,227 repeated rows, folds `root:on_action` into the `on_actions` enum
   plus the parameterised `on_action_body<S>`, folds the pure scope-switch
   rows into `scopes.links`, and relocates the profile tables per §4 of
-  `docs/rules-redesign.md`. Output goes to `rules/eu4-v2/` (staging for the
+  `docs/rules-redesign.md`. Output goes to `rules/eu4/` (staging for the
   one-cut switch) and is deterministic: repeated runs are byte-identical.
-  `rulec check rules/eu4-v2` passes with 0 errors; the generated
+  `rulec check rules/eu4` passes with 0 errors; the generated
   `docs/rules-migrate-report.md` carries the row-count coverage (8,463 rows
   fully reconciled) and the manual checklist for the human refinement pass.
 - The rules-v2 language front end lands, specified by the new
@@ -80,7 +81,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   trait binding exactly one of `loc`/`sprite`, `files.ext` accepts an extension
   list, and the new `files.exclude` carries the legacy `path_exclude_prefixes`.
   `rulec check` gains the `CardLint` family (`0..0` warning, `N..N` info,
-  overload upper-bound disagreement) and `rules/eu4-v2/` is regenerated from
+  overload upper-bound disagreement) and `rules/eu4/` is regenerated from
   the deterministic converter: 0 errors, 340 warnings, and the manual checklist
   drops from 119 to 109 items.
 - The `Localised` / `HasIcon` trait model carries the whole legacy binding

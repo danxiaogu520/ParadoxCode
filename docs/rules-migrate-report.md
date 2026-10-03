@@ -2,7 +2,7 @@
 
 Historical conversion snapshot retained when `rules-migrate` was retired on 2026-10-02 (source format 13).
 
-The former converter generated this report from the legacy tree; repeated runs over unchanged input were byte-identical. Its implementation and dedicated tests have been removed. The maintained `rules/eu4-v2` sources have subsequent refinements, so this report describes conversion coverage rather than their current contents. The counters and manual checklist below are preserved as recorded.
+The former converter generated this report from the legacy tree; repeated runs over unchanged input were byte-identical. Its implementation and dedicated tests have been removed. The maintained `rules/eu4` sources have subsequent refinements, so this report describes conversion coverage rather than their current contents. The counters and manual checklist below are preserved as recorded.
 
 ## Coverage
 

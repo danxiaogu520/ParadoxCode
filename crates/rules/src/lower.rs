@@ -2037,10 +2037,10 @@ mod tests {
     /// The real first-party corpus lowers, and its key constructs survive.
     #[test]
     fn the_first_party_corpus_lowers() {
-        let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4-v2");
+        let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4");
         let sources =
             crate::bundle::load_directory(&directory).expect("first-party source directory");
-        let ir = lower(&sources.files, sources.game).expect("rules/eu4-v2 lowers");
+        let ir = lower(&sources.files, sources.game).expect("rules/eu4 lowers");
 
         assert_eq!(
             ir.files.len(),

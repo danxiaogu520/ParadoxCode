@@ -2,7 +2,7 @@
 //!
 //! Everything here is EU4-specific: the installation descriptor compiled from `game.json`,
 //! the embedded first-party IR bootstrap, and the structured mission model. Production data
-//! lives under `rules/eu4-v2`.
+//! lives under `rules/eu4`.
 
 pub mod mission;
 
@@ -273,11 +273,11 @@ mod tests {
     }
 
     #[test]
-    fn embedded_v2_source_matches_the_filesystem_bundle() {
-        let ir = first_party_ir().expect("embedded EU4 rules-v2 source");
+    fn embedded_source_matches_the_filesystem_bundle() {
+        let ir = first_party_ir().expect("embedded EU4 rule source");
         let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let sources = rules::bundle::load_directory(&repository_root.join("rules/eu4-v2"))
-            .expect("filesystem EU4 rules-v2 source");
+        let sources = rules::bundle::load_directory(&repository_root.join("rules/eu4"))
+            .expect("filesystem EU4 rule source");
         let from_disk = rules::lower::lower(&sources.files, sources.game)
             .expect("the filesystem bundle lowers");
         assert_eq!(ir.game_id(), GAME_ID);

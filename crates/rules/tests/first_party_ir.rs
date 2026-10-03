@@ -11,7 +11,7 @@ use text::LogicalPath;
 fn ir() -> &'static RulesIr {
     static IR: OnceLock<RulesIr> = OnceLock::new();
     IR.get_or_init(|| {
-        let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4-v2");
+        let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4");
         let sources = rules::bundle::load_directory(&directory).expect("first-party source bundle");
         rules::lower::lower(&sources.files, sources.game).expect("checked first-party IR")
     })

@@ -19,7 +19,7 @@ fn watch(directory: &Path) {
 }
 
 fn main() {
-    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4-v2");
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4");
     watch(&source);
     let baked =
         rules::bake::compile(&source).expect("first-party rule checks must pass before embedding");

@@ -72,6 +72,16 @@ RSS 范围为旧版 1,090.66–1,149.23 MiB，IR 1,062.97–1,081.94 MiB；OS �
 随后使用本地 Rust 1.98.1 重跑全工作区、全目标、全特性 Clippy，`-D warnings` 通过。
 以上是 PR 兼容性收尾，原六项语义与性能验收结论仍对应前文冻结版本；新的 MSRV CI 待远端确认。
 
+### 规则目录命名统一（2026-10-03）
+
+按用户要求，当前规则源统一命名为 `rules/eu4`，目录中的 89 个 JSON 文件按原内容移动。
+构建入口、检查工具、第一方规则测试和开发文档的路径全部同步；旧规则模型仍保持退役。
+本文历史新源命令也使用当前目录名，原始报告与冻结记录继续保留各自身份。
+89 个规则文件逐一 SHA-256 比对均与冻结版本一致；规则 81 项回归、嵌入源与磁盘包一致性
+回归、产物 2 项及策略 88 项检查通过。IR manifest 可复现，嵌入 IR 与当前源一致，指纹仍为
+`c82f078ed894a5cd6c7416292599e55d87e0a4a6363eb06542cbb901443e6eea`。
+Rust 1.88 的全工作区、全目标、全特性编译已在更名后再次通过。
+
 ## 放宽校验决策重新审核（2026-10-02）
 
 用户重新明确产品目标：LSP 应帮助作者写出规范且语义明确的代码，游戏能够加载某种写法，
@@ -289,7 +299,7 @@ release 构建、严格 Clippy/Rustdoc、Rust/规则格式、whitespace 和 arti
 ## 后续实现：D16 与任务树能力边界（2026-10-02）
 
 - 源加载器递归读取所有普通 JSON 文件（根 game.json 是配置），统一按相对路径排序；
-  删除 eu4-v2 源 manifest，将 source_format_version 和 target_game_version 移入 game.json。
+  删除 eu4 源 manifest，将 source_format_version 和 target_game_version 移入 game.json。
   非 JSON 文件不影响编译；链接、逃逸/别名路径和重复输入拒绝；新增文件无需改清单。
   真实源回归不再因缺少 manifest 而静默跳过。
 - SQLite 升为 24，持久缓存记录 analyzer build_id。戳覆盖分析器代码、规则包、Cargo 配置与
@@ -864,7 +874,7 @@ IR 23.1 ms / 23.02 MiB。内存与规则加载退出项在这轮 main 中位数�
 - `rules-migrate` 两次输出目录中的 91 个文件逐字节相同；reviewed 轮与当时人工精修源有 37 个文件差异；角色、switch 声明更新后的两遍输出再次逐字节相同；nested 轮与精修源有 40 个文件差异；roundtrip 轮两次 91 文件仍逐字节相同，与精修源有 41 个文件差异。
   未用生成结果覆盖精修源，当前 artifact 可复现性由重新 check/lower/bake 与 manifest 比较验证。
   转换器回归同时验证 `always` 带 constant、普通 `is_capital` 不带 constant。
-- reviewed 轮 `rulec check rules/eu4-v2`：88 files、0 errors、264 warnings（未使用的声明）。
+- reviewed 轮 `rulec check rules/eu4`：88 files、0 errors、264 warnings（未使用的声明）。
 
 早先的失败和 golden 差异报告保留于本地；它们是历史定位资料，不能代表当前冻结版本的回归状态。
 两份独立的 IR golden 记录 `THIS` 冲突、trigger/effect 可用上下文、实际类型说明及最近所属容器范围；
@@ -886,7 +896,7 @@ IR 23.1 ms / 23.02 MiB。内存与规则加载退出项在这轮 main 中位数�
 | Vanilla 每个 error 有原因和证据；定义/引用按实际语义验证 | 通过本次范围。最终 8,324 errors 的身份与上一轮逐条一致：7,948 条冻结资源缺失、214 条原版问题、73 条规范性诊断，89 条按用户决定排除。最终新缓存的完整定义/引用多重集合与已审版一致，全部差异已归类，待审项为零 |
 | 固定位置补全集合相等或已解释 | 通过。最终既定 11 个完整集合中 7 组相等、4 组差异；2,637 个差异身份全部有解释。保留此前 1,974 个身份的证据，并补充 662 个声明式静态作用域链及 R09 删除 trade_node 候选的证据。每组前 512 项与 LSP 结果一致 |
 | `mem_probe` 内存、规则加载不劣于切换前 | 通过。最终相对 `96f50c8` 的三组安静配对，峰值 RSS 中位数 1,146.75 → 1,071.09 MiB，规则加载 191.5 → 22.8 ms；阶段采样完整、无采样错误。首次加载扫描仍多 1.7 秒，保留为已知风险 |
-| §1.3 硬编码全部删除 | 通过。旧控制流、ScopeContext 和 matcher 消费者已删除；当前消费者读取 IR 的控制流、寄存器和 selector 声明，旧模型标识及旧规则路径检索无生产残留 |
+| §1.3 硬编码全部删除 | 通过。旧控制流、ScopeContext 和 matcher 消费者已删除；当前消费者读取 IR 的控制流、寄存器和 selector 声明，旧模型标识及旧树的 catalog/semantic/types 结构无生产残留 |
 | 检查失败拒绝 bake | 通过。mandatory check、负例和 artifact gate 已验证 |
 
 另有明确的交付要求：删除旧 `model`、旧规则编译模块、`SemanticRule`、全部旧规则文件及

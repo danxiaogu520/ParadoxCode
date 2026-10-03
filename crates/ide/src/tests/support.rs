@@ -156,7 +156,7 @@ pub(crate) fn eu4_fixture_host(
     fields: serde_json::Value,
     profile: rules::GameProfile,
 ) -> AnalysisHost {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4-v2");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4");
     let mut bundle = rules::bundle::load_directory(&path).unwrap();
     let (_, file) = bundle
         .files

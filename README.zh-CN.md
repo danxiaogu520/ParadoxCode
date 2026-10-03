@@ -131,14 +131,14 @@ cargo tools gates
 
 ```bash
 cargo run -p rules --bin bake-ir -- build \
-  --source rules/eu4-v2 \
+  --source rules/eu4 \
   --manifest rules/ir-manifest.json
 ```
 
 官方 `paradoxcode` 二进制内嵌构建时检查并编译的 RulesIr 工件，启动时解码并恢复查询索引。
 生产语义直接读取 IR。
 
-`rules/eu4-v2/` 按游戏领域组织规则，共享 schema、类型、trait、作用域和修正位于 `core/`。
+`rules/eu4/` 按游戏领域组织规则，共享 schema、类型、trait、作用域和修正位于 `core/`。
 `game.json` 声明包身份及游戏配置；普通 JSON 文件递归发现并按规范化路径顺序合并。
 IR 指纹覆盖编译后的 arena、字符串表、溯源及 profile。
 
@@ -183,7 +183,7 @@ node editors/vscode/scripts/diagnose.mjs \
 | `crates/pdc` | 语言服务器 crate：LSP 生命周期与协议边界（以 `paradoxcode` 二进制形式发布） |
 | `crates/tools` | 仓库工具链（`check`、`release`、缓存构建），供 CI 与维护者使用 |
 | `editors/vscode/` | VS Code 扩展：服务器引导、引导流程、任务树预览 |
-| `rules/eu4-v2/` | 权威第一方 EU4 RulesIr 规则源 |
+| `rules/eu4/` | 权威第一方 EU4 RulesIr 规则源 |
 | `fuzz/` | 解析、编辑、格式化与 HIR 模糊测试目标 |
 
 当前第一方 EU4 规则面向游戏版本 **1.37.5**。

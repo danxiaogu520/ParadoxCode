@@ -3,6 +3,7 @@
 > 状态：**阶段 1–5 已完成本次范围内的实现与本地验收**（2026-10-03）。阶段 0 于 2026-09-29 合入 main；阶段 1–5 在长期分支 `feat/rules-v2`。89 条待核验资源项按用户决定排除；PR CI 仍是合并门禁。完整落地状态见 §8.1，冻结版本和验收边界见 `docs/phase5-validation.md`。
 > 前提：项目处于 0.x，**允许破坏性修改，不考虑历史兼容**；规则源格式**继续使用 JSON**。
 > 重构前问题的统计口径：2026-09-29，`rules/eu4`（`source_format_version` 10）与 `crates/*`。第 1 节保留当时的问题和代码位置，当前入口见文末。
+> 当前新规则源统一命名为 `rules/eu4`；历史新源命令的目录路径也使用现名，实际结果仍以各轮冻结身份为准。重构前同名旧树已整体替换。
 
 ## 0. 目标
 
@@ -463,7 +464,7 @@ trigger/effect 中的作用域切换块不再逐条手写，由一个 pattern �
 
 ### 3.2 本轮边界引出的落地缺口
 
-1. `card` 去 `serde(default)` + 转换器始终输出 card + `rules/eu4-v2` 重生成 + 规范 §3.1 默认列与论证按 50/35/13 重写（D14）。
+1. `card` 去 `serde(default)` + 转换器始终输出 card + `rules/eu4` 重生成 + 规范 §3.1 默认列与论证按 50/35/13 重写（D14）。
 2. `FileRule.resolution` 默认翻转为 `merge`（现默认只命中 6%，全表唯一打不中多数的默认值）（D14）。
 3. `FileRule.root` 对 `script` parser 的必填检查（规范已要求，`compile` 未实现）（D14 强制力）。
 4. `MapSpec.value|body`、`BindingSpec.loc|sprite` 的「至少一个」检查（D14 强制力）。
@@ -581,8 +582,8 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 ### 阶段 2：转换脚本 — **已完成**（自动部分 2026-09-30，人工收口 2026-10-01）
 
 > 实施备注：
-> - 历史工具 `rules-migrate` 曾读取 `rules/eu4`，生成 `rules/eu4-v2/` 与 `docs/rules-migrate-report.md`；当时重复运行逐字节一致。2026-10-02 已删除转换器及其专属测试，新源直接维护，不再从旧源重新生成。迁移报告保留为源版本 13 的历史转换记录；旧模型和旧源的最终退役仍属于阶段 5。
-> - 验收：`rulec check rules/eu4-v2` **0 error**（329 条 `UnusedDefinition` warning 属迁移期正常）；行数对平：8,463 = 1,227 去重 + 6,907 进字段 + 149 进 items + 127 折叠进 `scopes.links` + 10 折叠为寄存器位移 + 8 进 on_action 折叠 + 35 孤儿行（进人工清单）。
+> - 历史工具 `rules-migrate` 曾读取旧规则树，生成类型化新源与 `docs/rules-migrate-report.md`；新源现统一位于 `rules/eu4/`。当时重复运行逐字节一致。2026-10-02 已删除转换器及其专属测试，新源直接维护，不再从旧源重新生成。迁移报告保留为源版本 13 的历史转换记录；旧模型和旧源的最终退役已在阶段 5 完成。
+> - 验收：`rulec check rules/eu4` **0 error**（329 条 `UnusedDefinition` warning 属迁移期正常）；行数对平：8,463 = 1,227 去重 + 6,907 进字段 + 149 进 items + 127 折叠进 `scopes.links` + 10 折叠为寄存器位移 + 8 进 on_action 折叠 + 35 孤儿行（进人工清单）。
 > - 历史输出（现已改为显式分组）：on_action 折叠按当时设计产出 `on_actions` enum（`scope` 列）+ `on_action_body<S>`，但**丢弃了 `from` 列**：（scope, from）组合共 65 个，会打爆 §10.1 检查 4 的 64 实例上限；`starts_with`（`on_harmonized_*`）落为一条模板 pattern，body 参数待人工定夺。
 > - 历史设计（requires 已删除）：`ModifierSource` trait 当时未带 `requires: {include: "modifier_block"}`：`semantic_context_inheritance` 的 type:X→modifier 是"实例体自带 modifier 字段"而非"含 `modifier` 子块"，两种形态并存，requires 形态留人工收口（连同 trait impl 一起）。
 > - 修了两处 phase 1 的实现缺陷：`compile::check_instantiation_cap` 的迭代计数原为逐轮累加、域 ≥3 必然打到上限，改为不动点重算；`source` 源类型补 `Serialize`（转换器序列化输出用），JSON Schema 工件随之重新生成（schemars 现在能写出 `default` 值）。
@@ -639,7 +640,7 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 >   def、`field:id` 名字来源、mixin 字段的 provenance）、显式 subtype 引用分类与所有字段查询、查询 API 的 shape 分派（同键多 shape 重载、pattern 只答自己描述的 shape、
 >   键大小写不敏感）、单态化（分组行集、`$S` 代入、`ref | '0'` union）、`link` pattern（`SelfBlock`、
 >   scope link 的 `from`/`to`、模板 link 的空洞）；另有 `the_first_party_corpus_lowers` 全量降级
->   `rules/eu4-v2`，断言 137 条 files、on_action 四组行数分布、100 条 scope link、4 个 event subtype、
+>   `rules/eu4`，断言 137 条 files、on_action 四组行数分布、100 条 scope link、4 个 event subtype、
 >   无 `$unbound` 实例（语料不在仓库时自动跳过）。
 
 - 实现第 5 节 IR、编译降级与查询 API；以 events + on_action + decisions 为样板写 IR 级单测（def 收集、subtype 判定、单态化、`link` pattern）。
@@ -679,7 +680,7 @@ HIR 在降级时为每个块节点记录其 `SchemaId`（以及实例的 `Subtyp
 > - 本地验收通过：workspace 的 fmt、all-targets/all-features check 与 test、Clippy（`-D warnings`），
 >   Rustdoc（`-D warnings`）及 artifact gate。artifact 的规则源、编译、manifest 可复现性、
 >   嵌入产物一致性和 game_id 五项检查全部通过。
->   `rulec check rules/eu4-v2`：88 个源文件，0 errors、268 个 `UnusedDefinition` warnings；
+>   `rulec check rules/eu4`：88 个源文件，0 errors、268 个 `UnusedDefinition` warnings；
 >   转换器重复生成的 90 个 bundle 文件逐字节一致，且与仓库源文件一致。
 >   授权原版 sweep、补全候选对比与加载性能退出标准仍属于阶段 5。
 
@@ -798,7 +799,7 @@ D20、扩展 tutorial 支持等不自动追加为阶段五退出条件。
 
 - 规则源/编译/运行时：`crates/rules/src/{source,compile,lower,ir,bake,catalog,runtime}.rs`，CLI 为 `crates/rules/src/bin/{rulec,bake-ir}.rs`
 - 嵌入与 EU4 profile：`crates/game/build.rs`，`crates/game/src/eu4/mod.rs`
-- 规则源：`rules/eu4-v2/`（递归发现 JSON）；产物身份：`rules/ir-manifest.json`
+- 规则源：`rules/eu4/`（递归发现 JSON）；产物身份：`rules/ir-manifest.json`
 - 主要消费方：`crates/hir/src/{ir_lowering,callable,scope,model,collector}.rs`，`crates/ide/src/{ir_queries,ir_semantic,ir_callable,resolution,navigation,diagnostics,dynamic_rules,dynamic_contracts,localisation,semantic_tokens}.rs`，`crates/ide/src/completion/`，`crates/ide/src/hover/`
 - 任务树通用机制：`crates/engine/src/structure.rs`；游戏布局：`crates/game/src/mission.rs`
 - 扫描：`editors/vscode/scripts/sweep.mjs`（本地，不进 CI）；只读审计工具：`lab/perf/`

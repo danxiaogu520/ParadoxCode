@@ -102,7 +102,7 @@ Release succeeds.
 Use the sweep when a change can alter workspace-wide diagnostics, symbolization, indexing, or rule
 interpretation. It is normally expected for changes to:
 
-- `rules/eu4-v2/` or the rule compiler/matcher;
+- `rules/eu4/` or the rule compiler/matcher;
 - diagnostic emission, resolution, scopes, dynamic definitions, or file classification;
 - parsers or HIR lowering in ways that can affect existing game files;
 - Vanilla cache construction or workspace-wide query behavior.
