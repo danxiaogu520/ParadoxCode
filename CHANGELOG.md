@@ -56,6 +56,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Scripted quoted-payload parser errors are reported at the argument, including escaped and
+  UTF-8 content. Parameter value completion no longer depends on definition usage order.
 - Schema instantiation-cap checks no longer accumulate the same call domain repeatedly.
 - Quoted-script completion ranges, cached name navigation, and declaration-backed hover behavior.
 - Missing localisation bindings for EU4 rebel demands and papal actions; optional ancestor

@@ -5,6 +5,7 @@ use crate::types::{CancellationToken, Cancelled, CompletionItem, CompletionKind}
 use engine::AnalysisSnapshot;
 use parser::{CstKind, CstNode, QuotedScript, encode_quoted_script_text};
 use rules::ir::{FieldId, FieldValue, Matcher, MatcherId, RefTarget, Shape};
+use std::collections::BTreeSet;
 use text::{TextRange, TextSize};
 
 pub(crate) fn try_ir_completion(
@@ -482,19 +483,21 @@ fn append_callable_value_items(
     cancellation: &CancellationToken,
     items: &mut Vec<CompletionItem>,
 ) -> Result<(), Cancelled> {
-    let Some(first) = sites.first() else {
-        return Ok(());
-    };
-    let mut candidates = first.candidates(snapshot, parameter, prefix);
-    candidates.retain(|candidate| {
-        sites
-            .iter()
-            .all(|site| site.accepts_candidate(snapshot, parameter, candidate))
-    });
-    candidates.sort();
-    candidates.dedup();
+    // An unrestricted scalar site has no spellings to enumerate. Collect the other
+    // sites' spellings before intersecting constraints, regardless of source order.
+    let mut candidates = BTreeSet::new();
+    for site in sites {
+        cancellation.checkpoint()?;
+        candidates.extend(site.candidates(snapshot, parameter, prefix));
+    }
     for label in candidates {
         cancellation.checkpoint()?;
+        if !sites
+            .iter()
+            .all(|site| site.accepts_candidate(snapshot, parameter, &label))
+        {
+            continue;
+        }
         let Some(rank) = prefix_rank(&label, prefix) else {
             continue;
         };
