@@ -1,5 +1,5 @@
 //! Compile-time semantic checks for rules-v2 sources
-//! (`docs/rules-language.md` §10).
+//! (`crates/rules/LANGUAGE.md` §10).
 //!
 //! [`check`] parses every mini-syntax string with provenance (source file +
 //! JSON pointer + expression-internal column) and then runs the five
@@ -25,7 +25,7 @@ pub struct Diagnostic {
     pub code: DiagnosticCode,
     /// Human-readable description.
     pub message: String,
-    /// Source file name as listed by the manifest.
+    /// Source file name in the loaded rule bundle.
     pub file: String,
     /// JSON pointer of the offending value.
     pub pointer: String,
@@ -33,9 +33,9 @@ pub struct Diagnostic {
     pub column: Option<usize>,
 }
 
-/// The closed set of `rulec` compile diagnostics (`docs/rules-language.md`
+/// The closed set of `rulec` compile diagnostics (`crates/rules/LANGUAGE.md`
 /// §11). These are rule-source diagnostics, distinct from the script
-/// diagnostics in `docs/diagnostics.md`.
+/// diagnostics in `crates/ide/DIAGNOSTICS.md`.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum DiagnosticCode {
     /// A mini-syntax string failed to parse.
@@ -1775,7 +1775,7 @@ impl ParamCtx<'static> {
 static EMPTY_FIELDS: BTreeMap<String, FieldOverloads> = BTreeMap::new();
 
 /// Saturation point and limit of the parameterised-schema instance count
-/// (`docs/rules-language.md` §10.1, check 4): counts saturate one above the
+/// (`crates/rules/LANGUAGE.md` §10.1, check 4): counts saturate one above the
 /// limit so "over 64" stays provable under saturating arithmetic.
 const INSTANTIATION_CAP: u64 = 65;
 
@@ -2133,7 +2133,7 @@ fn lint_field_cards(
 mod tests {
     use super::*;
 
-    /// The examples of `docs/rules-language.md` folded into one fully
+    /// The examples of `crates/rules/LANGUAGE.md` folded into one fully
     /// referenced document: it must produce zero diagnostics.
     const CLEAN: &str = r#"{
   "files": {

@@ -1,4 +1,4 @@
-//! The type-expression mini-syntax (see `docs/rules-language.md`).
+//! The type-expression mini-syntax (see `crates/rules/LANGUAGE.md`).
 //!
 //! Type expressions are spelled as short strings in rule sources —
 //! `'yes'`, `int[1..10]`, `ref<event.country>`, `'monthly_{ref<governor>}'`,

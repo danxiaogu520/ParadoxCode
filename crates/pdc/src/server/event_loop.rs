@@ -901,7 +901,7 @@ impl LspServer {
                                 Ok((cache, message)) => {
                                     install_metadata.push((
                                         config,
-                                        cache.metadata().build_id.clone(),
+                                        cache.metadata().lsp_version.clone(),
                                         message,
                                     ));
                                     install_caches.push(cache);

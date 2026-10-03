@@ -11,7 +11,7 @@ lightweight, but repository rules enforce the quality and release invariants des
   commitments.
 - `main` is the only integration branch and must remain releasable.
 - `CHANGELOG.md` is the user-visible release history, and `RELEASING.md` is the release runbook.
-- `docs/validation.md` assigns every local check, remote gate, audit, and manual acceptance step to
+- `CONTRIBUTING.md#validation` assigns every local check, remote gate, audit, and manual acceptance step to
   one lifecycle owner.
 - Private security advisories are the only tracker for undisclosed vulnerabilities.
 
@@ -20,7 +20,8 @@ lightweight, but repository rules enforce the quality and release invariants des
 All repository changes use pull requests, including maintainer changes. The `Conclusion` status
 check must pass before squash merge. Non-trivial changes should have an issue that records the
 problem, chosen approach, and any deferred work. Architectural decisions may be captured in that
-issue or in a focused document under `docs/` when they need to live beside the code.
+issue or in an active proposal beside the affected implementation when they need code review.
+Completed decision and acceptance records stay in issues, PRs, and immutable Git history.
 
 CODEOWNERS requests the current maintainer for review. Adding another maintainer should split
 ownership by subsystem instead of granting every path by default.
@@ -38,7 +39,7 @@ ship a failing change or skip a release gate. Create an issue immediately afterw
 
 ## Releases and credentials
 
-Version tags and published releases are immutable. The workflow uses only the repository's
+Version tags and published releases are immutable. The release workflow uses the repository's
 short-lived `GITHUB_TOKEN`; Marketplace credentials are kept outside the repository and used only
 for the audited manual publishing step. Maintainers follow `RELEASING.md` for every release.
 
@@ -50,6 +51,11 @@ merge or release authority; repository-owned regression fixtures are the durable
 Account recovery codes, Marketplace ownership recovery, and any future signing keys must be held
 offline in a maintainer-controlled credential vault. They must never be committed, placed in issue
 text, or exposed to a repository workflow.
+
+The [PR autosync workflow](.github/workflows/pr-autosync.yml) separately uses the repository-scoped
+`AUTOMERGE_TOKEN`. The maintainer owns its least-privilege permissions, expiry/renewal, and recovery.
+Its failure pauses branch refresh/auto-merge; repair the credential and rerun autosync, keeping the
+normal required checks intact.
 
 ## Continuity
 

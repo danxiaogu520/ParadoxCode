@@ -2,25 +2,9 @@
 
 use std::path::Path;
 
-use serde::{Deserialize, Serialize};
-
-/// Identity and arena sizes recorded beside the first-party source.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct ArtifactManifest {
-    pub source_format_version: u32,
-    pub game_id: String,
-    pub target_game_version: Option<String>,
-    pub rule_hash: String,
-    pub schema_count: usize,
-    pub field_count: usize,
-    pub matcher_count: usize,
-    pub file_category_count: usize,
-}
-
-/// Checked arena and reproducible identity produced together.
+/// Checked arena and its deterministic serialized payload.
 pub struct BakedRules {
-    pub manifest: ArtifactManifest,
+    pub ir: crate::ir::RulesIr,
     pub bytes: Vec<u8>,
 }
 
@@ -47,20 +31,10 @@ pub fn compile(directory: &Path) -> Result<BakedRules, String> {
             spec.symbol_kind
         ));
     }
-    let manifest = ArtifactManifest {
-        source_format_version: sources.identity.source_format_version,
-        game_id: ir.game_id().to_owned(),
-        target_game_version: sources.identity.target_game_version,
-        rule_hash: ir.fingerprint(),
-        schema_count: ir.schemas.len(),
-        field_count: ir.fields.len(),
-        matcher_count: ir.matchers.len(),
-        file_category_count: ir.files.len(),
-    };
     let mut value = serde_json::to_value(&ir).map_err(|error| error.to_string())?;
     value.sort_all_objects();
     let bytes = serde_json::to_vec(&value).map_err(|error| error.to_string())?;
-    Ok(BakedRules { manifest, bytes })
+    Ok(BakedRules { ir, bytes })
 }
 
 #[cfg(test)]
@@ -72,10 +46,10 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4");
         let first = compile(&root).expect("bake");
         let second = compile(&root).expect("rebake");
-        assert_eq!(first.manifest, second.manifest);
+        assert_eq!(first.ir.fingerprint(), second.ir.fingerprint());
         assert_eq!(first.bytes, second.bytes);
         let ir = crate::ir::RulesIr::from_baked(&first.bytes).expect("decode");
-        assert_eq!(ir.fingerprint(), first.manifest.rule_hash);
+        assert_eq!(ir.fingerprint(), first.ir.fingerprint());
         assert!(ir.schema_by_name("on_actions_file").is_some());
         assert!(ir.type_by_name("event").is_some());
         assert!(

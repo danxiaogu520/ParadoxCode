@@ -337,7 +337,7 @@ pub(crate) fn prepare_initialize_candidate(
         },
         server_info: Some(ServerInfo {
             name: "pdc".to_owned(),
-            version: Some(env!("CARGO_PKG_VERSION").to_owned()),
+            version: Some(engine::LSP_VERSION.to_owned()),
         }),
     })
     .map_err(|error| RpcError {

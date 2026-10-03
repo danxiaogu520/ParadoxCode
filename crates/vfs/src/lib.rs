@@ -4,6 +4,9 @@
 //! cancellation and limits, the on-disk parse cache, and the shared string pool. It knows
 //! nothing about semantic analysis; higher layers consume these types read-only.
 
+/// Workspace release version shared by persistent caches and the shipped language server.
+pub const LSP_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 mod model;
 mod parse_cache;
 pub mod scan;
@@ -17,7 +20,7 @@ pub use model::{
     WorkspaceScanFilterError, WorkspaceScanFilters, WorkspaceScanIssue, WorkspaceScanIssueKind,
     WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
 };
-pub use parse_cache::{CURRENT_PARSE_CACHE_SCHEMA_VERSION, ParseCache, ParseCacheError};
+pub use parse_cache::{ParseCache, ParseCacheError};
 pub use scan::{
     read_archive_entry_bytes, read_source_file_cancellable, root_priority, split_archive_path,
 };

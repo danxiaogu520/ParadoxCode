@@ -37,6 +37,7 @@ fn phase_rss(label: &str) {
 }
 
 fn main() {
+    println!("PROBE_PID={}", std::process::id());
     let root_arg = std::env::args()
         .nth(1)
         .expect("usage: mem_probe <mod root>");

@@ -74,9 +74,8 @@ impl AnalysisSnapshot {
 
     /// Returns the immutable rules-v2 IR used for this snapshot.
     ///
-    /// Consumers migrate onto this module by module
-    /// (`docs/rules-redesign.md` §6 phase 4); it is empty until the
-    /// composition root installs one.
+    /// The composition root installs the checked, embedded IR. Consumers read
+    /// the same immutable semantic declarations for this snapshot.
     #[must_use]
     pub fn ir(&self) -> &RulesIr {
         &self.ir
