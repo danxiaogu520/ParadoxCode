@@ -34,45 +34,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Verify tag, main ancestry, CI, and release state
         id: verify
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo "Release tag must be a stable semantic version such as v0.4.0: $RELEASE_TAG" >&2
-            exit 1
-          fi
-
-          git fetch --force origin main "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
-          if [ "$(git cat-file -t "refs/tags/$RELEASE_TAG")" != "tag" ]; then
-            echo "Release tag must be annotated: $RELEASE_TAG" >&2
-            exit 1
-          fi
-
-          release_sha="$(git rev-list -n 1 "refs/tags/$RELEASE_TAG")"
-          git merge-base --is-ancestor "$release_sha" origin/main || {
-            echo "Release tag does not point to a commit on main: $release_sha" >&2
-            exit 1
-          }
-
-          conclusion="$(
-            gh api "repos/$GITHUB_REPOSITORY/commits/$release_sha/check-runs" \
-              --jq '[.check_runs | sort_by(.completed_at) | reverse[] | select(.name == "Conclusion") | .conclusion][0] // "missing"'
-          )"
-          if [ "$conclusion" != "success" ]; then
-            echo "The tagged commit must have a successful Conclusion check; got: $conclusion" >&2
-            exit 1
-          fi
-
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "A GitHub Release already exists for $RELEASE_TAG; published releases are never overwritten." >&2
-            exit 1
-          fi
-
-          echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
+        run: cargo run --locked -p tools -- ci release-preflight
 
   build:
     name: Build ${{ matrix.target }}
@@ -127,12 +95,12 @@ jobs:
             --version "$version" \
             --target "${{ matrix.target }}" \
             --binary "target/${{ matrix.target }}/release/${{ matrix.binary }}" \
-            --output-dir dist \
+            --output-dir target/dist \
             --root .
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: server-${{ matrix.target }}
-          path: dist/*
+          path: target/dist/*
           if-no-files-found: error
 
   vscode:
@@ -152,34 +120,18 @@ jobs:
       - run: npm ci --prefix editors/vscode --no-audit --no-fund
       - name: Audit production dependencies
         run: npm --prefix editors/vscode audit --omit=dev --audit-level=high
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Verify extension and tag versions
         shell: bash
-        run: |
-          version="${RELEASE_TAG#v}"
-          node -e '
-            const packageJson = require("./editors/vscode/package.json");
-            const packageLock = require("./editors/vscode/package-lock.json");
-            const expected = process.argv[1];
-            if (packageJson.version !== expected || packageLock.version !== expected) {
-              throw new Error(
-                "VS Code versions must equal tag " + expected +
-                ": package=" + packageJson.version +
-                ", lock=" + packageLock.version
-              );
-            }
-          ' "$version"
+        run: cargo run --locked -p tools -- ci verify-extension-version --version "${RELEASE_TAG#v}"
       - name: Check and package extension
-        working-directory: editors/vscode
-        shell: bash
-        run: |
-          npm run test:contract
-          mkdir -p ../../dist
-          version="${RELEASE_TAG#v}"
-          npm exec -- vsce package --out "../../dist/paradoxcode-vscode-${version}.vsix"
+        run: cargo run --locked -p tools -- editor test contract
+      - run: cargo run --locked -p tools -- editor package
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: vscode-extension
-          path: dist/*.vsix
+          path: target/dist/*.vsix
           if-no-files-found: error
 
   publish:
@@ -201,50 +153,13 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: server-*
-          path: dist/server
+          path: target/dist/server
           merge-multiple: true
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: vscode-extension
-          path: dist/extension
-      - name: Verify complete release payload
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="${RELEASE_TAG#v}"
-          cargo run --locked -p tools -- release verify \
-            --version "$version" \
-            --directory dist/server \
-            --root .
-          test -s "dist/extension/paradoxcode-vscode-${version}.vsix"
-
-          mkdir -p dist/release
-          cp dist/server/* dist/release/
-          cp dist/extension/*.vsix dist/release/
-          test "$(find dist/release -maxdepth 1 -type f | wc -l)" -eq 11
-      - name: Create, verify, and publish release
+          path: target/dist/extension
+      - name: Verify and publish complete release payload
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "A release already exists for $RELEASE_TAG; refusing to overwrite it." >&2
-            exit 1
-          fi
-
-          gh release create "$RELEASE_TAG" dist/release/* \
-            --draft \
-            --verify-tag \
-            --generate-notes \
-            --title "$RELEASE_TAG"
-
-          mapfile -t expected < <(find dist/release -maxdepth 1 -type f -printf '%f\n' | sort)
-          mapfile -t actual < <(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort)
-          if ! diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}"); then
-            echo "Draft release assets do not match the verified local payload." >&2
-            exit 1
-          fi
-
-          gh release edit "$RELEASE_TAG" --draft=false --latest
-          echo "Release $RELEASE_TAG is public and immutable; Marketplace publication remains a separate audited step."
+        run: cargo run --locked -p tools -- ci release-publish

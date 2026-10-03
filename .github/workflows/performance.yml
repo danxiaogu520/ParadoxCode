@@ -23,4 +23,4 @@ jobs:
         with:
           key: perf-stable
       - name: Run optimized benchmark suite
-        run: cargo bench --locked --workspace --all-features --benches
+        run: cargo run --locked -p tools -- perf bench --repeat 3

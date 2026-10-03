@@ -1,0 +1,101 @@
+[
+  {
+    "id": "rws-option-name-value",
+    "goldenFile": "rule_wrong_scope.txt",
+    "documentPath": "events/golden_rws.txt",
+    "line": 0,
+    "character": 65,
+    "expectLine": "province_event = { id = rws.1 title = rws.1.t option = { name = a add_prestige = 1 } }",
+    "reason": "value of known key `name` in an event option (localisation-key value, word `a`)"
+  },
+  {
+    "id": "rws-option-effect-key",
+    "goldenFile": "rule_wrong_scope.txt",
+    "documentPath": "events/golden_rws.txt",
+    "line": 0,
+    "character": 70,
+    "expectLine": "province_event = { id = rws.1 title = rws.1.t option = { name = a add_prestige = 1 } }",
+    "reason": "effect-key position in a province-scope option block (scope filter, word `add_prestige`)"
+  },
+  {
+    "id": "mle-empty-if-body",
+    "goldenFile": "missing_limit_and_empty_block.txt",
+    "documentPath": "events/golden_mle.txt",
+    "line": 3,
+    "character": 8,
+    "expectLine": "  if = { }",
+    "reason": "empty effect-block body (empty word in `if = { }`)"
+  },
+  {
+    "id": "mle-if-effect-key",
+    "goldenFile": "missing_limit_and_empty_block.txt",
+    "documentPath": "events/golden_mle.txt",
+    "line": 1,
+    "character": 15,
+    "expectLine": "  if = { add_prestige = 1 }",
+    "reason": "effect-key position inside an `if` body (word `add_prestige`)"
+  },
+  {
+    "id": "mle-limit-trigger-open",
+    "goldenFile": "missing_limit_and_empty_block.txt",
+    "documentPath": "events/golden_mle.txt",
+    "line": 2,
+    "character": 18,
+    "expectLine": "  if = { limit = { always = yes } }",
+    "reason": "empty position at the start of a `limit` block (trigger-key inventory)"
+  },
+  {
+    "id": "mle-limit-trigger-key",
+    "goldenFile": "missing_limit_and_empty_block.txt",
+    "documentPath": "events/golden_mle.txt",
+    "line": 2,
+    "character": 23,
+    "expectLine": "  if = { limit = { always = yes } }",
+    "reason": "trigger-key position inside a `limit` block (word `always`)"
+  },
+  {
+    "id": "msm-modifier-name-value",
+    "goldenFile": "modifier_scope_mismatch.txt",
+    "documentPath": "events/golden_events.txt",
+    "line": 4,
+    "character": 48,
+    "expectLine": "        add_province_modifier = { name = country_mod duration = 100 }",
+    "reason": "value of known key `name` in `add_province_modifier` (modifier-name reference, word `country_mod`)"
+  },
+  {
+    "id": "dsc-scope-target-open",
+    "goldenFile": "dynamic_scope_contracts.txt",
+    "documentPath": "common/scripted_effects/00_contracts.txt",
+    "line": 4,
+    "character": 39,
+    "expectLine": "dual_ok = { add_prestige = 1 add_core = FRA }",
+    "reason": "scope-target value of known key `add_core` (empty word before `FRA`)"
+  },
+  {
+    "id": "dsc-scope-chain-keyword",
+    "goldenFile": "dynamic_scope_contracts.txt",
+    "documentPath": "common/scripted_effects/00_contracts.txt",
+    "line": 8,
+    "character": 35,
+    "expectLine": "root_opaque = { add_prestige = 1 ROOT = { change_province_name = \"Z\" } }",
+    "reason": "scope-chain keyword position inside an effect body (word `ROOT`)"
+  },
+  {
+    "id": "mst-required-missions-open",
+    "goldenFile": "mission_trees.txt",
+    "documentPath": "missions/golden_main.txt",
+    "line": 14,
+    "character": 23,
+    "expectLine": "\t\trequired_missions = { gm_root }",
+    "reason": "mission-id reference block `required_missions` (empty word before `gm_root`)"
+  },
+  {
+    "id": "mst-required-missions-ref",
+    "goldenFile": "mission_trees.txt",
+    "documentPath": "missions/golden_main.txt",
+    "line": 14,
+    "character": 27,
+    "expectLine": "\t\trequired_missions = { gm_root }",
+    "reason": "mission-id reference position inside `required_missions` (word `gm_root`)"
+  }
+]

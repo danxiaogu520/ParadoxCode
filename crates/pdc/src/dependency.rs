@@ -103,7 +103,7 @@ pub(crate) fn run_dependency_cache_loads(
 /// A usable cache is loaded for installation and refreshed against the dependency directory so
 /// symbol changes are picked up without a full reindex. A missing, corrupt, or
 /// schema-incompatible cache is rebuilt from the configured dependency directory in place. A
-/// build mismatch triggers regeneration. A failed rebuild rejects stale semantic shards.
+/// LSP version mismatch triggers regeneration. A failed rebuild rejects stale semantic shards.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run_dependency_cache_load(
     config: &DependencyIndexCache,
@@ -146,6 +146,21 @@ pub(crate) fn run_dependency_cache_load(
                     log(&format!(
                         "Dependency cache phase: {} could not be loaded ({error}); rebuilding",
                         config.index_path.display()
+                    ));
+                }
+                if matches!(
+                    error,
+                    engine::IndexCacheError::LspVersionMismatch { .. }
+                        | engine::IndexCacheError::InvalidMetadata("lsp_version")
+                ) {
+                    return build_dependency_cache(
+                        config, &rules, &ir, &profile, scan_limits, log, progress,
+                        cancellation, "Dependency index regeneration",
+                    ).map(|cache| (cache, format!(
+                        "Dependency {} index was regenerated for LSP version {} and loaded from {}",
+                        config.root.path.display(), engine::LSP_VERSION, config.index_path.display()
+                    ))).map_err(|rebuild_error| format!(
+                        "{rebuild_error}; refusing to install the dependency cache: {error}"
                     ));
                 }
                 // The old file is unusable (missing, corrupt, or from an older schema); remove it so
@@ -193,98 +208,57 @@ pub(crate) fn run_dependency_cache_load(
                 loaded.index().position_ranges().len(),
             ));
         }
-        if loaded.metadata().build_id == engine::ANALYZER_BUILD_ID {
-            if let Some(log) = log {
-                log(&format!(
-                    "Dependency cache phase: analyzer build matches for {}; refreshing fingerprints",
-                    config.root.path.display()
-                ));
-            }
-            // The analyzer build still matches, so only the source files may have moved on: refresh the cache
-            // against the dependency directory (a fingerprint diff, not a reparse). A failed
-            // refresh — moved or unavailable source, cancellation — degrades to the cached
-            // symbols, and a save failure keeps the refreshed cache in memory with a warning.
-            let refresh_started = std::time::Instant::now();
-            if let Some(log) = log {
-                log(&format!(
-                    "Dependency refresh phase: checking source files under {}",
-                    config.root.path.display()
-                ));
-            }
-            return match loaded.refresh_with_ir_cancellable(
-                &rules,
-                &profile,
-                &ir,
-                cancellation,
-                progress,
-            ) {
-                Ok(refreshed) => {
-                    if let Some(log) = log {
-                        log(&format!(
-                            "Dependency refresh: {:.1} ms against {}",
-                            refresh_started.elapsed().as_secs_f64() * 1000.0,
-                            config.root.path.display()
-                        ));
-                    }
-                    let save = refreshed.save_with_progress(&config.index_path, progress);
-                    let suffix = match save {
-                        Ok(()) => String::new(),
-                        Err(error) => format!(
-                            "; refreshed content could not be saved to {}: {error}",
-                            config.index_path.display()
-                        ),
-                    };
-                    Ok((
-                        refreshed,
-                        format!(
-                            "Dependency {} symbols refreshed against {} and loaded from {}{suffix}",
-                            config.root.path.display(),
-                            config.root.path.display(),
-                            config.index_path.display()
-                        ),
-                    ))
-                }
-                Err(error) => Ok((
-                    loaded,
-                    format!(
-                        "Dependency {} symbols loaded from {}; refresh skipped: {error}",
-                        config.root.path.display(),
-                        config.index_path.display()
-                    ),
-                )),
-            };
-        }
-        let stale_build = &loaded.metadata().build_id;
-        let current_build = engine::ANALYZER_BUILD_ID;
         if let Some(log) = log {
             log(&format!(
-                "Dependency cache {} is stale (analyzer build {stale_build} != {current_build}); regenerating from {}",
-                config.index_path.display(),
+                "Dependency cache phase: LSP version matches for {}; refreshing fingerprints",
                 config.root.path.display()
             ));
         }
-        let rebuilt = build_dependency_cache(
-            config,
-            &rules,
-            &ir,
-            &profile,
-            scan_limits,
-            log,
-            progress,
-            cancellation,
-            "Dependency index regeneration",
-        );
-        match rebuilt {
-            Ok(cache) => Ok((
-                cache,
+        // The LSP version still matches, so only the source files may have moved on: refresh the cache
+        // against the dependency directory (a fingerprint diff, not a reparse). A failed
+        // refresh — moved or unavailable source, cancellation — degrades to the cached
+        // symbols, and a save failure keeps the refreshed cache in memory with a warning.
+        let refresh_started = std::time::Instant::now();
+        if let Some(log) = log {
+            log(&format!(
+                "Dependency refresh phase: checking source files under {}",
+                config.root.path.display()
+            ));
+        }
+        match loaded.refresh_with_ir_cancellable(&rules, &profile, &ir, cancellation, progress) {
+            Ok(refreshed) => {
+                if let Some(log) = log {
+                    log(&format!(
+                        "Dependency refresh: {:.1} ms against {}",
+                        refresh_started.elapsed().as_secs_f64() * 1000.0,
+                        config.root.path.display()
+                    ));
+                }
+                let save = refreshed.save_with_progress(&config.index_path, progress);
+                let suffix = match save {
+                    Ok(()) => String::new(),
+                    Err(error) => format!(
+                        "; refreshed content could not be saved to {}: {error}",
+                        config.index_path.display()
+                    ),
+                };
+                Ok((
+                    refreshed,
+                    format!(
+                        "Dependency {} symbols refreshed against {} and loaded from {}{suffix}",
+                        config.root.path.display(),
+                        config.root.path.display(),
+                        config.index_path.display()
+                    ),
+                ))
+            }
+            Err(error) => Ok((
+                loaded,
                 format!(
-                    "Dependency {} index was regenerated for the active analyzer build {current_build} and loaded from {}",
+                    "Dependency {} symbols loaded from {}; refresh skipped: {error}",
                     config.root.path.display(),
                     config.index_path.display()
                 ),
-            )),
-            Err(error) => Err(format!(
-                "{error}; refusing to install the dependency cache because its analyzer build is stale (cached {stale_build}, active {current_build})"
             )),
         }
     })();
@@ -448,7 +422,75 @@ mod tests {
     }
 
     #[test]
-    fn changed_ir_rejects_stale_dependency_cache_when_rebuild_fails() {
+    fn changed_lsp_version_rebuilds_dependency_cache_from_source() {
+        let container = tempdir().unwrap();
+        let source = container.path().join("dependency");
+        fs::create_dir_all(source.join("events")).unwrap();
+        let event = source.join("events/example.txt");
+        fs::write(&event, "country_event = { id = old.1 }").unwrap();
+        let root = SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::Dependency,
+            AbsPath::normalize(&source),
+        );
+        let ir = game::eu4::first_party_ir().unwrap();
+        let rules = rules::RuleSet::from_ir_catalog(&ir);
+        let profile = ir.game.profile.clone();
+        let mut host = AnalysisHost::with_ir(rules.clone(), profile.clone(), ir.clone());
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![root.clone()]));
+        host.refresh_source_roots().unwrap();
+        let cache = IndexCache::from_snapshot(&host.snapshot()).unwrap();
+        let path = container.path().join("dependency.pdcindex");
+        cache.save(&path).unwrap();
+        rusqlite::Connection::open(&path)
+            .unwrap()
+            .execute(
+                "UPDATE metadata SET value = ?1 WHERE key = 'lsp_version'",
+                [b"0.0.0-old".as_slice()],
+            )
+            .unwrap();
+        fs::write(&event, "country_event = { id = new.2 }").unwrap();
+        let (rebuilt, message) = run_dependency_cache_load(
+            &DependencyIndexCache {
+                root,
+                index_path: path.clone(),
+            },
+            rules,
+            ir,
+            profile,
+            WorkspaceScanLimits::default(),
+            &[],
+            None,
+            None,
+            &WorkspaceScanToken::new(),
+        )
+        .unwrap();
+        assert!(message.contains("regenerated"));
+        assert_eq!(rebuilt.metadata().lsp_version, engine::LSP_VERSION);
+        assert_ne!(
+            rebuilt.metadata().source_fingerprint,
+            cache.metadata().source_fingerprint
+        );
+        assert!(
+            rebuilt
+                .index()
+                .definitions_iter()
+                .any(|definition| definition.name.as_ref() == "new.2")
+        );
+        assert!(
+            !rebuilt
+                .index()
+                .definitions_iter()
+                .any(|definition| definition.name.as_ref() == "old.1")
+        );
+        assert_eq!(
+            IndexCache::load(&path).unwrap().metadata(),
+            rebuilt.metadata()
+        );
+    }
+
+    #[test]
+    fn changed_lsp_version_rejects_stale_dependency_cache_when_rebuild_fails() {
         let container = tempdir().expect("temporary dependency container");
         let source = container.path().join("dependency");
         fs::create_dir_all(source.join("events")).expect("dependency directory");
@@ -479,11 +521,13 @@ mod tests {
         rusqlite::Connection::open(&index_path)
             .unwrap()
             .execute(
-                "UPDATE metadata SET value = ?1 WHERE key = 'build_id'",
-                [b"previous-analyzer-build".as_slice()],
+                "UPDATE metadata SET value = ?1 WHERE key = 'lsp_version'",
+                [b"0.0.0-old".as_slice()],
             )
             .unwrap();
         drop(stale_host);
+        let previous_bytes = fs::read(&index_path).unwrap();
+        let persisted_path = index_path.clone();
         fs::remove_dir_all(&source).expect("remove dependency so rebuild fails");
 
         let ir = game::eu4::first_party_ir().expect("embedded rules-v2 IR");
@@ -498,10 +542,15 @@ mod tests {
             None,
             &WorkspaceScanToken::new(),
         );
-        let error = result.expect_err("stale IR cache must not be returned");
+        let error = result.expect_err("a cache from another LSP version must not be returned");
         assert!(
             error.contains("refusing to install the dependency cache"),
-            "IR mismatch is explicit: {error}"
+            "LSP version mismatch is explicit: {error}"
+        );
+        assert_eq!(
+            fs::read(persisted_path).unwrap(),
+            previous_bytes,
+            "a failed rebuild must leave the prior file intact"
         );
     }
 }

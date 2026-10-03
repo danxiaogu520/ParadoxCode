@@ -7,7 +7,7 @@
 # Default owner for everything not matched below
 * @danxiaogu520
 
-# Core Rust crates (engine layers, dependency direction: text -> parser -> engine -> analysis -> lsp)
+# Core Rust crates (see the generated dependency table in CONTRIBUTING.md)
 /crates/text/ @danxiaogu520
 /crates/parser/ @danxiaogu520
 /crates/rules/ @danxiaogu520
@@ -39,5 +39,3 @@
 /RELEASING.md @danxiaogu520
 /GOVERNANCE.md @danxiaogu520
 /CHANGELOG.md @danxiaogu520
-/AGENTS.md @danxiaogu520
-/docs/validation.md @danxiaogu520

@@ -28,31 +28,6 @@ mod write;
 
 pub use references_store::ReferenceIndexStore;
 
-/// Current on-disk cache schema.
-///
-/// Schema 24 records analyzer build identity; rule hashes are diagnostic metadata only.
-/// Schema 21 merges attribute summaries for payloads replayed at multiple scopes.
-/// Schema 20 retains preview payload symbols and references in scope/enum unions.
-/// Schema 22 respects scalar fallbacks and retains resolved overlapping reference branches.
-/// Schema 19 collects parameterized symbol expansions consistently in scanned references.
-/// Schema 18 replays quoted Callable payloads into indexed definitions and references.
-/// Schema 17 persists subtype facts with each retained definition-attribute summary.
-/// Schema 16 records the rules-v2 IR fingerprint independently of the legacy rules hash.
-/// Schema 15 raises the localisation preview bound from 240 to 1000 characters;
-/// caches written before that hold the shorter previews. Schema 14 decodes
-/// EU4dll-transcoded localisation values in persisted previews
-/// (tied to `transcode::TRANSCODE_VERSION`); caches written before that hold the raw
-/// escaped form. Schema 12 adds the `flag_writes` table (`dynamic_set` write sites)
-/// to shards. Schema 11 persisted localisation previews; schema 10 persists the exact
-/// selection range of definitions. Schema 9 invalidated indexes built
-/// by the old encoding-recovery sanitizer, which could expose braces from malformed comments as
-/// active syntax. Older caches are rebuilt once by the CLI or LSP, the same way a rules update
-/// triggers a rebuild; no legacy reader is retained.
-pub const CURRENT_CACHE_SCHEMA_VERSION: u32 = 24;
-
-/// Oldest on-disk cache schema this executable can still load.
-pub const MIN_SUPPORTED_CACHE_SCHEMA_VERSION: u32 = CURRENT_CACHE_SCHEMA_VERSION;
-
 const APPLICATION_ID: i32 = 0x5044_5856;
 const MAX_CACHE_BYTES: u64 = 1024 * 1024 * 1024;
 const MAX_CACHE_FILES: usize = 100_000;
@@ -88,17 +63,14 @@ type LoadedIndex = (
 /// Observable metadata recorded when an index cache is built manually.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexCacheMetadata {
-    /// Cache format version.
-    pub schema_version: u32,
+    /// LSP release that produced these semantic shards. Other versions require a full rebuild.
+    pub lsp_version: String,
     /// Stable game identity carried by the rules artifact.
     pub game_id: String,
-    /// Analyzer build that produced these semantic shards. Updates require a full rebuild.
-    pub build_id: String,
     /// Rules hash retained for reports and assertions, never for cache invalidation.
     pub rule_hash: String,
-    /// Rules-v2 IR fingerprint used to create the cache. Empty IR still has a
-    /// versioned, non-empty fingerprint so caches cannot silently cross the
-    /// legacy-only and rules-v2 paths.
+    /// Rules-v2 IR fingerprint retained for report comparisons, including empty IR.
+    /// This identity does not control cache reuse.
     pub ir_hash: String,
     /// Human-readable source directory identity.
     pub source_identity: String,
@@ -231,9 +203,8 @@ impl IndexCache {
             .map_err(|error| IndexCacheError::InvalidData(error.to_string()))?
             .as_secs();
         let metadata = IndexCacheMetadata {
-            schema_version: CURRENT_CACHE_SCHEMA_VERSION,
+            lsp_version: crate::LSP_VERSION.to_owned(),
             game_id: snapshot.rules().game_id().to_owned(),
-            build_id: crate::ANALYZER_BUILD_ID.to_owned(),
             rule_hash: snapshot.rules().rule_hash().to_hex(),
             ir_hash: snapshot.ir_fingerprint().to_owned(),
             source_identity: root.path.display().to_string(),
@@ -258,14 +229,13 @@ impl IndexCache {
     /// Reindexes this cache against its recorded source directory, avoiding reads for files whose
     /// recorded filesystem metadata is unchanged and parsing only files whose content changed.
     ///
-    /// The rules must match the hash recorded in the cache: shard contents (kinds, dynamic-definition
-    /// summaries, references) depend on the rules, so a different hash needs a full rebuild.
+    /// The LSP release version must match. Rule fingerprints remain report metadata;
+    /// published releases are immutable, and semantic changes require a version bump.
     pub fn refresh(&self, rules: &RuleSet, profile: &GameProfile) -> Result<Self, IndexCacheError> {
         self.refresh_with_ir(rules, profile, &RulesIr::empty())
     }
 
-    /// Reindexes this cache while validating both the legacy rules and the
-    /// rules-v2 IR fingerprint.
+    /// Reindexes source changes using the supplied rules-v2 IR under the same LSP version.
     pub fn refresh_with_ir(
         &self,
         rules: &RuleSet,
@@ -307,6 +277,12 @@ impl IndexCache {
 }
 
 impl IndexCache {
+    /// Reads only the recorded source root from a recognized cache, including older releases.
+    /// Semantic payloads are never decoded or reused by this recovery operation.
+    pub fn recorded_source_root(path: &Path) -> Result<SourceRoot, IndexCacheError> {
+        read::recorded_source_root(path)
+    }
+
     /// Loads a cache without reading or scanning its original source directory.
     pub fn load(path: &Path) -> Result<Self, IndexCacheError> {
         Self::load_cancellable(path, &WorkspaceScanToken::new())
@@ -432,8 +408,6 @@ pub enum IndexCacheError {
     Sql(rusqlite::Error),
     /// The file is SQLite but is not a ParadoxCode index cache.
     NotIndexCache,
-    /// The cache schema is not understood by this executable.
-    UnsupportedSchema(u32),
     /// Required metadata is absent or malformed.
     InvalidMetadata(&'static str),
     /// Valid resource bounds were exceeded.
@@ -444,8 +418,8 @@ pub enum IndexCacheError {
     GameMismatch { expected: String, actual: String },
     /// The cached root conflicts with a configured source root.
     RootConflict { root: AbsPath, configured: AbsPath },
-    /// Cache shards were produced by another analyzer build.
-    BuildMismatch { cached: String, active: String },
+    /// Cache shards were produced by another LSP release.
+    LspVersionMismatch { cached: String, active: String },
 }
 
 impl fmt::Display for IndexCacheError {
@@ -457,12 +431,6 @@ impl fmt::Display for IndexCacheError {
             Self::NotIndexCache => formatter.write_str(
                 "the selected file is not a ParadoxCode index cache and will not be overwritten",
             ),
-            Self::UnsupportedSchema(version) => {
-                write!(
-                    formatter,
-                    "unsupported index cache schema version: {version}"
-                )
-            }
             Self::InvalidMetadata(key) => {
                 write!(formatter, "invalid or missing index cache metadata: {key}")
             }
@@ -480,9 +448,9 @@ impl fmt::Display for IndexCacheError {
                 root.as_path().display(),
                 configured.as_path().display()
             ),
-            Self::BuildMismatch { cached, active } => write!(
+            Self::LspVersionMismatch { cached, active } => write!(
                 formatter,
-                "index cache analyzer build mismatch: cached {cached}, active {active}; a full reindex is required"
+                "index cache LSP version mismatch: cached {cached}, active {active}; a full reindex is required"
             ),
         }
     }

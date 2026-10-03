@@ -1,4 +1,4 @@
-//! The rules runtime IR (`docs/rules-redesign.md` §5).
+//! The checked runtime IR consumed by HIR, indexing, and IDE queries.
 //!
 //! A [`RulesIr`] is a closed arena: every key, name, and template is an
 //! interned [`Symbol`], every structure is an id-addressed entry, and all
@@ -743,7 +743,7 @@ impl ScopeRef {
 pub struct Provenance {
     /// The field.
     pub field: FieldId,
-    /// The source file name as listed by the manifest.
+    /// The source file name in the loaded rule bundle.
     pub file: Symbol,
     /// The JSON pointer of the field specification.
     pub pointer: Symbol,

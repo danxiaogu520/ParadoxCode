@@ -4,11 +4,14 @@ fn main() -> Result<(), pdc::LspError> {
     eprintln!("paradoxcode: {process_message}");
     let mut startup_messages = vec![process_message];
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|argument| argument == "mcp") {
+        return pdc::mcp::run(&args[1..]).map_err(pdc::LspError::Protocol);
+    }
     if args
         .iter()
         .any(|argument| argument == "--version" || argument == "-V")
     {
-        println!("paradoxcode {}", env!("CARGO_PKG_VERSION"));
+        println!("paradoxcode {}", engine::LSP_VERSION);
         return Ok(());
     }
     if !args.is_empty() {

@@ -73,9 +73,38 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     results.push(requires_file("RELEASING.md"));
     results.push(requires_file("SECURITY.md"));
     results.push(requires_file("LICENSE"));
+    let misplaced_outputs: Vec<_> = ["performance-results", "diagnostic-reports", "dist"]
+        .into_iter()
+        .filter(|directory| root.join(directory).exists())
+        .collect();
+    results.push(check(
+        misplaced_outputs.is_empty(),
+        "generated output stays under target",
+        format!(
+            "move repository-root output directories into target/: {}",
+            misplaced_outputs.join(", ")
+        ),
+    ));
     results.push(requires_file(".github/workflows/ci.yml"));
     results.push(requires_file(".github/workflows/release.yml"));
-    results.push(requires_file("docs/validation.md"));
+    for path in [
+        "CONTRIBUTING.md",
+        "crates/rules/LANGUAGE.md",
+        "crates/ide/DIAGNOSTICS.md",
+        "editors/vscode/README.md",
+        "rules/README.md",
+    ] {
+        results.push(requires_file(path));
+    }
+    let documentation = crate::documentation::check(root);
+    results.push(match documentation {
+        Ok(errors) => check(
+            errors.is_empty(),
+            "documentation contracts",
+            errors.join("\n"),
+        ),
+        Err(error) => CheckResult::fail("documentation contracts", error),
+    });
     results.push(requires_file("deny.toml"));
     results.push(requires_file("editors/vscode/package.json"));
     results.push(requires_file("editors/vscode/package-lock.json"));
@@ -93,12 +122,12 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
 
     if let Ok(release_workflow) = fs::read_to_string(root.join(".github/workflows/release.yml")) {
         results.push(check(
-            release_workflow.contains("--draft")
-                && release_workflow.contains("-eq 11")
+            release_workflow.contains("ci release-preflight")
+                && release_workflow.contains("ci release-publish")
                 && !release_workflow.contains("sweep")
                 && !release_workflow.contains("--clobber"),
             "immutable release workflow",
-            "release workflow must verify the eleven redistributable assets, publish from a draft, avoid licensed-data sweep dependencies, and never clobber assets",
+            "release workflow must use native provenance and complete-payload publication checks, avoid licensed-data sweep dependencies, and never clobber assets",
         ));
     }
 
@@ -120,9 +149,10 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
             "README disclaimer is missing",
         ));
         results.push(check(
-            readme.contains("Latest release:"),
+            readme.contains("https://github.com/danxiaogu520/ParadoxCode/releases")
+                && !readme.contains("Latest release: v"),
             "README release status",
-            "README release status is missing",
+            "README must link to published releases rather than copy a current version",
         ));
     }
 
@@ -556,29 +586,24 @@ pub fn check_release_artifact(root: &Path) -> Vec<CheckResult> {
     check_ir_artifact(root)
 }
 
-/// Validates the checked IR manifest against source and the build-time payload.
+/// Validates deterministic source compilation and the build-time embedded payload.
 fn check_ir_artifact(root: &Path) -> Vec<CheckResult> {
-    let expected = fs::read(root.join("rules/ir-manifest.json"))
-        .map_err(|error| error.to_string())
-        .and_then(|bytes| {
-            serde_json::from_slice::<rules::bake::ArtifactManifest>(&bytes)
-                .map_err(|error| error.to_string())
-        });
     let generated = rules::bake::compile(&root.join("rules/eu4"));
-    let (expected, generated) = match (expected, generated) {
-        (Ok(expected), Ok(generated)) => (expected, generated),
+    let repeated = rules::bake::compile(&root.join("rules/eu4"));
+    let (generated, repeated) = match (generated, repeated) {
+        (Ok(generated), Ok(repeated)) => (generated, repeated),
         (Err(error), _) | (_, Err(error)) => {
             return vec![CheckResult::fail("checked IR source compilation", error)];
         }
     };
     let mut results = vec![check(
-        generated.manifest == expected,
-        "IR manifest reproducibility",
-        "rules/ir-manifest.json differs from the checked source",
+        generated.bytes == repeated.bytes,
+        "IR baking reproducibility",
+        "repeated source compilation produced different IR payloads",
     )];
     match game::eu4::first_party_ir() {
         Ok(embedded) => results.push(check(
-            embedded.fingerprint() == generated.manifest.rule_hash,
+            embedded.fingerprint() == generated.ir.fingerprint(),
             "embedded IR matches checked source",
             "the build-time embedded IR differs from the checked source",
         )),
