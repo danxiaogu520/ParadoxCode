@@ -1,193 +1,187 @@
 # Contributing to ParadoxCode
 
-Thanks for your interest in ParadoxCode! This guide explains how to build, test, and contribute to
-the repository. Repository rules and maintainer responsibilities are documented in
-[`GOVERNANCE.md`](GOVERNANCE.md).
+Start with the [product overview](README.md) and [governance](GOVERNANCE.md).
+This guide owns development setup, validation choices, and documentation maintenance.
 
-## Project overview
+## Build and debug
 
-ParadoxCode is a game-neutral PDX language engine with an EU4-first scope. The architecture keeps
-the parser, HIR, workspace, analysis, and LSP layers game-agnostic while EU4 paths, scopes,
-commands, symbols, and special semantics stay in the EU4 profile. Contributions should respect
-these boundaries:
+Use the Rust minimum declared in [Cargo.toml](Cargo.toml) or a newer stable toolchain,
+and the Node.js version selected by [CI](.github/workflows/ci.yml) for extension work.
+Use the committed lockfiles. No machine-local Cargo alias or commit hook is required.
 
-```text
-text
-  -> parser -> vfs -> hir -> index -> engine -> ide -> pdc
-game (EU4 profile) -> parser + text + rules
-rules -> bake
-rules + game -> engine / ide / index
-```
-
-Each layer has a strict responsibility list; details live in the
-[`README` architecture section](README.md#architecture). As a rule of thumb: EU4 name tables,
-scope lists, and special semantics belong in `game` (the EU4 profile), never in the generic engine,
-LSP layer, or editor extensions.
-
-## Prerequisites
-
-- Rust **1.88 or newer** (see `.github/workflows/ci.yml` for the enforced MSRV).
-- Node.js **24 LTS** for the VS Code extension.
-- Git. There are no commit hooks. Run focused checks while developing and the affected local gate
-  groups before pushing. CI owns clean-checkout platform, MSRV, dependency-policy, typo, and
-  nightly fuzz coverage that is impractical to reproduce in every local environment. The complete
-  ownership matrix lives in [`docs/validation.md`](docs/validation.md).
-
-## Building and testing
-
-```bash
+```sh
 cargo build --locked --workspace
 cargo test --locked --workspace --all-targets
-cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+npm ci --prefix editors/vscode --no-audit --no-fund
+npm --prefix editors/vscode run check
 ```
 
-Run every deterministic local group explicitly when a large change warrants it:
+Run focused tests during development, such as `cargo test -p ide completion` or
+`cargo test -p pdc format_command`. For extension debugging, open `editors/vscode` in VS Code
+and use its [checked-in launch configuration](editors/vscode/.vscode/launch.json).
+Server integration and configuration belong to the [server guide](crates/pdc/README.md)
+and [extension guide](editors/vscode/README.md).
 
-```bash
-cargo tools gates
-```
+## Architecture
 
-or select only the affected group: `core`, `core-fast`, `vscode`, `policy`, `artifact`, `fuzz`,
-or `perf` (the long spelling without the cargo alias is
-`cargo run -p tools -- gates <group>`). `all` means all default deterministic **local** groups;
-optimized `perf` remains opt-in, and neither form is a release-readiness certificate.
+Source text passes through loss-aware syntax, rule-aware HIR, per-file index shards,
+immutable workspace snapshots, editor-neutral queries, and the LSP adapter.
+EU4 spellings and data belong to the [first-party rule package](rules/README.md);
+shared analysis mechanisms belong to the engine and analysis layers.
 
-Pull-request CI follows the `core-fast` intent and leaves the optimized benchmark suite to the
-scheduled/manual `perf` workflow. Run the latter explicitly when changing performance-sensitive
-code:
+Module and crate rustdoc owns implementation responsibilities and public API contracts.
+The table below is generated from Cargo manifests: it lists direct runtime workspace
+dependencies, rather than implying that the workspace is a single linear chain.
 
-```bash
-cargo tools gates perf
-```
+<!-- generated:crate-dependencies:start -->
 
-CI runs the editor, fuzz, repository policy, artifact contract, and deterministic dependency jobs
-on every pull request. Fuzz is limited to its direct runtime dependencies, and the Windows release
-build runs in parallel with Windows tests and clippy. Branch protection requires the stable
-`Conclusion` aggregate rather than every individual job. External advisory databases and optimized
-benchmarks are scheduled audits rather than unrelated-PR blockers.
-
-Validate the first-party EU4 rule source and regenerate its IR manifest:
-
-```bash
-cargo run -p rules --bin bake-ir -- build \
-  --source rules/eu4 \
-  --manifest rules/ir-manifest.json
-```
-
-Compilation checks run before either output is written; invalid sources cannot replace a valid artifact.
-
-A whole-Project diagnostic pass against a local Vanilla index is available through
-`node editors/vscode/scripts/diagnose.mjs` (or `npm --prefix editors/vscode run
-  diagnose -- ...`; see the README for usage). Generated reports land in the
-ignored `diagnostic-reports/` directory and must not be committed.
-
-The full Vanilla sweep is also local-only. It is expected for changes that can alter
-workspace-wide diagnostics, rules, parsing/HIR semantics, indexing, or query behavior, and it
-requires an explicit server binary:
-
-```bash
-cargo build --locked --release -p pdc --bin paradoxcode
-node editors/vscode/scripts/sweep.mjs \
-  --server target/release/paradoxcode.exe \
-  --vanilla-source /path/to/eu4
-```
-
-Sweep reports can contain licensed game excerpts and machine-local paths. Keep them in the ignored
-`performance-results/` directory and never attach them to a pull request, issue, CI run, or Release.
-Convert every discovered defect into a minimal repository-owned regression fixture.
-
-## Repository layout
-
-| Path | Purpose |
+| Crate | Direct runtime workspace dependencies |
 | --- | --- |
-| `crates/` | Rust parser, rules, HIR, workspace, analysis, formatter, LSP, and CLI crates |
-| `editors/vscode/` | VS Code extension with server bootstrap and mission-tree preview |
-| `rules/` | Authoritative first-party EU4 rule source (`rules/eu4/**/*.json`) |
-| `fuzz/` | Parser, edit, formatter, and HIR fuzz targets |
-| `crates/tools/` | Cross-platform repository, release, and quality-gate tooling |
+| [transcode](crates/transcode/src/lib.rs) | — |
+| [text](crates/text/src/lib.rs) | — |
+| [parser](crates/parser/src/lib.rs) | `text` |
+| [rules](crates/rules/src/lib.rs) | `text` |
+| [game](crates/game/src/lib.rs) | `engine`, `parser`, `rules`, `text` |
+| [vfs](crates/vfs/src/lib.rs) | `parser`, `rules`, `text`, `transcode` |
+| [hir](crates/hir/src/lib.rs) | `parser`, `rules`, `text`, `vfs` |
+| [index](crates/index/src/lib.rs) | `hir`, `parser`, `rules`, `text`, `vfs` |
+| [engine](crates/engine/src/lib.rs) | `hir`, `index`, `parser`, `rules`, `text`, `transcode`, `vfs` |
+| [ide](crates/ide/src/lib.rs) | `engine`, `game`, `hir`, `parser`, `rules`, `text`, `transcode`, `vfs` |
+| [pdc](crates/pdc/src/lib.rs) | `engine`, `game`, `ide`, `parser`, `rules`, `text`, `transcode` |
+| [tools](crates/tools/src/lib.rs) | `engine`, `game`, `ide`, `pdc`, `rules`, `text` |
+<!-- generated:crate-dependencies:end -->
 
-## How to contribute
-
-1. **Open an issue first** for non-trivial changes so the problem and approach are agreed before
-   code is written. Use the issue templates for bug reports and feature requests.
-2. **Make focused, reviewable changes.** Keep behavior-preserving refactors separate from new
-   features, and add tests or fixtures that prove the behavior in the same change.
-3. **Run the affected local groups explicitly** and make sure the PR's `Conclusion` check passes.
-4. **Open a pull request** describing the change, the tests run, and any residual risks.
-
-### Commit message convention
-
-ParadoxCode uses [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-<type>(<optional scope>): <imperative summary>
-
-<optional body>
-```
-
-- Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `ci`, `chore`, `style`.
-- Use a scope when it helps, e.g. `fix(lsp):`, `ci(release):`, `feat(mission):`.
-- Keep the subject under 72 characters, capitalized, no trailing period.
-- The body is optional; when present, wrap at 72 columns and explain *why*, not what.
-- Mark breaking changes with `!` after the type/scope in addition to a `BREAKING CHANGE:` trailer.
-
-Example:
-
-```
-fix(lsp): validate document version before publishing diagnostics
-
-Snapshot workers may finish after a newer edit; discard their results so
-stale diagnostics never reach the client.
-```
-
-### Branching and publishing
-
-- The default publishing target is `main`; all changes, including maintainer changes, use a pull
-  request. The protected branch rejects direct pushes, force pushes, and deletion.
-- Pull-request titles follow the commit convention above because squash merge uses the PR title as
-  the commit subject. Delete the source branch after merge.
-- Maintainers push annotated release tags (`v0.x.y`) only after the merged commit's `Conclusion`
-  check passes. Version tags are protected from updates and deletion. See
-  [`RELEASING.md`](RELEASING.md) for the full release checklist.
-- Emergency rule bypasses are reserved for repository recovery and must be documented in an issue.
-  See [`GOVERNANCE.md`](GOVERNANCE.md).
+Keep user-facing protocol conversion in `pdc`, VS Code UI in the extension, and
+semantic decisions in `ide`/HIR/rules. Generic structured-view graph and writeback mechanisms
+live in `engine`; game layout policy lives in `game`. Extend existing responsibilities
+before introducing another layer.
 
 ## Engineering conventions
 
-These are the invariants the repository enforces; please keep them in mind in every change:
+- Workspace Cargo lints forbid `unsafe`.
+- User-controlled input returns errors; it must not trigger `unwrap`/`expect` panics.
+- Files, documents, roots, and symbols use stable identities across requests.
+- Background work cooperates with cancellation or has explicit resource bounds.
+- Malformed source remains available for analysis through loss-aware syntax and unknown nodes.
+- `rules/eu4/` is the first-party rule authority. Builds check and embed its compiled IR;
+  runtime analysis does not load external rule paths.
 
-- **No `unsafe`.** The workspace forbids `unsafe_code` in Cargo lints.
-- **No panics on user input.** Paths, file contents, and configuration errors must be returned
-  explicitly; do not use `unwrap`/`expect` on user-supplied data.
-- **Stable identities.** Source roots, files, documents, and symbols use stable IDs. Never use
-  absolute paths or CST node pointers as cross-request identities.
-- **Everything is cancellable.** Background work must cooperate with cancellation or have clear
-  resource and time bounds.
-- **Syntax errors never block analysis.** Parsers produce loss-aware CSTs even on malformed input;
-  unrecognized constructs lower to `Unknown*` nodes instead of panicking.
-- **One authoritative rule source.** `rules/eu4/` is the only rule authority; builds
-  check and compile the source into an embedded RulesIr artifact. Runtime semantics read that IR. `.cwt` files are never rule
-  input, and the runtime accepts no external rule paths.
-- **`rule_hash` is content-based.** It hashes the compiled arena, strings, provenance and profile
-  deterministically. Formatting changes do not alter its value.
+Choose tests by behavior: parser recovery/format preservation, HIR definitions and scopes,
+engine overlay/cache invalidation, IDE query results, or real LSP transport and lifecycle.
+Use repository-owned minimal fixtures. Fixed fuzz crashes become regression corpus inputs.
+Rule authors start with the [rule-package workflow](rules/README.md).
 
-### Testing guidance
+## Validation
 
-Pick the level that matches the change:
+Each validation class has one authority:
 
-- `text`: offsets, line endings, UTF-16, URI/path.
-- `parser`: typed CST, error recovery, incremental edits, formatter safety, token preservation.
-- `rules` / `bake`: schema, foreign keys, stable identity, deterministic hash, round-trip.
-- `engine`: scope transitions, unknown context, source-root order, overlay, shard replacement.
-- `ide`: diagnostics, completion, definition, references, hover, rename.
-- `pdc`: real JSON-RPC transport, out-of-order versions, cancellation, stale diagnostics.
-- Editors: manifest/build smoke tests and file recognition tests.
+| Class | Authority | Purpose |
+| --- | --- | --- |
+| Developer feedback | Local checkout | Focused tests, deterministic local groups, local Vanilla exploration |
+| Merge gate | [CI](.github/workflows/ci.yml) | Required `Conclusion` check on the reviewed commit |
+| Scheduled audit | [Security](.github/workflows/security.yml), [Performance](.github/workflows/performance.yml) | Advisory refresh and optimized benchmark runs |
+| Release gate | [Tag workflow](.github/workflows/release.yml) | Provenance and redistributable artifact verification |
+| Manual acceptance | Maintainer following [RELEASING.md](RELEASING.md) | Clean-profile install and Marketplace publication |
 
-Fuzz targets live in `fuzz/`. Any crash discovered in fuzzing must be added to the regression
-corpus after it is fixed.
+Select the affected local group with `cargo run --locked -p tools -- gates GROUP`.
+The available groups and their commands are implemented in
+[the gate runner](crates/tools/src/gates.rs); `cargo run --locked -p tools -- --help`
+shows the CLI. Rust behavior normally calls for `core-fast`, extension work for `vscode`,
+repository/docs changes for `policy`, embedded/distribution changes for `artifact`, and
+fuzz changes for `fuzz`. Performance-sensitive work also runs a targeted benchmark or `perf`.
+The default local run includes deterministic groups; optimized `perf` remains opt-in.
 
-## Getting help
+Before committing, run formatting and focused checks. Before opening/updating a PR, run affected
+groups and record exact commands, outcomes, and residual risks. Passing local groups does not
+replace clean-checkout, cross-platform CI or authorize publication. A local commit does not
+require a full Vanilla sweep, benchmark suite, or network advisory scan.
 
-- Open an issue for bugs and feature requests (bug reports should use the template).
-- Report security vulnerabilities privately as described in [`SECURITY.md`](SECURITY.md) — never
-  in a public issue.
+CI runs on PRs and `main`; its workflow is authoritative for job coverage and tool versions.
+A failing post-merge `Conclusion` receives a focused repair PR. Scheduled audit failures are
+triaged by the maintainer into an actionable issue; they do not block unrelated PRs.
+Release and manual acceptance failures follow the recovery steps in [RELEASING.md](RELEASING.md).
+
+### Local Vanilla acceptance
+
+Run a local full sweep when rules, diagnostics, scope/resolution, parser/HIR semantics,
+index construction, or workspace queries can change existing game behavior.
+Documentation, isolated UI changes, and behavior-preserving refactors covered by focused tests
+normally do not need it. The [audit guide](crates/tools/README.md#diagnostics-and-semantic-evidence)
+owns invocation and report handling; the [performance lab](lab/perf/README.md) owns local comparisons.
+
+Licensed game data, excerpts, caches, binary snapshots, and raw reports stay in ignored local
+directories. They must not be copied to Actions, issues, PRs, or Releases. Record only a short
+redistribution-safe conclusion and reduce defects to repository-owned fixtures.
+Local Vanilla acceptance informs development; remote `Conclusion` retains merge authority.
+
+## Changes and review
+
+Persistent index and parse caches use the workspace LSP version. Release versions are immutable;
+semantic or cache-format changes require a new version before publication. During development
+at the same version, rebuild Vanilla/dependency indexes and clear the persistent parse
+cache before validating changed parser or analyzer behavior.
+
+Open an issue for substantial work to record the problem, accepted scope, and deferred work.
+Keep refactors, behavior changes, and release/process work independently reviewable.
+Use draft PRs while implementation or review evidence is incomplete: the
+[autosync workflow](.github/workflows/pr-autosync.yml) enables auto-merge for eligible maintainer PRs.
+
+Use Conventional Commit subjects for commits and PR titles: `type(scope): summary`.
+Use `!` and a `BREAKING CHANGE:` trailer for breaking changes. Explain the concrete problem,
+resulting behavior, validation, and material residual risks in the PR description.
+Branch protection, merging, and ownership rules live in [GOVERNANCE.md](GOVERNANCE.md).
+
+## Local generated output
+
+Repository-generated reports, benchmark snapshots, profiles, experiment binaries/caches, and
+release staging belong under `target/`. Diagnostic clients use `target/diagnostic-reports/`,
+performance exports use `target/performance-results/`, the lab uses `target/perf/`, and release
+packaging uses `target/dist/`. The shared tools path helper enforces the report-output boundary.
+The existing `data/` corpus remains an input. On-demand JSON Schema output also belongs under
+`target/`, as does explicitly baked IR. Documentation projections and owned regression/fuzz
+fixtures remain beside their authoritative source.
+
+## Documentation ownership
+
+Documentation lives beside the implementation it explains. Root READMEs provide orientation
+and links; component guides explain use and stable concepts. Keep both root language entries
+aligned in purpose without copying configuration tables, version numbers, or protocol details.
+
+| Information | Authoritative source | Reader view |
+| --- | --- | --- |
+| Published releases and changes | GitHub Releases; `CHANGELOG.md` | Root badges and release links |
+| Rust/tool dependencies | Cargo manifests and lockfiles | Generated crate table above |
+| Extension settings, commands, agent tools | `editors/vscode/package.json` and NLS bundles | [Generated reference](editors/vscode/REFERENCE.md) |
+| Rule source fields and serialization | `crates/rules/src/source.rs` | On-demand JSON Schema (`rulec schema`) and generated [source reference](crates/rules/SOURCE-REFERENCE.md) |
+| Rule-language semantics and rationale | [LANGUAGE.md](crates/rules/LANGUAGE.md), compiler tests | Semantic guide; complete examples are validated by the documentation check |
+| Script diagnostic identifiers/default severity | `ide::DiagnosticCode` | Generated index in [diagnostic guide](crates/ide/DIAGNOSTICS.md) |
+| CLI options and bounds | CLI implementations and `--help` | Runnable help; guides explain workflows |
+| Public API and module responsibilities | Rust/TypeScript source documentation | Rustdoc and source |
+| UI translation choices | [Localisation guide](editors/vscode/l10n/README.md) and translation bundles | UI and component prose |
+| Local measurement and semantic review | [Performance lab](lab/perf/README.md), [audit tools](lab/audit/README.md) | Local developer evidence |
+| Decisions and acceptance history | Issues, PRs, immutable Git history | Links from the relevant change |
+
+Regenerate derived references with:
+
+```sh
+cargo run --locked -p tools -- documentation write
+cargo run --locked -p tools -- documentation check
+```
+
+The documentation check rejects stale generated output, missing local links/anchors, missing
+registered diagnostic sections, and invalid complete rule-language examples. It runs inside the
+existing `policy` check in CI. Generated files/sections are projections, not independently edited
+sources. When facts change, update their source and regenerate in the same PR.
+
+Write stable responsibilities, usage, and design reasons by hand. Avoid reproducing field defaults,
+limits, dependency lists, and current source line numbers. Examples involving local game paths
+must remain illustrative; they are never executed by remote documentation checks.
+
+Use issue/PR discussion for implementation decisions and acceptance records. Completed migration
+plans and logs are available in [the merged RulesIr PR](https://github.com/danxiaogu520/ParadoxCode/pull/141)
+and the [immutable migration snapshot](https://github.com/danxiaogu520/ParadoxCode/tree/2626b0a1341a72478f754c171edd53d4d8537b07/docs).
+Active proposals may live beside the affected subsystem with an explicit proposal status;
+[the Template proposal](crates/hir/TEMPLATE-PROPOSAL.md) is not a production contract.
+
+Report security issues through [SECURITY.md](SECURITY.md).

@@ -8,7 +8,7 @@ use rusqlite::{Connection, Transaction, params};
 use text::{PositionRange, TextRange};
 
 use super::codec::{encode_file_id, encode_path, resolution_name};
-use super::{APPLICATION_ID, CURRENT_CACHE_SCHEMA_VERSION, IndexCache, IndexCacheError};
+use super::{APPLICATION_ID, IndexCache, IndexCacheError};
 use super::{position_codec, read::validate_database_identity, template_codec};
 use crate::SourceFileId;
 
@@ -181,17 +181,17 @@ fn write_cache(
          );",
     )?;
     transaction.pragma_update(None, "application_id", APPLICATION_ID)?;
-    transaction.pragma_update(None, "user_version", CURRENT_CACHE_SCHEMA_VERSION)?;
+    // Clear the retired schema counter when replacing an older cache.
+    transaction.pragma_update(None, "user_version", 0)?;
     let (path_encoding, source_root) = encode_path(&cache.root.path)?;
     // Values are written as byte strings; path data (Windows UTF-16) can be non-UTF-8.
     // The column is declared TEXT for intent, and TEXT affinity preserves binary values.
     for (key, value) in [
         (
-            "schema_version",
-            cache.metadata.schema_version.to_string().into_bytes(),
+            "lsp_version",
+            cache.metadata.lsp_version.clone().into_bytes(),
         ),
         ("game_id", cache.metadata.game_id.clone().into_bytes()),
-        ("build_id", cache.metadata.build_id.clone().into_bytes()),
         ("rule_hash", cache.metadata.rule_hash.clone().into_bytes()),
         ("ir_hash", cache.metadata.ir_hash.clone().into_bytes()),
         (
@@ -219,12 +219,6 @@ fn write_cache(
         ),
         ("path_encoding", path_encoding.to_owned().into_bytes()),
         ("source_root", source_root),
-        // Persisted localisation previews are decoded by `transcode`; a transcode
-        // version change alters their meaning, so the reader rejects mismatches.
-        (
-            "transcode_version",
-            transcode::TRANSCODE_VERSION.to_string().into_bytes(),
-        ),
     ] {
         transaction.execute(
             "INSERT INTO metadata(key, value) VALUES (?1, ?2)",

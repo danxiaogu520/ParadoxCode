@@ -2,7 +2,7 @@
 //!
 //! The cache mirrors the useful part of CWTools Rust's `.cwb` parse cache without persisting
 //! semantic HIR, source text, or source-root state. Entries are keyed by stable file identity and
-//! validated by parser schema, frontend format, source digest, and CST range safety before they
+//! validated by the LSP release version, frontend format, source digest, and CST range safety before they
 //! are reused. The compact postcard payload is zstd-compressed to keep the disk cache cheap while
 //! decompression remains bounded by the same 64 MiB safety limit. Cache entries use the maintained
 //! postcard serde adapter and are versioned so older payloads are ordinary misses.
@@ -17,17 +17,10 @@ use parser::{FileFormat, ParsedFile, ParsedFileCache};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::SourceFile;
-
-/// Current on-disk syntax-tree cache schema.
-///
-/// v7 records the analyzer build stamp and invalidates frontends after any build update.
-/// v6: the CST moved from a nested node tree to the flat `SyntaxTree` arena, changing the
-/// postcard wire format of `ParsedFileCache`; older entries are ordinary misses.
-pub const CURRENT_PARSE_CACHE_SCHEMA_VERSION: u32 = 7;
+use crate::{LSP_VERSION, SourceFile};
 
 const MAX_PARSE_CACHE_BYTES: u64 = 64 * 1024 * 1024;
-const CACHE_NAMESPACE: &[u8] = b"paradoxcode/parse-cache/v7\0";
+const CACHE_NAMESPACE: &[u8] = b"paradoxcode/parse-cache\0";
 static WRITE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 /// A user-local directory containing independent syntax-tree cache entries.
@@ -38,8 +31,7 @@ pub struct ParseCache {
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ParseCacheEntry {
-    schema_version: u32,
-    build_id: String,
+    lsp_version: String,
     format: FileFormat,
     source_sha256: [u8; 32],
     parsed: ParsedFileCache,
@@ -122,8 +114,7 @@ impl ParseCache {
         if !remaining.is_empty() {
             return None;
         }
-        if entry.schema_version != CURRENT_PARSE_CACHE_SCHEMA_VERSION
-            || entry.build_id != env!("PDC_ANALYZER_BUILD_ID")
+        if entry.lsp_version != LSP_VERSION
             || entry.format != format
             || entry.source_sha256 != digest(source)
             || entry.parsed.format != format
@@ -147,8 +138,7 @@ impl ParseCache {
             return Err(ParseCacheError::InvalidEntry);
         }
         let entry = ParseCacheEntry {
-            schema_version: CURRENT_PARSE_CACHE_SCHEMA_VERSION,
-            build_id: env!("PDC_ANALYZER_BUILD_ID").to_owned(),
+            lsp_version: LSP_VERSION.to_owned(),
             format,
             source_sha256: digest(source),
             parsed: parsed.cache_data(),
@@ -214,6 +204,7 @@ fn digest(source: &str) -> [u8; 32] {
 fn file_key(file: &SourceFile) -> String {
     let mut hasher = Sha256::new();
     hasher.update(CACHE_NAMESPACE);
+    put_string(&mut hasher, LSP_VERSION);
     hasher.update(file.root_id.get().to_le_bytes());
     put_string(&mut hasher, file.logical_path.as_str());
     put_string(&mut hasher, &file.physical_path.to_string_lossy());
@@ -299,8 +290,8 @@ mod tests {
     }
 
     #[test]
-    fn a_previous_analyzer_build_is_a_cache_miss() {
-        let directory = test_directory("stale-build");
+    fn a_different_lsp_version_is_a_cache_miss() {
+        let directory = test_directory("stale-version");
         let cache = ParseCache::new(directory.join("parse-cache"));
         let file = file(&directory);
         let source = "a = { b = yes }";
@@ -313,7 +304,8 @@ mod tests {
             zstd::bulk::decompress(&fs::read(&path).unwrap(), MAX_PARSE_CACHE_BYTES as usize)
                 .unwrap();
         let (mut entry, _) = postcard::take_from_bytes::<ParseCacheEntry>(&bytes).unwrap();
-        entry.build_id = "previous-build".to_owned();
+        assert_eq!(entry.lsp_version, LSP_VERSION);
+        entry.lsp_version = "0.0.0-old".to_owned();
         fs::write(
             path,
             zstd::bulk::compress(&postcard::to_allocvec(&entry).unwrap(), 3).unwrap(),

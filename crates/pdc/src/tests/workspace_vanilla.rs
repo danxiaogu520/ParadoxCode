@@ -536,13 +536,10 @@ fn stale_vanilla_cache_is_regenerated_with_an_explicit_notification() {
         .as_nanos();
     let container = std::env::temp_dir().join(format!("pdc-regen-cache-{nonce}"));
     let cache_path = stale_cache_fixture(&container);
-    assert_ne!(
-        IndexCache::load(&cache_path)
-            .expect("stale cache reload")
-            .metadata()
-            .build_id,
-        engine::ANALYZER_BUILD_ID
-    );
+    assert!(matches!(
+        IndexCache::load(&cache_path),
+        Err(engine::IndexCacheError::LspVersionMismatch { .. })
+    ));
 
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":file_uri_string(&container.join("workspace")),"name":"test"}],"capabilities":{},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
@@ -587,12 +584,67 @@ fn stale_vanilla_cache_is_regenerated_with_an_explicit_notification() {
         IndexCache::load(&cache_path)
             .expect("regenerated cache reload")
             .metadata()
-            .build_id,
-        engine::ANALYZER_BUILD_ID,
-        "the cache file on disk must be replaced with the regenerated analyzer identity"
+            .lsp_version,
+        engine::LSP_VERSION,
+        "the cache file on disk must be replaced with the current LSP version"
     );
     assert_eq!(server.snapshot().source_roots().len(), 2);
     fs::remove_dir_all(container).expect("cleanup");
+}
+
+#[test]
+fn legacy_vanilla_cache_is_rebuilt_without_decoding_its_rows() {
+    let container = tempfile::tempdir().unwrap();
+    let cache_path = stale_cache_fixture(container.path());
+    rusqlite::Connection::open(&cache_path).unwrap().execute_batch(
+        "DELETE FROM metadata WHERE key = 'lsp_version';
+         INSERT INTO metadata VALUES ('schema_version', X'3234'), ('build_id', X'6f6c64'), ('transcode_version', X'3131');
+         PRAGMA user_version = 24;
+         DROP TABLE definitions;"
+    ).unwrap();
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":file_uri_string(&container.path().join("workspace")),"name":"test"}],"capabilities":{},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).unwrap();
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .unwrap();
+    assert!(
+        server
+            .snapshot()
+            .source_roots()
+            .iter()
+            .any(|root| root.kind == SourceRootKind::Vanilla)
+    );
+    assert_eq!(
+        IndexCache::load(&cache_path)
+            .unwrap()
+            .metadata()
+            .lsp_version,
+        engine::LSP_VERSION
+    );
+    let database = rusqlite::Connection::open(&cache_path).unwrap();
+    assert_eq!(database.query_row(
+        "SELECT COUNT(*) FROM metadata WHERE key IN ('schema_version', 'build_id', 'transcode_version')",
+        [], |row| row.get::<_, i64>(0)
+    ).unwrap(), 0);
+    assert_eq!(
+        database
+            .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    assert!(decode_frames(&output).iter().any(|value| {
+        value["method"] == "window/showMessage"
+            && value["params"]["type"] == 3
+            && value["params"]["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("regenerated"))
+    }));
 }
 
 #[test]
@@ -712,9 +764,9 @@ fn valid_cache_load_reports_work_done_progress() {
     assert!(
         responses.iter().any(|value| {
             value["method"] == "window/logMessage"
-                && value["params"]["message"]
-                    .as_str()
-                    .is_some_and(|message| message.contains("analyzer build matches"))
+                && value["params"]["message"].as_str().is_some_and(|message| {
+                    message.contains("LSP version") && message.contains("matches")
+                })
         }),
         "the cache load must explain why a rebuild was not needed"
     );
@@ -819,7 +871,7 @@ fn stale_vanilla_cache_reports_regeneration_failure_explicitly() {
         .expect("warning message");
     assert!(
         message.contains("regeneration") && message.contains("refusing to install"),
-        "the failed IR-mismatch rebuild must refuse the stale cache: {message}"
+        "the failed LSP-version rebuild must refuse the stale cache: {message}"
     );
     assert!(
         server
@@ -827,7 +879,7 @@ fn stale_vanilla_cache_reports_regeneration_failure_explicitly() {
             .source_roots()
             .iter()
             .all(|root| root.kind != SourceRootKind::Vanilla),
-        "a cache with a mismatched rules-v2 IR must not be installed after rebuild failure"
+        "a cache from another LSP version must not be installed after rebuild failure"
     );
     fs::remove_dir_all(container).expect("cleanup");
 }

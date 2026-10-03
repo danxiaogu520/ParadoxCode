@@ -7,7 +7,7 @@
 /// Checked, deterministic Rules IR artifacts for build-time embedding.
 pub mod bake;
 
-/// Rules-v2 language front end (see `docs/rules-language.md`): the type-expression
+/// Rules-v2 language front end (see `crates/rules/LANGUAGE.md`): the type-expression
 /// mini-syntax, the source model, and the compile-time semantic checks used by
 /// the production IR compiler.
 pub mod bundle;

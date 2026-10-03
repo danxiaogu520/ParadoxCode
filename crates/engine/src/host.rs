@@ -40,9 +40,8 @@ use vfs::{
 pub struct AnalysisHost {
     revision: u64,
     rules: Arc<RuleSet>,
-    /// The rules-v2 IR, shared with every clone. It is empty until the
-    /// composition root installs one; consumers move onto it module by module
-    /// (`docs/rules-redesign.md` §6 phase 4).
+    /// Checked rules IR installed by the composition root and shared by
+    /// workspace snapshots and their semantic consumers.
     ir: Arc<RulesIr>,
     ir_fingerprint: Arc<str>,
     profile: Arc<GameProfile>,
@@ -648,10 +647,10 @@ impl AnalysisHost {
             Vec::<(SourceRootId, Arc<crate::index_cache::ReferenceIndexStore>)>::new();
 
         for cache in caches {
-            if cache.metadata().build_id != crate::ANALYZER_BUILD_ID {
-                return Err(IndexCacheError::BuildMismatch {
-                    cached: cache.metadata().build_id.clone(),
-                    active: crate::ANALYZER_BUILD_ID.to_owned(),
+            if cache.metadata().lsp_version != crate::LSP_VERSION {
+                return Err(IndexCacheError::LspVersionMismatch {
+                    cached: cache.metadata().lsp_version.clone(),
+                    active: crate::LSP_VERSION.to_owned(),
                 });
             }
             if cache.metadata().game_id != self.rules.game_id()

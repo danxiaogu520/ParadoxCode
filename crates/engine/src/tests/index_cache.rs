@@ -215,7 +215,7 @@ fn ir_callable_payload_symbols_and_dependent_links_survive_cache_roundtrip() {
 }
 
 #[test]
-fn previous_cache_schema_is_rejected_before_table_loading() {
+fn cache_without_lsp_version_is_rejected_before_table_loading() {
     let root = temp_root("old-schema-cache");
     let vanilla = root.join("vanilla");
     fs::create_dir_all(vanilla.join("events")).expect("event directory");
@@ -238,16 +238,17 @@ fn previous_cache_schema_is_rejected_before_table_loading() {
 
     let connection = rusqlite::Connection::open(&cache_path).expect("open cache metadata");
     connection
-        .execute(
-            "UPDATE metadata SET value = ?1 WHERE key = 'schema_version'",
-            rusqlite::params![b"9".as_slice()],
-        )
-        .expect("mark cache as previous schema");
+        .execute_batch("DELETE FROM metadata WHERE key = 'lsp_version'; DROP TABLE definitions;")
+        .expect("mark cache as a previous format with incompatible rows");
     drop(connection);
     assert!(matches!(
         IndexCache::load(&cache_path),
-        Err(IndexCacheError::UnsupportedSchema(9))
+        Err(IndexCacheError::InvalidMetadata("lsp_version"))
     ));
+    assert_eq!(
+        IndexCache::recorded_source_root(&cache_path).unwrap().path,
+        AbsPath::normalize(&fs::canonicalize(&vanilla).unwrap())
+    );
     fs::remove_dir_all(root).expect("cleanup");
 }
 
@@ -697,7 +698,7 @@ fn refresh_rejects_stale_builds_and_mismatched_games() {
     cache.save(&cache_path).expect("save cache");
     let loaded = IndexCache::load(&cache_path).expect("load cache");
 
-    // Hashes are report identity only; a build stamp alone decides cache compatibility.
+    // Hashes are report identity only; the LSP version alone decides cache compatibility.
     let database = rusqlite::Connection::open(&cache_path).unwrap();
     for key in ["rule_hash", "ir_hash"] {
         database
@@ -715,20 +716,19 @@ fn refresh_rejects_stale_builds_and_mismatched_games() {
     );
     database
         .execute(
-            "UPDATE metadata SET value = ?1 WHERE key = 'build_id'",
-            [b"previous-build".as_slice()],
+            "UPDATE metadata SET value = ?1 WHERE key = 'lsp_version'",
+            [b"0.0.0-old".as_slice()],
         )
         .unwrap();
     drop(database);
-    let compatible = IndexCache::load(&cache_path).unwrap();
+    // Even an incompatible row layout must be rejected by version before decoding.
+    rusqlite::Connection::open(&cache_path)
+        .unwrap()
+        .execute_batch("DROP TABLE definitions")
+        .unwrap();
     assert!(matches!(
-        compatible.refresh(&bootstrap, &game::eu4::profile()),
-        Err(IndexCacheError::BuildMismatch { .. })
-    ));
-    let mut fresh_host = eu4_host_with(bootstrap);
-    assert!(matches!(
-        fresh_host.install_index_cache(compatible),
-        Err(IndexCacheError::BuildMismatch { .. })
+        IndexCache::load(&cache_path),
+        Err(IndexCacheError::LspVersionMismatch { .. })
     ));
     assert!(matches!(
         loaded.refresh(&RuleSet::empty(), &game::eu4::profile()),
@@ -851,6 +851,20 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
     ));
     let loaded = IndexCache::load(&cache_path).expect("load cache");
     assert_eq!(loaded.metadata(), cache.metadata());
+    assert_eq!(loaded.metadata().lsp_version, crate::LSP_VERSION);
+    let metadata = rusqlite::Connection::open(&cache_path).unwrap();
+    let retired_keys: i64 = metadata.query_row(
+        "SELECT COUNT(*) FROM metadata WHERE key IN ('schema_version', 'build_id', 'transcode_version')",
+        [], |row| row.get(0),
+    ).unwrap();
+    assert_eq!(retired_keys, 0);
+    assert_eq!(
+        metadata
+            .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    drop(metadata);
     assert_eq!(loaded.source_files(), cache.source_files());
     assert_eq!(loaded.index(), cache.index());
     assert_eq!(

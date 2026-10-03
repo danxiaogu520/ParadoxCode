@@ -4,8 +4,10 @@
 //! conversion, and result freshness checks. Parser and language-feature logic remains in the
 //! editor-neutral workspace and analysis crates.
 
+pub mod client;
 mod dependency;
 mod initialize;
+pub mod mcp;
 mod protocol;
 mod requests;
 mod server;

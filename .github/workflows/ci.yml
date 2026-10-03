@@ -41,9 +41,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Install actionlint 1.7.12
         run: go install github.com/rhysd/actionlint/cmd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca
-      - run: |
-          actionlint="$(go env GOPATH)/bin/actionlint"
-          "$actionlint"
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - run: cargo run --locked -p tools -- ci workflow-lint
 
   rustfmt:
     name: Rust formatting
@@ -183,20 +183,7 @@ jobs:
       - name: Build fuzz targets
         run: cargo +nightly fuzz build --dev --target x86_64-unknown-linux-gnu
       - name: Run invariant smoke over all targets
-        # Enumerate targets from fuzz/Cargo.toml via `cargo fuzz list` so new
-        # fuzz targets are picked up automatically. -runs bounds each target;
-        # -seed keeps the run deterministic. Seed corpus under
-        # fuzz/corpus/<target>/ is replayed on startup, so regressions fixed
-        # into the corpus stay covered here.
-        run: |
-          targets="$(cargo +nightly fuzz list)"
-          if [ -z "$targets" ]; then
-            echo "cargo fuzz list returned no targets" >&2
-            exit 1
-          fi
-          for target in $targets; do
-            cargo +nightly fuzz run --dev --target x86_64-unknown-linux-gnu "$target" -- -runs=200 -seed=1
-          done
+        run: cargo run --locked -p tools -- fuzz smoke --target x86_64-unknown-linux-gnu --runs 200 --seed 1
 
   release:
     name: Release and artifact smoke
@@ -207,10 +194,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       # Inline like rust-analyzer: build the shipped binary, then re-run the
-      # release checks maintainers use locally (`cargo tools check release`).
+      # release checks maintainers use locally through `cargo run -p tools`.
       - run: cargo build --locked -p pdc --bin paradoxcode
       - run: cargo run --locked -p tools -- check policy --root .
       - run: cargo run --locked -p tools -- check release --root .
+      - name: Semantic audit regression fixtures
+        run: cargo run --locked -p tools -- gates audit --root .
 
   dependencies:
     name: Dependency policy
@@ -234,18 +223,11 @@ jobs:
       FORCE_COLOR: 1
       TYPOS_VERSION: v1.50.0
     steps:
-      - name: Download typos
-        run: |
-          # `$HOME` (not `~`: unexpanded inside quotes) and `mkdir -p` keep this
-          # working on images that ship no rustup/CARGO_HOME.
-          mkdir -p "${CARGO_HOME:-$HOME/.cargo}/bin"
-          curl -LsSf "https://github.com/crate-ci/typos/releases/download/${TYPOS_VERSION}/typos-${TYPOS_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
-            | tar zxf - -C "${CARGO_HOME:-$HOME/.cargo}/bin"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      # Game-data spellings (see _typos.toml) are allowlisted; everything else
-      # must be spelled correctly.
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Check for typos
-        run: typos
+        run: cargo run --locked -p tools -- ci typos
 
   cancel-if-matrix-failed:
     name: Cancel the run when a matrix leg failed
@@ -255,14 +237,14 @@ jobs:
     permissions:
       actions: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Cancel parallel jobs
-        run: |
-          if jq --exit-status 'all(.result == "success" or .result == "skipped")' <<< '${{ toJson(needs) }}'; then
-            exit 0
-          fi
-          curl -L -X POST \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/cancel"
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+          GH_TOKEN: ${{ github.token }}
+        run: cargo run --locked -p tools -- ci cancel-matrix-failed
 
   # Single required check for branch protection: `!cancelled()` runs even when
   # a dependency failed or was skipped, and the jq gate turns that into a red X.
@@ -284,7 +266,10 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Conclusion
-        run: |
-          jq -C <<< '${{ toJson(needs) }}'
-          jq --exit-status 'all(.result == "success" or .result == "skipped")' <<< '${{ toJson(needs) }}'
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: cargo run --locked -p tools -- ci conclusion

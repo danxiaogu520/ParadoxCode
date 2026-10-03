@@ -7,229 +7,71 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-- 最低 Rust 版本降至 1.88，开发文档与 MSRV CI 同步；checkpoint 原子计数兼容最低版本和 Rust 1.99 的弃用检查。
-- 第一方 EU4 规则源统一位于 `rules/eu4`，构建、校验、测试与文档入口同步更名。
-- 删除旧规则模型、编译模块、规则源和兼容语义消费者，生产语义统一读取 RulesIr；迁移保留的行为夹具，并修复引号脚本补全及缓存名称定位。
-- 修复 EU4 叛军需求和教廷行动的本地化绑定遗漏，恢复祖先性格描述的可选展示；嵌套字段的颜色分量不再被索引为省份引用。
-- EU4 贸易节点的执行作用域全面并入 `province`，同步规则值域、寄存器、链接、诊断和补全；节点符号引用与导航保留。
-
-- 规则源改为目录递归发现并按路径排序，删除源清单；持久索引以分析器构建身份失效（SQLite 24）。
-- 任务树以规则包声明的能力、字段名和写回顺序接入 IDE/LSP；图及写回机制移入引擎。
-
 ### Added
 
-- Rule-source formatting with `rulec fmt`, explicit default expansion with `--expanded`,
-  and a read-only `--check`. Installation recognition facts now live in `game.json` and
-  generate the static game descriptor at build time. Unused and insufficiently reused
-  mixins are removed or inlined without changing compiled rule semantics.
-- Phase 4 of the rules redesign moves production HIR, IDE and LSP consumers
-  onto the compiled rules-v2 IR. Schema facts drive scopes, definitions and
-  references, subtype restrictions, diagnostics, completion, hover and
-  navigation, including Callable parameters and quoted scripts. Workspace
-  scans and cache rebuilds collect definitions before resolving dynamic calls;
-  IR fingerprints invalidate analysis and SQLite caches (schema 17), which now
-  retain subtype facts. The runtime catalog bridge contains no legacy semantic
-  rules. Migration fixes make alias invocations optional and remove an extra
-  map layer from 13 nested definition patterns, reconnect sprite/decision
-  wrappers and preserve `.gfx` file selection. Pattern quotas count each actual
-  key; control chains, branch bodies and scope values follow IR declarations.
-  New integration and cache regressions cover the production path; legacy source/code deletion and the
-  full licensed-corpus/performance exit checks remain in phase 5.
-- Phase 3 of the rules redesign lands the runtime IR and its lowering.
-  `rules::ir` is the closed arena of §5 — `RulesIr` over `files` / `schemas` /
-  `fields` / `matchers` / `types` / `traits` / `enums` / `scopes` / `strings` /
-  `provenance` / `game`, with the `root_schema` / `lookup` / `child` /
-  `fields` / `subtypes_of` query API — and `rules::lower` compiles merged rule
-  sources into it, running the compile-time semantic checks first and refusing
-  to lower while any of them is an error. Lowering expands `include` mixins,
-  monomorphises each parameterised schema per argument tuple (an `enum<E>` key
-  feeding `$key.<column>` into the payload splits into one pattern per
-  attribute-column group, each carrying its group's row set), and interns both
-  the matcher and the field arena — the field fingerprint includes provenance,
-  so one mixin contributing to a hundred schemas is stored once while two
-  independently spelled fields keep their own origin. IR-level tests cover def
-  collection (including a `def` on a `map` key and mixin provenance), subtype
-  predicates, monomorphisation and the `link` pattern; a corpus test lowers
-  `rules/eu4` whole (1,224 schemas, 9,673 fields, 3,894 matchers) and pins
-  the `on_actions` group distribution. Nothing consumes the IR yet: the switch
-  is still the one cut.
-- Phase 2 of the rules redesign lands as `rules-migrate` (in `crates/tools`,
-  deleted after the switch): the one-shot conversion of the legacy rules
-  corpus into a rules-v2 source tree. It nests the flat `parent_path` rows
-  into schemas, folds `alternative_id` bundles into overloads/unions, renders
-  matchers as type expressions (normalising `member_kind_aliases`), dedupes
-  the 1,227 repeated rows, folds `root:on_action` into the `on_actions` enum
-  plus the parameterised `on_action_body<S>`, folds the pure scope-switch
-  rows into `scopes.links`, and relocates the profile tables per §4 of
-  `docs/rules-redesign.md`. Output goes to `rules/eu4/` (staging for the
-  one-cut switch) and is deterministic: repeated runs are byte-identical.
-  `rulec check rules/eu4` passes with 0 errors; the generated
-  `docs/rules-migrate-report.md` carries the row-count coverage (8,463 rows
-  fully reconciled) and the manual checklist for the human refinement pass.
-- The rules-v2 language front end lands, specified by the new
-  `docs/rules-language.md`: the type-expression mini-syntax parser
-  (`rules::expr`), the JSON source model with a `schemars`-generated JSON
-  Schema (`rules::source`, written to `rules/rules-language.schema.json` by
-  `rulec schema`), and the compile-time semantic checks (`rules::compile`, run
-  over a source directory by `rulec check`). Nothing consumes it yet: the
-  legacy model keeps working until the redesign's one-cut switch.
-- The D14 explicit-defaults pass lands ahead of the manual refinement: `card`
-  is a mandatory field-spec key (rejected at parse time, never defaulted),
-  `FileRule.resolution` defaults to `merge`, a `script` file entry must declare
-  `root` (an unmodelled category now says so with an open schema rather than
-  validating nothing), a `map` must declare exactly one of `value`/`body`, a
-  trait binding exactly one of `loc`/`sprite`, `files.ext` accepts an extension
-  list, and the new `files.exclude` carries the legacy `path_exclude_prefixes`.
-  `rulec check` gains the `CardLint` family (`0..0` warning, `N..N` info,
-  overload upper-bound disagreement) and `rules/eu4/` is regenerated from
-  the deterministic converter: 0 errors, 340 warnings, and the manual checklist
-  drops from 119 to 109 items.
-- The `Localised` / `HasIcon` trait model carries the whole legacy binding
-  corpus: an impl now enumerates its bindings, each with its own
-  localisation/sprite template and `required` flag, instead of the two fixed
-  `name`/`desc` parameters (`crates/rules/src/source.rs::ImplValue`). A legacy
-  binding gated on a structural field becomes a subtype impl whose `when`
-  predicate reads that field, so `imperial_reform`'s member/emperor/elector
-  families and `religion`'s harmonized bindings are back. The D19 change note
-  is in `docs/rules-redesign.md` §2.7; 60 checklist items close with it.
-- The phase-2 manual checklist is empty: the remaining conversion decisions
-  are mechanical or recorded losses. `token_definitions` parameter keys fold
-  into the `Callable` dynamic-key capability (the last empty enum stub goes
-  away), the trigger/effect `ref<>` keys are provably call positions, and the
-  cross-directory `def<>` cases are decided by comparing the profile paths.
-  The coverage table in `docs/rules-migrate-report.md` records every accepted
-  loss: typed-prefix operand filters, the on-action `from` column, name-prefix
-  conditioned bindings and the field-sourced bindings.
-- The type-expression grammar spells the legacy template `strip_prefix`
-  (D19: three corpus sites, `'{ref<estate strip_prefix estate_>}_loyalty_modifier'`);
-  the runtime matcher already carried the field, so nothing lowers differently.
-- Hover localisation previews keep up to 1000 characters (was 240), covering
-  the longest vanilla event and description texts.
-- New `pdc/transcodeDecode` and `pdc/transcodeEncode` requests expose the transparent-
-  localisation codec over the protocol: the server reads a file from disk, decides
-  eligibility (localisation yml under `localisation/`, or a workspace-relative script file
-  matching the new `transparentScriptGlobs` initialization option, default `["**/*.txt"]`),
-  classifies its scoped form, and returns the decoded view bytes plus read metadata
-  (`broken`, `damagedAt`, `quotedCjk`); encoding takes readable bytes and answers with the
-  scoped-escaped bytes or one of the three structured refusals (`invalidUtf8`,
-  `alreadyEscaped`, `unencodable`). Nothing is written by the server — the client owns the
-  file bytes, the write gate, and the presentation. Byte payloads travel as hex strings.
-  This is the server-side groundwork for retiring the extension's TypeScript codec twin.
-- `pdc/transcodeDecode` accepts an optional `bytes` payload: when present, the request
-  classifies the supplied buffer (an unsaved editor buffer) instead of the on-disk bytes,
-  while the path still decides the transcoding profile. The extension uses it to judge
-  edited buffers before a save. The extension also gains
-  `paradoxcode.localisation.autoOpen` (`needsTranscode` / `always` / `off`, default
-  `needsTranscode`), selecting when an eligible file is moved onto its decoded twin.
-
-### Fixed
-
-- `rulec`'s instantiation-cap check computes a fixpoint over call sites; the
-  previous loop added one call site's domain on every iteration, so any
-  parameterised schema with a domain of three or more saturated at the cap
-  and reported a false `ParameterError`.
+- Native Rust developer commands for diagnostics/baselines, evidence review, full completion
+  inventories, performance workflows, extension contracts and real-process LSP/MCP tests.
+- `paradoxcode mcp`, sharing the Rust transport client and the extension's agent-tool declarations.
+- `pdc/analyzerInfo` supplies the running server's version, rule identity and arena statistics.
+- A checked JSON rules language and compiled RulesIr shared by HIR, indexing, IDE, and LSP.
+  Rules support reusable schemas, type expressions, explicit cardinality, scope declarations,
+  symbol definitions/references, presentation bindings, and declared control flow.
+- `rulec fmt`, explicit default expansion with `--expanded`, and a read-only `--check`.
+  Rule sources are maintained under `rules/eu4` and discovered recursively in deterministic order.
+- Server-backed scoped transcoding through `pdc/transcodeDecode` and `pdc/transcodeEncode`,
+  including optional in-memory decode input for checking unsaved buffers. These requests do not
+  write files; the client controls saving and presentation.
+- Component-local guides with generated extension settings/commands/tool reference, rule-source
+  field reference, and diagnostic index. The existing policy gate checks document drift,
+  local links/anchors, diagnostic coverage, and complete rule examples.
 
 ### Changed
 
-- The rules source types (`rules::source`) serialise as well as parse (used
-  by `rules-migrate`), so `rules/rules-language.schema.json` is regenerated —
-  `schemars` now emits `default` values for defaulted fields.
-- Localisation hover previews render as a markdown table instead of bullet
-  lines. Columns adapt — a Field column appears only when labelled binding
-  fields contribute rows — and cells escape pipes and newlines so values
-  cannot break the table.
-- Localisation surfaces now follow a single target language: the first entry
-  of `paradoxcode.localisation.preferredLanguages` (default english; later
-  entries are ignored). Cache-installed, scanned, and lazy-SQL preview
-  retention keeps only the target language (the persistent `.pdcindex` still
-  stores every language, so switching preferences only needs a restart, not a
-  rebuild). Hover previews and mission-preview titles show only the target
-  language; localisation search returns one row per key, sited at the target
-  language's effective definition with english as the navigation fallback,
-  keeping keys defined solely in other languages listed without a value;
-  symbol navigation prefers the target language with english as the fixed
-  fallback.
-- The extension's marketplace copy is retitled and rewritten: `displayName` is now just
-  "ParadoxCode" (dropping the "- EU4 Language Tools" suffix) and the description reads
-  "Complete support for EU4 modding, including diagnostics, completions, hover, go-to-
-  definition, previews, and transcoding." (zh-cn: "为 EU4 模组编写提供完整支持，包括诊
-  断、补全、悬停、跳转、预览和转码。"). The extension README rendered on the Marketplace is
-  rewritten around the complete-support positioning and gains a Simplified Chinese intro-and-
-  setup section; the root READMEs' install sections reference the plain name.
-- Workspace scan filter validation messages no longer hard-code the word "ignore"; the
-  same bounded, normalized pattern machinery now also serves include globs
-  (`vfs::GlobIncludePatterns`), matched case-insensitively against whole workspace-relative
-  paths.
-- The extension's transparent-localisation provider now delegates every codec operation
-  to the server through `pdc/transcodeDecode` / `pdc/transcodeEncode`: opening a
-  `pdcloc://` view, saving through the scoped-encoding gate, and the manual one-shot
-  encode/decode commands all wait for the language server (with the same bounded
-  availability wait as the agent tools) and fail closed with a localized, retryable
-  message when it is unavailable. The save gate's three refusal messages, the read
-  diagnostics, and the `.pre-transcode.bak` backups are unchanged. Eligibility gates
-  (menus, auto-open) stay client-side path checks, kept in sync with the server through
-  the `localisation.transparentScriptGlobs` setting, which now restarts the server on
-  change.
-- The TypeScript transcoder twin (`src/transcode.ts`), the Rust↔TS differential vector
-  harness (`scripts/transcode.mjs`, 74,549 vectors), and the `transcode-vectors`
-  generator binary are retired; `crates/transcode` is the single codec implementation,
-  still pinned by its corpus, matrix, and fuzz suites.
-- The transparent-localisation auto-redirect is content-gated instead of path-only: only
-  files that actually participate in transcoding — escaped or damaged forms, or plain
-  text whose quoted CJK a save would encode — take over the raw tab and open through
-  their `pdcloc://` twin. Transcode fixed points (no escape markers, no CJK in quoted
-  strings) keep their ordinary `file://` URI, so search, diff, git, and timeline keep
-  working on them; a charset prescreen keeps plain ASCII files free of server
-  round-trips, and the server classifier still decides every form (classification
-  failure fails closed to the twin, preserving the save guard). A passed-through buffer
-  that later grows quoted CJK is promoted to its twin after the typing settles (the raw
-  save it performs is byte-preserving for that shape), keeping the typed-CJK gap closed;
-  documents rendered inside a diff editor are never taken over; and `autoOpen: "always"`
-  restores the legacy takeover of every eligible file. The flip to the twin also carries
-  the cursor over now (lines map one-to-one, columns clamp): VS Code's built-in search
-  indexes `file://` bytes only and always jumps to the raw file, so a search-result jump
-  lands on its target row in the decoded view instead of the top of the file.
-- Rule-source hygiene ahead of the rules-language redesign: semantic rows no longer spell
-  explicit JSON defaults (`parent_path: []`, `operator: null`, `severity: null`,
-  `replace_scope: []`, `min_occurs: null`, … — `serde` defaults fill them); float bounds are
-  JSON numbers (`"min": "0"` → `0`) with `ValueMatcher::Float` bounds typed as
-  finite-validated `f64`; the `{"any_scalar": null}` key spelling is normalized to
-  `"any_scalar"`; `push_scope` `"Unit"` is normalized to `unit`; and `profile/lexicon.json`'s
-  `ruler_personality` member-kind alias no longer points at `ancestor_personalities` (every
-  other singular alias maps to itself).
+- Developer operations use `tools audit`, `tools perf`, `tools editor` and the existing gate,
+  documentation and release commands. The former Node/Python/Shell developer scripts are retired;
+  JavaScript tests that execute extension code remain with the extension and run through tools.
+  Performance and semantic review retain separate commands and evidence criteria.
 
-### Removed
+- Repository report, performance-lab, experiment-cache, and release-staging outputs live under
+  `target/`; report exporters reject destinations outside the ignored target tree. Local `data/`
+  remains an input. Manual VSIX packaging writes a versioned archive under `target/dist/`.
 
-- Retire the one-shot `rules-migrate` binary and converter modules. Behavior
-  contracts now run directly against the maintained rule sources and production
-  IR; the migration coverage report remains as a historical snapshot.
-- `AGENTS.md` is deleted and the repository policy check no longer requires
-  it.
-- The `transcode` contract from `npm run test:contract` / `test:ci` (the remaining
-  assets / extension / package / i18n contracts are unchanged).
-- The `catalog/records` rule tables (12,962 rows, about 5 MB embedded in the binary) and the
-  `RuleRecord` model. Nothing read their contents; they only changed the rule hash.
-- The `strict_min` rule field (true on every one of the 8,463 rows) and the
-  `SemanticRule.required` shorthand. Requiredness lives solely in `min_occurs` (`>= 1` means
-  the key is required in its container; the two rows that set `required` already carried
-  `min_occurs: 1`, and minimum-cardinality severity always followed the strict path). Retiring
-  the shorthand retires its two rule-driven surfaces — the hover "- required" bullet and the
-  completion boost that sorted missing required rules first, both lit up only for those two
-  rows — and `pdc/ruleSearch` entries no longer carry a `required` key.
+- Production semantics use the checked IR embedded at build time. Persistent index and syntax
+  caches share the LSP release version; every version change forces a rebuild. Old cache schema
+  counters and analyzer build hashes are retired. Rule fingerprints remain audit identity.
+- Mission views use rule-package capability declarations for paths, fields, and writeback order.
+- EU4 trade-node execution scopes use `province`; the `trade_node` symbol namespace and navigation remain.
+- Localisation hover previews render as tables and retain up to 1000 characters instead of 240.
+  Hover, mission titles, preview retention, and search use the first preferred language, with
+  English as the navigation fallback. Switching the target language requires a server restart.
+- Transparent localisation delegates decoding/encoding to the Rust server. Automatic redirection
+  depends on file content: escaped or quoted-CJK files open through the decoded view, while plain
+  fixed-point files retain their ordinary URI. Newly typed quoted CJK triggers promotion;
+  diff editors remain ordinary views, and search-result navigation preserves the cursor.
+  `paradoxcode.localisation.autoOpen` controls automatic redirection.
+- The Marketplace display name is ParadoxCode. Workspace scan-pattern validation also supports
+  include globs without implying that every filter is an exclusion.
+- Minimum Rust is 1.88; atomic checkpoint counters support both the minimum compiler and
+  newer Rust deprecation checks.
 
 ### Fixed
 
-- Property-key hover no longer treats rule-metadata column names (`line`, `shape`,
-  `source_file`, `directives`, …) as known script keys. Hover and semantic-token coloring
-  now share one known-key set.
-- `AmbiguousDefinition` false positives from the decoded view's shadow copy. A decoded-view
-  tab takeover transiently opens the raw `file://` document and its `pdcloc://` twin over the
-  same backing path (and a window reload can restore both persistently); direct resolution
-  counted both twins' definitions, so every resolution-sensitive definition in the file
-  reported itself as shadowing its own twin. Overlay documents are now deduplicated by
-  backing path — the decoded `pdcloc://` twin is the effective text (it is the surface being
-  edited), same-scheme spelling twins fall back to id order, and the losers contribute no
-  definitions while their disk shards stay hidden through the path either way.
+- Schema instantiation-cap checks no longer accumulate the same call domain repeatedly.
+- Quoted-script completion ranges, cached name navigation, and declaration-backed hover behavior.
+- Missing localisation bindings for EU4 rebel demands and papal actions; optional ancestor
+  personality descriptions; nested color components falsely indexed as province references.
+- Property-key hover and semantic coloring no longer mistake rule metadata for script keys.
+- Decoded/raw URI twins no longer shadow their own definitions in `AmbiguousDefinition` diagnostics.
+
+### Removed
+
+- The checked-in IR manifest and its sidecar generation/input interfaces. Source compilation
+  is compared directly with embedded IR; audits obtain rule identity from the running LSP.
+- The duplicate `bake-ir` executable; explicit IR exports use `tools rules bake`.
+- Legacy rule models, sources, compiler paths, compatibility semantic consumers, and the one-shot
+  `rules-migrate` converter. Maintained regressions exercise the source and IR directly.
+- The extension's TypeScript transcoder twin, differential vectors, and obsolete transcode contract.
+- Repository `AGENTS.md`; repository policy no longer requires it.
 
 ## [0.4.2] - 2026-09-23
 

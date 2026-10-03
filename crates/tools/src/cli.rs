@@ -17,12 +17,20 @@ use text::AbsPath;
 
 use pdc::stable_dependency_root_id;
 
-const USAGE: &str = "usage (cargo tools <command> ... or: cargo run -p tools -- <command> ...):
+const USAGE: &str = "usage: cargo run --locked -p tools -- <command> ...
   index [vanilla] --source <EU4 directory> --output <cache.pdcindex>
   index dependency --id <id> --source <directory> --output <cache.pdcindex>
   setup vanilla [--game eu4] [--root <directory>]... [--source <game directory>]
   check policy|release|all [--root <repository root>]
-  gates [core|core-fast|vscode|policy|artifact|fuzz|perf|all]... [--root <repository root>]
+  rules check|fmt|schema|bake ...
+  audit diagnose|sweep|baseline|errors|diff|completions ...
+  perf bench|baseline|ab|sweep|probe|compare|memory|profile|init|status|import-corpus|control ...
+  editor check|compile|test|package ...
+  lsp test [--server PATH] [--root <repository root>]
+  fuzz smoke [--runs N] [--seed N] [--target TARGET]
+  ci conclusion|cancel-matrix-failed|autosync|release-preflight|release-publish|verify-extension-version|workflow-lint|typos ...
+  gates [core|core-fast|vscode|lsp|audit|policy|artifact|fuzz|perf|all]... [--root <repository root>]
+  documentation write|check [--root <repository root>]
   release package --version <semver> --target <target> --binary <path> --output-dir <path> [--root <repository root>]
   release verify --version <semver> --directory <path> [--root <repository root>]";
 const SUPPORTED_GAME_INSTALLATIONS: &[GameInstallDescriptor] = &[game::eu4::INSTALL_DESCRIPTOR];
@@ -30,6 +38,21 @@ const SUPPORTED_GAME_INSTALLATIONS: &[GameInstallDescriptor] = &[game::eu4::INST
 /// Executes one repository tooling command and returns text intended for stdout.
 pub fn execute(args: &[String]) -> Result<String, CliError> {
     match args {
+        [group, rest @ ..] if group == "audit" => {
+            crate::audit::execute(rest).map_err(CliError::Exec)
+        }
+        [group, rest @ ..] if group == "perf" => crate::perf::execute(rest).map_err(CliError::Exec),
+        [group, rest @ ..] if group == "editor" => {
+            crate::editor::execute(rest).map_err(CliError::Exec)
+        }
+        [group, rest @ ..] if group == "lsp" => crate::e2e::execute(rest).map_err(CliError::Exec),
+        [group, rest @ ..] if group == "rules" => {
+            crate::editor::rules(rest).map_err(CliError::Exec)
+        }
+        [group, rest @ ..] if group == "ci" || group == "fuzz" => {
+            crate::ci::execute(group, rest).map_err(CliError::Exec)
+        }
+        [help] if help == "--help" || help == "-h" => Ok(USAGE.to_owned()),
         [index, vanilla, rest @ ..] if index == "index" && vanilla == "vanilla" => {
             index_vanilla(rest)
         }
@@ -48,6 +71,26 @@ pub fn execute(args: &[String]) -> Result<String, CliError> {
         }
         [check, sub, rest @ ..] if check == "check" => execute_check(sub, rest),
         [gates, rest @ ..] if gates == "gates" => execute_gates(rest),
+        [command, mode, rest @ ..] if command == "documentation" => {
+            let root = parse_root_flag(rest)?;
+            match mode.as_str() {
+                "write" => crate::documentation::write(&root)
+                    .map(|count| format!("regenerated {count} documentation views"))
+                    .map_err(CliError::Exec),
+                "check" => {
+                    let errors = crate::documentation::check(&root).map_err(CliError::Exec)?;
+                    if errors.is_empty() {
+                        Ok("documentation check passed".to_owned())
+                    } else {
+                        eprintln!("{}", errors.join("\n"));
+                        Err(CliError::CheckFailed)
+                    }
+                }
+                _ => Err(CliError::Usage(format!(
+                    "unknown documentation mode: {mode}"
+                ))),
+            }
+        }
         [release, sub, rest @ ..] if release == "release" => execute_release(sub, rest),
         _ => Err(CliError::Usage(USAGE.to_owned())),
     }
@@ -535,7 +578,7 @@ impl fmt::Display for CliError {
             Self::Workspace(error) => write!(formatter, "Vanilla indexing error: {error}"),
             Self::Cache(error) => write!(formatter, "{error}"),
             Self::Discovery(message) => formatter.write_str(message),
-            Self::Exec(message) => write!(formatter, "gate execution failed: {message}"),
+            Self::Exec(message) => write!(formatter, "tool execution failed: {message}"),
             Self::UserConfig(error) => write!(formatter, "{error}"),
             Self::CheckFailed => formatter.write_str("one or more checks failed"),
         }

@@ -111,15 +111,43 @@ pub(crate) fn run_index_cache_load_with_options(
         ) {
             Ok(loaded) => loaded,
             Err(error) => {
-                // A missing, corrupt, or schema-incompatible cache (for example one built
-                // by an older test build) falls back to automatic discovery and rebuilds
-                // into the same explicit path, instead of silently losing Vanilla symbols.
                 if let Some(log) = log {
                     log(&format!(
                         "Vanilla cache {} could not be loaded ({error}); attempting a rebuild",
                         path.display()
                     ));
                 }
+                // Read only stable source metadata from an older release, never its shards.
+                // Keep the previous file until a complete rebuild can replace it atomically.
+                if let Ok(recorded) = IndexCache::recorded_source_root(path)
+                    && recorded.kind == SourceRootKind::Vanilla
+                {
+                    if let Some(log) = log {
+                        log(&format!(
+                            "Vanilla cache regeneration: rebuilding {} for LSP version {} from recorded source {}",
+                            path.display(),
+                            engine::LSP_VERSION,
+                            recorded.path.display()
+                        ));
+                    }
+                    let rebuilt = build_cache_from_source(
+                        &recorded.path,
+                        path,
+                        &context,
+                        "Vanilla cache regeneration",
+                    ).map_err(|rebuild_error| format!(
+                        "{rebuild_error}; refusing to install the unavailable Vanilla cache: {error}"
+                    ))?;
+                    return Ok((
+                        rebuilt,
+                        format!(
+                            "Vanilla cache was regenerated for LSP version {} and loaded from {}",
+                            engine::LSP_VERSION,
+                            path.display()
+                        ),
+                    ));
+                }
+                // Missing or unreadable source metadata falls back to installation discovery.
                 if let Some(rebuilt) = rebuild_unavailable_cache(path, &context)? {
                     return Ok((
                         rebuilt,
@@ -143,39 +171,16 @@ pub(crate) fn run_index_cache_load_with_options(
                 loaded.index().position_ranges().len(),
             ));
         }
-        if loaded.metadata().build_id == engine::ANALYZER_BUILD_ID {
-            if let Some(log) = log {
-                log("Vanilla cache phase: analyzer build matches; no rebuild required");
-            }
-            return Ok((
-                loaded,
-                format!("Vanilla symbols loaded from {}", path.display()),
-            ));
-        }
-        let stale_build = &loaded.metadata().build_id;
-        let current_build = engine::ANALYZER_BUILD_ID;
-        let source = loaded.source_root().path.clone();
         if let Some(log) = log {
             log(&format!(
-                "Vanilla cache {} is stale (analyzer build {stale_build} != {current_build}); regenerating from {}",
-                path.display(),
-                source.display()
+                "Vanilla cache phase: LSP version {} matches; no rebuild required",
+                engine::LSP_VERSION,
             ));
         }
-        let rebuilt =
-            build_cache_from_source(&source, path, &context, "Vanilla cache regeneration");
-        match rebuilt {
-            Ok(cache) => Ok((
-                cache,
-                format!(
-                    "Vanilla cache was regenerated for the active analyzer build {current_build} and loaded from {}",
-                    path.display()
-                ),
-            )),
-            Err(error) => Err(format!(
-                "{error}; refusing to install the Vanilla cache because its analyzer build is stale (cached {stale_build}, active {current_build})"
-            )),
-        }
+        Ok((
+            loaded,
+            format!("Vanilla symbols loaded from {}", path.display()),
+        ))
     })();
     if let Some(log) = log {
         log(&format!(
@@ -383,8 +388,8 @@ fn build_cache_from_source(
 }
 
 /// Creates the temporary Vanilla indexing host with the same persistent parse-cache namespace
-/// used by initialization.  A rules-hash rebuild must re-run semantic lowering, but the parser
-/// output is source-dependent only and can safely be reused across that rebuild.
+/// used by initialization. Entries from another LSP version are misses, so a release update
+/// reparses and reindexes source files. Same-version source rebuilds may reuse matching entries.
 fn cache_build_host(
     rules: &RuleSet,
     ir: Arc<RulesIr>,

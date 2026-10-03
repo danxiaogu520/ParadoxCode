@@ -24,6 +24,10 @@ pub enum GateAction {
     PolicyChecks,
     /// Run [`crate::check::check_release_artifact`] in-process.
     ArtifactChecks,
+    /// Run native extension contracts, behavior tests, LSP/MCP contracts and packaging.
+    EditorTests,
+    /// Run the real-binary LSP and MCP contract suite.
+    LspTests,
 }
 
 fn cargo_step(args: &[&str], env: Vec<(String, String)>) -> GateAction {
@@ -95,17 +99,12 @@ pub fn gate_actions(group: &str) -> Option<Vec<GateAction>> {
             ],
             Vec::new(),
         )]),
-        "vscode" => Some(vec![GateAction::Command {
-            name: "npm run test:ci (editors/vscode)".to_owned(),
-            program: "npm".to_owned(),
-            args: vec![
-                "--prefix".to_owned(),
-                "editors/vscode".to_owned(),
-                "run".to_owned(),
-                "test:ci".to_owned(),
-            ],
-            env: Vec::new(),
-        }]),
+        "vscode" => Some(vec![GateAction::EditorTests]),
+        "lsp" => Some(vec![GateAction::LspTests]),
+        "audit" => Some(vec![cargo_step(
+            &["test", "--locked", "-p", "tools", "--lib", "audit::"],
+            Vec::new(),
+        )]),
         "policy" => Some(vec![GateAction::PolicyChecks]),
         "artifact" => Some(vec![
             cargo_step(
@@ -147,7 +146,7 @@ pub fn gate_actions(group: &str) -> Option<Vec<GateAction>> {
 /// Resolves the repository root for gate execution.
 ///
 /// `--root` wins; otherwise the root is derived from `CARGO_MANIFEST_DIR`
-/// (always set by `cargo run`, so the `cargo tools` alias just works).
+/// (set by `cargo run -p tools`).
 pub fn resolve_root(root: Option<&Path>) -> Result<PathBuf, CliError> {
     if let Some(root) = root {
         if !root.join("Cargo.toml").is_file() {
@@ -163,7 +162,7 @@ pub fn resolve_root(root: Option<&Path>) -> Result<PathBuf, CliError> {
         .ok_or_else(|| {
             CliError::Usage(
                 "gates requires --root when the binary runs outside cargo \
-                 (or use: cargo tools -- gates)"
+                 (or use: cargo run --locked -p tools -- gates)"
                     .to_owned(),
             )
         })?;
@@ -233,6 +232,18 @@ pub fn run_gates(groups: &[String], root: &Path) -> Result<usize, CliError> {
                         return Err(CliError::CheckFailed);
                     }
                 }
+                GateAction::EditorTests => {
+                    crate::editor::execute(&[
+                        "test".into(),
+                        "ci".into(),
+                        "--root".into(),
+                        root.display().to_string(),
+                    ])
+                    .map_err(CliError::Exec)?;
+                }
+                GateAction::LspTests => {
+                    crate::e2e::run(root, None).map_err(CliError::Exec)?;
+                }
             }
         }
     }
@@ -266,7 +277,10 @@ mod tests {
                 GateAction::Command {
                     name, args, env, ..
                 } => Some((name, args, env)),
-                GateAction::PolicyChecks | GateAction::ArtifactChecks => None,
+                GateAction::PolicyChecks
+                | GateAction::ArtifactChecks
+                | GateAction::EditorTests
+                | GateAction::LspTests => None,
             })
             .collect()
     }
@@ -321,9 +335,7 @@ mod tests {
 
     #[test]
     fn vscode_runs_deterministic_contract_and_package_tests() {
-        let commands = commands("vscode");
-        assert_eq!(commands.len(), 1, "{commands:?}");
-        assert!(commands[0].1.contains(&"test:ci".to_owned()));
+        assert_eq!(gate_actions("vscode"), Some(vec![GateAction::EditorTests]));
     }
 
     #[test]

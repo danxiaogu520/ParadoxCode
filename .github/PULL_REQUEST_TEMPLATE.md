@@ -12,12 +12,12 @@
 
 <!--
 List exactly what you ran and its result; do not substitute a generic "all gates" claim. Examples:
-- `cargo tools gates core` — passed
+- `cargo run --locked -p tools -- gates core` — passed
 - `cargo test -p ide rename` — passed
 - Local Vanilla sweep — not applicable (no diagnostic/rule/index behavior changed)
 -->
 
-- [ ] The affected local groups from `docs/validation.md` passed.
+- [ ] The affected local groups from `CONTRIBUTING.md#validation` passed.
 - [ ] New behavior is covered by tests or fixtures in this PR.
 - [ ] No licensed game files, excerpts, sweep reports, or machine-local paths are included.
 
@@ -31,12 +31,19 @@ game-derived report.
 
 <!--
 Call out anything reviewers should verify:
-- Does this respect the architecture boundaries in README.md (no EU4 logic leaking into generic layers)?
+- Does this respect the architecture boundaries in CONTRIBUTING.md (no EU4 logic leaking into generic layers)?
 - Any behavior changes, migration notes, or follow-up work?
 - Any residual risks or checks that could not be run locally?
 -->
 
 - [ ] No design boundaries were crossed without a documented reason in this PR.
+
+## Documentation
+
+<!-- Update the authoritative source and its reader view together. Explain why no docs change is needed
+when a CLI, configuration, protocol, or user-visible behavior change leaves prose unchanged. -->
+
+- [ ] Affected guides are updated; generated references pass `tools documentation check`.
 
 ## Release notes
 

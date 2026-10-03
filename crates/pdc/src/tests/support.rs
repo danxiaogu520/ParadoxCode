@@ -244,8 +244,8 @@ pub(crate) fn stale_cache_fixture(container: &std::path::Path) -> std::path::Pat
     rusqlite::Connection::open(&cache_path)
         .unwrap()
         .execute(
-            "UPDATE metadata SET value = ?1 WHERE key = 'build_id'",
-            [b"previous-analyzer-build".as_slice()],
+            "UPDATE metadata SET value = ?1 WHERE key = 'lsp_version'",
+            [b"0.0.0-old".as_slice()],
         )
         .unwrap();
     cache_path

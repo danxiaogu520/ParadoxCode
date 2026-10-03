@@ -324,10 +324,26 @@ impl SnapshotRequestContext {
             "pdc/symbolSearch" => self.symbol_search(params),
             "pdc/symbolReferences" => self.symbol_references(params),
             "pdc/workspaceSummary" => self.workspace_summary(params),
+            "pdc/analyzerInfo" => self.analyzer_info(params),
             _ => Err(RpcError::new(METHOD_NOT_FOUND, "method is not implemented")),
         }
     }
 
+    fn analyzer_info(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        if params.is_some() {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                "analyzer info does not accept parameters",
+            ));
+        }
+        self.ensure_active()?;
+        let ir = self.snapshot.ir();
+        let package: Value = serde_json::from_str(include_str!("../../../rules/eu4/game.json"))
+            .map_err(|error| RpcError::new(crate::INTERNAL_ERROR, error.to_string()))?;
+        Ok(
+            json!({"version":engine::LSP_VERSION,"gameId":self.snapshot.rules().game_id(),"ruleHash":self.snapshot.rules().rule_hash().to_hex(),"irHash":self.snapshot.ir_fingerprint(),"sourceFormatVersion":package["source_format_version"],"targetGameVersion":package["target_game_version"],"schemaCount":ir.schemas.len(),"fieldCount":ir.fields.len(),"matcherCount":ir.matchers.len(),"fileCategoryCount":ir.files.len()}),
+        )
+    }
     fn text_diagnostics(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<TextDiagnosticsParams>(params, "text diagnostics")?;
         if params.files.is_empty() || params.files.len() > MAX_TEXT_DIAGNOSTIC_FILES {

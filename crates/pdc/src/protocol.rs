@@ -387,7 +387,7 @@ fn related_information_for(
 /// Base URL of the per-code diagnostic documentation; each code anchors to
 /// its own section.
 const DIAGNOSTIC_DOCS_URL: &str =
-    "https://github.com/danxiaogu520/ParadoxCode/blob/main/docs/diagnostics.md";
+    "https://github.com/danxiaogu520/ParadoxCode/blob/main/crates/ide/DIAGNOSTICS.md";
 
 /// Returns the documentation link editors show next to the diagnostic code.
 fn code_description_for(code: &str) -> Option<lsp_types::CodeDescription> {
@@ -963,7 +963,7 @@ the game clamps this to the nearest column"
         assert_eq!(value["tags"], serde_json::json!([1]));
         assert_eq!(
             value["codeDescription"]["href"],
-            "https://github.com/danxiaogu520/ParadoxCode/blob/main/docs/diagnostics.md#cardinality"
+            "https://github.com/danxiaogu520/ParadoxCode/blob/main/crates/ide/DIAGNOSTICS.md#cardinality"
         );
 
         // Untagged diagnostics omit the field entirely.
@@ -978,7 +978,7 @@ the game clamps this to the nearest column"
         assert!(value.get("tags").is_none());
         assert_eq!(
             value["codeDescription"]["href"],
-            "https://github.com/danxiaogu520/ParadoxCode/blob/main/docs/diagnostics.md#unknownkey"
+            "https://github.com/danxiaogu520/ParadoxCode/blob/main/crates/ide/DIAGNOSTICS.md#unknownkey"
         );
     }
 

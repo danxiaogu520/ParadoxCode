@@ -33,9 +33,6 @@ pnpm-debug.log*
 /rules/vanilla-cache/
 /rules/*.pdcrules
 
-# Generated whole-Current-Mod diagnostic reports
-**/diagnostic-reports/
-
 # Temporary local rule-inspection helper
 /rules/find-rule.cjs
 
@@ -53,14 +50,7 @@ Desktop.ini
 # External CWTools reference material
 /reference/
 
-# Local performance benchmark results
-/performance-results/*
-
-# Performance lab: run outputs, machine-local overrides, control binaries
-/lab/perf/runs/
-/lab/perf/baselines/
-/lab/perf/profiles/
-/lab/perf/bin/
+# Performance lab machine-local configuration (outputs live under target/)
 /lab/perf/config.local.sh
 
 # Local game-data corpus copies (licensed, local-only, never uploaded)

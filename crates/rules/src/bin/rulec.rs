@@ -1,5 +1,5 @@
 //! `rulec` — the rule-source compiler front end (see
-//! `docs/rules-language.md` §10.3).
+//! `crates/rules/LANGUAGE.md` §10.3).
 //!
 //! Subcommands:
 //!
@@ -17,7 +17,7 @@ use std::process::ExitCode;
 use rules::compile;
 use rules::source::{self, RuleFile};
 
-const DEFAULT_SCHEMA_PATH: &str = "rules/rules-language.schema.json";
+const DEFAULT_SCHEMA_PATH: &str = "target/rules-language.schema.json";
 
 fn main() -> ExitCode {
     let mut arguments = std::env::args().skip(1);
@@ -223,6 +223,12 @@ fn run_schema(arguments: &[String]) -> ExitCode {
         }
     }
     let rendered = source::json_schema_pretty();
+    if let Some(parent) = output.parent().filter(|path| !path.as_os_str().is_empty())
+        && let Err(failure) = std::fs::create_dir_all(parent)
+    {
+        eprintln!("rulec schema: {}: {failure}", parent.display());
+        return ExitCode::from(1);
+    }
     if let Err(failure) = std::fs::write(&output, &rendered) {
         eprintln!("rulec schema: {}: {failure}", output.display());
         return ExitCode::from(1);

@@ -1,12 +1,11 @@
 //! Lowering: the rules-v2 source model → the runtime IR
-//! (`docs/rules-redesign.md` §5.3 step 1: *check, expand, monomorphise,
+//! (*check, expand, monomorphise,
 //! index*).
 //!
 //! [`lower`] first runs the compile-time semantic checks ([`compile::check`])
 //! and refuses to produce an IR while any of them is an error: the IR is a
 //! *closed* arena, so it cannot represent an unresolved reference or an
-//! unreachable overload. That refusal is what phase 5 makes the mandatory
-//! precondition of `bake`.
+//! unreachable overload. That refusal is the mandatory precondition of `bake`.
 //!
 //! Everything the language defers to compile time happens here:
 //!

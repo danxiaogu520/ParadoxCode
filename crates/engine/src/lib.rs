@@ -4,10 +4,6 @@
 //! must not depend on editor protocol types. The underlying data model is provided by the
 //! `vfs`, `hir`, and `index` crates and re-exported here as the stable facade.
 
-/// Identity of all analyzer source, embedded rule data, compiler, and build options.
-/// Persistent semantic indexes from another build must be regenerated.
-pub const ANALYZER_BUILD_ID: &str = env!("PDC_ANALYZER_BUILD_ID");
-
 mod fingerprint;
 mod host;
 mod index_cache;
@@ -33,16 +29,14 @@ pub use index::{
     LocalisationPreviewMap, LocalisationPreviewMapIter, ParsedSource, PositionMap, PositionMapIter,
     PreparedDocument, Reference, WorkspaceIndex,
 };
-pub use index_cache::{
-    CURRENT_CACHE_SCHEMA_VERSION, IndexCache, IndexCacheError, IndexCacheMetadata,
-};
+pub use index_cache::{IndexCache, IndexCacheError, IndexCacheMetadata};
 pub use vfs::{
-    CURRENT_PARSE_CACHE_SCHEMA_VERSION, DiskFileChange, DiskFileChangeKind, DocumentError,
-    DocumentId, DocumentSource, GlobIncludePatterns, LocalisationPreview, ParseCache,
-    ParseCacheError, ResolvedCandidate, SourceFile, SourceFileId, SourceRoot, SourceRootId,
-    SourceRootKind, StringPool, TextChange, WorkspaceChange, WorkspaceError,
-    WorkspaceScanFilterError, WorkspaceScanFilters, WorkspaceScanIssue, WorkspaceScanIssueKind,
-    WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken, intern_shard_string,
+    DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId, DocumentSource,
+    GlobIncludePatterns, LSP_VERSION, LocalisationPreview, ParseCache, ParseCacheError,
+    ResolvedCandidate, SourceFile, SourceFileId, SourceRoot, SourceRootId, SourceRootKind,
+    StringPool, TextChange, WorkspaceChange, WorkspaceError, WorkspaceScanFilterError,
+    WorkspaceScanFilters, WorkspaceScanIssue, WorkspaceScanIssueKind, WorkspaceScanLimits,
+    WorkspaceScanReport, WorkspaceScanToken, intern_shard_string,
 };
 
 #[cfg(test)]

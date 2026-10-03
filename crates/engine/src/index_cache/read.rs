@@ -21,9 +21,9 @@ use super::codec::{decode_file_id, decode_path, decode_range, parse_resolution};
 use super::position_codec;
 use super::template_codec;
 use super::{
-    APPLICATION_ID, CURRENT_CACHE_SCHEMA_VERSION, IndexCache, IndexCacheError, IndexCacheMetadata,
-    LoadedIndex, MAX_CACHE_BYTES, MAX_CACHE_FILES, MAX_CACHE_SYMBOLS, MAX_POSITION_PAYLOAD_BYTES,
-    MAX_TEXT_FIELD_BYTES, MIN_SUPPORTED_CACHE_SCHEMA_VERSION, parse_root_kind,
+    APPLICATION_ID, IndexCache, IndexCacheError, IndexCacheMetadata, LoadedIndex, MAX_CACHE_BYTES,
+    MAX_CACHE_FILES, MAX_CACHE_SYMBOLS, MAX_POSITION_PAYLOAD_BYTES, MAX_TEXT_FIELD_BYTES,
+    parse_root_kind,
 };
 
 /// Row-count and text-length limits per table, in validation order.
@@ -106,6 +106,20 @@ fn load_cancellable_with(
     if cancellation.is_cancelled() {
         return Err(IndexCacheError::Cancelled);
     }
+    let connection = open_connection(path)?;
+    let cancellation = cancellation.clone();
+    let _ = connection.progress_handler(1_000, Some(move || cancellation.is_cancelled()));
+    load_connection(
+        &connection,
+        build_lookup_maps,
+        progress,
+        rules,
+        preferred_localisation_languages,
+    )
+    .map_err(map_interrupted)
+}
+
+fn open_connection(path: &Path) -> Result<Connection, IndexCacheError> {
     let metadata = fs::metadata(path)?;
     if !metadata.is_file() {
         return Err(IndexCacheError::InvalidData(format!(
@@ -119,17 +133,33 @@ fn load_cancellable_with(
             usize::try_from(MAX_CACHE_BYTES).unwrap_or(usize::MAX),
         ));
     }
-    let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-    let cancellation = cancellation.clone();
-    let _ = connection.progress_handler(1_000, Some(move || cancellation.is_cancelled()));
-    load_connection(
-        &connection,
-        build_lookup_maps,
-        progress,
-        rules,
-        preferred_localisation_languages,
-    )
-    .map_err(map_interrupted)
+    Ok(Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?)
+}
+
+pub(super) fn recorded_source_root(path: &Path) -> Result<SourceRoot, IndexCacheError> {
+    let connection = open_connection(path)?;
+    validate_database_identity(&connection)?;
+    read_source_root(&connection)
+}
+
+fn read_source_root(connection: &Connection) -> Result<SourceRoot, IndexCacheError> {
+    let source_root = decode_path(
+        &metadata_blob(connection, "source_root")?,
+        &metadata_text(connection, "path_encoding")?,
+    )?;
+    let root_id = u32::from_le_bytes(
+        metadata_blob(connection, "root_id")?
+            .try_into()
+            .map_err(|_| IndexCacheError::InvalidMetadata("root_id"))?,
+    );
+    Ok(SourceRoot::new(
+        SourceRootId::new(root_id),
+        parse_root_kind(&metadata_text(connection, "root_kind")?)?,
+        AbsPath::normalize(&source_root),
+    ))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -141,21 +171,12 @@ fn load_connection(
     preferred_localisation_languages: &[String],
 ) -> Result<IndexCache, IndexCacheError> {
     validate_database_identity(connection)?;
-    let schema_version = metadata_text(connection, "schema_version")?
-        .parse::<u32>()
-        .map_err(|_| IndexCacheError::InvalidMetadata("schema_version"))?;
-    if !(MIN_SUPPORTED_CACHE_SCHEMA_VERSION..=CURRENT_CACHE_SCHEMA_VERSION)
-        .contains(&schema_version)
-    {
-        return Err(IndexCacheError::UnsupportedSchema(schema_version));
-    }
-    // Previews are decoded by `transcode`; a transcode version bump changes their
-    // meaning, so caches written by a different transcode version are rebuilt
-    // instead of mixed in.
-    if metadata_text(connection, "transcode_version")?.trim()
-        != transcode::TRANSCODE_VERSION.to_string()
-    {
-        return Err(IndexCacheError::UnsupportedSchema(schema_version));
+    let lsp_version = metadata_text(connection, "lsp_version")?;
+    if lsp_version != crate::LSP_VERSION {
+        return Err(IndexCacheError::LspVersionMismatch {
+            cached: lsp_version,
+            active: crate::LSP_VERSION.to_owned(),
+        });
     }
     let table_counts = validate_table_limits(connection)?;
     // Every loaded row plus the derived cross-table validation work: the known-range set
@@ -189,24 +210,8 @@ fn load_connection(
         done: 0,
     };
     progress.report(0);
-    let source_root = decode_path(
-        &metadata_blob(connection, "source_root")?,
-        &metadata_text(connection, "path_encoding")?,
-    )?;
-    // Schema 8 records the cached source root identity and per-file metadata stamps; older
-    // caches are rebuilt once.
-    let root_id = u32::from_le_bytes(
-        metadata_blob(connection, "root_id")?
-            .try_into()
-            .map_err(|_| IndexCacheError::InvalidMetadata("root_id"))?,
-    );
-    let root = SourceRoot::new(
-        SourceRootId::new(root_id),
-        parse_root_kind(&metadata_text(connection, "root_kind")?)?,
-        AbsPath::normalize(&source_root),
-    );
+    let root = read_source_root(connection)?;
     let game_id = metadata_text(connection, "game_id")?;
-    let build_id = metadata_text(connection, "build_id")?;
     let rule_hash = metadata_text(connection, "rule_hash")?;
     let ir_hash = metadata_text(connection, "ir_hash")?;
     let source_identity = metadata_text(connection, "source_identity")?;
@@ -242,9 +247,8 @@ fn load_connection(
     index.replace_all_position_ranges(positions);
     Ok(IndexCache {
         metadata: IndexCacheMetadata {
-            schema_version,
+            lsp_version,
             game_id,
-            build_id,
             rule_hash,
             ir_hash,
             source_identity,

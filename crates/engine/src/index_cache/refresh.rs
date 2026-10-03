@@ -23,8 +23,8 @@ use vfs::{
 };
 
 use super::{
-    CURRENT_CACHE_SCHEMA_VERSION, IndexCache, IndexCacheError, IndexCacheMetadata, MAX_CACHE_FILES,
-    content_fingerprint, put_fingerprint_field, source_metadata_fingerprint, validate_cache_limits,
+    IndexCache, IndexCacheError, IndexCacheMetadata, MAX_CACHE_FILES, content_fingerprint,
+    put_fingerprint_field, source_metadata_fingerprint, validate_cache_limits,
 };
 
 pub(super) fn refresh_cancellable(
@@ -41,10 +41,10 @@ pub(super) fn refresh_cancellable(
             actual: cache.metadata.game_id.clone(),
         });
     }
-    if cache.metadata.build_id != crate::ANALYZER_BUILD_ID {
-        return Err(IndexCacheError::BuildMismatch {
-            cached: cache.metadata.build_id.clone(),
-            active: crate::ANALYZER_BUILD_ID.to_owned(),
+    if cache.metadata.lsp_version != crate::LSP_VERSION {
+        return Err(IndexCacheError::LspVersionMismatch {
+            cached: cache.metadata.lsp_version.clone(),
+            active: crate::LSP_VERSION.to_owned(),
         });
     }
     if !ir.files.is_empty() {
@@ -235,9 +235,8 @@ pub(super) fn refresh_cancellable(
         .map_err(|error| IndexCacheError::InvalidData(error.to_string()))?
         .as_secs();
     let metadata = IndexCacheMetadata {
-        schema_version: CURRENT_CACHE_SCHEMA_VERSION,
+        lsp_version: cache.metadata.lsp_version.clone(),
         game_id: cache.metadata.game_id.clone(),
-        build_id: cache.metadata.build_id.clone(),
         rule_hash: cache.metadata.rule_hash.clone(),
         ir_hash: cache.metadata.ir_hash.clone(),
         source_identity: cache.metadata.source_identity.clone(),
@@ -449,9 +448,8 @@ fn refresh_with_ir_full(
         .map_err(|error| IndexCacheError::InvalidData(error.to_string()))?
         .as_secs();
     let metadata = IndexCacheMetadata {
-        schema_version: CURRENT_CACHE_SCHEMA_VERSION,
+        lsp_version: cache.metadata.lsp_version.clone(),
         game_id: cache.metadata.game_id.clone(),
-        build_id: cache.metadata.build_id.clone(),
         rule_hash: cache.metadata.rule_hash.clone(),
         ir_hash: cache.metadata.ir_hash.clone(),
         source_identity: cache.metadata.source_identity.clone(),
