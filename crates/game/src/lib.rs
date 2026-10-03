@@ -5,6 +5,25 @@
 //! EU4 profile lives in the `eu4` module.
 
 pub mod eu4;
+/// Structured-view capability boundary.
+pub mod mission;
+
+/// The built-in package selected by the application composition root.
+pub use eu4::{INSTALL_DESCRIPTOR, first_party_ir, profile, runtime_rules};
+
+/// Gets the compiled arena supplied by a registered game package.
+///
+/// # Errors
+/// Returns an embedded-arena decoding error for the selected package.
+pub fn compiled_ir(
+    profile: &rules::GameProfile,
+) -> Result<Option<std::sync::Arc<rules::ir::RulesIr>>, rules::RulesError> {
+    if profile.game_id == eu4::GAME_ID {
+        eu4::first_party_ir().map(Some)
+    } else {
+        Ok(None)
+    }
+}
 
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};

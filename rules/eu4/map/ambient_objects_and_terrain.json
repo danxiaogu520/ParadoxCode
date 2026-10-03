@@ -1,0 +1,252 @@
+{
+  "schemas": {
+    "ambient_object_basis_body": {
+      "fields": {
+        "always_visible": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "object": {
+          "body": "ambient_object_basis_body__object",
+          "card": "1..*",
+          "def": {
+            "name": "field:name",
+            "type": "ambient_object"
+          }
+        },
+        "scale": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "time_duration": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "type": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "use_animation": {
+          "card": "1",
+          "value": "bool"
+        },
+        "visible_in_all_map_modes": {
+          "card": "0..1",
+          "value": "'yes'"
+        }
+      }
+    },
+    "ambient_object_basis_body__object": {
+      "fields": {
+        "hidden_on_start": {
+          "card": "1",
+          "value": "bool"
+        },
+        "name": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "position": {
+          "card": "1",
+          "list": "float"
+        },
+        "rotation": {
+          "card": "1",
+          "list": "float"
+        }
+      }
+    },
+    "ambient_object_basis_body__object__position": {
+      "items": "float"
+    },
+    "ambient_object_basis_body__object__rotation": {
+      "items": "float"
+    },
+    "graphical_terrain_body": {
+      "fields": {
+        "color": {
+          "card": "1",
+          "list": "int"
+        },
+        "type": {
+          "card": "1",
+          "value": "ref<terrain>"
+        }
+      }
+    },
+    "graphical_terrain_body__color": {
+      "items": "int"
+    },
+    "terrain_body": {
+      "fields": {
+        "color": {
+          "card": "0..1",
+          "list": "int[0..]"
+        },
+        "combat_width": {
+          "card": "0..1",
+          "doc": "Multiplier to increase or decrease combat width in this terrain",
+          "value": "float"
+        },
+        "cs_only_local_development_cost": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "defence": {
+          "card": "0..1",
+          "doc": "Addition to defence roll in combat in this terrain",
+          "value": "int"
+        },
+        "inland_sea": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "is_water": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "movement_cost": {
+          "card": "0..1",
+          "doc": "Multiplier to movement time into/out of province with terrain",
+          "value": "float"
+        },
+        "nation_designer_cost_multiplier": {
+          "card": "0..1",
+          "doc": "Extra cost multiplier when picked in the Nation Designer",
+          "value": "float"
+        },
+        "sound_type": {
+          "card": "0..1",
+          "value": "enum<terrain_sound_types>"
+        },
+        "terrain_override": {
+          "card": "0..1",
+          "list": "ref<province_id>"
+        },
+        "type": {
+          "card": "0..1",
+          "doc": "Types are used by the game to apply certain bonuses/maluses on movement/combat etc.",
+          "value": "enum<terrain_types>"
+        }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "body": "terrain_body__empty",
+          "card": "0..*",
+          "key": "scalar"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
+    },
+    "terrain_body__color": {
+      "items": "int[0..]"
+    },
+    "terrain_body__empty": {},
+    "terrain_body__terrain_override": {
+      "items": "ref<province_id>"
+    },
+    "trade_winds_body": {
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "province id = rotation in degrees, 0 is pointing right, then ccw",
+          "key": "ref<province_id>",
+          "value": "int"
+        }
+      ]
+    },
+    "tree_terrain_body": {
+      "fields": {
+        "color": {
+          "card": "1",
+          "list": "int"
+        },
+        "terrain": {
+          "card": "1",
+          "value": "ref<terrain>"
+        }
+      }
+    },
+    "tree_terrain_body__color": {
+      "items": "int"
+    }
+  }
+}

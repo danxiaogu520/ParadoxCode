@@ -49,18 +49,23 @@ impl CancellationToken {
 
     pub(crate) fn checkpoint(&self) -> Result<(), Cancelled> {
         #[cfg(test)]
-        if self
-            .remaining_checkpoints
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
-                if remaining != usize::MAX && remaining > 0 {
-                    Some(remaining - 1)
-                } else {
-                    None
-                }
-            })
-            .is_err_and(|remaining| remaining == 0)
         {
-            self.cancel();
+            // Keep this update compatible with the minimum supported Rust version.
+            let mut remaining = self.remaining_checkpoints.load(Ordering::Acquire);
+            while remaining != usize::MAX && remaining > 0 {
+                match self.remaining_checkpoints.compare_exchange_weak(
+                    remaining,
+                    remaining - 1,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                ) {
+                    Ok(_) => break,
+                    Err(actual) => remaining = actual,
+                }
+            }
+            if remaining == 0 {
+                self.cancel();
+            }
         }
         if self.is_cancelled() {
             Err(Cancelled)
@@ -383,6 +388,8 @@ pub struct DiagnosticProvenance {
     pub context: Option<String>,
     pub source_file: Option<String>,
     pub source_line: Option<u32>,
+    /// JSON pointer of a compiled IR declaration.
+    pub source_pointer: Option<String>,
 }
 
 /// A safe, editor-neutral source edit suggested by a diagnostic.
@@ -457,6 +464,7 @@ impl DiagnosticProvenance {
             context: None,
             source_file: None,
             source_line: None,
+            source_pointer: None,
         }
     }
 }

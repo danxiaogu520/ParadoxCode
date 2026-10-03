@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use engine::{AnalysisSnapshot, DocumentId};
 use parser::{CstKind, CstNode, FileFormat, ParsedFile};
-use rules::KeyMatcher;
 use text::TextRange;
 
 use crate::semantic::effective_workspace_member_names;
@@ -71,6 +70,31 @@ pub fn semantic_tokens_in_range_with_cancellation(
         cancellation,
         range,
     )?;
+    if let Some(hir) = input.hir.as_deref().filter(|hir| hir.uses_ir()) {
+        for token in &mut tokens {
+            if !matches!(
+                token.token_type,
+                SemanticTokenType::Variable | SemanticTokenType::Parameter
+            ) && let Some(fact) = hir.field_fact_at(token.range)
+            {
+                let ir = snapshot.ir();
+                token.token_type = if fact.fields.iter().any(|id| ir.field(*id).control.is_some()) {
+                    SemanticTokenType::Keyword
+                } else if !fact.fields.is_empty() {
+                    SemanticTokenType::Function
+                } else {
+                    SemanticTokenType::Property
+                };
+            }
+            if hir
+                .definitions()
+                .iter()
+                .any(|definition| definition.selection_range == token.range)
+            {
+                token.definition = true;
+            }
+        }
+    }
     Ok(tokens)
 }
 
@@ -81,7 +105,7 @@ pub fn semantic_tokens_in_range_with_cancellation(
 ///
 /// Tens of thousands of exact rule keys are lowercased into this set; doing
 /// that per semantic-tokens request dominated the request cost.
-fn static_semantic_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<String>> {
+pub(crate) fn static_semantic_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<String>> {
     let revision = snapshot.revision();
     const KEY: &str = "semantic-keys:static";
     if let Some(cached) = snapshot
@@ -96,19 +120,16 @@ fn static_semantic_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<String>> {
         .iter()
         .map(|key| key.to_ascii_lowercase())
         .collect::<BTreeSet<_>>();
-    for rule in &snapshot.rules().model().semantic.rules {
-        if let KeyMatcher::Exact(key) = &rule.key {
-            keys.insert(key.to_ascii_lowercase());
+    {
+        for schema in &snapshot.ir().schemas {
+            keys.extend(
+                schema
+                    .exact
+                    .keys()
+                    .map(|key| snapshot.ir().strings.resolve(*key).to_owned()),
+            );
         }
     }
-    keys.extend(
-        snapshot
-            .rules()
-            .model()
-            .symbol_descriptors
-            .iter()
-            .map(|descriptor| descriptor.kind_id.to_ascii_lowercase()),
-    );
     let keys = Arc::new(keys);
     snapshot.query_cache().insert(
         revision,
@@ -124,20 +145,20 @@ fn semantic_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
     // Completion classifies workspace-defined dynamic definitions as callable functions. Reuse the
     // same effective (overlay-aware and source-priority-aware) member view for source coloring so
     // a definition does not switch back to the generic property color after insertion.
-    let dynamic_types = snapshot
-        .rules()
-        .model()
-        .semantic
-        .type_descriptors
-        .iter()
-        .filter_map(|(type_name, descriptor)| {
-            descriptor
-                .dynamic_definition
-                .as_ref()
-                .filter(|dynamic_descriptor| dynamic_descriptor.enabled)
-                .map(|_| type_name.clone())
-        })
-        .collect::<Vec<_>>();
+    let dynamic_types = {
+        snapshot
+            .ir()
+            .types
+            .iter()
+            .filter(|info| {
+                crate::semantic::dynamic_definition_type(
+                    snapshot,
+                    snapshot.ir().strings.resolve(info.name),
+                )
+            })
+            .map(|info| snapshot.ir().strings.resolve(info.name).to_owned())
+            .collect::<Vec<_>>()
+    };
     for type_name in dynamic_types {
         keys.extend(
             effective_workspace_member_names(snapshot, &type_name)

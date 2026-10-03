@@ -6,6 +6,7 @@ use std::fs;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use rules::ir::RulesIr;
 use rules::{GameProfile, RuleSet};
 use sha2::{Digest, Sha256};
 use text::AbsPath;
@@ -29,6 +30,14 @@ pub use references_store::ReferenceIndexStore;
 
 /// Current on-disk cache schema.
 ///
+/// Schema 24 records analyzer build identity; rule hashes are diagnostic metadata only.
+/// Schema 21 merges attribute summaries for payloads replayed at multiple scopes.
+/// Schema 20 retains preview payload symbols and references in scope/enum unions.
+/// Schema 22 respects scalar fallbacks and retains resolved overlapping reference branches.
+/// Schema 19 collects parameterized symbol expansions consistently in scanned references.
+/// Schema 18 replays quoted Callable payloads into indexed definitions and references.
+/// Schema 17 persists subtype facts with each retained definition-attribute summary.
+/// Schema 16 records the rules-v2 IR fingerprint independently of the legacy rules hash.
 /// Schema 15 raises the localisation preview bound from 240 to 1000 characters;
 /// caches written before that hold the shorter previews. Schema 14 decodes
 /// EU4dll-transcoded localisation values in persisted previews
@@ -39,7 +48,7 @@ pub use references_store::ReferenceIndexStore;
 /// by the old encoding-recovery sanitizer, which could expose braces from malformed comments as
 /// active syntax. Older caches are rebuilt once by the CLI or LSP, the same way a rules update
 /// triggers a rebuild; no legacy reader is retained.
-pub const CURRENT_CACHE_SCHEMA_VERSION: u32 = 15;
+pub const CURRENT_CACHE_SCHEMA_VERSION: u32 = 24;
 
 /// Oldest on-disk cache schema this executable can still load.
 pub const MIN_SUPPORTED_CACHE_SCHEMA_VERSION: u32 = CURRENT_CACHE_SCHEMA_VERSION;
@@ -83,9 +92,14 @@ pub struct IndexCacheMetadata {
     pub schema_version: u32,
     /// Stable game identity carried by the rules artifact.
     pub game_id: String,
-    /// Rules hash used to create the cache. Loading never rejects a mismatch; callers (the CLI
-    /// or LSP) compare it and decide whether a full reindex is warranted.
+    /// Analyzer build that produced these semantic shards. Updates require a full rebuild.
+    pub build_id: String,
+    /// Rules hash retained for reports and assertions, never for cache invalidation.
     pub rule_hash: String,
+    /// Rules-v2 IR fingerprint used to create the cache. Empty IR still has a
+    /// versioned, non-empty fingerprint so caches cannot silently cross the
+    /// legacy-only and rules-v2 paths.
+    pub ir_hash: String,
     /// Human-readable source directory identity.
     pub source_identity: String,
     /// SHA-256 over indexed logical paths and per-file content fingerprints at build time.
@@ -219,7 +233,9 @@ impl IndexCache {
         let metadata = IndexCacheMetadata {
             schema_version: CURRENT_CACHE_SCHEMA_VERSION,
             game_id: snapshot.rules().game_id().to_owned(),
+            build_id: crate::ANALYZER_BUILD_ID.to_owned(),
             rule_hash: snapshot.rules().rule_hash().to_hex(),
+            ir_hash: snapshot.ir_fingerprint().to_owned(),
             source_identity: root.path.display().to_string(),
             source_fingerprint,
             created_unix_seconds,
@@ -245,7 +261,18 @@ impl IndexCache {
     /// The rules must match the hash recorded in the cache: shard contents (kinds, dynamic-definition
     /// summaries, references) depend on the rules, so a different hash needs a full rebuild.
     pub fn refresh(&self, rules: &RuleSet, profile: &GameProfile) -> Result<Self, IndexCacheError> {
-        refresh::refresh_cancellable(self, rules, profile, &WorkspaceScanToken::new(), None)
+        self.refresh_with_ir(rules, profile, &RulesIr::empty())
+    }
+
+    /// Reindexes this cache while validating both the legacy rules and the
+    /// rules-v2 IR fingerprint.
+    pub fn refresh_with_ir(
+        &self,
+        rules: &RuleSet,
+        profile: &GameProfile,
+        ir: &RulesIr,
+    ) -> Result<Self, IndexCacheError> {
+        refresh::refresh_cancellable(self, rules, profile, ir, &WorkspaceScanToken::new(), None)
     }
 
     /// [`Self::refresh`] with cooperative cancellation and per-file `(done, total)` progress.
@@ -256,7 +283,26 @@ impl IndexCache {
         cancellation: &WorkspaceScanToken,
         progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     ) -> Result<Self, IndexCacheError> {
-        refresh::refresh_cancellable(self, rules, profile, cancellation, progress)
+        refresh::refresh_cancellable(
+            self,
+            rules,
+            profile,
+            &RulesIr::empty(),
+            cancellation,
+            progress,
+        )
+    }
+
+    /// Cancellable [`Self::refresh_with_ir`] with per-file `(done, total)` progress.
+    pub fn refresh_with_ir_cancellable(
+        &self,
+        rules: &RuleSet,
+        profile: &GameProfile,
+        ir: &RulesIr,
+        cancellation: &WorkspaceScanToken,
+        progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+    ) -> Result<Self, IndexCacheError> {
+        refresh::refresh_cancellable(self, rules, profile, ir, cancellation, progress)
     }
 }
 
@@ -398,8 +444,8 @@ pub enum IndexCacheError {
     GameMismatch { expected: String, actual: String },
     /// The cached root conflicts with a configured source root.
     RootConflict { root: AbsPath, configured: AbsPath },
-    /// The cache was built with a different rules hash; a full reindex is required.
-    RuleHashMismatch { cached: String, active: String },
+    /// Cache shards were produced by another analyzer build.
+    BuildMismatch { cached: String, active: String },
 }
 
 impl fmt::Display for IndexCacheError {
@@ -434,9 +480,9 @@ impl fmt::Display for IndexCacheError {
                 root.as_path().display(),
                 configured.as_path().display()
             ),
-            Self::RuleHashMismatch { cached, active } => write!(
+            Self::BuildMismatch { cached, active } => write!(
                 formatter,
-                "index cache rules hash mismatch: cached {cached}, active {active}; a full reindex is required"
+                "index cache analyzer build mismatch: cached {cached}, active {active}; a full reindex is required"
             ),
         }
     }

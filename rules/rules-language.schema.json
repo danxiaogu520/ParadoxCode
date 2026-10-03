@@ -1,0 +1,993 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RuleFile",
+  "description": "One rules source file: any subset of the seven top-level sections. The\ncompiler merges same-named sections across files into one namespace per\nsection and rejects duplicate names.",
+  "type": "object",
+  "properties": {
+    "enums": {
+      "description": "Enums as literal member lists.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/EnumSpec"
+      },
+      "default": {}
+    },
+    "files": {
+      "description": "Path-selection rules: logical path → parser / root schema.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/FileRule"
+      },
+      "default": {}
+    },
+    "mixins": {
+      "description": "Pure structural field bundles, expanded at compile time.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/MixinSpec"
+      },
+      "default": {}
+    },
+    "schemas": {
+      "description": "Block descriptions, keyed by schema name (formal parameters may be\nspelled in the key: `\"on_action_body<S>\"`).",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/SchemaSpec"
+      },
+      "default": {}
+    },
+    "scopes": {
+      "description": "Scope types, registers, links, and compatibility overrides.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ScopesSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "traits": {
+      "description": "Named trait markers; implementation data is declared on each type.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/TraitSpec"
+      },
+      "default": {}
+    },
+    "types": {
+      "description": "Symbol namespaces: resolution / subtypes / open / builtin / impl.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/TypeSpec"
+      },
+      "default": {}
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "BindingSpec": {
+      "description": "One type implementation binding: a localisation-key or sprite-name template.",
+      "type": "object",
+      "properties": {
+        "loc": {
+          "description": "Localisation-key template (`$` stands for the instance name).",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "required": {
+          "description": "Whether the bound symbol must resolve.",
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        },
+        "sprite": {
+          "description": "Sprite-name template.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "BlockForm": {
+      "description": "One legal combination of fields in a block. This describes structural\nalternatives without weakening the requirements of every branch.",
+      "type": "object",
+      "properties": {
+        "fields": {
+          "description": "Exact field names and their occurrence bounds in this form.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "patterns": {
+          "description": "Written pattern indices and their total occurrence bounds in this form.\nExact fields are excluded from pattern counts by normal dispatch.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "BlockSchema": {
+      "description": "The full description of one block.",
+      "type": "object",
+      "properties": {
+        "fields": {
+          "description": "Exact keys, hash lookup.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/FieldOverloads"
+          },
+          "default": {}
+        },
+        "forms": {
+          "description": "Alternative combinations of direct-field occurrence bounds. At least\none complete form must match; ordinary field bounds still apply.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BlockForm"
+          }
+        },
+        "include": {
+          "description": "Mixin names, expanded at compile time.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "items": {
+          "description": "Type expression for bare values in this block (list blocks).",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "open": {
+          "description": "Whether undeclared keys are allowed; defaults to false.",
+          "type": "boolean"
+        },
+        "patterns": {
+          "description": "Non-exact keys, tried in written order.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/FieldSpec"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "CompatSpec": {
+      "description": "One compatibility override between scope types.",
+      "type": "object",
+      "properties": {
+        "actual": {
+          "description": "The scope type actually produced.",
+          "type": "string"
+        },
+        "expected": {
+          "description": "The scope type accepted in its place.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "actual",
+        "expected"
+      ]
+    },
+    "ControlKind": {
+      "description": "The closed set of control-flow primitives.",
+      "oneOf": [
+        {
+          "description": "Head of an if-chain (`if`).",
+          "type": "string",
+          "const": "branch"
+        },
+        {
+          "description": "Continuation of an if-chain (`else_if`, `else`).",
+          "type": "string",
+          "const": "branch_continue"
+        },
+        {
+          "description": "Guard sub-block whose body is a trigger (`limit`).",
+          "type": "string",
+          "const": "guard"
+        },
+        {
+          "description": "Boolean combinator (`AND` / `OR` / `NOT`).",
+          "type": "string",
+          "const": "logic"
+        },
+        {
+          "description": "Value-as-key weighted branch (`random_list`).",
+          "type": "string",
+          "const": "weighted"
+        },
+        {
+          "description": "Probability block (`random`).",
+          "type": "string",
+          "const": "chance"
+        },
+        {
+          "description": "Branch keys validated against a trigger's values (`trigger_switch`).",
+          "type": "string",
+          "const": "switch"
+        },
+        {
+          "description": "Scope-transparent wrapper (`hidden_effect`).",
+          "type": "string",
+          "const": "transparent"
+        },
+        {
+          "description": "Display only, not executed (`tooltip`).",
+          "type": "string",
+          "const": "display_only"
+        },
+        {
+          "description": "A predicate whose boolean value is its constant result.",
+          "type": "string",
+          "const": "constant"
+        }
+      ]
+    },
+    "ControlSpec": {
+      "description": "A control-flow primitive attached to a field.",
+      "type": "object",
+      "properties": {
+        "chain": {
+          "description": "Sibling keys that may continue this chain (`[\"else_if\", \"else\"]`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "default": null,
+          "items": {
+            "type": "string"
+          }
+        },
+        "guard": {
+          "description": "Guard sub-block key (`\"limit\"` for branch kinds).",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "kind": {
+          "description": "Which primitive this field implements.",
+          "$ref": "#/$defs/ControlKind"
+        },
+        "on": {
+          "description": "Field name whose scalar values are the branch keys of a `switch`.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "op": {
+          "description": "Logic operator for `logic` kinds (`AND` / `OR` / `NOT`).",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "selector_schema": {
+          "description": "Schema supplying the scalar selector keys and their branch value matchers.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ]
+    },
+    "DefSpec": {
+      "description": "Defines a symbol instance at the field's position.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Instance-name source: `\"key\"` (default), `\"field:<name>\"`, or `\"file\"`.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "strip_prefix": {
+          "description": "Prefix removed from the derived instance name.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "strip_suffix": {
+          "description": "Suffix removed from the derived instance name.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "type": {
+          "description": "Type name, optionally with the subtype granted at this position\n(`\"event.country\"`).",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ]
+    },
+    "EnumSpec": {
+      "description": "An enum is a list of literal member names.",
+      "anyOf": [
+        {
+          "description": "Literal members.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "ExtSpec": {
+      "description": "One file extension, or a list of them. The singular form keeps the\none-extension case readable; the list form replaces the legacy\n`extensions` array without splitting one category into several entries.",
+      "anyOf": [
+        {
+          "description": "One extension.",
+          "type": "string"
+        },
+        {
+          "description": "Several extensions.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "FieldOverloads": {
+      "description": "One exact key's field spec, or several shape overloads of it.",
+      "anyOf": [
+        {
+          "description": "A single field spec.",
+          "$ref": "#/$defs/FieldSpec"
+        },
+        {
+          "description": "Several shape overloads, matched in written order.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FieldSpec"
+          }
+        }
+      ]
+    },
+    "FieldSpec": {
+      "description": "One field specification (an element of `patterns`, a value of `fields`, or\nthe `root` instance form). Exactly one of `value` / `body` / `list` / `map`\nmust be present (checked by the compiler).",
+      "type": "object",
+      "properties": {
+        "body": {
+          "description": "Block: schema name (or `\"self\"`), optionally instantiated.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "card": {
+          "description": "Cardinality, e.g. `\"1\"`, `\"0..1\"`, `\"2..5\"`. Mandatory: the corpus has\nno majority value, and the field drives missing/repeated-key\ndiagnostics, so it is never defaulted (D14).",
+          "type": "string"
+        },
+        "control": {
+          "description": "Control-flow primitive (field attribute, never a global key name).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ControlSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "def": {
+          "description": "Defines a symbol instance at this position.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DefSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "deprecated": {
+          "description": "Whether the field is deprecated.",
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        },
+        "doc": {
+          "description": "Documentation text.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "key": {
+          "description": "Key type expression; only meaningful inside `patterns`.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "list": {
+          "description": "Bare-value list block whose element type is this expression.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "map": {
+          "description": "Homogeneous map block.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MapSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "override": {
+          "description": "Explicitly overrides a mixin-declared field of the same key.",
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        },
+        "scope": {
+          "description": "Scope effect: `in` / `push` / `set`.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScopeEffect"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "severity": {
+          "description": "Diagnostic severity for violations of this field.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Severity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "value": {
+          "description": "Scalar type expression for the value.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "card"
+      ]
+    },
+    "FileRule": {
+      "description": "One `files` entry: which documents a rule selects and how their root\nstructure is described.",
+      "type": "object",
+      "properties": {
+        "exclude": {
+          "description": "Path prefixes this entry does not apply to (the legacy\n`path_exclude_prefixes`).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ext": {
+          "description": "File extension without the dot, or a list of extensions (the legacy\n`extensions` list); absent means every extension.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExtSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "file": {
+          "description": "Exact file name within `path`.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "parser": {
+          "description": "Document parser; defaults to `script`.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceParser"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "path": {
+          "description": "Logical directory prefix (the legacy `game/` prefix is not spelled).",
+          "type": "string"
+        },
+        "resolution": {
+          "description": "Definition-priority policy; defaults to `merge` (D14: the default must\ncover the corpus majority).",
+          "$ref": "#/$defs/SourceFileResolution",
+          "default": "merge"
+        },
+        "root": {
+          "description": "Root structure: a schema name, or a field spec with `def` describing a\nwhole-file symbol instance. Parsers without script structure\n(`localisation`, `asset`) may omit it.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RootSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "strict": {
+          "description": "When true, `path` does not recurse into subdirectories.",
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ]
+    },
+    "ImplSpec": {
+      "description": "Arguments of one trait implementation: binding (or parameter) name → value.\n\n`Localised` and `HasIcon` take one [`BindingSpec`] per binding they\ncontribute, because the binding set is per-type data rather than a fixed\ntrait shape; the other built-ins take plain strings (`Callable`'s `body`).",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/ImplValue"
+      }
+    },
+    "ImplValue": {
+      "description": "One trait-implementation argument.",
+      "anyOf": [
+        {
+          "description": "A plain argument value (`Callable`'s `body` schema name).",
+          "type": "string"
+        },
+        {
+          "description": "One localisation or sprite binding contributed by the impl.",
+          "$ref": "#/$defs/BindingSpec"
+        }
+      ]
+    },
+    "LinkSpec": {
+      "description": "One scope link.",
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "Scopes the link may start from (`\"any\"` allowed).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "to": {
+          "description": "Scope the link lands in (`\"any\"` allowed).",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "to"
+      ]
+    },
+    "MapSpec": {
+      "description": "A homogeneous map block: same key and value shapes for every entry.",
+      "type": "object",
+      "properties": {
+        "body": {
+          "description": "Block: schema name (or `\"self\"`), optionally instantiated.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "key": {
+          "description": "Key type expression (often `def<…>` or `enum<…>`).",
+          "type": "string"
+        },
+        "value": {
+          "description": "Scalar type expression for the value.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ]
+    },
+    "MixinSpec": {
+      "description": "A mixin: a pure structural field bundle.",
+      "type": "object",
+      "properties": {
+        "fields": {
+          "description": "Field specs contributed to every including schema.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/FieldOverloads"
+          },
+          "default": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "RegisterRole": {
+      "description": "Game-independent state slots selected by scope register declarations.",
+      "oneOf": [
+        {
+          "description": "Root scope of the invocation.",
+          "type": "string",
+          "const": "root"
+        },
+        {
+          "description": "Current scope, without pushing a new frame.",
+          "type": "string",
+          "const": "current"
+        },
+        {
+          "description": "Earlier scope frames, nearest first.",
+          "type": "string",
+          "const": "previous"
+        },
+        {
+          "description": "Calling event's scope frames, nearest first.",
+          "type": "string",
+          "const": "from"
+        }
+      ]
+    },
+    "RegisterSpec": {
+      "description": "One scope register.",
+      "type": "object",
+      "properties": {
+        "chain": {
+          "description": "Whether the register chains (`prev_prev`, `fromfrom`, …).",
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        },
+        "role": {
+          "description": "Runtime register selected by this declared spelling.",
+          "$ref": "#/$defs/RegisterRole"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "role"
+      ]
+    },
+    "RootSpec": {
+      "description": "A [`FileRule`]'s root structure: either a schema name, or one field spec\ncarrying `def` for the whole-file-instance case.",
+      "anyOf": [
+        {
+          "description": "The name of the root schema.",
+          "type": "string"
+        },
+        {
+          "description": "A field spec with `def` (and usually `body`) describing the file as a\nsingle symbol instance.",
+          "$ref": "#/$defs/FieldSpec"
+        }
+      ]
+    },
+    "SchemaSpec": {
+      "description": "A schema: a full block description, or one of the two schema-level\nshorthands (`{\"map\": …}`, `{\"list\": …}`).",
+      "anyOf": [
+        {
+          "description": "Full block description.",
+          "$ref": "#/$defs/BlockSchema"
+        },
+        {
+          "description": "Shorthand for a schema with a single map pattern.",
+          "type": "object",
+          "properties": {
+            "map": {
+              "description": "The homogeneous map.",
+              "$ref": "#/$defs/MapSpec"
+            }
+          },
+          "required": [
+            "map"
+          ]
+        },
+        {
+          "description": "Shorthand for a schema with only `items`.",
+          "type": "object",
+          "properties": {
+            "list": {
+              "description": "The element type expression for bare values.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "list"
+          ]
+        }
+      ]
+    },
+    "ScopeEffect": {
+      "description": "The scope effect of a field: only the object form exists.",
+      "type": "object",
+      "properties": {
+        "in": {
+          "description": "Scopes the field is valid in (empty = any).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "default": null,
+          "items": {
+            "type": "string"
+          }
+        },
+        "push": {
+          "description": "Scope entered by the nested block.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "set": {
+          "description": "Registers replaced on entry: register name → scope type.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "ScopesSpec": {
+      "description": "The scope model.",
+      "type": "object",
+      "properties": {
+        "compat": {
+          "description": "Compatibility overrides (\"actual accepted where expected is required\").",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/CompatSpec"
+          }
+        },
+        "links": {
+          "description": "Scope links, keyed by template text\n(`\"event_target:{ref<event_target>}\"`).",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/LinkSpec"
+          },
+          "default": {}
+        },
+        "registers": {
+          "description": "Scope registers (`root`, `this`, `prev`, `from`, …).",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/RegisterSpec"
+          },
+          "default": {}
+        },
+        "types": {
+          "description": "Scope type names. `any` is reserved and not listed here.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Severity": {
+      "description": "Diagnostic severity for a field's violations.",
+      "oneOf": [
+        {
+          "description": "Errors (the default).",
+          "type": "string",
+          "const": "error"
+        },
+        {
+          "description": "Warnings.",
+          "type": "string",
+          "const": "warning"
+        },
+        {
+          "description": "Information.",
+          "type": "string",
+          "const": "info"
+        }
+      ]
+    },
+    "SourceFileResolution": {
+      "description": "The definition-priority policy selected by a [`FileRule`].",
+      "oneOf": [
+        {
+          "description": "Later paths shadow earlier ones per file path (default).",
+          "type": "string",
+          "const": "replace-by-path"
+        },
+        {
+          "description": "All definitions remain visible.",
+          "type": "string",
+          "const": "merge"
+        }
+      ]
+    },
+    "SourceParser": {
+      "description": "The document parser selected by a [`FileRule`].",
+      "oneOf": [
+        {
+          "description": "Paradox script.",
+          "type": "string",
+          "const": "script"
+        },
+        {
+          "description": "`localisation/*.yml`.",
+          "type": "string",
+          "const": "localisation"
+        },
+        {
+          "description": "Asset manifests (`.gfx`, `.asset`).",
+          "type": "string",
+          "const": "asset"
+        },
+        {
+          "description": "Structure only: parse and report syntax, no semantic rules.",
+          "type": "string",
+          "const": "syntax-only"
+        }
+      ]
+    },
+    "SubtypeSpec": {
+      "description": "One named subtype.",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "TraitSpec": {
+      "description": "One named trait marker; implementation data belongs to the type.",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "TypeResolution": {
+      "description": "The conflict behavior of a symbol type.",
+      "oneOf": [
+        {
+          "description": "Later definitions shadow earlier ones; same-name collisions warn.",
+          "type": "string",
+          "const": "replace"
+        },
+        {
+          "description": "Structurally repeated keys stay independent (the default).",
+          "type": "string",
+          "const": "independent"
+        }
+      ]
+    },
+    "TypeSpec": {
+      "description": "One symbol namespace.",
+      "type": "object",
+      "properties": {
+        "builtin": {
+          "description": "Engine-provided members.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "default": null,
+          "items": {
+            "type": "string"
+          }
+        },
+        "impl": {
+          "description": "Traits implemented by this type and their arguments.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ImplSpec"
+          },
+          "default": {}
+        },
+        "open": {
+          "description": "Open world: any name may exist; `ref` never reports undefined names.",
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        },
+        "resolution": {
+          "description": "Conflict behavior; defaults to `independent`.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TypeResolution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "subtypes": {
+          "description": "Named subtypes of this type.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/SubtypeSpec"
+          },
+          "default": {}
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

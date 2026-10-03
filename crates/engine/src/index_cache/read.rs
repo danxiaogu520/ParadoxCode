@@ -36,7 +36,11 @@ const TABLE_LIMITS: [(&str, usize, &str); 8] = [
     ("definitions", MAX_CACHE_SYMBOLS, "kind, name"),
     ("symbol_references", MAX_CACHE_SYMBOLS, "kind, name"),
     ("dynamic_definitions", MAX_CACHE_SYMBOLS, "kind, name"),
-    ("definition_attributes", MAX_CACHE_SYMBOLS, "kind, name"),
+    (
+        "definition_attributes",
+        MAX_CACHE_SYMBOLS,
+        "kind, name, attribute_keys, subtypes",
+    ),
     ("dynamic_parameters", MAX_CACHE_SYMBOLS, "name"),
     // Position payloads have their own byte budget below; the row count is per file.
     ("navigation_positions", MAX_CACHE_FILES, ""),
@@ -202,7 +206,9 @@ fn load_connection(
         AbsPath::normalize(&source_root),
     );
     let game_id = metadata_text(connection, "game_id")?;
+    let build_id = metadata_text(connection, "build_id")?;
     let rule_hash = metadata_text(connection, "rule_hash")?;
+    let ir_hash = metadata_text(connection, "ir_hash")?;
     let source_identity = metadata_text(connection, "source_identity")?;
     let source_fingerprint = metadata_text(connection, "source_fingerprint")?;
     let created_unix_seconds = metadata_text(connection, "created_unix_seconds")?
@@ -238,7 +244,9 @@ fn load_connection(
         metadata: IndexCacheMetadata {
             schema_version,
             game_id,
+            build_id,
             rule_hash,
+            ir_hash,
             source_identity,
             source_fingerprint,
             created_unix_seconds,
@@ -591,7 +599,7 @@ fn load_definition_attributes(
 ) -> Result<usize, IndexCacheError> {
     let mut rows_loaded = 0usize;
     let mut statement = connection.prepare(
-        "SELECT file_id, ordinal, kind, name, definition_range_start, definition_range_end, attribute_keys
+        "SELECT file_id, ordinal, kind, name, definition_range_start, definition_range_end, attribute_keys, subtypes
          FROM definition_attributes ORDER BY file_id, ordinal",
     )?;
     let rows = statement.query_map([], |row| {
@@ -603,10 +611,11 @@ fn load_definition_attributes(
             row.get::<_, i64>(4)?,
             row.get::<_, i64>(5)?,
             row.get::<_, String>(6)?,
+            row.get::<_, String>(7)?,
         ))
     })?;
     for row in rows {
-        let (file_id, ordinal, kind, name, start, end, keys_payload) = row?;
+        let (file_id, ordinal, kind, name, start, end, keys_payload, subtypes_payload) = row?;
         let file_id = decode_file_id(&file_id)?;
         let ordinal = usize::try_from(ordinal).map_err(|_| {
             IndexCacheError::InvalidData("negative attribute summary ordinal".to_owned())
@@ -649,6 +658,19 @@ fn load_definition_attributes(
                 "attribute summary {kind} `{name}` retains an empty key"
             )));
         }
+        let subtypes: Vec<String> = serde_json::from_str(&subtypes_payload).map_err(|_| {
+            IndexCacheError::InvalidData("attribute subtypes are not decodable".to_owned())
+        })?;
+        if subtypes.iter().enumerate().any(|(index, subtype)| {
+            subtype.is_empty()
+                || subtypes[..index]
+                    .iter()
+                    .any(|candidate| candidate.eq_ignore_ascii_case(subtype))
+        }) {
+            return Err(IndexCacheError::InvalidData(format!(
+                "attribute summary {kind} `{name}` contains an empty or duplicate subtype"
+            )));
+        }
         shard.definition_attributes.push(DefinitionAttributes {
             kind: vfs::intern_shard_string(&kind),
             name,
@@ -656,6 +678,10 @@ fn load_definition_attributes(
             attribute_keys: attribute_keys
                 .into_iter()
                 .map(|key| vfs::intern_shard_string(&key))
+                .collect(),
+            subtypes: subtypes
+                .into_iter()
+                .map(|subtype| vfs::intern_shard_string(&subtype))
                 .collect(),
         });
         rows_loaded = rows_loaded.saturating_add(1);

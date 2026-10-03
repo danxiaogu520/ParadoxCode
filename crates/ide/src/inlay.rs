@@ -63,7 +63,19 @@ pub fn scope_inlay_hints_with_cancellation(
         let Some(resolved) = concrete_scope(&transition.current) else {
             continue;
         };
-        if ambient.eq_ignore_ascii_case(&resolved) || !snapshot.game_profile().is_scope(&resolved) {
+        if ambient.eq_ignore_ascii_case(&resolved)
+            || !(if snapshot.ir().schemas.is_empty() {
+                snapshot.game_profile().is_scope(&resolved)
+            } else {
+                snapshot.ir().scopes.types.iter().any(|scope| {
+                    snapshot
+                        .ir()
+                        .strings
+                        .resolve(*scope)
+                        .eq_ignore_ascii_case(&resolved)
+                })
+            })
+        {
             continue;
         }
         hints.push(ScopeInlayHint {

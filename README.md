@@ -165,7 +165,7 @@ rules + game -> engine / ide / index
 
 ## Building from source
 
-Prerequisites: **Rust 1.98 or newer** and **Node.js 24 LTS** (for the VS Code extension).
+Prerequisites: **Rust 1.88 or newer** and **Node.js 24 LTS** (for the VS Code extension).
 
 ```bash
 git clone https://github.com/danxiaogu520/ParadoxCode.git
@@ -190,25 +190,21 @@ block an unrelated pull request. The complete mapping from local feedback throug
 manual acceptance lives in
 [docs/validation.md](docs/validation.md).
 
-Validate the developer-maintained first-party rule source and regenerate its release manifest
-with `bake`:
+Validate the developer-maintained first-party rule source and regenerate its IR manifest:
 
 ```bash
-cargo run -p rules --bin bake -- build \
+cargo run -p rules --bin bake-ir -- build \
   --source rules/eu4 \
-  --manifest rules/manifest.json
+  --manifest rules/ir-manifest.json
 ```
 
-Official `paradoxcode` binaries embed the first-party JSON source and compile it straight into
-the in-memory rule set at startup; there is no persisted rules artifact.
+Official `paradoxcode` binaries embed a checked, compiled RulesIr artifact generated at build time.
+Startup decodes that artifact and restores its query indexes. Runtime semantics read the IR.
 
-The EU4 source is intentionally split by responsibility. `catalog/` contains file categories,
-symbol descriptors, and normalized records; `semantic/` contains executable rule alternatives
-grouped by context and game-directory schema; `types/`, `values/`, and `localisation/` contain
-the supporting semantic tables; and `profile/` contains the data-only EU4 filesystem, scope,
-symbol, dynamic-value, and semantic-inheritance profile. `rules/eu4/manifest.json` lists every
-fragment explicitly. The compiler merges those fragments into one logical `RulesModel`, and the
-same canonical `rule_hash` covers both semantic data and profile data.
+The EU4 source in `rules/eu4/` is grouped by game domain, with shared schemas, types, traits,
+scopes and modifiers in `core/`. `game.json` declares package identity and the data-only game
+configuration. Regular JSON files are discovered recursively and merged in normalized path order.
+The IR fingerprint covers the compiled arena, strings, provenance and profile.
 
 ## Development setup
 
@@ -306,7 +302,7 @@ change the automation threshold. Use `--help` for all options.
 | --- | --- |
 | `crates/text` | Text, range, position, and path primitives |
 | `crates/parser` | Loss-aware parser and canonical formatter |
-| `crates/rules` | Game-neutral rules schema, runtime, and first-party compiler (`bake`) |
+| `crates/rules` | Game-neutral rules schema, runtime, and first-party compiler (`rulec`, `bake-ir`) |
 | `crates/game` | EU4 profile: game discovery, local config, and EU4 mission model |
 | `crates/vfs` | Source roots, workspace scans, and the stable document data model |
 | `crates/hir` | Rule-aware semantic lowering (definitions, scopes, templates) |
@@ -316,12 +312,11 @@ change the automation threshold. Use `--help` for all options.
 | `crates/pdc` | The language-server crate: LSP lifecycle and protocol boundary (ships as the `paradoxcode` binary) |
 | `crates/tools` | Repository tooling (`check`, `release`, cache building) for CI and maintainers |
 | `editors/vscode/` | VS Code extension: server bootstrap, walkthrough, mission-tree preview |
-| `rules/eu4/` | Authoritative first-party EU4 rule tree (catalog, semantic, supporting tables, profile) |
+| `rules/eu4/` | Authoritative first-party EU4 RulesIr source |
 | `fuzz/` | Parser, edit, formatter, and HIR fuzz targets |
 
-The current first-party EU4 rules target game version **1.37.5** (8,525 semantic rules, 121 file
-categories, 2,667 symbol descriptors). The generated release manifest in `rules/manifest.json`
-records the schema version, source format, canonical `rule_hash`, and artifact checksum.
+The current first-party EU4 rules target game version **1.37.5**. The generated
+`rules/ir-manifest.json` records the source version, compiled `rule_hash`, and arena sizes.
 
 ## Releases
 

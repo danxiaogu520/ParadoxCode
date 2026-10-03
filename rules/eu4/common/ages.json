@@ -1,0 +1,354 @@
+{
+  "schemas": {
+    "game_age_body": {
+      "fields": {
+        "abilities": {
+          "body": "game_age_body__abilities",
+          "card": "1"
+        },
+        "absolutism": {
+          "body": "game_age_body__absolutism",
+          "card": "0..1"
+        },
+        "can_start": {
+          "body": "trigger",
+          "card": "1"
+        },
+        "objectives": {
+          "body": "game_age_objectives",
+          "card": "1"
+        },
+        "papacy": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "religious_conflicts": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "start": {
+          "card": "1",
+          "value": "int"
+        }
+      }
+    },
+    "game_age_body__abilities": {
+      "patterns": [
+        {
+          "body": "game_age_body__abilities__game_age_ability",
+          "card": "1..*",
+          "key": "def<game_age_ability>"
+        }
+      ]
+    },
+    "game_age_body__abilities__game_age_ability": {
+      "fields": {
+        "ai_will_do": {
+          "body": "game_age_body__abilities__game_age_ability__ai_will_do",
+          "card": "1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "allow": {
+          "body": "trigger",
+          "card": "0..1",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "effect": {
+          "body": "effect",
+          "card": "0..1",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "0..1",
+          "doc": "Block of modifiers applied while the containing entry is active."
+        }
+      }
+    },
+    "game_age_body__abilities__game_age_ability__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "game_age_body__absolutism": {
+      "fields": {
+        "automatic_seat_in_parliament": {
+          "card": "1",
+          "value": "int"
+        },
+        "debase_currency": {
+          "card": "1",
+          "value": "int"
+        },
+        "decrease_autonomy_command": {
+          "card": "1",
+          "value": "int"
+        },
+        "execute_rebel_acceptance_command": {
+          "card": "1",
+          "value": "int"
+        },
+        "harsh_treatment": {
+          "card": "1",
+          "value": "int"
+        },
+        "increase_autonomy_command": {
+          "card": "1",
+          "value": "int"
+        },
+        "manual_seat_in_parliament": {
+          "card": "1",
+          "value": "int"
+        },
+        "stability": {
+          "card": "1",
+          "value": "int"
+        },
+        "strengthen_government": {
+          "card": "1",
+          "value": "int"
+        },
+        "war_exhaustion": {
+          "card": "1",
+          "value": "int"
+        }
+      }
+    },
+    "game_age_objective_body": {
+      "fields": {
+        "allow": {
+          "body": "trigger",
+          "card": "0..1"
+        }
+      },
+      "include": [
+        "keys__trigger"
+      ],
+      "patterns": [
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the country tags listed /Europa Universalis IV/common/country_tags",
+          "key": "ref<country_tag>",
+          "scope": {
+            "push": "country"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has hired an advisor of the specified type which has at least level X.",
+          "key": "ref<advisor_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[1..5]"
+        },
+        {
+          "body": "trigger__area_used",
+          "card": "0..*",
+          "doc": "Refers to the areas listed /Europa Universalis IV/map/areas.txt",
+          "key": "ref<area.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X buildings from the specified building type.",
+          "key": "ref<building>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__colonial_region",
+          "card": "0..*",
+          "doc": "Refers to any colonial region found in /Europa Universalis IV/common/colonial_regions/",
+          "key": "ref<colonial_region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__continent",
+          "card": "0..*",
+          "doc": "Refers to any continent found in /Europa Universalis IV/map/continent.txt",
+          "key": "ref<continent>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X ideas from the specified idea group.",
+          "key": "ref<idea_group>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[0..8]"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the support for the specified institution in the province is at least X.",
+          "key": "ref<institution>",
+          "scope": {
+            "in": [
+              "province"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "body": "trigger__province_group_used",
+          "card": "0..*",
+          "doc": "Refers to the province_group listed /Europa Universalis IV/map/provincegroup.txt",
+          "key": "ref<province_group.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<province_id>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__region",
+          "card": "0..*",
+          "doc": "Refers to any region found in /Europa Universalis IV/map/region.txt",
+          "key": "ref<region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has a tolerance of at least X of the specified religion. Note: No correct localisation.",
+          "key": "ref<religion>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "card": "0..*",
+          "key": "ref<scripted_trigger>",
+          "value": "bool"
+        },
+        {
+          "body": "trigger__scripted_trigger",
+          "card": "0..*",
+          "key": "ref<scripted_trigger>"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X vassals.",
+          "key": "ref<subject_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__superregion",
+          "card": "0..*",
+          "doc": "Refers to any superregion found in /Europa Universalis IV/map/superregion.txt",
+          "key": "ref<superregion>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__trade_company",
+          "card": "0..*",
+          "doc": "Refers to any trade company found in /Europa Universalis IV/common/trade_companies//",
+          "key": "ref<trade_company>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X provinces producing the specified trade good.",
+          "key": "ref<trade_good>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Scopes to the province, which is also a trade node (defined in common/tradenodes)",
+          "key": "ref<trade_node>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "key": "link"
+        }
+      ]
+    },
+    "game_age_objectives": {
+      "patterns": [
+        {
+          "body": "game_age_objective_body",
+          "card": "1..*",
+          "key": "scalar",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

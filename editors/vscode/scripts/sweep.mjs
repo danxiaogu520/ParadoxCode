@@ -88,6 +88,7 @@ Options:
   --query-samples N       files sampled for per-query latencies (default: ${DEFAULT_QUERY_SAMPLES})
   --fail-on LEVEL         error, warning, or none (default: none)
   --help                  show this help
+  --rules-manifest PATH   manifest matching the selected server (default: rules/ir-manifest.json)
 `;
 
 let activeServerChild;
@@ -133,6 +134,7 @@ function parseSweepArgs(argv) {
     ['--vanilla-source', 'vanillaSource'],
     ['--vanilla-cache', 'vanillaCache'],
     ['--server', 'server'],
+    ['--rules-manifest', 'rulesManifest'],
     ['--output', 'output'],
     ['--label', 'label'],
     ['--previous', 'previous'],
@@ -182,6 +184,7 @@ function resolveSweepOptions(raw) {
     vanillaSource,
     vanillaCache: raw.vanillaCache,
     server: raw.server,
+    rulesManifest: raw.rulesManifest,
     output: raw.output,
     timeoutMs: raw.timeoutMs,
     fileTimeoutMs: raw.fileTimeoutMs,

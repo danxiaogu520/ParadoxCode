@@ -1,0 +1,74 @@
+{
+  "schemas": {
+    "flagship_modification_body": {
+      "fields": {
+        "ai_trade_score": {
+          "body": "flagship_modification_body__ai_trade_score",
+          "card": "0..1",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "ai_war_score": {
+          "body": "flagship_modification_body__ai_war_score",
+          "card": "0..1",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "base_modification": {
+          "card": "0..1",
+          "value": "'yes'"
+        },
+        "modifier": {
+          "body": "flagship_modifier",
+          "card": "1",
+          "doc": "Block of modifiers applied while the containing entry is active."
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "0..1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        }
+      }
+    },
+    "flagship_modification_body__ai_trade_score": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "flagship_modification_body__ai_war_score": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    }
+  }
+}

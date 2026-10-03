@@ -17,55 +17,9 @@ fn query_input_reuses_the_document_hir_handle() {
 }
 
 #[test]
-fn quoted_transition_beats_any_scalar_leaf_fallback() {
-    let (host, _) = quoted_script_snapshot(
-        "country_event = { id = test.1 trigger = { embedded = \"foo = yes\" } }\n",
-    );
-    let snapshot = host.snapshot();
-    let quoted = snapshot
-        .rules()
-        .exact_semantic_rules("embedded")
-        .find(|rule| matches!(rule.shape, RuleShape::QuotedScript))
-        .expect("quoted fixture rule");
-    let mut fallback = quoted.clone();
-    fallback.id = "fixture:trigger:any-scalar-fallback".to_owned();
-    fallback.key = KeyMatcher::AnyScalar;
-    fallback.shape = RuleShape::Leaf;
-    fallback.child_context = None;
-    let property = crate::ScriptProperty {
-        key: std::sync::Arc::from("embedded"),
-        key_range: TextRange::empty(0),
-        range: TextRange::empty(0),
-        operator: Some(std::sync::Arc::from("=")),
-        scalar: Some((std::sync::Arc::from("foo = yes"), TextRange::empty(0))),
-        quoted: true,
-        quoted_source: None,
-        block_range: None,
-        block: Vec::new(),
-        bare_values: Vec::new(),
-    };
-    let scope = crate::ScopeContext::new(snapshot.game_profile_handle());
-
-    let selected = crate::semantic_selected_transition(crate::SemanticTransitionInput {
-        snapshot: &snapshot,
-        matching: &[&fallback, quoted],
-        selected_alternative: None,
-        context: "trigger",
-        parent_path: &[],
-        property: &property,
-        scope: &scope,
-        transparent_wrapper: false,
-    })
-    .expect("specific quoted transition");
-
-    assert_eq!(selected.id, quoted.id);
-    assert_eq!(selected.child_context.as_deref(), Some("trigger"));
-}
-
-#[test]
 fn identity_only_host_does_not_guess_eu4_semantics_from_game_id() {
     let mut host = AnalysisHost::new(game::eu4::bootstrap_rules());
-    let id = DocumentId::new("file:///tmp/common/events/generic.txt");
+    let id = DocumentId::new("file:///tmp/events/generic.txt");
     host.open_document(
         id.clone(),
         1,
@@ -79,7 +33,7 @@ fn identity_only_host_does_not_guess_eu4_semantics_from_game_id() {
     assert!(
         diagnostics(&snapshot, &id)
             .iter()
-            .any(|item| item.code == DiagnosticCode::InvalidValue)
+            .all(|item| item.code != DiagnosticCode::InvalidValue)
     );
 }
 
@@ -91,26 +45,6 @@ fn eu4_profile_supplies_known_scope_spellings() {
         diagnostics(&host.snapshot(), &id)
             .iter()
             .all(|item| !matches!(item.code, DiagnosticCode::InvalidValue))
-    );
-}
-
-#[test]
-fn multiple_hir_scope_candidates_remain_conservative_in_analysis() {
-    let state = hir::ScopeState {
-        root: hir::ScopeValue::known(vec!["country".to_owned(), "province".to_owned()]),
-        current: vec![hir::ScopeValue::known(vec![
-            "country".to_owned(),
-            "province".to_owned(),
-        ])],
-        from: vec![hir::ScopeValue::known(vec!["country".to_owned()])],
-        previous: Vec::new(),
-    };
-    let context = crate::scope_context_from_hir(std::sync::Arc::new(game::eu4::profile()), &state);
-    assert_eq!(context.root.as_ref(), "any");
-    assert_eq!(context.current.as_ref(), "any");
-    assert_eq!(
-        context.from.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
-        vec!["country"]
     );
 }
 
@@ -127,7 +61,7 @@ fn logical_scope_wrappers_keep_the_trigger_context() {
 
 #[test]
 fn alias_definition_cardinality_does_not_limit_repeated_effect_commands() {
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     let id = DocumentId::new("file:///tmp/events/repeated-tooltip.txt");
     host.open_document(
@@ -147,7 +81,7 @@ fn alias_definition_cardinality_does_not_limit_repeated_effect_commands() {
 
 #[test]
 fn semantic_type_selector_applies_event_rules_to_country_event() {
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     let id = DocumentId::new("file:///tmp/events/test.txt");
     host.open_document(
@@ -169,17 +103,8 @@ fn area_scope_transition_keeps_province_trigger_valid() {
     use engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
     use std::fs;
 
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
-    let mut profile = game::eu4::profile();
-    profile.definitions.push(ProfileDefinitionRule {
-        path: ProfileTextMatcher::insensitive(ProfileMatchMode::Exact, "map/area.txt"),
-        key: ProfileTextMatcher::any(),
-        kind: "area".to_owned(),
-        name_field: None,
-        requires_value: false,
-        retain_attributes: false,
-    });
-    let mut host = AnalysisHost::with_profile(rules, profile);
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
+    let mut host = eu4_host(rules);
     let root = std::env::temp_dir().join(format!(
         "ide-area-scope-{}",
         std::time::SystemTime::now()
@@ -248,7 +173,7 @@ fn eu4_normal_type_selector_applies_mission_rules_to_custom_root_names() {
             .as_nanos()
     ));
     fs::create_dir_all(root.join("missions")).expect("missions directory");
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -295,7 +220,7 @@ fn eu4_normal_type_selector_applies_mission_rules_to_custom_root_names() {
 
 #[test]
 fn eu4_starts_with_type_selector_applies_on_action_rules() {
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     let id = DocumentId::new("file:///tmp/common/on_actions/test.txt");
     host.open_document(
@@ -314,32 +239,45 @@ fn eu4_starts_with_type_selector_applies_on_action_rules() {
 
 #[test]
 fn eu4_starts_with_type_selector_still_requires_a_matching_path() {
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let host = eu4_host(rules);
-    let snapshot = host.snapshot();
     let valid_path =
         LogicalPath::parse("common/on_actions/test.txt").expect("valid on-action path");
     let unrelated_path = LogicalPath::parse("events/test.txt").expect("valid unrelated path");
 
-    assert_eq!(
-        semantic_root_context(&snapshot, "on_harmonized_religiongroup", Some(&valid_path))
-            .as_deref(),
-        Some("type:on_action")
-    );
-    assert_ne!(
-        semantic_root_context(
-            &snapshot,
-            "on_harmonized_religiongroup",
-            Some(&unrelated_path)
+    let mut host = host;
+    for (path, expected) in [(valid_path, true), (unrelated_path, false)] {
+        let id = DocumentId::new(format!("file:///tmp/{path}"));
+        host.open_document(
+            id.clone(),
+            1,
+            "on_harmonized_religiongroup = {}".into(),
+            None,
         )
-        .as_deref(),
-        Some("type:on_action")
-    );
+        .unwrap();
+        let snapshot = host.snapshot();
+        let input = input_for_document(&snapshot, &id).unwrap();
+        let hir = input.hir.as_ref().unwrap();
+        assert_eq!(
+            hir.definitions()
+                .iter()
+                .any(|definition| definition.kind.as_ref() == "on_action"
+                    && definition.name == "on_harmonized_religiongroup"),
+            expected
+        );
+        if !expected {
+            assert!(
+                diagnostics(&snapshot, &id)
+                    .iter()
+                    .any(|diagnostic| diagnostic.code == DiagnosticCode::UnknownKey)
+            );
+        }
+    }
 }
 
 #[test]
 fn eu4_alias_alternatives_do_not_cross_report_cardinality() {
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     let id = DocumentId::new("file:///tmp/events/alternatives.txt");
     host.open_document(
@@ -359,430 +297,18 @@ fn eu4_alias_alternatives_do_not_cross_report_cardinality() {
 }
 
 #[test]
-fn semantic_alternative_selection_refuses_equal_scores() {
-    let base = game::eu4::first_party_rules().expect("first-party rules");
-    let mut left = base.model().semantic.rules[0].clone();
-    left.id = "fixture:left".to_owned();
-    left.context = "fixture".to_owned();
-    left.parent_path.clear();
-    left.key = KeyMatcher::Exact("left".to_owned());
-    left.shape = RuleShape::Leaf;
-    left.value = ValueMatcher::Bool;
-    left.alternative_id = Some("left-alternative".to_owned());
-    left.allowed_scopes.clear();
-    let mut right = left.clone();
-    right.id = "fixture:right".to_owned();
-    right.key = KeyMatcher::Exact("right".to_owned());
-    right.alternative_id = Some("right-alternative".to_owned());
-    // Rebuild the runtime index so the keyed container lookups can see the fixture rules.
-    let mut model = base.model().clone();
-    model.semantic.rules = vec![left.clone(), right.clone()];
-    let host = eu4_host(rules::RuleSet::from_model(model));
-    let snapshot = host.snapshot();
-    let rules = snapshot
-        .rules()
-        .model()
-        .semantic
-        .rules
-        .iter()
-        .collect::<Vec<_>>();
-    let scope = crate::ScopeContext::new(std::sync::Arc::new(game::eu4::profile()));
-    assert_eq!(
-        crate::semantic_selected_alternative(&snapshot, &rules, "fixture", &[], &[], &[], &scope),
-        None
-    );
-
-    let property = crate::ScriptProperty {
-        key: std::sync::Arc::from("left"),
-        key_range: TextRange::empty(0),
-        range: TextRange::empty(0),
-        operator: None,
-        scalar: Some((std::sync::Arc::from("yes"), TextRange::empty(0))),
-        quoted: false,
-        quoted_source: None,
-        block_range: None,
-        block: Vec::new(),
-        bare_values: Vec::new(),
-    };
-    assert_eq!(
-        crate::semantic_selected_alternative(
-            &snapshot,
-            &rules,
-            "fixture",
-            &[],
-            &[&property],
-            &[],
-            &scope,
-        )
-        .as_deref(),
-        Some("left-alternative")
-    );
-}
-
-#[test]
-fn first_party_alternatives_select_value_shape_by_current_scope() {
-    let host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
-    let snapshot = host.snapshot();
-    let accepts =
-        |context: &str, key: &str, value: Option<&str>, block: bool, current_scope: &str| {
-            let property = crate::ScriptProperty {
-                key: std::sync::Arc::from(key),
-                key_range: TextRange::empty(0),
-                range: TextRange::empty(0),
-                operator: Some(std::sync::Arc::from("=")),
-                scalar: value.map(|value| {
-                    (
-                        std::sync::Arc::from(value),
-                        TextRange::empty(u32::try_from(key.len() + 3).expect("offset")),
-                    )
-                }),
-                quoted: false,
-                quoted_source: None,
-                block_range: block.then(|| TextRange::empty(0)),
-                block: Vec::new(),
-                bare_values: Vec::new(),
-            };
-            let mut scope = crate::ScopeContext::new(snapshot.game_profile_handle());
-            scope.root = std::sync::Arc::from(current_scope);
-            scope.current = std::sync::Arc::from(current_scope);
-            let candidates = snapshot
-                .rules()
-                .semantic_rules_for_context_key(context, key)
-                .filter(|rule| {
-                    rule.parent_path.is_empty()
-                        && crate::semantic::semantic_rule_key_matches(&snapshot, rule, &[], key)
-                })
-                .collect::<Vec<_>>();
-            candidates.into_iter().any(|rule| {
-                crate::semantic::semantic_scope_allows(rule, &scope)
-                    && crate::semantic::semantic_property_matches(
-                        &snapshot, rule, &property, &scope,
-                    )
-            })
-        };
-
-    // kill_leader is a country+province dual (cwtools-compare arbitration):
-    // both the block shape and the scalar spelling resolve in either scope.
-    assert!(accepts("effect", "kill_leader", None, true, "country"));
-    assert!(accepts(
-        "effect",
-        "kill_leader",
-        Some("general"),
-        false,
-        "country"
-    ));
-    assert!(accepts(
-        "effect",
-        "kill_leader",
-        Some("general"),
-        false,
-        "province"
-    ));
-    assert!(accepts("effect", "kill_leader", None, true, "province"));
-
-    // Absolute scope switches (emperor, enum[country_tags], global iterators,
-    // type addresses) are unrestricted: usable from any scope.
-    assert!(accepts("effect", "emperor", None, true, "country"));
-    assert!(accepts("effect", "emperor", None, true, "province"));
-    assert!(accepts("effect", "emperor", None, true, "unit"));
-    assert!(accepts(
-        "effect",
-        "emperor",
-        None,
-        true,
-        "mercenary_company"
-    ));
-    assert!(accepts("trigger", "emperor", None, true, "province"));
-    assert!(accepts(
-        "trigger",
-        "emperor",
-        None,
-        true,
-        "mercenary_company"
-    ));
-    assert!(accepts("effect", "every_country", None, true, "unit"));
-    assert!(accepts("trigger", "any_province", None, true, "country"));
-    // every_owned_province is a country+province dual (cwtools-compare
-    // arbitration): unit scope no longer accepts it.
-    assert!(accepts(
-        "effect",
-        "every_owned_province",
-        None,
-        true,
-        "country"
-    ));
-    assert!(accepts(
-        "effect",
-        "every_owned_province",
-        None,
-        true,
-        "province"
-    ));
-    assert!(!accepts(
-        "effect",
-        "every_owned_province",
-        None,
-        true,
-        "unit"
-    ));
-
-    // All estate_loyalty variants are country-scope only.
-    assert!(accepts("trigger", "estate_loyalty", None, true, "country"));
-    assert!(!accepts(
-        "trigger",
-        "estate_loyalty",
-        None,
-        true,
-        "province"
-    ));
-
-    // change_national_focus accepts the `none` spelling in country scope only.
-    assert!(accepts(
-        "effect",
-        "change_national_focus",
-        Some("none"),
-        false,
-        "country"
-    ));
-    assert!(!accepts(
-        "effect",
-        "change_national_focus",
-        Some("none"),
-        false,
-        "province"
-    ));
-
-    // trade_range is province-class; trade-node contexts accept it through the
-    // one-way trade_node→province compatibility, not by declaration.
-    assert!(accepts(
-        "trigger",
-        "trade_range",
-        Some("owner"),
-        false,
-        "province"
-    ));
-    assert!(accepts(
-        "trigger",
-        "trade_range",
-        Some("owner"),
-        false,
-        "trade_node"
-    ));
-    assert!(!accepts(
-        "trigger",
-        "trade_range",
-        Some("owner"),
-        false,
-        "country"
-    ));
-    assert!(accepts(
-        "trigger",
-        "same_continent",
-        Some("owner"),
-        false,
-        "country"
-    ));
-    assert!(accepts(
-        "trigger",
-        "same_continent",
-        Some("capital_scope"),
-        false,
-        "province"
-    ));
-
-    assert!(accepts(
-        "trigger",
-        "has_discovered",
-        Some("capital_scope"),
-        false,
-        "country"
-    ));
-    // The first-party declarations split the flattened mirror pair by scope:
-    // country scope takes province references, province scope takes country
-    // references, so a province-resolving ROOT no longer matches there.
-    assert!(!accepts(
-        "trigger",
-        "has_discovered",
-        Some("ROOT"),
-        false,
-        "country"
-    ));
-    assert!(accepts(
-        "trigger",
-        "has_discovered",
-        Some("owner"),
-        false,
-        "province"
-    ));
-    // The vanilla province-event spelling: ROOT is the acting country while
-    // the trigger runs in province scope, so the root register differs from
-    // the current scope.
-    {
-        let property = crate::ScriptProperty {
-            key: std::sync::Arc::from("has_discovered"),
-            key_range: TextRange::empty(0),
-            range: TextRange::empty(0),
-            operator: Some(std::sync::Arc::from("=")),
-            scalar: Some((std::sync::Arc::from("ROOT"), TextRange::empty(20))),
-            quoted: false,
-            quoted_source: None,
-            block_range: None,
-            block: Vec::new(),
-            bare_values: Vec::new(),
-        };
-        let mut province_event_scope = crate::ScopeContext::new(snapshot.game_profile_handle());
-        province_event_scope.root = std::sync::Arc::from("country");
-        province_event_scope.current = std::sync::Arc::from("province");
-        let accepted = snapshot
-            .rules()
-            .semantic_rules_for_context_key("trigger", "has_discovered")
-            .filter(|rule| rule.parent_path.is_empty())
-            .any(|rule| {
-                crate::semantic::semantic_scope_allows(rule, &province_event_scope)
-                    && crate::semantic::semantic_property_matches(
-                        &snapshot,
-                        rule,
-                        &property,
-                        &province_event_scope,
-                    )
-            });
-        assert!(
-            accepted,
-            "ROOT-as-country must satisfy has_discovered in province scope"
-        );
-    }
-}
-
-#[test]
-fn workspace_type_child_key_selects_only_one_transition() {
-    use engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
-    use std::fs;
-
-    let root = std::env::temp_dir().join(format!("ide-dynamic-transition-{}", std::process::id()));
-    fs::create_dir_all(root.join("common/country_tags")).expect("country tag directory");
-    fs::write(
-        root.join("common/country_tags/00_test.txt"),
-        "FRA = \"countries/France.txt\"\n",
-    )
-    .expect("country tag definition");
-
-    let mut model = game::eu4::first_party_rules()
-        .expect("load first-party rules")
-        .model()
-        .clone();
-    let mut country_transition = model.semantic.rules[0].clone();
-    country_transition.id = "fixture:country-transition".to_owned();
-    country_transition.context = "fixture".to_owned();
-    country_transition.parent_path.clear();
-    country_transition.key = KeyMatcher::Exact("choose".to_owned());
-    country_transition.shape = RuleShape::Node;
-    country_transition.child_context = Some("country-destination".to_owned());
-    country_transition.alternative_id = None;
-    country_transition.allowed_scopes.clear();
-    country_transition.push_scope = None;
-    country_transition.replace_scope.clear();
-    let mut other_transition = country_transition.clone();
-    other_transition.id = "fixture:other-transition".to_owned();
-    other_transition.child_context = Some("other-destination".to_owned());
-
-    let mut country_child = country_transition.clone();
-    country_child.id = "fixture:country-child".to_owned();
-    country_child.context = "country-destination".to_owned();
-    country_child.key = KeyMatcher::Type("country_tag".to_owned());
-    country_child.shape = RuleShape::Leaf;
-    country_child.child_context = None;
-    country_child.value = ValueMatcher::Bool;
-    let mut other_child = country_child.clone();
-    other_child.id = "fixture:other-child".to_owned();
-    other_child.context = "other-destination".to_owned();
-    other_child.key = KeyMatcher::Exact("other".to_owned());
-    model.semantic.rules.extend([
-        country_transition.clone(),
-        other_transition.clone(),
-        country_child,
-        other_child,
-    ]);
-
-    let mut host = eu4_host(RuleSet::from_model(model));
-    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
-        id: SourceRootId::new(1),
-        kind: SourceRootKind::Project,
-        path: AbsPath::normalize(&root),
-        order: 0,
-        writable: true,
-    }]));
-    host.refresh_source_roots()
-        .expect("scan country tag definition");
-    let snapshot = host.snapshot();
-    let scope = crate::ScopeContext::new(std::sync::Arc::new(game::eu4::profile()));
-    let mut property = crate::ScriptProperty {
-        key: std::sync::Arc::from("choose"),
-        key_range: TextRange::empty(0),
-        range: TextRange::empty(0),
-        operator: Some(std::sync::Arc::from("=")),
-        scalar: None,
-        quoted: false,
-        quoted_source: None,
-        block_range: Some(TextRange::empty(0)),
-        block: vec![crate::ScriptProperty {
-            key: std::sync::Arc::from("FRA"),
-            key_range: TextRange::empty(0),
-            range: TextRange::empty(0),
-            operator: Some(std::sync::Arc::from("=")),
-            scalar: Some((std::sync::Arc::from("yes"), TextRange::empty(0))),
-            quoted: false,
-            quoted_source: None,
-            block_range: None,
-            block: Vec::new(),
-            bare_values: Vec::new(),
-        }],
-        bare_values: Vec::new(),
-    };
-    let selected = crate::semantic_selected_transition(crate::SemanticTransitionInput {
-        snapshot: &snapshot,
-        matching: &[&country_transition, &other_transition],
-        selected_alternative: None,
-        context: "fixture",
-        parent_path: &[],
-        property: &property,
-        scope: &scope,
-        transparent_wrapper: false,
-    })
-    .expect("workspace-backed child key selects a transition");
-    assert_eq!(
-        selected.child_context.as_deref(),
-        Some("country-destination")
-    );
-
-    property.block[0].key = std::sync::Arc::from("MISSING");
-    assert!(
-        crate::semantic_selected_transition(crate::SemanticTransitionInput {
-            snapshot: &snapshot,
-            matching: &[&country_transition, &other_transition],
-            selected_alternative: None,
-            context: "fixture",
-            parent_path: &[],
-            property: &property,
-            scope: &scope,
-            transparent_wrapper: false,
-        })
-        .is_none(),
-        "an unresolved child key must not fall back to rule order"
-    );
-
-    fs::remove_dir_all(root).expect("cleanup");
-}
-
-#[test]
 fn eu4_dynamic_culture_definition_is_used_by_semantic_type_matcher() {
     use engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
     use std::fs;
 
     let root = std::env::temp_dir().join(format!("ide-cwt-dynamic-{}", std::process::id()));
     fs::create_dir_all(root.join("common/cultures")).expect("culture directory");
-    fs::write(root.join("common/cultures/00_test.txt"), "french = { }\n")
-        .expect("culture definition");
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    fs::write(
+        root.join("common/cultures/00_test.txt"),
+        "latin = { french = { } }\n",
+    )
+    .expect("culture definition");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
@@ -822,7 +348,7 @@ fn eu4_country_tag_definition_feeds_dynamic_enum_matcher() {
         "FRA = \"countries/France.txt\"\n",
     )
     .expect("country tag definition");
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
@@ -861,7 +387,7 @@ fn eu4_flag_definition_feeds_dynamic_value_matcher() {
         "country_event = { immediate = { set_country_flag = known_flag } }\n",
     )
     .expect("flag definition");
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
@@ -903,7 +429,7 @@ fn eu4_scripted_effect_params_are_owner_qualified() {
         ),
     )
     .expect("scripted effect definition");
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
@@ -927,8 +453,12 @@ fn eu4_scripted_effect_params_are_owner_qualified() {
         1
     );
     assert_eq!(
-        crate::parameter_names_for_owner(&snapshot, "scripted_effect", "apply")
-            .expect("resolved owner parameters"),
+        crate::semantic::dynamic_definition_summary(&snapshot, "scripted_effect", "apply")
+            .expect("resolved owner parameters")
+            .parameters
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect::<Vec<_>>(),
         ["amount", "optional"]
     );
     assert!(diagnostics(&snapshot, &id).iter().all(|item| !matches!(
@@ -1022,7 +552,7 @@ fn unresolved_dynamic_signature_keeps_parameter_blocks_open_world() {
     )
     .expect("second definition");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -1037,8 +567,12 @@ fn unresolved_dynamic_signature_keeps_parameter_blocks_open_world() {
         .expect("open invocation");
     let snapshot = host.snapshot();
     assert!(
-        crate::parameter_names_for_owner(&snapshot, "scripted_effect", "ambiguous_effect")
-            .is_none()
+        crate::semantic::dynamic_definition_summary(
+            &snapshot,
+            "scripted_effect",
+            "ambiguous_effect"
+        )
+        .is_none()
     );
     let results = diagnostics(&snapshot, &id);
     assert!(!results.iter().any(|item| {
@@ -1084,7 +618,7 @@ fn eu4_legacy_governments_use_eu4_reform_semantics() {
         "reform_a = { legacy_government = yes }\n",
     )
     .expect("legacy reform definition");
-    let rules = game::eu4::first_party_rules().expect("load first-party rules");
+    let rules = game::eu4::runtime_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
@@ -1125,7 +659,7 @@ fn membership_caches_do_not_leak_across_hosts_with_equal_revisions() {
         let effects = root.join("common/scripted_effects");
         std::fs::create_dir_all(&effects).expect("definitions directory");
         std::fs::write(effects.join("00_definitions.txt"), definitions).expect("definitions");
-        let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+        let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::Project,

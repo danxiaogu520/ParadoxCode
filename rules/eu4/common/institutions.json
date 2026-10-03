@@ -1,0 +1,925 @@
+{
+  "schemas": {
+    "institution_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "institution_body__ai_will_do",
+          "card": "1",
+          "doc": "Cost of embracing institution must be lower than this factor * last month's regular income, and higher if loans are needed. (Or it has a more than long term goal...)"
+        },
+        "bonus": {
+          "body": "modifier",
+          "card": "1"
+        },
+        "can_embrace": {
+          "body": "trigger",
+          "card": "1",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "can_start": {
+          "body": "trigger",
+          "card": "0..1",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "effect": {
+          "body": "effect",
+          "card": "0..1",
+          "doc": "Effect that runs when the country embraces it",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "embracement_speed": {
+          "body": "institution_body__embracement_speed",
+          "card": "1",
+          "doc": "any_friendly_coast_border_province is a special scope made for institution spread. It checks for adjacent provinces or provinces one seazone away. Friendly is defined as at positive relations or owned by the same country that owns the province.",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "historical_start_date": {
+          "card": "0..1",
+          "value": "date"
+        },
+        "historical_start_province": {
+          "card": "0..1",
+          "value": "ref<province_id>"
+        },
+        "history": {
+          "body": "trigger",
+          "card": "1",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "on_start": {
+          "card": "0..1",
+          "value": "ref<event.country>"
+        },
+        "start_chance": {
+          "card": "0..1",
+          "value": "int[0..100]"
+        },
+        "trade_company_efficiency": {
+          "card": "0..1",
+          "value": "float"
+        }
+      }
+    },
+    "institution_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "institution_body__embracement_speed": {
+      "fields": {
+        "modifier": {
+          "body": "institution_body__embracement_speed__modifier",
+          "card": "1..*",
+          "doc": "Block of modifiers applied while the containing entry is active."
+        }
+      }
+    },
+    "institution_body__embracement_speed__modifier": {
+      "fields": {
+        "AND": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "AND"
+          },
+          "doc": "Evaluates to true when every trigger inside the block is true.",
+          "override": true
+        },
+        "NOT": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "NOT"
+          },
+          "doc": "Evaluates to true when the trigger inside the block is false.",
+          "override": true
+        },
+        "OR": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "OR"
+          },
+          "doc": "Evaluates to true when at least one trigger inside the block is true.",
+          "override": true
+        },
+        "custom_trigger_tooltip": {
+          "body": "institution_body__embracement_speed__modifier__custom_trigger_tooltip",
+          "card": "0..1",
+          "override": true
+        },
+        "else": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "branch_continue"
+          },
+          "doc": "Follows if/else_if; executes when no previous branch ran.",
+          "override": true
+        },
+        "exclude_from_progress": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Excludes the triggers inside for the trigger counter in the UI, used in Age Objeciives.",
+          "override": true
+        },
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float"
+        },
+        "force_potential": {
+          "card": "0..1",
+          "doc": "Hide the this modifier when potential is false",
+          "override": true,
+          "value": "'yes'"
+        },
+        "hidden_trigger": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Hides the enclosed conditions so that they are still required but cannot be seen by human players.",
+          "override": true
+        },
+        "potential": {
+          "body": "institution_body__embracement_speed__modifier__potential",
+          "card": "0..1",
+          "doc": "Trigger conditions evaluated once; gate the entry's visibility.",
+          "override": true
+        },
+        "scale": {
+          "card": "0..1",
+          "doc": "if a modifier is scaled, it is multiplied with development in the province.",
+          "override": true,
+          "value": "bool"
+        },
+        "scope_field": {
+          "body": "trigger",
+          "card": "0..*",
+          "override": true
+        },
+        "this": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Switches the block's scope to the current scope; block contents are triggers.",
+          "override": true
+        }
+      },
+      "include": [
+        "keys__trigger"
+      ],
+      "patterns": [
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the country tags listed /Europa Universalis IV/common/country_tags",
+          "key": "ref<country_tag>",
+          "scope": {
+            "push": "country"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has hired an advisor of the specified type which has at least level X.",
+          "key": "ref<advisor_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[1..5]"
+        },
+        {
+          "body": "trigger__area_used",
+          "card": "0..*",
+          "doc": "Refers to the areas listed /Europa Universalis IV/map/areas.txt",
+          "key": "ref<area.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X buildings from the specified building type.",
+          "key": "ref<building>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__colonial_region",
+          "card": "0..*",
+          "doc": "Refers to any colonial region found in /Europa Universalis IV/common/colonial_regions/",
+          "key": "ref<colonial_region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__continent",
+          "card": "0..*",
+          "doc": "Refers to any continent found in /Europa Universalis IV/map/continent.txt",
+          "key": "ref<continent>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X ideas from the specified idea group.",
+          "key": "ref<idea_group>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[0..8]"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the support for the specified institution in the province is at least X.",
+          "key": "ref<institution>",
+          "scope": {
+            "in": [
+              "province"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "body": "trigger__province_group_used",
+          "card": "0..*",
+          "doc": "Refers to the province_group listed /Europa Universalis IV/map/provincegroup.txt",
+          "key": "ref<province_group.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<province_id>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__region",
+          "card": "0..*",
+          "doc": "Refers to any region found in /Europa Universalis IV/map/region.txt",
+          "key": "ref<region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has a tolerance of at least X of the specified religion. Note: No correct localisation.",
+          "key": "ref<religion>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "card": "0..*",
+          "key": "ref<scripted_trigger>",
+          "value": "bool"
+        },
+        {
+          "body": "trigger__scripted_trigger",
+          "card": "0..*",
+          "key": "ref<scripted_trigger>"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X vassals.",
+          "key": "ref<subject_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__superregion",
+          "card": "0..*",
+          "doc": "Refers to any superregion found in /Europa Universalis IV/map/superregion.txt",
+          "key": "ref<superregion>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__trade_company",
+          "card": "0..*",
+          "doc": "Refers to any trade company found in /Europa Universalis IV/common/trade_companies//",
+          "key": "ref<trade_company>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X provinces producing the specified trade good.",
+          "key": "ref<trade_good>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Scopes to the province, which is also a trade node (defined in common/tradenodes)",
+          "key": "ref<trade_node>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "key": "link"
+        }
+      ]
+    },
+    "institution_body__embracement_speed__modifier__custom_trigger_tooltip": {
+      "fields": {
+        "AND": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "AND"
+          },
+          "doc": "Evaluates to true when every trigger inside the block is true.",
+          "override": true
+        },
+        "NOT": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "NOT"
+          },
+          "doc": "Evaluates to true when the trigger inside the block is false.",
+          "override": true
+        },
+        "OR": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "OR"
+          },
+          "doc": "Evaluates to true when at least one trigger inside the block is true.",
+          "override": true
+        },
+        "any_friendly_coast_border_province": {
+          "body": "trigger",
+          "card": "0..1",
+          "doc": "any_friendly_coast_border_province is a special scope made for institution spread. It checks for adjacent provinces or provinces one seazone away. Friendly is defined as at positive relations or owned by the same country that owns the province.",
+          "override": true,
+          "scope": {
+            "push": "province"
+          }
+        },
+        "else": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "branch_continue"
+          },
+          "doc": "Follows if/else_if; executes when no previous branch ran.",
+          "override": true
+        },
+        "exclude_from_progress": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Excludes the triggers inside for the trigger counter in the UI, used in Age Objeciives.",
+          "override": true
+        },
+        "hidden_trigger": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Hides the enclosed conditions so that they are still required but cannot be seen by human players.",
+          "override": true
+        },
+        "scope_field": {
+          "body": "trigger",
+          "card": "0..*",
+          "override": true
+        },
+        "this": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Switches the block's scope to the current scope; block contents are triggers.",
+          "override": true
+        },
+        "tooltip": {
+          "card": "1",
+          "control": {
+            "kind": "display_only"
+          },
+          "override": true,
+          "value": "loc"
+        }
+      },
+      "include": [
+        "keys__trigger"
+      ],
+      "patterns": [
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the country tags listed /Europa Universalis IV/common/country_tags",
+          "key": "ref<country_tag>",
+          "scope": {
+            "push": "country"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has hired an advisor of the specified type which has at least level X.",
+          "key": "ref<advisor_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[1..5]"
+        },
+        {
+          "body": "trigger__area_used",
+          "card": "0..*",
+          "doc": "Refers to the areas listed /Europa Universalis IV/map/areas.txt",
+          "key": "ref<area.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X buildings from the specified building type.",
+          "key": "ref<building>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__colonial_region",
+          "card": "0..*",
+          "doc": "Refers to any colonial region found in /Europa Universalis IV/common/colonial_regions/",
+          "key": "ref<colonial_region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__continent",
+          "card": "0..*",
+          "doc": "Refers to any continent found in /Europa Universalis IV/map/continent.txt",
+          "key": "ref<continent>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X ideas from the specified idea group.",
+          "key": "ref<idea_group>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[0..8]"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the support for the specified institution in the province is at least X.",
+          "key": "ref<institution>",
+          "scope": {
+            "in": [
+              "province"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "body": "trigger__province_group_used",
+          "card": "0..*",
+          "doc": "Refers to the province_group listed /Europa Universalis IV/map/provincegroup.txt",
+          "key": "ref<province_group.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<province_id>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__region",
+          "card": "0..*",
+          "doc": "Refers to any region found in /Europa Universalis IV/map/region.txt",
+          "key": "ref<region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has a tolerance of at least X of the specified religion. Note: No correct localisation.",
+          "key": "ref<religion>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "card": "0..*",
+          "key": "ref<scripted_trigger>",
+          "value": "bool"
+        },
+        {
+          "body": "trigger__scripted_trigger",
+          "card": "0..*",
+          "key": "ref<scripted_trigger>"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X vassals.",
+          "key": "ref<subject_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__superregion",
+          "card": "0..*",
+          "doc": "Refers to any superregion found in /Europa Universalis IV/map/superregion.txt",
+          "key": "ref<superregion>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__trade_company",
+          "card": "0..*",
+          "doc": "Refers to any trade company found in /Europa Universalis IV/common/trade_companies//",
+          "key": "ref<trade_company>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X provinces producing the specified trade good.",
+          "key": "ref<trade_good>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Scopes to the province, which is also a trade node (defined in common/tradenodes)",
+          "key": "ref<trade_node>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "key": "link"
+        }
+      ]
+    },
+    "institution_body__embracement_speed__modifier__potential": {
+      "fields": {
+        "AND": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "AND"
+          },
+          "doc": "Evaluates to true when every trigger inside the block is true.",
+          "override": true
+        },
+        "NOT": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "NOT"
+          },
+          "doc": "Evaluates to true when the trigger inside the block is false.",
+          "override": true
+        },
+        "OR": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "logic",
+            "op": "OR"
+          },
+          "doc": "Evaluates to true when at least one trigger inside the block is true.",
+          "override": true
+        },
+        "any_friendly_coast_border_province": {
+          "body": "trigger",
+          "card": "0..1",
+          "doc": "any_friendly_coast_border_province is a special scope made for institution spread. It checks for adjacent provinces or provinces one seazone away. Friendly is defined as at positive relations or owned by the same country that owns the province.",
+          "override": true,
+          "scope": {
+            "push": "province"
+          }
+        },
+        "else": {
+          "body": "trigger",
+          "card": "0..*",
+          "control": {
+            "kind": "branch_continue"
+          },
+          "doc": "Follows if/else_if; executes when no previous branch ran.",
+          "override": true
+        },
+        "exclude_from_progress": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Excludes the triggers inside for the trigger counter in the UI, used in Age Objeciives.",
+          "override": true
+        },
+        "hidden_trigger": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Hides the enclosed conditions so that they are still required but cannot be seen by human players.",
+          "override": true
+        },
+        "scope_field": {
+          "body": "trigger",
+          "card": "0..*",
+          "override": true
+        },
+        "this": {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Switches the block's scope to the current scope; block contents are triggers.",
+          "override": true
+        }
+      },
+      "include": [
+        "keys__trigger"
+      ],
+      "patterns": [
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the country tags listed /Europa Universalis IV/common/country_tags",
+          "key": "ref<country_tag>",
+          "scope": {
+            "push": "country"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has hired an advisor of the specified type which has at least level X.",
+          "key": "ref<advisor_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[1..5]"
+        },
+        {
+          "body": "trigger__area_used",
+          "card": "0..*",
+          "doc": "Refers to the areas listed /Europa Universalis IV/map/areas.txt",
+          "key": "ref<area.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X buildings from the specified building type.",
+          "key": "ref<building>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__colonial_region",
+          "card": "0..*",
+          "doc": "Refers to any colonial region found in /Europa Universalis IV/common/colonial_regions/",
+          "key": "ref<colonial_region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__continent",
+          "card": "0..*",
+          "doc": "Refers to any continent found in /Europa Universalis IV/map/continent.txt",
+          "key": "ref<continent>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X ideas from the specified idea group.",
+          "key": "ref<idea_group>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int[0..8]"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the support for the specified institution in the province is at least X.",
+          "key": "ref<institution>",
+          "scope": {
+            "in": [
+              "province"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "body": "trigger__province_group_used",
+          "card": "0..*",
+          "doc": "Refers to the province_group listed /Europa Universalis IV/map/provincegroup.txt",
+          "key": "ref<province_group.used>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Refers to the province ids listed /Europa Universalis IV/map/definition.csv",
+          "key": "ref<province_id>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__region",
+          "card": "0..*",
+          "doc": "Refers to any region found in /Europa Universalis IV/map/region.txt",
+          "key": "ref<region>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has a tolerance of at least X of the specified religion. Note: No correct localisation.",
+          "key": "ref<religion>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "card": "0..*",
+          "key": "ref<scripted_trigger>",
+          "value": "bool"
+        },
+        {
+          "body": "trigger__scripted_trigger",
+          "card": "0..*",
+          "key": "ref<scripted_trigger>"
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X vassals.",
+          "key": "ref<subject_type>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger__superregion",
+          "card": "0..*",
+          "doc": "Refers to any superregion found in /Europa Universalis IV/map/superregion.txt",
+          "key": "ref<superregion>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger__trade_company",
+          "card": "0..*",
+          "doc": "Refers to any trade company found in /Europa Universalis IV/common/trade_companies//",
+          "key": "ref<trade_company>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "card": "0..*",
+          "doc": "Returns true if the country has at least X provinces producing the specified trade good.",
+          "key": "ref<trade_good>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "int"
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "doc": "Scopes to the province, which is also a trade node (defined in common/tradenodes)",
+          "key": "ref<trade_node>",
+          "scope": {
+            "push": "province"
+          }
+        },
+        {
+          "body": "trigger",
+          "card": "0..*",
+          "key": "link"
+        }
+      ]
+    }
+  }
+}

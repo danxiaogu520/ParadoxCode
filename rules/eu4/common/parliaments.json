@@ -1,0 +1,209 @@
+{
+  "schemas": {
+    "parliament_bribe_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "parliament_bribe_body__ai_will_do",
+          "card": "1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "from": "province",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "chance": {
+          "body": "parliament_bribe_body__chance",
+          "card": "0..1",
+          "doc": "Chance a bribe will appear in a parliament issue",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "effect": {
+          "body": "effect",
+          "card": "1",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "from": "province",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "estate": {
+          "card": "0..1",
+          "value": "ref<estate>"
+        },
+        "name": {
+          "card": "0..1",
+          "value": "loc"
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "from": "province",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        }
+      }
+    },
+    "parliament_bribe_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "parliament_bribe_body__chance": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "parliament_issue_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "parliament_issue_body__ai_will_do",
+          "card": "1",
+          "doc": "AI weighting block: factor = base weight, modifier blocks adjust it.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "allow": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "Trigger conditions checked when using the entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "backing_percentage": {
+          "card": "0..1",
+          "doc": "Percentage of seats that will back up the issue. Defaults to PARLIAMENT_BACKING_PERCENTAGE",
+          "value": "int"
+        },
+        "category": {
+          "card": "1",
+          "value": "int"
+        },
+        "chance": {
+          "body": "parliament_issue_body__chance",
+          "card": "0..1",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "chance_of_decision": {
+          "card": "0..1",
+          "doc": "Chance debate is decided upon after debate duration, defaults to PARLIAMENT_CHANCE_OF_DECISION",
+          "value": "float"
+        },
+        "debate_duration": {
+          "card": "0..1",
+          "doc": "How many years an issue will last before being able to be randomly decided on, defaults to PARLIAMENT_DEBATE_DURATION",
+          "value": "int"
+        },
+        "effect": {
+          "body": "effect",
+          "card": "0..1",
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "effect_duration": {
+          "card": "0..1",
+          "doc": "How many years the effects of a passed issue last, also prevents picking a new issue, defaults to PARLIAMENT_EFFECT_DURATION",
+          "value": "int"
+        },
+        "influence_scaled_modifier": {
+          "body": "modifier",
+          "card": "0..1"
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "0..1",
+          "doc": "Block of modifiers applied while the containing entry is active."
+        },
+        "on_issue_taken": {
+          "body": "effect",
+          "card": "0..1",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "scale_estate_influence": {
+          "card": "0..1",
+          "value": "ref<estate>"
+        }
+      }
+    },
+    "parliament_issue_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    },
+    "parliament_issue_body__chance": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    }
+  }
+}

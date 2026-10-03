@@ -1,0 +1,2477 @@
+{
+  "files": {
+    "asset": {
+      "ext": [
+        "png",
+        "dds",
+        "tga",
+        "jpg",
+        "jpeg",
+        "ogg",
+        "wav",
+        "fnt"
+      ],
+      "parser": "asset",
+      "path": "",
+      "resolution": "replace-by-path"
+    },
+    "csv": {
+      "ext": "csv",
+      "parser": "syntax-only",
+      "path": "",
+      "resolution": "replace-by-path"
+    },
+    "eu4_opaque_credits": {
+      "ext": "txt",
+      "file": "credits.txt",
+      "parser": "syntax-only",
+      "path": "interface",
+      "resolution": "replace-by-path"
+    },
+    "eu4_path_common_achievements": {
+      "ext": "txt",
+      "file": "achievements.txt",
+      "path": "common",
+      "root": "common_achievements_file"
+    },
+    "eu4_path_common_advisortypes": {
+      "ext": "txt",
+      "path": "common/advisortypes",
+      "root": "common_advisortypes_file"
+    },
+    "eu4_path_common_ages": {
+      "ext": "txt",
+      "path": "common/ages",
+      "root": "common_ages_file"
+    },
+    "eu4_path_common_ai_army": {
+      "ext": "txt",
+      "path": "common/ai_army",
+      "root": "common_ai_army_file"
+    },
+    "eu4_path_common_ai_attitudes": {
+      "ext": "txt",
+      "path": "common/ai_attitudes",
+      "root": "open_script_file"
+    },
+    "eu4_path_common_ai_personalities": {
+      "ext": "txt",
+      "path": "common/ai_personalities",
+      "root": "common_ai_personalities_file"
+    },
+    "eu4_path_common_alerts": {
+      "ext": "txt",
+      "file": "alerts.txt",
+      "path": "common",
+      "root": "alerts_body"
+    },
+    "eu4_path_common_ancestor_personalities": {
+      "ext": "txt",
+      "path": "common/ancestor_personalities",
+      "root": "common_ancestor_personalities_file"
+    },
+    "eu4_path_common_bookmarks": {
+      "ext": "txt",
+      "path": "common/bookmarks",
+      "root": "common_bookmarks_file"
+    },
+    "eu4_path_common_buildings": {
+      "ext": "txt",
+      "path": "common/buildings",
+      "root": "common_buildings_file"
+    },
+    "eu4_path_common_cb_types": {
+      "ext": "txt",
+      "path": "common/cb_types",
+      "root": "common_cb_types_file"
+    },
+    "eu4_path_common_centers_of_trade": {
+      "ext": "txt",
+      "path": "common/centers_of_trade",
+      "root": "common_centers_of_trade_file"
+    },
+    "eu4_path_common_church_aspects": {
+      "ext": "txt",
+      "path": "common/church_aspects",
+      "root": "common_church_aspects_file"
+    },
+    "eu4_path_common_client_states": {
+      "ext": "txt",
+      "path": "common/client_states",
+      "root": "common_client_states_file"
+    },
+    "eu4_path_common_colonial_regions": {
+      "ext": "txt",
+      "path": "common/colonial_regions",
+      "root": "common_colonial_regions_file"
+    },
+    "eu4_path_common_countries": {
+      "ext": "txt",
+      "path": "common/countries",
+      "root": {
+        "body": "country_file_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "country_file"
+        }
+      }
+    },
+    "eu4_path_common_country_colors": {
+      "ext": "txt",
+      "path": "common/country_colors",
+      "root": {
+        "body": "country_color_file_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "country_color_file"
+        }
+      }
+    },
+    "eu4_path_common_country_tags": {
+      "ext": "txt",
+      "path": "common/country_tags",
+      "root": "country_tags_file"
+    },
+    "eu4_path_common_cultures": {
+      "ext": "txt",
+      "path": "common/cultures",
+      "root": "common_cultures_file"
+    },
+    "eu4_path_common_custom_country_colors": {
+      "ext": "txt",
+      "path": "common/custom_country_colors",
+      "root": "open_script_file"
+    },
+    "eu4_path_common_custom_gui": {
+      "ext": "txt",
+      "path": "common/custom_gui",
+      "root": "custom_gui_file"
+    },
+    "eu4_path_common_custom_ideas": {
+      "ext": "txt",
+      "path": "common/custom_ideas",
+      "root": "common_custom_ideas_file"
+    },
+    "eu4_path_common_decrees": {
+      "ext": "txt",
+      "path": "common/decrees",
+      "root": "common_decrees_file"
+    },
+    "eu4_path_common_defender_of_faith": {
+      "ext": "txt",
+      "path": "common/defender_of_faith",
+      "root": "common_defender_of_faith_file"
+    },
+    "eu4_path_common_defines": {
+      "ext": "txt",
+      "path": "common/defines",
+      "root": "open_script_file"
+    },
+    "eu4_path_common_defines_lua": {
+      "ext": "lua",
+      "parser": "syntax-only",
+      "path": "common/defines",
+      "resolution": "replace-by-path"
+    },
+    "eu4_path_common_diplomatic_actions": {
+      "ext": "txt",
+      "path": "common/diplomatic_actions",
+      "root": "common_diplomatic_actions_file"
+    },
+    "eu4_path_common_disasters": {
+      "ext": "txt",
+      "path": "common/disasters",
+      "root": "common_disasters_file"
+    },
+    "eu4_path_common_dynasty_colors": {
+      "ext": "txt",
+      "path": "common/dynasty_colors",
+      "root": {
+        "body": "dynasty_colors_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "dynasty_colors"
+        }
+      }
+    },
+    "eu4_path_common_estate_agendas": {
+      "ext": "txt",
+      "path": "common/estate_agendas",
+      "root": "common_estate_agendas_file"
+    },
+    "eu4_path_common_estate_crown_land": {
+      "ext": "txt",
+      "path": "common/estate_crown_land",
+      "root": "common_estate_crown_land_file"
+    },
+    "eu4_path_common_estate_privileges": {
+      "ext": "txt",
+      "path": "common/estate_privileges",
+      "root": "common_estate_privileges_file"
+    },
+    "eu4_path_common_estates": {
+      "ext": "txt",
+      "path": "common/estates",
+      "root": "common_estates_file"
+    },
+    "eu4_path_common_estates_preload": {
+      "ext": "txt",
+      "path": "common/estates_preload",
+      "root": "common_estates_preload_file"
+    },
+    "eu4_path_common_event_modifiers": {
+      "ext": "txt",
+      "path": "common/event_modifiers",
+      "root": "common_event_modifiers_file"
+    },
+    "eu4_path_common_factions": {
+      "ext": "txt",
+      "path": "common/factions",
+      "root": "common_factions_file"
+    },
+    "eu4_path_common_federation_advancements": {
+      "ext": "txt",
+      "path": "common/federation_advancements",
+      "root": "common_federation_advancements_file"
+    },
+    "eu4_path_common_fervor": {
+      "ext": "txt",
+      "path": "common/fervor",
+      "root": "common_fervor_file"
+    },
+    "eu4_path_common_fetishist_cults": {
+      "ext": "txt",
+      "path": "common/fetishist_cults",
+      "root": "common_fetishist_cults_file"
+    },
+    "eu4_path_common_flagship_modifications": {
+      "ext": "txt",
+      "path": "common/flagship_modifications",
+      "root": "common_flagship_modifications_file"
+    },
+    "eu4_path_common_golden_bulls": {
+      "ext": "txt",
+      "path": "common/golden_bulls",
+      "root": "common_golden_bulls_file"
+    },
+    "eu4_path_common_government_mechanics": {
+      "ext": "txt",
+      "path": "common/government_mechanics",
+      "root": "common_government_mechanics_file"
+    },
+    "eu4_path_common_government_names": {
+      "ext": "txt",
+      "path": "common/government_names",
+      "root": "common_government_names_file"
+    },
+    "eu4_path_common_government_ranks": {
+      "ext": "txt",
+      "path": "common/government_ranks",
+      "root": "open_script_file"
+    },
+    "eu4_path_common_government_reforms": {
+      "ext": "txt",
+      "path": "common/government_reforms",
+      "root": "common_government_reforms_file"
+    },
+    "eu4_path_common_governments": {
+      "ext": "txt",
+      "path": "common/governments",
+      "root": "common_governments_file"
+    },
+    "eu4_path_common_graphicalculturetype": {
+      "ext": "txt",
+      "file": "graphicalculturetype.txt",
+      "path": "common",
+      "root": "graphical_cultures_file"
+    },
+    "eu4_path_common_great_projects": {
+      "ext": "txt",
+      "path": "common/great_projects",
+      "root": "common_great_projects_file"
+    },
+    "eu4_path_common_hegemons": {
+      "ext": "txt",
+      "path": "common/hegemons",
+      "root": "common_hegemons_file"
+    },
+    "eu4_path_common_historial_lucky": {
+      "ext": "txt",
+      "file": "historial_lucky.txt",
+      "path": "common",
+      "root": "luck_body"
+    },
+    "eu4_path_common_holy_orders": {
+      "ext": "txt",
+      "path": "common/holy_orders",
+      "root": "common_holy_orders_file"
+    },
+    "eu4_path_common_ideas": {
+      "ext": "txt",
+      "path": "common/ideas",
+      "root": "common_ideas_file"
+    },
+    "eu4_path_common_imperial_incidents": {
+      "ext": "txt",
+      "path": "common/imperial_incidents",
+      "root": "common_imperial_incidents_file"
+    },
+    "eu4_path_common_imperial_reforms": {
+      "ext": "txt",
+      "path": "common/imperial_reforms",
+      "root": "common_imperial_reforms_file"
+    },
+    "eu4_path_common_incidents": {
+      "ext": "txt",
+      "path": "common/incidents",
+      "root": "common_incidents_file"
+    },
+    "eu4_path_common_institutions": {
+      "ext": "txt",
+      "path": "common/institutions",
+      "root": "common_institutions_file"
+    },
+    "eu4_path_common_insults": {
+      "ext": "txt",
+      "path": "common/insults",
+      "root": "common_insults_file"
+    },
+    "eu4_path_common_isolationism": {
+      "ext": "txt",
+      "path": "common/isolationism",
+      "root": "common_isolationism_file"
+    },
+    "eu4_path_common_leader_personalities": {
+      "ext": "txt",
+      "path": "common/leader_personalities",
+      "root": "common_leader_personalities_file"
+    },
+    "eu4_path_common_mercenary_companies": {
+      "ext": "txt",
+      "path": "common/mercenary_companies",
+      "root": "common_mercenary_companies_file"
+    },
+    "eu4_path_common_natives": {
+      "ext": "txt",
+      "path": "common/natives",
+      "root": "common_natives_file"
+    },
+    "eu4_path_common_naval_doctrines": {
+      "ext": "txt",
+      "path": "common/naval_doctrines",
+      "root": "common_naval_doctrines_file"
+    },
+    "eu4_path_common_new_diplomatic_actions": {
+      "ext": "txt",
+      "path": "common/new_diplomatic_actions",
+      "root": "common_new_diplomatic_actions_file"
+    },
+    "eu4_path_common_opinion_modifiers": {
+      "ext": "txt",
+      "path": "common/opinion_modifiers",
+      "root": "common_opinion_modifiers_file"
+    },
+    "eu4_path_common_parliament_bribes": {
+      "ext": "txt",
+      "path": "common/parliament_bribes",
+      "root": "common_parliament_bribes_file"
+    },
+    "eu4_path_common_parliament_issues": {
+      "ext": "txt",
+      "path": "common/parliament_issues",
+      "root": "common_parliament_issues_file"
+    },
+    "eu4_path_common_peace_treaties": {
+      "ext": "txt",
+      "path": "common/peace_treaties",
+      "root": "common_peace_treaties_file"
+    },
+    "eu4_path_common_personal_deities": {
+      "ext": "txt",
+      "path": "common/personal_deities",
+      "root": "common_personal_deities_file"
+    },
+    "eu4_path_common_policies": {
+      "ext": "txt",
+      "path": "common/policies",
+      "root": "common_policies_file"
+    },
+    "eu4_path_common_powerprojection": {
+      "ext": "txt",
+      "path": "common/powerprojection",
+      "root": "common_powerprojection_file"
+    },
+    "eu4_path_common_prices": {
+      "ext": "txt",
+      "path": "common/prices",
+      "root": {
+        "body": "prices_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "prices"
+        }
+      }
+    },
+    "eu4_path_common_professionalism": {
+      "ext": "txt",
+      "path": "common/professionalism",
+      "root": "common_professionalism_file"
+    },
+    "eu4_path_common_province_names": {
+      "ext": "txt",
+      "path": "common/province_names",
+      "root": {
+        "body": "province_names_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "province_names"
+        }
+      }
+    },
+    "eu4_path_common_province_triggered_modifiers": {
+      "ext": "txt",
+      "path": "common/province_triggered_modifiers",
+      "root": "common_province_triggered_modifiers_file"
+    },
+    "eu4_path_common_rebel_types": {
+      "ext": "txt",
+      "path": "common/rebel_types",
+      "root": "common_rebel_types_file"
+    },
+    "eu4_path_common_region_colors": {
+      "ext": "txt",
+      "path": "common/region_colors",
+      "root": {
+        "body": "region_colors_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "region_colors"
+        }
+      }
+    },
+    "eu4_path_common_religions": {
+      "ext": "txt",
+      "path": "common/religions",
+      "root": "common_religions_file"
+    },
+    "eu4_path_common_religious_conversions": {
+      "ext": "txt",
+      "path": "common/religious_conversions",
+      "root": "common_religious_conversions_file"
+    },
+    "eu4_path_common_religious_reforms": {
+      "ext": "txt",
+      "path": "common/religious_reforms",
+      "root": "common_religious_reforms_file"
+    },
+    "eu4_path_common_revolt_triggers": {
+      "ext": "txt",
+      "path": "common/revolt_triggers",
+      "root": "common_revolt_triggers_file"
+    },
+    "eu4_path_common_revolution": {
+      "ext": "txt",
+      "path": "common/revolution",
+      "root": "common_revolution_file"
+    },
+    "eu4_path_common_ruler_personalities": {
+      "ext": "txt",
+      "path": "common/ruler_personalities",
+      "root": "common_ruler_personalities_file"
+    },
+    "eu4_path_common_scripted_effects": {
+      "ext": "txt",
+      "path": "common/scripted_effects",
+      "root": "common_scripted_effects_file"
+    },
+    "eu4_path_common_scripted_functions": {
+      "ext": "txt",
+      "path": "common/scripted_functions",
+      "root": "common_scripted_functions_file"
+    },
+    "eu4_path_common_scripted_loc": {
+      "ext": "txt",
+      "path": "common/scripted_loc",
+      "root": "scripted_localisation_file"
+    },
+    "eu4_path_common_scripted_localisation": {
+      "ext": "txt",
+      "path": "common/scripted_localisation",
+      "root": "scripted_localisation_file"
+    },
+    "eu4_path_common_scripted_localization": {
+      "ext": "txt",
+      "path": "common/scripted_localization",
+      "root": "scripted_localisation_file"
+    },
+    "eu4_path_common_scripted_triggers": {
+      "ext": "txt",
+      "path": "common/scripted_triggers",
+      "root": "common_scripted_triggers_file"
+    },
+    "eu4_path_common_state_edicts": {
+      "ext": "txt",
+      "path": "common/state_edicts",
+      "root": "common_state_edicts_file"
+    },
+    "eu4_path_common_static_modifiers": {
+      "ext": "txt",
+      "path": "common/static_modifiers",
+      "root": "common_static_modifiers_file"
+    },
+    "eu4_path_common_subject_type_upgrades": {
+      "ext": "txt",
+      "path": "common/subject_type_upgrades",
+      "root": "common_subject_type_upgrades_file"
+    },
+    "eu4_path_common_subject_types": {
+      "ext": "txt",
+      "path": "common/subject_types",
+      "root": "common_subject_types_file"
+    },
+    "eu4_path_common_technologies": {
+      "ext": "txt",
+      "path": "common/technologies",
+      "root": "common_technologies_file"
+    },
+    "eu4_path_common_technology": {
+      "ext": "txt",
+      "file": "technology.txt",
+      "path": "common",
+      "root": "technology_file_file"
+    },
+    "eu4_path_common_timed_modifiers": {
+      "ext": "txt",
+      "path": "common/timed_modifiers",
+      "root": "common_timed_modifiers_file"
+    },
+    "eu4_path_common_trade_companies": {
+      "ext": "txt",
+      "path": "common/trade_companies",
+      "root": "common_trade_companies_file"
+    },
+    "eu4_path_common_tradecompany_investments": {
+      "ext": "txt",
+      "path": "common/tradecompany_investments",
+      "root": "common_tradecompany_investments_file"
+    },
+    "eu4_path_common_tradegoods": {
+      "ext": "txt",
+      "path": "common/tradegoods",
+      "root": "common_tradegoods_file"
+    },
+    "eu4_path_common_tradenodes": {
+      "ext": "txt",
+      "path": "common/tradenodes",
+      "root": "common_tradenodes_file"
+    },
+    "eu4_path_common_trading_policies": {
+      "ext": "txt",
+      "path": "common/trading_policies",
+      "root": "common_trading_policies_file"
+    },
+    "eu4_path_common_triggered_modifiers": {
+      "ext": "txt",
+      "path": "common/triggered_modifiers",
+      "root": "common_triggered_modifiers_file"
+    },
+    "eu4_path_common_units": {
+      "ext": "txt",
+      "path": "common/units",
+      "root": {
+        "body": "unit_type_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "unit_type"
+        }
+      }
+    },
+    "eu4_path_common_units_display": {
+      "ext": "txt",
+      "path": "common/units_display",
+      "root": {
+        "body": "units_display_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "units_display"
+        }
+      }
+    },
+    "eu4_path_common_wargoal_types": {
+      "ext": "txt",
+      "path": "common/wargoal_types",
+      "root": "common_wargoal_types_file"
+    },
+    "eu4_path_customizable_localization": {
+      "ext": "txt",
+      "path": "customizable_localization",
+      "root": "customizable_localization_file"
+    },
+    "eu4_path_decisions": {
+      "ext": "txt",
+      "path": "decisions",
+      "root": "decision_file"
+    },
+    "eu4_path_events": {
+      "ext": "txt",
+      "path": "events",
+      "root": "event_file"
+    },
+    "eu4_path_gfx_sprite_packs": {
+      "ext": "txt",
+      "path": "gfx/sprite_packs",
+      "root": "gfx_sprite_packs_file"
+    },
+    "eu4_path_gfx_sprite_packs_order": {
+      "ext": "txt",
+      "path": "gfx/sprite_packs_order",
+      "root": {
+        "body": "packorder_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "packorder"
+        }
+      }
+    },
+    "eu4_path_history_advisors": {
+      "ext": "txt",
+      "path": "history/advisors",
+      "root": "history_advisors_file"
+    },
+    "eu4_path_history_countries": {
+      "ext": "txt",
+      "path": "history/countries",
+      "root": {
+        "body": "country_history_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "country_history"
+        },
+        "scope": {
+          "set": {
+            "root": "country",
+            "this": "country"
+          }
+        }
+      }
+    },
+    "eu4_path_history_diplomacy": {
+      "ext": "txt",
+      "path": "history/diplomacy",
+      "root": {
+        "body": "diplomacy_history_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "diplomacy_history"
+        }
+      }
+    },
+    "eu4_path_history_provinces": {
+      "ext": "txt",
+      "path": "history/provinces",
+      "root": {
+        "body": "province_history_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "province_history"
+        },
+        "scope": {
+          "set": {
+            "root": "province",
+            "this": "province"
+          }
+        }
+      }
+    },
+    "eu4_path_history_wars": {
+      "ext": "txt",
+      "path": "history/wars",
+      "root": {
+        "body": "war_history_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "war_history"
+        }
+      }
+    },
+    "eu4_path_interface": {
+      "ext": "txt",
+      "path": "interface",
+      "root": "open_script_file"
+    },
+    "eu4_path_map": {
+      "exclude": [
+        "map/random/tiles"
+      ],
+      "ext": "txt",
+      "path": "map",
+      "root": "open_script_file"
+    },
+    "eu4_path_missions": {
+      "ext": "txt",
+      "path": "missions",
+      "root": "missions_file"
+    },
+    "files_common_custom_country_colors_00_custom_country_colors_txt": {
+      "file": "00_custom_country_colors.txt",
+      "path": "common/custom_country_colors",
+      "resolution": "replace-by-path",
+      "root": {
+        "body": "custom_country_colors_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "custom_country_colors"
+        }
+      },
+      "strict": true
+    },
+    "files_common_government_ranks_00_government_ranks_txt": {
+      "file": "00_government_ranks.txt",
+      "path": "common/government_ranks",
+      "resolution": "replace-by-path",
+      "root": {
+        "body": "government_ranks_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "government_ranks"
+        }
+      }
+    },
+    "files_interface_gfx": {
+      "ext": "gfx",
+      "path": "interface",
+      "resolution": "replace-by-path",
+      "root": "sprite_file"
+    },
+    "files_map_ambient_object_txt": {
+      "file": "ambient_object.txt",
+      "path": "map",
+      "resolution": "replace-by-path",
+      "root": "map_ambient_objects_file"
+    },
+    "files_map_area_txt": {
+      "file": "area.txt",
+      "path": "map",
+      "resolution": "replace-by-path",
+      "root": "map_area_file"
+    },
+    "files_map_climate_txt": {
+      "file": "climate.txt",
+      "path": "map",
+      "resolution": "replace-by-path",
+      "root": {
+        "body": "mapclimate_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "mapclimate"
+        }
+      }
+    },
+    "files_map_continent_txt": {
+      "file": "continent.txt",
+      "path": "map",
+      "resolution": "replace-by-path",
+      "root": "map_continent_file"
+    },
+    "files_map_default_map": {
+      "file": "default.map",
+      "path": "map",
+      "resolution": "replace-by-path",
+      "root": {
+        "body": "default_map_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "default_map"
+        }
+      }
+    },
+    "files_map_positions_txt": {
+      "file": "positions.txt",
+      "path": "map",
+      "resolution": "replace-by-path",
+      "root": "map_positions_file"
+    },
+    "files_map_provincegroup_txt": {
+      "file": "provincegroup.txt",
+      "path": "map",
+      "resolution": "replace-by-path",
+      "root": "map_provincegroup_file"
+    },
+    "files_map_region_txt": {
+      "file": "region.txt",
+      "path": "map",
+      "resolution": "replace-by-path",
+      "root": "map_region_file"
+    },
+    "files_map_superregion_txt": {
+      "file": "superregion.txt",
+      "path": "map",
+      "resolution": "replace-by-path",
+      "root": "map_superregion_file"
+    },
+    "files_map_terrain_txt": {
+      "file": "terrain.txt",
+      "path": "map",
+      "resolution": "replace-by-path",
+      "root": "map_terrain_file"
+    },
+    "files_map_trade_winds_txt": {
+      "file": "trade_winds.txt",
+      "path": "map",
+      "resolution": "replace-by-path",
+      "root": {
+        "body": "trade_winds_body",
+        "card": "0..1",
+        "def": {
+          "name": "file",
+          "type": "trade_winds"
+        }
+      }
+    },
+    "localisation": {
+      "ext": [
+        "yml",
+        "yaml"
+      ],
+      "parser": "localisation",
+      "path": "localisation",
+      "resolution": "replace-by-path"
+    },
+    "script": {
+      "exclude": [
+        "common",
+        "map/random/tiles",
+        "dlc_metadata",
+        "gfx/entities"
+      ],
+      "ext": [
+        "txt",
+        "gui",
+        "gfx",
+        "asset",
+        "sfx"
+      ],
+      "path": "",
+      "resolution": "replace-by-path",
+      "root": "open_script_file"
+    },
+    "syntax_only": {
+      "exclude": [
+        "common"
+      ],
+      "ext": [
+        "json",
+        "lua"
+      ],
+      "parser": "syntax-only",
+      "path": "",
+      "resolution": "replace-by-path"
+    }
+  },
+  "schemas": {
+    "ambient_object_body": {},
+    "ancestor_personality_body": {},
+    "climate_body": {},
+    "common_achievements_file": {
+      "patterns": [
+        {
+          "body": "achievement_body",
+          "card": "0..1",
+          "key": "def<achievement>"
+        }
+      ]
+    },
+    "common_advisortypes_file": {
+      "patterns": [
+        {
+          "body": "advisor_type_body",
+          "card": "0..1",
+          "key": "def<advisor_type>"
+        }
+      ]
+    },
+    "common_ages_file": {
+      "patterns": [
+        {
+          "body": "game_age_body",
+          "card": "0..1",
+          "key": "def<game_age>"
+        }
+      ]
+    },
+    "common_ai_army_file": {
+      "fields": {
+        "province": {
+          "body": "common_ai_army_file__province",
+          "card": "0..1"
+        }
+      }
+    },
+    "common_ai_army_file__province": {
+      "patterns": [
+        {
+          "body": "ai_army_body",
+          "card": "0..1",
+          "key": "def<ai_army>"
+        }
+      ]
+    },
+    "common_ai_personalities_file": {
+      "patterns": [
+        {
+          "body": "ai_personality_body",
+          "card": "0..1",
+          "key": "def<ai_personality>"
+        }
+      ]
+    },
+    "common_ancestor_personalities_file": {
+      "patterns": [
+        {
+          "body": "ancestor_personalities_body",
+          "card": "0..1",
+          "def": {
+            "strip_prefix": "ancestor_",
+            "strip_suffix": "_personality",
+            "type": "ancestor_personality"
+          },
+          "key": "def<ancestor_personality>"
+        }
+      ]
+    },
+    "common_bookmarks_file": {
+      "fields": {
+        "bookmark": {
+          "body": "bookmark_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "bookmark"
+          }
+        }
+      }
+    },
+    "common_buildings_file": {
+      "patterns": [
+        {
+          "body": "building_body",
+          "card": "0..1",
+          "key": "def<building>"
+        }
+      ]
+    },
+    "common_cb_types_file": {
+      "patterns": [
+        {
+          "body": "casus_belli_body",
+          "card": "0..1",
+          "key": "def<casus_belli>"
+        }
+      ]
+    },
+    "common_centers_of_trade_file": {
+      "patterns": [
+        {
+          "body": "trade_center_body",
+          "card": "0..1",
+          "key": "def<trade_center>"
+        }
+      ]
+    },
+    "common_church_aspects_file": {
+      "patterns": [
+        {
+          "body": "aspects_and_blessings_body",
+          "card": "0..1",
+          "key": "def<aspects_and_blessings>"
+        }
+      ]
+    },
+    "common_client_states_file": {
+      "patterns": [
+        {
+          "body": "client_state_body",
+          "card": "0..1",
+          "key": "def<client_state>"
+        }
+      ]
+    },
+    "common_colonial_regions_file": {
+      "patterns": [
+        {
+          "body": "colonial_region_body",
+          "card": "0..1",
+          "key": "def<colonial_region>"
+        }
+      ]
+    },
+    "common_cultures_file": {
+      "patterns": [
+        {
+          "body": "culture_group_body",
+          "card": "0..1",
+          "key": "def<culture_group>"
+        }
+      ]
+    },
+    "common_custom_ideas_file": {
+      "patterns": [
+        {
+          "body": "custom_ideas_group",
+          "card": "0..1",
+          "key": "scalar"
+        }
+      ]
+    },
+    "common_decrees_file": {
+      "patterns": [
+        {
+          "body": "decree_body",
+          "card": "0..1",
+          "key": "def<decree>"
+        }
+      ]
+    },
+    "common_defender_of_faith_file": {
+      "patterns": [
+        {
+          "body": "defender_faith_body",
+          "card": "0..1",
+          "key": "def<defender_faith>"
+        }
+      ]
+    },
+    "common_diplomatic_actions_file": {
+      "patterns": [
+        {
+          "body": "diplomatic_action_body",
+          "card": "0..1",
+          "key": "def<diplomatic_action>"
+        }
+      ]
+    },
+    "common_disasters_file": {
+      "patterns": [
+        {
+          "body": "disaster_body",
+          "card": "0..1",
+          "key": "def<disaster>"
+        }
+      ]
+    },
+    "common_estate_agendas_file": {
+      "patterns": [
+        {
+          "body": "estate_agenda_body",
+          "card": "0..1",
+          "key": "def<estate_agenda>"
+        }
+      ]
+    },
+    "common_estate_crown_land_file": {
+      "fields": {
+        "bonus": {
+          "body": "estate_crown_land_bonus_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:key",
+            "type": "estate_crown_land_bonus"
+          }
+        },
+        "interaction": {
+          "body": "estate_interaction_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:key",
+            "type": "estate_interaction"
+          }
+        }
+      }
+    },
+    "common_estate_privileges_file": {
+      "patterns": [
+        {
+          "body": "estate_privilege_body",
+          "card": "0..1",
+          "key": "def<estate_privilege>"
+        }
+      ]
+    },
+    "common_estates_file": {
+      "patterns": [
+        {
+          "body": "estate_body",
+          "card": "0..1",
+          "key": "def<estate>"
+        }
+      ]
+    },
+    "common_estates_preload_file": {
+      "patterns": [
+        {
+          "body": "estate_modifier_body",
+          "card": "0..1",
+          "key": "ref<estate>"
+        }
+      ]
+    },
+    "common_event_modifiers_file": {
+      "patterns": [
+        {
+          "body": "event_modifier_body",
+          "card": "0..1",
+          "key": "def<event_modifier>"
+        }
+      ]
+    },
+    "common_factions_file": {
+      "patterns": [
+        {
+          "body": "faction_body",
+          "card": "0..1",
+          "key": "def<faction>"
+        }
+      ]
+    },
+    "common_federation_advancements_file": {
+      "patterns": [
+        {
+          "body": "federation_advancements_body",
+          "card": "0..1",
+          "key": "def<federation_advancements>"
+        }
+      ]
+    },
+    "common_fervor_file": {
+      "patterns": [
+        {
+          "body": "fervor_body",
+          "card": "0..1",
+          "key": "def<fervor>"
+        }
+      ]
+    },
+    "common_fetishist_cults_file": {
+      "patterns": [
+        {
+          "body": "cult_body",
+          "card": "0..1",
+          "key": "def<cult>"
+        }
+      ]
+    },
+    "common_file": {
+      "patterns": [
+        {
+          "body": "achievement_body",
+          "card": "0..1",
+          "key": "def<achievement>"
+        },
+        {
+          "body": "luck_body",
+          "card": "0..1",
+          "key": "def<luck>"
+        }
+      ]
+    },
+    "common_flagship_modifications_file": {
+      "patterns": [
+        {
+          "body": "flagship_modification_body",
+          "card": "0..1",
+          "key": "def<flagship_modification>"
+        }
+      ]
+    },
+    "common_golden_bulls_file": {
+      "patterns": [
+        {
+          "body": "golden_bull_body",
+          "card": "0..1",
+          "key": "def<golden_bull>"
+        }
+      ]
+    },
+    "common_government_mechanics_file": {
+      "patterns": [
+        {
+          "body": "government_mechanic_body",
+          "card": "0..1",
+          "key": "def<government_mechanic>"
+        }
+      ]
+    },
+    "common_government_names_file": {
+      "patterns": [
+        {
+          "body": "government_name_body",
+          "card": "0..1",
+          "key": "def<government_name>"
+        }
+      ]
+    },
+    "common_government_reforms_file": {
+      "patterns": [
+        {
+          "body": "government_reform_body",
+          "card": "0..1",
+          "key": "def<government_reform>"
+        }
+      ]
+    },
+    "common_governments_file": {
+      "fields": {
+        "pre_dharma_mapping": {
+          "body": "pre_dharma_mapping_body",
+          "card": "0..1"
+        }
+      },
+      "patterns": [
+        {
+          "body": "government_body",
+          "card": "0..1",
+          "key": "def<government>"
+        }
+      ]
+    },
+    "common_great_projects_file": {
+      "patterns": [
+        {
+          "body": "great_project_body",
+          "card": "0..1",
+          "key": "def<great_project>"
+        }
+      ]
+    },
+    "common_hegemons_file": {
+      "patterns": [
+        {
+          "body": "hegemon_body",
+          "card": "0..1",
+          "key": "def<hegemon>"
+        }
+      ]
+    },
+    "common_holy_orders_file": {
+      "patterns": [
+        {
+          "body": "holy_order_body",
+          "card": "0..1",
+          "key": "def<holy_order>"
+        }
+      ]
+    },
+    "common_ideas_file": {
+      "patterns": [
+        {
+          "body": "idea_group_body",
+          "card": "0..1",
+          "key": "def<idea_group>"
+        }
+      ]
+    },
+    "common_imperial_incidents_file": {
+      "patterns": [
+        {
+          "body": "imperial_incident_body",
+          "card": "0..1",
+          "key": "def<imperial_incident>"
+        }
+      ]
+    },
+    "common_imperial_reforms_file": {
+      "patterns": [
+        {
+          "body": "imperial_reform_body",
+          "card": "0..1",
+          "key": "def<imperial_reform>"
+        }
+      ]
+    },
+    "common_incidents_file": {
+      "patterns": [
+        {
+          "body": "incident_body",
+          "card": "0..1",
+          "key": "def<incident>"
+        }
+      ]
+    },
+    "common_institutions_file": {
+      "patterns": [
+        {
+          "body": "institution_body",
+          "card": "0..1",
+          "key": "def<institution>"
+        }
+      ]
+    },
+    "common_insults_file": {
+      "patterns": [
+        {
+          "body": "insult_body",
+          "card": "0..1",
+          "key": "def<insult>"
+        }
+      ]
+    },
+    "common_isolationism_file": {
+      "patterns": [
+        {
+          "body": "isolationism_body",
+          "card": "0..1",
+          "key": "def<isolationism>"
+        }
+      ]
+    },
+    "common_leader_personalities_file": {
+      "patterns": [
+        {
+          "body": "leader_personality_body",
+          "card": "0..1",
+          "key": "def<leader_personality>"
+        }
+      ]
+    },
+    "common_luck_file": {
+      "patterns": [
+        {
+          "body": "luck_body",
+          "card": "0..1",
+          "key": "def<luck>"
+        }
+      ]
+    },
+    "common_mercenary_companies_file": {
+      "patterns": [
+        {
+          "body": "mercenary_company_body",
+          "card": "0..1",
+          "key": "def<mercenary_company>"
+        }
+      ]
+    },
+    "common_natives_file": {
+      "patterns": [
+        {
+          "body": "natives_body",
+          "card": "0..1",
+          "key": "def<natives>"
+        }
+      ]
+    },
+    "common_naval_doctrines_file": {
+      "patterns": [
+        {
+          "body": "naval_doctrine_body",
+          "card": "0..1",
+          "key": "def<naval_doctrine>"
+        }
+      ]
+    },
+    "common_new_diplomatic_actions_file": {
+      "fields": {
+        "static_actions": {
+          "body": "static_diplomatic_actions_body",
+          "card": "0..1"
+        }
+      },
+      "patterns": [
+        {
+          "body": "new_diplomatic_action_body",
+          "card": "0..1",
+          "key": "def<new_diplomatic_action>"
+        }
+      ]
+    },
+    "common_opinion_modifiers_file": {
+      "patterns": [
+        {
+          "body": "opinion_modifier_body",
+          "card": "0..1",
+          "key": "def<opinion_modifier>"
+        }
+      ]
+    },
+    "common_parliament_bribes_file": {
+      "patterns": [
+        {
+          "body": "parliament_bribe_body",
+          "card": "0..1",
+          "key": "def<parliament_bribe>"
+        }
+      ]
+    },
+    "common_parliament_issues_file": {
+      "patterns": [
+        {
+          "body": "parliament_issue_body",
+          "card": "0..1",
+          "key": "def<parliament_issue>"
+        }
+      ]
+    },
+    "common_peace_treaties_file": {
+      "patterns": [
+        {
+          "body": "peace_treaty_body",
+          "card": "0..1",
+          "key": "def<peace_treaty>"
+        }
+      ]
+    },
+    "common_personal_deities_file": {
+      "patterns": [
+        {
+          "body": "personal_deity_body",
+          "card": "0..1",
+          "key": "def<personal_deity>"
+        }
+      ]
+    },
+    "common_policies_file": {
+      "patterns": [
+        {
+          "body": "policy_body",
+          "card": "0..1",
+          "key": "def<policy>"
+        }
+      ]
+    },
+    "common_powerprojection_file": {
+      "patterns": [
+        {
+          "body": "power_projection_body",
+          "card": "0..1",
+          "key": "def<power_projection>"
+        }
+      ]
+    },
+    "common_professionalism_file": {
+      "patterns": [
+        {
+          "body": "professionalism_modifier_body",
+          "card": "0..1",
+          "key": "def<professionalism_modifier>"
+        }
+      ]
+    },
+    "common_province_triggered_modifiers_file": {
+      "patterns": [
+        {
+          "body": "province_triggered_modifier_body",
+          "card": "0..1",
+          "key": "def<province_triggered_modifier>"
+        }
+      ]
+    },
+    "common_rebel_types_file": {
+      "patterns": [
+        {
+          "body": "rebel_type_body",
+          "card": "0..1",
+          "key": "def<rebel_type>"
+        }
+      ]
+    },
+    "common_religions_file": {
+      "patterns": [
+        {
+          "body": "religion_group_body",
+          "card": "0..1",
+          "key": "def<religion_group>"
+        }
+      ]
+    },
+    "common_religious_conversions_file": {
+      "patterns": [
+        {
+          "body": "religion_propagation_body",
+          "card": "0..1",
+          "key": "def<religion_propagation>"
+        }
+      ]
+    },
+    "common_religious_reforms_file": {
+      "patterns": [
+        {
+          "body": "religious_reform_group_body",
+          "card": "0..1",
+          "key": "def<religious_reform_group>"
+        }
+      ]
+    },
+    "common_revolt_triggers_file": {
+      "patterns": [
+        {
+          "body": "trigger",
+          "card": "0..1",
+          "key": "def<revolt_trigger>",
+          "scope": {
+            "set": {
+              "root": "province",
+              "this": "province"
+            }
+          }
+        }
+      ]
+    },
+    "common_revolution_file": {
+      "patterns": [
+        {
+          "body": "center_of_revolution_conversion_body",
+          "card": "0..1",
+          "key": "def<center_of_revolution_conversion>"
+        }
+      ]
+    },
+    "common_ruler_personalities_file": {
+      "patterns": [
+        {
+          "body": "ruler_personality_body",
+          "card": "0..1",
+          "key": "def<ruler_personality>"
+        }
+      ]
+    },
+    "common_scripted_effects_file": {
+      "patterns": [
+        {
+          "body": "effect",
+          "card": "0..1",
+          "key": "def<scripted_effect>"
+        }
+      ]
+    },
+    "common_scripted_functions_file": {
+      "patterns": [
+        {
+          "body": "scripted_function_body",
+          "card": "0..1",
+          "key": "def<scripted_function>"
+        }
+      ]
+    },
+    "common_scripted_triggers_file": {
+      "patterns": [
+        {
+          "body": "trigger",
+          "card": "0..1",
+          "key": "def<scripted_trigger>"
+        }
+      ]
+    },
+    "common_state_edicts_file": {
+      "patterns": [
+        {
+          "body": "edict_body",
+          "card": "0..1",
+          "key": "def<edict>"
+        }
+      ]
+    },
+    "common_static_modifiers_file": {
+      "patterns": [
+        {
+          "body": "static_modifier_body",
+          "card": "0..1",
+          "key": "def<static_modifier>"
+        }
+      ]
+    },
+    "common_subject_type_upgrades_file": {
+      "patterns": [
+        {
+          "body": "subject_upgrades_body",
+          "card": "0..1",
+          "key": "def<subject_upgrades>"
+        }
+      ]
+    },
+    "common_subject_types_file": {
+      "patterns": [
+        {
+          "body": "subject_type_body",
+          "card": "0..*",
+          "key": "def<subject_type>"
+        }
+      ]
+    },
+    "common_technologies_file": {
+      "fields": {
+        "ahead_of_time": {
+          "body": "tech_ahead_of_time_body",
+          "card": "0..*",
+          "def": {
+            "type": "tech_ahead_of_time"
+          }
+        },
+        "monarch_power": {
+          "card": "0..1",
+          "value": "'ADM' | 'DIP' | 'MIL'"
+        },
+        "technology": {
+          "body": "technology_body",
+          "card": "0..*",
+          "def": {
+            "type": "technology"
+          }
+        }
+      }
+    },
+    "common_timed_modifiers_file": {
+      "patterns": [
+        {
+          "body": "timed_modifier_body",
+          "card": "0..1",
+          "key": "def<timed_modifier>"
+        }
+      ]
+    },
+    "common_trade_companies_file": {
+      "patterns": [
+        {
+          "body": "trade_company_body",
+          "card": "0..1",
+          "key": "def<trade_company>"
+        }
+      ]
+    },
+    "common_tradecompany_investments_file": {
+      "patterns": [
+        {
+          "body": "trade_company_investment_body",
+          "card": "0..1",
+          "key": "def<trade_company_investment>"
+        }
+      ]
+    },
+    "common_tradegoods_file": {
+      "patterns": [
+        {
+          "body": "trade_good_body",
+          "card": "0..1",
+          "key": "def<trade_good>"
+        }
+      ]
+    },
+    "common_tradenodes_file": {
+      "patterns": [
+        {
+          "body": "trade_node_body",
+          "card": "0..1",
+          "key": "def<trade_node>"
+        }
+      ]
+    },
+    "common_trading_policies_file": {
+      "patterns": [
+        {
+          "body": "trading_policy_body",
+          "card": "0..1",
+          "key": "def<trading_policy>"
+        }
+      ]
+    },
+    "common_triggered_modifiers_file": {
+      "patterns": [
+        {
+          "body": "triggered_modifier_body",
+          "card": "0..1",
+          "key": "def<triggered_modifier>"
+        }
+      ]
+    },
+    "common_wargoal_types_file": {
+      "patterns": [
+        {
+          "body": "wargoal_type_body",
+          "card": "0..1",
+          "key": "def<wargoal_type>"
+        }
+      ]
+    },
+    "country_tag_body": {},
+    "country_tags_file": {
+      "patterns": [
+        {
+          "card": "0..1",
+          "key": "def<country_tag>",
+          "value": "path"
+        }
+      ]
+    },
+    "culture_body": {},
+    "custom_gui_body": {},
+    "custom_gui_file": {
+      "fields": {
+        "custom_button": {
+          "body": "custom_button_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "custom_button"
+          }
+        },
+        "custom_icon": {
+          "body": "custom_icon_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "custom_icon"
+          }
+        },
+        "custom_shield": {
+          "body": "custom_shield_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "custom_shield"
+          }
+        },
+        "custom_text_box": {
+          "body": "custom_text_box_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "custom_text_box"
+          }
+        },
+        "custom_window": {
+          "body": "custom_window_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "custom_window"
+          }
+        }
+      }
+    },
+    "custom_ideas_group": {
+      "fields": {
+        "category": {
+          "card": "0..1",
+          "value": "enum<power_categories>"
+        }
+      },
+      "patterns": [
+        {
+          "body": "customideas_body",
+          "card": "0..1",
+          "key": "def<customideas>"
+        }
+      ]
+    },
+    "customizable_localization_file": {
+      "patterns": [
+        {
+          "body": "defined_text_body",
+          "card": "0..*",
+          "key": "def<defined_text>"
+        }
+      ]
+    },
+    "decision_file__country_decisions": {
+      "patterns": [
+        {
+          "body": "decision_body",
+          "card": "0..1",
+          "key": "def<decision>"
+        }
+      ]
+    },
+    "estate_modifier_body": {
+      "fields": {
+        "modifier_definition": {
+          "body": "estate_modifier_definition_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:key",
+            "type": "estate_modifier"
+          },
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        }
+      }
+    },
+    "estate_modifier_definition_body": {
+      "fields": {
+        "key": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "0..1"
+        },
+        "type": {
+          "card": "1",
+          "value": "'loyalty' | 'influence' | 'privileges'"
+        }
+      }
+    },
+    "game_age_ability_body": {},
+    "gfx_engine_object": {
+      "open": true
+    },
+    "gfx_global_textcolors": {
+      "patterns": [
+        {
+          "card": "0..*",
+          "key": "scalar",
+          "list": "int[0..255]"
+        }
+      ]
+    },
+    "gfx_sprite_packs_file": {
+      "patterns": [
+        {
+          "body": "sprite_pack_body",
+          "card": "0..1",
+          "key": "def<packentity>"
+        },
+        {
+          "body": "sprite_pack_body",
+          "card": "0..1",
+          "key": "def<sprite_pack>"
+        }
+      ]
+    },
+    "government_attributes_body": {},
+    "government_mechanic_interaction_body": {},
+    "government_mechanic_power_body": {
+      "fields": {
+        "base_monthly_growth": {
+          "card": "1",
+          "value": "float"
+        },
+        "development_scaled_monthly_growth": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "graphical_cultures_body": {},
+    "graphical_cultures_file": {
+      "items": "enum<graphical_cultures>"
+    },
+    "guru_body": {},
+    "guru_teaching_body": {},
+    "history_advisors_file": {
+      "patterns": [
+        {
+          "body": "advisor_id_body",
+          "card": "0..*",
+          "key": "def<advisor_id>"
+        }
+      ]
+    },
+    "idea_body": {},
+    "interface_file__2_bitmapfonts": {
+      "fields": {
+        "bitmapfont": {
+          "body": "bitmap_font_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "bitmap_font"
+          }
+        }
+      }
+    },
+    "interface_file__bitmapfonts": {
+      "fields": {
+        "bitmapfont": {
+          "body": "bitmap_font_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "bitmap_font"
+          }
+        },
+        "textcolors": {
+          "body": "gfx_global_textcolors",
+          "card": "0..1"
+        }
+      }
+    },
+    "interface_file__objectTypes": {
+      "fields": {
+        "LineChartType": {
+          "body": "object_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "object"
+          }
+        },
+        "PieChartType": {
+          "body": "object_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "object"
+          }
+        },
+        "animatedmaptext": {
+          "body": "object_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "object"
+          }
+        },
+        "arrowType": {
+          "body": "object_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "object"
+          }
+        },
+        "pdxmesh": {
+          "body": "object_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "object"
+          }
+        },
+        "pdxparticle": {
+          "body": "object_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "object"
+          }
+        },
+        "tradeRouteType": {
+          "body": "object_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "object"
+          }
+        }
+      }
+    },
+    "map_ambient_objects_file": {
+      "fields": {
+        "type": {
+          "body": "ambient_object_basis_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:type",
+            "type": "ambient_object_basis"
+          }
+        }
+      }
+    },
+    "map_area_file": {
+      "patterns": [
+        {
+          "body": "area_body",
+          "card": "0..1",
+          "key": "def<area.used>"
+        }
+      ]
+    },
+    "map_continent_file": {
+      "patterns": [
+        {
+          "body": "continent_body",
+          "card": "0..1",
+          "key": "def<continent>"
+        }
+      ]
+    },
+    "map_file": {
+      "fields": {
+        "categories": {
+          "body": "map_file__categories",
+          "card": "0..1"
+        },
+        "terrain": {
+          "body": "map_file__terrain",
+          "card": "0..1"
+        },
+        "tree": {
+          "body": "map_file__tree",
+          "card": "0..1"
+        },
+        "type": {
+          "body": "map_file__type",
+          "card": "0..1"
+        }
+      },
+      "patterns": [
+        {
+          "body": "ambient_object_basis_body",
+          "card": "0..1",
+          "key": "def<ambient_object_basis>"
+        },
+        {
+          "body": "area_body",
+          "card": "0..1",
+          "key": "def<area>"
+        },
+        {
+          "body": "continent_body",
+          "card": "0..1",
+          "key": "def<continent>"
+        },
+        {
+          "body": "province_group_body",
+          "card": "0..1",
+          "key": "def<province_group>"
+        },
+        {
+          "body": "province_id_body",
+          "card": "0..1",
+          "key": "def<province_id>"
+        },
+        {
+          "body": "region_body",
+          "card": "0..1",
+          "key": "def<region>"
+        },
+        {
+          "body": "superregion_body",
+          "card": "0..1",
+          "key": "def<superregion>"
+        }
+      ]
+    },
+    "map_file__categories": {
+      "patterns": [
+        {
+          "body": "terrain_body",
+          "card": "0..1",
+          "key": "def<terrain>"
+        }
+      ]
+    },
+    "map_file__terrain": {
+      "patterns": [
+        {
+          "body": "graphical_terrain_body",
+          "card": "0..1",
+          "key": "def<graphical_terrain>"
+        }
+      ]
+    },
+    "map_file__tree": {
+      "patterns": [
+        {
+          "body": "tree_terrain_body",
+          "card": "0..1",
+          "key": "def<tree_terrain>"
+        }
+      ]
+    },
+    "map_file__type": {
+      "patterns": [
+        {
+          "body": "ambient_object_body",
+          "card": "0..1",
+          "key": "def<ambient_object>"
+        }
+      ]
+    },
+    "map_positions_file": {
+      "patterns": [
+        {
+          "body": "province_id_body",
+          "card": "0..1",
+          "key": "def<province_id>"
+        }
+      ]
+    },
+    "map_provincegroup_file": {
+      "patterns": [
+        {
+          "body": "province_group_body",
+          "card": "0..1",
+          "key": "def<province_group.used>"
+        }
+      ]
+    },
+    "map_region_file": {
+      "patterns": [
+        {
+          "body": "region_body",
+          "card": "0..1",
+          "key": "def<region>"
+        }
+      ]
+    },
+    "map_superregion_file": {
+      "patterns": [
+        {
+          "body": "superregion_body",
+          "card": "0..1",
+          "key": "def<superregion>"
+        }
+      ]
+    },
+    "map_terrain_file": {
+      "fields": {
+        "categories": {
+          "body": "map_file__categories",
+          "card": "0..1"
+        },
+        "terrain": {
+          "body": "map_file__terrain",
+          "card": "0..1"
+        },
+        "tree": {
+          "body": "map_file__tree",
+          "card": "0..1"
+        }
+      }
+    },
+    "mission_body": {},
+    "missions_file": {
+      "patterns": [
+        {
+          "body": "mission_series_body",
+          "card": "0..1",
+          "key": "def<mission_series>"
+        }
+      ]
+    },
+    "open_script_file": {
+      "open": true
+    },
+    "orthodox_icon_body": {},
+    "packentity_body": {},
+    "papal_policy_body": {},
+    "peace_options_body": {},
+    "pre_dharma_mapping_body": {
+      "patterns": [
+        {
+          "body": "pre_dharma_mapping_entry",
+          "card": "0..1",
+          "doc": "Legacy save government identifiers form a mapping table; they are not references to current reform definitions.",
+          "key": "scalar"
+        }
+      ]
+    },
+    "pre_dharma_mapping_entry": {
+      "fields": {
+        "government": {
+          "card": "1",
+          "value": "ref<government>"
+        },
+        "legacy_government": {
+          "card": "1",
+          "value": "ref<government_reform> | enum<hardcoded_legacygovernments>"
+        }
+      }
+    },
+    "rebel_demand_loc_body": {},
+    "religion_body": {
+      "fields": {
+        "harmonized_modifier": {
+          "card": "1",
+          "value": "scalar"
+        }
+      }
+    },
+    "religious_reform_body": {},
+    "religious_school_body": {},
+    "revolt_trigger_body": {
+      "include": [
+        "keys__trigger"
+      ]
+    },
+    "scripted_localisation_body": {
+      "fields": {
+        "name": {
+          "card": "1",
+          "value": "scalar"
+        }
+      },
+      "open": true
+    },
+    "scripted_localisation_file": {
+      "patterns": [
+        {
+          "body": "scripted_localisation_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "defined_text"
+          },
+          "key": "scalar"
+        }
+      ]
+    },
+    "sprite_file__spriteTypes": {
+      "fields": {
+        "LineChartType": {
+          "body": "object_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "object"
+          }
+        },
+        "PieChartType": {
+          "body": "object_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "object"
+          }
+        },
+        "corneredTileSpriteType": {
+          "body": "sprite_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "sprite"
+          }
+        },
+        "cursor_offset": {
+          "card": "0..1",
+          "doc": "Global cursor hotspot offset.",
+          "list": "int"
+        },
+        "frameAnimatedSpriteType": {
+          "body": "sprite_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "sprite"
+          }
+        },
+        "maskedShieldType": {
+          "body": "sprite_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "sprite"
+          }
+        },
+        "pdxmesh": {
+          "body": "gfx_engine_object",
+          "card": "0..*",
+          "doc": "Engine mesh object; it does not declare a sprite."
+        },
+        "progressbartype": {
+          "body": "sprite_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "sprite"
+          }
+        },
+        "spriteType": {
+          "body": "sprite_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "sprite"
+          }
+        },
+        "textSpriteType": {
+          "body": "sprite_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "sprite"
+          }
+        }
+      }
+    },
+    "states_general_faction_body": {},
+    "static_diplomatic_action_body": {
+      "fields": {
+        "alert_index": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "alert_tooltip": {
+          "card": "0..1",
+          "value": "loc"
+        }
+      }
+    },
+    "static_diplomatic_actions_body": {
+      "patterns": [
+        {
+          "body": "static_diplomatic_action_body",
+          "card": "0..1",
+          "key": "def<diplomatic_action>"
+        }
+      ]
+    },
+    "tech_ahead_of_time_body": {
+      "fields": {
+        "ahead_of_time_benefit_adm": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "ahead_of_time_benefit_dip": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "ahead_of_time_benefit_mil": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "monthly_russian_modernization": {
+          "card": "0..1",
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
+    },
+    "technology_file_body": {
+      "fields": {
+        "adm_tech": {
+          "card": "0..1",
+          "value": "path<common>"
+        },
+        "dip_tech": {
+          "card": "0..1",
+          "value": "path<common>"
+        },
+        "mil_tech": {
+          "card": "0..1",
+          "value": "path<common>"
+        }
+      }
+    },
+    "technology_file_file": {
+      "fields": {
+        "groups": {
+          "body": "technology_file_file__groups",
+          "card": "0..1",
+          "def": {
+            "type": "technology_file"
+          }
+        },
+        "tables": {
+          "body": "technology_file_body",
+          "card": "0..1",
+          "def": {
+            "type": "technology_file"
+          }
+        }
+      }
+    },
+    "technology_file_file__groups": {
+      "patterns": [
+        {
+          "body": "technology_group_body",
+          "card": "0..1",
+          "key": "def<technology_group>"
+        }
+      ]
+    },
+    "trade_node_name_body": {}
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "schemas": {
+    "colonial_region_body": {
+      "fields": {
+        "color": {
+          "card": "1",
+          "list": "int[0..255]"
+        },
+        "culture": {
+          "body": "colonial_region_body__culture",
+          "card": "0..1"
+        },
+        "names": {
+          "body": "colonial_region_body__names",
+          "card": "0..*"
+        },
+        "native_ferocity": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "native_hostileness": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "native_size": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "provinces": {
+          "card": "0..1",
+          "list": "ref<province_id>"
+        },
+        "religion": {
+          "body": "colonial_region_body__religion",
+          "card": "0..1"
+        },
+        "tax_income": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "trade_goods": {
+          "body": "colonial_region_body__trade_goods",
+          "card": "0..1"
+        }
+      }
+    },
+    "colonial_region_body__color": {
+      "items": "int[0..255]"
+    },
+    "colonial_region_body__culture": {
+      "patterns": [
+        {
+          "card": "1..*",
+          "key": "ref<culture>",
+          "value": "int"
+        }
+      ]
+    },
+    "colonial_region_body__names": {
+      "fields": {
+        "name": {
+          "card": "1",
+          "value": "loc"
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "0..1",
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        }
+      }
+    },
+    "colonial_region_body__provinces": {
+      "items": "ref<province_id>"
+    },
+    "colonial_region_body__religion": {
+      "patterns": [
+        {
+          "card": "1..*",
+          "key": "ref<religion>",
+          "value": "int"
+        }
+      ]
+    },
+    "colonial_region_body__trade_goods": {
+      "patterns": [
+        {
+          "card": "1..*",
+          "key": "ref<trade_good>",
+          "value": "int"
+        }
+      ]
+    }
+  }
+}

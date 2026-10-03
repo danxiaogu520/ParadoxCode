@@ -189,12 +189,7 @@ fn reference_card(
     position: TextSize,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
-    if input.format != parser::FileFormat::Script
-        || !input
-            .profile
-            .game_id
-            .eq_ignore_ascii_case(game::eu4::GAME_ID)
-    {
+    if input.format != parser::FileFormat::Script {
         return Ok(None);
     }
     let semantic = semantic_data_with_cancellation(snapshot, input, cancellation)?;
@@ -219,12 +214,22 @@ fn reference_card(
             }
         }
     }
-    if crate::mission::is_mission_path(input.path.as_ref()) {
+    if crate::mission::is_mission_path(&input.profile, input.path.as_ref()) {
         cancellation.checkpoint()?;
-        let Some(name) = required_mission_at(&input.source, position) else {
+        let Some(name) = required_mission_at(input, position) else {
             return Ok(None);
         };
-        let candidates = symbol_candidates_for_hover(snapshot, "mission", &name, cancellation)?;
+        let candidates = symbol_candidates_for_hover(
+            snapshot,
+            &input
+                .profile
+                .mission_view
+                .as_ref()
+                .expect("declared view")
+                .symbol_kind,
+            &name,
+            cancellation,
+        )?;
         for candidate in &candidates {
             cancellation.checkpoint()?;
             let Some(target) = input_for_location(snapshot, &candidate.location) else {
@@ -248,8 +253,8 @@ fn reference_card(
 /// The `required_missions` member under `position`, if any: bare block
 /// members carry no semantic reference, so the parse model's prerequisite
 /// token ranges are the anchor.
-fn required_mission_at(source: &str, position: TextSize) -> Option<String> {
-    let loaded = game::eu4::mission::parse_file(source);
+fn required_mission_at(input: &ParsedInput, position: TextSize) -> Option<String> {
+    let loaded = game::mission::view(&input.profile)?.parse(&input.source);
     for mission in loaded
         .file
         .trees
@@ -284,16 +289,14 @@ fn mission_card(
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
     if input.format != parser::FileFormat::Script
-        || !input
-            .profile
-            .game_id
-            .eq_ignore_ascii_case(game::eu4::GAME_ID)
-        || !crate::mission::is_mission_path(input.path.as_ref())
+        || !crate::mission::is_mission_path(&input.profile, input.path.as_ref())
     {
         return Ok(None);
     }
     cancellation.checkpoint()?;
-    let loaded = game::eu4::mission::parse_file(&input.source);
+    let loaded = game::mission::view(&input.profile)
+        .expect("mission path has a declared view")
+        .parse(&input.source);
     let Some(mission) = loaded
         .file
         .trees
@@ -316,11 +319,13 @@ fn mission_card_for_reference(
     name: &str,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
-    if !crate::mission::is_mission_path(target.path.as_ref()) {
+    if !crate::mission::is_mission_path(&target.profile, target.path.as_ref()) {
         return Ok(None);
     }
     cancellation.checkpoint()?;
-    let loaded = game::eu4::mission::parse_file(&target.source);
+    let loaded = game::mission::view(&target.profile)
+        .expect("mission path has a declared view")
+        .parse(&target.source);
     let mut by_name = None;
     for mission in loaded
         .file
@@ -345,15 +350,23 @@ fn mission_card_for_reference(
 /// texture, and the fixed node chrome.
 fn mission_card_for_mission(
     snapshot: &AnalysisSnapshot,
-    mission: &game::eu4::mission::Mission,
+    mission: &game::mission::Mission,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
     // The title key comes from the mission's `$_title` binding — the JSON is
     // the single source; an absent binding degrades to no title (the client
     // falls back to the raw id).
     let title_key = snapshot
-        .rules()
-        .localisation_template_key("mission", "name", &mission.id)
+        .localisation_template_key(
+            &snapshot
+                .game_profile()
+                .mission_view
+                .as_ref()
+                .expect("declared view")
+                .symbol_kind,
+            "name",
+            &mission.id,
+        )
         .unwrap_or_default();
     let titles = localisation_values_by_key(snapshot, &[title_key.as_str()], cancellation)?;
     let title = titles.get(&title_key).cloned();
@@ -366,7 +379,14 @@ fn mission_card_for_mission(
     // card declaration, not from this renderer.
     let frame = match snapshot
         .game_profile()
-        .hover_card("mission")
+        .hover_card(
+            &snapshot
+                .game_profile()
+                .mission_view
+                .as_ref()
+                .expect("declared view")
+                .symbol_kind,
+        )
         .and_then(|spec| spec.chrome.get("frame"))
     {
         Some(name) => sprite_asset(snapshot, name, cancellation)?,
@@ -404,12 +424,7 @@ fn icon_card(
     position: TextSize,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
-    if input.format != parser::FileFormat::Script
-        || !input
-            .profile
-            .game_id
-            .eq_ignore_ascii_case(game::eu4::GAME_ID)
-    {
+    if input.format != parser::FileFormat::Script {
         return Ok(None);
     }
     let semantic = semantic_data_with_cancellation(snapshot, input, cancellation)?;
@@ -625,6 +640,8 @@ struct CardAnchor<'a> {
     /// declares one (events name themselves through `id`; missions are their
     /// own key).
     name_field: Option<&'a str>,
+    /// Instance name supplied directly by IR definition facts.
+    name: Option<&'a str>,
     /// Full range of the anchored top-level block.
     block_range: TextRange,
 }
@@ -644,8 +661,23 @@ fn cardable_definition<'a>(
 /// Finds the cardable top-level block whose key token contains `position`.
 fn card_anchor_at(input: &ParsedInput, position: TextSize) -> Option<CardAnchor<'_>> {
     let hir = input.hir.as_deref()?;
-    let path = input.path.as_ref()?;
     let profile = input.profile.as_ref();
+    if hir.uses_ir() {
+        let property = hir
+            .properties()
+            .iter()
+            .find(|property| property.top_level && contains(property.key_range, position))?;
+        let definition = hir.definitions().iter().find(|definition| {
+            definition.range == property.range && profile.hover_card(&definition.kind).is_some()
+        })?;
+        return Some(CardAnchor {
+            kind: &definition.kind,
+            name_field: None,
+            name: Some(&definition.name),
+            block_range: definition.range,
+        });
+    }
+    let path = input.path.as_ref()?;
     for property in hir
         .properties()
         .iter()
@@ -658,6 +690,7 @@ fn card_anchor_at(input: &ParsedInput, position: TextSize) -> Option<CardAnchor<
         return Some(CardAnchor {
             kind,
             name_field,
+            name: None,
             block_range: property.range,
         });
     }
@@ -669,8 +702,24 @@ fn card_anchor_at(input: &ParsedInput, position: TextSize) -> Option<CardAnchor<
 /// else the first block whose range contains it.
 fn card_anchor_for_selection(input: &ParsedInput, selection: TextSize) -> Option<CardAnchor<'_>> {
     let hir = input.hir.as_deref()?;
-    let path = input.path.as_ref()?;
     let profile = input.profile.as_ref();
+    if hir.uses_ir() {
+        let definition = hir
+            .definitions()
+            .iter()
+            .filter(|definition| {
+                contains(definition.range, selection)
+                    && profile.hover_card(&definition.kind).is_some()
+            })
+            .min_by_key(|definition| definition.range.len())?;
+        return Some(CardAnchor {
+            kind: &definition.kind,
+            name_field: None,
+            name: Some(&definition.name),
+            block_range: definition.range,
+        });
+    }
+    let path = input.path.as_ref()?;
     let properties = hir.properties();
     let mut by_range = None;
     for property in properties.iter().filter(|property| property.top_level) {
@@ -692,6 +741,7 @@ fn card_anchor_for_selection(input: &ParsedInput, selection: TextSize) -> Option
         let anchor = || CardAnchor {
             kind,
             name_field,
+            name: None,
             block_range: property.range,
         };
         if name_value_range.is_some_and(|range| contains(range, selection)) {
@@ -712,12 +762,7 @@ fn event_card(
     position: TextSize,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
-    if input.format != parser::FileFormat::Script
-        || !input
-            .profile
-            .game_id
-            .eq_ignore_ascii_case(game::eu4::GAME_ID)
-    {
+    if input.format != parser::FileFormat::Script {
         return Ok(None);
     }
     cancellation.checkpoint()?;
@@ -735,12 +780,7 @@ fn event_card_for_reference(
     selection: TextRange,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverCard>, Cancelled> {
-    if target.format != parser::FileFormat::Script
-        || !target
-            .profile
-            .game_id
-            .eq_ignore_ascii_case(game::eu4::GAME_ID)
-    {
+    if target.format != parser::FileFormat::Script {
         return Ok(None);
     }
     let Some(anchor) = card_anchor_for_selection(target, selection.start()) else {
@@ -784,16 +824,54 @@ fn event_card_for_anchor(
             .and_then(|property| property.scalar.as_ref())
             .map(|scalar| scalar.value.clone())
     };
-    let Some(id) = anchor.name_field.and_then(child_scalar) else {
+    let Some(id) = anchor
+        .name
+        .map(str::to_owned)
+        .or_else(|| anchor.name_field.and_then(child_scalar))
+    else {
         return Ok(None);
     };
     // Only fields the rule set types as localisation keys are read as such:
     // a field whose typing disappears from the rules stops resolving here the
     // same moment validation stops checking it.
-    let field_semantics = spec
-        .context
-        .as_deref()
-        .map(|context| crate::semantic::construct_field_semantics(snapshot, context));
+    let field_semantics = if hir.uses_ir() {
+        let ir = snapshot.ir();
+        fn typed(ir: &rules::ir::RulesIr, matcher: rules::ir::MatcherId, kind: &str) -> bool {
+            match ir.matcher(matcher) {
+                rules::ir::Matcher::Loc => kind == "localisation",
+                rules::ir::Matcher::Ref(rules::ir::RefTarget::Type { type_id, .. }) => {
+                    ir.strings.resolve(ir.type_info(*type_id).name) == kind
+                }
+                rules::ir::Matcher::Union(items) => items.iter().any(|id| typed(ir, *id, kind)),
+                _ => false,
+            }
+        }
+        let mut semantics = crate::semantic::ConstructFieldSemantics {
+            localisation_fields: Vec::new(),
+            sprite_fields: Vec::new(),
+        };
+        for property in properties.iter().filter(|property| {
+            property.path.len() == 2 && within(anchor.block_range, property.range)
+        }) {
+            let Some(fact) = hir.field_fact_at(property.key_range) else {
+                continue;
+            };
+            for id in &fact.fields {
+                let rules::ir::FieldValue::Scalar(matcher) = ir.field(*id).value else {
+                    continue;
+                };
+                if typed(ir, matcher, "localisation") {
+                    semantics.localisation_fields.push(property.key.clone());
+                }
+                if typed(ir, matcher, "sprite") {
+                    semantics.sprite_fields.push(property.key.clone());
+                }
+            }
+        }
+        Some(semantics)
+    } else {
+        None
+    };
     let localisation_value = |field: &str| -> Option<String> {
         field_semantics
             .as_ref()

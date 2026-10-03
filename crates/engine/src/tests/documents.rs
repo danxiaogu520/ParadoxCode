@@ -1,6 +1,194 @@
+use rules::ir::RulesIr;
 use text::AbsPath;
 
 use super::*;
+
+#[test]
+fn the_rules_v2_ir_is_shared_and_revisioned() {
+    let mut host = AnalysisHost::new(RuleSet::empty());
+    assert_eq!(
+        host.ir().schemas.len(),
+        0,
+        "a host with no installed bundle starts on an empty IR"
+    );
+
+    let ir = Arc::new(RulesIr::empty());
+    host.set_ir(Arc::clone(&ir));
+    let snapshot = host.snapshot();
+    assert!(
+        Arc::ptr_eq(&snapshot.ir, &ir),
+        "the snapshot shares the handle"
+    );
+
+    let via_constructor =
+        AnalysisHost::with_ir(RuleSet::empty(), Default::default(), Arc::clone(&ir));
+    assert!(
+        std::ptr::eq(via_constructor.snapshot().ir(), ir.as_ref()),
+        "`with_ir` installs the handle it was given"
+    );
+
+    let revision = host.snapshot().revision();
+    host.set_ir(Arc::clone(&ir));
+    assert_eq!(
+        host.snapshot().revision(),
+        revision,
+        "re-installing the same handle invalidates nothing"
+    );
+    host.set_ir(Arc::new(RulesIr::empty()));
+    assert!(
+        host.snapshot().revision() > revision,
+        "a different handle invalidates cached analyses"
+    );
+}
+
+#[test]
+fn overlay_definition_open_and_close_relower_other_overlay_references() {
+    let root = temp_root("overlay-ir-facts");
+    let scripted = root.join("common/scripted_effects");
+    let events = root.join("events");
+    std::fs::create_dir_all(&scripted).expect("scripted effects directory");
+    std::fs::create_dir_all(&events).expect("events directory");
+    std::fs::write(
+        scripted.join("defs.txt"),
+        "temporary_effect = { add_treasury = 1 }\n",
+    )
+    .expect("write disk definition");
+    let definition_path = AbsPath::normalize(&scripted.join("defs.txt"));
+    let caller_path = AbsPath::normalize(&events.join("caller.txt"));
+    let mut host = AnalysisHost::with_ir(
+        game::eu4::runtime_rules().expect("legacy rules"),
+        game::eu4::profile(),
+        game::eu4::first_party_ir().expect("compiled IR"),
+    );
+    host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Project,
+            AbsPath::normalize(&root),
+        ),
+    ]));
+    host.refresh_source_roots().expect("scan disk candidate");
+    let caller_id = DocumentId::new("file:///overlay/events/caller.txt");
+    let definition_id = DocumentId::new("file:///overlay/common/scripted_effects/defs.txt");
+    host.open_document(
+        caller_id.clone(),
+        1,
+        "country_event = { immediate = { temporary_effect = { } } }\n".to_owned(),
+        Some(caller_path),
+    )
+    .expect("open caller overlay");
+    assert!(
+        host.snapshot()
+            .document(&caller_id)
+            .and_then(|document| document.hir())
+            .is_some_and(|hir| hir.references().iter().any(|reference| {
+                reference.kind.as_ref() == "scripted_effect" && reference.name == "temporary_effect"
+            })),
+        "disk definition should provide the initial workspace fact"
+    );
+
+    host.open_document(
+        definition_id.clone(),
+        1,
+        "temporary_effect = { add_treasury = 1 }\n".to_owned(),
+        Some(definition_path),
+    )
+    .expect("open definition overlay");
+    assert!(
+        host.snapshot()
+            .document(&caller_id)
+            .and_then(|document| document.hir())
+            .is_some_and(|hir| hir.references().iter().any(|reference| {
+                reference.kind.as_ref() == "scripted_effect" && reference.name == "temporary_effect"
+            })),
+        "opening a definition overlay should re-lower already-open caller HIR"
+    );
+
+    host.apply_document_changes(
+        &definition_id,
+        2,
+        &[super::TextChange {
+            range: None,
+            text: "renamed_effect = { add_treasury = 1 }\n".to_owned(),
+        }],
+    )
+    .expect("rename definition overlay");
+    assert!(
+        !host
+            .snapshot()
+            .document(&caller_id)
+            .and_then(|document| document.hir())
+            .is_some_and(|hir| hir.references().iter().any(|reference| {
+                reference.kind.as_ref() == "scripted_effect" && reference.name == "temporary_effect"
+            })),
+        "editing a definition overlay should remove its prior fact from caller HIR"
+    );
+
+    host.apply_document_changes(
+        &definition_id,
+        3,
+        &[super::TextChange {
+            range: None,
+            text: "temporary_effect = { add_treasury = 1 }\n".to_owned(),
+        }],
+    )
+    .expect("restore definition name");
+    assert!(
+        host.snapshot()
+            .document(&caller_id)
+            .and_then(|document| document.hir())
+            .is_some_and(|hir| hir.references().iter().any(|reference| {
+                reference.kind.as_ref() == "scripted_effect" && reference.name == "temporary_effect"
+            })),
+        "restoring the overlay definition should restore the workspace fact"
+    );
+
+    host.close_document(&definition_id)
+        .expect("close definition overlay");
+    assert!(
+        host.snapshot()
+            .document(&caller_id)
+            .and_then(|document| document.hir())
+            .is_some_and(|hir| hir.references().iter().any(|reference| {
+                reference.kind.as_ref() == "scripted_effect" && reference.name == "temporary_effect"
+            })),
+        "closing the overlay should restore the shadowed disk definition fact"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn installing_ir_after_scan_finds_previously_unclassified_disk_files() {
+    let root = temp_root("set-ir-reclassify");
+    std::fs::create_dir_all(root.join("events")).expect("events directory");
+    std::fs::write(
+        root.join("events/test.txt"),
+        "country_event = { id = set_ir.1 }\n",
+    )
+    .expect("event source");
+    let mut host = AnalysisHost::with_profile(RuleSet::empty(), game::eu4::profile());
+    host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Project,
+            AbsPath::normalize(&root),
+        ),
+    ]));
+    host.refresh_source_roots()
+        .expect("initial empty-rules scan");
+    assert!(host.snapshot().source_files().is_empty());
+
+    host.set_ir(game::eu4::first_party_ir().expect("compiled IR"));
+    let snapshot = host.snapshot();
+    assert!(
+        snapshot
+            .source_files()
+            .values()
+            .any(|file| file.logical_path.as_str() == "events/test.txt")
+    );
+    assert_eq!(snapshot.scan_report().indexed_files, 1);
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
 
 #[test]
 fn targeted_disk_changes_replace_one_shard_without_overwriting_an_overlay() {
@@ -431,6 +619,7 @@ fn snapshots_share_immutable_state_and_preserve_old_revisions() {
     let second = host.snapshot();
 
     assert!(Arc::ptr_eq(&first.rules, &second.rules));
+    assert!(Arc::ptr_eq(&first.ir, &second.ir));
     assert!(Arc::ptr_eq(&first.profile, &second.profile));
     assert!(Arc::ptr_eq(&first.roots, &second.roots));
     assert!(Arc::ptr_eq(&first.documents, &second.documents));
@@ -698,7 +887,7 @@ fn roots_overlay_and_shards_preserve_shadowed_semantic_definitions() {
             .iter()
             .filter(|candidate| candidate.active)
             .count(),
-        1
+        3
     );
     host.open_document(
         DocumentId::new("file:///current/foo.txt"),
@@ -779,21 +968,7 @@ fn declaring_document_edits_move_the_definitions_cache_domain() {
     fs::create_dir_all(&triggers).expect("fixture directory");
     fs::write(triggers.join("base.txt"), "is_ready = { always = yes }\n").expect("trigger fixture");
 
-    // The bootstrap rules carry no semantic model, so the declaring-kind
-    // recognition needs a dynamic-definition descriptor injected here.
-    let mut model = rules::RulesModel::default();
-    model.semantic.type_descriptors.insert(
-        "scripted_trigger".to_owned(),
-        rules::TypeDescriptor {
-            dynamic_definition: Some(rules::DynamicDefinitionDescriptor {
-                body_context: "trigger".to_owned(),
-                enabled: true,
-                ..rules::DynamicDefinitionDescriptor::default()
-            }),
-            ..rules::TypeDescriptor::default()
-        },
-    );
-    let mut host = eu4_host_with(rules::RuleSet::from_model(model));
+    let mut host = eu4_host();
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
             SourceRootId::new(1),

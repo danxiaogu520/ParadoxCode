@@ -5,6 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use rules::ir::RulesIr;
 use rules::{GameProfile, ParserKind, RuleSet};
 use text::{AbsPath, LogicalPath, TextRange};
 
@@ -15,9 +16,11 @@ use crate::texture::TextureCatalog;
 use index::{DocumentSnapshot, FileState, PreparedDocument};
 use index::{FileIndexShard, LocalisationPreviewMap, PositionMap, WorkspaceIndex};
 use index::{
-    SourceLoadContext, SourceReadJob, build_file_state, empty_file_state, load_source_files,
-    position_ranges_for_state, prepare_document_snapshot, staged_overlay_document,
-    unparsed_document,
+    IndexSymbolFacts, SourceLoadContext, SourceReadJob, build_file_state_with_ir,
+    build_file_state_with_ir_and_facts, empty_file_state, load_source_files,
+    position_ranges_for_state, prepare_document_snapshot_with_ir,
+    prepare_document_snapshot_with_ir_and_facts, replay_symbol_dependent_files,
+    staged_overlay_document, unparsed_document,
 };
 use vfs::ParseCache;
 use vfs::scan::{
@@ -27,8 +30,8 @@ use vfs::scan::{
 use vfs::{
     DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId, DocumentSource,
     LocalisationPreview, SourceFile, SourceFileId, SourceRoot, SourceRootId, SourceRootKind,
-    TextChange, WorkspaceChange, WorkspaceError, WorkspaceScanFilters, WorkspaceScanIssueKind,
-    WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
+    TextChange, WorkspaceChange, WorkspaceError, WorkspaceScanFilters, WorkspaceScanIssue,
+    WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
     localisation_previews_from_parsed,
 };
 
@@ -37,6 +40,11 @@ use vfs::{
 pub struct AnalysisHost {
     revision: u64,
     rules: Arc<RuleSet>,
+    /// The rules-v2 IR, shared with every clone. It is empty until the
+    /// composition root installs one; consumers move onto it module by module
+    /// (`docs/rules-redesign.md` §6 phase 4).
+    ir: Arc<RulesIr>,
+    ir_fingerprint: Arc<str>,
     profile: Arc<GameProfile>,
     roots: Arc<[SourceRoot]>,
     workspace_root: Option<AbsPath>,
@@ -94,9 +102,21 @@ impl AnalysisHost {
     /// Creates an empty host with explicit game-specific profile data.
     #[must_use]
     pub fn with_profile(rules: RuleSet, profile: GameProfile) -> Self {
+        Self::with_ir(rules, profile, Arc::new(RulesIr::empty()))
+    }
+
+    /// Creates an empty host with explicit game-specific profile data and the
+    /// rules-v2 IR that consumers are migrating onto.
+    ///
+    /// The IR is shared, not copied: it is one interned arena per kind and
+    /// callers hand the same handle to every host of a session.
+    #[must_use]
+    pub fn with_ir(rules: RuleSet, profile: GameProfile, ir: Arc<RulesIr>) -> Self {
         Self {
             revision: 0,
             rules: Arc::new(rules),
+            ir_fingerprint: Arc::from(ir.fingerprint()),
+            ir,
             profile: Arc::new(profile),
             roots: Arc::from([]),
             workspace_root: None,
@@ -124,6 +144,217 @@ impl AnalysisHost {
             texture_catalog_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             reference_sources: Arc::default(),
             revision_watch: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+        }
+    }
+
+    fn active_category(
+        &self,
+        path: &LogicalPath,
+    ) -> Option<(String, ParserKind, rules::FileResolutionPolicy)> {
+        if self.ir.files.is_empty() {
+            return self.rules.classify(path).map(|category| {
+                (
+                    category.id.clone(),
+                    category.parser.clone(),
+                    category.resolution,
+                )
+            });
+        }
+        let (_, file) = self.ir.file_rule(path)?;
+        let parser = match file.parser {
+            rules::ir::DocumentParser::Script => ParserKind::Script,
+            rules::ir::DocumentParser::Localisation => ParserKind::Localisation,
+            rules::ir::DocumentParser::Asset => ParserKind::Asset,
+            rules::ir::DocumentParser::SyntaxOnly => ParserKind::SyntaxOnly,
+        };
+        let resolution = match file.resolution {
+            rules::ir::FileResolution::ReplaceByPath => {
+                rules::FileResolutionPolicy::ReplaceByRelativePath
+            }
+            rules::ir::FileResolution::Merge => rules::FileResolutionPolicy::Merge,
+        };
+        Some((
+            self.ir.strings.resolve(file.name).to_owned(),
+            parser,
+            resolution,
+        ))
+    }
+
+    /// Returns the rules-v2 IR this host was built with.
+    ///
+    /// [`RulesIr::empty`] until the composition root installs one.
+    #[must_use]
+    pub fn ir(&self) -> &RulesIr {
+        &self.ir
+    }
+
+    /// Installs the rules-v2 IR, advancing the revision when it actually
+    /// changes so cached analyses cannot outlive the rules they were built
+    /// against.
+    pub fn set_ir(&mut self, ir: Arc<RulesIr>) {
+        if !Arc::ptr_eq(&self.ir, &ir) {
+            let invalidated_cache_roots = self.installed_caches.clone();
+            self.ir_fingerprint = Arc::from(ir.fingerprint());
+            self.ir = ir;
+            let mut files = self.source_files.as_ref().clone();
+            let mut states = BTreeMap::new();
+            let installed = self.installed_caches.clone();
+            for (id, mut file) in files.clone() {
+                let Some(root) = self.roots.iter().find(|root| root.id == file.root_id) else {
+                    continue;
+                };
+                if installed.contains(&root.id) {
+                    files.remove(&id);
+                    continue;
+                }
+                let Some((category_id, parser, resolution)) =
+                    self.active_category(&file.logical_path)
+                else {
+                    files.remove(&id);
+                    continue;
+                };
+                file.category_id = Some(category_id);
+                file.resolution = resolution;
+                files.insert(id, file.clone());
+                if matches!(parser, ParserKind::Asset) {
+                    states.insert(id, Arc::new(empty_file_state(&file, 0)));
+                } else if let Some(previous) = self.file_states.get(&id) {
+                    let mut rebuilt = build_file_state_with_ir(
+                        &file,
+                        previous.source().to_owned(),
+                        previous.revision().saturating_add(1),
+                        &self.rules,
+                        &self.profile,
+                        &self.ir,
+                        self.parse_cache.as_ref(),
+                    );
+                    if previous.parsed().is_none() {
+                        rebuilt = rebuilt.cache_only();
+                    }
+                    states.insert(id, Arc::new(rebuilt));
+                }
+            }
+            let preliminary_documents = self
+                .documents
+                .iter()
+                .map(|(id, document)| {
+                    (
+                        id.clone(),
+                        prepare_document_snapshot_with_ir(
+                            &self.rules,
+                            &self.profile,
+                            &self.ir,
+                            &self.roots,
+                            document.clone(),
+                        ),
+                    )
+                })
+                .collect::<BTreeMap<_, _>>();
+            let mut candidate =
+                WorkspaceIndex::from_shards(states.values().map(|state| state.shard_handle()));
+            candidate.resolve_priorities(&source_priorities(&self.roots, &files));
+            let overlay_hirs = preliminary_documents
+                .values()
+                .filter(|document| document.source == DocumentSource::Overlay)
+                .filter_map(|document| document.hir.clone())
+                .collect::<Vec<_>>();
+            let overlay_file_ids = overlay_source_file_ids(&preliminary_documents, &files);
+            let facts = IndexSymbolFacts::with_overlay_files(
+                &self.ir,
+                &candidate,
+                &overlay_hirs,
+                &overlay_file_ids,
+            );
+            let mut final_states = BTreeMap::new();
+            for (id, state) in states {
+                let Some(file) = files.get(&id) else { continue };
+                let mut rebuilt = build_file_state_with_ir_and_facts(
+                    file,
+                    state.source().to_owned(),
+                    state.revision(),
+                    &self.rules,
+                    &self.profile,
+                    &self.ir,
+                    &facts,
+                    self.parse_cache.as_ref(),
+                );
+                if state.parsed().is_none() {
+                    rebuilt = rebuilt.cache_only();
+                }
+                final_states.insert(id, Arc::new(rebuilt));
+            }
+            self.documents = Arc::new(
+                preliminary_documents
+                    .into_iter()
+                    .map(|(id, document)| {
+                        (
+                            id.clone(),
+                            prepare_document_snapshot_with_ir_and_facts(
+                                &self.rules,
+                                &self.profile,
+                                &self.ir,
+                                &facts,
+                                &self.roots,
+                                document,
+                            ),
+                        )
+                    })
+                    .collect(),
+            );
+            self.source_files = Arc::new(files);
+            self.source_file_paths = Arc::new(source_file_paths(&self.source_files));
+            self.file_states = Arc::new(final_states);
+            let mut index = WorkspaceIndex::from_shards(
+                self.file_states.values().map(|state| state.shard_handle()),
+            );
+            index.resolve_priorities(&source_priorities(&self.roots, &self.source_files));
+            self.index = Arc::new(index);
+            self.installed_caches.clear();
+            self.reference_sources = Arc::default();
+            self.installed_localisation_previews = Arc::new(LocalisationPreviewMap::new());
+            self.scanned_localisation_previews =
+                Arc::new(Self::collect_scanned_localisation_previews(
+                    &self.file_states,
+                    &self.source_files,
+                    &self.preferred_localisation_languages,
+                ));
+            self.rebuild_serving_localisation_previews();
+            self.advance_revision();
+            // Reclassifying only resident files misses paths that the previous IR did not
+            // classify at all. Re-scan on-disk roots so newly eligible files appear immediately.
+            // Installed-cache roots have no source text available and remain invalidated until
+            // their cache loader supplies data for the new IR.
+            if !self.roots.is_empty() {
+                let roots = Arc::clone(&self.roots);
+                self.roots = Arc::from(
+                    roots
+                        .iter()
+                        .filter(|root| !invalidated_cache_roots.contains(&root.id))
+                        .cloned()
+                        .collect::<Vec<_>>(),
+                );
+                self.scan_report = Arc::new(WorkspaceScanReport::default());
+                let scan = self.refresh_source_roots();
+                self.roots = roots;
+                if let Err(error) = scan {
+                    // The old report described another rules arena. Do not present it as the
+                    // result for this IR; expose the failed best-effort rebuild instead.
+                    let mut report = WorkspaceScanReport::default();
+                    report.issues.push(WorkspaceScanIssue {
+                        kind: WorkspaceScanIssueKind::DirectoryUnreadable,
+                        path: self
+                            .roots
+                            .first()
+                            .map_or_else(PathBuf::new, |root| root.path.as_path().to_path_buf()),
+                        detail: format!(
+                            "IR change triggered a workspace rescan that failed: {error}"
+                        ),
+                    });
+                    self.scan_report = Arc::new(report);
+                }
+            } else {
+                self.scan_report = Arc::new(WorkspaceScanReport::default());
+            }
         }
     }
 
@@ -212,12 +443,127 @@ impl AnalysisHost {
         source: DocumentSource,
         path: Option<AbsPath>,
     ) -> DocumentSnapshot {
-        prepare_document_snapshot(
+        let preliminary = prepare_document_snapshot_with_ir(
             self.rules.as_ref(),
             self.profile.as_ref(),
+            self.ir.as_ref(),
             &self.roots,
             unparsed_document(id, version, text, source, path),
+        );
+        let mut overlays = self
+            .documents
+            .values()
+            .filter(|document| document.source == DocumentSource::Overlay)
+            .filter_map(|document| document.hir.clone())
+            .collect::<Vec<_>>();
+        if let Some(hir) = &preliminary.hir {
+            overlays.push(Arc::clone(hir));
+        }
+        let mut overlay_files = overlay_source_file_ids(&self.documents, &self.source_files);
+        if preliminary.source == DocumentSource::Overlay
+            && let Some(file_id) = preliminary
+                .path
+                .as_ref()
+                .and_then(|path| self.source_file_paths.get(path).copied())
+        {
+            overlay_files.insert(file_id);
+        }
+        let facts =
+            IndexSymbolFacts::with_overlay_files(&self.ir, &self.index, &overlays, &overlay_files);
+        prepare_document_snapshot_with_ir_and_facts(
+            self.rules.as_ref(),
+            self.profile.as_ref(),
+            self.ir.as_ref(),
+            &facts,
+            &self.roots,
+            preliminary,
         )
+    }
+
+    /// Re-lowers every parsed document against one candidate fact set. Overlay definitions can
+    /// affect references and subtype gates in other open documents, so changing the overlay
+    /// definition set must update those HIR snapshots atomically as well.
+    fn relower_documents_with_overlay_facts(&mut self) {
+        if self.ir.files.is_empty() {
+            return;
+        }
+        let preliminary = self
+            .documents
+            .iter()
+            .map(|(id, document)| {
+                let document = if (document.source == DocumentSource::Overlay
+                    && document.hir.is_none())
+                    || document
+                        .hir
+                        .as_ref()
+                        .is_some_and(|hir| !hir.depends_on_symbol_facts())
+                {
+                    document.clone()
+                } else {
+                    prepare_document_snapshot_with_ir(
+                        &self.rules,
+                        &self.profile,
+                        &self.ir,
+                        &self.roots,
+                        document.clone(),
+                    )
+                };
+                (id.clone(), document)
+            })
+            .collect::<BTreeMap<_, _>>();
+        let overlay_hirs = preliminary
+            .values()
+            .filter(|document| document.source == DocumentSource::Overlay)
+            .filter_map(|document| document.hir.clone())
+            .collect::<Vec<_>>();
+        let overlay_file_ids = overlay_source_file_ids(&preliminary, &self.source_files);
+        let facts = IndexSymbolFacts::with_overlay_files(
+            &self.ir,
+            &self.index,
+            &overlay_hirs,
+            &overlay_file_ids,
+        );
+        self.documents = Arc::new(
+            preliminary
+                .into_iter()
+                .map(|(id, document)| {
+                    let document = if (document.source == DocumentSource::Overlay
+                        && document.hir.is_none())
+                        || document
+                            .hir
+                            .as_ref()
+                            .is_some_and(|hir| !hir.depends_on_symbol_facts())
+                    {
+                        document
+                    } else {
+                        prepare_document_snapshot_with_ir_and_facts(
+                            &self.rules,
+                            &self.profile,
+                            &self.ir,
+                            &facts,
+                            &self.roots,
+                            document,
+                        )
+                    };
+                    (id, document)
+                })
+                .collect(),
+        );
+    }
+
+    fn document_contributes_symbol_facts(&self, document: &DocumentSnapshot) -> bool {
+        document.hir().is_some_and(|hir| {
+            !hir.definitions().is_empty() || !hir.definition_attributes().is_empty()
+        }) || (document.source == DocumentSource::Overlay
+            && document
+                .path
+                .as_ref()
+                .and_then(|path| self.source_file_paths.get(path))
+                .and_then(|file_id| self.file_states.get(file_id))
+                .is_some_and(|state| {
+                    !state.shard().definitions.is_empty()
+                        || !state.shard().definition_attributes.is_empty()
+                }))
     }
 
     /// Applies one event-loop change and advances the snapshot revision.
@@ -302,6 +648,12 @@ impl AnalysisHost {
             Vec::<(SourceRootId, Arc<crate::index_cache::ReferenceIndexStore>)>::new();
 
         for cache in caches {
+            if cache.metadata().build_id != crate::ANALYZER_BUILD_ID {
+                return Err(IndexCacheError::BuildMismatch {
+                    cached: cache.metadata().build_id.clone(),
+                    active: crate::ANALYZER_BUILD_ID.to_owned(),
+                });
+            }
             if cache.metadata().game_id != self.rules.game_id()
                 || cache.metadata().game_id != self.profile.game_id
             {
@@ -420,7 +772,7 @@ impl AnalysisHost {
         shards.extend(self.index.shards.values().cloned());
         // One combined build sets the case policy and derives the lookup maps together, so the
         // merged cache + workspace shards are not rebuilt twice.
-        let mut index = WorkspaceIndex::from_shards_with_rules(shards, self.rules.as_ref());
+        let mut index = WorkspaceIndex::from_shards(shards);
         // Source-file IDs were checked for collisions above, so the cached and existing position
         // keys are disjoint. Merge the existing snapshot positions in one pass: calling
         // `replace_position_ranges` once per Project file would repeatedly rebuild the
@@ -441,7 +793,7 @@ impl AnalysisHost {
         );
         index.replace_all_position_ranges(position_ranges);
         let priorities = source_priorities(&roots, &files);
-        index.resolve_priorities(&priorities, self.rules.as_ref());
+        index.resolve_priorities(&priorities);
 
         // Cache installation owns the preview identity of its files: drop any
         // scanned entries for them so the serving map never mixes the two
@@ -693,7 +1045,9 @@ impl AnalysisHost {
             for (logical, physical) in paths {
                 cancellation.checkpoint()?;
                 let id = SourceFileId::new(stable_file_id(root.id, &logical));
-                let Some(category) = self.rules.classify(&logical) else {
+                let Some((category_id, category_parser, category_resolution)) =
+                    self.active_category(&logical)
+                else {
                     continue;
                 };
                 let source_file = SourceFile {
@@ -701,13 +1055,13 @@ impl AnalysisHost {
                     root_id: root.id,
                     physical_path: physical.clone(),
                     logical_path: logical,
-                    category_id: Some(category.id.clone()),
-                    resolution: category.resolution,
+                    category_id: Some(category_id),
+                    resolution: category_resolution,
                 };
                 // Opaque resources participate in path/overlay resolution, but have no
                 // text parser or semantic state. In particular, do not read binary assets as
                 // UTF-8 just to manufacture an empty shard for them.
-                if matches!(&category.parser, ParserKind::Asset) {
+                if matches!(&category_parser, ParserKind::Asset) {
                     let file_for_state = source_file.clone();
                     if let Some(existing) = files.insert(id, source_file) {
                         return Err(WorkspaceError::FileIdCollision {
@@ -750,6 +1104,7 @@ impl AnalysisHost {
             previous_states: self.file_states.as_ref(),
             rules: self.rules.as_ref(),
             profile: self.profile.as_ref(),
+            ir: Some(self.ir.as_ref()),
             parse_cache: self.parse_cache.as_ref(),
             cancellation,
             progress,
@@ -791,11 +1146,63 @@ impl AnalysisHost {
                     .map(|(_, shard)| shard.clone()),
             );
         }
-        let mut index = WorkspaceIndex::from_shards_cancellable_with_rules(
-            shards,
-            self.rules.as_ref(),
-            cancellation,
-        )?;
+        let mut index = WorkspaceIndex::from_shards_cancellable(shards, cancellation)?;
+        let priorities = source_priorities(&self.roots, &files);
+        index.resolve_priorities_cancellable(&priorities, cancellation)?;
+        if !self.ir.files.is_empty() {
+            // First-pass HIR discovers ordinary definitions. Callable payloads can introduce
+            // further symbols; replay until the exact symbol facts stabilize so references
+            // in other files see them before committing the new workspace.
+            let overlays = self
+                .documents
+                .values()
+                .filter(|document| document.source == DocumentSource::Overlay)
+                .filter_map(|document| document.hir.clone())
+                .collect::<Vec<_>>();
+            let overlay_file_ids = overlay_source_file_ids(&self.documents, &files);
+            let mut passes = 0;
+            loop {
+                passes += 1;
+                let facts = IndexSymbolFacts::with_overlay_files(
+                    &self.ir,
+                    &index,
+                    &overlays,
+                    &overlay_file_ids,
+                );
+                let relowered = replay_symbol_dependent_files(
+                    &files,
+                    &file_states,
+                    &self.ir,
+                    &facts,
+                    &source_context,
+                )?;
+                let mut changed = false;
+                for (id, state) in relowered {
+                    cancellation.checkpoint()?;
+                    changed |= file_states
+                        .get(&id)
+                        .is_none_or(|previous| !state.shard().same_symbol_facts(previous.shard()));
+                    file_states.insert(id, state);
+                }
+                drop(facts);
+                index.replace_replayed_shards_cancellable(
+                    file_states.values().map(|state| state.shard_handle()),
+                    &priorities,
+                    cancellation,
+                )?;
+                if !changed {
+                    break;
+                }
+                if passes >= 32 {
+                    return Err(WorkspaceError::Io(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "IR symbol facts did not stabilize after 32 passes",
+                    )));
+                }
+            }
+        }
+        // The candidate now contains the final shards and resolved symbol facts;
+        // it can serve queries without rebuilding the same lookup maps again.
         let mut position_ranges = self.index.position_ranges().clone();
         position_ranges.retain_files(|file_id| {
             files.contains_key(&file_id) && !file_states.contains_key(&file_id)
@@ -808,16 +1215,6 @@ impl AnalysisHost {
             );
         }
         index.replace_all_position_ranges(position_ranges);
-        let priorities = source_priorities(&self.roots, &files);
-        let has_multiple_source_roots = self
-            .roots
-            .iter()
-            .filter(|root| files.values().any(|file| file.root_id == root.id))
-            .nth(1)
-            .is_some();
-        if !self.installed_caches.is_empty() || has_multiple_source_roots {
-            index.resolve_priorities_cancellable(&priorities, self.rules.as_ref(), cancellation)?;
-        }
         cancellation.checkpoint()?;
         self.source_files = Arc::new(files);
         self.source_file_paths = Arc::new(source_file_paths(&self.source_files));
@@ -884,6 +1281,7 @@ impl AnalysisHost {
         let mut report = WorkspaceScanReport::default();
         let mut changed = false;
         let mut preview_files: Vec<SourceFileId> = Vec::new();
+        let mut changed_semantic_files = BTreeSet::new();
 
         for change in changes {
             cancellation.checkpoint()?;
@@ -951,7 +1349,7 @@ impl AnalysisHost {
                     paths.remove(&change.path);
                     file_states.remove(&id);
                     let priorities = source_priorities(&self.roots, &files);
-                    index.remove_shard_resolved(id, &priorities, self.rules.as_ref());
+                    index.remove_shard_resolved(id, &priorities);
                     index.remove_position_ranges(id);
                     preview_files.push(id);
                     changed = true;
@@ -959,7 +1357,18 @@ impl AnalysisHost {
                 continue;
             }
 
-            let Some(category) = self.rules.classify(&logical) else {
+            let Some((category_id, category_parser, category_resolution)) =
+                self.active_category(&logical)
+            else {
+                if files.remove(&id).is_some() {
+                    paths.remove(&change.path);
+                    file_states.remove(&id);
+                    let priorities = source_priorities(&self.roots, &files);
+                    index.remove_shard_resolved(id, &priorities);
+                    index.remove_position_ranges(id);
+                    preview_files.push(id);
+                    changed = true;
+                }
                 continue;
             };
             let source_file = SourceFile {
@@ -967,8 +1376,8 @@ impl AnalysisHost {
                 root_id: root.id,
                 physical_path: change.path.clone(),
                 logical_path: logical,
-                category_id: Some(category.id.clone()),
-                resolution: category.resolution,
+                category_id: Some(category_id),
+                resolution: category_resolution,
             };
             if let Some(existing) = files.get(&id)
                 && existing.physical_path != source_file.physical_path
@@ -978,7 +1387,7 @@ impl AnalysisHost {
                     second: source_file.physical_path,
                 });
             }
-            let text = if matches!(&category.parser, ParserKind::Asset) {
+            let text = if matches!(&category_parser, ParserKind::Asset) {
                 None
             } else {
                 let Some(text) = read_source_file_cancellable(
@@ -1003,14 +1412,17 @@ impl AnalysisHost {
             let file_revision = file_states
                 .get(&id)
                 .map_or(0, |state| state.revision().saturating_add(1));
+            let has_text = text.is_some();
             let state = Arc::new(match text {
                 Some(text) => {
-                    let state = build_file_state(
+                    let state = build_file_state_with_ir(
                         &source_file,
                         text,
                         file_revision,
                         self.rules.as_ref(),
                         self.profile.as_ref(),
+                        self.ir.as_ref(),
+                        self.parse_cache.as_ref(),
                     );
                     // Same retention policy as the scan: extract positions,
                     // then drop the frontend so closed files never hold a
@@ -1023,15 +1435,60 @@ impl AnalysisHost {
             files.insert(id, source_file);
             paths.insert(change.path.clone(), id);
             file_states.insert(id, Arc::clone(&state));
+            if has_text {
+                changed_semantic_files.insert(id);
+            }
             preview_files.push(id);
             let priorities = source_priorities(&self.roots, &files);
-            index.replace_shard_resolved(state.shard_handle(), &priorities, self.rules.as_ref());
+            index.replace_shard_resolved(state.shard_handle(), &priorities);
             report.indexed_files = report.indexed_files.saturating_add(1);
             changed = true;
         }
 
         cancellation.checkpoint()?;
         if changed {
+            if !changed_semantic_files.is_empty() && !self.ir.files.is_empty() {
+                let priorities = source_priorities(&self.roots, &files);
+                index.resolve_priorities_cancellable(&priorities, cancellation)?;
+                let overlays = self
+                    .documents
+                    .values()
+                    .filter(|document| document.source == DocumentSource::Overlay)
+                    .filter_map(|document| document.hir.clone())
+                    .collect::<Vec<_>>();
+                let candidate_index = index.clone();
+                let overlay_file_ids = overlay_source_file_ids(&self.documents, &files);
+                let facts = IndexSymbolFacts::with_overlay_files(
+                    &self.ir,
+                    &candidate_index,
+                    &overlays,
+                    &overlay_file_ids,
+                );
+                for id in changed_semantic_files {
+                    cancellation.checkpoint()?;
+                    let (Some(file), Some(previous)) = (files.get(&id), file_states.get(&id))
+                    else {
+                        continue;
+                    };
+                    if !previous.symbol_facts_dependency {
+                        continue;
+                    }
+                    let state = build_file_state_with_ir_and_facts(
+                        file,
+                        previous.source().to_owned(),
+                        previous.revision(),
+                        &self.rules,
+                        &self.profile,
+                        &self.ir,
+                        &facts,
+                        self.parse_cache.as_ref(),
+                    );
+                    index.replace_position_ranges(id, position_ranges_for_state(&state));
+                    let state = Arc::new(state.cache_only());
+                    index.replace_shard_resolved(state.shard_handle(), &priorities);
+                    file_states.insert(id, state);
+                }
+            }
             self.source_files = Arc::new(files);
             self.source_file_paths = Arc::new(paths);
             self.file_states = Arc::new(file_states);
@@ -1063,11 +1520,7 @@ impl AnalysisHost {
         let file_id = shard.file_id;
         let priorities = source_priorities(&self.roots, &self.source_files);
         let shard = Arc::new(shard);
-        Arc::make_mut(&mut self.index).replace_shard_resolved(
-            Arc::clone(&shard),
-            &priorities,
-            self.rules.as_ref(),
-        );
+        Arc::make_mut(&mut self.index).replace_shard_resolved(Arc::clone(&shard), &priorities);
         Arc::make_mut(&mut self.index).remove_position_ranges(file_id);
         if let Some(previous) = self.file_states.get(&file_id) {
             let mut replacement = previous.as_ref().clone();
@@ -1102,11 +1555,15 @@ impl AnalysisHost {
             path,
         );
         let declares_dynamic_definitions = self.document_declares_dynamic_definitions(&document);
+        let contributes_symbol_facts = self.document_contributes_symbol_facts(&document);
         let overlay_file = document
             .path
             .as_ref()
             .and_then(|path| self.source_file_paths.get(path).copied());
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
+        if contributes_symbol_facts {
+            self.relower_documents_with_overlay_facts();
+        }
         // The overlay now owns this file's live text; scan-derived previews
         // must stop serving until the document closes.
         if let Some(file_id) = overlay_file {
@@ -1139,6 +1596,9 @@ impl AnalysisHost {
         }
         let document = staged_overlay_document(id.clone(), version, text, path);
         Arc::make_mut(&mut self.documents).insert(id, document);
+        // The unparsed overlay already hides any disk-backed definition at this path. Rebuild
+        // other open documents without that outgoing disk fact until the prepared HIR commits.
+        self.relower_documents_with_overlay_facts();
         // Staging swaps in an unparsed overlay snapshot: only document state
         // changes, so index-derived cache entries must survive. A full advance
         // here would wipe the index domain on every document open and starve
@@ -1172,8 +1632,12 @@ impl AnalysisHost {
         // falls back to the index text for this document; definition-derived
         // entries must move with it when the outgoing text declared anything.
         let declares_dynamic_definitions = self.document_declares_dynamic_definitions(current);
+        let contributes_symbol_facts = self.document_contributes_symbol_facts(current);
         let document = staged_overlay_document(id.clone(), version, text, current.path.clone());
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
+        if contributes_symbol_facts {
+            self.relower_documents_with_overlay_facts();
+        }
         self.advance_document_revision();
         if declares_dynamic_definitions {
             self.query_cache.advance_definitions(self.revision);
@@ -1199,7 +1663,11 @@ impl AnalysisHost {
         // document entries advance with the revision below.
         let declares_dynamic_definitions =
             self.document_declares_dynamic_definitions(&prepared.document);
+        let contributes_symbol_facts = self.document_contributes_symbol_facts(&prepared.document);
         Arc::make_mut(&mut self.documents).insert(id, prepared.document);
+        if contributes_symbol_facts || !self.ir.files.is_empty() {
+            self.relower_documents_with_overlay_facts();
+        }
         // Only the overlay document map changes here, so index-derived cache
         // entries stay valid; a full advance would wipe them on every
         // keystroke's parse commit and defeat the index cache domain.
@@ -1256,6 +1724,7 @@ impl AnalysisHost {
 
         let path = current.path.clone();
         let previous_declared = self.document_declares_dynamic_definitions(current);
+        let previous_contributes = self.document_contributes_symbol_facts(current);
         let document = self.document_snapshot(
             id.clone(),
             Some(version),
@@ -1265,7 +1734,12 @@ impl AnalysisHost {
         );
         let declares_dynamic_definitions =
             previous_declared || self.document_declares_dynamic_definitions(&document);
+        let contributes_symbol_facts =
+            previous_contributes || self.document_contributes_symbol_facts(&document);
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
+        if contributes_symbol_facts {
+            self.relower_documents_with_overlay_facts();
+        }
         self.advance_document_revision();
         if declares_dynamic_definitions {
             self.query_cache.advance_definitions(self.revision);
@@ -1286,6 +1760,7 @@ impl AnalysisHost {
         // like editing one; the restored index candidate counts too (an edit
         // that removed every definition must still invalidate).
         let mut declares_dynamic_definitions = self.document_declares_dynamic_definitions(current);
+        let contributes_symbol_facts = self.document_contributes_symbol_facts(current);
         let overlay_file = current
             .path
             .as_ref()
@@ -1310,6 +1785,9 @@ impl AnalysisHost {
                     self.document_declares_dynamic_definitions(&document);
                 Arc::make_mut(&mut self.documents).insert(id.clone(), document);
             }
+        }
+        if contributes_symbol_facts {
+            self.relower_documents_with_overlay_facts();
         }
         // With the overlay gone the scan-derived previews for this file may
         // serve again (unless another overlay still owns the path).
@@ -1408,6 +1886,8 @@ impl AnalysisHost {
         AnalysisSnapshot {
             revision: self.revision,
             rules: Arc::clone(&self.rules),
+            ir: Arc::clone(&self.ir),
+            ir_fingerprint: Arc::clone(&self.ir_fingerprint),
             profile: Arc::clone(&self.profile),
             roots: Arc::clone(&self.roots),
             workspace_root: self.workspace_root.clone(),
@@ -1472,6 +1952,23 @@ fn source_file_paths(files: &BTreeMap<SourceFileId, SourceFile>) -> HashMap<AbsP
         paths.entry(file.physical_path.clone()).or_insert(*id);
     }
     paths
+}
+
+fn overlay_source_file_ids(
+    documents: &BTreeMap<DocumentId, DocumentSnapshot>,
+    files: &BTreeMap<SourceFileId, SourceFile>,
+) -> BTreeSet<SourceFileId> {
+    documents
+        .values()
+        .filter(|document| document.source == DocumentSource::Overlay)
+        .filter_map(|document| document.path.as_ref())
+        .filter_map(|path| {
+            files
+                .iter()
+                .find(|(_, file)| &file.physical_path == path)
+                .map(|(id, _)| *id)
+        })
+        .collect()
 }
 
 /// Compares two configured/cached root paths tolerating an offline source directory.

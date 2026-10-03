@@ -1,0 +1,68 @@
+{
+  "schemas": {
+    "decree_body": {
+      "fields": {
+        "ai_will_do": {
+          "body": "decree_body__ai_will_do",
+          "card": "1",
+          "doc": "ai_will_do has to be 10 for AI to do it (with >=99 Meritocracy).",
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "cost": {
+          "card": "1",
+          "doc": "Cost in meritocracy of enacting the decree",
+          "value": "int"
+        },
+        "duration": {
+          "card": "1",
+          "doc": "Duration in days of the modifier of the decree",
+          "value": "int"
+        },
+        "effect": {
+          "body": "effect",
+          "card": "1",
+          "doc": "Effects to run when the decree is enacted"
+        },
+        "modifier": {
+          "body": "modifier",
+          "card": "1",
+          "doc": "Modifiers active during the duration of the decree"
+        },
+        "potential": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "If false the decree will not appear"
+        },
+        "removed_effect": {
+          "body": "effect",
+          "card": "1",
+          "doc": "Effects to run when the decree is expired"
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "1",
+          "doc": "If false you will not be able to take the decree"
+        }
+      }
+    },
+    "decree_body__ai_will_do": {
+      "fields": {
+        "factor": {
+          "card": "1",
+          "doc": "Base weight multiplier in the enclosing weight/AI block.",
+          "override": true,
+          "value": "float"
+        }
+      },
+      "include": [
+        "keys__modifier_rule"
+      ]
+    }
+  }
+}

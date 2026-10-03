@@ -21,9 +21,15 @@ pub struct LoadedFile {
 /// Parses `source` as an EU4 mission file.
 #[must_use]
 pub fn parse_file(source: &str) -> LoadedFile {
+    parse_file_with_spec(source, super::view_spec())
+}
+
+/// Parses the concrete mission view using field facts supplied by the package.
+#[must_use]
+pub fn parse_file_with_spec(source: &str, spec: &rules::ProfileMissionViewSpec) -> LoadedFile {
     let parsed = parser::parse(parser::FileFormat::Script, source);
     let mut warnings = Vec::new();
-    let trees = extract_trees(&parsed, &mut warnings);
+    let trees = extract_trees(&parsed, &mut warnings, spec);
     LoadedFile {
         file: MissionFile { trees },
         syntax_errors: parsed.errors().to_vec(),
@@ -31,7 +37,11 @@ pub fn parse_file(source: &str) -> LoadedFile {
     }
 }
 
-fn extract_trees(parsed: &ParsedFile, warnings: &mut Vec<String>) -> Vec<MissionTree> {
+fn extract_trees(
+    parsed: &ParsedFile,
+    warnings: &mut Vec<String>,
+    spec: &rules::ProfileMissionViewSpec,
+) -> Vec<MissionTree> {
     let mut trees = Vec::new();
     for node in parsed.root().children() {
         if node.kind() != CstKind::Property {
@@ -48,7 +58,7 @@ fn extract_trees(parsed: &ParsedFile, warnings: &mut Vec<String>) -> Vec<Mission
             // Top-level scalars (e.g. stray assignments) are not trees.
             continue;
         };
-        let tree = parse_tree(parsed, key, block, node.range(), warnings);
+        let tree = parse_tree(parsed, key, block, node.range(), warnings, spec);
         trees.push(tree);
     }
     trees
@@ -60,6 +70,7 @@ fn parse_tree(
     value: CstNode<'_>,
     span: text::TextRange,
     warnings: &mut Vec<String>,
+    spec: &rules::ProfileMissionViewSpec,
 ) -> MissionTree {
     let mut tree = MissionTree {
         id: scalar(parsed, key),
@@ -81,34 +92,36 @@ fn parse_tree(
         };
         let name = scalar(parsed, k);
         match name.as_str() {
-            "slot" => match parse_u32(parsed, v) {
+            name if name == spec.tree_fields.slot => match parse_u32(parsed, v) {
                 Some(n) => tree.slot = n,
-                None => push_unknown(&mut tree.unknown, &name, value_text(parsed, v), warnings),
+                None => push_unknown(&mut tree.unknown, name, value_text(parsed, v), warnings),
             },
-            "generic" => match parse_bool(parsed, v) {
+            name if name == spec.tree_fields.generic => match parse_bool(parsed, v) {
                 Some(b) => tree.generic = b,
-                None => push_unknown(&mut tree.unknown, &name, value_text(parsed, v), warnings),
+                None => push_unknown(&mut tree.unknown, name, value_text(parsed, v), warnings),
             },
-            "ai" => match parse_bool(parsed, v) {
+            name if name == spec.tree_fields.ai => match parse_bool(parsed, v) {
                 Some(b) => tree.ai = Some(b),
-                None => push_unknown(&mut tree.unknown, &name, value_text(parsed, v), warnings),
+                None => push_unknown(&mut tree.unknown, name, value_text(parsed, v), warnings),
             },
-            "has_country_shield" => match parse_bool(parsed, v) {
+            name if name == spec.tree_fields.has_country_shield => match parse_bool(parsed, v) {
                 Some(b) => tree.has_country_shield = Some(b),
-                None => push_unknown(&mut tree.unknown, &name, value_text(parsed, v), warnings),
+                None => push_unknown(&mut tree.unknown, name, value_text(parsed, v), warnings),
             },
-            "potential" if as_block(v).is_some() => {
+            name if name == spec.tree_fields.potential && as_block(v).is_some() => {
                 tree.potential = as_block(v).map(|b| block(parsed, b));
             }
-            "potential_on_load" if as_block(v).is_some() => {
+            name if name == spec.tree_fields.potential_on_load && as_block(v).is_some() => {
                 tree.potential_on_load = as_block(v).map(|b| block(parsed, b));
             }
-            "potential" | "potential_on_load" => {
-                push_unknown(&mut tree.unknown, &name, value_text(parsed, v), warnings);
+            name if name == spec.tree_fields.potential
+                || name == spec.tree_fields.potential_on_load =>
+            {
+                push_unknown(&mut tree.unknown, name, value_text(parsed, v), warnings);
             }
             _ if as_block(v).is_some() => {
                 let block = as_block(v).expect("checked above");
-                let mission = parse_mission(parsed, k, block, prop.range(), warnings);
+                let mission = parse_mission(parsed, k, block, prop.range(), warnings, spec);
                 tree.missions.push(mission);
             }
             _ => {
@@ -128,6 +141,7 @@ fn parse_mission(
     value: CstNode<'_>,
     span: text::TextRange,
     warnings: &mut Vec<String>,
+    spec: &rules::ProfileMissionViewSpec,
 ) -> Mission {
     let mut mission = Mission {
         id: scalar(parsed, key),
@@ -152,37 +166,41 @@ fn parse_mission(
         };
         let name = scalar(parsed, k);
         match name.as_str() {
-            "icon" => mission.icon = Some(scalar(parsed, v)),
-            "type" => mission.mission_type = Some(scalar(parsed, v)),
-            "provinces_to_highlight" if as_block(v).is_some() => {
+            name if name == spec.node_fields.icon => mission.icon = Some(scalar(parsed, v)),
+            name if name == spec.node_fields.node_type => {
+                mission.mission_type = Some(scalar(parsed, v))
+            }
+            name if name == spec.node_fields.provinces_to_highlight && as_block(v).is_some() => {
                 mission.provinces_to_highlight = as_block(v).map(|b| block(parsed, b));
             }
-            "required_missions" if as_block(v).is_some() => {
+            name if name == spec.node_fields.required_missions && as_block(v).is_some() => {
                 let entries = block_scalars(parsed, as_block(v).expect("checked above"));
                 for (name, range) in entries {
                     mission.required.push(name);
                     mission.required_ranges.push(range);
                 }
             }
-            "required_missions" => {
-                push_unknown(&mut mission.unknown, &name, value_text(parsed, v), warnings);
+            name if name == spec.node_fields.required_missions => {
+                push_unknown(&mut mission.unknown, name, value_text(parsed, v), warnings);
             }
-            "position" => match parse_u32(parsed, v) {
+            name if name == spec.node_fields.position => match parse_u32(parsed, v) {
                 Some(n) => {
                     mission.position = Some(n);
                     mission.position_range = Some(v.range());
                 }
-                None => push_unknown(&mut mission.unknown, &name, value_text(parsed, v), warnings),
+                None => push_unknown(&mut mission.unknown, name, value_text(parsed, v), warnings),
             },
-            "completed_by" => mission.completed_by = Some(scalar(parsed, v)),
-            "trigger" if as_block(v).is_some() => {
+            name if name == spec.node_fields.completed_by => {
+                mission.completed_by = Some(scalar(parsed, v))
+            }
+            name if name == spec.node_fields.trigger && as_block(v).is_some() => {
                 mission.trigger = as_block(v).map(|b| block(parsed, b));
             }
-            "effect" if as_block(v).is_some() => {
+            name if name == spec.node_fields.effect && as_block(v).is_some() => {
                 mission.effect = as_block(v).map(|b| block(parsed, b));
             }
-            "trigger" | "effect" => {
-                push_unknown(&mut mission.unknown, &name, value_text(parsed, v), warnings);
+            name if name == spec.node_fields.trigger || name == spec.node_fields.effect => {
+                push_unknown(&mut mission.unknown, name, value_text(parsed, v), warnings);
             }
             _ => mission.unknown.push(RawField {
                 name,

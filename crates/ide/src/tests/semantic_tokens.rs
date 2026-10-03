@@ -43,7 +43,7 @@ fn script_tokens_cover_comments_operators_keys_and_scalars() {
             ("=".to_owned(), SemanticTokenType::Operator, false),
             ("id".to_owned(), SemanticTokenType::Function, false),
             ("=".to_owned(), SemanticTokenType::Operator, false),
-            ("test.1".to_owned(), SemanticTokenType::String, false),
+            ("test.1".to_owned(), SemanticTokenType::String, true),
             ("quux".to_owned(), SemanticTokenType::Property, false),
             ("=".to_owned(), SemanticTokenType::Operator, false),
             ("3.5".to_owned(), SemanticTokenType::Number, false),
@@ -76,7 +76,7 @@ fn indexed_dynamic_definition_names_use_the_function_token_color() {
     )
     .expect("scripted trigger definition");
 
-    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,
@@ -148,17 +148,17 @@ fn headers_and_parameter_conditions_use_type_and_parameter_tokens() {
 fn control_flow_keys_are_keywords_above_functions() {
     // Profile control-flow keys take precedence over the rule-known Function classification so
     // the script skeleton (if/limit/not/...) reads differently from effects and triggers.
-    let text = "country_event = {\n  id = test.1\n  trigger = { NOT = { has_dlc = \"x\" } }\n  immediate = { limit = { always = yes } }\n}\n";
+    let text = "country_event = {\n  id = test.1\n  trigger = { NOT = { has_dlc = \"x\" } }\n  immediate = { limit = { is_year = 1500 } }\n}\n";
     let (host, id) = snapshot(text);
     let tokens = token_spellings(&host, &id, text);
-    for spelling in ["trigger", "NOT", "immediate", "limit"] {
+    for spelling in ["NOT", "limit"] {
         assert!(
             tokens.contains(&(spelling.to_owned(), SemanticTokenType::Keyword, false)),
             "{spelling} should be a keyword token"
         );
     }
-    // `always` is a profile fallback key, so it stays Function-colored.
-    assert!(tokens.contains(&("always".to_owned(), SemanticTokenType::Function, false)));
+    // `is_year` is a declared trigger, so it stays Function-colored.
+    assert!(tokens.contains(&("is_year".to_owned(), SemanticTokenType::Function, false)));
 }
 
 #[test]

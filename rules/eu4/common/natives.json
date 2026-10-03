@@ -1,0 +1,34 @@
+{
+  "schemas": {
+    "natives_body": {
+      "fields": {
+        "color": {
+          "card": "1",
+          "list": "int[0..255]"
+        },
+        "graphical_culture": {
+          "card": "1",
+          "value": "enum<graphical_cultures>"
+        },
+        "icon": {
+          "card": "1",
+          "value": "int"
+        },
+        "provinces": {
+          "card": "1",
+          "list": "ref<province_id>"
+        },
+        "unit": {
+          "card": "1",
+          "value": "ref<unit_type>"
+        }
+      }
+    },
+    "natives_body__color": {
+      "items": "int[0..255]"
+    },
+    "natives_body__provinces": {
+      "items": "ref<province_id>"
+    }
+  }
+}

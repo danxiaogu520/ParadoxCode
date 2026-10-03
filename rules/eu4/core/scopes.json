@@ -1,0 +1,196 @@
+{
+  "scopes": {
+    "links": {
+      "capital": {
+        "from": [
+          "country"
+        ],
+        "to": "province"
+      },
+      "capital_scope": {
+        "from": [
+          "country"
+        ],
+        "to": "province"
+      },
+      "colonial_parent": {
+        "from": [
+          "country"
+        ],
+        "to": "country"
+      },
+      "controller": {
+        "from": [
+          "province"
+        ],
+        "to": "country"
+      },
+      "crusade_target": {
+        "from": [
+          "any"
+        ],
+        "to": "country"
+      },
+      "emperor": {
+        "from": [
+          "any"
+        ],
+        "to": "country"
+      },
+      "enlightenment_origin": {
+        "from": [
+          "any"
+        ],
+        "to": "province"
+      },
+      "event_target:{ref<event_target>}": {
+        "from": [
+          "any"
+        ],
+        "to": "any"
+      },
+      "feudalism_origin": {
+        "from": [
+          "any"
+        ],
+        "to": "province"
+      },
+      "global_event_target:{ref<global_event_target>}": {
+        "from": [
+          "any"
+        ],
+        "to": "any"
+      },
+      "global_trade_origin": {
+        "from": [
+          "any"
+        ],
+        "to": "province"
+      },
+      "home_province": {
+        "from": [
+          "mercenary_company"
+        ],
+        "to": "province"
+      },
+      "industrialization_origin": {
+        "from": [
+          "any"
+        ],
+        "to": "province"
+      },
+      "location": {
+        "from": [
+          "mercenary_company",
+          "unit"
+        ],
+        "to": "province"
+      },
+      "manufactories_origin": {
+        "from": [
+          "any"
+        ],
+        "to": "province"
+      },
+      "most_province_trade_power": {
+        "from": [
+          "province"
+        ],
+        "to": "country"
+      },
+      "native_sponsor_scope": {
+        "from": [
+          "country"
+        ],
+        "to": "country"
+      },
+      "new_world_i_origin": {
+        "from": [
+          "any"
+        ],
+        "to": "province"
+      },
+      "overlord": {
+        "from": [
+          "country"
+        ],
+        "to": "country"
+      },
+      "owner": {
+        "from": [
+          "province"
+        ],
+        "to": "country"
+      },
+      "printing_press_origin": {
+        "from": [
+          "any"
+        ],
+        "to": "province"
+      },
+      "renaissance_origin": {
+        "from": [
+          "any"
+        ],
+        "to": "province"
+      },
+      "revolution_target": {
+        "from": [
+          "any"
+        ],
+        "to": "country"
+      },
+      "sea_zone": {
+        "from": [
+          "province"
+        ],
+        "to": "province"
+      },
+      "tribal_owner": {
+        "from": [
+          "province"
+        ],
+        "to": "country"
+      },
+      "unit_owner": {
+        "from": [
+          "unit"
+        ],
+        "to": "country"
+      }
+    },
+    "registers": {
+      "from": {
+        "chain": true,
+        "role": "from"
+      },
+      "prev": {
+        "chain": true,
+        "role": "previous"
+      },
+      "root": {
+        "role": "root"
+      },
+      "this": {
+        "role": "current"
+      }
+    },
+    "types": [
+      "province",
+      "country",
+      "unit",
+      "monarch",
+      "heir",
+      "consort",
+      "mercenary_company",
+      "rebel_faction",
+      "religion",
+      "culture",
+      "advisor",
+      "leader",
+      "trade_company",
+      "global",
+      "none"
+    ]
+  }
+}

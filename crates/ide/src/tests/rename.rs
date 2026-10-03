@@ -4,7 +4,7 @@ use super::support::*;
 
 #[test]
 fn rename_updates_definition_and_resolved_references() {
-    let text = "country_event = { id = test.1 }\nevent = test.1\n";
+    let text = "country_event = { id = test.1 }\ncountry_event = { immediate = { country_event = { id = test.1 } } }\n";
     let (mut host, id) = snapshot(text);
     let position = u32::try_from(text.rfind("test.1").expect("reference")).expect("offset");
     let prepared = prepare_rename(&host.snapshot(), &id, position).expect("prepare rename");
@@ -35,7 +35,7 @@ fn rename_updates_definition_and_resolved_references() {
 #[test]
 fn rename_rejects_invalid_names_ambiguous_symbols_and_conflicts() {
     let (host, id) = snapshot(
-        "country_event = { id = old.1 }\ncountry_event = { id = other.1 }\nevent = old.1\n",
+        "country_event = { id = old.1 }\ncountry_event = { id = other.1 }\ncountry_event = { immediate = { country_event = { id = old.1 } } }\n",
     );
     let current_snapshot = host.snapshot();
     let old_position = u32::try_from("country_event = { id = ".len()).expect("offset");
@@ -48,7 +48,7 @@ fn rename_rejects_invalid_names_ambiguous_symbols_and_conflicts() {
         RenameError::Conflict
     );
 
-    let ambiguous_text = "country_event = { id = duplicate.1 }\ncountry_event = { id = duplicate.1 }\nevent = duplicate.1\n";
+    let ambiguous_text = "country_event = { id = duplicate.1 }\ncountry_event = { id = duplicate.1 }\ncountry_event = { immediate = { country_event = { id = duplicate.1 } } }\n";
     let (ambiguous_host, ambiguous_id) = snapshot(ambiguous_text);
     let reference =
         u32::try_from(ambiguous_text.rfind("duplicate.1").expect("reference")).expect("offset");

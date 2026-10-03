@@ -506,7 +506,7 @@ pub(crate) fn symbol_localisation_preview(
     references.dedup();
 
     let mut rows = Vec::new();
-    let mut seen = BTreeSet::<String>::new();
+    let mut seen = BTreeSet::new();
     for (name, range) in references {
         cancellation.checkpoint()?;
         let previews = localisation_previews_for_name(snapshot, &name, cancellation)?;
@@ -533,37 +533,19 @@ pub(crate) fn symbol_localisation_preview(
     Ok(rows)
 }
 
-/// Generated-template localisation previews for a typed token whose
-/// definition site is not at hand — the rule-layer hovers over
-/// `Type`-matched scope links (`tripolitania_area = { … }`) and typed scalar
-/// values. Localisation keys resolve on their own, so no definition lookup
-/// participates.
-pub(crate) fn typed_name_localisation_previews(
-    snapshot: &AnalysisSnapshot,
-    kind: &str,
-    name: &str,
-    cancellation: &CancellationToken,
-) -> Result<Vec<LocalisationPreviewRow>, Cancelled> {
-    if !kind_is_localisation_displayable(snapshot, kind) {
-        return Ok(Vec::new());
-    }
-    let mut rows = Vec::new();
-    let mut seen = BTreeSet::<String>::new();
-    collect_generated_preview_rows(snapshot, kind, name, &mut rows, &mut seen, cancellation)?;
-    Ok(rows)
-}
-
 /// Whether hover localisation previews apply to a kind: it names a semantic
 /// type. Types without declared bindings can still carry schema-typed
 /// localisation fields whose in-range references drive the preview.
 pub(crate) fn kind_is_localisation_displayable(snapshot: &AnalysisSnapshot, kind: &str) -> bool {
-    snapshot
-        .rules()
-        .model()
-        .semantic
-        .type_descriptors
-        .keys()
-        .any(|type_name| type_name.eq_ignore_ascii_case(kind))
+    snapshot.ir().type_by_name(kind).is_some()
+}
+
+/// Every binding declared by the resolved instance's type.
+fn type_trait_impls(
+    snapshot: &AnalysisSnapshot,
+    type_id: rules::ir::TypeId,
+) -> &[rules::ir::TraitImpl] {
+    &snapshot.ir().type_info(type_id).trait_impls
 }
 
 /// Appends every generated-key row (self bindings and template bindings alike)
@@ -573,38 +555,42 @@ fn collect_generated_preview_rows(
     kind: &str,
     symbol_name: &str,
     rows: &mut Vec<LocalisationPreviewRow>,
-    seen: &mut BTreeSet<String>,
+    seen: &mut BTreeSet<(Option<String>, String)>,
     cancellation: &CancellationToken,
 ) -> Result<(), Cancelled> {
-    for binding in snapshot
-        .rules()
-        .model()
-        .semantic
-        .localisation_bindings
-        .iter()
-        .filter(|binding| binding.type_name.eq_ignore_ascii_case(kind))
-    {
-        let Some(key) = binding.key.as_deref() else {
-            continue;
-        };
-        let name = key.replace('$', symbol_name);
-        cancellation.checkpoint()?;
-        let previews = localisation_previews_for_name(snapshot, &name, cancellation)?;
-        push_preview_rows(rows, seen, Some(binding.name.clone()), &previews);
+    let ir = snapshot.ir();
+    if let Some(type_id) = ir.type_by_name(kind) {
+        for implementation in type_trait_impls(snapshot, type_id) {
+            for (label, argument) in &implementation.arguments {
+                if let rules::ir::TraitArgument::Binding(binding) = argument
+                    && let Some(template) = binding.loc
+                {
+                    cancellation.checkpoint()?;
+                    let name = ir.strings.resolve(template).replace('$', symbol_name);
+                    let previews = localisation_previews_for_name(snapshot, &name, cancellation)?;
+                    push_preview_rows(
+                        rows,
+                        seen,
+                        Some(ir.strings.resolve(*label).to_owned()),
+                        &previews,
+                    );
+                }
+            }
+        }
     }
     Ok(())
 }
 
-/// Appends one row per value not already shown; empty values and repeats of
-/// an identical value are dropped.
+/// Appends one row per binding label and value; repeated rows and empty
+/// values are dropped without hiding distinct bindings with identical text.
 fn push_preview_rows(
     rows: &mut Vec<LocalisationPreviewRow>,
-    seen: &mut BTreeSet<String>,
+    seen: &mut BTreeSet<(Option<String>, String)>,
     label: Option<String>,
     previews: &[(Option<String>, String)],
 ) {
     for (_, value) in previews {
-        if value.is_empty() || !seen.insert(value.clone()) {
+        if value.is_empty() || !seen.insert((label.clone(), value.clone())) {
             continue;
         }
         rows.push(LocalisationPreviewRow {
@@ -636,20 +622,27 @@ fn generated_key_field<'a>(
     symbol_name: &str,
     key: &str,
 ) -> Option<&'a str> {
-    snapshot
-        .rules()
-        .model()
-        .semantic
-        .localisation_bindings
-        .iter()
-        .filter(|binding| binding.type_name.eq_ignore_ascii_case(kind))
-        .find_map(|binding| {
-            let template = binding.key.as_deref()?;
-            template
-                .replace('$', symbol_name)
-                .eq_ignore_ascii_case(key)
-                .then_some(binding.name.as_str())
-        })
+    let ir = snapshot.ir();
+    ir.type_by_name(kind).and_then(|id| {
+        type_trait_impls(snapshot, id)
+            .iter()
+            .find_map(|implementation| {
+                implementation
+                    .arguments
+                    .iter()
+                    .find_map(|(label, argument)| {
+                        let rules::ir::TraitArgument::Binding(binding) = argument else {
+                            return None;
+                        };
+                        let template = binding.loc?;
+                        ir.strings
+                            .resolve(template)
+                            .replace('$', symbol_name)
+                            .eq_ignore_ascii_case(key)
+                            .then(|| ir.strings.resolve(*label))
+                    })
+            })
+    })
 }
 
 /// The key of the property whose scalar value sits at `range` — labels

@@ -3,7 +3,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
-use rules::{RuleSet, SymbolResolutionPolicy};
 use text::{PositionRange, TextRange};
 
 use hir::{DefinitionAttributes, Template};
@@ -664,6 +663,16 @@ pub struct FileIndexShard {
 }
 
 impl FileIndexShard {
+    /// Compares the exact facts that can affect another file's schema walk.
+    /// References do not participate: they consume these facts.
+    #[must_use]
+    pub fn same_symbol_facts(&self, other: &Self) -> bool {
+        self.definitions == other.definitions
+            && self.dynamic_definitions == other.dynamic_definitions
+            && self.definition_attributes == other.definition_attributes
+            && self.flag_writes == other.flag_writes
+    }
+
     /// Hash of everything this file contributes to *other* files' diagnostics:
     /// definition identities (kind, name, active), dynamic-definition
     /// signatures and templates, retained attribute summaries, and flag
@@ -720,7 +729,6 @@ pub struct WorkspaceIndex {
     /// Nested so lookups probe with borrowed strings: kind spellings as written, folded
     /// names inside. Nested BTree iteration preserves the previous `(kind, name)` order.
     definitions: BTreeMap<Box<str>, BTreeMap<Box<str>, Vec<DefinitionPointer>>>,
-    case_sensitive_kinds: BTreeSet<String>,
     /// Lowercased dynamic kind -> write-site view for flag-style membership.
     flag_writes: BTreeMap<Box<str>, FlagWriteIndex>,
     /// Cached UTF-16 positions for files whose source text is not retained, such as Vanilla.
@@ -732,22 +740,6 @@ impl WorkspaceIndex {
     #[must_use]
     pub fn empty() -> Self {
         Self::default()
-    }
-
-    /// Applies symbol-name case policies from the immutable rule set and rebuilds lookup maps.
-    ///
-    /// The index historically lower-cased every symbol name.  Keeping the policy on the index
-    /// makes the lookup identity explicit while preserving the cheap bucketed queries used by
-    /// analysis.
-    pub fn configure_case_sensitivity(&mut self, rules: &RuleSet) {
-        self.case_sensitive_kinds = rules
-            .model()
-            .symbol_descriptors
-            .iter()
-            .filter(|descriptor| descriptor.case_sensitive)
-            .map(|descriptor| descriptor.kind_id.to_ascii_lowercase())
-            .collect();
-        self.rebuild_maps();
     }
 
     /// Builds an index from a complete set of file shards and derives lookup maps once.
@@ -762,48 +754,12 @@ impl WorkspaceIndex {
         }
     }
 
-    /// Builds an index with the symbol case policy applied in the same single pass.
-    #[must_use]
-    pub fn from_shards_with_rules(
-        shards: impl IntoIterator<Item: Into<Arc<FileIndexShard>>>,
-        rules: &RuleSet,
-    ) -> Self {
-        match Self::from_shards_cancellable_with_rules(shards, rules, &WorkspaceScanToken::new()) {
-            Ok(index) => index,
-            Err(WorkspaceError::Cancelled) => {
-                unreachable!("a fresh workspace scan token cannot be cancelled")
-            }
-            Err(_) => unreachable!("index construction has no other fallible operation"),
-        }
-    }
-
-    fn from_shards_cancellable(
+    /// Builds an index from a complete set of file shards, checking `cancellation` per shard.
+    pub fn from_shards_cancellable(
         shards: impl IntoIterator<Item: Into<Arc<FileIndexShard>>>,
         cancellation: &WorkspaceScanToken,
     ) -> Result<Self, WorkspaceError> {
         let mut index = Self::empty();
-        for shard in shards {
-            cancellation.checkpoint()?;
-            let shard = shard.into();
-            index.shards.insert(shard.file_id, shard);
-        }
-        index.rebuild_maps_cancellable(cancellation)?;
-        Ok(index)
-    }
-
-    pub fn from_shards_cancellable_with_rules(
-        shards: impl IntoIterator<Item: Into<Arc<FileIndexShard>>>,
-        rules: &RuleSet,
-        cancellation: &WorkspaceScanToken,
-    ) -> Result<Self, WorkspaceError> {
-        let mut index = Self::empty();
-        index.case_sensitive_kinds = rules
-            .model()
-            .symbol_descriptors
-            .iter()
-            .filter(|descriptor| descriptor.case_sensitive)
-            .map(|descriptor| descriptor.kind_id.to_ascii_lowercase())
-            .collect();
         for shard in shards {
             cancellation.checkpoint()?;
             let shard = shard.into();
@@ -830,7 +786,7 @@ impl WorkspaceIndex {
     fn definition_bucket(&self, kind: &str, name: &str) -> &[DefinitionPointer] {
         self.definitions
             .get(kind)
-            .and_then(|by_name| by_name.get(self.lookup_name(kind, name).as_ref()))
+            .and_then(|by_name| by_name.get(Self::lookup_name(name).as_ref()))
             .map_or(&[][..], |bucket| bucket.as_slice())
     }
 
@@ -885,23 +841,12 @@ impl WorkspaceIndex {
             })
     }
 
-    /// Returns the name folding applied by definition lookups for one kind.
-    ///
-    /// Case-sensitive kinds keep their spelling; every other kind folds to lowercase. Public
-    /// so higher layers can precompute membership keys exactly as [`Self::definitions`] does.
+    /// Returns the name folding applied by definition lookups: symbol names are
+    /// case-insensitive and fold to lowercase. Public so higher layers can precompute
+    /// membership keys exactly as [`Self::definitions`] does.
     #[must_use]
-    pub fn definition_name_key<'name>(
-        &self,
-        kind: &str,
-        name: &'name str,
-    ) -> std::borrow::Cow<'name, str> {
-        if self.is_case_sensitive(kind) {
-            std::borrow::Cow::Borrowed(name)
-        } else if name.bytes().any(|byte| byte.is_ascii_uppercase()) {
-            std::borrow::Cow::Owned(name.to_ascii_lowercase())
-        } else {
-            std::borrow::Cow::Borrowed(name)
-        }
+    pub fn definition_name_key<'name>(&self, name: &'name str) -> std::borrow::Cow<'name, str> {
+        Self::lookup_name(name)
     }
 
     /// Iterates over retained definitions of one exact kind without scanning unrelated symbols.
@@ -1033,7 +978,26 @@ impl WorkspaceIndex {
     /// Returns a cached editor position for one indexed byte range, if available.
     #[must_use]
     pub fn position_for(&self, file_id: SourceFileId, range: TextRange) -> Option<PositionRange> {
-        self.position_ranges.get((file_id, range)).copied()
+        self.position_ranges
+            .get((file_id, range))
+            .copied()
+            .or_else(|| {
+                // Definition positions are persisted under the full declaration range,
+                // while navigation targets its name. Reuse that position without
+                // retaining a second entry for every definition in large caches.
+                self.shard(file_id)?
+                    .definitions
+                    .iter()
+                    .find_map(|definition| {
+                        (definition.selection_range == range)
+                            .then(|| {
+                                self.position_ranges
+                                    .get((file_id, definition.range))
+                                    .copied()
+                            })
+                            .flatten()
+                    })
+            })
     }
 
     /// Returns all cached editor positions retained by this index.
@@ -1083,19 +1047,13 @@ impl WorkspaceIndex {
         &mut self,
         file_id: SourceFileId,
         priorities: &BTreeMap<SourceFileId, u64>,
-        rules: &RuleSet,
     ) {
         let affected = self.remove_shard_entries(file_id);
-        let policies = symbol_policies(rules);
-        self.resolve_definition_buckets(&affected, priorities, &policies);
+        self.resolve_definition_buckets(&affected, priorities);
     }
 
-    pub fn resolve_priorities(
-        &mut self,
-        priorities: &BTreeMap<SourceFileId, u64>,
-        rules: &RuleSet,
-    ) {
-        match self.resolve_priorities_cancellable(priorities, rules, &WorkspaceScanToken::new()) {
+    pub fn resolve_priorities(&mut self, priorities: &BTreeMap<SourceFileId, u64>) {
+        match self.resolve_priorities_cancellable(priorities, &WorkspaceScanToken::new()) {
             Ok(()) => {}
             Err(WorkspaceError::Cancelled) => {
                 unreachable!("a fresh workspace scan token cannot be cancelled")
@@ -1107,7 +1065,6 @@ impl WorkspaceIndex {
     pub fn resolve_priorities_cancellable(
         &mut self,
         priorities: &BTreeMap<SourceFileId, u64>,
-        rules: &RuleSet,
         cancellation: &WorkspaceScanToken,
     ) -> Result<(), WorkspaceError> {
         let keys = self
@@ -1117,10 +1074,9 @@ impl WorkspaceIndex {
                 by_name.keys().map(move |name| (kind.clone(), name.clone()))
             })
             .collect::<Vec<_>>();
-        let policies = symbol_policies(rules);
         for key in &keys {
             cancellation.checkpoint()?;
-            self.resolve_definition_buckets(std::slice::from_ref(key), priorities, &policies);
+            self.resolve_definition_buckets(std::slice::from_ref(key), priorities);
         }
         Ok(())
     }
@@ -1129,11 +1085,50 @@ impl WorkspaceIndex {
         &mut self,
         shard: Arc<FileIndexShard>,
         priorities: &BTreeMap<SourceFileId, u64>,
-        rules: &RuleSet,
     ) {
         let affected = self.replace_shard_entries(shard);
-        let policies = symbol_policies(rules);
-        self.resolve_definition_buckets(&affected, priorities, &policies);
+        self.resolve_definition_buckets(&affected, priorities);
+    }
+
+    /// Applies a symbol-fact replay with unchanged file priorities.
+    /// Reference-only changes preserve resolved definition buckets; changed
+    /// symbol facts update only their buckets and rebuild the flag-write view.
+    pub fn replace_replayed_shards_cancellable(
+        &mut self,
+        shards: impl IntoIterator<Item = Arc<FileIndexShard>>,
+        priorities: &BTreeMap<SourceFileId, u64>,
+        cancellation: &WorkspaceScanToken,
+    ) -> Result<(), WorkspaceError> {
+        let mut flags_changed = false;
+        for shard in shards {
+            cancellation.checkpoint()?;
+            let previous = self.shards.get(&shard.file_id);
+            if previous.is_some_and(|previous| Arc::ptr_eq(previous, &shard)) {
+                continue;
+            }
+            flags_changed |=
+                previous.is_none_or(|previous| previous.flag_writes != shard.flag_writes);
+            if previous.is_some_and(|previous| previous.same_symbol_facts(&shard)) {
+                // Definition ordinals and resolved activity remain valid.
+                self.remove_position_ranges(shard.file_id);
+                self.shards.insert(shard.file_id, shard);
+            } else {
+                self.replace_shard_resolved(shard, priorities);
+            }
+        }
+        if flags_changed {
+            self.flag_writes.clear();
+            for shard in self.shards.values() {
+                cancellation.checkpoint()?;
+                for write in &shard.flag_writes {
+                    self.flag_writes
+                        .entry(Box::from(write.kind.to_ascii_lowercase()))
+                        .or_default()
+                        .record(&write.name);
+                }
+            }
+        }
+        Ok(())
     }
 
     fn replace_shard_entries(&mut self, shard: Arc<FileIndexShard>) -> Vec<(Box<str>, Box<str>)> {
@@ -1195,13 +1190,8 @@ impl WorkspaceIndex {
         &mut self,
         keys: &[(Box<str>, Box<str>)],
         priorities: &BTreeMap<SourceFileId, u64>,
-        policies: &BTreeMap<String, SymbolResolutionPolicy>,
     ) {
         for key in keys {
-            let policy = policies
-                .get(&key.0.to_ascii_lowercase())
-                .copied()
-                .unwrap_or(SymbolResolutionPolicy::ReplaceBySymbol);
             let Some(highest) = self
                 .definitions
                 .get(key.0.as_ref())
@@ -1226,12 +1216,9 @@ impl WorkspaceIndex {
                     self.shards
                         .get(&file_id)
                         .and_then(|shard| shard.definitions.get(pointer.ordinal))
-                        .map(|_definition| match policy {
-                            SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique => true,
-                            SymbolResolutionPolicy::ReplaceBySymbol => {
-                                Some(priorities.get(&file_id).copied().unwrap_or(0))
-                                    == Some(highest)
-                            }
+                        .map(|_definition| {
+                            // A higher-priority root's definition shadows lower-priority ones.
+                            priorities.get(&file_id).copied().unwrap_or(0) == highest
                         })
                 })
                 .collect::<Vec<_>>();
@@ -1259,14 +1246,6 @@ impl WorkspaceIndex {
             {
                 values.sort_by_key(|pointer| (!pointer.active, pointer.file_id));
             }
-        }
-    }
-
-    fn rebuild_maps(&mut self) {
-        match self.rebuild_maps_cancellable(&WorkspaceScanToken::new()) {
-            Ok(()) => {}
-            Err(WorkspaceError::Cancelled) => unreachable!("a fresh index rebuild cannot cancel"),
-            Err(_) => unreachable!("index rebuild has no other fallible operation"),
         }
     }
 
@@ -1328,37 +1307,9 @@ impl WorkspaceIndex {
     }
 }
 
-/// Builds the kind -> resolution policy lookup used while resolving definition priorities.
-fn symbol_policies(rules: &RuleSet) -> BTreeMap<String, SymbolResolutionPolicy> {
-    rules
-        .model()
-        .symbol_descriptors
-        .iter()
-        .map(|descriptor| {
-            (
-                descriptor.kind_id.to_ascii_lowercase(),
-                descriptor.resolution,
-            )
-        })
-        .collect()
-}
-
 impl WorkspaceIndex {
-    fn is_case_sensitive(&self, kind: &str) -> bool {
-        // Kinds are stored (and queried) lowercase in practice; borrowing avoids the
-        // per-probe lowercase allocation this membership hot path used to pay.
-        if kind.bytes().any(|byte| byte.is_ascii_uppercase()) {
-            self.case_sensitive_kinds
-                .contains(&kind.to_ascii_lowercase())
-        } else {
-            self.case_sensitive_kinds.contains(kind)
-        }
-    }
-
-    fn lookup_name<'name>(&self, kind: &str, name: &'name str) -> std::borrow::Cow<'name, str> {
-        if self.is_case_sensitive(kind) {
-            std::borrow::Cow::Borrowed(name)
-        } else if name.bytes().any(|byte| byte.is_ascii_uppercase()) {
+    fn lookup_name(name: &str) -> std::borrow::Cow<'_, str> {
+        if name.bytes().any(|byte| byte.is_ascii_uppercase()) {
             std::borrow::Cow::Owned(name.to_ascii_lowercase())
         } else {
             std::borrow::Cow::Borrowed(name)
@@ -1366,7 +1317,7 @@ impl WorkspaceIndex {
     }
 
     fn definition_key(&self, definition: &Definition) -> (Box<str>, Box<str>) {
-        let folded = self.lookup_name(&definition.kind, &definition.name);
+        let folded = Self::lookup_name(&definition.name);
         (
             Box::from(definition.kind.as_ref()),
             Box::from(folded.as_ref()),

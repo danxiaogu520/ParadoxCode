@@ -1,0 +1,12 @@
+{
+  "schemas": {
+    "sprite_type_body": {
+      "fields": {
+        "severity": {
+          "card": "0..1",
+          "value": "'warning'"
+        }
+      }
+    }
+  }
+}

@@ -34,6 +34,8 @@ pub struct FileState {
     pub source: Arc<str>,
     pub parsed: Option<ParsedSource>,
     pub hir: Option<Arc<HirFile>>,
+    /// Retained after frontend eviction so pure local lowering can skip replay.
+    pub symbol_facts_dependency: bool,
     pub shard: Arc<FileIndexShard>,
     pub cached_localisation_previews: Option<Arc<Vec<(TextRange, LocalisationPreview)>>>,
 }
@@ -105,6 +107,7 @@ impl FileState {
             source: self.source,
             parsed: None,
             hir: None,
+            symbol_facts_dependency: self.symbol_facts_dependency,
             shard: self.shard,
             cached_localisation_previews,
         }
@@ -127,6 +130,7 @@ impl FileState {
             source: Arc::clone(&self.source),
             parsed: None,
             hir: None,
+            symbol_facts_dependency: self.symbol_facts_dependency,
             shard: Arc::clone(&self.shard),
             cached_localisation_previews,
         }
@@ -155,6 +159,7 @@ impl FileState {
             source: Arc::clone(&self.source),
             parsed: None,
             hir: None,
+            symbol_facts_dependency: self.symbol_facts_dependency,
             shard: Arc::clone(&self.shard),
             cached_localisation_previews: self.cached_localisation_previews.clone(),
         })

@@ -5,7 +5,7 @@
 //! tokens, HIR collections, index shards, cached positions and previews) so
 //! memory work targets the real hot spot. Not part of any test gate.
 //!
-//! Usage: `cargo run --release -p engine --example mem_probe -- <mod root>`
+//! Usage: `cargo run --release -p engine --example mem_probe -- <mod root> [--rules-only]`
 
 use std::mem::size_of;
 use std::path::Path;
@@ -45,9 +45,22 @@ fn main() {
         .expect("canonicalize root");
     let started = Instant::now();
 
-    let rules = game::eu4::first_party_rules().expect("rules");
-    let profile = game::eu4::profile();
-    let mut host = AnalysisHost::with_profile(rules, profile);
+    let ir_started = Instant::now();
+    let ir = game::eu4::first_party_ir().expect("rules IR");
+    println!(
+        "rules IR: {:.1}ms; {} schemas / {} fields / {} matchers",
+        ir_started.elapsed().as_secs_f64() * 1000.0,
+        ir.schemas.len(),
+        ir.fields.len(),
+        ir.matchers.len()
+    );
+    // Rules-only mode isolates cold IR load time and retained arena memory.
+    if std::env::args().any(|argument| argument == "--rules-only") {
+        return;
+    }
+    let rules = rules::RuleSet::from_ir_catalog(&ir);
+    let profile = ir.game.profile.clone();
+    let mut host = AnalysisHost::with_ir(rules, profile, Arc::clone(&ir));
     // Mirrors the LSP: the Project takes root id u32::MAX and the vanilla
     // index cache installs its own root at id 0 before the first scan.
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -72,6 +85,7 @@ fn main() {
     host.refresh_source_roots().expect("scan");
     let scan_seconds = started.elapsed().as_secs_f64();
     println!("vanilla cache installed: {vanilla_installed}");
+    phase_rss("index-retained");
 
     let snapshot = host.snapshot();
     let mut source_bytes = 0usize;
@@ -284,81 +298,21 @@ fn main() {
         );
     }
 
-    // Rules database: SemanticRule structs plus their (un-interned) strings,
-    // and the raw normalized records that hover-only fallback keys consume.
+    // Runtime IR: shared arenas and interned strings. Nested vectors/map
+    // allocations are excluded from this lower-bound estimate.
     {
-        let rules = snapshot.rules();
-        let mut rule_entries = 0usize;
-        let mut rule_string_bytes = 0usize;
-        let mut rule_vec_elements = 0usize;
-        fn add_str(total: &mut usize, value: &str) {
-            *total += value.len() + 16;
-        }
-        for rule in rules.semantic_rules() {
-            rule_entries += 1;
-            add_str(&mut rule_string_bytes, &rule.id);
-            add_str(&mut rule_string_bytes, &rule.context);
-            for segment in &rule.parent_path {
-                add_str(&mut rule_string_bytes, segment);
-                rule_vec_elements += 1;
-            }
-            if let rules::KeyMatcher::Exact(key) | rules::KeyMatcher::Enum(key) = &rule.key {
-                add_str(&mut rule_string_bytes, key);
-            }
-            if let Some(operator) = &rule.operator {
-                add_str(&mut rule_string_bytes, operator);
-            }
-            if let Some(child) = &rule.child_context {
-                add_str(&mut rule_string_bytes, child);
-            }
-            if let Some(alternative) = &rule.alternative_id {
-                add_str(&mut rule_string_bytes, alternative);
-            }
-            for line in &rule.documentation {
-                add_str(&mut rule_string_bytes, line);
-                rule_vec_elements += 1;
-            }
-            for scope in &rule.allowed_scopes {
-                add_str(&mut rule_string_bytes, scope);
-                rule_vec_elements += 1;
-            }
-            if let Some(push) = &rule.push_scope {
-                add_str(&mut rule_string_bytes, push);
-            }
-            for (register, scope) in &rule.replace_scope {
-                add_str(&mut rule_string_bytes, register);
-                add_str(&mut rule_string_bytes, scope);
-                rule_vec_elements += 2;
-            }
-        }
+        let ir = snapshot.ir();
+        let arena_bytes = ir.schemas.len() * size_of::<rules::ir::Schema>()
+            + ir.fields.len() * size_of::<rules::ir::Field>()
+            + ir.matchers.len() * size_of::<rules::ir::Matcher>()
+            + ir.types.len() * size_of::<rules::ir::TypeInfo>()
+            + ir.traits.len() * size_of::<rules::ir::TraitInfo>();
+        let string_bytes: usize = ir.strings().iter().map(|(_, value)| value.len()).sum();
         println!(
-            "semantic rules: {rule_entries} x {}B = {:.0} MiB structs; strings {:.0} MiB; vec headers ~{:.0} MiB",
-            std::mem::size_of::<rules::SemanticRule>(),
-            mib((rule_entries * std::mem::size_of::<rules::SemanticRule>()) as f64),
-            mib(rule_string_bytes as f64),
-            mib((rule_vec_elements * std::mem::size_of::<String>()) as f64),
-        );
-        let model = rules.model();
-        let record_struct_bytes = model.records.len() * std::mem::size_of::<rules::RuleRecord>();
-        let mut record_field_count = 0usize;
-        let mut record_string_bytes = 0usize;
-        for record in &model.records {
-            add_str(&mut record_string_bytes, &record.table);
-            add_str(&mut record_string_bytes, &record.logical_id);
-            for (key, value) in &record.fields {
-                record_field_count += 1;
-                add_str(&mut record_string_bytes, key);
-                add_str(&mut record_string_bytes, value);
-            }
-        }
-        println!(
-            "records: {} x {}B = {:.0} MiB structs; {} fields = {:.0} MiB nodes; strings {:.0} MiB",
-            model.records.len(),
-            std::mem::size_of::<rules::RuleRecord>(),
-            mib(record_struct_bytes as f64),
-            record_field_count,
-            mib((record_field_count * 80) as f64),
-            mib(record_string_bytes as f64),
+            "rules IR: arenas ≥{:.2} MiB; interned strings {:.2} MiB; fingerprint {}",
+            mib(arena_bytes as f64),
+            mib(string_bytes as f64),
+            snapshot.ir_fingerprint(),
         );
     }
 
@@ -392,11 +346,12 @@ fn main() {
         let parsed = Arc::new(parser::parse(format, &source));
         parse_ns += started.elapsed().as_nanos();
         let started = std::time::Instant::now();
-        let hir = hir::lower_with_profile(
-            (*parsed).clone(),
+        let hir = hir::lower_shared_with_ir(
+            Arc::clone(&parsed),
             logical,
             snapshot.rules(),
             snapshot.game_profile(),
+            snapshot.ir(),
         );
         lower_ns += started.elapsed().as_nanos();
         phase_files += 1;
@@ -406,6 +361,7 @@ fn main() {
     println!("read:  {:.1}s", read_ns as f64 / 1e9);
     println!("parse: {:.1}s", parse_ns as f64 / 1e9);
     println!("lower: {:.1}s", lower_ns as f64 / 1e9);
+    phase_rss("lower-retained");
 
     // Diagnostics pass timing (single thread) for optimization feedback. The
     // digest hashes every diagnostic (code, range, severity, certainty,
@@ -494,8 +450,9 @@ fn main() {
     phase_rss("evicted");
 
     // Ablation: drop the entire host (index, shards, positions, sources,
-    // rules). Anything the working set keeps afterwards is allocator
-    // retention from the scan's transient frontends, not live data.
+    // rules). Remaining RSS may include allocator-retained pages, separately
+    // shared handles or thread-local query views; RSS alone does not prove
+    // that all of it is allocator fragmentation.
     drop(host);
     phase_rss("dropped");
     phase_rss("end");

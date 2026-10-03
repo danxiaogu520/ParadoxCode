@@ -1,0 +1,695 @@
+{
+  "schemas": {
+    "mercenary_company_body": {
+      "fields": {
+        "artillery_fire": {
+          "body": "mercenary_company_body__artillery_fire",
+          "card": "0..1"
+        },
+        "artillery_power": {
+          "body": "mercenary_company_body__artillery_power",
+          "card": "0..1"
+        },
+        "artillery_shock": {
+          "body": "mercenary_company_body__artillery_shock",
+          "card": "0..1"
+        },
+        "artillery_weight": {
+          "card": "0..1",
+          "value": "float[0.0..1.0]"
+        },
+        "cavalry_cap": {
+          "card": "0..1",
+          "value": "int"
+        },
+        "cavalry_fire": {
+          "body": "mercenary_company_body__cavalry_fire",
+          "card": "0..1"
+        },
+        "cavalry_flanking": {
+          "body": "mercenary_company_body__cavalry_flanking",
+          "card": "0..1"
+        },
+        "cavalry_power": {
+          "body": "mercenary_company_body__cavalry_power",
+          "card": "0..1"
+        },
+        "cavalry_shock": {
+          "body": "mercenary_company_body__cavalry_shock",
+          "card": "0..1"
+        },
+        "cavalry_weight": {
+          "card": "0..1",
+          "value": "float[0.0..1.0]"
+        },
+        "cost_modifier": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "counts_towards_force_limit": {
+          "card": "0..1",
+          "doc": "If mercenary company counts toward force limit",
+          "value": "'no'"
+        },
+        "discipline": {
+          "body": "mercenary_company_body__discipline",
+          "card": "0..1"
+        },
+        "fire_damage": {
+          "body": "mercenary_company_body__fire_damage",
+          "card": "0..1"
+        },
+        "fire_damage_received": {
+          "body": "mercenary_company_body__fire_damage_received",
+          "card": "0..1"
+        },
+        "home_province": {
+          "card": "0..1",
+          "doc": "No home province means local mercenary company",
+          "value": "ref<province_id>"
+        },
+        "infantry_fire": {
+          "body": "mercenary_company_body__infantry_fire",
+          "card": "0..1"
+        },
+        "infantry_power": {
+          "body": "mercenary_company_body__infantry_power",
+          "card": "0..1"
+        },
+        "infantry_shock": {
+          "body": "mercenary_company_body__infantry_shock",
+          "card": "0..1"
+        },
+        "land_attrition": {
+          "body": "mercenary_company_body__land_attrition",
+          "card": "0..1"
+        },
+        "land_morale": {
+          "body": "mercenary_company_body__land_morale",
+          "card": "0..1"
+        },
+        "manpower_pool": {
+          "card": "0..1",
+          "doc": "Starting manpower pool",
+          "value": "int[1..]"
+        },
+        "max_size": {
+          "card": "0..1",
+          "doc": "Maximum size of the mercenary army",
+          "value": "int[1..]"
+        },
+        "mercenary_desc_key": {
+          "card": "0..1",
+          "value": "loc"
+        },
+        "min_size": {
+          "card": "0..1",
+          "doc": "Minimum size of the mercenary army",
+          "value": "int[1..]"
+        },
+        "modifier": {
+          "body": "mercenary_company_body__modifier",
+          "card": "0..1",
+          "doc": "Block of modifiers applied while the containing entry is active."
+        },
+        "movement_speed": {
+          "body": "mercenary_company_body__movement_speed",
+          "card": "0..1"
+        },
+        "no_additional_manpower_from_max_size": {
+          "card": "0..1",
+          "doc": "If extra manpower from company being above max_size is trasfered to company's manpower pool",
+          "value": "'yes'"
+        },
+        "prestige_from_land": {
+          "body": "mercenary_company_body__prestige_from_land",
+          "card": "0..1"
+        },
+        "regiments_per_development": {
+          "card": "0..1",
+          "value": "float"
+        },
+        "reinforce_speed": {
+          "body": "mercenary_company_body__reinforce_speed",
+          "card": "0..1"
+        },
+        "shock_damage": {
+          "body": "mercenary_company_body__shock_damage",
+          "card": "0..1"
+        },
+        "shock_damage_received": {
+          "body": "mercenary_company_body__shock_damage_received",
+          "card": "0..1"
+        },
+        "sprites": {
+          "card": "0..1",
+          "list": "scalar"
+        },
+        "trigger": {
+          "body": "trigger",
+          "card": "0..1",
+          "doc": "Default: Always = yes",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        }
+      }
+    },
+    "mercenary_company_body__artillery_fire": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "sub_unit": {
+          "card": "1",
+          "value": "'artillery'"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__artillery_power": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "sub_unit": {
+          "card": "1",
+          "value": "'artillery'"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__artillery_shock": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "sub_unit": {
+          "card": "1",
+          "value": "'artillery'"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__cavalry_fire": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "sub_unit": {
+          "card": "1",
+          "value": "'cavalry'"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__cavalry_flanking": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "sub_unit": {
+          "card": "1",
+          "value": "'cavalry'"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__cavalry_power": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "sub_unit": {
+          "card": "1",
+          "value": "'cavalry'"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__cavalry_shock": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "sub_unit": {
+          "card": "1",
+          "value": "'cavalry'"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__discipline": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__fire_damage": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__fire_damage_received": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__infantry_fire": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "sub_unit": {
+          "card": "1",
+          "value": "'infantry'"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__infantry_power": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "sub_unit": {
+          "card": "1",
+          "value": "'infantry'"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__infantry_shock": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "sub_unit": {
+          "card": "1",
+          "value": "'infantry'"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__land_attrition": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__land_morale": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__modifier": {
+      "fields": {
+        "may_recruit_female_generals": {
+          "card": "0..1",
+          "override": true,
+          "value": "'yes'"
+        }
+      },
+      "include": [
+        "keys__modifier"
+      ],
+      "patterns": [
+        {
+          "card": "0..*",
+          "doc": "Modifies the monthly gain of power for this mechanic power",
+          "key": "'monthly_{ref<government_mechanic_power>}'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the influence of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_influence_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the loyalty of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_loyalty_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the number of privilege slots of the specified estate.",
+          "key": "'{ref<estate strip_prefix estate_>}_privilege_slots'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Adds to the monthly rate of faction influence; generated for all factions in common/factions.",
+          "key": "'{ref<faction>}_influence'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..*",
+          "doc": "Modifies the gain from the add_government_power effect",
+          "key": "'{ref<government_mechanic_power>}_gain_modifier'",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        },
+        {
+          "card": "0..1",
+          "key": "ref<estate_modifier>",
+          "scope": {
+            "in": [
+              "country"
+            ]
+          },
+          "value": "float"
+        }
+      ]
+    },
+    "mercenary_company_body__movement_speed": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__prestige_from_land": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__reinforce_speed": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__shock_damage": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__shock_damage_received": {
+      "fields": {
+        "cost_modifier": {
+          "card": "1",
+          "value": "float"
+        },
+        "max": {
+          "card": "1",
+          "value": "float"
+        },
+        "min": {
+          "card": "1",
+          "value": "float"
+        },
+        "weight": {
+          "card": "1",
+          "value": "float"
+        }
+      }
+    },
+    "mercenary_company_body__sprites": {
+      "items": "scalar"
+    }
+  }
+}

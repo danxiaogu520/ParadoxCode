@@ -1,7 +1,7 @@
 use std::fs;
 use std::io::Cursor;
 
-use rules::{RuleSet, RulesError, RulesModel};
+use rules::{RuleSet, RulesError};
 use serde_json::{Value, json};
 use text::TextRange;
 
@@ -209,10 +209,11 @@ fn windows_file_uri_normalizes_verbatim_unc_paths() {
 
 #[test]
 fn selected_game_rejects_a_mismatched_rules_artifact() {
-    let rules = RuleSet::from_model(RulesModel {
-        game_id: "another-game".to_owned(),
-        ..RulesModel::default()
-    });
+    let rules = RuleSet::from_catalog(
+        "another-game".to_owned(),
+        Vec::new(),
+        rules::GameProfile::empty("another-game"),
+    );
 
     let error = LspServer::try_new_with_rules(InitializeOptions, rules, game::eu4::profile())
         .expect_err("mismatched game must be rejected");

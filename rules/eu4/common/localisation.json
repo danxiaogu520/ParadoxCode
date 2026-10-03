@@ -1,0 +1,541 @@
+{
+  "schemas": {
+    "localisation_commands_body": {
+      "fields": {
+        "GetAdjective": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetAdjectiveCap": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetAdm": {
+          "card": "1",
+          "value": "'monarch'"
+        },
+        "GetAreaName": {
+          "card": "1",
+          "value": "'province'"
+        },
+        "GetArmyName": {
+          "card": "1",
+          "value": "'rebel_faction'"
+        },
+        "GetBrahminsName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetBurghersName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetCachedAgendasFlavorText": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetCapitalName": {
+          "card": "1",
+          "value": "'province'"
+        },
+        "GetClergyName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetColonialRegionName": {
+          "card": "1",
+          "value": "'province'"
+        },
+        "GetContinentName": {
+          "card": "1",
+          "value": "'province'"
+        },
+        "GetCossacksName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetCountryModifiers": {
+          "card": "1",
+          "value": "'religion'"
+        },
+        "GetCult": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetCultureGroupName": {
+          "card": "1",
+          "value": "'Variable'"
+        },
+        "GetCultureName": {
+          "card": "1",
+          "value": "'Variable'"
+        },
+        "GetDate": {
+          "card": "1",
+          "value": "'any'"
+        },
+        "GetDateText": {
+          "card": "1",
+          "value": "'any'"
+        },
+        "GetDaughterSon": {
+          "body": "localisation_commands_body__getdaughterson",
+          "card": "1"
+        },
+        "GetDhimmiName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetDip": {
+          "card": "1",
+          "value": "'monarch'"
+        },
+        "GetEunuchsName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetFlagshipName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetGhilmanName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetGroupName": {
+          "body": "localisation_commands_body__getgroupname",
+          "card": "1"
+        },
+        "GetHerHim": {
+          "body": "localisation_commands_body__getherhim",
+          "card": "1"
+        },
+        "GetHerHimCap": {
+          "body": "localisation_commands_body__getherhimcap",
+          "card": "1"
+        },
+        "GetHerHis": {
+          "body": "localisation_commands_body__getherhis",
+          "card": "1"
+        },
+        "GetHerHisCap": {
+          "body": "localisation_commands_body__getherhiscap",
+          "card": "1"
+        },
+        "GetHersHis": {
+          "body": "localisation_commands_body__gethershis",
+          "card": "1"
+        },
+        "GetHersHisCap": {
+          "body": "localisation_commands_body__gethershiscap",
+          "card": "1"
+        },
+        "GetHerselfHimself": {
+          "body": "localisation_commands_body__getherselfhimself",
+          "card": "1"
+        },
+        "GetHerselfHimselfCap": {
+          "body": "localisation_commands_body__getherselfhimselfcap",
+          "card": "1"
+        },
+        "GetJainsName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetJanissariesName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetLeaderName": {
+          "card": "1",
+          "value": "'rebel_faction'"
+        },
+        "GetLostFlagshipName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetMarathasName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetMil": {
+          "card": "1",
+          "value": "'monarch'"
+        },
+        "GetMonth": {
+          "card": "1",
+          "value": "'any'"
+        },
+        "GetMotherFather": {
+          "body": "localisation_commands_body__getmotherfather",
+          "card": "1"
+        },
+        "GetName": {
+          "card": "1",
+          "value": "'any' | 'Variable'"
+        },
+        "GetNobilityName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetParliamentName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetParliamentWithGrammer": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetProvinceModifiers": {
+          "card": "1",
+          "value": "'religion'"
+        },
+        "GetQizilbashName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetRajputsName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetRandomShipName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetRegion": {
+          "card": "1",
+          "list": "'trade_company'"
+        },
+        "GetRegionName": {
+          "card": "1",
+          "value": "'province'"
+        },
+        "GetReligionGroupName": {
+          "card": "1",
+          "value": "'Variable'"
+        },
+        "GetReligionName": {
+          "card": "1",
+          "value": "'Variable'"
+        },
+        "GetReligiousSchool": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetReligiousSchoolCountryModifiers": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetSheHe": {
+          "body": "localisation_commands_body__getshehe",
+          "card": "1"
+        },
+        "GetSheHeCap": {
+          "body": "localisation_commands_body__getshehecap",
+          "card": "1"
+        },
+        "GetSisterBrother": {
+          "body": "localisation_commands_body__getsisterbrother",
+          "card": "1"
+        },
+        "GetStats": {
+          "body": "localisation_commands_body__getstats",
+          "card": "1"
+        },
+        "GetSuperRegionName": {
+          "card": "1",
+          "value": "'province'"
+        },
+        "GetTag": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetTitle": {
+          "body": "localisation_commands_body__gettitle",
+          "card": "1"
+        },
+        "GetTradeGoodsName": {
+          "card": "1",
+          "value": "'province'"
+        },
+        "GetTradeNodeName": {
+          "card": "1",
+          "value": "'province'"
+        },
+        "GetTribesName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetVaishyasName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "GetValue": {
+          "card": "1",
+          "value": "'variable'"
+        },
+        "GetWifeHusband": {
+          "body": "localisation_commands_body__getwifehusband",
+          "card": "1"
+        },
+        "GetWomanMan": {
+          "body": "localisation_commands_body__getwomanman",
+          "card": "1"
+        },
+        "GetYear": {
+          "card": "1",
+          "value": "'any'"
+        },
+        "GovernmentName": {
+          "card": "1",
+          "value": "'country'"
+        },
+        "Leader": {
+          "card": "1",
+          "value": "'unit'"
+        },
+        "Location": {
+          "card": "1",
+          "value": "'unit'"
+        },
+        "NativeCulture": {
+          "card": "1",
+          "value": "'province'"
+        },
+        "OriginalReligion": {
+          "card": "1",
+          "value": "'province'"
+        }
+      },
+      "patterns": [
+        {
+          "card": "1",
+          "key": "enum<defined_text_commands>",
+          "value": "'any'"
+        }
+      ]
+    },
+    "localisation_commands_body__getdaughterson": {
+      "fields": {
+        "consort": {
+          "card": "1",
+          "value": "'advisor'"
+        },
+        "monarch": {
+          "card": "1",
+          "value": "'heir'"
+        }
+      }
+    },
+    "localisation_commands_body__getgroupname": {
+      "fields": {
+        "religion": {
+          "card": "1",
+          "value": "'culture'"
+        }
+      }
+    },
+    "localisation_commands_body__getherhim": {
+      "fields": {
+        "consort": {
+          "card": "1",
+          "value": "'advisor'"
+        },
+        "monarch": {
+          "card": "1",
+          "value": "'heir'"
+        }
+      },
+      "items": "'leader'"
+    },
+    "localisation_commands_body__getherhimcap": {
+      "fields": {
+        "consort": {
+          "card": "1",
+          "value": "'advisor'"
+        },
+        "monarch": {
+          "card": "1",
+          "value": "'heir'"
+        }
+      },
+      "items": "'leader'"
+    },
+    "localisation_commands_body__getherhis": {
+      "fields": {
+        "consort": {
+          "card": "1",
+          "value": "'advisor'"
+        },
+        "monarch": {
+          "card": "1",
+          "value": "'heir'"
+        }
+      },
+      "items": "'leader'"
+    },
+    "localisation_commands_body__getherhiscap": {
+      "fields": {
+        "consort": {
+          "card": "1",
+          "value": "'advisor'"
+        },
+        "monarch": {
+          "card": "1",
+          "value": "'heir'"
+        }
+      },
+      "items": "'leader'"
+    },
+    "localisation_commands_body__getherselfhimself": {
+      "fields": {
+        "consort": {
+          "card": "1",
+          "value": "'advisor'"
+        },
+        "monarch": {
+          "card": "1",
+          "value": "'heir'"
+        }
+      },
+      "items": "'leader'"
+    },
+    "localisation_commands_body__getherselfhimselfcap": {
+      "fields": {
+        "consort": {
+          "card": "1",
+          "value": "'advisor'"
+        },
+        "monarch": {
+          "card": "1",
+          "value": "'heir'"
+        }
+      },
+      "items": "'leader'"
+    },
+    "localisation_commands_body__gethershis": {
+      "fields": {
+        "consort": {
+          "card": "1",
+          "value": "'advisor'"
+        },
+        "monarch": {
+          "card": "1",
+          "value": "'heir'"
+        }
+      },
+      "items": "'leader'"
+    },
+    "localisation_commands_body__gethershiscap": {
+      "fields": {
+        "consort": {
+          "card": "1",
+          "value": "'advisor'"
+        },
+        "monarch": {
+          "card": "1",
+          "value": "'heir'"
+        }
+      },
+      "items": "'leader'"
+    },
+    "localisation_commands_body__getmotherfather": {
+      "fields": {
+        "consort": {
+          "card": "1",
+          "value": "'advisor'"
+        },
+        "monarch": {
+          "card": "1",
+          "value": "'heir'"
+        }
+      }
+    },
+    "localisation_commands_body__getregion": {
+      "items": "'trade_company'"
+    },
+    "localisation_commands_body__getshehe": {
+      "fields": {
+        "consort": {
+          "card": "1",
+          "value": "'advisor'"
+        },
+        "monarch": {
+          "card": "1",
+          "value": "'heir'"
+        }
+      },
+      "items": "'leader'"
+    },
+    "localisation_commands_body__getshehecap": {
+      "fields": {
+        "consort": {
+          "card": "1",
+          "value": "'advisor'"
+        },
+        "monarch": {
+          "card": "1",
+          "value": "'heir'"
+        }
+      },
+      "items": "'leader'"
+    },
+    "localisation_commands_body__getsisterbrother": {
+      "fields": {
+        "consort": {
+          "card": "1",
+          "value": "'advisor'"
+        },
+        "monarch": {
+          "card": "1",
+          "value": "'heir'"
+        }
+      }
+    },
+    "localisation_commands_body__getstats": {
+      "fields": {
+        "monarch": {
+          "card": "1",
+          "value": "'advisor'"
+        }
+      }
+    },
+    "localisation_commands_body__gettitle": {
+      "fields": {
+        "consort": {
+          "card": "1",
+          "value": "'advisor'"
+        },
+        "monarch": {
+          "card": "1",
+          "value": "'heir'"
+        }
+      }
+    },
+    "localisation_commands_body__getwifehusband": {
+      "fields": {
+        "consort": {
+          "card": "1",
+          "value": "'advisor'"
+        },
+        "monarch": {
+          "card": "1",
+          "value": "'heir'"
+        }
+      }
+    },
+    "localisation_commands_body__getwomanman": {
+      "fields": {
+        "consort": {
+          "card": "1",
+          "value": "'advisor'"
+        },
+        "monarch": {
+          "card": "1",
+          "value": "'heir'"
+        }
+      },
+      "items": "'leader'"
+    }
+  }
+}

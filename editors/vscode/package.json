@@ -1377,10 +1377,10 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "check": "npm run compile && node scripts/smoke.mjs && node scripts/assets-test.mjs && node scripts/locformat-test.mjs && node scripts/i18n-test.mjs",
-    "test:ci": "npm run compile && node scripts/smoke.mjs && node scripts/assets-test.mjs && node scripts/locformat-test.mjs && node scripts/i18n-test.mjs && node scripts/extension.mjs && node scripts/package.mjs && npm run test:package",
+    "check": "npm run compile && node scripts/smoke.mjs && node scripts/assets-test.mjs && node scripts/locformat-test.mjs && node scripts/i18n-test.mjs && node scripts/audit-test.mjs",
+    "test:ci": "npm run compile && node scripts/smoke.mjs && node scripts/assets-test.mjs && node scripts/locformat-test.mjs && node scripts/i18n-test.mjs && node scripts/audit-test.mjs && node scripts/extension.mjs && node scripts/package.mjs && npm run test:package",
     "vscode:prepublish": "npm run compile",
-    "test:contract": "npm run compile && node scripts/assets-test.mjs && node scripts/extension.mjs && node scripts/package.mjs && node scripts/i18n-test.mjs",
+    "test:contract": "npm run compile && node scripts/assets-test.mjs && node scripts/extension.mjs && node scripts/package.mjs && node scripts/i18n-test.mjs && node scripts/audit-test.mjs",
     "test:package": "vsce package --out ../../target/paradoxcode-vscode-contract.vsix",
     "test:host": "npm run compile && node scripts/host.mjs",
     "diagnose": "node scripts/diagnose.mjs",
@@ -1388,6 +1388,7 @@
     "package": "npm run compile && vsce package",
     "perf:probe": "node scripts/probe.mjs",
     "sweep": "node scripts/sweep.mjs",
+    "baseline": "node scripts/baseline.mjs",
     "mcp": "node scripts/mcp.mjs"
   },
   "dependencies": {

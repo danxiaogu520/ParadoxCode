@@ -1,0 +1,12 @@
+{
+  "schemas": {
+    "power_projection_modifier_type_body": {
+      "fields": {
+        "power": {
+          "card": "1",
+          "value": "float[0.1..] | float[-1000.0..-0.1]"
+        }
+      }
+    }
+  }
+}

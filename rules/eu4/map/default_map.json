@@ -1,0 +1,148 @@
+{
+  "schemas": {
+    "default_map_body": {
+      "fields": {
+        "adjacencies": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "ambient_object": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "area": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "canal_definition": {
+          "body": "default_map_body__canal_definition",
+          "card": "0..*"
+        },
+        "climate": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "continent": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "definitions": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "force_coastal": {
+          "card": "1",
+          "list": "ref<province_id>"
+        },
+        "height": {
+          "card": "1",
+          "value": "int"
+        },
+        "heightmap": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "lakes": {
+          "card": "1",
+          "list": "ref<province_id>"
+        },
+        "max_provinces": {
+          "card": "1",
+          "doc": "There is an unknown minimum number required due to a paradox bug. If a custom map is crashing try a higher number.",
+          "value": "int[2300..]"
+        },
+        "only_used_for_random": {
+          "card": "1",
+          "list": "ref<province_id>"
+        },
+        "positions": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "provincegroup": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "provinces": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "region": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "rivers": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "sea_starts": {
+          "card": "1",
+          "list": "ref<province_id>"
+        },
+        "seasons": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "superregion": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "terrain": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "terrain_definition": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "trade_winds": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "tree": {
+          "card": "1",
+          "list": "int[0..]"
+        },
+        "tree_definition": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "width": {
+          "card": "1",
+          "value": "int"
+        }
+      }
+    },
+    "default_map_body__canal_definition": {
+      "fields": {
+        "name": {
+          "card": "1",
+          "value": "scalar"
+        },
+        "x": {
+          "card": "1",
+          "value": "int"
+        },
+        "y": {
+          "card": "1",
+          "value": "int"
+        }
+      }
+    },
+    "default_map_body__force_coastal": {
+      "items": "ref<province_id>"
+    },
+    "default_map_body__lakes": {
+      "items": "ref<province_id>"
+    },
+    "default_map_body__only_used_for_random": {
+      "items": "ref<province_id>"
+    },
+    "default_map_body__sea_starts": {
+      "items": "ref<province_id>"
+    },
+    "default_map_body__tree": {
+      "items": "int[0..]"
+    }
+  }
+}

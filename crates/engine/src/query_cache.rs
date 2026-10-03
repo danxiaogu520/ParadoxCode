@@ -11,7 +11,7 @@
 //! revisions are discarded as soon as a newer revision is observed; an old worker that finishes
 //! later cannot repopulate the cache with stale data.
 //!
-//! Entries live in one of three invalidation domains, each tracking its own revision.
+//! Entries use three invalidation lineages, each tracking its own revision.
 //! Document edits used to clear the whole cache, so every keystroke discarded
 //! workspace-scale indexes (member-name lists, the localisation key index) and rebuilt them
 //! from scratch. Index-domain entries now survive document revisions: an entry built from
@@ -41,6 +41,9 @@ pub enum CacheDomain {
     Index,
     /// Derived from open overlay documents; invalidated by every document edit.
     Documents,
+    /// Heavy parsed/lowered frontends, sharing document invalidation but a
+    /// separate small capacity so workspace sweeps do not retain every HIR.
+    Frontends,
     /// Derived from the dynamic-definition set (index plus declaring overlays);
     /// invalidated when a declaring document commits or the index advances.
     Definitions,
@@ -81,6 +84,7 @@ struct CacheState {
     definitions_revision: Option<u64>,
     index: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
     documents: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
+    frontends: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
     definitions: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
 }
 
@@ -89,6 +93,7 @@ impl CacheState {
         match domain {
             CacheDomain::Index => &mut self.index,
             CacheDomain::Documents => &mut self.documents,
+            CacheDomain::Frontends => &mut self.frontends,
             CacheDomain::Definitions => &mut self.definitions,
         }
     }
@@ -111,6 +116,7 @@ impl SnapshotQueryCache {
                 definitions_revision: None,
                 index: FxHashMap::default(),
                 documents: FxHashMap::default(),
+                frontends: FxHashMap::default(),
                 definitions: FxHashMap::default(),
             }),
             capacity,
@@ -153,6 +159,11 @@ impl SnapshotQueryCache {
         {
             return Arc::clone(value).downcast::<T>().ok();
         }
+        if state.documents_revision == Some(revision)
+            && let Some(value) = state.frontends.get(key)
+        {
+            return Arc::clone(value).downcast::<T>().ok();
+        }
         if state
             .definitions_revision
             .is_some_and(|current| revision >= current)
@@ -187,10 +198,11 @@ impl SnapshotQueryCache {
     ) {
         let mut state = self.write();
         match domain {
-            CacheDomain::Documents => match state.documents_revision {
+            CacheDomain::Documents | CacheDomain::Frontends => match state.documents_revision {
                 Some(current) if revision < current => return,
                 Some(current) if revision > current => {
                     state.documents.clear();
+                    state.frontends.clear();
                     state.documents_revision = Some(revision);
                 }
                 None => state.documents_revision = Some(revision),
@@ -214,8 +226,12 @@ impl SnapshotQueryCache {
                 None => state.definitions_revision = Some(revision),
             },
         }
+        let capacity = match domain {
+            CacheDomain::Frontends => self.capacity.min(32),
+            _ => self.capacity,
+        };
         let entries = state.map(domain);
-        if entries.len() >= self.capacity && !entries.contains_key(key.as_str()) {
+        if entries.len() >= capacity && !entries.contains_key(key.as_str()) {
             entries.clear();
         }
         entries
@@ -245,6 +261,7 @@ impl SnapshotQueryCache {
             .is_none_or(|current| revision > current)
         {
             state.documents.clear();
+            state.frontends.clear();
             state.documents_revision = Some(revision);
         }
     }
@@ -261,6 +278,7 @@ impl SnapshotQueryCache {
             .is_none_or(|current| revision > current)
         {
             state.documents.clear();
+            state.frontends.clear();
             state.documents_revision = Some(revision);
         }
     }
@@ -295,7 +313,7 @@ impl SnapshotQueryCache {
             .expect("snapshot query cache lock poisoned");
         let watermark = match domain {
             CacheDomain::Index => state.index_revision,
-            CacheDomain::Documents => state.documents_revision,
+            CacheDomain::Documents | CacheDomain::Frontends => state.documents_revision,
             CacheDomain::Definitions => state.definitions_revision,
         };
         watermark.is_some_and(|current| revision < current)
@@ -308,7 +326,7 @@ impl SnapshotQueryCache {
             .state
             .read()
             .expect("snapshot query cache lock poisoned");
-        state.index.len() + state.documents.len() + state.definitions.len()
+        state.index.len() + state.documents.len() + state.frontends.len() + state.definitions.len()
     }
 
     /// Returns whether the cache holds no entries.
@@ -337,6 +355,49 @@ impl fmt::Debug for SnapshotQueryCache {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn frontend_overflow_does_not_evict_lightweight_document_views() {
+        let cache = SnapshotQueryCache::new();
+        cache.insert(1, CacheDomain::Documents, "cheap".into(), Arc::new(7_u32));
+        let first = Arc::new(vec![1_u32]);
+        let weak = Arc::downgrade(&first);
+        cache.insert(1, CacheDomain::Frontends, "frontend-0".into(), first);
+        for index in 1_u32..=32 {
+            cache.insert(
+                1,
+                CacheDomain::Frontends,
+                format!("frontend-{index}"),
+                Arc::new(vec![index]),
+            );
+        }
+        assert!(weak.upgrade().is_none(), "old frontends must be released");
+        assert_eq!(*cache.get::<u32>(1, "cheap").unwrap(), 7);
+        assert_eq!(cache.len(), 2, "one frontend and the cheap view survive");
+        assert_eq!(*cache.get::<Vec<u32>>(1, "frontend-32").unwrap(), vec![32]);
+    }
+
+    #[test]
+    fn frontends_follow_document_revisions_and_reject_stale_workers() {
+        let cache = SnapshotQueryCache::new();
+        cache.insert(
+            1,
+            CacheDomain::Frontends,
+            "frontend".into(),
+            Arc::new(3_u32),
+        );
+        cache.insert(1, CacheDomain::Index, "index".into(), Arc::new(5_u32));
+        cache.advance_documents(2);
+        assert!(cache.get::<u32>(1, "frontend").is_none());
+        assert!(cache.get::<u32>(2, "frontend").is_none());
+        assert!(cache.get::<u32>(2, "index").is_some());
+        cache.insert(1, CacheDomain::Frontends, "stale".into(), Arc::new(9_u32));
+        assert!(cache.get::<u32>(2, "stale").is_none());
+        assert!(cache.is_superseded(CacheDomain::Frontends, 1));
+        cache.insert(2, CacheDomain::Frontends, "fresh".into(), Arc::new(11_u32));
+        cache.advance_to(3);
+        assert!(cache.get::<u32>(3, "fresh").is_none());
+    }
 
     #[test]
     fn entries_are_immutable_and_capacity_is_bounded() {

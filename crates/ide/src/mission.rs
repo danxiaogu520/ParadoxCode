@@ -33,32 +33,32 @@ pub(crate) fn mission_diagnostics(
     cancellation: &CancellationToken,
 ) -> Result<Vec<Diagnostic>, Cancelled> {
     cancellation.checkpoint()?;
+    let Some(view) = game::mission::view(&input.profile) else {
+        return Ok(Vec::new());
+    };
     if input.format != parser::FileFormat::Script
         || !input
-            .profile
-            .game_id
-            .eq_ignore_ascii_case(game::eu4::GAME_ID)
-        || !is_mission_path(input.path.as_ref())
+            .path
+            .as_ref()
+            .is_some_and(|path| view.matches(path.as_str()))
     {
         return Ok(Vec::new());
     }
-    let universe = mission_universe(snapshot, cancellation)?;
-    let loaded = game::eu4::mission::parse_file(&input.source);
+    let universe = mission_universe(snapshot, &view.spec.symbol_kind, cancellation)?;
+    let loaded = view.parse(&input.source);
     // Syntax errors in the file are owned by the main syntax pass; the
     // mission validator only contributes structural findings.
-    Ok(
-        game::eu4::mission::validate_with_universe_ids(&loaded.file, &universe.ids)
-            .into_iter()
-            .filter_map(mission_diagnostic)
-            .collect(),
-    )
+    Ok(view
+        .validate(&loaded.file, &universe.ids)
+        .into_iter()
+        .filter_map(mission_diagnostic)
+        .collect())
 }
 
-/// True when `path` sits inside a `missions/` directory, the EU4 mission-file
-/// root (EU4 1.35+ format).
-pub(crate) fn is_mission_path(path: Option<&LogicalPath>) -> bool {
-    path.and_then(|path| path.as_str().split('/').next())
-        .is_some_and(|first| first.eq_ignore_ascii_case("missions"))
+/// Whether the active package exposes a mission view at this logical path.
+pub(crate) fn is_mission_path(profile: &rules::GameProfile, path: Option<&LogicalPath>) -> bool {
+    game::mission::view(profile)
+        .is_some_and(|view| path.is_some_and(|path| view.matches(path.as_str())))
 }
 
 /// Translates one mission-validator finding into a pipeline diagnostic.
@@ -66,7 +66,7 @@ pub(crate) fn is_mission_path(path: Option<&LogicalPath>) -> bool {
 /// Returns `None` for findings the rest of the pipeline owns: duplicate ids
 /// (the symbol layer's later-wins pass) and any code this mapping has not
 /// caught up with — better silent than wrong.
-fn mission_diagnostic(finding: game::eu4::mission::Diagnostic) -> Option<Diagnostic> {
+fn mission_diagnostic(finding: game::mission::Diagnostic) -> Option<Diagnostic> {
     let (code, severity) = match finding.code {
         "dangling-required" | "dependency-cycle" => {
             (DiagnosticCode::InvalidDependency, Severity::Error)
@@ -103,25 +103,75 @@ struct MissionUniverse {
 /// mission file analyzed.
 fn mission_universe(
     snapshot: &AnalysisSnapshot,
+    kind: &str,
     cancellation: &CancellationToken,
 ) -> Result<Arc<MissionUniverse>, Cancelled> {
     cancellation.checkpoint()?;
     let revision = snapshot.revision();
+    let key = format!("mission-universe-ids:{kind}");
     if let Some(cached) = snapshot
         .query_cache()
-        .get::<MissionUniverse>(revision, "mission-universe-ids")
+        .get::<MissionUniverse>(revision, &key)
     {
         return Ok(cached);
     }
-    let ids = crate::semantic::effective_workspace_member_names(snapshot, "mission")
+    let ids = crate::semantic::effective_workspace_member_names(snapshot, kind)
         .into_iter()
         .collect();
     let universe = Arc::new(MissionUniverse { ids });
-    snapshot.query_cache().insert(
-        revision,
-        CacheDomain::Documents,
-        "mission-universe-ids".to_owned(),
-        Arc::clone(&universe),
-    );
+    snapshot
+        .query_cache()
+        .insert(revision, CacheDomain::Documents, key, Arc::clone(&universe));
     Ok(universe)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn declared_view_supports_another_identity_and_missing_capability_disables_it() {
+        let mut profile = rules::GameProfile::empty("synthetic");
+        let mut spec = game::first_party_ir()
+            .unwrap()
+            .game
+            .profile
+            .mission_view
+            .clone()
+            .unwrap();
+        spec.path.pattern = "graphs/".to_owned();
+        spec.symbol_kind = "node".to_owned();
+        spec.node_fields.required_missions = "after".to_owned();
+        profile.mission_view = Some(spec);
+        let sources = vec![("graph.json".to_owned(), serde_json::from_str(r#"{"files":{"graph":{"path":"graphs","root":"body"}},"schemas":{"body":{"open":true}},"types":{"node":{}}}"#).unwrap())];
+        let source = "tree = { a = { after = { b } } b = { after = { a } } }";
+        for (enabled, expected) in [(true, 1), (false, 0)] {
+            let mut selected = profile.clone();
+            if !enabled {
+                selected.mission_view = None;
+            }
+            let ir = Arc::new(
+                rules::lower::lower(
+                    &sources,
+                    rules::ir::GameConfig {
+                        profile: selected.clone(),
+                    },
+                )
+                .unwrap(),
+            );
+            let host =
+                engine::AnalysisHost::with_ir(rules::RuleSet::from_ir_catalog(&ir), selected, ir);
+            let snapshot = host.snapshot();
+            let path = LogicalPath::parse("graphs/example.txt").unwrap();
+            let input = crate::support::input_for_text(&snapshot, &path, source).unwrap();
+            let findings =
+                mission_diagnostics(&snapshot, &input, &CancellationToken::new()).unwrap();
+            assert_eq!(
+                findings
+                    .iter()
+                    .filter(|finding| finding.message.contains("dependency cycle"))
+                    .count(),
+                expected
+            );
+        }
+    }
 }

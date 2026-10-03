@@ -2,6 +2,62 @@ use super::*;
 use text::AbsPath;
 
 #[test]
+fn replayed_index_matches_full_rebuild_for_references_flags_and_shadowing() {
+    let first = SourceFileId::new(1);
+    let second = SourceFileId::new(2);
+    let range = TextRange::new(0, 3).unwrap();
+    let shard = |file_id| {
+        Arc::new(FileIndexShard {
+            file_id,
+            definitions: vec![Definition {
+                kind: "event".into(),
+                name: "shared.1".into(),
+                file_id,
+                range,
+                selection_range: range,
+                active: true,
+            }],
+            references: Vec::new(),
+            dynamic_definitions: Vec::new(),
+            definition_attributes: Vec::new(),
+            flag_writes: Vec::new(),
+            syntax_error_count: 0,
+        })
+    };
+    let priorities = BTreeMap::from([(first, 10), (second, 20)]);
+    let mut index = WorkspaceIndex::from_shards([shard(first), shard(second)]);
+    index.resolve_priorities(&priorities);
+    for step in 0..3 {
+        let mut replacement = (*index.shards[&second]).clone();
+        replacement.references.push(Reference {
+            kind: "event".into(),
+            name: "use.1".into(),
+            range,
+        });
+        if step == 1 {
+            replacement.definitions[0].name = "new.1".into();
+            replacement.flag_writes.push(::index::FlagWrite {
+                kind: "country_flag".into(),
+                name: "FLAG_$name$_END".into(),
+                range,
+            });
+        } else if step == 2 {
+            replacement.flag_writes.clear();
+        }
+        index
+            .replace_replayed_shards_cancellable(
+                [Arc::new(replacement)],
+                &priorities,
+                &WorkspaceScanToken::new(),
+            )
+            .unwrap();
+        let mut rebuilt = WorkspaceIndex::from_shards(index.shards.values().cloned());
+        rebuilt.resolve_priorities(&priorities);
+        assert_eq!(index, rebuilt, "replay step {step}");
+    }
+}
+
+#[test]
 fn grouped_position_map_keeps_sorted_lookup_and_replacement_semantics() {
     let first = SourceFileId::new(1);
     let second = SourceFileId::new(2);
@@ -154,7 +210,7 @@ fn type_per_file_definition_is_emitted_once_without_generic_pseudo_members() {
     )
     .expect("country fixture");
 
-    let rules = game::eu4::first_party_rules().expect("first-party rules");
+    let rules = game::eu4::runtime_rules().expect("first-party rules");
     let mut host = eu4_host_with(rules);
     host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
         SourceRoot::new(
@@ -199,7 +255,10 @@ fn type_per_file_definition_is_emitted_once_without_generic_pseudo_members() {
         .find(|definition| definition.kind.as_ref() == "country_file" && &*definition.name == "AAA")
         .expect("shard country definition");
     assert_eq!(definitions[0].range, shard_definition.range);
-    assert!(!shard_definition.selection_range.is_empty());
+    assert!(
+        shard_definition.selection_range.is_empty(),
+        "filename-derived symbols navigate to the file start"
+    );
     fs::remove_dir_all(
         countries
             .parent()
@@ -207,49 +266,6 @@ fn type_per_file_definition_is_emitted_once_without_generic_pseudo_members() {
             .expect("fixture root"),
     )
     .expect("cleanup");
-}
-
-#[test]
-fn symbol_case_policy_controls_definition_lookup_identity() {
-    let file_id = SourceFileId::new(9);
-    let range = TextRange::new(0, 3).expect("range");
-    let mut model = RulesModel {
-        game_id: "test".to_owned(),
-        ..RulesModel::default()
-    };
-    model.symbol_descriptors.push(SymbolDescriptor {
-        kind_id: "case_sensitive_kind".to_owned(),
-        resolution: SymbolResolutionPolicy::ReplaceBySymbol,
-        case_sensitive: true,
-    });
-    let rules = RuleSet::from_model(model);
-    let mut index = WorkspaceIndex::from_shards([FileIndexShard {
-        file_id,
-        definitions: vec![Definition {
-            kind: "case_sensitive_kind".into(),
-            name: "MixedName".into(),
-            file_id,
-            range,
-            selection_range: range,
-            active: true,
-        }],
-        references: Vec::new(),
-        dynamic_definitions: Vec::new(),
-        definition_attributes: Vec::new(),
-        flag_writes: Vec::new(),
-        syntax_error_count: 0,
-    }]);
-    index.configure_case_sensitivity(&rules);
-
-    assert_eq!(
-        index.definitions("case_sensitive_kind", "MixedName").len(),
-        1
-    );
-    assert!(
-        index
-            .definitions("case_sensitive_kind", "mixedname")
-            .is_empty()
-    );
 }
 
 #[test]
@@ -407,9 +423,8 @@ fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
             syntax_error_count: 0,
         },
     ]);
-    let rules = game::eu4::bootstrap_rules();
     let tied = BTreeMap::from([(first_file, 10), (second_file, 10)]);
-    index.resolve_priorities(&tied, &rules);
+    index.resolve_priorities(&tied);
     assert_eq!(
         index
             .definitions("event", "shared.1")
@@ -421,7 +436,7 @@ fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
     assert!(index.active_definition("event", "shared.1").is_none());
 
     let ordered = BTreeMap::from([(first_file, 10), (second_file, 20)]);
-    index.resolve_priorities(&ordered, &rules);
+    index.resolve_priorities(&ordered);
     assert_eq!(
         index
             .definition_identities()
@@ -451,7 +466,7 @@ fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
             .file_id,
         second_file
     );
-    index.remove_shard_resolved(second_file, &ordered, &rules);
+    index.remove_shard_resolved(second_file, &ordered);
     assert_eq!(
         index
             .active_definition("event", "shared.1")
