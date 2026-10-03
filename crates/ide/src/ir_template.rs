@@ -19,16 +19,32 @@ pub(crate) struct BodyAnalysis {
     pub(crate) coverage: hir::analysis::AnalysisCoverage,
 }
 
-fn has_structural_reads(template: &hir::Template) -> bool {
+fn has_structural_reads(template: &hir::Template, snapshot: &AnalysisSnapshot) -> bool {
     use rules::replacement::{TemplateFragment, TemplateInstruction, TemplateOperand};
+    let ir = snapshot.ir();
+    let schema = ir
+        .type_by_name(&template.kind)
+        .and_then(|kind| hir::template::template_body(ir, kind));
     template.program.blocks.iter().any(|block|block.iter().any(|node|match node {
-        TemplateInstruction::Recover(_) | TemplateInstruction::Consume(_) | TemplateInstruction::When{..}=>true,
-        TemplateInstruction::Dispatch(property)=>property.key.fragments.iter().any(|part|matches!(part,TemplateFragment::Parameter{..})) || matches!(&property.value,TemplateOperand::Scalar(token) if token.quoted && token.fragments.iter().any(|part|matches!(part,TemplateFragment::Parameter{..}))),
+        TemplateInstruction::Recover(_)|TemplateInstruction::Consume(_)|TemplateInstruction::When{..}=>true,
+        TemplateInstruction::Dispatch(property)=>{
+            if matches!(property.value,TemplateOperand::Block(_)) || property.key.fragments.iter().any(|part|matches!(part,TemplateFragment::Parameter{..}))
+                || matches!(&property.value,TemplateOperand::Scalar(token) if token.quoted && token.fragments.iter().any(|part|matches!(part,TemplateFragment::Parameter{..}))) {return true;}
+            let key=property.key.fragments.iter().map(|part|match part {TemplateFragment::Literal(text)=>Some(text.as_str()),_=>None}).collect::<Option<String>>();
+            schema.zip(key).is_some_and(|(schema,key)|hir::checking::field_candidates(ir,schema,&key,rules::ir::Shape::Scalar,&WorkspaceFacts{snapshot})
+                .iter().any(|id|hir::template::template_kind(ir,ir.field(*id).key).is_some()))
+        }
     }))
 }
 
-pub(crate) fn needs_body_analysis(summary: &engine::DynamicDefinitionSummary) -> bool {
-    summary.template.as_ref().is_some_and(has_structural_reads)
+pub(crate) fn needs_body_analysis(
+    snapshot: &AnalysisSnapshot,
+    summary: &engine::DynamicDefinitionSummary,
+) -> bool {
+    summary
+        .template
+        .as_ref()
+        .is_some_and(|template| has_structural_reads(template, snapshot))
 }
 
 /// Shared structural specialization for candidate filtering, diagnostics and explanations.
@@ -284,7 +300,7 @@ pub(crate) fn validate_candidate(
     cancellation: &CancellationToken,
 ) -> Result<Analysis<hir::analysis::Validation>, Cancelled> {
     use hir::analysis::Validation;
-    if !needs_body_analysis(summary) {
+    if !needs_body_analysis(snapshot, summary) {
         return Ok(Analysis {
             value: Validation::Valid,
             coverage: Default::default(),

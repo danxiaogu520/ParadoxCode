@@ -707,6 +707,8 @@ target/template-after/tools audit diff \
 
 本切片验证：`tools gates core-fast policy` 通过，工作区 1,016 项 Rust 测试及 94 项 policy 检查通过；workspace/all-targets/all-features Clippy 通过。自有有限关系参照通过实际 IDE 候选集合对照；Present Hole、受损定义、10,000 层任务栈、整块字段计数、嵌套引号精确范围与共享控制检查回归通过。release server/tools 已冻结在 ignored `target/performance-results/template-foundation/frozen/`，正式配对性能及完整 Vanilla 行为审计仍待最终核心收敛后完成。
 
+后续 scope/Block 切片：定义 scope 推导的独立递归树已删除，使用共享程序上的显式 Any/All 查询，按当前实参检查 guard 激活，未知 ROOT/FROM 与存在状态保留残余；10,000 层 scope 查询抵达末端。运行时 OR 不免除其中各语句的静态 scope 合法性，新增两个有确切 country/province 冲突的 owned 诊断并更新 golden。整块 Block 重载在同一容器上分别验证，确定解释沿用其 scope/符号类型；未决解释只合并共同事实。自有第二重载合法、跨重载混合拒绝、试算符号不进入 HIR、调用 guard/PRESENT Hole 与未知脚本前缀回归通过。LSP 消费者在未决解释下的候选/来源条件、独占引用闭包和完整预算仍需后续收敛，不能据此宣告阶段 3–6 退出。
+
 ## 实施顺序与 PR 出口
 
 每一步单独可审阅。开发期间可有内部比较开关；最终删除旧生产路径，避免长期维护两份动态语义。未达到该步出口的 PR 保持 draft，不用“基础测试通过”代替功能和语义验收。

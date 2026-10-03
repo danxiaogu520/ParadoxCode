@@ -25,6 +25,19 @@ checked together, including field counts and complete block forms. Display-only
 containers retain syntax and symbol facts without treating their contents as
 executed commands.
 
+[template_scope.rs](src/template_scope.rs) projects entry requirements from the
+same program using explicit Any/All continuations and concrete binding/scope
+states. Unknown guards remain conditional. Runtime `OR` still checks every child
+for static legality. Unresolved script prefixes prevent the projection from
+assuming that the suffix keeps its original lexical or scope context.
+
+[block_checking.rs](src/block_checking.rs) checks each overloaded schema against
+one complete container before choosing it. A proved choice retains its own scope
+and symbol namespace. Unresolved alternatives retain possible schema contexts;
+only common symbol, reference and scope facts enter the authoritative HIR. A
+failure reports the whole overload requirement, rather than combining different
+children's successful alternatives into a fictitious valid block.
+
 [template_relations.rs](src/template_relations.rs) inverts finite strings into
 binding rows. Repeated parameter occurrences share one value. Relations are
 joined before projecting a focused completion value, so separate usages cannot

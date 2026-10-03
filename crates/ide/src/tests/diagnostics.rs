@@ -4101,9 +4101,8 @@ fn dynamic_scope_contracts_infer_and_reject_empty_intersections() {
         // A THIS block only evaluates the entry scope in trigger context;
         // as an effect container it must not constrain the entry either.
         "this_opaque = { add_prestige = 1 THIS = { change_province_name = \"W\" } }\n",
-        // OR branches union: one satisfiable branch is enough, so the
-        // province-only and country-only limits of the two branches combine
-        // instead of clashing.
+        // Runtime OR does not exempt its children from static scope legality.
+        // Each child is checked under the same parent scope.
         "or_union = { if = { limit = { OR = { is_capital = yes has_estate_privilege = some_priv } } add_prestige = 1 } }\n",
         // An OR branch with no scope knowledge keeps the whole OR unconstrained.
         "or_open = { if = { limit = { OR = { unknown_branch_key = yes is_capital = yes } } add_prestige = 1 } }\n",
@@ -4161,7 +4160,7 @@ fn dynamic_scope_contracts_infer_and_reject_empty_intersections() {
         if snapshot.ir().schemas.is_empty() {
             vec!["clash", "via_callee"]
         } else {
-            vec!["clash", "via_callee", "this_opaque"]
+            vec!["clash", "via_callee", "this_opaque", "or_union", "or_open"]
         },
         "IR preserves THIS's current scope; the legacy fixture treated it as opaque: {all:?}"
     );
@@ -4196,13 +4195,13 @@ fn dynamic_scope_contracts_infer_and_reject_empty_intersections() {
     );
     assert_eq!(
         dynamic_contract(&snapshot, "scripted_effect", "or_union"),
-        Some(ScopeContract::Scopes(vec!["country".to_owned()])),
-        "OR branches union, so the province branch does not clash with add_prestige"
+        Some(ScopeContract::Empty),
+        "every OR child must be statically legal in the same scope"
     );
     assert_eq!(
         dynamic_contract(&snapshot, "scripted_effect", "or_open"),
-        Some(ScopeContract::Scopes(vec!["country".to_owned()])),
-        "an unconstrained OR branch keeps the OR unconstrained"
+        Some(ScopeContract::Empty),
+        "an unknown OR child cannot hide an independently invalid known child"
     );
     let fine_hover = contract_hover_line(&snapshot, "scripted_effect", "fine");
     assert!(

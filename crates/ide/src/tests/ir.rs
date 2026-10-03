@@ -4163,3 +4163,208 @@ fn ir_block_forms_preserve_estate_loyalty_alternatives() {
         "unconditional required field was weakened"
     );
 }
+
+#[test]
+fn template_scope_summary_retains_guards_and_actual_calls_activate_them() {
+    let mut host = host();
+    let definitions = "guarded_scope = { add_prestige = 1 [[P] change_province_name = \"X\" ] }";
+    let id = open(
+        &mut host,
+        "common/scripted_effects/guarded-scope.txt",
+        definitions,
+    );
+    assert!(
+        !diagnostics(&host.snapshot(), &id)
+            .iter()
+            .any(|item| item.code == DiagnosticCode::EmptyScopeContract)
+    );
+    let guard = definitions.find("[[P]").unwrap() as u32 + 2;
+    let info = hover(&host.snapshot(), &id, guard).unwrap();
+    assert!(info.contents.contains("optional"), "{info:?}");
+    for (name, argument, invalid) in [
+        ("inactive", "", false),
+        ("active", "P = yes", true),
+        ("hole", "P =", true),
+    ] {
+        let source = format!(
+            "country_event = {{ id = guard.{name} immediate = {{ guarded_scope = {{ {argument} }} }} option = {{ name = guard.{name} }} }}"
+        );
+        let caller = open(
+            &mut host,
+            &format!("events/guard-scope-{name}.txt"),
+            &source,
+        );
+        let values = diagnostics(&host.snapshot(), &caller);
+        assert_eq!(
+            values
+                .iter()
+                .any(|item| item.code == DiagnosticCode::WrongScope),
+            invalid,
+            "{name}: {values:?}"
+        );
+    }
+}
+
+#[test]
+fn template_fixed_callee_errors_are_checked_at_the_outer_call() {
+    let mut host = host();
+    open(
+        &mut host,
+        "common/scripted_effects/fixed-callee.txt",
+        "bad_leaf = { add_prestige = wrong } outer_fixed = { bad_leaf = yes }",
+    );
+    let source = "country_event = { id = fixed.1 immediate = { outer_fixed = yes } option = { name = fixed.1 } }";
+    let id = open(&mut host, "events/fixed-callee.txt", source);
+    let values = diagnostics(&host.snapshot(), &id);
+    assert!(
+        values
+            .iter()
+            .any(|value| value.code == DiagnosticCode::InvalidValue
+                && value.message.contains("add_prestige")),
+        "{values:?}"
+    );
+}
+
+fn overload_host() -> AnalysisHost {
+    super::support::fixture_host(serde_json::json!({
+        "traits":{"Template":{}},"types":{"fixture_template":{"impl":{"Template":{"body":"effect"}},"resolution":"replace"},"flag_a":{},"flag_b":{}},
+        "schemas":{
+            "fixture_root":{"fields":{"__templates":{"body":"definitions","card":"0..*"}}},
+            "definitions":{"map":{"key":"def<fixture_template>","body":"effect"}},
+            "arguments":{"map":{"key":"scalar","value":"scalar"}},
+            "effect":{"fields":{"pick":[
+                {"body":"country_variant","card":"0..*","scope":{"in":["country"],"push":"country"}},
+                {"body":"province_variant","card":"0..*","scope":{"in":["country"],"push":"province"}}
+            ]},"patterns":[{"key":"ref<fixture_template>","body":"arguments","card":"0..*"}]},
+            "country_variant":{"fields":{"a":{"value":"bool","card":"1","scope":{"in":["country"]}},"flag":{"value":"def<flag_a>","card":"0..1"}}},
+            "province_variant":{"fields":{"b":{"value":"bool","card":"1","scope":{"in":["province"]}},"flag":{"value":"def<flag_b>","card":"0..1"}}}
+        }
+    }))
+}
+
+#[test]
+fn complete_block_selects_one_consistent_overload_scope_and_symbol_namespace() {
+    let mut host = overload_host();
+    let source = "country_event = { immediate = { pick = { b = yes flag = chosen } } }";
+    let id = open(&mut host, "events/overload.txt", source);
+    let snapshot = host.snapshot();
+    let input = snapshot.document(&id).unwrap().hir().unwrap();
+    assert!(
+        !diagnostics(&snapshot, &id).iter().any(|item| matches!(
+            item.code,
+            DiagnosticCode::InvalidValue
+                | DiagnosticCode::UnknownKey
+                | DiagnosticCode::WrongScope
+                | DiagnosticCode::Cardinality
+        )),
+        "{:?}",
+        diagnostics(&snapshot, &id)
+    );
+    assert!(
+        input
+            .definitions()
+            .iter()
+            .any(|definition| definition.kind.as_ref() == "flag_b" && definition.name == "chosen")
+    );
+    assert!(
+        !input
+            .definitions()
+            .iter()
+            .any(|definition| definition.kind.as_ref() == "flag_a")
+    );
+    let b = source.find("b =").unwrap() as u32;
+    assert_eq!(
+        input
+            .scope_fact_at(text::TextRange::new(b, b + 1).unwrap())
+            .unwrap()
+            .state
+            .current
+            .first(),
+        Some(&hir::ScopeValue::known_single("province"))
+    );
+    assert_eq!(
+        input.overload_facts()[0].validation,
+        hir::analysis::Validation::Valid
+    );
+}
+
+#[test]
+fn template_block_overloads_cannot_mix_children_or_leak_speculative_facts() {
+    let mut host = overload_host();
+    open(
+        &mut host,
+        "definitions.txt",
+        "__templates = { wrap = { $BODY$ } }",
+    );
+    let valid = "country_event = { immediate = { wrap = { BODY = \"pick = { b = yes flag = chosen }\" } } }";
+    let id = open(&mut host, "events/template-overload.txt", valid);
+    let values = diagnostics(&host.snapshot(), &id);
+    assert!(
+        !values.iter().any(|item| matches!(
+            item.code,
+            DiagnosticCode::InvalidValue
+                | DiagnosticCode::UnknownKey
+                | DiagnosticCode::WrongScope
+                | DiagnosticCode::Cardinality
+        )),
+        "{values:?}"
+    );
+    let invalid =
+        "country_event = { immediate = { pick = { a = yes b = yes flag = speculative } } }";
+    let id = open(&mut host, "events/mixed-overload.txt", invalid);
+    let snapshot = host.snapshot();
+    let input = snapshot.document(&id).unwrap().hir().unwrap();
+    assert_eq!(
+        input.overload_facts()[0].validation,
+        hir::analysis::Validation::Invalid
+    );
+    assert!(
+        diagnostics(&snapshot, &id)
+            .iter()
+            .any(|item| item.code == DiagnosticCode::InvalidValue
+                && item.message.contains("no rule overload"))
+    );
+    assert!(
+        !input
+            .definitions()
+            .iter()
+            .any(|definition| definition.name == "speculative"),
+        "{:?}",
+        input.definitions()
+    );
+}
+
+#[test]
+fn unknown_script_prefix_does_not_prove_a_suffix_scope_or_value_error() {
+    let mut host = host();
+    let definitions = "fragile = { $BODY$ add_prestige = 1 change_province_name = \"X\" } before_hole = { add_prestige = wrong $BODY$ }";
+    let id = open(
+        &mut host,
+        "common/scripted_effects/open-boundary.txt",
+        definitions,
+    );
+    assert!(
+        !diagnostics(&host.snapshot(), &id)
+            .iter()
+            .any(|value| value.code == DiagnosticCode::EmptyScopeContract),
+        "{:?}",
+        diagnostics(&host.snapshot(), &id)
+    );
+    let source = "country_event = { id = prefix.1 immediate = { fragile = { BODY = \"# the suffix is a comment\" } before_hole = {} } option = { name = prefix.1 } }";
+    let id = open(&mut host, "events/open-boundary.txt", source);
+    let values = diagnostics(&host.snapshot(), &id);
+    assert!(
+        !values
+            .iter()
+            .any(|value| value.code == DiagnosticCode::WrongScope
+                && value.message.contains("fragile")),
+        "{values:?}"
+    );
+    assert!(
+        values
+            .iter()
+            .any(|value| value.code == DiagnosticCode::InvalidValue
+                && value.message.contains("before_hole")),
+        "{values:?}"
+    );
+}

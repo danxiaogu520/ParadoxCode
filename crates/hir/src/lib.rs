@@ -9,6 +9,7 @@ use rules::{GameProfile, RuleSet};
 use text::LogicalPath;
 
 pub mod analysis;
+pub mod block_checking;
 pub mod checking;
 mod collector;
 mod ir_lowering;
@@ -18,6 +19,7 @@ mod scope;
 pub mod template;
 mod template_lowering;
 pub mod template_relations;
+pub mod template_scope;
 pub mod template_text;
 
 pub use model::*;
@@ -216,6 +218,7 @@ pub fn lower_ir_schema(
     }
     HirFile {
         analysis_coverage,
+        overload_facts: ir_facts.overload_facts,
         syntax,
         scope: Scope::Unknown,
         properties: collected.properties,
@@ -325,6 +328,7 @@ fn lower_shared_impl(
     }
     HirFile {
         analysis_coverage,
+        overload_facts: facts.overload_facts,
         syntax,
         scope: Scope::Unknown,
         properties: collected.properties,

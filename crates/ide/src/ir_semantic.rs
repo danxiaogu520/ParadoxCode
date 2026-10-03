@@ -66,15 +66,6 @@ pub(crate) fn matcher_matches_with_state(
         != hir::analysis::Validation::Invalid
 }
 
-pub(crate) fn matcher_pattern_matches(
-    ir: &RulesIr,
-    parts: &[PatternPart],
-    value: &str,
-    facts: &impl SymbolFacts,
-) -> bool {
-    hir::checking::pattern_matches(ir, parts, value, facts)
-}
-
 /// Human-readable description of a complete IR matcher.
 pub(crate) fn describe(ir: &RulesIr, matcher: MatcherId) -> String {
     match ir.matcher(matcher) {
@@ -643,6 +634,18 @@ fn schema_diagnostics_at_depth(
         BTreeMap::<(TextRange, FieldId), BTreeMap<String, (u32, TextRange)>>::new();
     let mut unbound_keys = BTreeSet::new();
     let properties = hir.properties();
+    for overload in hir
+        .overload_facts()
+        .iter()
+        .filter(|overload| overload.validation == hir::analysis::Validation::Invalid)
+    {
+        diagnostics.push(Diagnostic::new(
+            DiagnosticCode::InvalidValue,
+            Severity::Error,
+            overload.range,
+            "no rule overload accepts this complete block".to_owned(),
+        ));
+    }
     for property in properties {
         cancellation.checkpoint()?;
         let owner_range = (!hir.parameter_references().is_empty())
@@ -676,6 +679,13 @@ fn schema_diagnostics_at_depth(
             continue;
         }
         if template_arguments.contains(&property.key_range) {
+            continue;
+        }
+        if hir.overload_facts().iter().any(|overload| {
+            overload.validation != hir::analysis::Validation::Valid
+                && overload.container.start() <= property.key_range.start()
+                && property.key_range.end() <= overload.container.end()
+        }) {
             continue;
         }
         let Some(field_fact) = hir.field_fact_at(property.key_range) else {
@@ -883,6 +893,13 @@ fn schema_diagnostics_at_depth(
         }
     }
     for fact in hir.schema_facts() {
+        if hir.overload_facts().iter().any(|overload| {
+            overload.validation != hir::analysis::Validation::Valid
+                && overload.container.start() <= fact.range.start()
+                && fact.range.end() <= overload.container.end()
+        }) {
+            continue;
+        }
         cancellation.checkpoint()?;
         let schema = ir.schema(fact.schema);
         // A substituted key can satisfy a required field or pattern only after
@@ -1340,7 +1357,7 @@ fn template_argument_diagnostics(
                     && child.range.end() <= property.range.end()
             })
             .collect::<Vec<_>>();
-        if crate::ir_template::needs_body_analysis(&summary)
+        if crate::ir_template::needs_body_analysis(snapshot, &summary)
             && let Some(body) =
                 crate::ir_template::analyse_body(snapshot, hir, property, None, cancellation)?
         {
@@ -1452,7 +1469,7 @@ fn template_argument_diagnostics(
                                     diagnostics.push(diagnostic);
                                 }
                             }
-                            if !crate::ir_template::needs_body_analysis(&summary) {
+                            if !crate::ir_template::needs_body_analysis(snapshot, &summary) {
                                 let mut usages: Vec<(
                                     &crate::ir_template::ParameterSite,
                                     Vec<Vec<Diagnostic>>,

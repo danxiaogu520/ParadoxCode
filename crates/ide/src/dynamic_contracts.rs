@@ -1,37 +1,12 @@
-//! Definition-site entry-scope contracts for dynamic definitions.
-//!
-//! A dynamic definition's body executes in the caller's scope, so the definition is
-//! only usable where every statement in its body is valid. This module infers
-//! that entry contract once per definition: it walks the lowered template,
-//! collects the `allowed_scopes` of each body statement's matching rules, and
-//! keeps the scopes that satisfy all of them (compatibility-aware, mirroring
-//! `semantic_scope_allows`). Scope-switching containers (`any_country`, …)
-//! constrain the entry only through their own rule row; same-scope containers
-//! (`AND`/`OR`/`NOT`, `if`, `limit`) are descended so their children constrain
-//! the entry too. `OR` branches union — one satisfiable branch is enough —
-//! while every other descended statement intersects. Dynamic scope links
-//! (`ROOT`/`PREV`/`FROM`/`THIS`, event targets) re-target a scope decided by
-//! the caller's runtime context, so their bodies are opaque to the entry
-//! contract. An empty intersection is a definition that can never run
-//! correctly and is reported at the definition site — the Rust principle:
-//! reject the definition rather than every call site.
-//!
-//! Calls with a `$param$` in key position dispatch dynamically; their targets
-//! are unknowable at definition time, so they do not narrow the contract (the
-//! flag is kept for reporting and hover). Nested dynamic-definition calls
-//! contribute the callee's own inferred contract.
-
+//! IDE projections of entry-scope queries over the shared Template program.
+//! Guard-dependent requirements stay conditional; actual calls use supplied presence and text.
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use engine::{AnalysisSnapshot, DocumentSource};
-use hir::{ScopeValue, TemplateFragment, TemplateItem, TemplateToken, TemplateValue};
-use rules::GameProfile;
+use hir::ScopeValue;
 
-use crate::semantic::{
-    ResolvedDynamicDefinition, dynamic_definition_type, probe_query_cache,
-    resolve_dynamic_definition,
-};
+use crate::semantic::{dynamic_definition_type, probe_query_cache};
 use crate::support::ParsedInput;
 use crate::types::{CancellationToken, Cancelled, Diagnostic, DiagnosticCode, uncancelled};
 
@@ -52,17 +27,6 @@ pub(crate) enum ScopeContract {
 }
 
 impl ScopeContract {
-    /// True when `scope` may enter a definition carrying this contract.
-    pub(crate) fn accepts(&self, profile: &GameProfile, scope: &str) -> bool {
-        match self {
-            Self::Unconstrained | Self::Unknown => true,
-            Self::Scopes(scopes) => scopes
-                .iter()
-                .any(|expected| profile.scopes_compatible(scope, expected)),
-            Self::Empty => false,
-        }
-    }
-
     fn display(&self) -> String {
         match self {
             Self::Unconstrained => "any".to_owned(),
@@ -79,6 +43,7 @@ pub(crate) struct DynamicContractReport {
     contracts: BTreeMap<(String, String), ScopeContract>,
     /// Definitions whose template dispatches through a `$param$` key.
     dynamic: BTreeSet<(String, String)>,
+    conditions: BTreeMap<(String, String), Vec<String>>,
 }
 
 impl DynamicContractReport {
@@ -160,7 +125,6 @@ pub(crate) fn dynamic_call_site_diagnostics(
     let Some(hir) = input.hir.as_deref() else {
         return Ok(Vec::new());
     };
-    let profile = snapshot.game_profile();
     let mut report = None;
     let mut diagnostics = Vec::new();
     for property in hir.properties() {
@@ -211,24 +175,72 @@ pub(crate) fn dynamic_call_site_diagnostics(
         let Some(contract) = report.contract(&dynamic_kind, &property.key) else {
             continue;
         };
-        // Empty contracts are already reported at the definition site;
-        // unconstrained and unknown contracts accept every scope.
-        let ScopeContract::Scopes(expected) = contract else {
-            continue;
-        };
-        if contract.accepts(profile, &ambient) {
+        // A definition-side guaranteed contradiction already has its located report.
+        if matches!(contract, ScopeContract::Empty) {
             continue;
         }
-        diagnostics.push(Diagnostic::new(
-            DiagnosticCode::WrongScope,
-            DiagnosticCode::WrongScope.severity(),
-            property.key_range,
+        if crate::semantic::dynamic_definition_summary(snapshot, &dynamic_kind, &property.key)
+            .is_some_and(|summary| crate::ir_template::needs_body_analysis(snapshot, &summary))
+        {
+            continue;
+        }
+        let scoped = hir::template_scope::check_scope(
+            snapshot.ir(),
+            &crate::ir_semantic::WorkspaceFacts { snapshot },
+            &dynamic_kind,
+            &property.key,
+            &crate::ir_template::invocation_inputs(hir, property),
+            fact.state.clone(),
+            &mut || cancellation.checkpoint(),
+        )?;
+        if scoped.value != hir::analysis::Validation::Invalid {
+            continue;
+        }
+        if !scoped.coverage.is_complete() {
+            diagnostics.push(Diagnostic::new(
+                DiagnosticCode::AnalysisIncomplete,
+                crate::Severity::Information,
+                property.key_range,
+                scoped.coverage.limit_description(),
+            ));
+        }
+        let inputs = crate::ir_template::invocation_inputs(hir, property);
+        let mut expected = Vec::new();
+        for scope in &snapshot.ir().scopes.types {
+            let scope = snapshot.ir().strings().resolve(*scope);
+            let mut state = fact.state.clone();
+            state.current = vec![ScopeValue::known_single(scope)];
+            let check = hir::template_scope::check_scope(
+                snapshot.ir(),
+                &crate::ir_semantic::WorkspaceFacts { snapshot },
+                &dynamic_kind,
+                &property.key,
+                &inputs,
+                state,
+                &mut || cancellation.checkpoint(),
+            )?;
+            if check.value != hir::analysis::Validation::Invalid {
+                expected.push(scope.to_owned());
+            }
+        }
+        let message = if expected.is_empty() {
+            format!(
+                "dynamic definition `{}` has no valid entry scope for these parameter bindings",
+                property.key
+            )
+        } else {
             format!(
                 "dynamic definition `{}` requires entry scope {} but is called in `{}` scope",
                 property.key,
                 expected.join(", "),
                 ambient
-            ),
+            )
+        };
+        diagnostics.push(Diagnostic::new(
+            DiagnosticCode::WrongScope,
+            DiagnosticCode::WrongScope.severity(),
+            property.key_range,
+            message,
         ));
     }
     Ok(diagnostics)
@@ -266,7 +278,23 @@ pub(crate) fn contract_hover_line(snapshot: &AnalysisSnapshot, kind: &str, name:
     } else {
         ""
     };
-    format!("- Inferred entry scope: {scope}{dispatch}")
+    let cancellation = CancellationToken::new();
+    let report = uncancelled(dynamic_contract_report(snapshot, &cancellation));
+    let guards = report
+        .conditions
+        .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
+        .filter(|guards| !guards.is_empty())
+        .map_or(String::new(), |guards| {
+            format!(
+                "; conditional requirements depend on {}",
+                guards
+                    .iter()
+                    .map(|name| format!("`{name}`"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        });
+    format!("- Inferred entry scope: {scope}{dispatch}{guards}")
 }
 
 fn contract_is_dynamic(snapshot: &AnalysisSnapshot, kind: &str, name: &str) -> bool {
@@ -292,7 +320,7 @@ fn dynamic_contract_report(
     // following probe would rerun the workspace-wide inference.
     if snapshot
         .query_cache()
-        .is_superseded(engine::CacheDomain::Definitions, revision)
+        .is_superseded(engine::CacheDomain::Documents, revision)
     {
         return Ok(Arc::new(DynamicContractReport::default()));
     }
@@ -318,270 +346,11 @@ fn dynamic_contract_report(
     let report = Arc::new(report);
     snapshot.query_cache().insert(
         revision,
-        engine::CacheDomain::Definitions,
+        engine::CacheDomain::Documents,
         CONTRACT_CACHE_KEY.to_owned(),
         report.clone(),
     );
     Ok(report)
-}
-
-struct ContractInference<'a> {
-    snapshot: &'a AnalysisSnapshot,
-    /// Memoized contracts keyed by `(kind lower, name lower)`.
-    memo: BTreeMap<(String, String), ScopeContract>,
-    /// Definitions currently being inferred (cycle guard).
-    visiting: BTreeSet<(String, String)>,
-    dynamic: BTreeSet<(String, String)>,
-}
-
-impl<'a> ContractInference<'a> {
-    fn contract_of(&mut self, resolved: &ResolvedDynamicDefinition) -> ScopeContract {
-        let key = (
-            resolved.summary.kind.to_ascii_lowercase(),
-            resolved.summary.name.to_ascii_lowercase(),
-        );
-        if let Some(cached) = self.memo.get(&key) {
-            return cached.clone();
-        }
-        if !self.visiting.insert(key.clone()) {
-            return ScopeContract::Unknown;
-        }
-        let contract = match resolved.summary.template.as_ref() {
-            Some(template) => {
-                let contract = self
-                    .snapshot
-                    .ir()
-                    .schema_by_name(&resolved.body_context)
-                    .map_or(ScopeContract::Unknown, |schema| {
-                        self.ir_items(schema, &template.items)
-                    });
-                if template_dispatches(&template.items) {
-                    self.dynamic.insert(key.clone());
-                }
-                contract
-            }
-            None => ScopeContract::Unknown,
-        };
-        self.visiting.remove(&key);
-        self.memo.insert(key, contract.clone());
-        contract
-    }
-
-    fn ir_items(&mut self, schema: rules::ir::SchemaId, items: &[TemplateItem]) -> ScopeContract {
-        let contracts = items
-            .iter()
-            .map(|item| self.ir_item(schema, item))
-            .collect::<Vec<_>>();
-        self.combine_ir_contracts(&contracts, false)
-    }
-
-    fn combine_ir_contracts(&self, contracts: &[ScopeContract], union: bool) -> ScopeContract {
-        if contracts.is_empty() {
-            return ScopeContract::Unconstrained;
-        }
-        if union
-            && contracts.iter().any(|contract| {
-                matches!(
-                    contract,
-                    ScopeContract::Unconstrained | ScopeContract::Unknown
-                )
-            })
-        {
-            return ScopeContract::Unconstrained;
-        }
-        if !union
-            && contracts.iter().all(|contract| {
-                matches!(
-                    contract,
-                    ScopeContract::Unconstrained | ScopeContract::Unknown
-                )
-            })
-        {
-            return ScopeContract::Unconstrained;
-        }
-        let ir = self.snapshot.ir();
-        let candidates = contracts
-            .iter()
-            .filter_map(|contract| match contract {
-                ScopeContract::Scopes(scopes) => Some(scopes),
-                _ => None,
-            })
-            .flatten()
-            .cloned()
-            .collect::<BTreeSet<_>>();
-        let scopes = candidates
-            .iter()
-            .filter(|candidate| {
-                let accepts = |contract: &ScopeContract| match contract {
-                    ScopeContract::Scopes(expected) => expected.iter().any(|expected| {
-                        ir.strings()
-                            .lookup_folded(expected)
-                            .is_some_and(|expected| {
-                                ir.strings()
-                                    .lookup_folded(candidate)
-                                    .is_some_and(|actual| ir.scopes_compatible(actual, expected))
-                            })
-                    }),
-                    ScopeContract::Empty => false,
-                    _ => true,
-                };
-                if union {
-                    contracts.iter().any(accepts)
-                } else {
-                    contracts.iter().all(accepts)
-                }
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        if scopes.is_empty() {
-            ScopeContract::Empty
-        } else {
-            ScopeContract::Scopes(scopes)
-        }
-    }
-
-    fn ir_item(&mut self, schema: rules::ir::SchemaId, item: &TemplateItem) -> ScopeContract {
-        use rules::ir::{FieldValue, Matcher, Shape};
-        let ir = self.snapshot.ir();
-        let property = match item {
-            TemplateItem::Conditional(conditional) => {
-                return self.ir_items(schema, &conditional.items);
-            }
-            TemplateItem::BareValue(_) | TemplateItem::Recover(_) => {
-                return ScopeContract::Unconstrained;
-            }
-            TemplateItem::Property(property) => property,
-        };
-        let Some(key) = single_literal(&property.key) else {
-            return ScopeContract::Unconstrained;
-        };
-        let shape = match &property.value {
-            TemplateValue::Block { .. } => Shape::Block,
-            _ => Shape::Scalar,
-        };
-        let mut fields = ir.lookup(schema, key, shape).collect::<Vec<_>>();
-        let exact = fields.iter().copied().filter(|id| matches!(ir.matcher(ir.field(*id).key), Matcher::Literal(symbol) if ir.strings().resolve(*symbol).eq_ignore_ascii_case(key))).collect::<Vec<_>>();
-        if !exact.is_empty() {
-            fields = exact;
-        }
-        fields.retain(|id| {
-            crate::ir_semantic::matcher_matches(
-                ir,
-                ir.field(*id).key,
-                key,
-                &crate::ir_semantic::WorkspaceFacts {
-                    snapshot: self.snapshot,
-                },
-            )
-        });
-        let mut alternatives = Vec::new();
-        for id in fields {
-            let field = ir.field(id);
-            if let Some(kind) = crate::ir_template::template_kind(ir, field.key) {
-                if let Some(resolved) = resolve_dynamic_definition(self.snapshot, &kind, key) {
-                    alternatives.push(self.contract_of(&resolved));
-                }
-                continue;
-            }
-            // Registers and links retarget the body. They constrain their own origin only;
-            // statements inside them do not constrain the definition's entry scope.
-            if matches!(ir.matcher(field.key), Matcher::Link) {
-                if let Some(link) = ir.scopes.links.iter().find(|link| {
-                    crate::ir_semantic::matcher_pattern_matches(
-                        ir,
-                        &link.pattern,
-                        key.split('.').next().unwrap_or(key),
-                        &crate::ir_semantic::WorkspaceFacts {
-                            snapshot: self.snapshot,
-                        },
-                    )
-                }) && !link
-                    .from
-                    .iter()
-                    .any(|scope| matches!(scope, rules::ir::ScopeRef::Any))
-                {
-                    alternatives.push(ScopeContract::Scopes(
-                        link.from
-                            .iter()
-                            .filter_map(|scope| scope.type_name())
-                            .map(|scope| ir.strings().resolve(scope).to_owned())
-                            .collect(),
-                    ));
-                } else {
-                    alternatives.push(ScopeContract::Unconstrained);
-                }
-                continue;
-            }
-            let mut constraints = Vec::new();
-            if let Some(effect) = &field.scope
-                && !effect.scopes_in.is_empty()
-            {
-                constraints.push(ScopeContract::Scopes(
-                    effect
-                        .scopes_in
-                        .iter()
-                        .map(|scope| ir.strings().resolve(*scope).to_owned())
-                        .collect(),
-                ));
-            }
-            if field
-                .scope
-                .as_ref()
-                .is_none_or(|effect| effect.push.is_none() && effect.set.is_empty())
-            {
-                let child = match field.value {
-                    FieldValue::Block(child) => Some(child),
-                    FieldValue::SelfBlock => Some(schema),
-                    _ => None,
-                };
-                if let Some(child) = child
-                    && let TemplateValue::Block { items, .. } = &property.value
-                {
-                    let union = field
-                        .control
-                        .as_ref()
-                        .and_then(|control| control.op)
-                        .is_some_and(|op| ir.strings().resolve(op).eq_ignore_ascii_case("or"));
-                    let children = items
-                        .iter()
-                        .map(|item| self.ir_item(child, item))
-                        .collect::<Vec<_>>();
-                    constraints.push(self.combine_ir_contracts(&children, union));
-                }
-            }
-            alternatives.push(self.combine_ir_contracts(&constraints, false));
-        }
-        self.combine_ir_contracts(&alternatives, true)
-    }
-}
-
-fn template_dispatches(items: &[TemplateItem]) -> bool {
-    items.iter().any(|item| match item {
-        TemplateItem::Recover(_) => true,
-        TemplateItem::Conditional(conditional) => template_dispatches(&conditional.items),
-        TemplateItem::Property(property) => {
-            token_has_parameter(&property.key)
-                || match &property.value {
-                    TemplateValue::Block { items, .. } => template_dispatches(items),
-                    _ => false,
-                }
-        }
-        _ => false,
-    })
-}
-
-fn token_has_parameter(token: &TemplateToken) -> bool {
-    token
-        .fragments
-        .iter()
-        .any(|fragment| matches!(fragment, TemplateFragment::Parameter { .. }))
-}
-
-fn single_literal(token: &TemplateToken) -> Option<&str> {
-    match token.fragments.as_slice() {
-        [TemplateFragment::Literal(text)] => Some(text),
-        _ => None,
-    }
 }
 
 fn build_contract_report(
@@ -621,27 +390,35 @@ fn build_contract_report(
             }
         }
     }
-    let mut inference = ContractInference {
-        snapshot,
-        memo: BTreeMap::new(),
-        visiting: BTreeSet::new(),
-        dynamic: BTreeSet::new(),
-    };
-    let mut contracts = BTreeMap::new();
-    for (kind, name) in &candidates {
+    let facts = crate::ir_semantic::WorkspaceFacts { snapshot };
+    let mut report = DynamicContractReport::default();
+    for (kind, name) in candidates {
         cancellation.checkpoint()?;
-        let Some(resolved) = resolve_dynamic_definition(snapshot, kind, name) else {
-            continue;
+        let checked =
+            hir::template_scope::entry_scopes(snapshot.ir(), &facts, &kind, &name, &mut || {
+                cancellation.checkpoint()
+            })?;
+        let key = (kind.to_ascii_lowercase(), name.to_ascii_lowercase());
+        let contract = if snapshot.ir().scopes.types.is_empty() {
+            ScopeContract::Unknown
+        } else if checked.value.possible.is_empty() {
+            ScopeContract::Empty
+        } else if checked.value.possible.len() == snapshot.ir().scopes.types.len() {
+            if checked.coverage.is_complete() {
+                ScopeContract::Unconstrained
+            } else {
+                ScopeContract::Unknown
+            }
+        } else {
+            ScopeContract::Scopes(checked.value.possible.clone())
         };
-        let key = (
-            resolved.summary.kind.to_ascii_lowercase(),
-            resolved.summary.name.to_ascii_lowercase(),
-        );
-        let contract = inference.contract_of(&resolved);
-        contracts.insert(key, contract);
+        if checked.value.dynamic {
+            report.dynamic.insert(key.clone());
+        }
+        report
+            .conditions
+            .insert(key.clone(), checked.value.conditions.into_iter().collect());
+        report.contracts.insert(key, contract);
     }
-    Ok(DynamicContractReport {
-        contracts,
-        dynamic: inference.dynamic,
-    })
+    Ok(report)
 }

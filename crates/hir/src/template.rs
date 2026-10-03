@@ -688,12 +688,8 @@ impl<E> Interpreter<'_, E> {
                     self.add(domain, token, &state);
                     return Ok(());
                 };
-                let mut fields = ir.lookup(schema, &key, shape).collect::<Vec<_>>();
-                let exact = fields.iter().copied().filter(|id| matches!(ir.matcher(ir.field(*id).key), Matcher::Literal(symbol) if ir.strings().resolve(*symbol).eq_ignore_ascii_case(&key))).collect::<Vec<_>>();
-                if !exact.is_empty() {
-                    fields = exact;
-                }
-                fields.retain(|id| key_matches(ir, ir.field(*id).key, &key, self.facts));
+                let mut fields =
+                    crate::checking::field_candidates(ir, schema, &key, shape, self.facts);
                 let scoped = fields
                     .iter()
                     .copied()
@@ -978,10 +974,10 @@ mod tests {
     use super::*;
     use rules::replacement::{Template, TemplateItem, TemplateProperty, TemplateValue};
 
-    struct Definitions(BTreeMap<String, Arc<Template>>);
+    struct Definitions(BTreeMap<String, Arc<Template>>, rules::ir::TypeId);
     impl rules::ir::SymbolFacts for Definitions {
-        fn type_member(&self, _: rules::ir::TypeId, name: &str) -> bool {
-            self.0.contains_key(&name.to_ascii_lowercase())
+        fn type_member(&self, ty: rules::ir::TypeId, name: &str) -> bool {
+            ty == self.1 && self.0.contains_key(&name.to_ascii_lowercase())
         }
         fn replacement_template(&self, _: rules::ir::TypeId, name: &str) -> Option<Arc<Template>> {
             self.0.get(&name.to_ascii_lowercase()).cloned()
@@ -1053,7 +1049,7 @@ mod tests {
             "chain10000".into(),
             definition("chain10000", "add_prestige", false),
         );
-        let facts = Definitions(definitions);
+        let facts = Definitions(definitions, ir.type_by_name("scripted_effect").unwrap());
         let sites = parameter_sites::<std::convert::Infallible>(
             &ir,
             &facts,
@@ -1067,6 +1063,16 @@ mod tests {
         .unwrap();
         assert!(sites.coverage.is_complete(), "{:?}", sites.coverage);
         assert_eq!(sites.len(), 1);
+        let scopes = crate::template_scope::entry_scopes::<std::convert::Infallible>(
+            &ir,
+            &facts,
+            "scripted_effect",
+            "chain0",
+            &mut || Ok(()),
+        )
+        .unwrap();
+        assert!(scopes.coverage.is_complete(), "{:?}", scopes.coverage);
+        assert_eq!(scopes.value.possible, vec!["country"]);
         let Domain::Value(matchers) = &sites[0].domain else {
             panic!("terminal scalar check missing");
         };

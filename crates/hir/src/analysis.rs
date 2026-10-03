@@ -52,6 +52,8 @@ pub enum ResidualReason {
     DynamicKey,
     /// An expression contains another unbound parameter.
     Binding,
+    /// Several rule interpretations remain feasible for the same container.
+    Interpretation,
     /// A scope register or transition remains unknown.
     Scope,
     /// Text interpretation is outside the adopted project support profile.

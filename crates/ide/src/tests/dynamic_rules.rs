@@ -96,7 +96,7 @@ fn dynamic_rows_locate_push_container_scope_contradictions() {
 
     assert_eq!(
         crate::dynamic_contracts::dynamic_contract(&snapshot, "scripted_effect", "bad_push"),
-        Some(ScopeContract::Scopes(vec!["country".into()]))
+        Some(ScopeContract::Empty)
     );
     let findings = ir_findings(&snapshot);
     assert!(
@@ -121,7 +121,7 @@ fn dynamic_rows_descend_opaque_entries_into_scope_switches() {
 
     assert_eq!(
         crate::dynamic_contracts::dynamic_contract(&snapshot, "scripted_effect", "opaque_entry"),
-        Some(ScopeContract::Unconstrained)
+        Some(ScopeContract::Empty)
     );
     let findings = ir_findings(&snapshot);
     assert!(

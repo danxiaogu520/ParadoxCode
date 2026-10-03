@@ -21,6 +21,57 @@ impl SymbolFacts for Facts<'_> {
     }
 }
 
+/// Shape/key dispatch shared by Template goals and ordinary lowering.
+pub fn field_candidates(
+    ir: &RulesIr,
+    schema: rules::ir::SchemaId,
+    key: &str,
+    shape: Shape,
+    facts: &dyn SymbolFacts,
+) -> Vec<rules::ir::FieldId> {
+    let mut candidates = ir.lookup(schema, key, shape).collect::<Vec<_>>();
+    let exact=candidates.iter().copied().filter(|id|matches!(ir.matcher(ir.field(*id).key),Matcher::Literal(name) if ir.strings().resolve(*name).eq_ignore_ascii_case(key))).collect::<Vec<_>>();
+    if !exact.is_empty() {
+        candidates = exact;
+    }
+    candidates.retain(|id| scalar_matches(ir, ir.field(*id).key, key, facts));
+    candidates
+}
+
+/// Input-scope validation preserves unresolved ambient registers as Unknown.
+pub fn field_scope_validation(
+    ir: &RulesIr,
+    id: rules::ir::FieldId,
+    state: &ScopeState,
+) -> crate::analysis::Validation {
+    use crate::analysis::Validation;
+    let Some(scope) = ir
+        .field(id)
+        .scope
+        .as_ref()
+        .filter(|scope| !scope.scopes_in.is_empty())
+    else {
+        return Validation::Valid;
+    };
+    match state.current.first() {
+        Some(ScopeValue::Invalid) => Validation::Invalid,
+        Some(ScopeValue::Known(names))
+            if names.len() == 1 && !names[0].eq_ignore_ascii_case("any") =>
+        {
+            if crate::ir_lowering::scope_value_allows(
+                ir,
+                state.current.first().expect("scope"),
+                &scope.scopes_in,
+            ) {
+                Validation::Valid
+            } else {
+                Validation::Invalid
+            }
+        }
+        _ => Validation::Unknown,
+    }
+}
+
 /// Interprets a scalar matcher using the same reference-prefix and pattern policy everywhere.
 pub fn scalar_matches(
     ir: &RulesIr,
@@ -193,6 +244,47 @@ pub fn scope_expression_allowed(
     ir.scope_matches(None, name) || ir.scopes.register(ir.strings(), name).is_some()
 }
 
+/// Three-valued scope expression checking, including actual register and link inputs.
+pub fn scope_validation(
+    ir: &RulesIr,
+    name: &str,
+    expected: Option<rules::ir::Symbol>,
+    state: &ScopeState,
+    facts: &dyn SymbolFacts,
+) -> crate::analysis::Validation {
+    use crate::analysis::Validation;
+    let parts = name.split('.').collect::<Vec<_>>();
+    let mut current = state.clone();
+    let mut unknown = false;
+    for (index, part) in parts.iter().enumerate() {
+        let expected = if index + 1 == parts.len() {
+            expected
+        } else {
+            None
+        };
+        if !scope_expression_allowed(ir, part, expected, Some(&current), facts) {
+            return Validation::Invalid;
+        }
+        if ir.scopes.register(ir.strings(),part).is_some() {
+            match crate::ir_scope_register_value(ir,&current,part) {
+                Some(ScopeValue::Invalid)=>return Validation::Invalid,
+                Some(ScopeValue::Known(names)) if names.len()==1 && !names[0].eq_ignore_ascii_case("any")=>{},
+                _=>unknown=true,
+            }
+        } else if let Some(link)=ir.scopes.links.iter().find(|link|pattern_matches(ir,&link.pattern,part,facts))
+            && !link.from.iter().any(|scope|matches!(scope,rules::ir::ScopeRef::Any))
+            && current.current.first().is_none_or(|scope|matches!(scope,ScopeValue::Unknown)|matches!(scope,ScopeValue::Known(names) if names.len()!=1 || names[0].eq_ignore_ascii_case("any"))) {
+            unknown=true;
+        }
+        current = crate::transition_ir_scope(ir, current, None, part);
+    }
+    if unknown {
+        Validation::Unknown
+    } else {
+        Validation::Valid
+    }
+}
+
 /// Checks the workspace-dependent form without granting missing environment capabilities a pass.
 pub fn scalar_validation(
     ir: &RulesIr,
@@ -208,20 +300,8 @@ pub fn scalar_validation(
         {
             facts.asset_member(ir.strings().resolve(*category), value)
         }
-        Matcher::Scope(expected) => Some(scope_expression_allowed(
-            ir,
-            value,
-            *expected,
-            Some(state),
-            facts,
-        )),
-        Matcher::Link => Some(scope_expression_allowed(
-            ir,
-            value,
-            None,
-            Some(state),
-            facts,
-        )),
+        Matcher::Scope(expected) => return scope_validation(ir, value, *expected, state, facts),
+        Matcher::Link => return scope_validation(ir, value, None, state, facts),
         Matcher::Union(items) => {
             let mut unknown = false;
             for id in items.iter() {
@@ -322,11 +402,11 @@ pub fn check_fragment<E>(
     source: &crate::template_text::RenderedTemplate,
     checkpoint: &mut dyn FnMut() -> Result<(), E>,
 ) -> Result<crate::analysis::Analysis<Vec<ConstraintEvidence>>, E> {
-    use crate::analysis::{Analysis, AnalysisCoverage, ResidualReason, Validation};
-    let mut coverage = AnalysisCoverage::default();
+    use crate::analysis::{Analysis, ResidualReason, Validation};
+    let mut coverage = hir.analysis_coverage().clone();
     let mut result = Vec::new();
     for error in hir.syntax().errors() {
-        if !source.has_hole(error.range) {
+        if !source.has_hole(error.range) && !source.has_unresolved_structure(error.range) {
             result.push(ConstraintEvidence {
                 severity: rules::source::Severity::Error,
                 kind: IssueKind::Syntax,
@@ -337,8 +417,28 @@ pub fn check_fragment<E>(
         }
     }
     let display = display_ranges(ir, hir);
+    for overload in hir
+        .overload_facts()
+        .iter()
+        .filter(|overload| overload.validation == Validation::Invalid)
+    {
+        result.push(ConstraintEvidence {
+            severity: rules::source::Severity::Error,
+            kind: IssueKind::Value,
+            range: overload.range,
+            explanation: "no rule overload accepts this complete block".into(),
+            container: overload.container,
+        });
+    }
     let mut counts = std::collections::BTreeMap::<(text::TextRange, usize), u32>::new();
     for property in hir.properties() {
+        if hir.overload_facts().iter().any(|overload| {
+            overload.validation != Validation::Valid
+                && overload.container.start() <= property.key_range.start()
+                && property.key_range.end() <= overload.container.end()
+        }) {
+            continue;
+        }
         checkpoint()?;
         if display.iter().any(|range| {
             range.start() < property.range.start() && property.range.end() <= range.end()
@@ -360,7 +460,9 @@ pub fn check_fragment<E>(
         else {
             continue;
         };
-        if source.has_hole(property.range) {
+        if source.has_hole(property.key_range)
+            || source.has_unresolved_structure(property.key_range)
+        {
             coverage.residuals.insert(ResidualReason::Binding);
             continue;
         }
@@ -420,6 +522,9 @@ pub fn check_fragment<E>(
         let mut selected = scoped[0];
         for id in &scoped {
             let outcome = match (ir.field(*id).value, property.scalar.as_ref()) {
+                (FieldValue::Scalar(_), Some(scalar)) if source.has_hole(scalar.range) => {
+                    Validation::Unknown
+                }
                 (FieldValue::Scalar(matcher), Some(scalar)) => {
                     scalar_validation(ir, matcher, &scalar.value, &parent.state, facts)
                 }
@@ -457,17 +562,25 @@ pub fn check_fragment<E>(
         *counts.entry((parent.range, selected.index())).or_default() += 1;
     }
     for context in hir.schema_facts() {
+        if hir.overload_facts().iter().any(|overload| {
+            overload.validation != Validation::Valid
+                && overload.container.start() <= context.range.start()
+                && context.range.end() <= overload.container.end()
+        }) {
+            continue;
+        }
         checkpoint()?;
         if display.iter().any(|range| {
             range.start() < context.range.start() && context.range.end() <= range.end()
         }) {
             continue;
         }
-        if source.has_hole(context.range) {
+        if source.has_hole(context.range) || source.has_unresolved_structure(context.range) {
             coverage.residuals.insert(ResidualReason::Binding);
         }
         let schema = ir.schema(context.schema);
         if !source.has_hole(context.range)
+            && !source.has_unresolved_structure(context.range)
             && !schema.forms.is_empty()
             && !schema.forms.iter().any(|form| {
                 form.counts.iter().all(|(ids, card)| {
@@ -519,7 +632,9 @@ pub fn check_fragment<E>(
                         .unwrap_or(0)
                 })
                 .sum::<u32>();
-            if (count < minimum && !source.has_hole(context.range))
+            if (count < minimum
+                && !source.has_hole(context.range)
+                && !source.has_unresolved_structure(context.range))
                 || maximum.is_some_and(|max| count > max)
             {
                 result.push(ConstraintEvidence {

@@ -299,6 +299,7 @@ pub enum HirReferenceOrigin {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HirFile {
     pub(super) analysis_coverage: crate::analysis::AnalysisCoverage,
+    pub(super) overload_facts: Vec<crate::block_checking::OverloadFact>,
     pub(super) syntax: Arc<ParsedFile>,
     pub(super) scope: Scope,
     pub(super) properties: Vec<HirProperty>,
@@ -322,6 +323,11 @@ pub struct HirFile {
 }
 
 impl HirFile {
+    /// Correlated whole-container overload selections and unresolved alternatives.
+    pub fn overload_facts(&self) -> &[crate::block_checking::OverloadFact] {
+        &self.overload_facts
+    }
+
     /// Coverage of generated semantic facts and represented Template declarations.
     pub fn analysis_coverage(&self) -> &crate::analysis::AnalysisCoverage {
         &self.analysis_coverage

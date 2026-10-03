@@ -1,8 +1,8 @@
 //! HIR facts lowered from the compiled Rules IR.
 use parser::{ParsedFile, parse_quoted_script};
 use rules::ir::{
-    DefName, Matcher, MatcherId, RefTarget, RootRule, RulesIr, SchemaId, Shape, SubtypeSet,
-    SymbolFacts, TypeId,
+    DefName, FieldId, Matcher, MatcherId, RefTarget, RootRule, RulesIr, SchemaId, Shape,
+    SubtypeSet, SymbolFacts, TypeId,
 };
 use text::{LogicalPath, TextRange};
 
@@ -11,8 +11,10 @@ use crate::{
     ScopeFact, ScopeState, ScopeValue,
 };
 
+#[derive(Clone)]
 pub(super) struct IrFacts {
     pub analysis_coverage: crate::analysis::AnalysisCoverage,
+    pub overload_facts: Vec<crate::block_checking::OverloadFact>,
     pub retain_validation_facts: bool,
     pub symbol_facts_dependency: std::cell::Cell<bool>,
     pub schema_facts: Vec<SchemaFact>,
@@ -51,6 +53,7 @@ pub(super) fn lower(
     let children = crate::scope::property_children(props);
     let mut out = IrFacts {
         analysis_coverage: Default::default(),
+        overload_facts: Vec::new(),
         retain_validation_facts,
         symbol_facts_dependency: std::cell::Cell::new(false),
         schema_facts: vec![],
@@ -231,6 +234,7 @@ pub(super) fn lower_schema_fragment(
     let children = crate::scope::property_children(&props);
     let mut out = IrFacts {
         analysis_coverage: Default::default(),
+        overload_facts: Vec::new(),
         retain_validation_facts: true,
         symbol_facts_dependency: std::cell::Cell::new(false),
         schema_facts: vec![SchemaFact {
@@ -382,11 +386,42 @@ fn descend(
             ScopeValue::Known(names) => names.len() != 1 || names[0].eq_ignore_ascii_case("any"),
             ScopeValue::Invalid => false,
         });
-        let candidates = if p.scalar.is_some() && uncertain_scope {
+        let mut candidates = if (p.scalar.is_some() && uncertain_scope)
+            || (p.scalar.is_none() && candidates.len() > 1)
+        {
             candidates
         } else {
             selected.into_iter().collect::<Vec<_>>()
         };
+        let mut fork = false;
+        if p.scalar.is_none() && candidates.len() > 1 {
+            let template_text = out.definitions.iter().any(|definition| {
+                out.template_kinds
+                    .contains(&definition.kind.to_ascii_lowercase())
+                    && definition.range.start() <= p.range.start()
+                    && p.range.end() <= definition.range.end()
+            });
+            let checked = crate::block_checking::select_overloads::<std::convert::Infallible>(
+                ir,
+                props,
+                children,
+                index,
+                schema,
+                &state,
+                &candidates,
+                &FactsRef(facts, &out.symbol_facts_dependency),
+                &[],
+                template_text,
+                &mut || Ok(()),
+            )
+            .expect("infallible checkpoint");
+            out.analysis_coverage.merge(&checked.coverage);
+            candidates = checked.value.fields.clone();
+            fork = checked.value.validation != crate::analysis::Validation::Valid;
+            if out.retain_validation_facts {
+                out.overload_facts.push(checked.value);
+            }
+        }
         // Scope alternatives remain in FieldFact for diagnostics. Symbol
         // collection must still respect each alternative's value domain: a
         // religion accepted by one overload is not an unresolved country tag
@@ -484,223 +519,320 @@ fn descend(
                 }),
             });
         }
-        for id in candidates {
-            let field = ir.field(id);
-            if let Some(control) = &field.control
-                && matches!(
-                    control.kind,
-                    rules::source::ControlKind::Branch | rules::source::ControlKind::BranchContinue
-                )
-            {
-                let guard = control.guard.and_then(|guard| {
-                    children[index].iter().find_map(|child| {
-                        let child = &props[*child];
-                        child
-                            .key
-                            .eq_ignore_ascii_case(ir.strings().resolve(guard))
-                            .then_some(child.range)
-                    })
-                });
-                out.runtime_parameter_guards.push((p.range, guard));
+        if fork {
+            let base = out.clone();
+            let mut branches = Vec::new();
+            for id in candidates {
+                let mut branch = base.clone();
+                let mut branch_seen = seen.clone();
+                lower_field_candidate(
+                    ir,
+                    path,
+                    props,
+                    bare_values,
+                    children,
+                    index,
+                    schema,
+                    &subtypes,
+                    &state,
+                    facts,
+                    source,
+                    &mut branch,
+                    &mut branch_seen,
+                    branch_self_schema,
+                    scalar_symbol_fields.as_ref(),
+                    id,
+                );
+                branches.push(branch);
             }
-            let key_def_is_field_def = matches!(
-                (&field.def, ir.matcher(field.key)),
-                (
-                    Some(def),
-                    Matcher::Def { type_id, subtype }
-                ) if def.type_id == *type_id && def.subtype == *subtype
-            );
-            if !key_def_is_field_def {
-                collect_matcher_refs(ir, field.key, &p.key, p.key_range, facts, out);
-            }
-            let mut candidate_subtypes = SubtypeSet::default();
-            if !key_def_is_field_def
-                && let Matcher::Def { type_id, subtype } = ir.matcher(field.key)
-            {
-                if let Some(subtype) = subtype {
-                    candidate_subtypes.insert(*type_id, *subtype);
+            if let Some(first) = branches.first() {
+                macro_rules! common {
+                    ($field:ident) => {
+                        out.$field = first
+                            .$field
+                            .iter()
+                            .filter(|item| {
+                                branches.iter().all(|branch| branch.$field.contains(item))
+                            })
+                            .cloned()
+                            .collect();
+                    };
                 }
-                let name = p.key.clone();
+                common!(field_facts);
+                common!(scope_facts);
+                common!(definitions);
+                common!(references);
+                common!(binding_references);
+                common!(definition_attributes);
+                common!(runtime_parameter_guards);
+                common!(overload_facts);
+                out.schema_facts = branches
+                    .iter()
+                    .flat_map(|branch| branch.schema_facts.iter().cloned())
+                    .collect();
+                out.schema_facts
+                    .sort_by_key(|fact| (fact.range, fact.schema.index()));
+                out.schema_facts.dedup();
+                for branch in &branches {
+                    out.analysis_coverage.merge(&branch.analysis_coverage);
+                }
+                out.symbol_facts_dependency.set(
+                    branches
+                        .iter()
+                        .any(|branch| branch.symbol_facts_dependency.get()),
+                );
+            }
+        } else {
+            for id in candidates {
+                lower_field_candidate(
+                    ir,
+                    path,
+                    props,
+                    bare_values,
+                    children,
+                    index,
+                    schema,
+                    &subtypes,
+                    &state,
+                    facts,
+                    source,
+                    out,
+                    seen,
+                    branch_self_schema,
+                    scalar_symbol_fields.as_ref(),
+                    id,
+                );
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_field_candidate(
+    ir: &RulesIr,
+    path: &LogicalPath,
+    props: &[HirProperty],
+    bare_values: &[crate::HirScalar],
+    children: &[Vec<usize>],
+    index: usize,
+    schema: SchemaId,
+    subtypes: &SubtypeSet,
+    state: &ScopeState,
+    facts: Option<&dyn SymbolFacts>,
+    source: &ParsedFile,
+    out: &mut IrFacts,
+    seen: &mut std::collections::BTreeSet<(u32, u32)>,
+    branch_self_schema: Option<SchemaId>,
+    scalar_symbol_fields: Option<&Vec<FieldId>>,
+    id: FieldId,
+) {
+    let p = &props[index];
+    let field = ir.field(id);
+    if let Some(control) = &field.control
+        && matches!(
+            control.kind,
+            rules::source::ControlKind::Branch | rules::source::ControlKind::BranchContinue
+        )
+    {
+        let guard = control.guard.and_then(|guard| {
+            children[index].iter().find_map(|child| {
+                let child = &props[*child];
+                child
+                    .key
+                    .eq_ignore_ascii_case(ir.strings().resolve(guard))
+                    .then_some(child.range)
+            })
+        });
+        out.runtime_parameter_guards.push((p.range, guard));
+    }
+    let key_def_is_field_def = matches!(
+        (&field.def, ir.matcher(field.key)),
+        (
+            Some(def),
+            Matcher::Def { type_id, subtype }
+        ) if def.type_id == *type_id && def.subtype == *subtype
+    );
+    if !key_def_is_field_def {
+        collect_matcher_refs(ir, field.key, &p.key, p.key_range, facts, out);
+    }
+    let mut candidate_subtypes = SubtypeSet::default();
+    if !key_def_is_field_def && let Matcher::Def { type_id, subtype } = ir.matcher(field.key) {
+        if let Some(subtype) = subtype {
+            candidate_subtypes.insert(*type_id, *subtype);
+        }
+        let name = p.key.clone();
+        push_definition(
+            ir,
+            out,
+            *type_id,
+            name.clone(),
+            p.range,
+            p.key_range,
+            children[index]
+                .iter()
+                .map(|child| props[*child].key.clone())
+                .collect(),
+            subtype_names_from_set(ir, *type_id, &candidate_subtypes),
+        );
+        add_bindings(ir, *type_id, &name, p.key_range, out);
+    }
+    if let rules::ir::FieldValue::Scalar(matcher) = field.value
+        && let Some(scalar) = &p.scalar
+        && let Matcher::Def { type_id, subtype } = ir.matcher(matcher)
+    {
+        let mut value_subtypes = candidate_subtypes.clone();
+        if let Some(subtype) = subtype {
+            value_subtypes.insert(*type_id, *subtype);
+        }
+        push_definition(
+            ir,
+            out,
+            *type_id,
+            scalar.value.clone(),
+            p.range,
+            scalar.range,
+            children[index]
+                .iter()
+                .map(|child| props[*child].key.clone())
+                .collect(),
+            subtype_names_from_set(ir, *type_id, &value_subtypes),
+        );
+        add_bindings(ir, *type_id, &scalar.value, scalar.range, out);
+    }
+    if let Some(def) = &field.def {
+        if let Some(subtype) = def.subtype {
+            candidate_subtypes.insert(def.type_id, subtype);
+        }
+        if let Some(name) = instance_name(ir, def, Some(p), path, props, &children[index]) {
+            let selection =
+                definition_selection(ir, def, Some(p), props, &children[index], p.key_range);
+            if seen.insert((p.key_range.start(), id.index() as u32)) {
                 push_definition(
                     ir,
                     out,
-                    *type_id,
+                    def.type_id,
                     name.clone(),
                     p.range,
-                    p.key_range,
+                    selection,
                     children[index]
                         .iter()
                         .map(|child| props[*child].key.clone())
                         .collect(),
-                    subtype_names_from_set(ir, *type_id, &candidate_subtypes),
+                    subtype_names_from_set(ir, def.type_id, &candidate_subtypes),
                 );
-                add_bindings(ir, *type_id, &name, p.key_range, out);
             }
-            if let rules::ir::FieldValue::Scalar(matcher) = field.value
-                && let Some(scalar) = &p.scalar
-                && let Matcher::Def { type_id, subtype } = ir.matcher(matcher)
-            {
-                let mut value_subtypes = candidate_subtypes.clone();
-                if let Some(subtype) = subtype {
-                    value_subtypes.insert(*type_id, *subtype);
-                }
-                push_definition(
-                    ir,
-                    out,
-                    *type_id,
-                    scalar.value.clone(),
-                    p.range,
-                    scalar.range,
-                    children[index]
-                        .iter()
-                        .map(|child| props[*child].key.clone())
-                        .collect(),
-                    subtype_names_from_set(ir, *type_id, &value_subtypes),
-                );
-                add_bindings(ir, *type_id, &scalar.value, scalar.range, out);
-            }
-            if let Some(def) = &field.def {
-                if let Some(subtype) = def.subtype {
-                    candidate_subtypes.insert(def.type_id, subtype);
-                }
-                if let Some(name) = instance_name(ir, def, Some(p), path, props, &children[index]) {
-                    let selection = definition_selection(
-                        ir,
-                        def,
-                        Some(p),
-                        props,
-                        &children[index],
-                        p.key_range,
-                    );
-                    if seen.insert((p.key_range.start(), id.index() as u32)) {
-                        push_definition(
-                            ir,
-                            out,
-                            def.type_id,
-                            name.clone(),
-                            p.range,
-                            selection,
-                            children[index]
-                                .iter()
-                                .map(|child| props[*child].key.clone())
-                                .collect(),
-                            subtype_names_from_set(ir, def.type_id, &candidate_subtypes),
-                        );
-                    }
-                    add_bindings(ir, def.type_id, &name, selection, out);
-                }
-            }
-            if let rules::ir::FieldValue::Scalar(matcher) = field.value
-                && let Some(s) = &p.scalar
-            {
-                // Pure scalar definitions already have the property's range,
-                // attributes and bindings above. Collecting them again with
-                // the token range would create a second definition.
-                if !matches!(ir.matcher(matcher), Matcher::Def { .. })
-                    && scalar_symbol_fields
-                        .as_ref()
-                        .is_none_or(|fields| fields.contains(&id))
-                {
-                    collect_matcher_refs(ir, matcher, &s.value, s.range, facts, out);
-                }
-            }
-            if p.scalar.is_none()
-                && let Some(kind) = crate::template::template_kind(ir, field.key)
-            {
-                // The first pass has no workspace facts yet. Missing template
-                // templates must still schedule a replay once definitions exist.
-                out.symbol_facts_dependency.set(true);
-                if let Some(facts) = facts {
-                    lower_template_arguments(
-                        ir,
-                        source,
-                        path,
-                        props,
-                        &children[index],
-                        &kind,
-                        &p.key,
-                        &state,
-                        facts,
-                        out,
-                        seen,
-                    );
-                }
-            }
-            if let Some(child_schema) = if matches!(field.value, rules::ir::FieldValue::SelfBlock) {
-                Some(branch_self_schema.unwrap_or(schema))
-            } else {
-                ir.child(id, schema)
-            } {
-                if p.scalar.as_ref().is_some_and(|scalar| scalar.quoted) {
-                    continue;
-                }
-                let key_def = match ir.matcher(field.key) {
-                    Matcher::Def { type_id, subtype } => Some((*type_id, *subtype)),
-                    _ => None,
-                };
-                let value_def = match field.value {
-                    rules::ir::FieldValue::Scalar(matcher) => match ir.matcher(matcher) {
-                        Matcher::Def { type_id, subtype } => Some((*type_id, *subtype)),
-                        _ => None,
-                    },
-                    _ => None,
-                };
-                let instance_def = field
-                    .def
+            add_bindings(ir, def.type_id, &name, selection, out);
+        }
+    }
+    if let rules::ir::FieldValue::Scalar(matcher) = field.value
+        && let Some(s) = &p.scalar
+    {
+        // Pure scalar definitions already have the property's range,
+        // attributes and bindings above. Collecting them again with
+        // the token range would create a second definition.
+        if !matches!(ir.matcher(matcher), Matcher::Def { .. })
+            && scalar_symbol_fields
+                .as_ref()
+                .is_none_or(|fields| fields.contains(&id))
+        {
+            collect_matcher_refs(ir, matcher, &s.value, s.range, facts, out);
+        }
+    }
+    if p.scalar.is_none()
+        && let Some(kind) = crate::template::template_kind(ir, field.key)
+    {
+        // The first pass has no workspace facts yet. Missing template
+        // templates must still schedule a replay once definitions exist.
+        out.symbol_facts_dependency.set(true);
+        if let Some(facts) = facts {
+            lower_template_arguments(
+                ir,
+                source,
+                path,
+                props,
+                &children[index],
+                &kind,
+                &p.key,
+                state,
+                facts,
+                out,
+                seen,
+            );
+        }
+    }
+    if let Some(child_schema) = if matches!(field.value, rules::ir::FieldValue::SelfBlock) {
+        Some(branch_self_schema.unwrap_or(schema))
+    } else {
+        ir.child(id, schema)
+    } {
+        if p.scalar.as_ref().is_some_and(|scalar| scalar.quoted) {
+            return;
+        }
+        let key_def = match ir.matcher(field.key) {
+            Matcher::Def { type_id, subtype } => Some((*type_id, *subtype)),
+            _ => None,
+        };
+        let value_def = match field.value {
+            rules::ir::FieldValue::Scalar(matcher) => match ir.matcher(matcher) {
+                Matcher::Def { type_id, subtype } => Some((*type_id, *subtype)),
+                _ => None,
+            },
+            _ => None,
+        };
+        let instance_def = field
+            .def
+            .as_ref()
+            .map(|def| (def.type_id, def.subtype))
+            .or(key_def)
+            .or(value_def);
+        let mut child_subtypes = if instance_def.is_some() {
+            SubtypeSet::default()
+        } else {
+            subtypes.clone()
+        };
+        if let Some((type_id, Some(subtype))) = instance_def {
+            child_subtypes.insert(type_id, subtype);
+        }
+        let child_state = transition_state(ir, state.clone(), field.scope.as_ref(), &p.key);
+        if let Some(range) = p.value_range
+            && out.retain_validation_facts
+        {
+            out.schema_facts.push(SchemaFact {
+                range,
+                schema: child_schema,
+                subtypes: child_subtypes.clone(),
+                state: child_state.clone(),
+            });
+        }
+        if !children[index].is_empty() {
+            descend(
+                ir,
+                path,
+                props,
+                bare_values,
+                children,
+                children[index].clone(),
+                child_schema,
+                child_subtypes,
+                child_state,
+                facts,
+                source,
+                out,
+                seen,
+                p.value_range.unwrap_or(p.range),
+                field
+                    .control
                     .as_ref()
-                    .map(|def| (def.type_id, def.subtype))
-                    .or(key_def)
-                    .or(value_def);
-                let mut child_subtypes = if instance_def.is_some() {
-                    SubtypeSet::default()
-                } else {
-                    subtypes.clone()
-                };
-                if let Some((type_id, Some(subtype))) = instance_def {
-                    child_subtypes.insert(type_id, subtype);
-                }
-                let child_state = transition_state(ir, state.clone(), field.scope.as_ref(), &p.key);
-                if let Some(range) = p.value_range
-                    && out.retain_validation_facts
-                {
-                    out.schema_facts.push(SchemaFact {
-                        range,
-                        schema: child_schema,
-                        subtypes: child_subtypes.clone(),
-                        state: child_state.clone(),
-                    });
-                }
-                if !children[index].is_empty() {
-                    descend(
-                        ir,
-                        path,
-                        props,
-                        bare_values,
-                        children,
-                        children[index].clone(),
-                        child_schema,
-                        child_subtypes,
-                        child_state,
-                        facts,
-                        source,
-                        out,
-                        seen,
-                        p.value_range.unwrap_or(p.range),
-                        field
-                            .control
-                            .as_ref()
-                            .filter(|control| {
-                                matches!(
-                                    control.kind,
-                                    rules::source::ControlKind::Weighted
-                                        | rules::source::ControlKind::Chance
-                                        | rules::source::ControlKind::Switch
-                                )
-                            })
-                            .map(|_| schema),
-                    );
-                }
-            }
+                    .filter(|control| {
+                        matches!(
+                            control.kind,
+                            rules::source::ControlKind::Weighted
+                                | rules::source::ControlKind::Chance
+                                | rules::source::ControlKind::Switch
+                        )
+                    })
+                    .map(|_| schema),
+            );
         }
     }
 }
