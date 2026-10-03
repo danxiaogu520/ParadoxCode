@@ -12,7 +12,6 @@ readme.workspace = true
 publish = false
 
 [dependencies]
-rustc-hash = "2"
 parser = { path = "../parser" }
 rules = { path = "../rules" }
 text = { path = "../text" }
