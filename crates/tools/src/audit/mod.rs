@@ -6,8 +6,9 @@ pub mod client;
 pub mod compare;
 pub mod completions;
 pub mod resources;
+pub mod templates;
 
-pub const HELP: &str = "tools audit errors --report PATH (--installation DIR | --prior-review DIR --prior-cache PATH --cache PATH) --output DIR [--decisions PATH]\ntools audit diff --before DIR --before-cache PATH --after DIR --after-cache PATH --output PATH\ntools audit completions --baseline PATH --cache PATH --output DIR\ntools audit diagnose|sweep|baseline --server PATH (--mod DIR | --vanilla-source DIR) --vanilla-cache PATH --output DIR";
+pub const HELP: &str = "tools audit errors --report PATH (--installation DIR | --prior-review DIR --prior-cache PATH --cache PATH) --output DIR [--decisions PATH]\ntools audit diff --before DIR --before-cache PATH --after DIR --after-cache PATH --output PATH\ntools audit completions --baseline PATH --cache PATH --output DIR\ntools audit templates --output DIR [--check-only] [--server PATH] [--samples N]\ntools audit diagnose|sweep|baseline --server PATH (--mod DIR | --vanilla-source DIR) --vanilla-cache PATH --output DIR";
 pub fn execute(arguments: &[String]) -> Result<String, String> {
     let Some((command, arguments)) = arguments.split_first() else {
         return Ok(HELP.into());
@@ -20,6 +21,9 @@ pub fn execute(arguments: &[String]) -> Result<String, String> {
     }
     if command == "completions" {
         return completions::execute(arguments);
+    }
+    if command == "templates" {
+        return templates::execute(arguments);
     }
     let args = Args::parse(
         arguments,

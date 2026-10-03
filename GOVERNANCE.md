@@ -20,7 +20,7 @@ lightweight, but repository rules enforce the quality and release invariants des
 All repository changes use pull requests, including maintainer changes. The `Conclusion` status
 check must pass before squash merge. Non-trivial changes should have an issue that records the
 problem, chosen approach, and any deferred work. Architectural decisions may be captured in that
-issue or in an active proposal beside the affected implementation when they need code review.
+issue or in an active proposal in the repository root when they need code review.
 Completed decision and acceptance records stay in issues, PRs, and immutable Git history.
 
 CODEOWNERS requests the current maintainer for review. Adding another maintainer should split

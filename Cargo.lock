@@ -1124,6 +1124,7 @@ dependencies = [
  "flate2",
  "game",
  "ide",
+ "parser",
  "pdc",
  "regex",
  "rules",
