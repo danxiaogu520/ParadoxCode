@@ -1,90 +1,128 @@
 # Releasing ParadoxCode
 
-ParadoxCode publishes the server and editor extension as one immutable version. The release
-workflow uses only repository-owned source and fixtures. The
-[distribution manifest](editors/vscode/server-distribution.json) declares native targets and archive layouts;
-[release verification](crates/tools/src/release.rs) derives the complete archive/checksum/VSIX inventory.
-The workflow verifies that payload and publishes it once. Licensed game files and local Vanilla sweep output never enter GitHub Actions or Releases.
+ParadoxCode releases the server and editor extension as one immutable version. The
+[distribution manifest](editors/vscode/server-distribution.json) owns the five native targets,
+archive layouts and size limits. GitHub publication promotes an already verified candidate;
+it does not rebuild the server or VSIX. Licensed game files and local Vanilla output never
+enter Actions or public releases. Marketplace publication remains a separate manual step.
 
-Visual Studio Marketplace publication remains a separate manual acceptance step. Validation
-ownership across the complete development lifecycle is documented in
-[the contributor validation guide](CONTRIBUTING.md#validation).
+## Publisher and repository setup
 
-## One-time publisher and repository setup
+- Keep the stable extension identity `paradoxcode.paradoxcode-vscode` and publisher `paradoxcode`.
+- Keep immutable GitHub releases, secret scanning, push protection and the `main-protection`
+  and `version-tags` rulesets enabled. `Conclusion` remains the required merge check;
+  formal `v*` tags cannot be moved or deleted.
+- Workflow changes require appropriate `workflow` permission. Check that capability before
+  preparing process changes; normal publishing uses short-lived `GITHUB_TOKEN` permissions.
+- Keep Marketplace credentials outside the repository and GitHub build jobs.
 
-1. Create or verify the `paradoxcode` publisher in Visual Studio Marketplace. The stable extension
-   identity is `paradoxcode.paradoxcode-vscode`.
-2. Enable immutable releases, secret scanning, push protection, Dependabot alerts, and Dependabot
-   security updates in the GitHub repository settings.
-3. Keep the `main-protection` and `version-tags` repository rulesets active. `main` requires the
-   `Conclusion` check; `v*` tags cannot be updated or deleted after creation.
-4. Keep Marketplace credentials outside the repository and GitHub build jobs.
+## Prepare the reviewed source
 
-## Release-preparation pull request
+1. Create a release-preparation PR. Update the workspace and extension version, the npm lockfile
+   and both Rust lockfiles. External package versions are not rewritten as workspace versions.
+2. Move the intended changes into a dated `CHANGELOG.md` section. That section becomes the
+   release notes; the comparison baseline is the last publicly published stable Release,
+   excluding unpublished tags and drafts.
+3. Run the affected local groups from [CONTRIBUTING.md](CONTRIBUTING.md#validation). Run
+   `cargo run --locked -p tools --no-default-features -- ci production-audit` before reserving
+   a formal version. High-severity advisories fail; an unavailable audit endpoint is also a
+   failure after bounded retries.
+4. Run local Vanilla acceptance when semantics change. Keep game-derived output local and
+   reduce defects to repository-owned fixtures.
+5. Merge only after `Conclusion` succeeds. A main push runs a lightweight evidence check:
+   matching tested source tree, check definitions, resolved Rust toolchain and successful
+   same-repository PR evidence allow reuse. Otherwise it runs the complete quality suite.
 
-1. Choose the version according to the release scope. Keep fixes and maintenance separate from
-   unrelated high-risk features.
-2. Update `Cargo.toml`, `editors/vscode/package.json`, and
-   `editors/vscode/package-lock.json`; update the root and fuzz lockfiles where required.
-3. Move the relevant `CHANGELOG.md` entries from Unreleased into a dated version section. Update
-   current-version user documentation without duplicating historical release prose.
-4. Run the affected local groups from the [contributor validation guide](CONTRIBUTING.md#validation). Package and install the VSIX into a
-   clean VS Code profile when extension startup, installation, or distribution changed.
-5. If diagnostic, rule, parser/HIR, index, or workspace-query behavior changed, run the local
-   Vanilla sweep as development evidence. Keep every generated report local and reduce any defect
-   found to a repository-owned regression fixture.
-6. Merge only after the pull request's required `Conclusion` check succeeds. Wait for the same
-   check to succeed on the resulting `main` commit.
+The complete CI suite retains an attempt-specific receipt and the validated VSIX for 90 days. Receipts
+include the actual checked-out merge tree, workflow/run identity, coverage and file digest.
+Failed, cancelled, incomplete, forked, expired or mismatched evidence is not reused. CI jobs
+cannot be marked successful merely because they were skipped. Rerun the complete workflow
+when an attempt lacks its required artifacts; receipts never borrow an older failed attempt.
 
-Local checks and sweep output do not authorize a release. The tagged commit's remote `Conclusion`
-is the source of truth.
+## Build and seal a candidate
 
-## Publish
+From the reviewed main workflow, dispatch:
 
-The workspace version is also the compatibility identity for persistent index and parse caches.
-Parser, analyzer, rule, and cache-format changes must ship under a new version. Published versions
-are immutable.
-
-Create and push an annotated version tag from the reviewed commit on `main`:
-
-```bash
-git tag -a vX.Y.Z -m "ParadoxCode X.Y.Z"
-git push origin vX.Y.Z
+```sh
+gh workflow run release-candidate.yml --ref main -f source=main
 ```
 
-The tag workflow performs these gates in order:
+`source` may also be an exact reviewed commit SHA reachable from main. The dispatch fixes the
+source identity; a later main update cannot silently change the candidate. Candidate control
+files must match the dispatched workflow.
 
-1. Verify stable SemVer, annotated-tag form, ancestry from `main`, a successful `Conclusion` check,
-   and the absence of an existing GitHub Release for the tag.
-2. Build and checksum the native server archives declared by the distribution manifest and verify that every binary reports the tag
-   version.
-3. Build, contract-test, audit, and package the VSIX at the same version.
-4. Reassemble and verify the complete release payload.
-5. Create a draft Release, compare every uploaded asset name with the verified payload, and only
-   then publish it. Repository release immutability locks the published assets and tag.
+The read-only candidate workflow:
 
-The workflow intentionally has no overwrite path. It can be manually rerun for an unpublished
-annotated tag, but it cannot replace or modify an existing Release.
+1. Verifies main CI evidence, all workspace/extension/lockfile versions and version availability.
+2. Performs a fresh production dependency audit before expensive platform builds.
+3. Builds all five native release targets once, checks each binary version, LSP startup, embedded
+   rules and diagnostics on owned input, then packages archives with checksums.
+   Lightweight `tools --no-default-features` packaging does not compile HIR/IDE
+   or embed game rules a second time.
+4. Downloads the original CI VSIX, verifies its producer and digest, and reuses those exact bytes.
+5. Verifies the complete inventory, archive contracts, VSIX identity and release notes. Seals
+   `candidate.json` with source/tree/policy, CI origin, producer run/attempt, sizes and SHA-256.
 
-## Recover an interrupted release
+The sealed `release-candidate-ATTEMPT` Actions artifact retains the complete public payload
+and notes for 90 days. No formal tag or GitHub Release is created during candidate preparation.
+Failed candidates can be corrected without consuming a formal version number.
 
-First distinguish infrastructure interruption from a product defect:
+The bounded startup check uses `ci candidate-smoke --binary PATH` without linking analyzer
+libraries. Public download and Marketplace installation are checked after those entry points exist.
 
-- For a transient build or GitHub interruption on an unpublished tag, rerun the Release workflow.
-- If the final job created an incomplete draft, confirm it is still a draft, record the failed run,
-  delete only that draft without deleting or moving its tag, then rerun the workflow.
-- If code or release metadata must change, repair it through a pull request and create a new patch
-  tag. Protected tags are never moved or deleted.
-- Published releases and their assets are never edited or replaced.
+## Promote the verified payload
 
-## Verify the public release
+After the entire candidate workflow succeeds, use its run ID:
 
-1. Confirm the Release is immutable and its assets exactly match the verified inventory, including
-   native archives, checksum sidecars, and the matching VSIX.
-2. Confirm the Release workflow's provenance, build, extension, payload-verification, and publish
-   jobs all passed.
-3. Upload the released VSIX manually to Visual Studio Marketplace. From a clean VS Code profile,
-   install the Marketplace version and verify checksum-backed server installation, startup,
-   completion, and diagnostics without relying on a populated global server cache.
-4. Record the GitHub Release and Marketplace links, known limitations, and milestone completion in
-   the release notes or release issue.
+```sh
+gh workflow run release.yml --ref main -f candidate_run=RUN_ID
+```
+
+Promotion executes trusted main control code. It accepts only a successful current attempt
+from the expected candidate workflow in this repository. Downloaded data is bounded, hashed,
+flat and non-executable; it cannot change the control program.
+
+Before any irreversible action, promotion rechecks candidate provenance, main ancestry, CI
+origin, versions, control definitions, all file digests/layouts and a fresh dependency audit.
+The audit uses the lockfile without installing packages or running lifecycle scripts, and
+receives no publication credential.
+
+It creates or resumes a draft under `candidate-RUN-ATTEMPT`, outside the formal `v*` namespace.
+It uploads the unchanged verified files and compares uploaded names, sizes, GitHub digests,
+source identity and notes. This staging draft is never publicly published.
+
+Only after every upload and verification succeeds does it create/push the annotated formal tag
+for the exact candidate commit, then reassign the prepared draft to that tag and publish it as
+immutable and latest. These are the final mutations. Tag pushes do not start builds or another
+CI suite. Published releases, assets and formal tags are never replaced.
+
+## Recover interruptions
+
+- For a failure before tag creation, correct the candidate source or retry transient infrastructure.
+- For an interrupted staging upload, redispatch promotion with the same candidate run. Matching
+  draft assets are preserved and only missing assets are uploaded. No formal tag has been reserved.
+- For an interruption between formal tag creation and public publication, redispatch the same
+  candidate. The tag must still point to its source; the complete draft is published without reupload.
+- Mismatched draft source, notes or assets fail without replacement. A published staging draft is
+  also refused; only a formal version may become public.
+- A retry after successful publication verifies the identical immutable payload and returns success.
+- For a corrupted draft, verify it is still unpublished, record the failed run and delete only that
+  draft through normal maintainer recovery before retrying. Never delete or move a formal tag.
+  Unused `candidate-RUN-ATTEMPT` references, if present, are temporary and may be cleaned up only
+  after confirming they are unrelated to a public Release.
+- Source or release metadata changes after a formal tag is reserved require a new patch version.
+- Missing, expired or rerun-attempt-mismatched candidate evidence requires a new successful candidate;
+  an existing formal tag can only be reused for its original exact source commit.
+
+## Verify public delivery
+
+1. Confirm the Release workflow succeeded, the public Release is immutable and all eleven assets
+   match the sealed inventory: five server archives, five checksum files and the VSIX.
+2. Download and verify the published files. From a separate VS Code profile with an empty server
+   cache, install the VSIX and check automatic download, checksum-backed startup, completion and
+   actual editor diagnostics.
+3. For Marketplace delivery, sign in to the existing `paradoxcode` publisher, upload the released
+   VSIX, wait for validation and verify the public version. Install that Marketplace version in
+   another clean profile and repeat the delivery checks.
+4. Record public links and verification outcomes in the release issue or local acceptance record.
+   Keep licensed content, raw game reports and credentials out of public records.

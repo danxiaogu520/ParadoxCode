@@ -5,16 +5,15 @@ on:
   push:
     branches: [main]
 
-# One run per ref; superseded runs are cancelled. Following rust-analyzer, every
-# job runs on every PR and push: no path filtering, no skip bookkeeping. The
-# fast lint jobs (rustfmt, clippy, rustdoc) return within minutes and never wait
-# behind the test suite, and the `conclusion` job aggregates them into a single
-# status check for branch protection.
+# PRs run the complete quality suite. A main push reuses a successful same-repository
+# PR receipt only when the actual tested tree, check definitions and toolchain match.
+# Missing or mismatched evidence selects full CI; Conclusion remains required.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
+  actions: read
   contents: read
   pull-requests: read
 
@@ -33,7 +32,27 @@ defaults:
     shell: bash
 
 jobs:
+  plan:
+    name: Resolve CI evidence
+    runs-on: ubuntu-latest
+    outputs:
+      full: ${{ steps.plan.outputs.full }}
+      reuse_run: ${{ steps.plan.outputs.reuse_run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: Select full CI or verified PR evidence
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: cargo run --locked -p tools --no-default-features -- ci plan
+
   workflow-lint:
+    needs: plan
+    if: needs.plan.outputs.full == 'true'
     name: Workflow lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -43,9 +62,11 @@ jobs:
         run: go install github.com/rhysd/actionlint/cmd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      - run: cargo run --locked -p tools -- ci workflow-lint
+      - run: cargo run --locked -p tools --no-default-features -- ci workflow-lint
 
   rustfmt:
+    needs: plan
+    if: needs.plan.outputs.full == 'true'
     name: Rust formatting
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -59,6 +80,8 @@ jobs:
       - run: cargo fmt --manifest-path fuzz/Cargo.toml -- --check
 
   clippy:
+    needs: plan
+    if: needs.plan.outputs.full == 'true'
     name: Clippy (Linux)
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -72,8 +95,11 @@ jobs:
         run: echo "::add-matcher::.github/rust.json"
       # dbg!/todo! never ship: an LSP server has no room for debug leftovers.
       - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings -D clippy::dbg_macro -D clippy::todo
+      - run: cargo clippy --locked -p tools --no-default-features --all-targets -- -D warnings -D clippy::dbg_macro -D clippy::todo
 
   rustdoc:
+    needs: plan
+    if: needs.plan.outputs.full == 'true'
     name: Rustdoc
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -86,6 +112,8 @@ jobs:
           RUSTDOCFLAGS: -D warnings
 
   rust:
+    needs: plan
+    if: needs.plan.outputs.full == 'true'
     name: Rust tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -121,6 +149,8 @@ jobs:
         run: cargo machete
 
   msrv:
+    needs: plan
+    if: needs.plan.outputs.full == 'true'
     name: Minimum supported Rust 1.88
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -134,19 +164,11 @@ jobs:
           key: msrv-1.88
       - run: cargo check --locked --workspace --all-features
 
-  windows-release:
-    name: Windows release build
-    runs-on: windows-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      # Keep the optimized build on a separate runner so it overlaps with the
-      # matrix test legs instead of extending their critical path.
-      - run: cargo build --locked --release -p pdc --bin paradoxcode
+      - run: cargo check --locked -p tools --no-default-features --all-targets
 
   vscode:
+    needs: plan
+    if: needs.plan.outputs.full == 'true'
     name: VS Code extension package
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -160,11 +182,21 @@ jobs:
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - run: npm ci --prefix editors/vscode --no-audit --no-fund
+      - name: Audit production dependencies before merge
+        run: cargo run --locked -p tools --no-default-features -- ci production-audit
       # The extension check compiles with tsc and smoke-tests the preview
       # contract against a cargo-built pdc, so both toolchains are present.
       - run: npm --prefix editors/vscode run test:ci
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ci-vsix-${{ github.run_attempt }}
+          path: target/paradoxcode-vscode-contract.vsix
+          retention-days: 90
+          if-no-files-found: error
 
   fuzz:
+    needs: plan
+    if: needs.plan.outputs.full == 'true'
     name: Fuzz targets compile and smoke
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -186,6 +218,8 @@ jobs:
         run: cargo run --locked -p tools -- fuzz smoke --target x86_64-unknown-linux-gnu --runs 200 --seed 1
 
   release:
+    needs: plan
+    if: needs.plan.outputs.full == 'true'
     name: Release and artifact smoke
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -202,6 +236,8 @@ jobs:
         run: cargo run --locked -p tools -- gates audit --root .
 
   dependencies:
+    needs: plan
+    if: needs.plan.outputs.full == 'true'
     name: Dependency policy
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -216,6 +252,8 @@ jobs:
       - run: cargo deny check licenses bans sources
 
   typo-check:
+    needs: plan
+    if: needs.plan.outputs.full == 'true'
     name: Typo Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -227,12 +265,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Check for typos
-        run: cargo run --locked -p tools -- ci typos
+        run: cargo run --locked -p tools --no-default-features -- ci typos
 
   cancel-if-matrix-failed:
     name: Cancel the run when a matrix leg failed
     needs: rust
-    if: ${{ always() }}
+    if: ${{ always() && needs.rust.result == 'failure' }}
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -244,32 +282,50 @@ jobs:
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
           GH_TOKEN: ${{ github.token }}
-        run: cargo run --locked -p tools -- ci cancel-matrix-failed
+        run: cargo run --locked -p tools --no-default-features -- ci cancel-matrix-failed
 
-  # Single required check for branch protection: `!cancelled()` runs even when
-  # a dependency failed or was skipped, and the jq gate turns that into a red X.
+  # Required check: skipped quality jobs are accepted only with validated evidence.
+  # Cancellation, failed planning, and partial execution never become green.
   conclusion:
     name: Conclusion
     needs:
+      - plan
       - workflow-lint
       - rustfmt
       - clippy
       - rustdoc
       - rust
       - msrv
-      - windows-release
       - vscode
       - fuzz
       - release
       - dependencies
       - typo-check
-    if: ${{ !cancelled() }}
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      - name: Conclusion
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        if: needs.plan.outputs.full == 'true' && needs.vscode.result == 'success'
+        with:
+          name: ci-vsix-${{ github.run_attempt }}
+          path: target/ci/vsix
+      - name: Verify complete results or their source-bound receipt
         env:
+          GH_TOKEN: ${{ github.token }}
           NEEDS_JSON: ${{ toJson(needs) }}
-        run: cargo run --locked -p tools -- ci conclusion
+          REUSE_RUN: ${{ needs.plan.outputs.reuse_run }}
+        run: >-
+          cargo run --locked -p tools --no-default-features -- ci receipt
+          --reuse-run "$REUSE_RUN" --vsix target/ci/vsix/paradoxcode-vscode-contract.vsix
+          --output target/ci/ci.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ci-evidence-${{ github.run_attempt }}
+          path: target/ci/ci.json
+          retention-days: 90
+          if-no-files-found: error
