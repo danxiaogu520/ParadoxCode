@@ -44,7 +44,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           if [[ -f crates/tools/src/ci.rs ]]; then
-            cargo run --locked -p tools -- ci autosync
+            cargo run --locked -p tools --no-default-features -- ci autosync
           else
             # Bootstrap the migration with the legacy script already trusted on main.
             # Do not execute PR-head code with AUTOMERGE_TOKEN.

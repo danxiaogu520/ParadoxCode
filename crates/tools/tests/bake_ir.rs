@@ -1,4 +1,5 @@
 //! Rejected source must never create or overwrite a distributable arena.
+#![cfg(feature = "analysis")]
 use std::fs;
 use std::process::Command;
 

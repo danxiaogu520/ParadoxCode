@@ -6,15 +6,11 @@ use serde_json::Value;
 #[cfg(test)]
 use serde_json::json;
 
-use std::collections::BTreeSet;
-
 use std::fs;
-
-use std::io::Write;
 
 use std::path::Path;
 
-const HELP: &str = "tools ci conclusion|cancel-matrix-failed (NEEDS_JSON environment)\ntools ci autosync (GH_TOKEN/GITHUB_REPOSITORY/GITHUB_REPOSITORY_OWNER/PR_NUMBER environment)\ntools ci release-preflight|release-publish --tag vVERSION\ntools ci verify-extension-version --version VERSION\ntools ci typos|workflow-lint\ntools fuzz smoke [--runs N] [--seed N] [--target TARGET]";
+const HELP: &str = "tools ci conclusion|cancel-matrix-failed (NEEDS_JSON environment)\ntools ci autosync (GH_TOKEN/GITHUB_REPOSITORY/GITHUB_REPOSITORY_OWNER/PR_NUMBER environment)\ntools ci plan|receipt|candidate-plan|candidate-smoke|candidate-vsix|seal-candidate|promote|production-audit\ntools ci verify-extension-version --version VERSION\ntools ci typos|workflow-lint\ntools fuzz smoke [--runs N] [--seed N] [--target TARGET]";
 
 fn env(name: &str) -> Result<String, String> {
     std::env::var(name)
@@ -160,186 +156,6 @@ fn autosync() -> Result<String, String> {
     Ok("PR autosync pass complete".into())
 }
 
-fn preflight(root: &Path, tag: &str) -> Result<String, String> {
-    let version = tag
-        .strip_prefix('v')
-        .ok_or("release tag must start with v")?;
-
-    crate::release::validate_release_version(version).map_err(|e| e.to_string())?;
-
-    process::run(
-        process::command("git")
-            .current_dir(root)
-            .args(["fetch", "--force", "origin", "main"])
-            .arg(format!("refs/tags/{tag}:refs/tags/{tag}")),
-    )?;
-
-    let tag_ref = format!("refs/tags/{tag}");
-
-    if text(
-        process::command("git")
-            .current_dir(root)
-            .args(["cat-file", "-t", &tag_ref]),
-    )? != "tag"
-    {
-        return Err("release tag must be annotated".into());
-    }
-
-    let sha = text(
-        process::command("git")
-            .current_dir(root)
-            .args(["rev-list", "-n", "1", &tag_ref]),
-    )?;
-
-    process::run(process::command("git").current_dir(root).args([
-        "merge-base",
-        "--is-ancestor",
-        &sha,
-        "origin/main",
-    ]))?;
-
-    let repo = env("GITHUB_REPOSITORY")?;
-
-    let checks = gh_json(&["api", &format!("repos/{repo}/commits/{sha}/check-runs")])?;
-
-    let mut conclusions = checks["check_runs"]
-        .as_array()
-        .ok_or("missing check runs")?
-        .iter()
-        .filter(|c| c["name"] == "Conclusion")
-        .collect::<Vec<_>>();
-
-    conclusions.sort_by_key(|c| c["completed_at"].as_str().unwrap_or(""));
-
-    if conclusions
-        .last()
-        .is_none_or(|c| c["conclusion"] != "success")
-    {
-        return Err("tagged commit must have a successful latest Conclusion check".into());
-    }
-
-    if gh(&["release", "view", tag, "--repo", &repo]).is_ok() {
-        return Err("a release already exists; immutable releases are not overwritten".into());
-    }
-
-    if let Ok(path) = std::env::var("GITHUB_OUTPUT") {
-        writeln!(
-            fs::OpenOptions::new()
-                .append(true)
-                .open(path)
-                .map_err(|e| e.to_string())?,
-            "release_sha={sha}"
-        )
-        .map_err(|e| e.to_string())?;
-    }
-
-    Ok(sha)
-}
-
-fn publish(root: &Path, tag: &str) -> Result<String, String> {
-    let version = tag.strip_prefix('v').ok_or("tag must start with v")?;
-
-    crate::release::validate_release_version(version).map_err(|e| e.to_string())?;
-
-    let server = root.join("target/dist/server");
-
-    let (limits, artifacts) = crate::release::load_contract(root).map_err(|e| e.to_string())?;
-
-    crate::release::verify_release_directory(version, &server, &artifacts, &limits)
-        .map_err(|e| e.to_string())?;
-
-    let extension = root
-        .join("target/dist/extension")
-        .join(format!("paradoxcode-vscode-{version}.vsix"));
-
-    if !extension.is_file() || fs::metadata(&extension).map_err(|e| e.to_string())?.len() == 0 {
-        return Err("release VSIX is missing or empty".into());
-    }
-
-    let repo = env("GITHUB_REPOSITORY")?;
-
-    if gh(&["release", "view", tag, "--repo", &repo]).is_ok() {
-        return Err("release already exists; refusing to overwrite".into());
-    }
-
-    let staging = root.join("target/dist/release");
-
-    fs::create_dir_all(&staging).map_err(|e| e.to_string())?;
-
-    let mut expected = BTreeSet::new();
-
-    for path in report::files(&server)?
-        .into_iter()
-        .chain(std::iter::once(extension))
-    {
-        let name = path.file_name().ok_or("invalid release asset")?;
-
-        if !expected.insert(name.to_string_lossy().into_owned()) {
-            return Err("duplicate release asset".into());
-        }
-
-        fs::copy(&path, staging.join(name)).map_err(|e| e.to_string())?;
-    }
-
-    let stale = report::files(&staging)?
-        .into_iter()
-        .filter(|p| !expected.contains(p.file_name().unwrap().to_string_lossy().as_ref()))
-        .collect::<Vec<_>>();
-
-    if !stale.is_empty() {
-        return Err("release staging contains stale assets".into());
-    }
-
-    let mut command = process::command("gh");
-
-    command.args([
-        "release",
-        "create",
-        tag,
-        "--repo",
-        &repo,
-        "--draft",
-        "--verify-tag",
-        "--generate-notes",
-        "--title",
-        tag,
-    ]);
-
-    for name in &expected {
-        command.arg(staging.join(name));
-    }
-
-    process::run(&mut command)?;
-
-    let actual = gh_json(&["release", "view", tag, "--repo", &repo, "--json", "assets"])?;
-
-    let actual = actual["assets"]
-        .as_array()
-        .ok_or("missing uploaded asset list")?
-        .iter()
-        .filter_map(|a| a["name"].as_str())
-        .map(str::to_owned)
-        .collect::<BTreeSet<_>>();
-
-    if actual != expected {
-        return Err("draft release assets differ from the verified local payload; draft remains unpublished".into());
-    }
-
-    gh(&[
-        "release",
-        "edit",
-        tag,
-        "--repo",
-        &repo,
-        "--draft=false",
-        "--latest",
-    ])?;
-
-    Ok(format!(
-        "Release {tag} published; Marketplace publication is a separate step"
-    ))
-}
-
 pub fn execute(group: &str, arguments: &[String]) -> Result<String, String> {
     let Some((name, arguments)) = arguments.split_first() else {
         return Ok(HELP.into());
@@ -355,6 +171,14 @@ pub fn execute(group: &str, arguments: &[String]) -> Result<String, String> {
             "--runs",
             "--seed",
             "--target",
+            "--ref",
+            "--reuse-run",
+            "--vsix",
+            "--output",
+            "--directory",
+            "--ci-run",
+            "--candidate-run",
+            "--binary",
         ],
         &[],
     )?;
@@ -455,22 +279,8 @@ pub fn execute(group: &str, arguments: &[String]) -> Result<String, String> {
         }
 
         "autosync" => autosync(),
-        "release-preflight" => preflight(
-            &root,
-            args.get("--tag")
-                .map(str::to_owned)
-                .or_else(|| std::env::var("RELEASE_TAG").ok())
-                .ok_or("missing --tag or RELEASE_TAG")?
-                .as_str(),
-        ),
-        "release-publish" => publish(
-            &root,
-            args.get("--tag")
-                .map(str::to_owned)
-                .or_else(|| std::env::var("RELEASE_TAG").ok())
-                .ok_or("missing --tag or RELEASE_TAG")?
-                .as_str(),
-        ),
+        "plan" | "receipt" | "candidate-plan" | "candidate-vsix" | "seal-candidate" | "promote"
+        | "production-audit" | "candidate-smoke" => crate::delivery::execute(name, &args),
         "verify-extension-version" => {
             let version = args.required("--version")?;
 
@@ -528,6 +338,7 @@ pub fn execute(group: &str, arguments: &[String]) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
 
     use super::*;
 
