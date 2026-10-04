@@ -1,0 +1,168 @@
+name: Release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Reviewed main commit SHA, or main"
+        required: true
+        default: main
+        type: string
+
+concurrency:
+  group: release-candidate-${{ inputs.source }}
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  resolve:
+    name: Resolve reviewed candidate
+    runs-on: ubuntu-24.04
+    outputs:
+      source_sha: ${{ steps.resolve.outputs.source_sha }}
+      version: ${{ steps.resolve.outputs.version }}
+      ci_run: ${{ steps.resolve.outputs.ci_run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: Check source, CI receipt, versions and release availability
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SOURCE: ${{ inputs.source }}
+        run: cargo run --locked -p tools --no-default-features -- ci candidate-plan --ref "$CANDIDATE_SOURCE"
+
+  audit:
+    name: Audit candidate dependencies
+    needs: resolve
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.resolve.outputs.source_sha }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - run: cargo run --locked -p tools --no-default-features -- ci production-audit
+
+  build:
+    name: Prepare ${{ matrix.target }}
+    needs: [resolve, audit]
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            binary: paradoxcode
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            binary: paradoxcode
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            binary: paradoxcode
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            binary: paradoxcode
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            binary: paradoxcode.exe
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.resolve.outputs.source_sha }}
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          key: candidate-${{ matrix.target }}
+      - run: cargo build --locked --release -p pdc --bin paradoxcode --target "${{ matrix.target }}"
+      - name: Verify binary version and prepare archive with checksum
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+          TARGET: ${{ matrix.target }}
+          BINARY: ${{ matrix.binary }}
+        run: |
+          binary="target/$TARGET/release/$BINARY"
+          test "$("$binary" --version)" = "paradoxcode $VERSION"
+          cargo run --locked -p tools --no-default-features -- ci candidate-smoke --binary "$binary"
+          cargo run --locked -p tools --no-default-features -- release package \
+            --version "$VERSION" --target "$TARGET" --binary "$binary" --output-dir target/dist
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: server-${{ matrix.target }}-${{ github.run_attempt }}
+          path: target/dist/*
+          retention-days: 30
+          if-no-files-found: error
+
+  vscode:
+    name: Reuse CI-validated VSIX
+    needs: [resolve, audit]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.resolve.outputs.source_sha }}
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: Verify and copy the original CI VSIX bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RUN: ${{ needs.resolve.outputs.ci_run }}
+        run: cargo run --locked -p tools --no-default-features -- ci candidate-vsix --ci-run "$CI_RUN"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: vscode-extension-${{ github.run_attempt }}
+          path: target/dist/extension/*.vsix
+          retention-days: 30
+          if-no-files-found: error
+
+  seal:
+    name: Verify and seal complete candidate
+    needs: [resolve, audit, build, vscode]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.resolve.outputs.source_sha }}
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: server-*-${{ github.run_attempt }}
+          path: target/dist/server
+          merge-multiple: true
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: vscode-extension-${{ github.run_attempt }}
+          path: target/dist/extension
+      - name: Seal source identity, checksums and release notes without a tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: cargo run --locked -p tools --no-default-features -- ci seal-candidate
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-candidate-${{ github.run_attempt }}
+          path: target/candidate/*
+          retention-days: 90
+          if-no-files-found: error

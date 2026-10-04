@@ -7,6 +7,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Main CI reuses successful same-repository PR evidence when the tested source tree,
+  check definitions and resolved Rust toolchain match. Missing or mismatched evidence
+  runs the complete suite; the required Conclusion check still verifies coverage.
+- Release candidates build and verify the complete platform inventory before creating
+  a formal tag. Publication promotes the sealed payload unchanged, reuses the CI VSIX,
+  and resumes matching draft uploads without replacing published assets. Formal tag reservation
+  and immutable publication follow verification of every staging upload.
+- CI control and packaging commands support a lightweight tools build without analyzer
+  dependencies. Production dependency auditing also runs before merge and tag creation.
+
 ## [0.5.1] - 2026-10-04
 
 This release completes the RulesIr migration and shared Template analysis, adds the native

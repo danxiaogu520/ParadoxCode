@@ -43,6 +43,38 @@ The extension's actual JavaScript behavior tests remain under
 the LSP/MCP contracts; `contract` adds package inventory checks; `ci` also produces a VSIX.
 `host` explicitly launches the VS Code/Electron suite. Normal CI groups do not download Electron.
 
+## CI evidence and release promotion
+
+`cargo run --locked -p tools --no-default-features -- ci ...` builds control and packaging
+commands without the analyzer, game rules or SQLite. The default `analysis` feature preserves
+the complete developer CLI; unsupported analysis commands fail explicitly in lightweight mode.
+
+The [delivery module](src/delivery.rs) owns strict CI receipts, source/tree/check-policy and
+resolved Rust-toolchain matching, safe GitHub artifact decoding and candidate manifests.
+`ci plan` selects full CI or an eligible same-repository merged-PR receipt. `ci receipt`
+requires every quality job to succeed, or verifies the exact reuse decision and original receipt;
+skipped/failed/partial results cannot manufacture a green check. Receipts and VSIX artifacts are
+bound to the successful run attempt. A missing or expired receipt causes full CI.
+
+`ci production-audit` audits the npm lockfile without install/lifecycle scripts, fails on high
+advisories or an unavailable endpoint, and uses bounded network retries. It runs before merge,
+before candidate builds and immediately before promotion; database refreshes do not rerun the
+unit suite or rebuild packages.
+
+`ci candidate-plan` resolves reviewed main source and prior CI. `ci candidate-smoke --binary PATH`
+checks native release startup, version, embedded rules and owned diagnostics with bounded LSP I/O.
+`ci candidate-vsix` verifies and
+reuses the original CI VSIX. `ci seal-candidate` validates all five server archives, checksums,
+VSIX identity and dated release notes, then records exact source and digest evidence without a
+formal tag. `ci promote --candidate-run RUN_ID` verifies that complete envelope before tag creation.
+It uploads to a resumable staging draft and verifies all remote bytes before its final mutations:
+formal tag reservation and immutable public publication.
+Matching existing assets are retained; mismatched or published assets are never overwritten.
+
+The [release runbook](../../RELEASING.md) owns dispatch, recovery and public installation acceptance.
+Generated candidates and downloaded evidence remain under `target/`; only repository-owned inputs
+and fixtures participate in CI.
+
 ## Diagnostics and semantic evidence
 
 ```sh

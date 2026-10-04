@@ -81,7 +81,7 @@ Each validation class has one authority:
 | Developer feedback | Local checkout | Focused tests, deterministic local groups, local Vanilla exploration |
 | Merge gate | [CI](.github/workflows/ci.yml) | Required `Conclusion` check on the reviewed commit |
 | Scheduled audit | [Security](.github/workflows/security.yml), [Performance](.github/workflows/performance.yml) | Advisory refresh and optimized benchmark runs |
-| Release gate | [Tag workflow](.github/workflows/release.yml) | Provenance and redistributable artifact verification |
+| Release gate | [Candidate workflow](.github/workflows/release-candidate.yml), [promotion](.github/workflows/release.yml) | Verify complete artifacts before creating a formal tag, then publish those same bytes |
 | Manual acceptance | Maintainer following [RELEASING.md](RELEASING.md) | Clean-profile install and Marketplace publication |
 
 Select the affected local group with `cargo run --locked -p tools -- gates GROUP`.
@@ -98,6 +98,10 @@ replace clean-checkout, cross-platform CI or authorize publication. A local comm
 require a full Vanilla sweep, benchmark suite, or network advisory scan.
 
 CI runs on PRs and `main`; its workflow is authoritative for job coverage and tool versions.
+PRs run the full suite, including production npm dependency auditing. A main push can reuse a
+successful same-repository PR result only after its tested tree, check definitions and resolved
+Rust toolchain match. Missing or mismatched evidence runs the full suite. `Conclusion` remains
+required and verifies either complete results or the original source-bound receipt.
 A failing post-merge `Conclusion` receives a focused repair PR. Scheduled audit failures are
 triaged by the maintainer into an actionable issue; they do not block unrelated PRs.
 Release and manual acceptance failures follow the recovery steps in [RELEASING.md](RELEASING.md).

@@ -1,18 +1,16 @@
 name: Release
 
+# Tags are created only after a complete candidate succeeds. Tag pushes never rebuild.
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
-      release_tag:
-        description: "Unpublished annotated version tag to publish (for example, v0.4.0)"
+      candidate_run:
+        description: "Successful Release candidate workflow run ID"
         required: true
         type: string
 
 concurrency:
-  group: release-${{ inputs.release_tag || github.ref_name }}
+  group: release-promotion
   cancel-in-progress: false
 
 permissions:
@@ -20,146 +18,27 @@ permissions:
   checks: read
   contents: read
 
-env:
-  RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
-
 jobs:
-  preflight:
-    name: Verify release provenance
+  publish:
+    name: Promote verified candidate
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    outputs:
-      release_sha: ${{ steps.verify.outputs.release_sha }}
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      checks: read
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      - name: Verify tag, main ancestry, CI, and release state
-        id: verify
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: cargo run --locked -p tools -- ci release-preflight
-
-  build:
-    name: Build ${{ matrix.target }}
-    needs: preflight
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
-            binary: paradoxcode
-          - runner: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
-            binary: paradoxcode
-          - runner: macos-15-intel
-            target: x86_64-apple-darwin
-            binary: paradoxcode
-          - runner: macos-15
-            target: aarch64-apple-darwin
-            binary: paradoxcode
-          - runner: windows-2025
-            target: x86_64-pc-windows-msvc
-            binary: paradoxcode.exe
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ env.RELEASE_TAG }}
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
-        with:
-          toolchain: stable
-          targets: ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-        with:
-          key: release-${{ matrix.target }}
-      - name: Build server
-        shell: bash
-        run: cargo build --locked --release -p pdc --bin paradoxcode --target "${{ matrix.target }}"
-      - name: Verify release version
-        shell: bash
-        run: |
-          version="${RELEASE_TAG#v}"
-          cargo run --locked -p tools -- check policy --root .
-          binary="target/${{ matrix.target }}/release/${{ matrix.binary }}"
-          test "$("$binary" --version)" = "paradoxcode $version"
-      - name: Package server and checksum
-        shell: bash
-        run: |
-          version="${RELEASE_TAG#v}"
-          cargo run --locked -p tools -- release package \
-            --version "$version" \
-            --target "${{ matrix.target }}" \
-            --binary "target/${{ matrix.target }}/release/${{ matrix.binary }}" \
-            --output-dir target/dist \
-            --root .
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: server-${{ matrix.target }}
-          path: target/dist/*
-          if-no-files-found: error
-
-  vscode:
-    name: Build VS Code extension
-    needs: preflight
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ env.RELEASE_TAG }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: editors/vscode/package-lock.json
-      - run: npm ci --prefix editors/vscode --no-audit --no-fund
-      - name: Audit production dependencies
-        run: npm --prefix editors/vscode audit --omit=dev --audit-level=high
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      - name: Verify extension and tag versions
-        shell: bash
-        run: cargo run --locked -p tools -- ci verify-extension-version --version "${RELEASE_TAG#v}"
-      - name: Check and package extension
-        run: cargo run --locked -p tools -- editor test contract
-      - run: cargo run --locked -p tools -- editor package
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: vscode-extension
-          path: target/dist/*.vsix
-          if-no-files-found: error
-
-  publish:
-    name: Publish immutable GitHub Release
-    needs: [preflight, build, vscode]
-    permissions:
-      actions: read
-      contents: write
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ env.RELEASE_TAG }}
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          pattern: server-*
-          path: target/dist/server
-          merge-multiple: true
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: vscode-extension
-          path: target/dist/extension
-      - name: Verify and publish complete release payload
+      - name: Verify candidate, audit and staging uploads before final publication
         env:
           GH_TOKEN: ${{ github.token }}
-        run: cargo run --locked -p tools -- ci release-publish
+          CANDIDATE_RUN: ${{ inputs.candidate_run }}
+        run: cargo run --locked -p tools --no-default-features -- ci promote --candidate-run "$CANDIDATE_RUN"

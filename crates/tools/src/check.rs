@@ -87,6 +87,7 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     ));
     results.push(requires_file(".github/workflows/ci.yml"));
     results.push(requires_file(".github/workflows/release.yml"));
+    results.push(requires_file(".github/workflows/release-candidate.yml"));
     for path in [
         "CONTRIBUTING.md",
         "crates/rules/LANGUAGE.md",
@@ -122,12 +123,25 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
 
     if let Ok(release_workflow) = fs::read_to_string(root.join(".github/workflows/release.yml")) {
         results.push(check(
-            release_workflow.contains("ci release-preflight")
-                && release_workflow.contains("ci release-publish")
+            release_workflow.contains("ci promote")
+                && release_workflow.contains("candidate_run")
+                && !release_workflow.contains("push:")
+                && !release_workflow.contains("cargo build")
                 && !release_workflow.contains("sweep")
                 && !release_workflow.contains("--clobber"),
             "immutable release workflow",
-            "release workflow must use native provenance and complete-payload publication checks, avoid licensed-data sweep dependencies, and never clobber assets",
+            "release workflow must promote a verified candidate without tag-triggered builds, licensed-data dependencies, or replacement of published assets",
+        ));
+    }
+    if let Ok(candidate) = fs::read_to_string(root.join(".github/workflows/release-candidate.yml"))
+    {
+        results.push(check(
+            candidate.contains("ci candidate-plan") && candidate.contains("ci production-audit")
+                && candidate.contains("ci candidate-smoke")
+                && candidate.contains("ci candidate-vsix") && candidate.contains("ci seal-candidate")
+                && !candidate.contains("contents: write") && !candidate.contains("git tag"),
+            "candidate preparation precedes irreversible publication",
+            "candidate workflow must verify source/audit/full payload with read-only GitHub permissions",
         ));
     }
 
