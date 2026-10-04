@@ -426,6 +426,15 @@ fn all_semantics_inner(
         if overlay_files.contains(&file.id) {
             continue;
         }
+        if snapshot
+            .index()
+            .shard(file.id)
+            .is_some_and(|shard| !shard.reference_coverage_known)
+        {
+            all.coverage
+                .limits
+                .insert(hir::analysis::AnalysisLimit::DependentQuery);
+        }
         let Some(state) = snapshot.file_state(file.id) else {
             continue;
         };

@@ -103,6 +103,7 @@ fn write_cache(
              category_id TEXT,
              resolution TEXT NOT NULL,
              syntax_error_count INTEGER NOT NULL CHECK(syntax_error_count >= 0),
+             reference_coverage_known INTEGER NOT NULL CHECK(reference_coverage_known IN (0, 1)),
              fingerprint TEXT NOT NULL CHECK(length(fingerprint) = 64),
              metadata_fingerprint TEXT CHECK(metadata_fingerprint IS NULL OR length(metadata_fingerprint) = 64)
          );
@@ -226,8 +227,8 @@ fn write_cache(
         )?;
     }
     let mut insert_source_file = transaction.prepare(
-        "INSERT INTO source_files(file_id, logical_path, category_id, resolution, syntax_error_count, fingerprint, metadata_fingerprint)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT INTO source_files(file_id, logical_path, category_id, resolution, syntax_error_count, fingerprint, metadata_fingerprint, reference_coverage_known)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
     )?;
     let mut insert_definition = transaction.prepare(
         "INSERT INTO definitions(file_id, ordinal, kind, name, range_start, range_end, selection_start, selection_end, active)
@@ -282,7 +283,8 @@ fn write_cache(
                     file.logical_path.as_str()
                 ))
             })?,
-            metadata_fingerprint.as_deref()
+            metadata_fingerprint.as_deref(),
+            shard.reference_coverage_known,
         ])?;
         for (ordinal, definition) in shard.definitions.iter().enumerate() {
             insert_definition.execute(params![

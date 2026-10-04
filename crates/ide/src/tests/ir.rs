@@ -257,11 +257,22 @@ fn ir_empty_custom_tooltips_are_valid_separators_without_relaxing_other_loc_fiel
         &mut host,
         "events/tooltip-separator.txt",
         "country_event = { id = phase5.separator immediate = { \
-         custom_tooltip = phase5.first custom_tooltip = \"\" custom_tooltip = phase5.second } \
+         custom_tooltip = phase5.first custom_tooltip = \"\" custom_tooltip = \" \" custom_tooltip = phase5.second } \
          option = { name = phase5.first } }",
     );
     let items = diagnostics(&host.snapshot(), &id);
     assert!(items.is_empty(), "{items:#?}");
+    assert!(
+        host.snapshot()
+            .document(&id)
+            .unwrap()
+            .hir()
+            .unwrap()
+            .references()
+            .iter()
+            .filter(|reference| reference.kind.as_ref() == "localisation")
+            .all(|reference| !reference.name.trim().is_empty())
+    );
     let invalid = open(
         &mut host,
         "events/tooltip-separator-invalid.txt",
@@ -4309,6 +4320,32 @@ fn template_block_overloads_cannot_mix_children_or_leak_speculative_facts() {
         )),
         "{values:?}"
     );
+    let view = host.snapshot();
+    let result = complete(&view, &id, valid.find("b = yes").unwrap() as u32 + 5);
+    let yes = result
+        .items
+        .iter()
+        .find(|item| item.label == "yes")
+        .expect("valid bool candidate");
+    let proof = yes
+        .template_evidence
+        .as_ref()
+        .expect("Template candidate evidence");
+    let effect = view.ir().schema_by_name("effect").unwrap();
+    let selected = view
+        .ir()
+        .lookup(effect, "pick", rules::ir::Shape::Block)
+        .nth(1)
+        .unwrap();
+    assert!(
+        proof
+            .interpretations
+            .iter()
+            .any(|proof| proof.schema == effect.index()
+                && proof.fields == vec![selected.index()]
+                && !proof.conditional),
+        "{proof:?}"
+    );
     let invalid =
         "country_event = { immediate = { pick = { a = yes b = yes flag = speculative } } }";
     let id = open(&mut host, "events/mixed-overload.txt", invalid);
@@ -4516,5 +4553,75 @@ fn completion_edit_round_trips_nested_carriers_and_literal_quote_values() {
     assert_eq!(
         item.template_evidence.as_ref().unwrap().validation,
         hir::analysis::Validation::Valid
+    );
+}
+
+#[test]
+fn unfinished_fact_discovery_does_not_turn_a_negative_key_lookup_into_an_error() {
+    let mut host = super::support::fixture_host(serde_json::json!({
+        "types":{"node":{}},
+        "schemas":{
+            "fixture_root":{"fields":{"seed":{"value":"def<node>","card":"0..*"},"strict":{"body":"strict","card":"0..*"},"independent":{"value":"bool","card":"0..*"}},
+                "patterns":[{"key":"ref<node>","body":"known","card":"0..*"},{"key":"scalar","body":"missing","card":"0..*"}]},
+            "known":{"fields":{"write":{"value":"scalar","card":"1"}}},
+            "missing":{"fields":{"write":{"value":"def<node>","card":"1"}}},
+            "strict":{"patterns":[{"key":"ref<node>","body":"known","card":"0..*"}]}
+        }
+    }));
+    let text = "seed = stable toggle = { write = toggle } strict = { pending_key = { write = valid } } independent = wrong";
+    let id = open(&mut host, "events/pending-facts.txt", text);
+    assert!(
+        !host
+            .snapshot()
+            .document(&id)
+            .unwrap()
+            .fact_coverage
+            .is_known()
+    );
+    let values = diagnostics(&host.snapshot(), &id);
+    assert!(
+        values
+            .iter()
+            .any(|item| item.code == DiagnosticCode::AnalysisIncomplete),
+        "{values:?}"
+    );
+    assert!(
+        !values
+            .iter()
+            .any(|item| item.code == DiagnosticCode::UnknownKey
+                && item.message.contains("pending_key")),
+        "a miss in unfinished facts is unknown: {values:?}"
+    );
+    assert!(
+        values
+            .iter()
+            .any(|item| item.code == DiagnosticCode::InvalidValue
+                && item.message.contains("independent")),
+        "independent rejection must survive: {values:?}"
+    );
+}
+
+#[test]
+fn template_value_rejections_preserve_rule_warning_severity_and_the_actual_value() {
+    let mut host = host();
+    open(
+        &mut host,
+        "common/scripted_effects/advisory.txt",
+        "advisory = { if = { limit = { has_government_attribute = $ATTRIBUTE$ } add_prestige = 1 } }",
+    );
+    let text = "country_event = { id = advisory.1 immediate = { advisory = { ATTRIBUTE = owned_missing_attribute } } }";
+    let id = open(&mut host, "events/advisory.txt", text);
+    let values = diagnostics(&host.snapshot(), &id);
+    let advisory = values
+        .iter()
+        .find(|item| {
+            item.code == DiagnosticCode::InvalidValue
+                && item.message.contains("has_government_attribute")
+        })
+        .expect("reference rejection witness");
+    assert_eq!(advisory.severity, crate::Severity::Warning, "{values:?}");
+    assert!(
+        advisory.message.contains("owned_missing_attribute"),
+        "{advisory:?}"
     );
 }

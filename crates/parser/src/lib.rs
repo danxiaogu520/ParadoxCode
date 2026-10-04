@@ -357,6 +357,61 @@ pub fn parse_script_bounded<E>(
     )))
 }
 
+/// A bounded prefix plus the first unparsed byte. Ancestor completion has at most
+/// a constant number of nodes per active nesting level; it introduces no new scan.
+pub struct ScriptParseProgress {
+    pub parsed: Option<ParsedFile>,
+    pub frontier: Option<(ScriptParseLimit, u32)>,
+}
+
+pub fn parse_script_prefix_bounded<E>(
+    source: &str,
+    budget: ScriptParseBudget,
+    checkpoint: &mut dyn FnMut() -> Result<(), E>,
+) -> Result<ScriptParseProgress, E> {
+    checkpoint()?;
+    if source.len() > budget.bytes {
+        return Ok(ScriptParseProgress {
+            parsed: None,
+            frontier: Some((ScriptParseLimit::Bytes, 0)),
+        });
+    }
+    let mut cancellation = None;
+    let mut frontier = None;
+    let (parts, stopped) = script::parse_guarded_prefix(source, &mut |offset, nodes, depth| {
+        if let Err(error) = checkpoint() {
+            cancellation = Some(error);
+            return false;
+        }
+        let limit = if depth > budget.depth {
+            Some(ScriptParseLimit::Depth)
+        } else if nodes >= budget.nodes {
+            Some(ScriptParseLimit::Nodes)
+        } else {
+            None
+        };
+        if let Some(limit) = limit {
+            frontier = Some((limit, offset as u32));
+            return false;
+        }
+        true
+    });
+    if let Some(error) = cancellation {
+        return Err(error);
+    }
+    checkpoint()?;
+    debug_assert!(!stopped || frontier.is_some());
+    Ok(ScriptParseProgress {
+        parsed: Some(ParsedFile::from_parts(
+            FileFormat::Script,
+            Arc::from(source),
+            parts,
+            0,
+        )),
+        frontier,
+    })
+}
+
 fn parse_with_revision(format: FileFormat, source: &str, revision: u64) -> ParsedFile {
     let source: Arc<str> = Arc::from(source);
     let parts = match format {
@@ -752,5 +807,54 @@ mod bounded_tests {
             .unwrap();
             assert_eq!(result, parse(FileFormat::Script, source));
         }
+    }
+}
+
+#[cfg(test)]
+mod prefix_tests {
+    use super::*;
+    #[test]
+    fn partial_cst_preserves_prefix_and_bounds_ancestor_completion() {
+        let budget = ScriptParseBudget {
+            nodes: 40,
+            depth: 8,
+            bytes: 1024 * 1024,
+        };
+        let source = "early = value outer = { ".to_owned() + &"tail = 1 ".repeat(10_000) + "}";
+        let result = parse_script_prefix_bounded::<std::convert::Infallible>(
+            &source,
+            budget,
+            &mut || Ok(()),
+        )
+        .unwrap();
+        let (limit, frontier) = result.frontier.unwrap();
+        assert_eq!(limit, ScriptParseLimit::Nodes);
+        assert!(frontier > "early = value".len() as u32 && frontier < source.len() as u32);
+        let parsed = result.parsed.unwrap();
+        assert!(parsed.tree().node_count() <= budget.nodes + 8 * budget.depth + 8);
+        assert_eq!(parsed.source(), source);
+        assert!(
+            parsed
+                .tokens()
+                .iter()
+                .any(|token| parsed.text(token.range()) == Some("early"))
+        );
+    }
+    #[test]
+    fn a_cancelled_prefix_is_never_published() {
+        let mut checks = 0;
+        let result = parse_script_prefix_bounded(
+            &"tail = 1 ".repeat(10_000),
+            Default::default(),
+            &mut || {
+                checks += 1;
+                if checks > 10 {
+                    Err("cancelled")
+                } else {
+                    Ok(())
+                }
+            },
+        );
+        assert!(matches!(result, Err("cancelled")));
     }
 }

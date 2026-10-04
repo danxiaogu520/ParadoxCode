@@ -1404,7 +1404,9 @@ impl SnapshotRequestContext {
                     data: item.template_evidence.map_or_else(||item.resolve_data.clone().map(Value::String), |evidence|
                         Some(serde_json::json!({"template":{
                             "validation":match evidence.validation {ide::TemplateValidation::Valid=>"valid",ide::TemplateValidation::Invalid=>"invalid",ide::TemplateValidation::Unknown=>"unknown"},
-                            "witness":evidence.witness,"revision":result.revision},"resolve":item.resolve_data}))),
+                            "witness":evidence.witness,"interpretations":evidence.interpretations.iter().map(|proof|serde_json::json!({
+                                "schema":proof.schema,"fields":proof.fields,"container":{"start":proof.container.start(),"end":proof.container.end()},"conditional":proof.conditional
+                            })).collect::<Vec<_>>(),"revision":result.revision},"resolve":item.resolve_data}))),
                     text_edit: Some(CompletionTextEdit::Edit(TextEdit {
                         range: range_to_lsp(
                             document.line_index(),

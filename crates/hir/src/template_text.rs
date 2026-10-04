@@ -78,6 +78,8 @@ pub struct RenderedTemplate {
     pub unresolved_bindings: Vec<text::TextRange>,
     /// Virtual holes supplied by a typed trial edit, independent of user text.
     pub trial_holes: Vec<text::TextRange>,
+    /// First unmaterialized byte at each resource/recovery frontier.
+    pub frontiers: Vec<u32>,
     /// Traversal and interpretation coverage.
     pub coverage: AnalysisCoverage,
 }
@@ -119,10 +121,13 @@ impl RenderedTemplate {
     }
     /// A free script hole can rewrite the suffix's lexical/container context.
     pub fn has_unresolved_structure(&self, range: text::TextRange) -> bool {
-        self.pieces.iter().any(|piece| {
-            (piece.structural_hole || piece.uncertain_text && piece.script)
-                && piece.range.start() <= range.end()
-        })
+        self.frontiers
+            .iter()
+            .any(|frontier| *frontier <= range.end())
+            || self.pieces.iter().any(|piece| {
+                (piece.structural_hole || piece.uncertain_text && piece.script)
+                    && piece.range.start() <= range.end()
+            })
     }
 }
 
@@ -140,6 +145,7 @@ pub fn render(
         &BTreeMap::new(),
         &BTreeSet::new(),
         &BTreeSet::new(),
+        &BTreeSet::new(),
         byte_limit,
         &mut || true,
     )
@@ -152,6 +158,7 @@ fn render_with_views(
     present: &BTreeSet<String>,
     raw: &BTreeMap<String, String>,
     scalar_uses: &BTreeSet<u32>,
+    raw_scalar_uses: &BTreeSet<u32>,
     script_uses: &BTreeSet<u32>,
     byte_limit: usize,
     checkpoint: &mut dyn FnMut() -> bool,
@@ -162,6 +169,7 @@ fn render_with_views(
             .coverage
             .limits
             .insert(AnalysisLimit::UnavailableTemplate);
+        output.frontiers.push(0);
         return output;
     }
     let source = template.source.as_ref();
@@ -172,6 +180,7 @@ fn render_with_views(
             .coverage
             .limits
             .insert(AnalysisLimit::StructuralRecovery);
+        output.frontiers.push(0);
         return output;
     };
     let mut offset = 0;
@@ -256,7 +265,7 @@ fn render_with_views(
                                     .and_then(|text| text.strip_suffix('"'))
                             })
                             .unwrap_or(value)
-                    } else if scalar_uses
+                    } else if raw_scalar_uses
                         .contains(&(template.body_range.start() + start as u32 + offset as u32))
                     {
                         supplied.unwrap_or(value).as_str()
@@ -353,6 +362,9 @@ fn render_with_views(
             .limits
             .insert(AnalysisLimit::StructuralRecovery);
     }
+    if !output.coverage.limits.is_empty() {
+        output.frontiers.push(output.text.len() as u32);
+    }
     output
 }
 
@@ -361,9 +373,11 @@ fn scalar_use_positions(
     template: &Template,
     bindings: &BTreeMap<String, String>,
     schema: rules::ir::SchemaId,
-) -> BTreeSet<u32> {
+    facts: &dyn rules::ir::SymbolFacts,
+) -> (BTreeSet<u32>, BTreeSet<u32>) {
     use rules::replacement::{TemplateFragment, TemplateInstruction, TemplateOperand};
     let mut result = BTreeSet::new();
+    let mut raw = BTreeSet::new();
     let mut pending = vec![(0, schema)];
     while let Some((block, schema)) = pending.pop() {
         for instruction in template.program.blocks[block].iter() {
@@ -385,16 +399,39 @@ fn scalar_use_positions(
                     let Some(key) = key else {
                         continue;
                     };
-                    let fields=ir.fields(schema).into_iter().filter(|id|matches!(ir.matcher(ir.field(*id).key),rules::ir::Matcher::Literal(name) if ir.strings().resolve(*name).eq_ignore_ascii_case(&key))).collect::<Vec<_>>();
+                    let fields = crate::checking::field_candidates(
+                        ir,
+                        schema,
+                        &key,
+                        rules::ir::Shape::Scalar,
+                        facts,
+                    )
+                    .into_iter()
+                    .chain(crate::checking::field_candidates(
+                        ir,
+                        schema,
+                        &key,
+                        rules::ir::Shape::Block,
+                        facts,
+                    ))
+                    .collect::<Vec<_>>();
                     match &property.value {
                         TemplateOperand::Scalar(token)
-                            if !token.quoted
-                                && token.fragments.len() == 1
-                                && fields.iter().any(|id| {
-                                    matches!(ir.field(*id).value, rules::ir::FieldValue::Scalar(_))
-                                }) =>
+                            if fields
+                                .iter()
+                                .any(|id| ir.shape(*id) == Some(rules::ir::Shape::Scalar))
+                                && !fields
+                                    .iter()
+                                    .any(|id| ir.shape(*id) == Some(rules::ir::Shape::Block)) =>
                         {
-                            result.insert(token.range.start());
+                            for fragment in &token.fragments {
+                                if let TemplateFragment::Parameter { range, .. } = fragment {
+                                    result.insert(range.start());
+                                }
+                            }
+                            if !token.quoted && token.fragments.len() == 1 {
+                                raw.insert(token.range.start());
+                            }
                         }
                         TemplateOperand::Block(block) => {
                             for id in fields {
@@ -410,13 +447,15 @@ fn scalar_use_positions(
             }
         }
     }
-    result
+    (result, raw)
 }
 
 fn script_use_positions(
     ir: &rules::ir::RulesIr,
     template: &Template,
+    bindings: &BTreeMap<String, String>,
     schema: rules::ir::SchemaId,
+    facts: &dyn rules::ir::SymbolFacts,
 ) -> BTreeSet<u32> {
     use rules::replacement::{TemplateFragment, TemplateInstruction, TemplateOperand};
     let mut result = BTreeSet::new();
@@ -442,13 +481,31 @@ fn script_use_positions(
                         .iter()
                         .map(|part| match part {
                             TemplateFragment::Literal(text) => Some(text.as_str()),
-                            _ => None,
+                            TemplateFragment::Parameter { name, .. } => {
+                                bindings.get(&name.to_ascii_lowercase()).map(String::as_str)
+                            }
                         })
-                        .collect::<Option<String>>();
+                        .collect::<Option<Vec<_>>>()
+                        .map(|parts| parts.concat());
                     let Some(key) = key else {
                         continue;
                     };
-                    let fields=ir.fields(schema).into_iter().filter(|id|matches!(ir.matcher(ir.field(*id).key),rules::ir::Matcher::Literal(name) if ir.strings().resolve(*name).eq_ignore_ascii_case(&key))).collect::<Vec<_>>();
+                    let fields = crate::checking::field_candidates(
+                        ir,
+                        schema,
+                        &key,
+                        rules::ir::Shape::Scalar,
+                        facts,
+                    )
+                    .into_iter()
+                    .chain(crate::checking::field_candidates(
+                        ir,
+                        schema,
+                        &key,
+                        rules::ir::Shape::Block,
+                        facts,
+                    ))
+                    .collect::<Vec<_>>();
                     match &property.value {
                         TemplateOperand::Scalar(token)
                             if fields
@@ -491,6 +548,7 @@ fn append_slice(
     };
     if text.len() > limit.saturating_sub(target.text.len()) {
         target.coverage.limits.insert(AnalysisLimit::TextBytes);
+        target.frontiers.push(target.text.len() as u32);
         return false;
     }
     let shift = target.text.len() as i64 - range.start() as i64;
@@ -525,6 +583,11 @@ fn append_slice(
                 text::TextRange::new((start as i64 + shift) as u32, (end as i64 + shift) as u32)
                     .expect("binding projection"),
             );
+        }
+    }
+    for frontier in &source.frontiers {
+        if range.start() <= *frontier && *frontier <= range.end() {
+            target.frontiers.push((*frontier as i64 + shift) as u32);
         }
     }
     target.coverage.merge(&source.coverage);
@@ -571,6 +634,7 @@ pub fn render_expanded<E>(
         || raw.values().any(|value| value.len() > byte_limit)
     {
         output.coverage.limits.insert(AnalysisLimit::TextBytes);
+        output.frontiers.push(0);
         return Ok(output);
     }
     let mut work = vec![RenderTask::Enter {
@@ -635,6 +699,7 @@ pub fn render_expanded<E>(
                 frames += 1;
                 if frames > 100_000 {
                     output.coverage.limits.insert(AnalysisLimit::Nodes);
+                    output.frontiers.push(output.text.len() as u32);
                     break;
                 }
                 let identity = format!(
@@ -643,11 +708,14 @@ pub fn render_expanded<E>(
                 );
                 if !visiting.insert(identity.clone()) {
                     output.coverage.limits.insert(AnalysisLimit::RecursiveState);
+                    output.frontiers.push(output.text.len() as u32);
                     break;
                 }
                 work.push(RenderTask::Exit(identity));
-                let scalar_uses = scalar_use_positions(ir, &template, &bindings, schema);
-                let script_uses = script_use_positions(ir, &template, schema);
+                let (scalar_uses, raw_scalar_uses) =
+                    scalar_use_positions(ir, &template, &bindings, schema, &DispatchFacts(facts));
+                let script_uses =
+                    script_use_positions(ir, &template, &bindings, schema, &DispatchFacts(facts));
                 let mut interrupted = None;
                 let mut rendered = render_with_views(
                     &template,
@@ -655,6 +723,7 @@ pub fn render_expanded<E>(
                     &present,
                     &raw,
                     &scalar_uses,
+                    &raw_scalar_uses,
                     &script_uses,
                     byte_limit,
                     &mut || match checkpoint() {
@@ -734,36 +803,54 @@ pub fn render_expanded<E>(
                 processed_bytes = processed_bytes.saturating_add(rendered.text.len());
                 if processed_bytes > byte_limit.saturating_mul(16) {
                     output.coverage.limits.insert(AnalysisLimit::TextBytes);
+                    output.frontiers.push(output.text.len() as u32);
                     break;
                 }
                 output.coverage.merge(&rendered.coverage);
-                let parsed = match parser::parse_script_bounded(
+                let progress = parser::parse_script_prefix_bounded(
                     &rendered.text,
                     parser::ScriptParseBudget {
                         bytes: byte_limit,
                         ..Default::default()
                     },
                     checkpoint,
-                )? {
-                    Ok(parsed) => std::sync::Arc::new(parsed),
-                    Err(limit) => {
-                        output.coverage.limits.insert(parse_limit(limit));
-                        break;
+                )?;
+                if let Some((limit, frontier)) = progress.frontier {
+                    rendered.coverage.limits.insert(parse_limit(limit));
+                    rendered.frontiers.push(frontier);
+                    if let Some(range) = text::TextRange::new(frontier, rendered.text.len() as u32)
+                    {
+                        rendered.trial_holes.push(range);
                     }
+                }
+                let Some(parsed) = progress.parsed else {
+                    output.coverage.merge(&rendered.coverage);
+                    output.frontiers.push(output.text.len() as u32);
+                    break;
                 };
-                let hir = crate::lower_ir_schema(
+                let parsed = std::sync::Arc::new(parsed);
+                let hir = crate::lower_ir_schema_with_holes(
                     parsed,
                     ir,
                     schema,
                     Default::default(),
                     state.clone(),
                     &DispatchFacts(facts),
+                    &rendered.trial_holes,
                 );
                 let call_view = std::sync::Arc::new(rendered.clone());
                 let mut calls = Vec::new();
                 let mut covered = Vec::<text::TextRange>::new();
                 for property in hir.properties() {
                     checkpoint()?;
+                    if rendered.has_unresolved_structure(property.key_range)
+                        || rendered
+                            .frontiers
+                            .iter()
+                            .any(|frontier| *frontier < property.range.end())
+                    {
+                        continue;
+                    }
                     if covered.iter().any(|range| {
                         range.start() <= property.range.start()
                             && property.range.end() <= range.end()
@@ -984,6 +1071,9 @@ pub fn parse_limit(limit: parser::ScriptParseLimit) -> AnalysisLimit {
 // is building its own explicit task stack.
 struct DispatchFacts<'a>(&'a dyn rules::ir::SymbolFacts);
 impl rules::ir::SymbolFacts for DispatchFacts<'_> {
+    fn facts_complete(&self) -> bool {
+        self.0.facts_complete()
+    }
     fn type_member(&self, ty: rules::ir::TypeId, name: &str) -> bool {
         self.0.type_member(ty, name)
     }
@@ -1024,4 +1114,126 @@ pub fn binding_range(
         return Some((map.parameter.clone(), relative));
     }
     None
+}
+
+#[cfg(test)]
+mod frontier_tests {
+    use super::*;
+    #[test]
+    fn byte_cutoff_is_not_a_user_syntax_error_and_keeps_a_known_rejection() {
+        let ir = game::eu4::first_party_ir().unwrap();
+        let catalog = rules::RuleSet::from_ir_catalog(&ir);
+        let source = "bounded = { always = wrong AND = { always = yes } }";
+        let parsed = std::sync::Arc::new(parser::parse(parser::FileFormat::Script, source));
+        let definition = crate::lower_shared_with_ir(
+            parsed,
+            &text::LogicalPath::parse("common/scripted_triggers/frontier.txt").unwrap(),
+            &catalog,
+            &ir.game.profile,
+            &ir,
+        );
+        let template = &definition.dynamic_templates()[0];
+        let limit = " always = wrong AND = { ".len();
+        let rendered = render(template, &Default::default(), &Default::default(), limit);
+        assert!(rendered.coverage.limits.contains(&AnalysisLimit::TextBytes));
+        let hir = crate::lower_ir_schema(
+            std::sync::Arc::new(parser::parse(parser::FileFormat::Script, &rendered.text)),
+            &ir,
+            crate::template::template_body(&ir, ir.type_by_name("scripted_trigger").unwrap())
+                .unwrap(),
+            Default::default(),
+            crate::ScopeState::initial(crate::ScopeValue::known_single("country")),
+            &rules::ir::NoSymbolFacts,
+        );
+        assert!(
+            !hir.syntax().errors().is_empty(),
+            "fixture must leave an unterminated block"
+        );
+        let checked = crate::checking::check_fragment::<std::convert::Infallible>(
+            &ir,
+            &hir,
+            &rules::ir::NoSymbolFacts,
+            &rendered,
+            &mut || Ok(()),
+        )
+        .unwrap();
+        assert!(
+            checked
+                .iter()
+                .any(|item| item.kind == crate::checking::IssueKind::Value),
+            "{:#?}",
+            checked.value
+        );
+        assert!(
+            !checked
+                .iter()
+                .any(|item| item.kind == crate::checking::IssueKind::Syntax),
+            "{:#?}",
+            checked.value
+        );
+        let full = render(template, &Default::default(), &Default::default(), 1024);
+        assert!(full.frontiers.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod value_context_tests {
+    use super::*;
+    #[test]
+    fn composite_scalars_decode_carriers_and_bound_block_keys_retain_script_uncertainty() {
+        let ir = game::eu4::first_party_ir().unwrap();
+        let catalog = rules::RuleSet::from_ir_catalog(&ir);
+        let schema =
+            crate::template::template_body(&ir, ir.type_by_name("scripted_effect").unwrap())
+                .unwrap();
+        let render_case =
+            |source: &str, bindings: BTreeMap<String, String>, raw: BTreeMap<String, String>| {
+                let hir = crate::lower_shared_with_ir(
+                    std::sync::Arc::new(parser::parse(parser::FileFormat::Script, source)),
+                    &text::LogicalPath::parse("common/scripted_effects/owned.txt").unwrap(),
+                    &catalog,
+                    &ir.game.profile,
+                    &ir,
+                );
+                render_expanded::<std::convert::Infallible>(
+                    &ir,
+                    &rules::ir::NoSymbolFacts,
+                    std::sync::Arc::new(hir.dynamic_templates()[0].clone()),
+                    &bindings,
+                    &raw,
+                    &bindings.keys().cloned().collect(),
+                    schema,
+                    crate::ScopeState::initial(crate::ScopeValue::known_single("country")),
+                    1024 * 1024,
+                    &mut || Ok(()),
+                )
+                .unwrap()
+            };
+        let scalar = render_case(
+            "owned = { set_country_flag = PREFIX_$P$_END }",
+            BTreeMap::from([("p".to_owned(), "alpha".to_owned())]),
+            BTreeMap::from([("p".to_owned(), "\"alpha\"".to_owned())]),
+        );
+        assert!(scalar.text.contains("PREFIX_alpha_END"), "{}", scalar.text);
+        assert!(!scalar.text.contains('"'));
+        let script = render_case(
+            "owned = { $KEY$ = $BODY$ add_prestige = wrong }",
+            BTreeMap::from([
+                ("key".to_owned(), "if".to_owned()),
+                (
+                    "body".to_owned(),
+                    "{ limit = { always = yes } } $LATER$".to_owned(),
+                ),
+            ]),
+            Default::default(),
+        );
+        let end = script.text.find("add_prestige").unwrap() as u32;
+        assert!(
+            script
+                .pieces
+                .iter()
+                .any(|piece| piece.script && piece.uncertain_text)
+        );
+        assert!(script.has_unresolved_structure(text::TextRange::new(end, end + 12).unwrap()));
+    }
 }

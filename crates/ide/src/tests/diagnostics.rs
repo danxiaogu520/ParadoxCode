@@ -2617,8 +2617,14 @@ fn embedded_modifier_templates_do_not_constrain_the_argument() {
     assert!(
         diagnostics.iter().all(|diagnostic| !diagnostic
             .message
-            .contains("estate_nobles_royal_court_tasks")),
+            .contains("value `estate_nobles_royal_court_tasks`")),
         "embedded modifier templates constrain the rendered name, not the bare argument: {diagnostics:?}"
+    );
+    assert!(
+        diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("value `estate_nobles_royal_court_tasks_loyal`")),
+        "{diagnostics:?}"
     );
 }
 

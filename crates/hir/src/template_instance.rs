@@ -54,18 +54,21 @@ pub fn instantiate<E>(
             }
         }
     }
-    let parsed = parser::parse_script_bounded(&rendered.text, Default::default(), checkpoint)?;
-    let limited = parsed.is_err();
-    let parsed = match parsed {
-        Ok(parsed) => parsed,
-        Err(limit) => {
-            rendered
-                .coverage
-                .limits
-                .insert(crate::template_text::parse_limit(limit));
-            parser::parse(parser::FileFormat::Script, "")
+    let progress =
+        parser::parse_script_prefix_bounded(&rendered.text, Default::default(), checkpoint)?;
+    if let Some((limit, frontier)) = progress.frontier {
+        rendered
+            .coverage
+            .limits
+            .insert(crate::template_text::parse_limit(limit));
+        rendered.frontiers.push(frontier);
+        if let Some(range) = text::TextRange::new(frontier, rendered.text.len() as u32) {
+            rendered.trial_holes.push(range);
         }
-    };
+    }
+    let parsed = progress
+        .parsed
+        .unwrap_or_else(|| parser::parse(parser::FileFormat::Script, ""));
     let hir = crate::lower_ir_schema_with_holes(
         Arc::new(parsed),
         ir,
@@ -77,7 +80,7 @@ pub fn instantiate<E>(
     );
     let mut coverage = rendered.coverage.clone();
     coverage.merge(hir.analysis_coverage());
-    let evidence = if limited || goal == InstanceGoal::Facts {
+    let evidence = if goal == InstanceGoal::Facts {
         Vec::new()
     } else {
         let checked = crate::checking::check_fragment(ir, &hir, facts, &rendered, checkpoint)?;

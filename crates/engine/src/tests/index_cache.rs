@@ -1658,3 +1658,71 @@ fn oscillating_generated_facts_do_not_commit_a_candidate_index() {
     assert_eq!(host.snapshot().index(), before.index());
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn unfinished_reference_discovery_survives_cache_round_trip_and_install() {
+    let root = temp_root("reference-coverage");
+    fs::create_dir_all(root.join("common/scripted_effects")).unwrap();
+    fs::create_dir_all(root.join("events")).unwrap();
+    fs::write(
+        root.join("common/scripted_effects/owned.txt"),
+        "writer_owned = { set_country_flag = $A$$B$ }",
+    )
+    .unwrap();
+    fs::write(root.join("events/owned.txt"),
+        "country_event = { id = coverage.1 immediate = { writer_owned = { A = prefix B = suffix } } }").unwrap();
+    let ir = game::eu4::first_party_ir().unwrap();
+    let mut host = AnalysisHost::with_ir(
+        rules::RuleSet::from_ir_catalog(&ir),
+        ir.game.profile.clone(),
+        ir.clone(),
+    );
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Vanilla,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().unwrap();
+    let snapshot = host.snapshot();
+    let file = snapshot
+        .source_files()
+        .values()
+        .find(|file| file.logical_path.as_str() == "events/owned.txt")
+        .unwrap();
+    assert!(
+        !snapshot
+            .index()
+            .shard(file.id)
+            .unwrap()
+            .reference_coverage_known
+    );
+    let path = root.join("coverage.pdcindex");
+    IndexCache::from_snapshot(&snapshot)
+        .unwrap()
+        .save(&path)
+        .unwrap();
+    let loaded = IndexCache::load(&path).unwrap();
+    assert!(
+        !loaded
+            .index()
+            .shard(file.id)
+            .unwrap()
+            .reference_coverage_known
+    );
+    let mut installed = AnalysisHost::with_ir(
+        rules::RuleSet::from_ir_catalog(&ir),
+        ir.game.profile.clone(),
+        ir,
+    );
+    installed.install_index_cache(loaded).unwrap();
+    assert!(
+        !installed
+            .snapshot()
+            .index()
+            .shard(file.id)
+            .unwrap()
+            .reference_coverage_known
+    );
+    assert!(installed.snapshot().file_state(file.id).is_none());
+    fs::remove_dir_all(root).unwrap();
+}

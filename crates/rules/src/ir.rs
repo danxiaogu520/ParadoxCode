@@ -771,6 +771,10 @@ impl GameConfig {
 /// A `ref<…>` matcher may name a symbol that only the
 /// workspace index knows, so the IR asks for it instead of guessing.
 pub trait SymbolFacts {
+    /// False when a related discovery transaction has not committed stable facts.
+    fn facts_complete(&self) -> bool {
+        true
+    }
     /// Asset visibility in the immutable view. None means the capability is unavailable.
     fn asset_member(&self, _category: &str, _name: &str) -> Option<bool> {
         None
@@ -1345,12 +1349,40 @@ impl RulesIr {
         value: &str,
         facts: &impl SymbolFacts,
     ) -> bool {
+        self.scalar_outcome(matcher, value, facts) == Some(true)
+    }
+
+    /// Three-valued matching: unfinished searches and missing unstable facts are unknown.
+    pub fn scalar_outcome(
+        &self,
+        matcher: MatcherId,
+        value: &str,
+        facts: &impl SymbolFacts,
+    ) -> Option<bool> {
+        let mut no_cancel = || false;
+        let mut budget = crate::pattern::SearchBudget::new(Default::default(), &mut no_cancel);
+        crate::pattern::evaluate(self, matcher, value, &mut budget, &mut |id, text| {
+            let result = self.scalar_primitive(id, text, facts);
+            if !result
+                && !facts.facts_complete()
+                && matches!(self.matcher(id), Matcher::Ref(_) | Matcher::Def { .. })
+            {
+                None
+            } else {
+                Some(result)
+            }
+        })
+    }
+
+    fn scalar_primitive(&self, matcher: MatcherId, value: &str, facts: &impl SymbolFacts) -> bool {
         match self.matcher(matcher) {
             Matcher::Scalar | Matcher::Opaque | Matcher::Loc | Matcher::Path(_) | Matcher::Link => {
                 !value.is_empty()
             }
             Matcher::Literal(text) => self.strings.resolve(*text).eq_ignore_ascii_case(value),
-            Matcher::Pattern(parts) => self.pattern_matches(parts, value, facts),
+            Matcher::Pattern(_) | Matcher::Union(_) => {
+                unreachable!("container matchers use bounded search")
+            }
             Matcher::Int { min, max } => value.parse::<i64>().is_ok_and(|parsed| {
                 min.is_none_or(|bound| parsed >= bound) && max.is_none_or(|bound| parsed <= bound)
             }),
@@ -1384,9 +1416,6 @@ impl RulesIr {
             Matcher::Def { type_id, .. } => facts.type_member(*type_id, value),
             Matcher::Enum { id } => self.enum_contains(*id, value),
             Matcher::Scope(scope) => self.scope_matches(scope.as_ref().copied(), value),
-            Matcher::Union(alternatives) => alternatives
-                .iter()
-                .any(|alternative| self.scalar_matches(*alternative, value, facts)),
         }
     }
 
@@ -1436,35 +1465,6 @@ impl RulesIr {
             };
         }
         false
-    }
-
-    fn pattern_matches(
-        &self,
-        parts: &[PatternPart],
-        value: &str,
-        facts: &impl SymbolFacts,
-    ) -> bool {
-        let Some((first, rest)) = parts.split_first() else {
-            return value.is_empty();
-        };
-        match first {
-            PatternPart::Text(text) => {
-                let text = self.strings.resolve(*text);
-                value.len() >= text.len()
-                    && value.is_char_boundary(text.len())
-                    && value[..text.len()].eq_ignore_ascii_case(text)
-                    && self.pattern_matches(rest, &value[text.len()..], facts)
-            }
-            PatternPart::Hole(hole) => value
-                .char_indices()
-                .map(|(index, _)| index)
-                .skip(1)
-                .chain(std::iter::once(value.len()))
-                .any(|end| {
-                    self.scalar_matches(*hole, &value[..end], facts)
-                        && self.pattern_matches(rest, &value[end..], facts)
-                }),
-        }
     }
 }
 

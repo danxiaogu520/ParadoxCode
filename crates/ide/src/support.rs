@@ -63,7 +63,7 @@ pub(crate) fn input_for_document(
     };
     let hir = if let Some(hir) = document
         .hir_handle()
-        .filter(|hir| !hir.depends_on_symbol_facts())
+        .filter(|hir| !hir.depends_on_symbol_facts() || !document.fact_coverage.is_known())
     {
         Some(hir)
     } else if !snapshot.ir().schemas.is_empty() {
@@ -80,6 +80,12 @@ pub(crate) fn input_for_document(
     } else {
         document.hir_handle()
     };
+    let hir = hir.map(|mut hir| {
+        if !document.fact_coverage.is_known() {
+            Arc::make_mut(&mut hir).merge_analysis_coverage(&document.fact_coverage);
+        }
+        hir
+    });
     let profile = snapshot.game_profile_handle();
     Some(ParsedInput {
         document: Some(id.clone()),

@@ -265,6 +265,18 @@ fn check<E>(
                     for field in fields {
                         let row = add(&mut nodes, alternatives, Node::All(Vec::new()));
                         let spec = ir.field(field);
+                        let (key, limit) =
+                            crate::checking::scalar_outcome(ir, spec.key, &property.key, facts);
+                        if limit.is_some() {
+                            coverage.limits.insert(AnalysisLimit::PatternSearch);
+                        }
+                        let key = if key.is_none() {
+                            partial = true;
+                            Validation::Unknown
+                        } else {
+                            Validation::Valid
+                        };
+                        add(&mut nodes, row, Node::Value(key));
                         let scope =
                             crate::checking::field_scope_validation(ir, field, &context.state);
                         add(&mut nodes, row, Node::Value(scope));
@@ -279,13 +291,16 @@ fn check<E>(
                                 Validation::Unknown
                             }
                             (FieldValue::Scalar(matcher), Some(value)) => {
-                                crate::checking::scalar_validation(
+                                let checked = crate::checking::scalar_validation_cancellable(
                                     ir,
                                     matcher,
                                     &value.value,
                                     &context.state,
                                     facts,
-                                )
+                                    checkpoint,
+                                )?;
+                                coverage.merge(&checked.coverage);
+                                checked.value
                             }
                             (FieldValue::Scalar(_), None) => Validation::Invalid,
                             (_, Some(_)) => Validation::Invalid,

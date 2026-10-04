@@ -7,7 +7,7 @@
 //   
 diagnostics:
 - code=InvalidValue severity=Error certainty=certain range=41..46
-  message: Template `embedded`: value of `foo` does not satisfy its rule
+  message: Template `embedded`: value `maybe` of `foo` does not satisfy its rule
 - code=UnknownKey severity=Error certainty=certain range=48..54
   message: Template `embedded`: unknown key `broken`
 - code=SyntaxError severity=Error certainty=certain range=57..59

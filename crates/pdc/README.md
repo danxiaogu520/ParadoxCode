@@ -63,7 +63,11 @@ negative lookup dependencies. Scans, disk events and persistent refresh share th
 [index discovery queue](../index/src/fact_stabilization.rs). Disk edits rebuild the
 affected reader component before discovery, so deleted generated facts are revoked.
 Cancelled, oscillating or budget-limited candidates do not replace the committed index.
-
+Overlay discovery uses the same transaction contract and retains the latest syntax
+with explicit incomplete fact coverage after a failed solve. Persistent shards retain
+whether reference discovery completed, so cache installation cannot erase a rename
+frontier. Pending workspace validation may run alongside immutable query requests;
+mutation workers still gate its start and stale revisions are requeued.
 
 The repository CLI builds persistent indexes and performs guided Vanilla setup. Read its
 current arguments instead of relying on an independently maintained option table:

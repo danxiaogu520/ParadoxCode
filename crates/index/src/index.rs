@@ -660,6 +660,8 @@ pub struct FileIndexShard {
     pub flag_writes: Vec<FlagWrite>,
     /// Syntax error count retained as a cheap health signal.
     pub syntax_error_count: usize,
+    /// Whether discovery proved a complete, invertible reference closure for this file.
+    pub reference_coverage_known: bool,
 }
 
 impl FileIndexShard {

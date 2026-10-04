@@ -497,7 +497,22 @@ fn schema_diagnostics(
     hir: &HirFile,
     cancellation: &CancellationToken,
 ) -> Result<Vec<Diagnostic>, Cancelled> {
-    schema_diagnostics_at_depth(snapshot, hir, cancellation, 0, false)
+    let mut result = schema_diagnostics_at_depth(snapshot, hir, cancellation, 0, false)?;
+    if hir
+        .analysis_coverage()
+        .limits
+        .contains(&hir::analysis::AnalysisLimit::FactStability)
+    {
+        result.push(Diagnostic::new(
+            DiagnosticCode::AnalysisIncomplete,
+            Severity::Information,
+            TextRange::empty(hir.syntax().root().range().start()),
+            hir::analysis::AnalysisLimit::FactStability
+                .message()
+                .to_owned(),
+        ));
+    }
+    Ok(result)
 }
 
 /// Rule-only overload groups that can impose an occurrence bound. Keep every
@@ -698,6 +713,13 @@ fn schema_diagnostics_at_depth(
         };
         let candidates = field_fact.fields.clone();
         if candidates.is_empty() {
+            if ir.fields(field_fact.schema).into_iter().any(|id| {
+                hir::checking::scalar_outcome(ir, ir.field(id).key, &property.key, &facts)
+                    .0
+                    .is_none()
+            }) {
+                continue;
+            }
             let known = ir
                 .fields(field_fact.schema)
                 .into_iter()
@@ -772,6 +794,24 @@ fn schema_diagnostics_at_depth(
             })
             .unwrap_or(candidates[0]);
         let field = ir.field(selected);
+        if let (FieldValue::Scalar(matcher), Some(scalar)) = (field.value, &property.scalar) {
+            let checked = hir::checking::scalar_validation_cancellable(
+                ir,
+                matcher,
+                &scalar.value,
+                &parent_schema.state,
+                &facts,
+                &mut || cancellation.checkpoint(),
+            )?;
+            if !checked.coverage.is_complete() {
+                diagnostics.push(Diagnostic::new(
+                    DiagnosticCode::AnalysisIncomplete,
+                    Severity::Information,
+                    scalar.range,
+                    checked.coverage.limit_description(),
+                ));
+            }
+        }
         direct_counts
             .entry((parent_schema.range, selected))
             .or_default()

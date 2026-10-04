@@ -333,6 +333,29 @@ impl HirFile {
         &self.analysis_coverage
     }
 
+    /// Retains a related transaction frontier without discarding independent evidence.
+    pub fn merge_analysis_coverage(&mut self, coverage: &crate::analysis::AnalysisCoverage) {
+        self.analysis_coverage.merge(coverage);
+    }
+
+    /// Removes facts whose dispatch depends on a failed discovery transaction.
+    /// Syntax and unconditional declarations remain available for editing.
+    pub fn discard_facts_in_ranges(&mut self, ranges: &[text::TextRange]) {
+        let inside = |range: text::TextRange| {
+            ranges
+                .iter()
+                .any(|parent| parent.start() <= range.start() && range.end() <= parent.end())
+        };
+        self.definitions.retain(|def| !inside(def.range));
+        self.references.retain(|reference| !inside(reference.range));
+        self.binding_references
+            .retain(|reference| !inside(reference.range));
+        self.definition_attributes
+            .retain(|attrs| !inside(attrs.definition_range));
+        self.dynamic_templates
+            .retain(|template| !inside(template.definition_range));
+    }
+
     /// Whether lowering consulted workspace symbols, including missing symbols.
     /// Files without such reads can reuse their shard during symbol-fact replay.
     #[must_use]

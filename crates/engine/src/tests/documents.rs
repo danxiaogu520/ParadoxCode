@@ -1078,3 +1078,161 @@ fn overlay_document_errors_report_their_specific_variant() {
         .expect_err("closing twice must fail");
     assert_eq!(error, super::DocumentError::NotOpen(id));
 }
+
+fn overlay_fact_fixture(oscillating: bool) -> AnalysisHost {
+    let schemas = if oscillating {
+        serde_json::json!({
+            "root":{"fields":{"seed":{"value":"def<node>","card":"0..*"}},"patterns":[{"key":"ref<node>","body":"known","card":"0..*"},{"key":"scalar","body":"next","card":"0..*"}]},
+            "known":{"fields":{"write":{"value":"scalar","card":"1"}}},
+            "next":{"fields":{"write":{"value":"def<node>","card":"1"}}}
+        })
+    } else {
+        serde_json::json!({
+            "root":{"fields":{"seed":{"value":"def<node>","card":"0..*"}},"patterns":[{"key":"ref<node>","body":"next","card":"0..*"}]},
+            "next":{"fields":{"write":{"value":"def<node>","card":"1"}}}
+        })
+    };
+    let file=serde_json::from_value(serde_json::json!({"types":{"node":{}},"files":{"fixture":{"path":"events","ext":"txt","root":"root"}},"schemas":schemas})).unwrap();
+    let mut profile = game::eu4::first_party_ir().unwrap().game.profile.clone();
+    profile.game_id = "fixture".to_owned();
+    let ir = rules::lower::lower(
+        &[("fixture.json".to_owned(), file)],
+        rules::ir::GameConfig { profile },
+    )
+    .unwrap();
+    AnalysisHost::with_ir(
+        rules::RuleSet::from_ir_catalog(&ir),
+        ir.game.profile.clone(),
+        ir.into(),
+    )
+}
+
+#[test]
+fn overlay_fact_chain_converges_and_retracts_after_seed_edit() {
+    let mut host = overlay_fact_fixture(false);
+    let seed = DocumentId::new("file:///tmp/events/seed.txt");
+    for i in 1..=40 {
+        host.open_document(
+            DocumentId::new(format!("file:///tmp/events/step{i}.txt")),
+            1,
+            format!("chain_{} = {{ write = chain_{i} }}", i - 1),
+            None,
+        )
+        .unwrap();
+    }
+    host.open_document(seed.clone(), 1, "seed = chain_0".to_owned(), None)
+        .unwrap();
+    let last = DocumentId::new("file:///tmp/events/step40.txt");
+    assert!(
+        host.snapshot()
+            .document(&last)
+            .unwrap()
+            .hir()
+            .unwrap()
+            .definitions()
+            .iter()
+            .any(|def| def.name == "chain_40")
+    );
+    host.apply_document_changes(&seed, 2, &[TextChange::full("")])
+        .unwrap();
+    assert!(
+        host.snapshot()
+            .documents()
+            .values()
+            .filter_map(|doc| doc.hir())
+            .all(|hir| !hir
+                .definitions()
+                .iter()
+                .any(|def| def.name.starts_with("chain_")))
+    );
+    host.apply_document_changes(&seed, 3, &[TextChange::full("seed = chain_0")])
+        .unwrap();
+    assert!(
+        host.snapshot()
+            .document(&last)
+            .unwrap()
+            .hir()
+            .unwrap()
+            .definitions()
+            .iter()
+            .any(|def| def.name == "chain_40")
+    );
+    let from_zero = {
+        let mut fresh = overlay_fact_fixture(false);
+        for doc in host.snapshot().documents().values().rev() {
+            fresh
+                .open_document(
+                    doc.id().clone(),
+                    doc.version().unwrap(),
+                    doc.text().to_owned(),
+                    None,
+                )
+                .unwrap();
+        }
+        fresh
+    };
+    for (id, doc) in host.snapshot().documents() {
+        assert_eq!(
+            doc.hir().unwrap().definitions(),
+            from_zero
+                .snapshot()
+                .document(id)
+                .unwrap()
+                .hir()
+                .unwrap()
+                .definitions()
+        );
+    }
+}
+
+#[test]
+fn overlay_oscillation_keeps_new_syntax_but_discards_speculative_facts() {
+    let mut host = overlay_fact_fixture(true);
+    let id = DocumentId::new("file:///tmp/events/toggle.txt");
+    host.open_document(id.clone(), 1, "seed = stable".to_owned(), None)
+        .unwrap();
+    let old = host.snapshot();
+    host.apply_document_changes(
+        &id,
+        2,
+        &[TextChange::full(
+            "seed = stable toggle = { write = toggle }",
+        )],
+    )
+    .unwrap();
+    let view = host.snapshot();
+    let doc = view.document(&id).unwrap();
+    assert_eq!(doc.version(), Some(2));
+    assert!(
+        doc.fact_coverage
+            .limits
+            .contains(&hir::analysis::AnalysisLimit::FactStability)
+    );
+    assert_eq!(view.index(), old.index());
+    assert!(
+        !doc.hir()
+            .unwrap()
+            .definitions()
+            .iter()
+            .any(|def| def.name == "toggle")
+    );
+    assert!(
+        doc.hir()
+            .unwrap()
+            .definitions()
+            .iter()
+            .any(|def| def.name == "stable")
+    );
+    // Base declarations are retained as syntax. The speculative solved rounds
+    // cannot be mistaken for a complete reference/discovery result.
+    assert!(!doc.hir().unwrap().analysis_coverage().is_complete());
+    host.apply_document_changes(&id, 3, &[TextChange::full("seed = stable")])
+        .unwrap();
+    assert!(
+        host.snapshot()
+            .document(&id)
+            .unwrap()
+            .fact_coverage
+            .is_known()
+    );
+}

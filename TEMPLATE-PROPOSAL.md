@@ -693,35 +693,17 @@ target/template-after/tools audit diff \
 
 ## 实施进度
 
-阶段 0 的自有参照、工具和计划以 `13f9630` 提交。阶段 1 已实现 editor-neutral `AnalysisCoverage`/残余状态、带覆盖的参数查询、独立的 AnalysisIncomplete 信息诊断，以及补全/hover/FileAnalysis 的覆盖透传；quoted 查询限额与无法表示的 Template 不再被静默视为完整结果。`pdc/analyzerInfo` 已补入实际请求路由。
+阶段 0 的项目支持契约、自有文本/调用/有限域参照与冻结基线已完成。阶段 1–4 的生产实现已使用统一 Template 名称和不可变程序、显式任务栈、逐目标覆盖、关联绑定见证及完整容器检查。普通 quoted 入口和 mission quoted 重载已删除；Template 专属消费、原始与已解码 carrier、逐层来源映射、编辑试写、scope/Block 重载后续状态与各 IDE 消费者共用实例。10,000 层调用与 scope 查询抵达末端，未决 callee 保留 opaque 参数表，名称循环不作为引擎错误。源码格式为 14，发布版本为 0.5.0。
 
-阶段 1 验证：core-fast/policy 通过，全工作区 1,009 项测试通过，workspace/all-targets/all-features Clippy 通过；自有长链、低节点预算和确定错误保留回归通过。重新构建的 Vanilla 基线为 8,670 文件、11,453 条诊断，其中新增 34 条 AnalysisIncomplete 信息，错误数量仍为 8,324；成对审计没有新增/移除错误身份。真实 LSP 的 12 个状态已复跑，长链补全的 isIncomplete 可观察；参数 key hover 的覆盖和限制说明有自有回归断言。原始证据保存在 ignored `target/performance-results/template-phase1/`。
+本轮完成了 overlay 的不可变轮次工作队列与事务回滚，并覆盖 40 步传播、负查找、种子删除、重新插入、从零重建和非单调震荡。失败视图保留当前版本的语法与基础声明、发布 FactStability 覆盖；缺失的 scalar/Pattern/key 事实保持 Unknown，独立 bool 错误仍被报告。持久 shard 保存引用发现是否完整，缓存安装不再擦除闭包边界。
 
-阶段 1 仍使用原有遍历及其深度/节点上限，新增提示是明确的过渡状态；阶段 2 必须用共享图和显式任务栈实际检查长链末端，再更新相应 owned 期望，不能只隐藏提示。阶段 2 至 6 尚未验收。
+开放 Pattern 的递归/无界切分已统一到有工作、状态、深度和取消边界的搜索。来源使用语义见证的 hole 切片；多个有效切分不能变成任意引用范围或重命名。补全保留实际试写的 schema/重载身份。标量复合片段的洞只影响其值；动态 Block key 及脚本片段继续保留结构不确定性，raw carrier 与已解码片段分别处理。
 
-阶段 2/3/4 的实现切片已接入：trait/API 统一为 Template，静态 matcher 改名 Pattern；共享不可变 arena 与显式任务栈替代原递归 replay，10,000 层调用回归抵达末端约束；Recover 保留受损定义，BindingInputs 区分存在与已知值。有限字符串反解支持同参数重复使用，多未知量先共享自然连接见证再投影候选；独立穷举参照现在实际对照 IDE 输出。候选 DTO/LSP data 保留验证状态、条件见证和 revision，参数 key/value hover 使用绑定查询。
+有限解析现在保留首个未解析字节之前的 CST；完成祖先栈所需空间受已有深度边界限制。前缀中的确定拒绝和引用仍可投影，边界造成的 EOF/recovery 不作为用户错误。此修复恢复 15 个 estate 引用；标量上下文修复恢复另外 5 个非空引用。5 个 quoted localisation 位置是改为引号内部的精确范围；空白 tooltip 作为分隔符，不建立 localisation 引用。新增可见的 government attribute 拒绝遵循规则 Warning 严重级别，并显示实际值。
 
-普通 quoted 构造、matcher/value/shape 与 mission quoted 重载已删除。Template 的结构路径按实例化整容器检查；共享标量、scope 与控制检查已接入，逐层 quote 字节映射保留精确来源，重复 payload 不再重复语义诊断。原 SCC 名字周期检查已删除，定义提示来自共享查询的实际绑定/scope 状态，作为 Information/Unresolved，不断言引擎错误。源码格式升至 14，工作区及扩展版本升至 0.5.0，为语义和缓存布局变化建立新的持久化兼容身份。
+实例与正文策略缓存按精确环境事实复用；成员、属性值、Template 正文/范围、overlay 屏蔽、事实完成状态与资产 generation 参与环境身份。调用者文字与位置变化不改变事实时复用同一实例；新增负查找目标使缓存失效，测试直接观察实例共享及拒绝证据变化。环境池至多四个 16 MiB memo，身份总预算 8 MiB；超限回退当前视图，未完成资源查询不跨请求缓存。持续只读请求不再阻止待处理的工作区诊断启动，版本竞争仍重排。
 
-这些是已经实现的切片，不代表阶段 2–6 的最终出口通过。剩余重点包括完整 Block 重载的后续状态关联、统一定义 scope 摘要、生成事实工作队列与撤销、所有编辑消费者的覆盖/精度契约、细化缓存依赖和混合负载，以及 fresh Vanilla/真实 LSP/配对性能最终验收。当前证据与开发日志保留在 ignored target 下；尚未完成的出口不能以局部测试替代。
-
-本切片验证：`tools gates core-fast policy` 通过，工作区 1,016 项 Rust 测试及 94 项 policy 检查通过；workspace/all-targets/all-features Clippy 通过。自有有限关系参照通过实际 IDE 候选集合对照；Present Hole、受损定义、10,000 层任务栈、整块字段计数、嵌套引号精确范围与共享控制检查回归通过。release server/tools 已冻结在 ignored `target/performance-results/template-foundation/frozen/`，正式配对性能及完整 Vanilla 行为审计仍待最终核心收敛后完成。
-
-后续 scope/Block 切片：定义 scope 推导的独立递归树已删除，使用共享程序上的显式 Any/All 查询，按当前实参检查 guard 激活，未知 ROOT/FROM 与存在状态保留残余；10,000 层 scope 查询抵达末端。运行时 OR 不免除其中各语句的静态 scope 合法性，新增两个有确切 country/province 冲突的 owned 诊断并更新 golden。整块 Block 重载在同一容器上分别验证，确定解释沿用其 scope/符号类型；未决解释只合并共同事实。自有第二重载合法、跨重载混合拒绝、试算符号不进入 HIR、调用 guard/PRESENT Hole 与未知脚本前缀回归通过。LSP 消费者在未决解释下的候选/来源条件、独占引用闭包和完整预算仍需后续收敛，不能据此宣告阶段 3–6 退出。
-
-消费/编辑切片：补全与 hover 改为同一完整父实例上的消费位置投影，删除补全对任意 quoted token 的独立递归探测，实际 Block operand 与固定兄弟的配额参与候选检查；候选回写临时完整源码后验证相关使用，snippet 孔洞以显式范围传给结构选择，不修改 host/index。插入协议改用显式 snippet 标记，quote 编码与 snippet 字面转义分开，保留根实参及转发 carrier 的层次，嵌套引号含字面双引号的实际客户端插入回归通过。items 消费逐项检查，引用 single item 与 quoted 多项不混为一个 Scalar；quoted Scalar 统一解码引号及反斜线，原始拼写仍从 syntax 读取。resolve 携带不可变 IR 指纹并拒绝过期 Template revision，复用快照已有指纹，避免按候选重复 hash 整份 IR。
-
-第一次完整 Vanilla 检查揭示未决重名 callee 的参数表被误检为语句，43,714 条 on_change_tag_effect 链错误并非可接受的语义变化。已以自有重名 callee 回归修复，保留未决参数表和 UnavailableTemplate 覆盖，而非发布虚假的 mission/key 错误；这一观察及修复必须在重新审计中核对，旧的 57,356 条诊断报告不是验收通过证据。其余引用/重命名等消费者与事实队列、缓存依赖及最终性能仍需阶段出口证明。
-
-本轮继续实现了共享 `hir::template_instance`：索引、导航、引用、高亮和 inlay 复用完整容器与根实参字节映射，删除 HIR/IDE 的独立 quoted 语义递归。无法逆投影的生成名称保留事实身份和不完整覆盖，不将整个实参当作可任意改写的名称；重命名要求引用闭包与来源映射完整。旧不可变快照在缓存域更新后仍可按自身输入重算，不能因缓存拒绝发布而丢掉定义。
-
-磁盘扫描、持久缓存刷新和磁盘增删事件已采用按正/负查找依赖调度的事实队列。增量更新先从基础声明重建受影响读者组件，再按不可变轮次求解；源文件和依赖与候选索引一起提交。自有 40 步事实链、删除触发源、重新插入负查找成员、从零对照与真实非单调震荡见证已接入回归。震荡或资源不足丢弃候选，保留已提交索引。二次解析新增分配前字节检查，以及 token/注释/空白/恢复/节点创建过程中的限额和取消检查；插入的新参数标记保留局部 TextInterpretation，并保留独立错误证据。
-
-本轮已通过完整 gate、1,038 项 Rust 测试及 94 项 policy、全目标 Clippy、Rust 1.88 编译检查、typos/machete；12 个编辑状态的 152 类真实 LSP 请求及 11 个完整 IDE 清单复跑。一次完整 Vanilla 观察为 8,670 文件、12,683 诊断、8,986 错误、工具错误零，较上一切片无新增错误身份、移除 39 个错误身份。实例缓存键已由整文件改为绑定/存在/schema/scope，并用两处调用共享语义实例但保持独立编辑范围的测试证明；Facts/Validation 目标优化前后九张持久语义表逐项哈希一致。
-
-引用对照另外发现展开擦除了参数中的中间调用名，已新增先失败后通过的跳转/重命名及完整键位置补全回归；渲染 trace 保留精确来源与预展开查询帧，不能以较少引用作为优化结果。该追加修复通过全工作区 1,040 项测试，后续部分转发再补 1 项回归；最新 HIR/engine/IDE 共 601 项通过，Clippy/MSRV/文档检查通过。新索引恢复 305 个中间调用引用和 7 个独立 concrete advisor 引用。早先性能观察不能作为本次最终验收。
-
-这些实现仍需要本轮全量 gate、fresh Vanilla、真实 LSP 与成对性能证明。Overlay 事实稳定事务、开放 pattern 搜索的统一工作预算、所有修复/引用闭包的最终矩阵，以及细粒度缓存/混合负载出口仍需完成；不能将磁盘事实队列通过等同于阶段 3–6 整体退出。
+上述实现与 owned 回归已经通过；最终 fresh Vanilla、完整 IDE 清单、真实 LSP 与冷热/混合负载配对正在验收。最终切换仍以本节的出口证据完成为准，不能将最后一轮运行中的检查写成已通过。
 
 ## 实施顺序与 PR 出口
 

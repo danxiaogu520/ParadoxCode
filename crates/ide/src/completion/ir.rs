@@ -83,11 +83,13 @@ fn projected_consumption_completion(
                 };
                 item.replacement_range = range;
                 item.insert_text = text;
+                let mut interpretations = Vec::new();
                 let checked = crate::ir_template::validate_consumption_edit(
                     snapshot,
                     input,
                     &projection,
                     &item,
+                    &mut interpretations,
                     cancellation,
                 )?;
                 coverage.merge(&checked.coverage);
@@ -97,6 +99,7 @@ fn projected_consumption_completion(
                 item.template_evidence = Some(crate::types::TemplateCompletionEvidence {
                     validation: checked.value,
                     witness: Default::default(),
+                    interpretations,
                 });
                 if seen.insert((
                     item.label.clone(),
@@ -590,6 +593,15 @@ fn append_template_value_items(
         if checked.value == hir::analysis::Validation::Invalid {
             continue;
         }
+        let interpretations = crate::ir_template::candidate_interpretations(
+            snapshot,
+            source,
+            invocation,
+            summary,
+            &witness,
+            parameter,
+            cancellation,
+        )?;
         witness.remove(&parameter.to_ascii_lowercase());
         if !emitted.insert((label.clone(), witness.clone())) {
             continue;
@@ -611,6 +623,7 @@ fn append_template_value_items(
             template_evidence: Some(crate::types::TemplateCompletionEvidence {
                 validation: checked.value,
                 witness,
+                interpretations,
             }),
             label: label.clone(),
             kind: CompletionKind::Value,

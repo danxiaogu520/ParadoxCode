@@ -37,10 +37,22 @@ pub(crate) fn needs_body_analysis(
     snapshot: &AnalysisSnapshot,
     summary: &engine::DynamicDefinitionSummary,
 ) -> bool {
-    summary
-        .template
-        .as_ref()
-        .is_some_and(|template| has_structural_reads(template, snapshot))
+    let Some(template) = summary.template.as_ref() else {
+        return false;
+    };
+    let facts = WorkspaceFacts { snapshot };
+    let memo = rules::ir::SymbolFacts::template_memo(&facts);
+    let key = format!("body-policy:{:?}:{:?}", template.kind, template.name);
+    if let Some(memo) = &memo
+        && let Some(value) = memo.get::<bool>(&key)
+    {
+        return *value;
+    }
+    let value = has_structural_reads(template, snapshot);
+    if let Some(memo) = memo {
+        memo.insert(key, std::sync::Arc::new(value), 1);
+    }
+    value
 }
 
 /// Shared structural specialization for candidate filtering, diagnostics and explanations.
@@ -160,7 +172,9 @@ fn analyse_body_with_bindings(
         &mut || cancellation.checkpoint(),
     )?);
     cancellation.checkpoint()?;
-    if let (Some(memo), Some(key)) = (memo, key) {
+    if let (Some(memo), Some(key)) = (memo, key)
+        && body.coverage.is_complete()
+    {
         let bytes = body
             .rendered
             .text
@@ -427,6 +441,46 @@ pub(crate) fn validate_candidate(
         },
         coverage: body.coverage.clone(),
     })
+}
+
+pub(crate) fn candidate_interpretations(
+    snapshot: &AnalysisSnapshot,
+    source: &hir::HirFile,
+    invocation: &hir::HirProperty,
+    summary: &engine::DynamicDefinitionSummary,
+    witness: &hir::template_relations::Witness,
+    parameter: &str,
+    cancellation: &CancellationToken,
+) -> Result<Vec<crate::types::TemplateInterpretation>, Cancelled> {
+    if !needs_body_analysis(snapshot, summary) {
+        return Ok(Vec::new());
+    }
+    Ok(
+        analyse_body_with_bindings(snapshot, source, invocation, witness, &[], cancellation)?
+            .map(|body| body_interpretations(&body, parameter))
+            .unwrap_or_default(),
+    )
+}
+
+fn body_interpretations(
+    body: &BodyAnalysis,
+    parameter: &str,
+) -> Vec<crate::types::TemplateInterpretation> {
+    body.hir
+        .overload_facts()
+        .iter()
+        .filter(|fact| {
+            body.rendered
+                .dependencies(fact.container)
+                .contains(&parameter.to_ascii_lowercase())
+        })
+        .map(|fact| crate::types::TemplateInterpretation {
+            schema: fact.schema.index(),
+            fields: fact.fields.iter().map(|field| field.index()).collect(),
+            container: fact.container,
+            conditional: fact.validation != hir::analysis::Validation::Valid,
+        })
+        .collect()
 }
 
 #[derive(Clone, Debug)]
@@ -1268,6 +1322,7 @@ pub(crate) fn validate_consumption_edit(
     input: &crate::support::ParsedInput,
     projection: &ConsumptionProjection,
     item: &crate::CompletionItem,
+    interpretations: &mut Vec<crate::types::TemplateInterpretation>,
     cancellation: &CancellationToken,
 ) -> Result<Analysis<hir::analysis::Validation>, Cancelled> {
     use hir::analysis::Validation;
@@ -1350,6 +1405,7 @@ pub(crate) fn validate_consumption_edit(
             coverage: Default::default(),
         });
     };
+    *interpretations = body_interpretations(&body, &projection.parameter);
     let rejected = body
         .evidence
         .iter()

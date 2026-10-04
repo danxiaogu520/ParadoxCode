@@ -41,6 +41,9 @@ impl TrackingFacts<'_> {
     }
 }
 impl SymbolFacts for TrackingFacts<'_> {
+    fn facts_complete(&self) -> bool {
+        self.facts.facts_complete()
+    }
     // Reusing a memo without replaying its read set would lose dependencies.
     fn replacement_template(
         &self,
@@ -105,6 +108,7 @@ pub fn affected_fact_readers(
         dynamic_definitions: Vec::new(),
         definition_attributes: Vec::new(),
         flag_writes: Vec::new(),
+        reference_coverage_known: true,
         syntax_error_count: 0,
     };
     loop {

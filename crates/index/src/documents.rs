@@ -174,6 +174,10 @@ impl FileState {
 /// A document candidate exposed by an immutable workspace snapshot.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DocumentSnapshot {
+    /// Lookup provenance from the last overlay discovery transaction.
+    pub fact_dependencies: std::collections::BTreeSet<crate::SymbolDependency>,
+    /// A failed discovery is distinct from the syntax/semantic query coverage.
+    pub fact_coverage: hir::analysis::AnalysisCoverage,
     pub id: DocumentId,
     pub version: Option<i64>,
     pub text: Arc<str>,

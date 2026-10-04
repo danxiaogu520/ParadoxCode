@@ -484,6 +484,38 @@ fn prepare_document_snapshot_impl(
     document
 }
 
+/// Reuses a document's immutable CST during fact rounds; source/version never change.
+pub(crate) fn relower_document_snapshot(
+    rules: &RuleSet,
+    profile: &GameProfile,
+    ir: &RulesIr,
+    roots: &[SourceRoot],
+    mut document: DocumentSnapshot,
+    facts: Option<&dyn SymbolFacts>,
+) -> DocumentSnapshot {
+    let Some((_, Some(path))) = parser_for_document(
+        Some(ir),
+        rules,
+        profile,
+        roots,
+        &document.id,
+        document.path.as_deref(),
+    ) else {
+        return document;
+    };
+    let Some(ParsedSource::Text(parsed)) = &document.parsed else {
+        return document;
+    };
+    record_pipeline_lower();
+    document.hir = Some(Arc::new(match facts {
+        Some(facts) => {
+            lower_shared_with_ir_and_facts(parsed.clone(), &path, rules, profile, ir, facts)
+        }
+        None => lower_shared_with_ir(parsed.clone(), &path, rules, profile, ir),
+    }));
+    document
+}
+
 pub fn unparsed_document(
     id: DocumentId,
     version: Option<i64>,
@@ -493,6 +525,8 @@ pub fn unparsed_document(
 ) -> DocumentSnapshot {
     let line_index = LineIndex::new(&text);
     DocumentSnapshot {
+        fact_dependencies: BTreeSet::new(),
+        fact_coverage: Default::default(),
         id,
         version,
         text: Arc::from(text),
@@ -948,6 +982,7 @@ fn build_file_state_impl(
                 dynamic_definitions: Vec::new(),
                 definition_attributes: Vec::new(),
                 flag_writes: Vec::new(),
+                reference_coverage_known: true,
                 syntax_error_count: 0,
             }),
             cached_localisation_previews: None,
@@ -973,6 +1008,7 @@ fn build_file_state_impl(
             dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
+            reference_coverage_known: true,
             syntax_error_count: parsed.errors().len(),
         },
         (None, _) => FileIndexShard {
@@ -982,6 +1018,7 @@ fn build_file_state_impl(
             dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
+            reference_coverage_known: true,
             syntax_error_count: 0,
         },
     };
@@ -1018,6 +1055,7 @@ pub fn empty_file_state(file: &SourceFile, revision: u64) -> FileState {
             dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
+            reference_coverage_known: true,
             syntax_error_count: 0,
         }),
         cached_localisation_previews: None,
@@ -1091,6 +1129,7 @@ fn shard_from_parsed(
         dynamic_definitions,
         definition_attributes: hir.definition_attributes().to_vec(),
         flag_writes,
+        reference_coverage_known: hir.analysis_coverage().is_known(),
         syntax_error_count: parsed.errors().len(),
     }
 }

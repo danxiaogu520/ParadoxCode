@@ -971,3 +971,154 @@ fn symbolic_forwarding_keeps_independent_concrete_reference_arguments() {
         "a symbolic DAY must not erase the independent EVENT reference: {locations:?}"
     );
 }
+
+#[test]
+fn forwarded_estate_reference_survives_separate_unknown_text_and_calls() {
+    let (mut host, _) = snapshot("country_event = { id = estate_owned.1 }");
+    host.open_document(
+        DocumentId::new("file:///tmp/common/estates/owned.txt"),
+        1,
+        "estate_owned = { }".to_owned(),
+        None,
+    )
+    .unwrap();
+    host.open_document(DocumentId::new("file:///tmp/common/scripted_effects/estate_owned.txt"), 1,
+        "outer_owned = { inner_owned = { ESTATE = $ESTATE$ } if = { limit = { has_country_flag = unknown_$FLAG$ } add_estate_loyalty = { estate = $ESTATE$ loyalty = -10 } } } inner_owned = { change_estate_land_share = { estate = $ESTATE$ share = -5 } }".to_owned(), None).unwrap();
+    let source = "country_event = { id = estate_owned.2 immediate = { outer_owned = { ESTATE = estate_owned } } }";
+    let id = DocumentId::new("file:///tmp/events/estate_owned.txt");
+    host.open_document(id.clone(), 1, source.to_owned(), None)
+        .unwrap();
+    let position = source.rfind("estate_owned").unwrap() as u32;
+    assert_eq!(
+        definition(&host.snapshot(), &id, position).len(),
+        1,
+        "an unrelated unresolved flag cannot erase a proved estate reference"
+    );
+}
+
+#[test]
+fn semantic_instance_survives_caller_edit_and_invalidates_a_negative_symbol_read() {
+    let original = "country_event = { id = memo.1 immediate = { memo_outer = { N = 1 EVENT = missing.1 } add_prestige = 2 } }";
+    let (mut host, id) = snapshot(original);
+    let definitions = DocumentId::new("file:///tmp/common/scripted_effects/memo.txt");
+    host.open_document(
+        definitions,
+        1,
+        "memo_outer = { add_prestige = $N$ country_event = { id = $EVENT$ days = 1 } }".to_owned(),
+        None,
+    )
+    .unwrap();
+    let analyse = |view: &engine::AnalysisSnapshot| {
+        let input = crate::support::input_for_document(view, &id).unwrap();
+        let hir = input.hir.as_ref().unwrap();
+        let call = hir
+            .properties()
+            .iter()
+            .find(|p| p.key == "memo_outer")
+            .unwrap();
+        crate::ir_template::analyse_body(view, hir, call, None, &CancellationToken::new())
+            .unwrap()
+            .unwrap()
+    };
+    let before = analyse(&host.snapshot());
+    host.apply_document_changes(
+        &id,
+        2,
+        &[engine::TextChange::full(
+            "\n\n".to_owned() + &original.replace("add_prestige = 2", "add_prestige = 300"),
+        )],
+    )
+    .unwrap();
+    let after = analyse(&host.snapshot());
+    assert!(
+        std::sync::Arc::ptr_eq(&before, &after),
+        "an unchanged environment and binding must reuse the proved instance"
+    );
+    assert!(
+        after
+            .evidence
+            .iter()
+            .any(|item| item.kind == hir::checking::IssueKind::Value),
+        "the missing event must have a rejection witness"
+    );
+    host.open_document(
+        DocumentId::new("file:///tmp/events/new.txt"),
+        1,
+        "country_event = { id = missing.1 }".to_owned(),
+        None,
+    )
+    .unwrap();
+    let view = host.snapshot();
+    let resolved = analyse(&view);
+    assert!(!std::sync::Arc::ptr_eq(&after, &resolved));
+    assert!(
+        !resolved
+            .evidence
+            .iter()
+            .any(|item| item.kind == hir::checking::IssueKind::Value),
+        "adding a formerly missing event must remove its rejection witness: {:?}",
+        resolved.evidence
+    );
+}
+
+#[test]
+fn parse_frontier_retains_proved_prefix_navigation_and_rejection() {
+    let (mut host, _) = snapshot("country_event = { id = prefix.1 }");
+    let definition_source =
+        "prefix_owned = { country_event = { id = $EVENT$ days = 1 } add_prestige = wrong\n"
+            .to_owned()
+            + &"add_prestige = 1\n".repeat(10_000)
+            + "}";
+    host.open_document(
+        DocumentId::new("file:///tmp/common/scripted_effects/prefix_owned.txt"),
+        1,
+        definition_source,
+        None,
+    )
+    .unwrap();
+    let text =
+        "country_event = { id = prefix.2 immediate = { prefix_owned = { EVENT = prefix.1 } } }";
+    let id = DocumentId::new("file:///tmp/events/prefix_owned.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .unwrap();
+    let view = host.snapshot();
+    let values = diagnostics(&view, &id);
+    assert!(
+        values
+            .iter()
+            .any(|item| item.code == DiagnosticCode::AnalysisIncomplete),
+        "{values:?}"
+    );
+    assert!(
+        values
+            .iter()
+            .any(|item| item.code == DiagnosticCode::InvalidValue),
+        "an earlier rejection remains a proof: {values:?}"
+    );
+    assert_eq!(
+        definition(&view, &id, text.rfind("prefix.1").unwrap() as u32).len(),
+        1,
+        "a tail parse limit cannot erase a proved reference before the frontier"
+    );
+}
+
+#[test]
+fn unresolved_composite_scalar_in_an_earlier_call_does_not_erase_later_script_references() {
+    let text = "country_event = { id = scalar_hole.2 immediate = { scalar_outer = { BODY = \"country_event = { id = scalar_hole.1 }\" } } }";
+    let (mut host, _) = snapshot("country_event = { id = scalar_hole.1 }");
+    host.open_document(DocumentId::new("file:///tmp/common/scripted_effects/scalar_hole.txt"), 1,
+        "scalar_outer = { scalar_inner = yes $BODY$ } scalar_inner = { custom_tooltip = OWNED_$OPTIONAL$_END }".to_owned(), None).unwrap();
+    let id = DocumentId::new("file:///tmp/events/scalar_hole.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .unwrap();
+    assert_eq!(
+        definition(
+            &host.snapshot(),
+            &id,
+            text.rfind("scalar_hole.1").unwrap() as u32
+        )
+        .len(),
+        1,
+        "a scalar composition hole is local to its value context"
+    );
+}

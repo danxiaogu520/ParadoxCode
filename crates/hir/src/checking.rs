@@ -8,6 +8,9 @@ use rules::source::ControlKind;
 
 struct Facts<'a>(&'a dyn SymbolFacts);
 impl SymbolFacts for Facts<'_> {
+    fn facts_complete(&self) -> bool {
+        self.0.facts_complete()
+    }
     fn type_member(&self, id: rules::ir::TypeId, name: &str) -> bool {
         self.0.type_member(id, name)
     }
@@ -34,7 +37,7 @@ pub fn field_candidates(
     if !exact.is_empty() {
         candidates = exact;
     }
-    candidates.retain(|id| scalar_matches(ir, ir.field(*id).key, key, facts));
+    candidates.retain(|id| scalar_outcome(ir, ir.field(*id).key, key, facts).0 != Some(false));
     candidates
 }
 
@@ -79,12 +82,18 @@ pub fn scalar_matches(
     value: &str,
     facts: &dyn SymbolFacts,
 ) -> bool {
-    match ir.matcher(matcher) {
+    scalar_outcome(ir, matcher, value, facts).0 == Some(true)
+}
+
+fn scalar_primitive(
+    ir: &RulesIr,
+    matcher: MatcherId,
+    value: &str,
+    facts: &dyn SymbolFacts,
+) -> Option<bool> {
+    let result = match ir.matcher(matcher) {
         Matcher::Link => crate::is_ir_scope_link(ir, value),
         Matcher::Def { .. } => !value.is_empty(),
-        Matcher::Union(alternatives) => alternatives
-            .iter()
-            .any(|id| scalar_matches(ir, *id, value, facts)),
         Matcher::Ref(RefTarget::Type {
             type_id,
             subtype,
@@ -95,7 +104,7 @@ pub fn scalar_matches(
                     .get(..ir.strings().resolve(prefix).len())
                     .is_some_and(|head| head.eq_ignore_ascii_case(ir.strings().resolve(prefix)))
             }) {
-                return false;
+                return Some(false);
             }
             let member = |candidate: &str| {
                 subtype.map_or_else(
@@ -108,58 +117,45 @@ pub fn scalar_matches(
                     member(&format!("{}{value}", ir.strings().resolve(prefix)))
                 })
         }
-        Matcher::Pattern(parts) => pattern_matches(ir, parts, value, facts),
+        Matcher::Union(_) | Matcher::Pattern(_) => unreachable!("bounded container search"),
         _ => ir.scalar_matches(matcher, value, &Facts(facts)),
+    };
+    if !result && !facts.facts_complete() && matches!(ir.matcher(matcher), Matcher::Ref(_)) {
+        None
+    } else {
+        Some(result)
     }
 }
 
-/// Matches a regular text pattern. Search states are explicit, not recursive native frames.
+/// Shared work and state limits distinguish exhausted search from a rejection.
+pub fn scalar_outcome(
+    ir: &RulesIr,
+    matcher: MatcherId,
+    value: &str,
+    facts: &dyn SymbolFacts,
+) -> (Option<bool>, Option<rules::pattern::SearchLimit>) {
+    let mut no_cancel = || false;
+    let mut budget = rules::pattern::SearchBudget::new(Default::default(), &mut no_cancel);
+    let matched = rules::pattern::evaluate(ir, matcher, value, &mut budget, &mut |id, text| {
+        scalar_primitive(ir, id, text, facts)
+    });
+    (matched, budget.limit)
+}
+
+/// Scope-link Patterns use exactly the same bounded text search.
 pub fn pattern_matches(
     ir: &RulesIr,
     parts: &[PatternPart],
     value: &str,
     facts: &dyn SymbolFacts,
 ) -> bool {
-    let mut pending = vec![(0, 0)];
-    let mut seen = std::collections::BTreeSet::new();
-    while let Some((part, offset)) = pending.pop() {
-        if !seen.insert((part, offset)) {
-            continue;
-        }
-        let Some(item) = parts.get(part) else {
-            if offset == value.len() {
-                return true;
-            }
-            continue;
-        };
-        let Some(tail) = value.get(offset..) else {
-            continue;
-        };
-        match item {
-            PatternPart::Text(text) => {
-                let text = ir.strings().resolve(*text);
-                if tail
-                    .get(..text.len())
-                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case(text))
-                {
-                    pending.push((part + 1, offset + text.len()));
-                }
-            }
-            PatternPart::Hole(matcher) => {
-                for end in tail
-                    .char_indices()
-                    .map(|(i, _)| i)
-                    .skip(1)
-                    .chain(std::iter::once(tail.len()))
-                {
-                    if scalar_matches(ir, *matcher, &tail[..end], facts) {
-                        pending.push((part + 1, offset + end));
-                    }
-                }
-            }
-        }
-    }
-    false
+    let mut no_cancel = || false;
+    let mut budget = rules::pattern::SearchBudget::new(Default::default(), &mut no_cancel);
+    rules::pattern::search(ir, parts, value, &mut budget, &mut |id, text| {
+        scalar_primitive(ir, id, text, facts)
+    })
+    .matched
+        == Some(true)
 }
 
 /// Checks scope links and registers against actual input/output scope context.
@@ -293,35 +289,80 @@ pub fn scalar_validation(
     state: &ScopeState,
     facts: &dyn SymbolFacts,
 ) -> crate::analysis::Validation {
+    scalar_validation_cancellable::<std::convert::Infallible>(
+        ir,
+        matcher,
+        value,
+        state,
+        facts,
+        &mut || Ok(()),
+    )
+    .unwrap()
+    .value
+}
+
+/// Cancellation and resource coverage belong to the same scalar goal as its proof.
+pub fn scalar_validation_cancellable<E>(
+    ir: &RulesIr,
+    matcher: MatcherId,
+    value: &str,
+    state: &ScopeState,
+    facts: &dyn SymbolFacts,
+    checkpoint: &mut dyn FnMut() -> Result<(), E>,
+) -> Result<crate::analysis::Analysis<crate::analysis::Validation>, E> {
     use crate::analysis::Validation;
-    let known = match ir.matcher(matcher) {
+    let mut error = None;
+    let mut cancelled = || match checkpoint() {
+        Ok(()) => false,
+        Err(value) => {
+            error = Some(value);
+            true
+        }
+    };
+    let mut budget = rules::pattern::SearchBudget::new(Default::default(), &mut cancelled);
+    let known = rules::pattern::evaluate(ir, matcher, value, &mut budget, &mut |id, text| match ir
+        .matcher(id)
+    {
         Matcher::Path(Some(category))
             if ir.strings().resolve(*category).eq_ignore_ascii_case("gfx") =>
         {
-            facts.asset_member(ir.strings().resolve(*category), value)
+            facts.asset_member(ir.strings().resolve(*category), text)
         }
-        Matcher::Scope(expected) => return scope_validation(ir, value, *expected, state, facts),
-        Matcher::Link => return scope_validation(ir, value, None, state, facts),
-        Matcher::Union(items) => {
-            let mut unknown = false;
-            for id in items.iter() {
-                match scalar_validation(ir, *id, value, state, facts) {
-                    Validation::Valid => return Validation::Valid,
-                    Validation::Unknown => unknown = true,
-                    Validation::Invalid => {}
-                }
-            }
-            if unknown {
-                return Validation::Unknown;
-            }
-            Some(false)
+        Matcher::Scope(expected) => {
+            validation_bool(scope_validation(ir, text, *expected, state, facts))
         }
-        _ => Some(scalar_matches(ir, matcher, value, facts)),
-    };
-    match known {
-        Some(true) => Validation::Valid,
-        Some(false) => Validation::Invalid,
-        None => Validation::Unknown,
+        Matcher::Link => validation_bool(scope_validation(ir, text, None, state, facts)),
+        _ => scalar_primitive(ir, id, text, facts),
+    });
+    let limit = budget.limit;
+    if let Some(error) = error {
+        return Err(error);
+    }
+    let mut coverage = crate::analysis::AnalysisCoverage::default();
+    if limit.is_some() {
+        coverage
+            .limits
+            .insert(crate::analysis::AnalysisLimit::PatternSearch);
+    } else if known.is_none() {
+        coverage
+            .residuals
+            .insert(crate::analysis::ResidualReason::Binding);
+    }
+    Ok(crate::analysis::Analysis {
+        value: match known {
+            Some(true) => Validation::Valid,
+            Some(false) => Validation::Invalid,
+            None => Validation::Unknown,
+        },
+        coverage,
+    })
+}
+
+fn validation_bool(validation: crate::analysis::Validation) -> Option<bool> {
+    match validation {
+        crate::analysis::Validation::Valid => Some(true),
+        crate::analysis::Validation::Invalid => Some(false),
+        crate::analysis::Validation::Unknown => None,
     }
 }
 
@@ -420,11 +461,10 @@ pub fn check_fragment<E>(
         }
     }
     let display = display_ranges(ir, hir);
-    for overload in hir
-        .overload_facts()
-        .iter()
-        .filter(|overload| overload.validation == Validation::Invalid)
-    {
+    for overload in hir.overload_facts().iter().filter(|overload| {
+        overload.validation == Validation::Invalid
+            && !source.has_unresolved_structure(overload.container)
+    }) {
         result.push(ConstraintEvidence {
             severity: rules::source::Severity::Error,
             kind: IssueKind::Value,
@@ -550,9 +590,27 @@ pub fn check_fragment<E>(
             .fields
             .iter()
             .copied()
-            .filter(|id| scalar_matches(ir, ir.field(*id).key, &property.key, facts))
+            .filter(|id| {
+                let (matched, limit) = scalar_outcome(ir, ir.field(*id).key, &property.key, facts);
+                if limit.is_some() {
+                    coverage
+                        .limits
+                        .insert(crate::analysis::AnalysisLimit::PatternSearch);
+                } else if matched.is_none() {
+                    coverage.residuals.insert(ResidualReason::Interpretation);
+                }
+                matched != Some(false)
+            })
             .collect::<Vec<_>>();
         if candidates.is_empty() {
+            if ir.fields(parent.schema).into_iter().any(|id| {
+                scalar_outcome(ir, ir.field(id).key, &property.key, facts)
+                    .0
+                    .is_none()
+            }) {
+                coverage.residuals.insert(ResidualReason::Interpretation);
+                continue;
+            }
             let recognized = ir
                 .fields(parent.schema)
                 .into_iter()
@@ -609,7 +667,16 @@ pub fn check_fragment<E>(
                     Validation::Unknown
                 }
                 (FieldValue::Scalar(matcher), Some(scalar)) => {
-                    scalar_validation(ir, matcher, &scalar.value, &parent.state, facts)
+                    let checked = scalar_validation_cancellable(
+                        ir,
+                        matcher,
+                        &scalar.value,
+                        &parent.state,
+                        facts,
+                        checkpoint,
+                    )?;
+                    coverage.merge(&checked.coverage);
+                    checked.value
                 }
                 (FieldValue::Scalar(_), None) => Validation::Invalid,
                 (FieldValue::Block(_) | FieldValue::SelfBlock, None) => Validation::Valid,
@@ -630,7 +697,7 @@ pub fn check_fragment<E>(
         }
         if !accepted && !unknown {
             result.push(ConstraintEvidence {
-                severity: rules::source::Severity::Error,
+                severity: ir.field(selected).severity,
                 kind: IssueKind::Value,
                 range: property
                     .scalar
@@ -638,7 +705,21 @@ pub fn check_fragment<E>(
                     .map_or(property.value_range.unwrap_or(property.range), |scalar| {
                         scalar.range
                     }),
-                explanation: format!("value of `{}` does not satisfy its rule", property.key),
+                explanation: property.scalar.as_ref().map_or_else(
+                    || format!("value of `{}` does not satisfy its rule", property.key),
+                    |scalar| {
+                        let value = scalar.value.chars().take(160).collect::<String>();
+                        let suffix = if value.len() < scalar.value.len() {
+                            "..."
+                        } else {
+                            ""
+                        };
+                        format!(
+                            "value `{value}{suffix}` of `{}` does not satisfy its rule",
+                            property.key
+                        )
+                    },
+                ),
                 container: parent.range,
             });
         }
@@ -1196,5 +1277,165 @@ fn matcher_label(ir: &RulesIr, id: MatcherId) -> String {
             .collect::<Vec<_>>()
             .join(" or "),
         _ => "a valid scalar value".into(),
+    }
+}
+
+#[cfg(test)]
+mod pattern_budget_tests {
+    use super::*;
+    use crate::analysis::{AnalysisLimit, Validation};
+
+    #[test]
+    fn unfinished_pattern_preserves_unknown_and_an_independent_scalar_rejection() {
+        let source = r#"{"files":{"owned":{"path":"events","ext":"txt","root":"root"}},"schemas":{"root":{"fields":{"needle":{"value":"'{scalar}{scalar}!'","card":"0..*"},"boolean":{"value":"bool","card":"0..*"}}}}}"#;
+        let ir = rules::lower::lower(
+            &[(
+                "owned.json".to_owned(),
+                serde_json::from_str(source).unwrap(),
+            )],
+            Default::default(),
+        )
+        .unwrap();
+        let schema = ir.schema_by_name("root").unwrap();
+        let value_matcher = |name| match ir
+            .field(ir.lookup(schema, name, Shape::Scalar).next().unwrap())
+            .value
+        {
+            FieldValue::Scalar(id) => id,
+            _ => unreachable!(),
+        };
+        let pattern = value_matcher("needle");
+        let boolean = value_matcher("boolean");
+        let state = ScopeState::initial(ScopeValue::Unknown);
+        let result = scalar_validation_cancellable::<std::convert::Infallible>(
+            &ir,
+            pattern,
+            &"a".repeat(10_000),
+            &state,
+            &rules::ir::NoSymbolFacts,
+            &mut || Ok(()),
+        )
+        .unwrap();
+        assert_eq!(result.value, Validation::Unknown);
+        assert!(
+            result
+                .coverage
+                .limits
+                .contains(&AnalysisLimit::PatternSearch)
+        );
+        assert_eq!(
+            scalar_validation(&ir, boolean, "wrong", &state, &rules::ir::NoSymbolFacts),
+            Validation::Invalid
+        );
+        assert_eq!(
+            scalar_validation(&ir, pattern, "ab!", &state, &rules::ir::NoSymbolFacts),
+            Validation::Valid
+        );
+        let mut calls = 0;
+        let cancelled = scalar_validation_cancellable(
+            &ir,
+            pattern,
+            &"a".repeat(10_000),
+            &state,
+            &rules::ir::NoSymbolFacts,
+            &mut || {
+                calls += 1;
+                if calls > 20 { Err("cancelled") } else { Ok(()) }
+            },
+        );
+        assert_eq!(cancelled.unwrap_err(), "cancelled");
+    }
+
+    #[test]
+    fn a_nested_reference_miss_in_uncommitted_facts_is_unknown() {
+        struct Pending;
+        impl SymbolFacts for Pending {
+            fn facts_complete(&self) -> bool {
+                false
+            }
+        }
+        let source = r#"{"files":{"owned":{"path":"events","ext":"txt","root":"root"}},"types":{"node":{},"other":{}},"schemas":{"root":{"fields":{"needle":{"value":"'prefix_{ref<node> | ref<other>}'","card":"0..*"}}}}}"#;
+        let ir = rules::lower::lower(
+            &[(
+                "owned.json".to_owned(),
+                serde_json::from_str(source).unwrap(),
+            )],
+            Default::default(),
+        )
+        .unwrap();
+        let schema = ir.schema_by_name("root").unwrap();
+        let FieldValue::Scalar(pattern) = ir
+            .field(ir.lookup(schema, "needle", Shape::Scalar).next().unwrap())
+            .value
+        else {
+            unreachable!()
+        };
+        let state = ScopeState::initial(ScopeValue::Unknown);
+        assert_eq!(
+            scalar_validation(&ir, pattern, "prefix_missing", &state, &Pending),
+            Validation::Unknown
+        );
+        assert_eq!(
+            scalar_validation(&ir, pattern, "different_missing", &state, &Pending),
+            Validation::Invalid
+        );
+    }
+}
+
+#[cfg(test)]
+mod pattern_reference_tests {
+    #[test]
+    fn source_holes_follow_the_semantic_split_and_ambiguous_splits_are_unresolved() {
+        let source = serde_json::json!({
+            "types":{"node":{}},"files":{"owned":{"path":"events","ext":"txt","root":"root"}},
+            "schemas":{"root":{"fields":{"seed":{"value":"def<node>","card":"0..*"}},
+                "patterns":[{"key":"'pair_{ref<node>}_{ref<node>}'","value":"bool","card":"0..*"}]}}
+        });
+        let ir = rules::lower::lower(
+            &[(
+                "owned.json".to_owned(),
+                serde_json::from_value(source).unwrap(),
+            )],
+            Default::default(),
+        )
+        .unwrap();
+        let catalog = rules::RuleSet::from_ir_catalog(&ir);
+        let lower = |source: &str| {
+            crate::lower_shared_with_ir(
+                std::sync::Arc::new(parser::parse(parser::FileFormat::Script, source)),
+                &text::LogicalPath::parse("events/owned.txt").unwrap(),
+                &catalog,
+                &ir.game.profile,
+                &ir,
+            )
+        };
+        let text = "seed = a_b seed = c pair_a_b_c = yes";
+        let hir = lower(text);
+        let names = hir
+            .references()
+            .iter()
+            .filter(|r| r.kind.as_ref() == "node")
+            .map(|r| r.name.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(names, vec!["a_b", "c"]);
+        for reference in hir.references() {
+            assert_eq!(
+                &text[reference.range.start() as usize..reference.range.end() as usize],
+                reference.name
+            );
+        }
+        let ambiguous = lower("seed = a seed = b_c seed = a_b seed = c pair_a_b_c = yes");
+        assert!(
+            ambiguous
+                .references()
+                .iter()
+                .all(|r| r.kind.as_ref() != "node")
+        );
+        assert!(
+            ambiguous
+                .analysis_coverage()
+                .residuals
+                .contains(&crate::analysis::ResidualReason::Interpretation)
+        );
     }
 }

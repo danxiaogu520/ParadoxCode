@@ -486,68 +486,19 @@ impl AnalysisHost {
         if self.ir.files.is_empty() {
             return;
         }
-        let preliminary = self
-            .documents
-            .iter()
-            .map(|(id, document)| {
-                let document = if (document.source == DocumentSource::Overlay
-                    && document.hir.is_none())
-                    || document
-                        .hir
-                        .as_ref()
-                        .is_some_and(|hir| !hir.depends_on_symbol_facts())
-                {
-                    document.clone()
-                } else {
-                    prepare_document_snapshot_with_ir(
-                        &self.rules,
-                        &self.profile,
-                        &self.ir,
-                        &self.roots,
-                        document.clone(),
-                    )
-                };
-                (id.clone(), document)
-            })
-            .collect::<BTreeMap<_, _>>();
-        let overlay_hirs = preliminary
-            .values()
-            .filter(|document| document.source == DocumentSource::Overlay)
-            .filter_map(|document| document.hir.clone())
-            .collect::<Vec<_>>();
-        let overlay_file_ids = overlay_source_file_ids(&preliminary, &self.source_files);
-        let facts = IndexSymbolFacts::with_overlay_files(
+        let excluded = overlay_source_file_ids(&self.documents, &self.source_files);
+        let transaction = index::stabilize_overlay_facts(
+            &self.documents,
+            &self.rules,
+            &self.profile,
             &self.ir,
+            &self.roots,
             &self.index,
-            &overlay_hirs,
-            &overlay_file_ids,
+            &excluded,
+            Default::default(),
+            &WorkspaceScanToken::new(),
         );
-        self.documents = Arc::new(
-            preliminary
-                .into_iter()
-                .map(|(id, document)| {
-                    let document = if (document.source == DocumentSource::Overlay
-                        && document.hir.is_none())
-                        || document
-                            .hir
-                            .as_ref()
-                            .is_some_and(|hir| !hir.depends_on_symbol_facts())
-                    {
-                        document
-                    } else {
-                        prepare_document_snapshot_with_ir_and_facts(
-                            &self.rules,
-                            &self.profile,
-                            &self.ir,
-                            &facts,
-                            &self.roots,
-                            document,
-                        )
-                    };
-                    (id, document)
-                })
-                .collect(),
-        );
+        self.documents = Arc::new(transaction.documents);
     }
 
     fn document_contributes_symbol_facts(&self, document: &DocumentSnapshot) -> bool {

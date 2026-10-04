@@ -14,6 +14,8 @@ use crate::{
 #[derive(Clone)]
 pub(super) struct IrFacts {
     pub analysis_coverage: crate::analysis::AnalysisCoverage,
+    pub pattern_ambiguous: std::cell::Cell<bool>,
+    pub pattern_search_incomplete: std::cell::Cell<bool>,
     pub overload_facts: Vec<crate::block_checking::OverloadFact>,
     pub unknown_ranges: Vec<TextRange>,
     pub retain_validation_facts: bool,
@@ -30,6 +32,9 @@ pub(super) struct IrFacts {
 }
 struct FactsRef<'a>(Option<&'a dyn SymbolFacts>, &'a std::cell::Cell<bool>);
 impl SymbolFacts for FactsRef<'_> {
+    fn facts_complete(&self) -> bool {
+        self.0.is_none_or(SymbolFacts::facts_complete)
+    }
     fn type_member(&self, ty: TypeId, name: &str) -> bool {
         self.1.set(true);
         self.0.is_some_and(|facts| facts.type_member(ty, name))
@@ -54,6 +59,8 @@ pub(super) fn lower(
     let children = crate::scope::property_children(props);
     let mut out = IrFacts {
         analysis_coverage: Default::default(),
+        pattern_search_incomplete: std::cell::Cell::new(false),
+        pattern_ambiguous: std::cell::Cell::new(false),
         overload_facts: Vec::new(),
         unknown_ranges: Vec::new(),
         retain_validation_facts,
@@ -158,6 +165,16 @@ pub(super) fn lower(
     out.definitions.sort_by_key(|d| d.selection_range.start());
     out.references.sort_by_key(|r| r.range.start());
     out.binding_references.sort_by_key(|r| r.range.start());
+    if out.pattern_ambiguous.get() {
+        out.analysis_coverage
+            .residuals
+            .insert(crate::analysis::ResidualReason::Interpretation);
+    }
+    if out.pattern_search_incomplete.get() {
+        out.analysis_coverage
+            .limits
+            .insert(crate::analysis::AnalysisLimit::PatternSearch);
+    }
     out
 }
 
@@ -240,6 +257,8 @@ pub(super) fn lower_schema_fragment(
     let root_range = root_range.unwrap_or(syntax.root().range());
     let mut out = IrFacts {
         analysis_coverage: Default::default(),
+        pattern_search_incomplete: std::cell::Cell::new(false),
+        pattern_ambiguous: std::cell::Cell::new(false),
         overload_facts: Vec::new(),
         unknown_ranges: unknown_ranges.to_vec(),
         retain_validation_facts: true,
@@ -296,6 +315,16 @@ pub(super) fn lower_schema_fragment(
     out.scope_facts.sort_by_key(|fact| fact.range);
     out.definitions
         .sort_by_key(|def| def.selection_range.start());
+    if out.pattern_ambiguous.get() {
+        out.analysis_coverage
+            .residuals
+            .insert(crate::analysis::ResidualReason::Interpretation);
+    }
+    if out.pattern_search_incomplete.get() {
+        out.analysis_coverage
+            .limits
+            .insert(crate::analysis::AnalysisLimit::PatternSearch);
+    }
     out
 }
 #[allow(clippy::too_many_arguments)]
@@ -373,6 +402,23 @@ fn descend(
             scoped
         };
         candidates.sort_by_key(|id| std::cmp::Reverse(field_value_priority(ir, *id)));
+        if let Some(scalar) = &p.scalar {
+            for id in &candidates {
+                if let rules::ir::FieldValue::Scalar(matcher) = ir.field(*id).value
+                    && matcher_has_pattern(ir, matcher)
+                    && crate::checking::scalar_outcome(
+                        ir,
+                        matcher,
+                        &scalar.value,
+                        &FactsRef(facts, &out.symbol_facts_dependency),
+                    )
+                    .1
+                    .is_some()
+                {
+                    out.pattern_search_incomplete.set(true);
+                }
+            }
+        }
         let selected = p
             .scalar
             .as_ref()
@@ -1205,11 +1251,18 @@ fn matcher_accepts_key(
         Matcher::Date => {
             key.split('.').count() == 3 && key.split('.').all(|part| part.parse::<u32>().is_ok())
         }
-        Matcher::Pattern(parts) => pattern_value_holes(ir, parts, key).is_some_and(|holes| {
-            holes.into_iter().all(|(matcher, start, end)| {
-                matcher_accepts_key(ir, matcher, &key[start..end], facts, out)
-            })
-        }),
+        Matcher::Pattern(parts) => {
+            let mut no_cancel = || false;
+            let mut budget = rules::pattern::SearchBudget::new(Default::default(), &mut no_cancel);
+            let result =
+                rules::pattern::search(ir, parts, key, &mut budget, &mut |matcher, text| {
+                    Some(matcher_accepts_key(ir, matcher, text, facts, out))
+                });
+            if budget.limit.is_some() {
+                out.pattern_search_incomplete.set(true);
+            }
+            result.matched != Some(false)
+        }
         Matcher::Union(items) => items
             .iter()
             .any(|item| matcher_accepts_key(ir, *item, key, facts, out)),
@@ -1555,6 +1608,7 @@ fn collect_matcher_refs(
         // Membership is checked by the field matcher; resolving a row against
         // an unrelated symbol namespace would report valid literals as missing.
         Matcher::Enum { .. } => {}
+        Matcher::Loc if value.trim().is_empty() => {}
         Matcher::Loc => out.references.push(HirReference {
             kind: "localisation".into(),
             name: value.into(),
@@ -1635,7 +1689,7 @@ fn collect_matcher_refs(
             }
         }
         Matcher::Pattern(parts) => {
-            if let Some(holes) = pattern_value_holes(ir, parts, value) {
+            if let Some(holes) = pattern_value_holes(ir, parts, value, facts, Some(out)) {
                 for (matcher, start, end) in holes {
                     collect_matcher_refs(
                         ir,
@@ -1653,7 +1707,9 @@ fn collect_matcher_refs(
             for segment in value.split('.') {
                 let segment_range = subrange(range, value, offset, offset + segment.len());
                 for link in &ir.scopes.links {
-                    if let Some(holes) = pattern_value_holes(ir, &link.pattern, segment) {
+                    if let Some(holes) =
+                        pattern_value_holes(ir, &link.pattern, segment, facts, Some(out))
+                    {
                         for (matcher, start, end) in holes {
                             collect_matcher_refs(
                                 ir,
@@ -1685,7 +1741,7 @@ fn definitely_non_reference(ir: &RulesIr, id: MatcherId, value: &str) -> bool {
         Matcher::Scope(expected)=>ir.scope_matches(*expected,value)||link_or_register_matches(ir,value),
         Matcher::Link=>link_or_register_matches(ir,value),
         Matcher::Opaque|Matcher::Path(_)|Matcher::Def{..}=>true,
-        Matcher::Pattern(parts)=>pattern_value_holes(ir,parts,value).is_some()&&!parts.iter().any(|part|matches!(part,rules::ir::PatternPart::Hole(m) if matcher_has_reference(ir,*m))),
+        Matcher::Pattern(parts)=>pattern_value_holes(ir,parts,value,None,None).is_some()&&!parts.iter().any(|part|matches!(part,rules::ir::PatternPart::Hole(m) if matcher_has_reference(ir,*m))),
         Matcher::Union(items)=>items.iter().any(|item|definitely_non_reference(ir,*item,value)),
         Matcher::Ref(_)=>false,
     }
@@ -1697,6 +1753,13 @@ fn matcher_has_reference(ir: &RulesIr, id: MatcherId) -> bool {
         Matcher::Pattern(parts) => parts.iter().any(
             |part| matches!(part,rules::ir::PatternPart::Hole(m) if matcher_has_reference(ir,*m)),
         ),
+        _ => false,
+    }
+}
+fn matcher_has_pattern(ir: &RulesIr, id: MatcherId) -> bool {
+    match ir.matcher(id) {
+        Matcher::Pattern(_) => true,
+        Matcher::Union(items) => items.iter().any(|id| matcher_has_pattern(ir, *id)),
         _ => false,
     }
 }
@@ -1727,12 +1790,13 @@ fn branch_reference_matches(
     match ir.matcher(id) {
         Matcher::Ref(_) => reference_matches(ir, id, value, facts, out),
         Matcher::Loc => true,
-        Matcher::Pattern(parts) => pattern_value_holes(ir, parts, value).is_some_and(|holes| {
-            holes.iter().any(|(matcher, start, end)| {
-                matcher_has_reference(ir, *matcher)
-                    && branch_reference_matches(ir, *matcher, &value[*start..*end], facts, out)
-            })
-        }),
+        Matcher::Pattern(parts) => pattern_value_holes(ir, parts, value, facts, Some(out))
+            .is_some_and(|holes| {
+                holes.iter().any(|(matcher, start, end)| {
+                    matcher_has_reference(ir, *matcher)
+                        && branch_reference_matches(ir, *matcher, &value[*start..*end], facts, out)
+                })
+            }),
         Matcher::Union(items) => items
             .iter()
             .any(|item| branch_reference_matches(ir, *item, value, facts, out)),
@@ -1750,7 +1814,7 @@ fn collect_branch_references(
     match ir.matcher(id) {
         Matcher::Ref(_) | Matcher::Loc => collect_matcher_refs(ir, id, value, range, facts, out),
         Matcher::Pattern(parts) => {
-            if let Some(holes) = pattern_value_holes(ir, parts, value) {
+            if let Some(holes) = pattern_value_holes(ir, parts, value, facts, Some(out)) {
                 for (matcher, start, end) in holes {
                     if matcher_has_reference(ir, matcher) {
                         collect_branch_references(
@@ -1819,40 +1883,38 @@ fn pattern_value_holes(
     ir: &RulesIr,
     parts: &[rules::ir::PatternPart],
     value: &str,
+    facts: Option<&dyn SymbolFacts>,
+    out: Option<&IrFacts>,
 ) -> Option<Vec<(MatcherId, usize, usize)>> {
-    let mut cursor = 0;
-    let mut holes = Vec::new();
-    for (index, part) in parts.iter().enumerate() {
-        match part {
-            rules::ir::PatternPart::Text(text) => {
-                let literal = ir.strings().resolve(*text);
-                let tail = value.get(cursor..)?;
-                let offset = tail
-                    .to_ascii_lowercase()
-                    .find(&literal.to_ascii_lowercase())?;
-                if index == 0 && offset != 0 {
-                    return None;
-                }
-                cursor += offset + literal.len();
-            }
-            rules::ir::PatternPart::Hole(matcher) => {
-                let start = cursor;
-                let end = if let Some(rules::ir::PatternPart::Text(next)) = parts.get(index + 1) {
-                    let needle = ir.strings().resolve(*next);
-                    let offset = value
-                        .get(cursor..)?
-                        .to_ascii_lowercase()
-                        .find(&needle.to_ascii_lowercase())?;
-                    cursor + offset
-                } else {
-                    value.len()
-                };
-                holes.push((*matcher, start, end));
-                cursor = end;
-            }
-        }
+    let mut no_cancel = || false;
+    let mut budget = rules::pattern::SearchBudget::new(Default::default(), &mut no_cancel);
+    let multiple = parts
+        .iter()
+        .filter(|part| matches!(part, rules::ir::PatternPart::Hole(_)))
+        .count()
+        > 1;
+    let mut primitive = |matcher, text: &str| {
+        out.map_or(Some(true), |out| {
+            Some(matcher_accepts_key(ir, matcher, text, facts, out))
+        })
+    };
+    let result = if multiple {
+        rules::pattern::unique_search(ir, parts, value, &mut budget, &mut primitive)
+    } else {
+        rules::pattern::search(ir, parts, value, &mut budget, &mut |_, _| Some(true))
+    };
+    if result.matched.is_none()
+        && budget.limit.is_none()
+        && let Some(out) = out
+    {
+        out.pattern_ambiguous.set(true);
     }
-    (cursor == value.len()).then_some(holes)
+    if budget.limit.is_some()
+        && let Some(out) = out
+    {
+        out.pattern_search_incomplete.set(true);
+    }
+    (result.matched == Some(true)).then_some(result.holes)
 }
 fn subrange(range: TextRange, value: &str, from: usize, to: usize) -> TextRange {
     if usize::try_from(range.len()).ok() == Some(value.len()) {

@@ -58,10 +58,14 @@ finite-domain checks live in [the audit tools](../tools/src/audit/templates/mod.
 Licensed source inputs, cache snapshots and performance reports remain local
 under `target/`.
 
-The semantic memo belongs to one immutable facts view and has a byte bound.
-Snapshot adapters currently use conservative document-domain invalidation;
-negative lookups, overlays, rules and source-root changes must invalidate any
-result that reads them. Parameter-site memo keys retain binding source ranges. Complete-container
+The semantic memo belongs to one immutable facts environment and has a byte bound.
+The snapshot adapter compares exact overlay membership, attributes, Template sources
+and ranges, overlay masking and fact coverage. It reuses results across caller edits
+that preserve these facts, including negative lookup answers. Rules/index/source-root
+changes invalidate the pool; texture generations participate in its identity.
+At most four environments retain 16 MiB memos, with an 8 MiB total identity bound.
+Oversized identities use only the current document view; unfinished resource queries
+are not memoized. Parameter-site memo keys retain binding source ranges. Complete-container
 instances use root-relative maps and share by bindings, presence, schema and scope;
 source locations are supplied separately for each caller. Persistent compatibility uses the
 workspace LSP release version.
@@ -76,7 +80,9 @@ The IDE validates a completion's actual source edit in an isolated frontend.
 Generated snippet holes are explicit trial ranges, rather than user-text marker
 heuristics. Script quote layers and snippet literal escaping compose separately;
 completion resolve retains its rule identity and refuses to reinterpret stale
-Template evidence. Unresolved callees retain an opaque argument map and a coverage
+Template evidence. Completion data also retains the schema and overload identities
+from the actual trial instance, and whether that interpretation remains conditional.
+Unresolved callees retain an opaque argument map and a coverage
 limit, never a statement schema guessed from their bindings.
 
 [template_instance.rs](src/template_instance.rs) owns complete-container specialization
@@ -98,10 +104,25 @@ changed facts enter subsequent rounds. Disk edits rebuild their transitive reade
 component from base declarations before solving, including outgoing generated facts.
 This prevents deleted seeds from sustaining cycles. Oscillation compares exact fact
 contents and aborts the transaction; histories and work are bounded. Persistent
-refresh uses the same mechanism. Overlay discovery still needs its complete
-transaction and completion-state acceptance.
+refresh uses the same mechanism. [Overlay discovery](../index/src/overlay_facts.rs)
+uses the same immutable-round and reader scheduling contract. It reuses syntax,
+rebuilds dependent declarations from base input, and atomically publishes the
+solved documents. Oscillation, work limits and cancellation discard speculative
+facts and retain the latest syntax with FactStability coverage. Missing symbols
+in that unfinished view remain Unknown during scalar and Pattern validation.
+
+Rendered text carries the first unmaterialized byte at each truncation frontier.
+Parser recovery beyond a frontier cannot become a user syntax error; independent
+rejection evidence before it survives.
 
 Consumed named call keys remain in the render trace after their bodies expand.
 Navigation and rename use their exact root binding ranges. Cursor queries on a
 removed key use its shared pre-expansion frame and still validate the real edit
 against the complete root instance. Call frames are counted in memo byte costs.
+
+[Pattern search](../rules/src/pattern.rs) shares a work/state/depth budget across
+unions, nested Patterns and failed splits. It schedules one hole split at a time
+and checks cancellation within search. Exhaustion is Unknown with PatternSearch
+coverage, while independent rejection witnesses remain usable. Source projections
+use semantic hole slices; multiple accepting slices retain Interpretation and do
+not become arbitrary reference or rename ranges.

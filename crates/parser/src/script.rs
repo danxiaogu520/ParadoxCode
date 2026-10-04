@@ -21,23 +21,31 @@ pub(crate) fn parse_guarded(
     source: &str,
     guard: &mut dyn FnMut(usize, usize, usize) -> bool,
 ) -> Option<ParseParts> {
+    let (parts, stopped) = parse_guarded_prefix(source, guard);
+    (!stopped).then_some(parts)
+}
+
+/// Finishes only the bounded active ancestor stack after a frontier. The caller
+/// must retain that frontier; recovery nodes do not prove anything beyond it.
+pub(crate) fn parse_guarded_prefix(
+    source: &str,
+    guard: &mut dyn FnMut(usize, usize, usize) -> bool,
+) -> (ParseParts, bool) {
     let mut parser = Parser::new(source);
     parser.guard = Some(guard);
     let mark = parser.tree.child_mark();
     parser.parse_container(None);
-    if parser.stopped {
-        return None;
-    }
     let children = parser.tree.children_since(mark);
     parser.node(CstKind::Document, 0, source.len(), children);
-    if parser.stopped {
-        return None;
-    }
-    Some(ParseParts {
-        tree: parser.tree.finish(),
-        tokens: parser.tokens,
-        errors: parser.errors,
-    })
+    let stopped = parser.stopped;
+    (
+        ParseParts {
+            tree: parser.tree.finish(),
+            tokens: parser.tokens,
+            errors: parser.errors,
+        },
+        stopped,
+    )
 }
 
 struct Parser<'source, 'guard> {

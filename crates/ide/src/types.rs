@@ -648,6 +648,16 @@ pub struct TemplateCompletionEvidence {
     pub validation: hir::analysis::Validation,
     /// Other bindings that must be supplied for this proposal to satisfy all usage sites.
     pub witness: std::collections::BTreeMap<String, String>,
+    /// Container interpretations supporting this proposal, within the returned revision.
+    pub interpretations: Vec<TemplateInterpretation>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TemplateInterpretation {
+    pub schema: usize,
+    pub fields: Vec<usize>,
+    pub container: TextRange,
+    pub conditional: bool,
 }
 
 /// Broad completion item categories independent of LSP enum values.

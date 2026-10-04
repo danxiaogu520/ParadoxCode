@@ -5,6 +5,10 @@ use std::ops::{Deref, DerefMut};
 /// A resource or representation boundary that prevented a requested query from completing.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum AnalysisLimit {
+    /// Generated workspace facts did not reach a stable, committed state.
+    FactStability,
+    /// A regular Pattern search exhausted its bounded work or state space.
+    PatternSearch,
     /// The active call stack reached its configured bound.
     CallDepth,
     /// The query exhausted its semantic-node budget.
@@ -31,6 +35,8 @@ impl AnalysisLimit {
     /// Stable, editor-independent explanation for a limit.
     pub const fn message(self) -> &'static str {
         match self {
+            Self::FactStability => "Generated fact discovery did not reach a stable state",
+            Self::PatternSearch => "Pattern matching did not finish within its search budget",
             Self::CallDepth => "Template analysis reached its call-depth limit",
             Self::Nodes => "Template analysis exhausted its semantic-node budget",
             Self::RecursiveState => "Template analysis retained an unresolved recursive state",

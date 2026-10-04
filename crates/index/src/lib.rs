@@ -13,7 +13,11 @@ pub use fact_stabilization::{
     stabilize_symbol_dependent_files,
 };
 mod index;
+mod overlay_facts;
 mod pipeline;
+pub use overlay_facts::{
+    OverlayFactBudget, OverlayFactReport, OverlayFactTransaction, stabilize_overlay_facts,
+};
 
 pub use documents::{DocumentSnapshot, FileState, ParsedSource, PreparedDocument};
 pub use index::{
