@@ -368,6 +368,60 @@ fn golden_dynamic_scope_contracts() {
     )
     .expect("open golden contracts");
     assert_golden("dynamic_scope_contracts", text, &analyze_text(&host, &id));
+    let snapshot = host.snapshot();
+    // The inferred contracts behind those diagnostics, via the hover view.
+    use crate::template_contracts::{ScopeContract, contract_hover_line, template_contract};
+    assert_eq!(
+        template_contract(&snapshot, "scripted_effect", "clash"),
+        Some(ScopeContract::Empty)
+    );
+    assert_eq!(
+        template_contract(&snapshot, "scripted_effect", "fine"),
+        Some(ScopeContract::Scopes(vec!["country".to_owned()]))
+    );
+    assert_eq!(
+        template_contract(&snapshot, "scripted_effect", "helper_province"),
+        Some(ScopeContract::Scopes(vec!["province".to_owned()]))
+    );
+    assert_eq!(
+        template_contract(&snapshot, "scripted_effect", "root_opaque"),
+        Some(ScopeContract::Scopes(vec!["country".to_owned()])),
+        "ROOT blocks re-target the event root and must not narrow the entry"
+    );
+    assert_eq!(
+        template_contract(&snapshot, "scripted_effect", "this_opaque"),
+        Some(if snapshot.ir().schemas.is_empty() {
+            ScopeContract::Scopes(vec!["country".to_owned()])
+        } else {
+            ScopeContract::Empty
+        }),
+        "THIS retains the current scope and its body constrains the IR entry contract"
+    );
+    assert_eq!(
+        template_contract(&snapshot, "scripted_effect", "or_union"),
+        Some(ScopeContract::Empty),
+        "every OR child must be statically legal in the same scope"
+    );
+    assert_eq!(
+        template_contract(&snapshot, "scripted_effect", "or_open"),
+        Some(ScopeContract::Empty),
+        "an unknown OR child cannot hide an independently invalid known child"
+    );
+    let fine_hover = contract_hover_line(&snapshot, "scripted_effect", "fine");
+    assert!(
+        fine_hover.contains("Inferred entry scope: country"),
+        "hover states the narrowed contract: {fine_hover}"
+    );
+    let dispatch_hover = contract_hover_line(&snapshot, "scripted_effect", "dynamic_dispatch");
+    assert!(
+        dispatch_hover.contains("dynamic `$param$` dispatch"),
+        "hover flags dynamic dispatch: {dispatch_hover}"
+    );
+    assert!(
+        contract_hover_line(&snapshot, "scripted_effect", "clash")
+            .contains("definition can never run"),
+        "hover explains the empty contract"
+    );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
 

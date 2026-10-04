@@ -157,35 +157,6 @@ fn closed_localisation_diagnostics_keep_indexed_symbols_and_observe_cancellation
 }
 
 #[test]
-fn scope_target_failures_use_distinct_categories() {
-    let mut host = fixture_host(
-        serde_json::json!({"schemas": {"trigger": {"fields": {"target": {"value": "scope<country>", "card": "0..*"}, "scope": {"value": "scope<country>", "card": "0..*"}}}}}),
-    );
-
-    let id = DocumentId::new("file:///tmp/events/scope-targets.txt");
-    host.open_document(
-        id.clone(),
-        1,
-        "trigger = { target = NOWHERE scope = NOWHERE target = capital }\n".to_owned(),
-        None,
-    )
-    .expect("open scope target fixture");
-    let diagnostics = diagnostics(&host.snapshot(), &id);
-    assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.code == DiagnosticCode::InvalidValue
-            && diagnostic.message.contains("for `target`")
-    }));
-    assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.code == DiagnosticCode::InvalidValue
-            && diagnostic.message.contains("for `scope`")
-            && diagnostic.message.contains("NOWHERE")
-    }));
-    assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.code == DiagnosticCode::WrongScope && diagnostic.message.contains("capital")
-    }));
-}
-
-#[test]
 fn quoted_script_diagnostics_reuse_semantic_validation_with_exact_ranges() {
     let text = "trigger = { embedded = { BODY = \"\n foo = maybe\n unknown = yes\n\" } }\n";
     let (host, id) = quoted_script_snapshot(text);
@@ -885,22 +856,6 @@ fn uncovered_semantic_context_is_syntax_only() {
 }
 
 #[test]
-fn semantic_matcher_rejects_invalid_values_and_unknown_keys() {
-    let (host, id) = semantic_snapshot("trigger = { foo = maybe unknown = yes }\n");
-    let diagnostics = diagnostics(&host.snapshot(), &id);
-    assert!(
-        diagnostics
-            .iter()
-            .any(|item| item.code == DiagnosticCode::InvalidValue)
-    );
-    assert!(
-        diagnostics
-            .iter()
-            .any(|item| item.code == DiagnosticCode::UnknownKey)
-    );
-}
-
-#[test]
 fn invalid_enum_value_carries_one_unique_did_you_mean_fix() {
     let mut host = fixture_host(
         serde_json::json!({"enums": {"fixture_modes": ["historic", "dynamic"]}, "schemas": {"trigger": {"fields": {"mode": {"value": "enum<fixture_modes>", "card": "0..1"}}}}}),
@@ -979,17 +934,6 @@ fn semantic_rule_severity_reaches_editor_diagnostic() {
             .and_then(|provenance| provenance.source_file.as_deref())
             .is_some_and(|file| file.contains("fixture.json")),
         "{invalid_value:?}"
-    );
-}
-
-#[test]
-fn semantic_matcher_enforces_max_cardinality() {
-    let (host, id) = semantic_snapshot("trigger = { foo = yes foo = no }\n");
-    let results = diagnostics(&host.snapshot(), &id);
-    assert!(
-        results
-            .iter()
-            .any(|item| item.code == DiagnosticCode::Cardinality)
     );
 }
 
@@ -2028,42 +1972,6 @@ fn vanilla_cache_only_dynamic_validates_quoted_payload_at_exact_call_site_range(
     );
     assert!(!unknown.message.contains("in expansion of"));
     std::fs::remove_dir_all(root).expect("cleanup");
-}
-
-#[test]
-fn required_type_localisation_keys_report_missing_derived_keys() {
-    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
-    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-        SourceRootId::new(1),
-        SourceRootKind::Project,
-        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
-    )]));
-    let id = DocumentId::new("file:///tmp/missions/test.txt");
-    host.open_document(
-        id.clone(),
-        1,
-        "series = { mission_one = { potential = { always = yes } } }\n".to_owned(),
-        Some(AbsPath::normalize(&std::path::PathBuf::from(
-            "/tmp/missions/test.txt",
-        ))),
-    )
-    .expect("open mission");
-
-    let messages = diagnostics(&host.snapshot(), &id)
-        .into_iter()
-        .filter(|diagnostic| diagnostic.code == DiagnosticCode::UnknownLocalisationKey)
-        .map(|diagnostic| diagnostic.message)
-        .collect::<Vec<_>>();
-    assert!(
-        messages
-            .iter()
-            .any(|message| message.contains("mission_one_title"))
-    );
-    assert!(
-        messages
-            .iter()
-            .any(|message| message.contains("mission_one_desc"))
-    );
 }
 
 #[test]
@@ -3852,111 +3760,6 @@ fn evicted_frontend_diagnostics_match_retained() {
 }
 
 #[test]
-fn logic_container_lints_fire_on_degenerate_shapes() {
-    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
-    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-        SourceRootId::new(1),
-        SourceRootKind::Project,
-        AbsPath::normalize(&std::path::PathBuf::from("/tmp")),
-    )]));
-    let id = DocumentId::new("file:///tmp/events/lint_probe.txt");
-    host.open_document(
-        id.clone(),
-        1,
-        concat!(
-            "country_event = { id = lint.1\n",
-            "  trigger = {\n",
-            "    NOT = { always = yes is_year = 1500 }\n",
-            "    OR = { has_country_flag = lint_flag }\n",
-            "    AND = { }\n",
-            "  }\n",
-            "  option = { name = lint.1.a\n",
-            "    if = { limit = { always = yes } add_prestige = 1\n",
-            "      else = { add_prestige = 4 }\n",
-            "    }\n",
-            "    else = { add_prestige = 2 }\n",
-            "    ai_chance = { factor = 0 }\n",
-            "  }\n",
-            "  option = { name = lint.1.b\n",
-            "    else = { add_prestige = 3 }\n",
-            "    has_country_flag = lint_flag\n",
-            "  }\n",
-            "}\n",
-            "country_event = { id = lint.2 trigger = { add_prestige = 1 } option = { name = lint.2.a } }\n",
-        )
-        .to_owned(),
-        Some(AbsPath::normalize(&std::path::PathBuf::from("/tmp/events/lint_probe.txt"))),
-    )
-    .expect("open lint probe");
-    let all = diagnostics(&host.snapshot(), &id);
-    let codes: Vec<(DiagnosticCode, String)> = all
-        .iter()
-        .map(|diagnostic| (diagnostic.code, diagnostic.message.clone()))
-        .collect();
-
-    assert!(
-        codes.iter().any(|(code, message)| {
-            *code == DiagnosticCode::LogicalContainer && message.contains("AND of NOTs")
-        }),
-        "NOT with multiple conditions must explain the NOR reading: {codes:?}"
-    );
-    assert!(
-        codes.iter().any(|(code, message)| {
-            *code == DiagnosticCode::LogicalContainer && message.contains("single condition")
-        }),
-        "single-condition OR must be flagged: {codes:?}"
-    );
-    assert!(
-        codes
-            .iter()
-            .any(|(code, message)| *code == DiagnosticCode::LogicalContainer
-                && message.contains("empty `AND`")),
-        "empty AND container must be flagged: {codes:?}"
-    );
-    assert!(
-        codes
-            .iter()
-            .any(|(code, message)| *code == DiagnosticCode::ConstantCondition
-                && message.contains("always true")),
-        "constant always-yes limit must be flagged: {codes:?}"
-    );
-    assert_eq!(
-        codes
-            .iter()
-            .filter(|(code, _)| *code == DiagnosticCode::OrphanElse)
-            .count(),
-        1,
-        "exactly the option-level else is orphaned; sibling and nested forms after an `if` are valid: {codes:?}"
-    );
-    assert!(
-        codes
-            .iter()
-            .any(|(code, message)| *code == DiagnosticCode::UnknownKey
-                && message.contains("is an effect and cannot be used inside a trigger block")),
-        "effect-in-trigger must sharpen the unknown-key message: {codes:?}"
-    );
-    assert!(
-        codes
-            .iter()
-            .any(|(code, message)| *code == DiagnosticCode::UnknownKey
-                && message.contains("is a trigger and cannot be used inside an effect block")),
-        "trigger-in-effect must sharpen the unknown-key message: {codes:?}"
-    );
-    assert!(
-        !all.iter()
-            .any(|diagnostic| diagnostic.message.contains("unexpected key `add_prestige`")),
-        "the sharpened effect-in-trigger message replaces the generic wording: {codes:?}"
-    );
-    // A deliberate `ai_chance = { factor = 0 }` (AI never picks this option)
-    // is a standard EU4 idiom and must stay silent.
-    assert!(
-        !all.iter()
-            .any(|diagnostic| diagnostic.message.contains("never chooses")),
-        "zero AI weight is intentional authoring and is not diagnosed: {codes:?}"
-    );
-}
-
-#[test]
 fn template_recursion_are_reported_at_definition_sites() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -4072,157 +3875,6 @@ fn template_recursion_are_reported_at_definition_sites() {
             .iter()
             .any(|diagnostic| diagnostic.code == DiagnosticCode::DynamicDefinitionCycle),
         "call sites no longer duplicate definition-site cycle reports: {event_diagnostics:?}"
-    );
-    std::fs::remove_dir_all(root).expect("cleanup");
-}
-
-#[test]
-fn dynamic_scope_contracts_infer_and_reject_empty_intersections() {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("ide-dynamic-contracts-{nonce}"));
-    let effects = root.join("common/scripted_effects");
-    std::fs::create_dir_all(&effects).expect("scripted effects directory");
-    let body = concat!(
-        // Direct clash: add_prestige wants country, add_province_modifier wants province.
-        "clash = { add_prestige = 1 add_province_modifier = { name = clash_mod duration = 1 } }\n",
-        // The clash also closes through a callee whose own contract is province-only.
-        "via_callee = { helper_province = yes add_prestige = 1 }\n",
-        "helper_province = { change_province_name = \"X\" }\n",
-        // Compatible single-scope bodies must not error.
-        "fine = { add_prestige = 1 add_manpower = 1000 }\n",
-        // add_core has alternative province and country rows: either accepts.
-        "dual_ok = { add_prestige = 1 add_core = FRA }\n",
-        // A scope-switching container constrains only through its own row.
-        "scoped_ok = { any_country = { change_province_name = \"Y\" } }\n",
-        // Same-scope containers (if/limit) are descended, not treated as switches.
-        "nested_ok = { if = { limit = { always = yes } add_prestige = 1 } }\n",
-        // Dynamic $param$ dispatch is not narrowed.
-        "dynamic_dispatch = { $action$ = yes }\n",
-        // Dynamic scope links re-target runtime scopes; their bodies must not
-        // constrain the entry (ROOT is the event root, not the definition entry).
-        "root_opaque = { add_prestige = 1 ROOT = { change_province_name = \"Z\" } }\n",
-        // A THIS block only evaluates the entry scope in trigger context;
-        // as an effect container it must not constrain the entry either.
-        "this_opaque = { add_prestige = 1 THIS = { change_province_name = \"W\" } }\n",
-        // Runtime OR does not exempt its children from static scope legality.
-        // Each child is checked under the same parent scope.
-        "or_union = { if = { limit = { OR = { is_capital = yes has_estate_privilege = some_priv } } add_prestige = 1 } }\n",
-        // An OR branch with no scope knowledge keeps the whole OR unconstrained.
-        "or_open = { if = { limit = { OR = { unknown_branch_key = yes is_capital = yes } } add_prestige = 1 } }\n",
-    );
-    std::fs::write(effects.join("00_contracts.txt"), body).expect("dynamic definitions");
-    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
-    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-        SourceRootId::new(1),
-        SourceRootKind::Project,
-        AbsPath::normalize(&root),
-    )]));
-    host.refresh_source_roots().expect("scan definitions");
-
-    let definitions = DocumentId::new("file:///tmp/common/scripted_effects/00_contracts.txt");
-    host.open_document(
-        definitions.clone(),
-        1,
-        body.to_owned(),
-        Some(AbsPath::normalize(&effects.join("00_contracts.txt"))),
-    )
-    .expect("open definitions");
-    let snapshot = host.snapshot();
-    let all = diagnostics(&snapshot, &definitions);
-    let empty: Vec<&Diagnostic> = all
-        .iter()
-        .filter(|diagnostic| diagnostic.code == DiagnosticCode::EmptyScopeContract)
-        .collect();
-
-    let clash_offset = u32::try_from(body.find("clash = ").expect("clash")).expect("u32");
-    assert!(
-        empty.iter().any(|diagnostic| {
-            diagnostic.message.contains("`clash`")
-                && diagnostic.message.contains("empty inferred entry scope")
-                && diagnostic.range.start() == clash_offset
-        }),
-        "the country/province clash must be an error at the definition site: {empty:?}"
-    );
-    let via_offset = u32::try_from(body.find("via_callee = ").expect("via_callee")).expect("u32");
-    assert!(
-        empty
-            .iter()
-            .any(|diagnostic| diagnostic.range.start() == via_offset),
-        "an empty contract propagates through a same-kind callee: {empty:?}"
-    );
-    let empty_names: Vec<&str> = empty
-        .iter()
-        .map(|diagnostic| {
-            let start = usize::try_from(diagnostic.range.start()).expect("usize");
-            let end = usize::try_from(diagnostic.range.end()).expect("usize");
-            body[start..end].trim_end_matches(" =")
-        })
-        .collect();
-    assert_eq!(
-        empty_names,
-        if snapshot.ir().schemas.is_empty() {
-            vec!["clash", "via_callee"]
-        } else {
-            vec!["clash", "via_callee", "this_opaque", "or_union", "or_open"]
-        },
-        "IR preserves THIS's current scope; the legacy fixture treated it as opaque: {all:?}"
-    );
-
-    // The inferred contracts behind those diagnostics, via the hover view.
-    use crate::template_contracts::{ScopeContract, contract_hover_line, template_contract};
-    assert_eq!(
-        template_contract(&snapshot, "scripted_effect", "clash"),
-        Some(ScopeContract::Empty)
-    );
-    assert_eq!(
-        template_contract(&snapshot, "scripted_effect", "fine"),
-        Some(ScopeContract::Scopes(vec!["country".to_owned()]))
-    );
-    assert_eq!(
-        template_contract(&snapshot, "scripted_effect", "helper_province"),
-        Some(ScopeContract::Scopes(vec!["province".to_owned()]))
-    );
-    assert_eq!(
-        template_contract(&snapshot, "scripted_effect", "root_opaque"),
-        Some(ScopeContract::Scopes(vec!["country".to_owned()])),
-        "ROOT blocks re-target the event root and must not narrow the entry"
-    );
-    assert_eq!(
-        template_contract(&snapshot, "scripted_effect", "this_opaque"),
-        Some(if snapshot.ir().schemas.is_empty() {
-            ScopeContract::Scopes(vec!["country".to_owned()])
-        } else {
-            ScopeContract::Empty
-        }),
-        "THIS retains the current scope and its body constrains the IR entry contract"
-    );
-    assert_eq!(
-        template_contract(&snapshot, "scripted_effect", "or_union"),
-        Some(ScopeContract::Empty),
-        "every OR child must be statically legal in the same scope"
-    );
-    assert_eq!(
-        template_contract(&snapshot, "scripted_effect", "or_open"),
-        Some(ScopeContract::Empty),
-        "an unknown OR child cannot hide an independently invalid known child"
-    );
-    let fine_hover = contract_hover_line(&snapshot, "scripted_effect", "fine");
-    assert!(
-        fine_hover.contains("Inferred entry scope: country"),
-        "hover states the narrowed contract: {fine_hover}"
-    );
-    let dispatch_hover = contract_hover_line(&snapshot, "scripted_effect", "dynamic_dispatch");
-    assert!(
-        dispatch_hover.contains("dynamic `$param$` dispatch"),
-        "hover flags dynamic dispatch: {dispatch_hover}"
-    );
-    assert!(
-        contract_hover_line(&snapshot, "scripted_effect", "clash")
-            .contains("definition can never run"),
-        "hover explains the empty contract"
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }

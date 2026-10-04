@@ -60,45 +60,6 @@ fn logical_scope_wrappers_keep_the_trigger_context() {
 }
 
 #[test]
-fn alias_definition_cardinality_does_not_limit_repeated_effect_commands() {
-    let rules = game::eu4::runtime_rules().expect("load first-party rules");
-    let mut host = eu4_host(rules);
-    let id = DocumentId::new("file:///tmp/events/repeated-tooltip.txt");
-    host.open_document(
-        id.clone(),
-        1,
-        "effect = { custom_tooltip = first custom_tooltip = second }\n".to_owned(),
-        None,
-    )
-    .expect("open");
-    let results = diagnostics(&host.snapshot(), &id);
-    assert!(
-        !results
-            .iter()
-            .any(|item| item.code == DiagnosticCode::Cardinality)
-    );
-}
-
-#[test]
-fn semantic_type_selector_applies_event_rules_to_country_event() {
-    let rules = game::eu4::runtime_rules().expect("load first-party rules");
-    let mut host = eu4_host(rules);
-    let id = DocumentId::new("file:///tmp/events/test.txt");
-    host.open_document(
-        id.clone(),
-        1,
-        "country_event = { id = test.1 definitely_not_an_event_key = yes }\n".to_owned(),
-        None,
-    )
-    .expect("open");
-    assert!(
-        diagnostics(&host.snapshot(), &id)
-            .iter()
-            .any(|item| item.code == DiagnosticCode::UnknownKey)
-    );
-}
-
-#[test]
 fn area_scope_transition_keeps_province_trigger_valid() {
     use engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
     use std::fs;

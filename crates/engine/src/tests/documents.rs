@@ -461,6 +461,7 @@ fn unchanged_file_states_are_reused_and_only_changed_files_advance() {
 
     host.refresh_source_roots().expect("unchanged scan");
     let second = host.snapshot();
+    assert_eq!(second.index(), first.index());
     assert!(Arc::ptr_eq(
         first.file_states.get(&a).expect("first a state"),
         second.file_states.get(&a).expect("second a state")
