@@ -2,6 +2,64 @@ use super::support::*;
 use text::AbsPath;
 
 #[test]
+fn deferred_definition_bindings_do_not_block_complete_call_rename() {
+    let root =
+        std::env::temp_dir().join(format!("template-rename-coverage-{}", std::process::id()));
+    std::fs::create_dir_all(root.join("common/scripted_effects")).unwrap();
+    let mut effects = String::from("rename_bool = { set_emperor = $P$ add_prestige = $N$ }\n");
+    for depth in 0..40 {
+        effects.push_str(&format!(
+            "rename_chain{depth} = {{ rename_chain{} = {{ N = $N$ }} }}\n",
+            depth + 1
+        ));
+    }
+    effects.push_str("rename_chain40 = { add_prestige = $N$ }\n");
+    let path = root.join("common/scripted_effects/owned.txt");
+    std::fs::write(&path, &effects).unwrap();
+    let mut host = eu4_host(game::eu4::runtime_rules().unwrap());
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::Project,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().unwrap();
+    let text = "country_event = { immediate = { rename_bool = { P = yes N = 2 } } }";
+    let id = DocumentId::new("file:///tmp/events/rename-coverage.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .unwrap();
+    let cursor = text.find("rename_bool").unwrap() as u32;
+    let plan = rename(&host.snapshot(), &id, cursor, "changed_bool").unwrap();
+    assert_eq!(
+        plan.edits.len(),
+        2,
+        "disk declaration and complete invocation"
+    );
+    let defs = DocumentId::new(format!("file://{}", path.display()));
+    host.open_document(defs, 1, effects, Some(AbsPath::normalize(&path)))
+        .unwrap();
+    let plan = rename(&host.snapshot(), &id, cursor, "changed_bool").unwrap();
+    assert_eq!(
+        plan.edits.len(),
+        2,
+        "overlay declaration retains the same closure"
+    );
+    host.apply_document_changes(
+        &id,
+        2,
+        &[engine::TextChange::full(
+            "country_event = { immediate = { rename_bool = { P = } } }",
+        )],
+    )
+    .unwrap();
+    assert_eq!(
+        rename(&host.snapshot(), &id, cursor, "changed_bool").unwrap_err(),
+        RenameError::Incomplete,
+        "an actual invocation hole still has incomplete coverage"
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn unresolved_symbol_is_diagnosed_without_a_definition() {
     let (host, id) =
         snapshot("country_event = { immediate = { country_event = { id = missing.1 } } }\n");

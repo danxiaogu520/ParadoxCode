@@ -242,18 +242,18 @@ fn try_ir_completion_inner(
         });
         return Ok(Some(items));
     }
-    let contracts = crate::dynamic_contracts::dynamic_contract_report_view(snapshot, cancellation)?;
-    let scope_state = schema_fact_at_cursor(hir, position).map(|fact| {
-        let mut state = fact.state.clone();
-        if state.current.first().is_none_or(|current| matches!(current, hir::ScopeValue::Unknown) || matches!(current, hir::ScopeValue::Known(scopes) if scopes.iter().all(|scope| scope.eq_ignore_ascii_case("any"))))
-            && let Some(owner) = hir.definitions().iter().find(|definition| contains(definition.range, position)
-                && crate::semantic::dynamic_definition_type(snapshot, &definition.kind))
-            && let Some(crate::dynamic_contracts::ScopeContract::Scopes(scopes)) = contracts.contract(&owner.kind, &owner.name)
-            && scopes.len() == 1 {
-            state.current = vec![hir::ScopeValue::known_single(&scopes[0])];
-        }
-        state
-    });
+    let mut scope_state = schema_fact_at_cursor(hir, position).map(|fact| fact.state.clone());
+    if let Some(state) = &mut scope_state
+        && state.current.first().is_none_or(|current| matches!(current, hir::ScopeValue::Unknown)
+            || matches!(current, hir::ScopeValue::Known(scopes) if scopes.iter().all(|scope| scope.eq_ignore_ascii_case("any"))))
+        && let Some(owner) = hir.definitions().iter().find(|definition| contains(definition.range, position)
+            && crate::semantic::dynamic_definition_type(snapshot, &definition.kind))
+        && let crate::dynamic_contracts::ScopeContract::Scopes(scopes) =
+            crate::dynamic_contracts::dynamic_contract_with_cancellation(snapshot, &owner.kind, &owner.name, cancellation)?
+        && scopes.len() == 1
+    {
+        state.current = vec![hir::ScopeValue::known_single(&scopes[0])];
+    }
     if let Some(property) = value_property {
         let Some(fact) = hir.field_fact_at(property.key_range) else {
             return Ok(Some(items));
@@ -384,8 +384,13 @@ fn try_ir_completion_inner(
                 };
                 let template_kind = crate::ir_template::template_kind(ir, matcher);
                 if let Some(kind) = &template_kind
-                    && let Some(crate::dynamic_contracts::ScopeContract::Scopes(expected)) =
-                        contracts.contract(kind, &label)
+                    && let crate::dynamic_contracts::ScopeContract::Scopes(expected) =
+                        crate::dynamic_contracts::dynamic_contract_with_cancellation(
+                            snapshot,
+                            kind,
+                            &label,
+                            cancellation,
+                        )?
                     && let Some(current) = state.current.first()
                 {
                     let expected = expected

@@ -1,16 +1,23 @@
 //! IDE projections of entry-scope queries over the shared Template program.
 //! Guard-dependent requirements stay conditional; actual calls use supplied presence and text.
-use std::collections::{BTreeMap, BTreeSet};
+#[cfg(test)]
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use engine::{AnalysisSnapshot, DocumentSource};
+use engine::AnalysisSnapshot;
+#[cfg(test)]
+use engine::DocumentSource;
 use hir::ScopeValue;
 
-use crate::semantic::{dynamic_definition_type, probe_query_cache};
+use crate::semantic::dynamic_definition_type;
+#[cfg(test)]
+use crate::semantic::probe_query_cache;
 use crate::support::ParsedInput;
 use crate::types::{CancellationToken, Cancelled, Diagnostic, DiagnosticCode, uncancelled};
 
 /// Cache key for the workspace-wide contract report inside the query cache.
+#[cfg(test)]
 const CONTRACT_CACHE_KEY: &str = "dynamic-scope-contracts";
 
 /// One inferred entry contract.
@@ -38,23 +45,20 @@ impl ScopeContract {
 }
 
 /// Workspace-wide inference result for every live dynamic definition.
+#[cfg(test)]
 #[derive(Clone, Debug, Default)]
 pub(crate) struct DynamicContractReport {
     contracts: BTreeMap<(String, String), ScopeContract>,
     /// Definitions whose template dispatches through a `$param$` key.
     dynamic: BTreeSet<(String, String)>,
-    conditions: BTreeMap<(String, String), Vec<String>>,
+    conditions: BTreeMap<(String, String), BTreeSet<String>>,
 }
 
+#[cfg(test)]
 impl DynamicContractReport {
     pub(crate) fn contract(&self, kind: &str, name: &str) -> Option<&ScopeContract> {
         self.contracts
             .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
-    }
-
-    pub(crate) fn is_dynamic(&self, kind: &str, name: &str) -> bool {
-        self.dynamic
-            .contains(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
     }
 }
 
@@ -79,18 +83,15 @@ pub(crate) fn dynamic_contract_diagnostics(
     {
         return Ok(Vec::new());
     }
-    let report = dynamic_contract_report(snapshot, cancellation)?;
-    if report.contracts.is_empty() {
-        return Ok(Vec::new());
-    }
     let mut diagnostics = Vec::new();
     for definition in hir.definitions() {
         if !dynamic_definition_type(snapshot, &definition.kind) {
             continue;
         }
-        let Some(ScopeContract::Empty) = report.contract(&definition.kind, &definition.name) else {
+        let entry = contract_entry(snapshot, &definition.kind, &definition.name, cancellation)?;
+        if !matches!(entry.contract, ScopeContract::Empty) {
             continue;
-        };
+        }
         diagnostics.push(Diagnostic::new(
             DiagnosticCode::EmptyScopeContract,
             DiagnosticCode::EmptyScopeContract.severity(),
@@ -125,7 +126,6 @@ pub(crate) fn dynamic_call_site_diagnostics(
     let Some(hir) = input.hir.as_deref() else {
         return Ok(Vec::new());
     };
-    let mut report = None;
     let mut diagnostics = Vec::new();
     for property in hir.properties() {
         cancellation.checkpoint()?;
@@ -162,26 +162,14 @@ pub(crate) fn dynamic_call_site_diagnostics(
         let Some(dynamic_kind) = dynamic_kind else {
             continue;
         };
-        let report = match report.as_ref() {
-            Some(report) => report,
-            None => {
-                let computed = dynamic_contract_report(snapshot, cancellation)?;
-                if computed.contracts.is_empty() {
-                    return Ok(Vec::new());
-                }
-                report.insert(computed)
-            }
-        };
-        let Some(contract) = report.contract(&dynamic_kind, &property.key) else {
-            continue;
-        };
-        // A definition-side guaranteed contradiction already has its located report.
-        if matches!(contract, ScopeContract::Empty) {
-            continue;
-        }
         if crate::semantic::dynamic_definition_summary(snapshot, &dynamic_kind, &property.key)
             .is_some_and(|summary| crate::ir_template::needs_body_analysis(snapshot, &summary))
         {
+            continue;
+        }
+        let entry = contract_entry(snapshot, &dynamic_kind, &property.key, cancellation)?;
+        // A definition-side guaranteed contradiction already has its located report.
+        if matches!(entry.contract, ScopeContract::Empty) {
             continue;
         }
         let scoped = hir::template_scope::check_scope(
@@ -246,22 +234,35 @@ pub(crate) fn dynamic_call_site_diagnostics(
     Ok(diagnostics)
 }
 
-/// Returns the workspace contract for one definition, computing the report when the
-/// per-revision cache is cold. Hover and call-site validation share this view.
+/// One definition's shared scope projection, with the caller's cancellation token.
+pub(crate) fn dynamic_contract_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+    name: &str,
+    cancellation: &CancellationToken,
+) -> Result<ScopeContract, Cancelled> {
+    Ok(contract_entry(snapshot, kind, name, cancellation)?
+        .contract
+        .clone())
+}
+
+/// Owned audit convenience for one definition's scope projection.
+#[cfg(test)]
 pub(crate) fn dynamic_contract(
     snapshot: &AnalysisSnapshot,
     kind: &str,
     name: &str,
 ) -> Option<ScopeContract> {
     let cancellation = CancellationToken::new();
-    let report = uncancelled(dynamic_contract_report(snapshot, &cancellation));
-    report.contract(kind, name).cloned()
+    Some(
+        uncancelled(contract_entry(snapshot, kind, name, &cancellation))
+            .contract
+            .clone(),
+    )
 }
 
-/// Loads the workspace-wide contract report for cancellable consumers such as
-/// completion filtering. The report is cached per revision, and the caller's
-/// token must reach the workspace traversal so obsolete editor requests stop
-/// before consuming a full core.
+/// Complete owned audit view; interactive consumers use targeted projections.
+#[cfg(test)]
 pub(crate) fn dynamic_contract_report_view(
     snapshot: &AnalysisSnapshot,
     cancellation: &CancellationToken,
@@ -271,38 +272,87 @@ pub(crate) fn dynamic_contract_report_view(
 
 /// One-line hover summary of a definition's inferred contract.
 pub(crate) fn contract_hover_line(snapshot: &AnalysisSnapshot, kind: &str, name: &str) -> String {
-    let contract = dynamic_contract(snapshot, kind, name);
-    let scope = contract.map_or_else(|| "unknown".to_owned(), |contract| contract.display());
-    let dispatch = if contract_is_dynamic(snapshot, kind, name) {
+    let cancellation = CancellationToken::new();
+    let entry = uncancelled(contract_entry(snapshot, kind, name, &cancellation));
+    let scope = entry.contract.display();
+    let dispatch = if entry.dynamic {
         " (dynamic `$param$` dispatch: not narrowed)"
     } else {
         ""
     };
-    let cancellation = CancellationToken::new();
-    let report = uncancelled(dynamic_contract_report(snapshot, &cancellation));
-    let guards = report
-        .conditions
-        .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
-        .filter(|guards| !guards.is_empty())
-        .map_or(String::new(), |guards| {
-            format!(
-                "; conditional requirements depend on {}",
-                guards
-                    .iter()
-                    .map(|name| format!("`{name}`"))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )
-        });
+    let guards = if entry.conditions.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "; conditional requirements depend on {}",
+            entry
+                .conditions
+                .iter()
+                .map(|name| format!("`{name}`"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    };
     format!("- Inferred entry scope: {scope}{dispatch}{guards}")
 }
 
-fn contract_is_dynamic(snapshot: &AnalysisSnapshot, kind: &str, name: &str) -> bool {
-    let cancellation = CancellationToken::new();
-    let report = uncancelled(dynamic_contract_report(snapshot, &cancellation));
-    report.is_dynamic(kind, name)
+#[derive(Clone, Debug)]
+struct ContractEntry {
+    contract: ScopeContract,
+    dynamic: bool,
+    conditions: BTreeSet<String>,
 }
 
+/// Interactive consumers infer only the definition they consume. The exact
+/// snapshot cache and shared environment memo invalidate generated-fact reads.
+fn contract_entry(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+    name: &str,
+    cancellation: &CancellationToken,
+) -> Result<Arc<ContractEntry>, Cancelled> {
+    cancellation.checkpoint()?;
+    let key = format!(
+        "template:scope-contract:{}:{}",
+        kind.to_ascii_lowercase(),
+        name.to_ascii_lowercase()
+    );
+    if let Some(entry) = snapshot.query_cache().get(snapshot.revision(), &key) {
+        return Ok(entry);
+    }
+    let facts = crate::ir_semantic::WorkspaceFacts { snapshot };
+    let checked =
+        hir::template_scope::entry_scopes(snapshot.ir(), &facts, kind, name, &mut || {
+            cancellation.checkpoint()
+        })?;
+    let contract = if snapshot.ir().scopes.types.is_empty() {
+        ScopeContract::Unknown
+    } else if checked.value.possible.is_empty() {
+        ScopeContract::Empty
+    } else if checked.value.possible.len() == snapshot.ir().scopes.types.len() {
+        if checked.coverage.is_complete() {
+            ScopeContract::Unconstrained
+        } else {
+            ScopeContract::Unknown
+        }
+    } else {
+        ScopeContract::Scopes(checked.value.possible.clone())
+    };
+    let entry = Arc::new(ContractEntry {
+        contract,
+        dynamic: checked.value.dynamic,
+        conditions: checked.value.conditions,
+    });
+    snapshot.query_cache().insert(
+        snapshot.revision(),
+        engine::CacheDomain::Documents,
+        key,
+        entry.clone(),
+    );
+    Ok(entry)
+}
+
+#[cfg(test)]
 fn dynamic_contract_report(
     snapshot: &AnalysisSnapshot,
     cancellation: &CancellationToken,
@@ -353,6 +403,7 @@ fn dynamic_contract_report(
     Ok(report)
 }
 
+#[cfg(test)]
 fn build_contract_report(
     snapshot: &AnalysisSnapshot,
     cancellation: &CancellationToken,
@@ -390,35 +441,17 @@ fn build_contract_report(
             }
         }
     }
-    let facts = crate::ir_semantic::WorkspaceFacts { snapshot };
     let mut report = DynamicContractReport::default();
     for (kind, name) in candidates {
-        cancellation.checkpoint()?;
-        let checked =
-            hir::template_scope::entry_scopes(snapshot.ir(), &facts, &kind, &name, &mut || {
-                cancellation.checkpoint()
-            })?;
+        let entry = contract_entry(snapshot, &kind, &name, cancellation)?;
         let key = (kind.to_ascii_lowercase(), name.to_ascii_lowercase());
-        let contract = if snapshot.ir().scopes.types.is_empty() {
-            ScopeContract::Unknown
-        } else if checked.value.possible.is_empty() {
-            ScopeContract::Empty
-        } else if checked.value.possible.len() == snapshot.ir().scopes.types.len() {
-            if checked.coverage.is_complete() {
-                ScopeContract::Unconstrained
-            } else {
-                ScopeContract::Unknown
-            }
-        } else {
-            ScopeContract::Scopes(checked.value.possible.clone())
-        };
-        if checked.value.dynamic {
+        if entry.dynamic {
             report.dynamic.insert(key.clone());
         }
         report
             .conditions
-            .insert(key.clone(), checked.value.conditions.into_iter().collect());
-        report.contracts.insert(key, contract);
+            .insert(key.clone(), entry.conditions.clone());
+        report.contracts.insert(key, entry.contract.clone());
     }
     Ok(report)
 }

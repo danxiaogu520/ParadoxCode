@@ -31,6 +31,13 @@ states. Unknown guards remain conditional. Runtime `OR` still checks every child
 for static legality. Unresolved script prefixes prevent the projection from
 assuming that the suffix keeps its original lexical or scope context.
 
+IDE diagnostics, hover and completion request entry scopes for the definitions
+they actually consume. Completion filters candidate names before requesting
+their contracts. Definition diagnostics likewise request recursion coverage only
+for the definitions in that document. Interactive queries do not build a report
+for every workspace Template; the shared program and exact environment memo
+still provide the same per-definition evidence and invalidation.
+
 [block_checking.rs](src/block_checking.rs) checks each overloaded schema against
 one complete container before choosing it. A proved choice retains its own scope
 and symbol namespace. Unresolved alternatives retain possible schema contexts;
@@ -91,6 +98,9 @@ hints project that same instance through exact root byte maps. A generated name
 spanning multiple bindings cannot become an edit of an arbitrary argument. Rename
 requires known reference discovery and an invertible selection; unfinished closure
 returns an explicit rejection. Shared instances use the immutable view's bounded memo.
+Unbound definition-side parameters are deferred bindings, rather than unfinished
+lexical reference discovery. An actual invocation hole, a resource frontier or
+a noninvertible generated selection still prevents a complete rename plan.
 
 Secondary script parsing checks bytes before source allocation and checks nodes,
 nesting and cancellation during token, comment, whitespace and recovery scans.

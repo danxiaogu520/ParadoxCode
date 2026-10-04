@@ -54,6 +54,51 @@ fn ir_findings(snapshot: &AnalysisSnapshot) -> Vec<crate::Diagnostic> {
 }
 
 #[test]
+fn interactive_scope_queries_do_not_walk_unrelated_definitions() {
+    let mut effects = String::from("focused_country = { add_prestige = 1 }\n");
+    for index in 0..500 {
+        effects.push_str(&format!("unrelated_{index} = {{ add_prestige = 1 }}\n"));
+    }
+    let mut host = eu4_host(game::eu4::runtime_rules().unwrap());
+    host.open_document(
+        DocumentId::new("file:///tmp/common/scripted_effects/focused.txt"),
+        1,
+        effects,
+        None,
+    )
+    .unwrap();
+    let id = DocumentId::new("file:///tmp/events/focused.txt");
+    let text = "province_event = { immediate = { focused_country = yes } }";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .unwrap();
+    let cancellation = CancellationToken::cancel_after(2000);
+    let findings = diagnostics_with_cancellation(&host.snapshot(), &id, &cancellation)
+        .expect("one call's scope query completes without traversing 500 unrelated bodies");
+    assert!(
+        findings.iter().any(|finding| {
+            finding.code == DiagnosticCode::WrongScope
+                && finding.message.contains("focused_country")
+        }),
+        "{findings:?}"
+    );
+    assert!(!cancellation.is_cancelled());
+    let scalar_id = DocumentId::new("file:///tmp/events/focused-scalar.txt");
+    let scalar_text = "country_event = { immediate = { add_prestige = 2 } }";
+    host.open_document(scalar_id.clone(), 1, scalar_text.to_owned(), None)
+        .unwrap();
+    let cancellation = CancellationToken::cancel_after(2000);
+    let result = complete_with_cancellation(
+        &host.snapshot(),
+        &scalar_id,
+        scalar_text.find('2').unwrap() as u32 + 1,
+        &cancellation,
+    )
+    .expect("static value completion does not infer unrelated Template scopes");
+    assert!(result.items.is_empty());
+    assert!(!cancellation.is_cancelled());
+}
+
+#[test]
 fn dynamic_rows_derive_contract_signature_and_value_constraints() {
     let host =
         definitions_snapshot("scale_works = { add_stability = $AMT$ add_manpower = $MP$ }\n");

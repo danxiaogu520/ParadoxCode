@@ -968,7 +968,17 @@ fn lower_template_arguments(
         &mut || Ok(()),
     )
     .expect("infallible checkpoint");
-    out.analysis_coverage.merge(&body.coverage);
+    let mut coverage = body.coverage.clone();
+    if symbolic_context {
+        // Definition-side parameters are deferred until an invocation supplies
+        // them. Their expected holes do not make the declaration's lexical
+        // references incomplete. Actual calls and resource/source frontiers
+        // retain their coverage below.
+        coverage
+            .residuals
+            .remove(&crate::analysis::ResidualReason::Binding);
+    }
+    out.analysis_coverage.merge(&coverage);
     let project = |range| {
         crate::template_instance::project_source_range(
             &body.rendered,
