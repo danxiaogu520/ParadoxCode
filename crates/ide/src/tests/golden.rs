@@ -314,7 +314,7 @@ fn golden_rule_wrong_scope() {
 }
 
 #[test]
-fn golden_dynamic_cycles() {
+fn golden_template_recursion() {
     let text = concat!(
         "ping = { pong = yes }\n",
         "pong = { ping = yes }\n",
@@ -334,7 +334,7 @@ fn golden_dynamic_cycles() {
         Some(AbsPath::normalize(&effects.join("00_cycles.txt"))),
     )
     .expect("open golden cycles");
-    assert_golden("dynamic_cycles", text, &analyze_text(&host, &id));
+    assert_golden("template_recursion", text, &analyze_text(&host, &id));
     std::fs::remove_dir_all(root).expect("cleanup");
 }
 
@@ -821,7 +821,7 @@ fn golden_gfx_sprite_semantics() {
 
 #[test]
 fn golden_quoted_script_syntax() {
-    let text = "trigger = { embedded = \"\n foo = maybe\n broken = {\n\" }\n";
+    let text = "trigger = { embedded = { BODY = \"\n foo = maybe\n broken = {\n\" } }\n";
     let (host, id) = quoted_script_snapshot(text);
     assert_golden("quoted_script_syntax", text, &analyze_text(&host, &id));
 }

@@ -262,14 +262,14 @@ Arguments of one trait implementation: binding (or parameter) name → value.
 
 `Localised` and `HasIcon` take one [`BindingSpec`] per binding they
 contribute, because the binding set is per-type data rather than a fixed
-trait shape; the other built-ins take plain strings (`Callable`'s `body`).
+trait shape; the other built-ins take plain strings (`Template`'s `body`).
 
 ```json
 {
   "additionalProperties": {
     "$ref": "#/$defs/ImplValue"
   },
-  "description": "Arguments of one trait implementation: binding (or parameter) name → value.\n\n`Localised` and `HasIcon` take one [`BindingSpec`] per binding they\ncontribute, because the binding set is per-type data rather than a fixed\ntrait shape; the other built-ins take plain strings (`Callable`'s `body`).",
+  "description": "Arguments of one trait implementation: binding (or parameter) name → value.\n\n`Localised` and `HasIcon` take one [`BindingSpec`] per binding they\ncontribute, because the binding set is per-type data rather than a fixed\ntrait shape; the other built-ins take plain strings (`Template`'s `body`).",
   "type": "object"
 }
 ```
@@ -282,7 +282,7 @@ One trait-implementation argument.
 {
   "anyOf": [
     {
-      "description": "A plain argument value (`Callable`'s `body` schema name).",
+      "description": "A plain argument value (`Template`'s `body` schema name).",
       "type": "string"
     },
     {

@@ -14,6 +14,7 @@ publish = false
 
 [dependencies]
 text = { path = "../text" }
+parser = { path = "../parser" }
 dunce = "1.0"
 pdc = { path = "../pdc" }
 rules = { path = "../rules" }

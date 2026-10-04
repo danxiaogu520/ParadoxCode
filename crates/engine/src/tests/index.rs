@@ -21,6 +21,7 @@ fn replayed_index_matches_full_rebuild_for_references_flags_and_shadowing() {
             dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
+            reference_coverage_known: true,
             syntax_error_count: 0,
         })
     };
@@ -140,6 +141,7 @@ fn bulk_index_build_retains_every_shard_and_definition() {
             dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
+            reference_coverage_known: true,
             syntax_error_count: 0,
         },
         FileIndexShard {
@@ -156,6 +158,7 @@ fn bulk_index_build_retains_every_shard_and_definition() {
             dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
+            reference_coverage_known: true,
             syntax_error_count: 0,
         },
     ];
@@ -345,6 +348,7 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
             dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
+            reference_coverage_known: true,
             syntax_error_count: 0,
         },
         FileIndexShard {
@@ -354,6 +358,7 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
             dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
+            reference_coverage_known: true,
             syntax_error_count: 0,
         },
     ]);
@@ -365,6 +370,7 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
         dynamic_definitions: Vec::new(),
         definition_attributes: Vec::new(),
         flag_writes: Vec::new(),
+        reference_coverage_known: true,
         syntax_error_count: 1,
     });
 
@@ -411,6 +417,7 @@ fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
             dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
+            reference_coverage_known: true,
             syntax_error_count: 0,
         },
         FileIndexShard {
@@ -420,6 +427,7 @@ fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
             dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
+            reference_coverage_known: true,
             syntax_error_count: 0,
         },
     ]);
@@ -495,6 +503,7 @@ fn identical_collector_records_resolve_as_one_physical_definition() {
         dynamic_definitions: Vec::new(),
         definition_attributes: Vec::new(),
         flag_writes: Vec::new(),
+        reference_coverage_known: true,
         syntax_error_count: 0,
     }]);
 
@@ -531,6 +540,7 @@ fn identical_collector_records_resolve_as_one_physical_definition() {
         dynamic_definitions: Vec::new(),
         definition_attributes: Vec::new(),
         flag_writes: Vec::new(),
+        reference_coverage_known: true,
         syntax_error_count: 0,
     }]);
     assert!(
@@ -560,6 +570,7 @@ fn flag_write_membership_distinguishes_literals_patterns_and_open_kinds() {
             write("country_flag", "built_dev_$building$"),
             write("province_flag", "$PARAM$"),
         ],
+        reference_coverage_known: true,
         syntax_error_count: 0,
     }]);
 

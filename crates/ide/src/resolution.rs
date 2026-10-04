@@ -7,7 +7,6 @@ use hir::{HirFile, HirReference};
 use std::cell::Cell;
 use text::{LogicalPath, TextRange, TextSize};
 
-use crate::quoted_script::{QuotedScriptParse, QuotedScriptSession};
 use crate::semantic::*;
 use crate::support::*;
 use crate::types::*;
@@ -44,12 +43,16 @@ impl ReferenceInternal {
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct SemanticWorkspace {
+    pub(crate) coverage: hir::analysis::AnalysisCoverage,
+    pub(crate) blocked_edits: BTreeSet<(String, String)>,
     pub(crate) definitions: Vec<DefinitionInfo>,
     pub(crate) references: Vec<ReferenceInternal>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct SemanticFile {
+    pub(crate) coverage: hir::analysis::AnalysisCoverage,
+    pub(crate) blocked_edits: BTreeSet<(String, String)>,
     pub(crate) definitions: Vec<DefinitionInfo>,
     pub(crate) references: Vec<ReferenceInternal>,
 }
@@ -114,15 +117,13 @@ fn semantic_data_with_cancellation_uncached(
     input: &ParsedInput,
     cancellation: &CancellationToken,
 ) -> Result<SemanticFile, Cancelled> {
-    let mut data = SemanticFile {
-        definitions: Vec::new(),
-        references: Vec::new(),
-    };
+    let mut data = SemanticFile::default();
     let Some(hir) = input.hir.as_deref() else {
-        collect_quoted_semantics(snapshot, input, &mut data, cancellation)?;
+        collect_template_semantics(snapshot, input, &mut data, cancellation)?;
         return Ok(data);
     };
 
+    data.coverage.merge(hir.analysis_coverage());
     for definition in hir.definitions() {
         cancellation.checkpoint()?;
         data.definitions.push(make_definition(
@@ -135,7 +136,7 @@ fn semantic_data_with_cancellation_uncached(
     }
     for reference in hir.references() {
         cancellation.checkpoint()?;
-        if !ir_reference_is_callable(snapshot, hir, reference) {
+        if !ir_reference_is_template(snapshot, hir, reference) {
             continue;
         }
         data.references.push(ReferenceInternal {
@@ -147,11 +148,11 @@ fn semantic_data_with_cancellation_uncached(
             path: input.path.clone(),
         });
     }
-    collect_quoted_semantics(snapshot, input, &mut data, cancellation)?;
+    collect_template_semantics(snapshot, input, &mut data, cancellation)?;
     Ok(data)
 }
 
-fn collect_quoted_semantics(
+fn collect_template_semantics(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     data: &mut SemanticFile,
@@ -161,149 +162,123 @@ fn collect_quoted_semantics(
         return Ok(());
     }
 
-    collect_ir_callable_payload_semantics(
+    crate::ir_template::for_each_consumption(
         snapshot,
         input,
-        data,
-        &mut QuotedScriptSession::new(cancellation),
-        0,
+        cancellation,
+        &mut |source, invocation, body| {
+            data.coverage.merge(&body.coverage);
+            for call in &body.rendered.calls {
+                let mapped = call.source.as_ref().and_then(|(parameter, range)| {
+                    hir::template_instance::project_binding_range(
+                        parameter,
+                        *range,
+                        source.syntax(),
+                        source.properties_in_range(invocation.range).filter(|arg| {
+                            arg.path.len() == invocation.path.len() + 1
+                                && arg.path.starts_with(&invocation.path)
+                        }),
+                    )
+                });
+                if let Some(range) = mapped {
+                    data.references.push(ReferenceInternal {
+                        kind: call.kind.clone(),
+                        name: call.name.clone(),
+                        range,
+                        document: input.document.clone(),
+                        file: input.file,
+                        path: input.path.clone(),
+                    });
+                } else {
+                    data.blocked_edits.insert((
+                        call.kind.to_ascii_lowercase(),
+                        call.name.to_ascii_lowercase(),
+                    ));
+                }
+            }
+            for definition in body.hir.definitions() {
+                cancellation.checkpoint()?;
+                if body
+                    .rendered
+                    .dependencies(definition.selection_range)
+                    .is_empty()
+                {
+                    continue;
+                }
+                let Some(selection) = crate::ir_template::project_source_range(
+                    body,
+                    definition.selection_range,
+                    source,
+                    invocation,
+                ) else {
+                    data.blocked_edits.insert((
+                        definition.kind.to_ascii_lowercase(),
+                        definition.name.to_ascii_lowercase(),
+                    ));
+                    continue;
+                };
+                let range = crate::ir_template::project_source_range(
+                    body,
+                    definition.range,
+                    source,
+                    invocation,
+                )
+                .unwrap_or(selection);
+                data.definitions.push(make_definition(
+                    input,
+                    &definition.kind,
+                    definition.name.clone(),
+                    range,
+                    selection,
+                ));
+            }
+            for reference in body.hir.references() {
+                cancellation.checkpoint()?;
+                if body.rendered.dependencies(reference.range).is_empty() {
+                    continue;
+                }
+                let Some(range) = crate::ir_template::project_source_range(
+                    body,
+                    reference.range,
+                    source,
+                    invocation,
+                ) else {
+                    data.blocked_edits.insert((
+                        reference.kind.to_ascii_lowercase(),
+                        reference.name.to_ascii_lowercase(),
+                    ));
+                    continue;
+                };
+                data.references.push(ReferenceInternal {
+                    kind: reference.kind.to_string(),
+                    name: reference.name.clone(),
+                    range,
+                    document: input.document.clone(),
+                    file: input.file,
+                    path: input.path.clone(),
+                });
+            }
+            Ok(())
+        },
     )?;
-    // Sort only after every quoted layer has mapped its appended ranges.
-    // Reordering the shared vector during recursion invalidates those slices.
     data.references.sort_by(|left, right| {
         (&left.kind, &left.name, left.range).cmp(&(&right.kind, &right.name, right.range))
     });
     data.references.dedup_by(|left, right| {
         left.kind == right.kind && left.name == right.name && left.range == right.range
     });
-    Ok(())
-}
-
-fn collect_ir_callable_payload_semantics(
-    snapshot: &AnalysisSnapshot,
-    input: &ParsedInput,
-    data: &mut SemanticFile,
-    session: &mut QuotedScriptSession<'_>,
-    depth: usize,
-) -> Result<(), Cancelled> {
-    let Some(hir) = input.hir.as_deref() else {
-        return Ok(());
-    };
-    for invocation in hir.properties() {
-        session.cancellation().checkpoint()?;
-        let Some(fact) = hir.field_fact_at(invocation.key_range) else {
-            continue;
-        };
-        let Some(kind) = fact.fields.iter().find_map(|id| {
-            crate::ir_callable::callable_kind(snapshot.ir(), snapshot.ir().field(*id).key)
-        }) else {
-            continue;
-        };
-        let mut arguments = hir
-            .properties_in_range(invocation.range)
-            .filter(|argument| {
-                invocation.range.start() < argument.range.start()
-                    && argument.range.end() <= invocation.range.end()
-                    && argument.path.len() == invocation.path.len() + 1
-                    && argument.scalar.as_ref().is_some_and(|scalar| scalar.quoted)
-            })
-            .peekable();
-        if arguments.peek().is_none() {
-            continue;
-        }
-        let bindings = crate::ir_callable::invocation_bindings(hir, invocation);
-        for argument in arguments {
-            let scalar = argument.scalar.as_ref().expect("quoted argument");
-            let sites = crate::ir_callable::parameter_symbol_sites(
-                snapshot,
-                &kind,
-                &invocation.key,
-                &argument.key,
-                &bindings,
-                crate::ir_callable::invocation_state(hir, invocation),
-                session.cancellation(),
-            )?;
-            if !sites
-                .iter()
-                .any(|site| matches!(site.domain, crate::ir_callable::Domain::Payload { .. }))
-            {
-                continue;
-            }
-            let Some(raw) = input.source_text(scalar.range) else {
-                continue;
-            };
-            let QuotedScriptParse::Parsed(script) = session.parse(raw, depth)? else {
-                continue;
-            };
-            let definition_start = data.definitions.len();
-            let reference_start = data.references.len();
-            for site in sites {
-                let crate::ir_callable::Domain::Payload { schema, .. } = site.domain else {
-                    continue;
-                };
-                let fragment = hir::lower_ir_schema(
-                    Arc::new(script.parsed().clone()),
-                    snapshot.ir(),
-                    schema,
-                    Default::default(),
-                    site.state,
-                    &crate::ir_queries::SnapshotSymbolFacts { snapshot },
-                );
-                let mut nested = input.clone();
-                nested.source = Arc::from(script.parsed().source());
-                nested.parsed = ParsedContent::Text(Arc::new(script.parsed().clone()));
-                nested.hir = Some(Arc::new(fragment));
-                for definition in nested.hir.as_deref().unwrap().definitions() {
-                    data.definitions.push(make_definition(
-                        &nested,
-                        &definition.kind,
-                        definition.name.clone(),
-                        definition.range,
-                        definition.selection_range,
-                    ));
-                }
-                for reference in nested.hir.as_deref().unwrap().references() {
-                    if !ir_reference_is_callable(
-                        snapshot,
-                        nested.hir.as_deref().unwrap(),
-                        reference,
-                    ) {
-                        continue;
-                    }
-                    data.references.push(ReferenceInternal {
-                        kind: reference.kind.to_string(),
-                        name: reference.name.clone(),
-                        range: reference.range,
-                        document: input.document.clone(),
-                        file: input.file,
-                        path: input.path.clone(),
-                    });
-                }
-                collect_ir_callable_payload_semantics(snapshot, &nested, data, session, depth + 1)?;
-            }
-            let map = |range| {
-                script
-                    .source_map()
-                    .decoded_range(range)
-                    .and_then(|relative| {
-                        TextRange::new(
-                            scalar.range.start().checked_add(relative.start())?,
-                            scalar.range.start().checked_add(relative.end())?,
-                        )
-                    })
-            };
-            for definition in &mut data.definitions[definition_start..] {
-                definition.symbol.range = map(definition.symbol.range).unwrap_or(scalar.range);
-                definition.symbol.selection_range =
-                    map(definition.symbol.selection_range).unwrap_or(scalar.range);
-                definition.symbol.location.range =
-                    map(definition.symbol.location.range).unwrap_or(scalar.range);
-            }
-            for reference in &mut data.references[reference_start..] {
-                reference.range = map(reference.range).unwrap_or(scalar.range);
-            }
-        }
-    }
+    data.definitions.sort_by(|left, right| {
+        (&left.kind, &left.name, left.symbol.selection_range).cmp(&(
+            &right.kind,
+            &right.name,
+            right.symbol.selection_range,
+        ))
+    });
+    data.definitions.dedup_by(|left, right| {
+        left.kind == right.kind
+            && left.name == right.name
+            && left.symbol.selection_range == right.symbol.selection_range
+    });
     Ok(())
 }
 
@@ -311,7 +286,7 @@ fn collect_ir_callable_payload_semantics(
 /// malformed. Navigation must apply the same scalar form and required-argument
 /// checks as diagnostics, using the actual compiled field rather than a legacy
 /// type descriptor.
-fn ir_reference_is_callable(
+fn ir_reference_is_template(
     snapshot: &AnalysisSnapshot,
     hir: &HirFile,
     reference: &HirReference,
@@ -327,7 +302,7 @@ fn ir_reference_is_callable(
         .fields
         .iter()
         .filter(|id| {
-            crate::ir_callable::callable_kind(ir, ir.field(**id).key)
+            crate::ir_template::template_kind(ir, ir.field(**id).key)
                 .is_some_and(|kind| kind.eq_ignore_ascii_case(&reference.kind))
         })
         .collect::<Vec<_>>();
@@ -339,12 +314,12 @@ fn ir_reference_is_callable(
         return false;
     };
     if summary.parameters.iter().any(|parameter| {
-        crate::dynamic_rules::parameter_effectively_required(snapshot, &summary, parameter)
+        crate::template_presence::parameter_effectively_required(snapshot, &summary, parameter)
     }) {
         return false;
     }
     let scalar = property.scalar.as_ref().unwrap();
-    let state = crate::ir_callable::invocation_state(hir, property);
+    let state = crate::ir_template::invocation_state(hir, property);
     fields.into_iter().any(|id| match ir.field(*id).value {
         rules::ir::FieldValue::Scalar(matcher) => crate::ir_semantic::matcher_matches_with_state(
             snapshot,
@@ -416,6 +391,9 @@ pub(crate) fn all_semantics_for_symbol(
         .map(|name| (*name).to_ascii_lowercase())
         .collect::<Vec<_>>();
     all_semantics_inner(snapshot, cancellation, &mut |_file, state| {
+        if state.symbol_facts_dependency {
+            return true;
+        }
         let source = state.source().as_bytes();
         needles.iter().any(|needle| {
             source
@@ -448,6 +426,15 @@ fn all_semantics_inner(
         if overlay_files.contains(&file.id) {
             continue;
         }
+        if snapshot
+            .index()
+            .shard(file.id)
+            .is_some_and(|shard| !shard.reference_coverage_known)
+        {
+            all.coverage
+                .limits
+                .insert(hir::analysis::AnalysisLimit::DependentQuery);
+        }
         let Some(state) = snapshot.file_state(file.id) else {
             continue;
         };
@@ -457,11 +444,10 @@ fn all_semantics_inner(
         let Some(input) = input_for_source_file(snapshot, file.id) else {
             continue;
         };
-        let mut quoted = SemanticFile {
-            definitions: Vec::new(),
-            references: Vec::new(),
-        };
-        collect_quoted_semantics(snapshot, &input, &mut quoted, cancellation)?;
+        let mut quoted = SemanticFile::default();
+        collect_template_semantics(snapshot, &input, &mut quoted, cancellation)?;
+        all.coverage.merge(&quoted.coverage);
+        all.blocked_edits.extend(quoted.blocked_edits);
         all.definitions.extend(quoted.definitions);
         all.references.extend(quoted.references);
     }
@@ -472,6 +458,8 @@ fn all_semantics_inner(
         }
         if let Some(input) = input_for_document(snapshot, document.id()) {
             let semantic = semantic_data_with_cancellation(snapshot, &input, cancellation)?;
+            all.coverage.merge(&semantic.coverage);
+            all.blocked_edits.extend(semantic.blocked_edits);
             all.definitions.extend(semantic.definitions);
             all.references.extend(semantic.references);
         }

@@ -1,0 +1,98 @@
+[
+  {
+    "id": "bool-partial",
+    "path": "events/trace.txt",
+    "text": "country_event = { id = stage0.1 immediate = { stage0_bool = { P = y } }  option = { name = stage0_option } }",
+    "anchor": "P = y",
+    "offset": 5,
+    "target": "yes is suggested despite missing unrelated N"
+  },
+  {
+    "id": "bool-complete",
+    "path": "events/trace.txt",
+    "text": "country_event = { id = stage0.1 immediate = { stage0_bool = { P = yes N = 2 } }  option = { name = stage0_option } }",
+    "anchor": "P = yes",
+    "offset": 7,
+    "target": "known bool is accepted; hover matches completion"
+  },
+  {
+    "id": "bool-invalid",
+    "path": "events/trace.txt",
+    "text": "country_event = { id = stage0.1 immediate = { stage0_bool = { P = wrong N = 2 } }  option = { name = stage0_option } }",
+    "anchor": "P = wrong",
+    "offset": 9,
+    "target": "bool mismatch has a source-ranged diagnostic"
+  },
+  {
+    "id": "dynamic-key",
+    "path": "events/province.txt",
+    "text": "province_event = { id = stage0.2 immediate = { stage0_key = { K = ta V = 2 } }  option = { name = stage0_option } }",
+    "anchor": "K = ta",
+    "offset": 6,
+    "target": "K = tax and associated numeric/scope requirements"
+  },
+  {
+    "id": "scope-key",
+    "path": "events/scope.txt",
+    "text": "country_event = { id = stage0.3 immediate = { stage0_scope = { TARGET = cap } }  option = { name = stage0_option } }",
+    "anchor": "TARGET = cap",
+    "offset": 12,
+    "target": "body constraints filter TARGET scope candidates"
+  },
+  {
+    "id": "repeated-affix",
+    "path": "events/repeated.txt",
+    "text": "country_event = { id = stage0.4 trigger = { stage0_repeated = { P = a } }  option = { name = stage0_option } }",
+    "anchor": "P = a",
+    "offset": 5,
+    "target": "P = abc via flag abc_abc; current inverse generation gap"
+  },
+  {
+    "id": "quoted-content",
+    "path": "events/quoted.txt",
+    "text": "country_event = { id = stage0.5 immediate = { stage0_body = { BODY = \"set_country_flag = stage0_flag add_prestige = 2\" } }  option = { name = stage0_option } }",
+    "anchor": "add_prestige",
+    "offset": 6,
+    "target": "only consumed quoted content receives script semantics"
+  },
+  {
+    "id": "quoted-utf16",
+    "path": "events/unicode.txt",
+    "text": "country_event = { id = stage0.6 immediate = { stage0_body = { BODY = \"log = \\\"界😀\\\" add_prestige = 2\" } }  option = { name = stage0_option } }",
+    "anchor": "add_prestige",
+    "offset": 6,
+    "target": "UTF-8/UTF-16 and escaped quoted source mapping"
+  },
+  {
+    "id": "ordinary-string",
+    "path": "events/string.txt",
+    "text": "country_event = { id = stage0.7 immediate = { log = \"set_country_flag = stage0_flag add_prestige = 2\" }  option = { name = stage0_option } }",
+    "anchor": "add_prestige",
+    "offset": 6,
+    "target": "ordinary Scalar does not gain script consumption"
+  },
+  {
+    "id": "mission-quoted-boundary",
+    "path": "missions/quoted.txt",
+    "text": "stage0_tree = { slot = 1 stage0_mission = { position = 1 trigger = \"always = yes\" effect = \"add_prestige = 2\" } }",
+    "anchor": "always",
+    "offset": 3,
+    "target": "current accepted mission quoted is an intentional future removal"
+  },
+  {
+    "id": "guard-hole",
+    "path": "events/guard.txt",
+    "text": "country_event = { id = stage0.8 immediate = { stage0_guard = { P = } }  option = { name = stage0_option } }",
+    "anchor": "P =",
+    "offset": 3,
+    "target": "Present Hole activates positive guard, does not become Missing"
+  },
+  {
+    "id": "forward-invalid",
+    "path": "events/chain.txt",
+    "text": "country_event = { id = stage0.9 immediate = { stage0_chain0 = { N = wrong } }  option = { name = stage0_option } }",
+    "anchor": "N = wrong",
+    "offset": 9,
+    "target": "40-level forwarding reaches nonnumeric rejection or explicit Incomplete"
+  }
+]

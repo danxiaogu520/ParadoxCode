@@ -86,7 +86,7 @@ impl<'syntax> FactCollector<'syntax> {
                 name_range: key.range(),
             });
         }
-        if node.kind() == CstKind::BareValue
+        if matches!(node.kind(), CstKind::BareValue | CstKind::QuotedString)
             && !inside_key
             && let Some(value) = self
                 .syntax
@@ -95,9 +95,14 @@ impl<'syntax> FactCollector<'syntax> {
                 .filter(|value| !value.is_empty())
         {
             self.bare_values.push(HirScalar {
-                value: value.to_owned(),
+                value: if node.kind() == CstKind::QuotedString {
+                    parser::decode_quoted_script(value)
+                        .map_or_else(|| value.trim_matches('"').to_owned(), |(text, _)| text)
+                } else {
+                    value.to_owned()
+                },
                 range: node.range(),
-                quoted: false,
+                quoted: node.kind() == CstKind::QuotedString,
             });
         }
         if node.kind() == CstKind::Property
@@ -158,11 +163,12 @@ fn direct_scalar(syntax: &ParsedFile, node: CstNode<'_>) -> Option<HirScalar> {
         .children()
         .find(|child| matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString))?;
     let raw = syntax.text(scalar.range())?.trim();
-    let value = raw
-        .strip_prefix('"')
-        .and_then(|value| value.strip_suffix('"'))
-        .unwrap_or(raw)
-        .to_owned();
+    let value = if scalar.kind() == CstKind::QuotedString {
+        parser::decode_quoted_script(raw)
+            .map_or_else(|| raw.trim_matches('"').to_owned(), |(text, _)| text)
+    } else {
+        raw.to_owned()
+    };
     Some(HirScalar {
         value,
         range: scalar.range(),

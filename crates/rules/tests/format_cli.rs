@@ -8,7 +8,7 @@ fn formatting_preflights_the_bundle_and_check_never_writes() {
     let root = directory.path();
     fs::write(
         root.join("game.json"),
-        r#"{"game_id":"test","source_format_version":13}"#,
+        r#"{"game_id":"test","source_format_version":14}"#,
     )
     .unwrap();
     let first = root.join("first.json");

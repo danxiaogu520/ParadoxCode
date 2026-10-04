@@ -1,10 +1,10 @@
-use crate::dynamic_contracts;
-use crate::dynamic_cycles;
 use crate::messages::did_you_mean;
 use crate::resolution::*;
 use crate::semantic::*;
 use crate::suggest::best_suggestion;
 use crate::support::*;
+use crate::template_contracts;
+use crate::template_recursion;
 use crate::types::*;
 use engine::{AnalysisSnapshot, DocumentId, DocumentSource, SourceFileId};
 use hir::Scope;
@@ -69,7 +69,25 @@ fn file_analysis(
     semantic: SemanticFile,
     diagnostics: Vec<Diagnostic>,
 ) -> FileAnalysis {
+    let mut coverage = input
+        .hir
+        .as_ref()
+        .map(|hir| hir.analysis_coverage().clone())
+        .unwrap_or_default();
+    coverage.merge(&semantic.coverage);
+    if !semantic.blocked_edits.is_empty() {
+        coverage.limits.insert(hir::analysis::AnalysisLimit::Output);
+    }
+    if diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.code == DiagnosticCode::AnalysisIncomplete)
+    {
+        coverage
+            .limits
+            .insert(hir::analysis::AnalysisLimit::DependentQuery);
+    }
     FileAnalysis {
+        coverage,
         revision: snapshot.revision(),
         document: input.document.clone(),
         file: input.file,
@@ -223,7 +241,7 @@ pub(crate) fn analyze_input_with_cancellation(
     cancellation: &CancellationToken,
 ) -> Result<FileAnalysis, Cancelled> {
     cancellation.checkpoint()?;
-    let semantic = semantic_data(snapshot, input);
+    let semantic = semantic_data_with_cancellation(snapshot, input, cancellation)?;
     cancellation.checkpoint()?;
     // Localisation documents remain parsed and indexed so script-side references, hover, and
     // navigation keep working, but the editor surface deliberately publishes no diagnostics for
@@ -237,21 +255,21 @@ pub(crate) fn analyze_input_with_cancellation(
     {
         diagnostics
             .values
-            .extend(dynamic_contracts::dynamic_contract_diagnostics(
+            .extend(template_contracts::template_contract_diagnostics(
                 snapshot,
                 input,
                 cancellation,
             )?);
         diagnostics
             .values
-            .extend(dynamic_contracts::dynamic_call_site_diagnostics(
+            .extend(template_contracts::template_call_site_diagnostics(
                 snapshot,
                 input,
                 cancellation,
             )?);
         diagnostics
             .values
-            .extend(dynamic_cycles::dynamic_cycle_diagnostics(
+            .extend(template_recursion::template_recursion_diagnostics(
                 snapshot,
                 input,
                 cancellation,

@@ -1,4 +1,4 @@
-//! Dynamic-definition hovers: call-site parameters and callable signatures.
+//! Dynamic-definition hovers: call-site parameters and template signatures.
 
 use super::render::{HoverModel, code_span};
 use crate::support::{ParsedInput, contains};
@@ -6,7 +6,7 @@ use crate::types::{CancellationToken, Cancelled};
 use engine::AnalysisSnapshot;
 use text::TextSize;
 
-/// Callable argument keys are tied to the IR reference selected at the call.
+/// Template argument keys and scalar values share the call's binding-aware evidence.
 pub(crate) fn ir_invocation_parameter_hover(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
@@ -17,11 +17,13 @@ pub(crate) fn ir_invocation_parameter_hover(
     let Some(hir) = input.hir.as_deref() else {
         return Ok(None);
     };
-    let Some(argument) = hir
-        .properties()
-        .iter()
-        .find(|property| contains(property.key_range, position))
-    else {
+    let Some(argument) = hir.properties().iter().find(|property| {
+        contains(property.key_range, position)
+            || property
+                .scalar
+                .as_ref()
+                .is_some_and(|scalar| contains(scalar.range, position))
+    }) else {
         return Ok(None);
     };
     let Some(invocation) = hir
@@ -62,24 +64,58 @@ pub(crate) fn ir_invocation_parameter_hover(
     ));
     let mut section = format!(
         "- Presence: `{}`",
-        if crate::dynamic_rules::parameter_effectively_required(snapshot, &summary, parameter) {
+        if crate::template_presence::parameter_effectively_required(snapshot, &summary, parameter) {
             "required"
         } else {
             "optional"
         }
     );
-    let sites = crate::ir_callable::parameter_sites(
+    let sites = crate::ir_template::parameter_sites_at(
         snapshot,
+        hir,
+        invocation,
         &reference.kind,
         &reference.name,
         &parameter.name,
-        &crate::ir_callable::invocation_bindings(hir, invocation),
-        crate::ir_callable::invocation_state(hir, invocation),
         cancellation,
     )?;
+    model.coverage.merge(&sites.coverage);
+    if !sites.coverage.is_complete() {
+        section.push_str(&format!(
+            "\n- Analysis incomplete: {}",
+            sites.coverage.limit_description()
+        ));
+    }
     if let Some(lines) = ir_parameter_contract_lines(snapshot, &summary, &parameter.name, &sites) {
         section.push('\n');
         section.push_str(&lines);
+    }
+    if let Some(scalar) = &argument.scalar {
+        let rejected = sites
+            .iter()
+            .any(|site| !site.accepts(snapshot, &parameter.name, &scalar.value));
+        let witness = std::collections::BTreeMap::from([(
+            parameter.name.to_ascii_lowercase(),
+            scalar.value.to_string(),
+        )]);
+        let body = crate::ir_template::validate_candidate(
+            snapshot,
+            hir,
+            invocation,
+            &summary,
+            &parameter.name,
+            &witness,
+            cancellation,
+        )?;
+        model.coverage.merge(&body.coverage);
+        let status = if rejected || body.value == hir::analysis::Validation::Invalid {
+            "invalid"
+        } else if !model.coverage.is_known() || body.value == hir::analysis::Validation::Unknown {
+            "unknown"
+        } else {
+            "valid"
+        };
+        section.push_str(&format!("\n- Current binding: `{status}`"));
     }
     model.push_section(section);
     Ok(Some(model))
@@ -89,13 +125,13 @@ pub(crate) fn ir_invocation_parameter_hover(
 /// resolves the row by kind (or name alone when the caller does not know the
 /// kind) and replays the parameter's usage-site rows under an any-scope,
 /// showing every conditional branch.
-pub(crate) fn dynamic_parameter_contract_lines(
+pub(crate) fn template_parameter_contract_lines(
     snapshot: &AnalysisSnapshot,
     owner_kind: Option<&str>,
     owner_name: &str,
     parameter_name: &str,
     cancellation: &CancellationToken,
-) -> Result<Option<String>, Cancelled> {
+) -> Result<Option<hir::analysis::Analysis<String>>, Cancelled> {
     cancellation.checkpoint()?;
 
     let summary = if let Some(kind) = owner_kind {
@@ -111,28 +147,34 @@ pub(crate) fn dynamic_parameter_contract_lines(
     let Some(summary) = summary else {
         return Ok(None);
     };
-    let sites = crate::ir_callable::definition_parameter_sites(
+    let sites = crate::ir_template::definition_parameter_sites(
         snapshot,
         &summary.kind,
         owner_name,
         parameter_name,
         cancellation,
     )?;
-    Ok(ir_parameter_contract_lines(
-        snapshot,
-        &summary,
-        parameter_name,
-        &sites,
-    ))
+    let coverage = sites.coverage.clone();
+    let mut lines = ir_parameter_contract_lines(snapshot, &summary, parameter_name, &sites);
+    if !coverage.is_complete() {
+        let line = format!("- Analysis incomplete: {}", coverage.limit_description());
+        if let Some(lines) = &mut lines {
+            lines.push('\n');
+            lines.push_str(&line);
+        } else {
+            lines = Some(line);
+        }
+    }
+    Ok(lines.map(|value| hir::analysis::Analysis { value, coverage }))
 }
 
 fn ir_parameter_contract_lines(
     snapshot: &AnalysisSnapshot,
     summary: &engine::DynamicDefinitionSummary,
     parameter: &str,
-    sites: &[crate::ir_callable::ParameterSite],
+    sites: &[crate::ir_template::ParameterSite],
 ) -> Option<String> {
-    use crate::ir_callable::Domain;
+    use crate::ir_template::Domain;
     summary
         .parameters
         .iter()
@@ -140,7 +182,7 @@ fn ir_parameter_contract_lines(
     let mut lines = Vec::new();
     if sites
         .iter()
-        .any(|site| matches!(site.domain, Domain::Payload { .. }))
+        .any(|site| matches!(site.domain, Domain::Template { .. }))
     {
         lines.push(
             "- Payload: quoted script (the caller's raw text is spliced into the body)".into(),
@@ -179,7 +221,7 @@ fn ir_parameter_contract_lines(
                     ));
                 }
             }
-            Domain::Payload { .. } | Domain::Unresolved => {}
+            Domain::Template { .. } | Domain::Unresolved => {}
         }
     }
     if !values.is_empty() {
@@ -224,14 +266,14 @@ fn ir_parameter_value_label(ir: &rules::ir::RulesIr, id: rules::ir::MatcherId) -
     }
 }
 
-/// Renders the `#### Callable signature` section for a dynamic definition symbol hover.
+/// Renders the `#### Template signature` section for a dynamic definition symbol hover.
 ///
 /// The invocation form matches the completion snippet's model: scalar only
 /// for parameterless definitions, otherwise a named parameter block. Required
 /// and optional group by activation scoping — the same partition that picks
 /// snippet tabstops — so hover, completion, and diagnostics agree on which
 /// parameters an invocation may omit.
-pub(crate) fn dynamic_signature_hover(
+pub(crate) fn template_signature_hover(
     snapshot: &AnalysisSnapshot,
     summary: &engine::DynamicDefinitionSummary,
 ) -> String {
@@ -240,7 +282,7 @@ pub(crate) fn dynamic_signature_hover(
         _ => "named parameter block".to_owned(),
     };
     let required_presence = |parameter: &engine::DynamicParameterSignature| {
-        crate::dynamic_rules::parameter_effectively_required(snapshot, summary, parameter)
+        crate::template_presence::parameter_effectively_required(snapshot, summary, parameter)
     };
     let required = summary
         .parameters
@@ -264,7 +306,7 @@ pub(crate) fn dynamic_signature_hover(
     if summary.parameters.is_empty() {
         lines.push("- Parameters: none".to_owned());
     }
-    format!("#### Callable signature\n\n{}", lines.join("\n"))
+    format!("#### Template signature\n\n{}", lines.join("\n"))
 }
 
 /// Presence of one parameter of a resolved dynamic definition under the
@@ -281,7 +323,7 @@ pub(crate) fn parameter_presence_required(
         .summary
         .template;
     let template = template.as_ref()?;
-    Some(!crate::dynamic_rules::parameter_is_activation_scoped(
+    Some(!crate::template_presence::parameter_is_activation_scoped(
         snapshot, template, parameter,
     ))
 }

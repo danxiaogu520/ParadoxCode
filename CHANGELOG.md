@@ -9,6 +9,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Shared Template programs, correlated parameter constraints and complete-container
+  specialization across diagnostics, completion, hover, navigation and indexing. Analysis
+  retains independent evidence when input, parsing or fact discovery is incomplete.
+- Owned Template text/call references, finite-relation oracles and real LSP editing traces
+  through `tools audit templates`.
 - Native Rust developer commands for diagnostics/baselines, evidence review, full completion
   inventories, performance workflows, extension contracts and real-process LSP/MCP tests.
 - `paradoxcode mcp`, sharing the Rust transport client and the extension's agent-tool declarations.
@@ -27,6 +32,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Scripted template capability and query APIs use `Template`; literal string matchers use
+  `Pattern`. Quoted script content is consumed through Templates; ordinary fields and mission
+  `trigger`/`effect` no longer have a generic quoted-script overload. Workspace version 0.5.0
+  invalidates older persisted caches.
+- Generated Template facts converge in dependency-tracked transactions. Failed discovery
+  preserves current syntax and reports incomplete analysis; rename requires complete reference
+  discovery and an invertible source mapping. Interactive Template scope queries are computed
+  on demand, and workspace diagnostics can progress while read-only requests remain in flight.
 - Developer operations use `tools audit`, `tools perf`, `tools editor` and the existing gate,
   documentation and release commands. The former Node/Python/Shell developer scripts are retired;
   JavaScript tests that execute extension code remain with the extension and run through tools.

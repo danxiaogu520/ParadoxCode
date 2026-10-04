@@ -5,26 +5,27 @@
 
 mod completion;
 mod diagnostics;
-mod dynamic_contracts;
-mod dynamic_cycles;
-mod dynamic_rules;
 mod hover;
 mod hover_card;
 mod inlay;
-mod ir_callable;
+mod insertion;
 mod ir_queries;
 mod ir_semantic;
+mod ir_template;
 mod localisation;
 mod messages;
 mod mission;
 mod navigation;
 mod quick_fix;
-mod quoted_script;
 mod resolution;
 mod semantic;
 mod semantic_tokens;
 mod suggest;
 mod support;
+mod template_contracts;
+mod template_parse;
+mod template_presence;
+mod template_recursion;
 mod transcode;
 mod types;
 
@@ -60,6 +61,8 @@ pub fn ir_matcher_description(ir: &rules::ir::RulesIr, matcher: rules::ir::Match
     ir_semantic::describe(ir, matcher)
 }
 
+pub use hir::analysis::Validation as TemplateValidation;
+
 pub use types::{
     AnalysisResult, CancellationToken, Cancelled, CompletionItem, CompletionKind, CompletionResult,
     Diagnostic, DiagnosticCertainty, DiagnosticCode, DiagnosticProvenance, DiagnosticTag,
@@ -76,3 +79,5 @@ pub(crate) use resolution::ALL_SEMANTICS_CALLS;
 pub(crate) use support::input_for_document;
 #[cfg(test)]
 mod tests;
+
+pub use insertion::snippet_plain_text;

@@ -76,7 +76,7 @@ fn ir_parameterized_symbol_membership_and_links_survive_cache_and_overlay_maskin
 }
 
 #[test]
-fn ir_callable_payload_symbols_and_dependent_links_survive_cache_roundtrip() {
+fn ir_template_payload_symbols_and_dependent_links_survive_cache_roundtrip() {
     let root = temp_root("ir-payload-symbols");
     fs::create_dir_all(root.join("common/scripted_effects")).unwrap();
     fs::create_dir_all(root.join("events")).unwrap();
@@ -1389,8 +1389,8 @@ fn lazy_reference_load_serves_skipped_kinds_from_disk() {
 }
 
 #[test]
-fn ir_catalog_lazy_cache_retains_callable_references_for_the_call_graph() {
-    let root = temp_root("ir-callable-cache");
+fn ir_catalog_lazy_cache_retains_template_references_for_the_call_graph() {
+    let root = temp_root("ir-template-cache");
     fs::create_dir_all(root.join("common/scripted_effects")).unwrap();
     fs::create_dir_all(root.join("events")).unwrap();
     fs::write(
@@ -1433,7 +1433,7 @@ fn ir_catalog_lazy_cache_retains_callable_references_for_the_call_graph() {
             .index()
             .references_iter()
             .any(|(_, reference)| { reference.kind.as_ref() == "localisation" }),
-        "non-callable references remain lazy"
+        "non-template references remain lazy"
     );
     fs::remove_dir_all(root).unwrap();
 }
@@ -1511,4 +1511,218 @@ fn lazy_preferred_language_load_skips_other_languages() {
     );
     assert_eq!(french_values.len(), 1);
     fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn fact_discovery_crosses_32_rounds_and_retracts_after_root_removal() {
+    let root = temp_root("fact-chain");
+    fs::create_dir_all(root.join("events")).unwrap();
+    fs::write(root.join("events/seed.txt"), "seed = chain_0").unwrap();
+    for i in 1..=40 {
+        fs::write(
+            root.join(format!("events/step_{i}.txt")),
+            format!("chain_{} = {{ write = chain_{i} }}", i - 1),
+        )
+        .unwrap();
+    }
+    fs::write(
+        root.join("events/unrelated.txt"),
+        "unrelated = { write = outsider }",
+    )
+    .unwrap();
+    let file = serde_json::from_value(serde_json::json!({
+        "types": {"node": {}},
+        "files": {"fixture": {"path": "events", "ext": "txt", "root": "root"}},
+        "schemas": {
+            "root": {"fields": {"seed": {"value": "def<node>", "card": "0..*"}}, "patterns": [{"key": "ref<node>", "body": "next", "card": "0..*"}]},
+            "next": {"fields": {"write": {"value": "def<node>", "card": "1"}}}
+        }
+    })).unwrap();
+    let mut profile = game::eu4::first_party_ir().unwrap().game.profile.clone();
+    profile.game_id = "fixture".to_owned();
+    let ir = rules::lower::lower(
+        &[("fixture.json".to_owned(), file)],
+        rules::ir::GameConfig { profile },
+    )
+    .unwrap();
+    let rules = rules::RuleSet::from_ir_catalog(&ir);
+    let mut host = AnalysisHost::with_ir(rules, ir.game.profile.clone(), ir.into());
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Project,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().unwrap();
+    assert!(
+        host.snapshot()
+            .index()
+            .active_definition("node", "chain_40")
+            .is_some()
+    );
+    let unrelated = host
+        .snapshot()
+        .source_file_id_for_path(&AbsPath::normalize(&root.join("events/unrelated.txt")))
+        .unwrap();
+    let untouched = host
+        .snapshot()
+        .file_state(unrelated)
+        .unwrap()
+        .source_handle();
+    fs::remove_file(root.join("events/seed.txt")).unwrap();
+    host.apply_disk_file_changes(&[DiskFileChange {
+        path: AbsPath::normalize(&root.join("events/seed.txt")),
+        kind: DiskFileChangeKind::Deleted,
+    }])
+    .unwrap();
+    assert!(
+        host.snapshot()
+            .index()
+            .active_definition("node", "chain_40")
+            .is_none(),
+        "generated facts must not sustain each other after the seed is removed"
+    );
+    assert!(
+        std::sync::Arc::ptr_eq(
+            &untouched,
+            &host
+                .snapshot()
+                .file_state(unrelated)
+                .unwrap()
+                .source_handle()
+        ),
+        "an unrelated negative lookup must not relower after deleting the seed"
+    );
+    let incremental = host.snapshot();
+    host.refresh_source_roots().unwrap();
+    assert_eq!(incremental.index().shards, host.snapshot().index().shards);
+    fs::write(root.join("events/seed.txt"), "seed = chain_0").unwrap();
+    host.apply_disk_file_changes(&[DiskFileChange {
+        path: AbsPath::normalize(&root.join("events/seed.txt")),
+        kind: DiskFileChangeKind::Created,
+    }])
+    .unwrap();
+    assert!(
+        host.snapshot()
+            .index()
+            .active_definition("node", "chain_40")
+            .is_some(),
+        "negative lookup insertion must invalidate the entire dependent component"
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn oscillating_generated_facts_do_not_commit_a_candidate_index() {
+    let root = temp_root("fact-oscillation");
+    fs::create_dir_all(root.join("events")).unwrap();
+    fs::write(root.join("events/stable.txt"), "seed = stable").unwrap();
+    let file = serde_json::from_value(serde_json::json!({
+        "types":{"node":{}}, "files":{"fixture":{"path":"events","ext":"txt","root":"root"}},
+        "schemas":{
+            "root":{"fields":{"seed":{"value":"def<node>","card":"0..*"}},"patterns":[
+                {"key":"ref<node>","body":"known","card":"0..*"},
+                {"key":"scalar","body":"missing","card":"0..*"}
+            ]},
+            "known":{"fields":{"write":{"value":"scalar","card":"1"}}},
+            "missing":{"fields":{"write":{"value":"def<node>","card":"1"}}}
+        }
+    }))
+    .unwrap();
+    let mut profile = game::eu4::first_party_ir().unwrap().game.profile.clone();
+    profile.game_id = "fixture".to_owned();
+    let ir = rules::lower::lower(
+        &[("fixture.json".to_owned(), file)],
+        rules::ir::GameConfig { profile },
+    )
+    .unwrap();
+    let mut host = AnalysisHost::with_ir(
+        rules::RuleSet::from_ir_catalog(&ir),
+        ir.game.profile.clone(),
+        ir.into(),
+    );
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Project,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().unwrap();
+    let before = host.snapshot();
+    fs::write(
+        root.join("events/toggle.txt"),
+        "toggle = { write = toggle }",
+    )
+    .unwrap();
+    let error = host.refresh_source_roots().unwrap_err();
+    assert!(error.to_string().contains("oscillat"), "{error}");
+    assert_eq!(host.snapshot().revision(), before.revision());
+    assert_eq!(host.snapshot().index(), before.index());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn unfinished_reference_discovery_survives_cache_round_trip_and_install() {
+    let root = temp_root("reference-coverage");
+    fs::create_dir_all(root.join("common/scripted_effects")).unwrap();
+    fs::create_dir_all(root.join("events")).unwrap();
+    fs::write(
+        root.join("common/scripted_effects/owned.txt"),
+        "writer_owned = { set_country_flag = $A$$B$ }",
+    )
+    .unwrap();
+    fs::write(root.join("events/owned.txt"),
+        "country_event = { id = coverage.1 immediate = { writer_owned = { A = prefix B = suffix } } }").unwrap();
+    let ir = game::eu4::first_party_ir().unwrap();
+    let mut host = AnalysisHost::with_ir(
+        rules::RuleSet::from_ir_catalog(&ir),
+        ir.game.profile.clone(),
+        ir.clone(),
+    );
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Vanilla,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().unwrap();
+    let snapshot = host.snapshot();
+    let file = snapshot
+        .source_files()
+        .values()
+        .find(|file| file.logical_path.as_str() == "events/owned.txt")
+        .unwrap();
+    assert!(
+        !snapshot
+            .index()
+            .shard(file.id)
+            .unwrap()
+            .reference_coverage_known
+    );
+    let path = root.join("coverage.pdcindex");
+    IndexCache::from_snapshot(&snapshot)
+        .unwrap()
+        .save(&path)
+        .unwrap();
+    let loaded = IndexCache::load(&path).unwrap();
+    assert!(
+        !loaded
+            .index()
+            .shard(file.id)
+            .unwrap()
+            .reference_coverage_known
+    );
+    let mut installed = AnalysisHost::with_ir(
+        rules::RuleSet::from_ir_catalog(&ir),
+        ir.game.profile.clone(),
+        ir,
+    );
+    installed.install_index_cache(loaded).unwrap();
+    assert!(
+        !installed
+            .snapshot()
+            .index()
+            .shard(file.id)
+            .unwrap()
+            .reference_coverage_known
+    );
+    assert!(installed.snapshot().file_state(file.id).is_none());
+    fs::remove_dir_all(root).unwrap();
 }

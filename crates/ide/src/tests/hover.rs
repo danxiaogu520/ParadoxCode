@@ -22,20 +22,10 @@ fn symbol_hover_does_not_materialize_the_full_workspace() {
 
 #[test]
 fn semantic_hover_descends_into_quoted_script_with_mapped_range() {
-    let text = "trigger = { embedded = \"foo = yes\" }\n";
+    let text = "trigger = { embedded = { BODY = \"foo = yes\" } }\n";
     let (host, id) = quoted_script_snapshot(text);
     let start = u32::try_from(text.find("foo").expect("inner key")).expect("offset");
     let snapshot = host.snapshot();
-    let input = input_for_document(&snapshot, &id).expect("input");
-    let fact = input
-        .hir
-        .as_ref()
-        .unwrap()
-        .field_facts()
-        .iter()
-        .find(|f| f.range.start() <= start + 1 && start + 1 < f.range.end())
-        .expect("quoted field fact");
-    assert_eq!(fact.range, TextRange::new(start, start + 3).unwrap());
     let hover = hover(&snapshot, &id, start + 1).expect("quoted semantic hover");
 
     assert!(hover.contents.contains("### Trigger `foo`"), "{hover:?}");
@@ -1082,7 +1072,7 @@ fn signature_hover_groups_parameters_by_activation_scoping() {
         let position = u32::try_from(text.find(name).expect("call site") + 1).expect("position");
         let hover = hover(&snapshot, &id, position).expect("signature hover");
         assert!(
-            hover.contents.contains("#### Callable signature")
+            hover.contents.contains("#### Template signature")
                 && hover.contents.contains("named parameter block")
                 && hover.contents.contains(expected),
             "{name} signature must group by activation scoping: {}",

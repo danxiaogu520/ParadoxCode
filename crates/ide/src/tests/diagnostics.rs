@@ -187,7 +187,7 @@ fn scope_target_failures_use_distinct_categories() {
 
 #[test]
 fn quoted_script_diagnostics_reuse_semantic_validation_with_exact_ranges() {
-    let text = "trigger = { embedded = \"\n foo = maybe\n unknown = yes\n\" }\n";
+    let text = "trigger = { embedded = { BODY = \"\n foo = maybe\n unknown = yes\n\" } }\n";
     let (host, id) = quoted_script_snapshot(text);
     let diagnostics = diagnostics(&host.snapshot(), &id);
     let invalid = diagnostics
@@ -210,19 +210,25 @@ fn quoted_script_diagnostics_reuse_semantic_validation_with_exact_ranges() {
 
 #[test]
 fn quoted_script_diagnostics_map_nested_escapes_and_recovered_syntax() {
-    let text = "trigger = { embedded = \"nested = \\\"foo = maybe\\\"\nbroken = {\" }\n";
+    let text = "trigger = { embedded = { BODY = \"nested = { BODY = \\\"foo = maybe\\\" }\nbroken = {\" } }\n";
     let (host, id) = quoted_script_snapshot(text);
     let diagnostics = diagnostics(&host.snapshot(), &id);
-    assert!(diagnostics.iter().any(|item| {
-        item.code == DiagnosticCode::InvalidValue
-            && item.range.start()
-                == u32::try_from(text.find("maybe").expect("maybe")).expect("offset")
-    }));
-    assert!(diagnostics.iter().any(|item| {
-        item.code == DiagnosticCode::Syntax
-            && item.range.start()
-                >= u32::try_from(text.find("broken").expect("broken")).expect("offset")
-    }));
+    assert!(
+        diagnostics.iter().any(|item| {
+            item.code == DiagnosticCode::InvalidValue
+                && item.range.start()
+                    == u32::try_from(text.find("maybe").expect("maybe")).expect("offset")
+        }),
+        "{diagnostics:?}"
+    );
+    assert!(
+        diagnostics.iter().any(|item| {
+            item.code == DiagnosticCode::Syntax
+                && item.range.start()
+                    >= u32::try_from(text.find("broken").expect("broken")).expect("offset")
+        }),
+        "{diagnostics:?}"
+    );
 }
 
 #[test]
@@ -733,7 +739,7 @@ fn cached_runtime_branch_dynamic_recomputes_optional_parameters_from_the_templat
 }
 
 #[test]
-fn first_party_mission_trigger_and_effect_accept_quoted_script_forms() {
+fn first_party_mission_trigger_and_effect_reject_quoted_script_forms() {
     let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -759,30 +765,24 @@ fn first_party_mission_trigger_and_effect_accept_quoted_script_forms() {
 
     let diagnostics = diagnostics(&host.snapshot(), &id);
 
-    for key in ["definitely_unknown_trigger", "definitely_unknown_effect"] {
-        let start = u32::try_from(text.find(key).expect("inner key")).expect("offset");
-        assert!(
-            diagnostics.iter().any(|diagnostic| {
-                diagnostic.code == DiagnosticCode::UnknownKey && diagnostic.range.start() == start
-            }),
-            "missing quoted mission diagnostic for {key}: {diagnostics:?}"
-        );
-    }
     assert!(
-        diagnostics.iter().all(|diagnostic| {
-            diagnostic.code != DiagnosticCode::InvalidValue
-                || (!contains_text_range(text, diagnostic.range, "trigger")
-                    && !contains_text_range(text, diagnostic.range, "effect"))
-        }),
-        "quoted mission containers must not be rejected as node values: {diagnostics:?}"
+        !diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::UnknownKey
+                && ["definitely_unknown_trigger", "definitely_unknown_effect"]
+                    .iter()
+                    .any(|key| diagnostic.range.start() == text.find(key).unwrap() as u32)),
+        "{diagnostics:?}"
     );
-}
-
-fn contains_text_range(text: &str, range: TextRange, needle: &str) -> bool {
-    let start = usize::try_from(range.start()).unwrap_or(text.len());
-    let end = usize::try_from(range.end()).unwrap_or(text.len());
-    text.get(start..end)
-        .is_some_and(|slice| slice.contains(needle))
+    assert_eq!(
+        diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue
+                && diagnostic.message.contains("block"))
+            .count(),
+        2,
+        "{diagnostics:?}"
+    );
 }
 
 #[test]
@@ -1852,7 +1852,7 @@ fn dynamic_definitions_activate_conditionals_and_report_cycles() {
         definition_results.iter().any(|diagnostic| {
             diagnostic.code == DiagnosticCode::DynamicDefinitionCycle
                 && diagnostic.message.contains("`first`")
-                && diagnostic.message.contains("first -> second -> first")
+                && diagnostic.message.contains("binding/scope state")
         }),
         "the cycle must be reported at the participating definitions: {definition_results:?}"
     );
@@ -1860,7 +1860,7 @@ fn dynamic_definitions_activate_conditionals_and_report_cycles() {
         definition_results.iter().any(|diagnostic| {
             diagnostic.code == DiagnosticCode::DynamicDefinitionCycle
                 && diagnostic.message.contains("`second`")
-                && diagnostic.message.contains("second -> first -> second")
+                && diagnostic.message.contains("binding/scope state")
         }),
         "both participants report the rotated cycle walk: {definition_results:?}"
     );
@@ -1954,7 +1954,7 @@ fn vanilla_cache_only_dynamic_row_records_unknown_body_statement() {
     // The persisted template is enough to derive the body finding without the
     // original source; publishing definition-site findings is P3.
     let snapshot = host.snapshot();
-    let sites = crate::ir_callable::definition_parameter_sites(
+    let sites = crate::ir_template::definition_parameter_sites(
         &snapshot,
         "scripted_effect",
         "cached_dynamic",
@@ -2617,8 +2617,14 @@ fn embedded_modifier_templates_do_not_constrain_the_argument() {
     assert!(
         diagnostics.iter().all(|diagnostic| !diagnostic
             .message
-            .contains("estate_nobles_royal_court_tasks")),
+            .contains("value `estate_nobles_royal_court_tasks`")),
         "embedded modifier templates constrain the rendered name, not the bare argument: {diagnostics:?}"
+    );
+    assert!(
+        diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("value `estate_nobles_royal_court_tasks_loyal`")),
+        "{diagnostics:?}"
     );
 }
 
@@ -3951,7 +3957,7 @@ fn logic_container_lints_fire_on_degenerate_shapes() {
 }
 
 #[test]
-fn dynamic_cycles_are_reported_at_definition_sites() {
+fn template_recursion_are_reported_at_definition_sites() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -4006,7 +4012,7 @@ fn dynamic_cycles_are_reported_at_definition_sites() {
     assert!(
         cycles.iter().any(|diagnostic| {
             diagnostic.message.contains("`ping`")
-                && diagnostic.message.contains("ping -> pong -> ping")
+                && diagnostic.message.contains("binding/scope state")
                 && diagnostic.range.start() == ping_offset
         }),
         "mutual recursion must be reported at the definition site: {cycles:?}"
@@ -4028,7 +4034,7 @@ fn dynamic_cycles_are_reported_at_definition_sites() {
         u32::try_from(definition_text.find("loop_self = ").expect("self")).expect("u32");
     assert!(
         cycles.iter().any(|diagnostic| {
-            diagnostic.message.contains("loop_self -> loop_self")
+            diagnostic.message.contains("binding/scope state")
                 && diagnostic.range.start() == self_offset
         }),
         "self-recursion must be reported at the definition site: {cycles:?}"
@@ -4036,10 +4042,10 @@ fn dynamic_cycles_are_reported_at_definition_sites() {
     let dispatch_offset =
         u32::try_from(definition_text.find("dispatch = ").expect("dispatch")).expect("u32");
     assert!(
-        cycles.iter().any(|diagnostic| {
+        !cycles.iter().any(|diagnostic| {
             diagnostic.message.contains("`dispatch`") && diagnostic.range.start() == dispatch_offset
         }),
-        "the parameter-bound dispatch cycle must close through call-site bindings: {cycles:?}"
+        "an unbound dispatch has no proven recursive concrete state: {cycles:?}"
     );
     assert!(
         !cycles
@@ -4101,9 +4107,8 @@ fn dynamic_scope_contracts_infer_and_reject_empty_intersections() {
         // A THIS block only evaluates the entry scope in trigger context;
         // as an effect container it must not constrain the entry either.
         "this_opaque = { add_prestige = 1 THIS = { change_province_name = \"W\" } }\n",
-        // OR branches union: one satisfiable branch is enough, so the
-        // province-only and country-only limits of the two branches combine
-        // instead of clashing.
+        // Runtime OR does not exempt its children from static scope legality.
+        // Each child is checked under the same parent scope.
         "or_union = { if = { limit = { OR = { is_capital = yes has_estate_privilege = some_priv } } add_prestige = 1 } }\n",
         // An OR branch with no scope knowledge keeps the whole OR unconstrained.
         "or_open = { if = { limit = { OR = { unknown_branch_key = yes is_capital = yes } } add_prestige = 1 } }\n",
@@ -4161,32 +4166,32 @@ fn dynamic_scope_contracts_infer_and_reject_empty_intersections() {
         if snapshot.ir().schemas.is_empty() {
             vec!["clash", "via_callee"]
         } else {
-            vec!["clash", "via_callee", "this_opaque"]
+            vec!["clash", "via_callee", "this_opaque", "or_union", "or_open"]
         },
         "IR preserves THIS's current scope; the legacy fixture treated it as opaque: {all:?}"
     );
 
     // The inferred contracts behind those diagnostics, via the hover view.
-    use crate::dynamic_contracts::{ScopeContract, contract_hover_line, dynamic_contract};
+    use crate::template_contracts::{ScopeContract, contract_hover_line, template_contract};
     assert_eq!(
-        dynamic_contract(&snapshot, "scripted_effect", "clash"),
+        template_contract(&snapshot, "scripted_effect", "clash"),
         Some(ScopeContract::Empty)
     );
     assert_eq!(
-        dynamic_contract(&snapshot, "scripted_effect", "fine"),
+        template_contract(&snapshot, "scripted_effect", "fine"),
         Some(ScopeContract::Scopes(vec!["country".to_owned()]))
     );
     assert_eq!(
-        dynamic_contract(&snapshot, "scripted_effect", "helper_province"),
+        template_contract(&snapshot, "scripted_effect", "helper_province"),
         Some(ScopeContract::Scopes(vec!["province".to_owned()]))
     );
     assert_eq!(
-        dynamic_contract(&snapshot, "scripted_effect", "root_opaque"),
+        template_contract(&snapshot, "scripted_effect", "root_opaque"),
         Some(ScopeContract::Scopes(vec!["country".to_owned()])),
         "ROOT blocks re-target the event root and must not narrow the entry"
     );
     assert_eq!(
-        dynamic_contract(&snapshot, "scripted_effect", "this_opaque"),
+        template_contract(&snapshot, "scripted_effect", "this_opaque"),
         Some(if snapshot.ir().schemas.is_empty() {
             ScopeContract::Scopes(vec!["country".to_owned()])
         } else {
@@ -4195,14 +4200,14 @@ fn dynamic_scope_contracts_infer_and_reject_empty_intersections() {
         "THIS retains the current scope and its body constrains the IR entry contract"
     );
     assert_eq!(
-        dynamic_contract(&snapshot, "scripted_effect", "or_union"),
-        Some(ScopeContract::Scopes(vec!["country".to_owned()])),
-        "OR branches union, so the province branch does not clash with add_prestige"
+        template_contract(&snapshot, "scripted_effect", "or_union"),
+        Some(ScopeContract::Empty),
+        "every OR child must be statically legal in the same scope"
     );
     assert_eq!(
-        dynamic_contract(&snapshot, "scripted_effect", "or_open"),
-        Some(ScopeContract::Scopes(vec!["country".to_owned()])),
-        "an unconstrained OR branch keeps the OR unconstrained"
+        template_contract(&snapshot, "scripted_effect", "or_open"),
+        Some(ScopeContract::Empty),
+        "an unknown OR child cannot hide an independently invalid known child"
     );
     let fine_hover = contract_hover_line(&snapshot, "scripted_effect", "fine");
     assert!(
@@ -5176,4 +5181,19 @@ fn genuine_in_file_duplicates_still_warn_with_twin_overlays_open() {
     assert_eq!(shadows[0].range.start(), second_name);
     assert!(shadows[0].message.contains("shadows an earlier definition"));
     std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn template_present_editing_hole_activates_guard_without_becoming_a_missing_key() {
+    let (mut host, id) = quoted_script_snapshot("trigger = { guarded = { P = } }");
+    host.open_document(
+        DocumentId::new("file:///tmp/guarded-template.txt"),
+        1,
+        "__templates = { guarded = { [[P] foo = $Q$ ] } }".to_owned(),
+        None,
+    )
+    .unwrap();
+    let values = diagnostics(&host.snapshot(), &id);
+    assert!(values.iter().any(|value|value.code==DiagnosticCode::Cardinality && value.message.contains("`Q`")),"{values:?}");
+    assert!(!values.iter().any(|value|value.code==DiagnosticCode::Cardinality && value.message.contains("`P`")),"{values:?}");
 }

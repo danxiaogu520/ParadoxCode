@@ -16,10 +16,10 @@ use crate::texture::TextureCatalog;
 use index::{DocumentSnapshot, FileState, PreparedDocument};
 use index::{FileIndexShard, LocalisationPreviewMap, PositionMap, WorkspaceIndex};
 use index::{
-    IndexSymbolFacts, SourceLoadContext, SourceReadJob, build_file_state_with_ir,
-    build_file_state_with_ir_and_facts, empty_file_state, load_source_files,
-    position_ranges_for_state, prepare_document_snapshot_with_ir,
-    prepare_document_snapshot_with_ir_and_facts, replay_symbol_dependent_files,
+    IndexSymbolFacts, SourceLoadContext, SourceReadJob, affected_fact_readers,
+    build_file_state_with_ir, build_file_state_with_ir_and_facts, empty_file_state,
+    load_source_files, position_ranges_for_state, prepare_document_snapshot_with_ir,
+    prepare_document_snapshot_with_ir_and_facts, stabilize_symbol_dependent_files,
     staged_overlay_document, unparsed_document,
 };
 use vfs::ParseCache;
@@ -486,68 +486,19 @@ impl AnalysisHost {
         if self.ir.files.is_empty() {
             return;
         }
-        let preliminary = self
-            .documents
-            .iter()
-            .map(|(id, document)| {
-                let document = if (document.source == DocumentSource::Overlay
-                    && document.hir.is_none())
-                    || document
-                        .hir
-                        .as_ref()
-                        .is_some_and(|hir| !hir.depends_on_symbol_facts())
-                {
-                    document.clone()
-                } else {
-                    prepare_document_snapshot_with_ir(
-                        &self.rules,
-                        &self.profile,
-                        &self.ir,
-                        &self.roots,
-                        document.clone(),
-                    )
-                };
-                (id.clone(), document)
-            })
-            .collect::<BTreeMap<_, _>>();
-        let overlay_hirs = preliminary
-            .values()
-            .filter(|document| document.source == DocumentSource::Overlay)
-            .filter_map(|document| document.hir.clone())
-            .collect::<Vec<_>>();
-        let overlay_file_ids = overlay_source_file_ids(&preliminary, &self.source_files);
-        let facts = IndexSymbolFacts::with_overlay_files(
+        let excluded = overlay_source_file_ids(&self.documents, &self.source_files);
+        let transaction = index::stabilize_overlay_facts(
+            &self.documents,
+            &self.rules,
+            &self.profile,
             &self.ir,
+            &self.roots,
             &self.index,
-            &overlay_hirs,
-            &overlay_file_ids,
+            &excluded,
+            Default::default(),
+            &WorkspaceScanToken::new(),
         );
-        self.documents = Arc::new(
-            preliminary
-                .into_iter()
-                .map(|(id, document)| {
-                    let document = if (document.source == DocumentSource::Overlay
-                        && document.hir.is_none())
-                        || document
-                            .hir
-                            .as_ref()
-                            .is_some_and(|hir| !hir.depends_on_symbol_facts())
-                    {
-                        document
-                    } else {
-                        prepare_document_snapshot_with_ir_and_facts(
-                            &self.rules,
-                            &self.profile,
-                            &self.ir,
-                            &facts,
-                            &self.roots,
-                            document,
-                        )
-                    };
-                    (id, document)
-                })
-                .collect(),
-        );
+        self.documents = Arc::new(transaction.documents);
     }
 
     fn document_contributes_symbol_facts(&self, document: &DocumentSnapshot) -> bool {
@@ -1149,7 +1100,7 @@ impl AnalysisHost {
         let priorities = source_priorities(&self.roots, &files);
         index.resolve_priorities_cancellable(&priorities, cancellation)?;
         if !self.ir.files.is_empty() {
-            // First-pass HIR discovers ordinary definitions. Callable payloads can introduce
+            // First-pass HIR discovers ordinary definitions. Template payloads can introduce
             // further symbols; replay until the exact symbol facts stabilize so references
             // in other files see them before committing the new workspace.
             let overlays = self
@@ -1159,46 +1110,17 @@ impl AnalysisHost {
                 .filter_map(|document| document.hir.clone())
                 .collect::<Vec<_>>();
             let overlay_file_ids = overlay_source_file_ids(&self.documents, &files);
-            let mut passes = 0;
-            loop {
-                passes += 1;
-                let facts = IndexSymbolFacts::with_overlay_files(
-                    &self.ir,
-                    &index,
-                    &overlays,
-                    &overlay_file_ids,
-                );
-                let relowered = replay_symbol_dependent_files(
-                    &files,
-                    &file_states,
-                    &self.ir,
-                    &facts,
-                    &source_context,
-                )?;
-                let mut changed = false;
-                for (id, state) in relowered {
-                    cancellation.checkpoint()?;
-                    changed |= file_states
-                        .get(&id)
-                        .is_none_or(|previous| !state.shard().same_symbol_facts(previous.shard()));
-                    file_states.insert(id, state);
-                }
-                drop(facts);
-                index.replace_replayed_shards_cancellable(
-                    file_states.values().map(|state| state.shard_handle()),
-                    &priorities,
-                    cancellation,
-                )?;
-                if !changed {
-                    break;
-                }
-                if passes >= 32 {
-                    return Err(WorkspaceError::Io(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "IR symbol facts did not stabilize after 32 passes",
-                    )));
-                }
-            }
+            stabilize_symbol_dependent_files(
+                &files,
+                &mut file_states,
+                &mut index,
+                &self.ir,
+                &overlays,
+                &overlay_file_ids,
+                &priorities,
+                &source_context,
+                None,
+            )?;
         }
         // The candidate now contains the final shards and resolved symbol facts;
         // it can serve queries without rebuilding the same lookup maps again.
@@ -1350,6 +1272,7 @@ impl AnalysisHost {
                     let priorities = source_priorities(&self.roots, &files);
                     index.remove_shard_resolved(id, &priorities);
                     index.remove_position_ranges(id);
+                    changed_semantic_files.insert(id);
                     preview_files.push(id);
                     changed = true;
                 }
@@ -1365,6 +1288,7 @@ impl AnalysisHost {
                     let priorities = source_priorities(&self.roots, &files);
                     index.remove_shard_resolved(id, &priorities);
                     index.remove_position_ranges(id);
+                    changed_semantic_files.insert(id);
                     preview_files.push(id);
                     changed = true;
                 }
@@ -1455,37 +1379,64 @@ impl AnalysisHost {
                     .filter(|document| document.source == DocumentSource::Overlay)
                     .filter_map(|document| document.hir.clone())
                     .collect::<Vec<_>>();
-                let candidate_index = index.clone();
-                let overlay_file_ids = overlay_source_file_ids(&self.documents, &files);
-                let facts = IndexSymbolFacts::with_overlay_files(
-                    &self.ir,
-                    &candidate_index,
-                    &overlays,
-                    &overlay_file_ids,
+                let affected = affected_fact_readers(
+                    &file_states,
+                    &self.index,
+                    &index,
+                    &changed_semantic_files,
                 );
-                for id in changed_semantic_files {
+                for id in &affected {
                     cancellation.checkpoint()?;
-                    let (Some(file), Some(previous)) = (files.get(&id), file_states.get(&id))
-                    else {
+                    let (Some(file), Some(previous)) = (files.get(id), file_states.get(id)) else {
                         continue;
                     };
                     if !previous.symbol_facts_dependency {
                         continue;
                     }
-                    let state = build_file_state_with_ir_and_facts(
+                    let state = build_file_state_with_ir(
                         file,
                         previous.source().to_owned(),
                         previous.revision(),
                         &self.rules,
                         &self.profile,
                         &self.ir,
-                        &facts,
                         self.parse_cache.as_ref(),
-                    );
-                    index.replace_position_ranges(id, position_ranges_for_state(&state));
-                    let state = Arc::new(state.cache_only());
+                    )
+                    .cache_only();
                     index.replace_shard_resolved(state.shard_handle(), &priorities);
-                    file_states.insert(id, state);
+                    file_states.insert(*id, Arc::new(state));
+                }
+                let overlay_file_ids = overlay_source_file_ids(&self.documents, &files);
+                let context = SourceLoadContext {
+                    limits,
+                    previous_files: &self.source_files,
+                    previous_states: &self.file_states,
+                    rules: &self.rules,
+                    profile: &self.profile,
+                    ir: Some(&self.ir),
+                    parse_cache: self.parse_cache.as_ref(),
+                    cancellation,
+                    progress: None,
+                };
+                stabilize_symbol_dependent_files(
+                    &files,
+                    &mut file_states,
+                    &mut index,
+                    &self.ir,
+                    &overlays,
+                    &overlay_file_ids,
+                    &priorities,
+                    &context,
+                    Some(&affected),
+                )?;
+                for (id, state) in &file_states {
+                    if self
+                        .file_states
+                        .get(id)
+                        .is_none_or(|old| !Arc::ptr_eq(old, state))
+                    {
+                        index.replace_position_ranges(*id, position_ranges_for_state(state));
+                    }
                 }
             }
             self.source_files = Arc::new(files);

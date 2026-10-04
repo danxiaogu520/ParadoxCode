@@ -1,0 +1,193 @@
+[
+  {
+    "id": "affix-reference",
+    "domains": {
+      "P": [
+        "",
+        "burghers",
+        "nobles"
+      ]
+    },
+    "constraints": [
+      {
+        "pieces": [
+          {
+            "literal": "estate_"
+          },
+          {
+            "parameter": "P"
+          }
+        ],
+        "allowed": [
+          "estate_burghers"
+        ]
+      }
+    ],
+    "focus": "P",
+    "expected": [
+      "burghers"
+    ]
+  },
+  {
+    "id": "repeated-reference",
+    "domains": {
+      "P": [
+        "",
+        "a",
+        "abc",
+        "def"
+      ]
+    },
+    "constraints": [
+      {
+        "pieces": [
+          {
+            "parameter": "P"
+          },
+          {
+            "literal": "_"
+          },
+          {
+            "parameter": "P"
+          }
+        ],
+        "allowed": [
+          "abc_abc",
+          "abc_def"
+        ]
+      }
+    ],
+    "focus": "P",
+    "expected": [
+      "abc"
+    ]
+  },
+  {
+    "id": "shared-witness-reject",
+    "domains": {
+      "P": [
+        "a",
+        "b"
+      ],
+      "Q": [
+        "x",
+        "y"
+      ]
+    },
+    "constraints": [
+      {
+        "pieces": [
+          {
+            "parameter": "P"
+          },
+          {
+            "literal": "_"
+          },
+          {
+            "parameter": "Q"
+          }
+        ],
+        "allowed": [
+          "a_x"
+        ]
+      },
+      {
+        "pieces": [
+          {
+            "parameter": "P"
+          },
+          {
+            "literal": "_"
+          },
+          {
+            "parameter": "Q"
+          }
+        ],
+        "allowed": [
+          "a_y"
+        ]
+      }
+    ],
+    "focus": "P",
+    "expected": []
+  },
+  {
+    "id": "shared-witness-accept",
+    "domains": {
+      "P": [
+        "a",
+        "b"
+      ],
+      "Q": [
+        "x",
+        "y"
+      ]
+    },
+    "constraints": [
+      {
+        "pieces": [
+          {
+            "parameter": "P"
+          },
+          {
+            "literal": "_"
+          },
+          {
+            "parameter": "Q"
+          }
+        ],
+        "allowed": [
+          "a_x",
+          "b_y"
+        ]
+      },
+      {
+        "pieces": [
+          {
+            "parameter": "Q"
+          }
+        ],
+        "allowed": [
+          "y"
+        ]
+      }
+    ],
+    "focus": "P",
+    "expected": [
+      "b"
+    ]
+  },
+  {
+    "id": "unicode-empty",
+    "domains": {
+      "P": [
+        "",
+        "界😀"
+      ]
+    },
+    "constraints": [
+      {
+        "pieces": [
+          {
+            "literal": "前"
+          },
+          {
+            "parameter": "P"
+          },
+          {
+            "literal": "后"
+          }
+        ],
+        "allowed": [
+          "前后",
+          "前界😀后"
+        ]
+      }
+    ],
+    "focus": "P",
+    "expected": [
+      "",
+      "界😀"
+    ]
+  }
+]

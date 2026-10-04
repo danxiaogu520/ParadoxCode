@@ -265,17 +265,6 @@ impl<'a> Checker<'a> {
     fn expr(&mut self, at: &At, raw: &str, ctx: &ParamCtx) -> Option<Expr> {
         match expr::parse(raw) {
             Ok(parsed) => {
-                if let Err(mixed) = union_shape(&parsed) {
-                    report_parse(
-                        &mut self.diagnostics,
-                        at,
-                        None,
-                        format!(
-                            "union mixes {mixed} branches; all branches must share one shape \
-                             (express shape variation with field-array overloads)"
-                        ),
-                    );
-                }
                 for param in expr_params(&parsed) {
                     self.params.push(ParamUse {
                         name: param.name,
@@ -1186,17 +1175,6 @@ impl<'a> Checker<'a> {
                         });
                     }
                 }
-                Primary::Quoted(argument) => {
-                    if let Some(name) = first_name(argument) {
-                        self.references.push(Reference {
-                            kind: RefKind::Schema,
-                            name,
-                            subtype: None,
-                            owner: owner.map(ToOwned::to_owned),
-                            at: at.clone(),
-                        });
-                    }
-                }
                 Primary::Literal(parts) => {
                     for part in parts {
                         if let expr::LiteralPart::Hole(hole) = part {
@@ -1812,8 +1790,7 @@ fn expr_params(parsed: &Expr) -> Vec<Param> {
                 Primary::Ref(argument)
                 | Primary::Def(argument)
                 | Primary::Enum(argument)
-                | Primary::Scope(argument)
-                | Primary::Quoted(argument) => {
+                | Primary::Scope(argument) => {
                     if let Some(segments) = argument.segments() {
                         for segment in segments {
                             if let Segment::Param(param) = segment {
@@ -1836,23 +1813,6 @@ fn expr_params(parsed: &Expr) -> Vec<Param> {
     let mut out = Vec::new();
     walk(parsed, &mut out);
     out
-}
-
-/// The shape mismatch of a mixed union, if any.
-fn union_shape(parsed: &Expr) -> Result<(), &'static str> {
-    let mut quoted = false;
-    let mut scalar = false;
-    for alternative in &parsed.alternatives {
-        match alternative {
-            Primary::Quoted(_) => quoted = true,
-            _ => scalar = true,
-        }
-    }
-    if quoted && scalar {
-        Err("scalar and quoted-script")
-    } else {
-        Ok(())
-    }
 }
 
 /// The first `$name` spelled in a raw string, if any.
@@ -2336,7 +2296,7 @@ mod tests {
     "scripted_effect": {
       "resolution": "replace",
       "impl": {
-        "Callable": {
+        "Template": {
           "body": "effect"
         }
       }
@@ -2345,7 +2305,7 @@ mod tests {
     "sprite": {}
   },
   "traits": {
-    "Callable": {}
+    "Template": {}
   },
   "enums": {
     "pictures": [

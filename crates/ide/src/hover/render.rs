@@ -13,6 +13,7 @@ pub(crate) struct HoverModel {
     pub(crate) title: String,
     pub(crate) sections: Vec<String>,
     pub(crate) has_localisation_preview: bool,
+    pub(crate) coverage: hir::analysis::AnalysisCoverage,
 }
 
 impl HoverModel {
@@ -21,6 +22,7 @@ impl HoverModel {
             title,
             sections: Vec::new(),
             has_localisation_preview: false,
+            coverage: Default::default(),
         }
     }
 
@@ -40,6 +42,7 @@ impl HoverModel {
         Hover {
             contents: self.render(),
             range: Some(range),
+            coverage: self.coverage,
         }
     }
 }

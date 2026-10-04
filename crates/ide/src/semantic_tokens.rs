@@ -95,6 +95,138 @@ pub fn semantic_tokens_in_range_with_cancellation(
             }
         }
     }
+    let mut projected = std::collections::BTreeMap::<TextRange, Vec<SemanticToken>>::new();
+    crate::ir_template::for_each_consumption(
+        snapshot,
+        &input,
+        cancellation,
+        &mut |source, invocation, body| {
+            for call in &body.rendered.calls {
+                let Some((parameter, relative)) = &call.source else {
+                    continue;
+                };
+                let Some(mapped) = hir::template_instance::project_binding_range(
+                    parameter,
+                    *relative,
+                    source.syntax(),
+                    source.properties_in_range(invocation.range).filter(|arg| {
+                        arg.path.len() == invocation.path.len() + 1
+                            && arg.path.starts_with(&invocation.path)
+                    }),
+                ) else {
+                    continue;
+                };
+                if range.is_some_and(|requested| {
+                    mapped.end() <= requested.start() || requested.end() <= mapped.start()
+                }) {
+                    continue;
+                }
+                projected.entry(mapped).or_default().push(SemanticToken {
+                    range: mapped,
+                    token_type: SemanticTokenType::Function,
+                    definition: false,
+                });
+            }
+            let parsed = body.hir.syntax();
+            let mut nested = Vec::new();
+            collect_tokens(
+                parsed,
+                parsed.root(),
+                &keys,
+                profile,
+                &mut nested,
+                cancellation,
+                None,
+            )?;
+            for mut token in nested {
+                cancellation.checkpoint()?;
+                if !body.rendered.pieces.iter().any(|piece| {
+                    (piece.script || piece.binding_source.as_ref().is_some_and(|map| map.script))
+                        && piece.range.start() <= token.range.start()
+                        && token.range.end() <= piece.range.end()
+                }) {
+                    continue;
+                }
+                if let Some(fact) = body.hir.field_fact_at(token.range) {
+                    let controls = fact
+                        .fields
+                        .iter()
+                        .filter(|id| snapshot.ir().field(**id).control.is_some())
+                        .count();
+                    token.token_type = if !fact.fields.is_empty() && controls == fact.fields.len() {
+                        SemanticTokenType::Keyword
+                    } else if controls > 0 || fact.fields.is_empty() {
+                        SemanticTokenType::Property
+                    } else {
+                        SemanticTokenType::Function
+                    };
+                }
+                token.definition = body
+                    .hir
+                    .definitions()
+                    .iter()
+                    .any(|d| d.selection_range == token.range);
+                let Some(mapped) =
+                    crate::ir_template::project_source_range(body, token.range, source, invocation)
+                else {
+                    continue;
+                };
+                if range.is_some_and(|requested| {
+                    mapped.end() <= requested.start() || requested.end() <= mapped.start()
+                }) {
+                    continue;
+                }
+                token.range = mapped;
+                projected.entry(mapped).or_default().push(token);
+            }
+            Ok(())
+        },
+    )?;
+    // Multiple consumption contexts must agree before publishing a token kind.
+    let additions = projected
+        .into_values()
+        .filter_map(|choices| {
+            let first = choices.first()?;
+            choices
+                .iter()
+                .all(|choice| choice == first)
+                .then(|| first.clone())
+        })
+        .collect::<Vec<_>>();
+    if !additions.is_empty() {
+        let mut merged = Vec::new();
+        for token in tokens {
+            if token.token_type != SemanticTokenType::String {
+                merged.push(token);
+                continue;
+            }
+            let mut start = token.range.start();
+            for addition in &additions {
+                if addition.range.start() < token.range.start()
+                    || token.range.end() < addition.range.end()
+                {
+                    continue;
+                }
+                if start < addition.range.start() {
+                    let mut fragment = token.clone();
+                    fragment.range =
+                        TextRange::new(start, addition.range.start()).expect("ordered token gap");
+                    merged.push(fragment);
+                }
+                start = start.max(addition.range.end());
+            }
+            if start < token.range.end() {
+                let mut fragment = token;
+                fragment.range =
+                    TextRange::new(start, fragment.range.end()).expect("ordered token suffix");
+                merged.push(fragment);
+            }
+        }
+        merged.extend(additions);
+        merged.sort_by_key(|token| token.range);
+        merged.dedup();
+        tokens = merged;
+    }
     Ok(tokens)
 }
 
@@ -142,7 +274,7 @@ pub(crate) fn static_semantic_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<
 
 fn semantic_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
     let mut keys = (*static_semantic_keys(snapshot)).clone();
-    // Completion classifies workspace-defined dynamic definitions as callable functions. Reuse the
+    // Completion classifies workspace-defined dynamic definitions as template functions. Reuse the
     // same effective (overlay-aware and source-priority-aware) member view for source coloring so
     // a definition does not switch back to the generic property color after insertion.
     let dynamic_types = {

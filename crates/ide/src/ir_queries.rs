@@ -1,16 +1,144 @@
 //! Workspace facts for schema lowering, independent of completion preferences.
 use engine::{AnalysisSnapshot, DocumentSource};
 use rules::ir::{Symbol, SymbolFacts, TypeId};
+use std::fmt::Write;
+use std::sync::{Arc, Mutex};
+
+const ENVIRONMENT_BYTES: usize = 8 * 1024 * 1024;
+#[derive(Default)]
+struct MemoEnvironments(Mutex<Vec<(String, Arc<rules::template::TemplateMemo>)>>);
+struct EnvironmentIdentity(String);
+impl Write for EnvironmentIdentity {
+    fn write_str(&mut self, text: &str) -> std::fmt::Result {
+        if self.0.len().saturating_add(text.len()) > ENVIRONMENT_BYTES {
+            return Err(std::fmt::Error);
+        }
+        self.0.push_str(text);
+        Ok(())
+    }
+}
+fn environment_identity(snapshot: &AnalysisSnapshot) -> Option<String> {
+    let mut identity = EnvironmentIdentity(String::new());
+    write!(
+        identity,
+        "textures:{};",
+        snapshot.texture_catalog_generation()
+    )
+    .ok()?;
+    for doc in snapshot
+        .documents()
+        .values()
+        .filter(|doc| doc.source() == DocumentSource::Overlay)
+    {
+        write!(
+            identity,
+            "overlay:{:?}:{:?}:{:?};",
+            doc.id(),
+            doc.path(),
+            doc.fact_coverage
+        )
+        .ok()?;
+        let hir = doc.hir()?;
+        for definition in hir.definitions() {
+            // Membership reads have no dependence on caller source positions.
+            write!(
+                identity,
+                "member:{:?}:{:?};",
+                definition.kind, definition.name
+            )
+            .ok()?;
+        }
+        for attributes in hir.definition_attributes() {
+            write!(
+                identity,
+                "attributes:{:?}:{:?}:{:?}:{:?};",
+                attributes.kind, attributes.name, attributes.attribute_keys, attributes.subtypes
+            )
+            .ok()?;
+        }
+        for template in hir.dynamic_templates() {
+            // Source and ranges determine both program semantics and definition-side maps.
+            write!(
+                identity,
+                "body:{:?}:{:?}:{:?}:{:?}:{:?};",
+                template.kind,
+                template.name,
+                template.source,
+                template.definition_range,
+                template.body_range
+            )
+            .ok()?;
+        }
+    }
+    Some(identity.0)
+}
 
 pub(crate) struct SnapshotSymbolFacts<'a> {
     pub(crate) snapshot: &'a AnalysisSnapshot,
 }
 impl SymbolFacts for SnapshotSymbolFacts<'_> {
-    fn replacement_template(
+    fn facts_complete(&self) -> bool {
+        self.snapshot
+            .documents()
+            .values()
+            .all(|doc| doc.fact_coverage.is_known())
+    }
+    fn asset_member(&self, category: &str, name: &str) -> Option<bool> {
+        category
+            .eq_ignore_ascii_case("gfx")
+            .then(|| self.snapshot.resolve_texture_path(name).is_some())
+    }
+    fn template_memo(&self) -> Option<std::sync::Arc<rules::template::TemplateMemo>> {
+        const KEY: &str = "template:semantic-memo";
+        let cache = self.snapshot.query_cache();
+        let revision = self.snapshot.revision();
+        if let Some(value) = cache.get::<rules::template::TemplateMemo>(revision, KEY) {
+            return Some(value);
+        }
+        const POOL: &str = "template:environment-memos";
+        let pool = cache
+            .get::<MemoEnvironments>(revision, POOL)
+            .unwrap_or_else(|| {
+                let pool = Arc::new(MemoEnvironments::default());
+                cache.insert(
+                    revision,
+                    engine::CacheDomain::Index,
+                    POOL.to_owned(),
+                    pool.clone(),
+                );
+                // Concurrent misses use the one published pool; old snapshots can use a private one.
+                cache.get(revision, POOL).unwrap_or(pool)
+            });
+        let value = if let Some(identity) = environment_identity(self.snapshot) {
+            let mut entries = pool.0.lock().ok()?;
+            if let Some((_, memo)) = entries.iter().find(|(key, _)| key == &identity) {
+                memo.clone()
+            } else {
+                let bytes = entries.iter().map(|(key, _)| key.len()).sum::<usize>();
+                if entries.len() >= 4 || bytes.saturating_add(identity.len()) > ENVIRONMENT_BYTES {
+                    entries.clear();
+                }
+                let memo = Arc::new(rules::template::TemplateMemo::default());
+                entries.push((identity, memo.clone()));
+                memo
+            }
+        } else {
+            Arc::new(rules::template::TemplateMemo::default())
+        };
+        cache.insert(
+            revision,
+            engine::CacheDomain::Documents,
+            KEY.to_owned(),
+            value.clone(),
+        );
+        Some(value)
+    }
+
+    fn template(
         &self,
         type_id: TypeId,
         name: &str,
-    ) -> Option<std::sync::Arc<rules::replacement::Template>> {
+    ) -> Option<std::sync::Arc<rules::template::Template>> {
         let kind = self
             .snapshot
             .ir()

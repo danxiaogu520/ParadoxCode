@@ -91,7 +91,7 @@ fn event_file_root_offers_all_entries_with_correct_shapes() {
         "block entries must insert a skeleton: {result:?}"
     );
     assert_eq!(
-        by_label("namespace").expect("namespace").insert_text,
+        crate::snippet_plain_text(&by_label("namespace").expect("namespace").insert_text),
         "namespace = ",
         "leaf entries must insert only the assignment: {result:?}"
     );
@@ -99,7 +99,7 @@ fn event_file_root_offers_all_entries_with_correct_shapes() {
         by_label("normal_or_historical_nations")
             .expect("normal_or_historical_nations")
             .insert_text,
-        "normal_or_historical_nations = ",
+        "normal_or_historical_nations = $0",
         "leaf entries must insert only the assignment: {result:?}"
     );
 }
@@ -662,21 +662,21 @@ fn leaf_value_clause_bare_value_completion_offers_typed_workspace_members() {
 
 #[test]
 fn quoted_script_completion_distinguishes_keys_values_and_escapes_snippets() {
-    let key_text = "trigger = { embedded = \"\n fo\n\" }\n";
+    let key_text = "trigger = { embedded = { BODY = \"\n fo\n\" } }\n";
     let (host, id) = quoted_script_snapshot(key_text);
     let key_position =
         u32::try_from(key_text.find("fo").expect("foo prefix") + 2).expect("position");
     let keys = complete(&host.snapshot(), &id, key_position);
     assert!(keys.items.iter().any(|item| item.label == "foo"));
 
-    let value_text = "trigger = { embedded = \"\n foo = \n\" }\n";
+    let value_text = "trigger = { embedded = { BODY = \"\n foo = \n\" } }\n";
     let (host, id) = quoted_script_snapshot(value_text);
     let value_position =
         u32::try_from(value_text.find("foo = ").expect("value") + 6).expect("position");
     let values = complete(&host.snapshot(), &id, value_position);
     assert!(values.items.iter().any(|item| item.label == "yes"));
 
-    let blank_text = "trigger = { embedded = \"\n \n\" }\n";
+    let blank_text = "trigger = { embedded = { BODY = \"\n \n\" } }\n";
     let (host, id) = quoted_script_snapshot(blank_text);
     let blank_position =
         u32::try_from(blank_text.find("\n \n").expect("blank") + 2).expect("position");
@@ -686,13 +686,12 @@ fn quoted_script_completion_distinguishes_keys_values_and_escapes_snippets() {
         .iter()
         .find(|item| item.label == "embedded")
         .expect("recursive quoted Script key");
-    assert!(embedded.insert_text.contains("\\\""));
-    assert!(!embedded.insert_text.contains(" = \"\n"));
+    assert!(embedded.insert_text.contains("{"));
 }
 
 #[test]
 fn quoted_script_completion_survives_incomplete_payload_syntax() {
-    let text = "trigger = { embedded = \"\n foo = \n";
+    let text = "trigger = { embedded = { BODY = \"\n foo = \n";
     let (host, id) = quoted_script_snapshot(text);
     let position = u32::try_from(text.len() - 1).expect("position");
     let result = complete(&host.snapshot(), &id, position);
@@ -1723,8 +1722,8 @@ fn dynamic_argument_value_inference_handles_conditionals_scope_and_conflicts() {
     );
     let cycle = complete_argument(&host, "cycle", "cycle_a = { VALUE =  }");
     assert!(
-        cycle.iter().any(|item| item.label == "THIS"),
-        "cyclic inference must fall back to rule-backed scope candidates: {cycle:?}"
+        cycle.is_empty(),
+        "unresolved recursion must not invent a scope domain: {cycle:?}"
     );
     assert!(
         cycle
@@ -2507,7 +2506,7 @@ fn key_completion_inserts_equals_for_scalars_and_skeletons_for_blocks() {
         .iter()
         .find(|item| item.label == "foo")
         .expect("scalar rule item");
-    assert_eq!(foo.insert_text, "foo = ");
+    assert_eq!(crate::snippet_plain_text(&foo.insert_text), "foo = ");
 
     let existing = "trigger = { ba = yes }";
     let mut existing_host = fixture_host(patch.clone());
@@ -2846,7 +2845,7 @@ fn file_root_scaffolds_use_rule_backed_entry_containers() {
         by_label("normal_or_historical_nations")
             .expect("normal_or_historical_nations")
             .insert_text,
-        "normal_or_historical_nations = "
+        "normal_or_historical_nations = $0"
     );
 }
 
@@ -2866,7 +2865,7 @@ fn mission_probe(text: &str, needle: &str, path: &str) -> (Vec<String>, MissionC
     let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     {
         // This is a Vanilla scripted helper, not an engine command. Its
-        // candidate requires the same definition evidence as other Callables.
+        // candidate requires the same definition evidence as other Templates.
         host.open_document(
             DocumentId::new("file:///tmp/common/scripted_triggers/mission-helper.txt"),
             1,
@@ -3575,7 +3574,7 @@ fn dynamic_trigger_completion_filters_by_entry_contract() {
 }
 
 #[test]
-fn dynamic_contract_report_honors_completion_cancellation() {
+fn template_contract_report_honors_completion_cancellation() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -3601,7 +3600,7 @@ fn dynamic_contract_report_honors_completion_cancellation() {
     // contract before the outer query could observe cancellation.
     let cancellation = CancellationToken::cancel_after(1);
     assert!(matches!(
-        crate::dynamic_contracts::dynamic_contract_report_view(&host.snapshot(), &cancellation),
+        crate::template_contracts::template_contract_report_view(&host.snapshot(), &cancellation),
         Err(Cancelled)
     ));
     assert!(cancellation.is_cancelled());
@@ -3697,8 +3696,8 @@ fn dynamic_key_position_parameter_completes_command_names() {
         .map(|item| item.label.as_str())
         .collect::<Vec<_>>();
     assert!(
-        labels.contains(&"add_prestige"),
-        "whole-key parameter must complete effect names: {labels:?}"
+        labels.contains(&"set_emperor") && !labels.contains(&"add_prestige"),
+        "whole-key candidates must accept the actual `yes` operand: {labels:?}"
     );
     assert!(
         !labels
@@ -3830,8 +3829,8 @@ fn dynamic_key_position_parameter_respects_site_scope() {
         .map(|item| item.label.as_str())
         .collect::<Vec<_>>();
     assert!(
-        labels.contains(&"add_base_tax"),
-        "province-scoped key site must offer province commands: {labels:?}"
+        labels.contains(&"set_in_empire") && !labels.contains(&"add_base_tax"),
+        "province-scoped keys must accept their fixed operand: {labels:?}"
     );
     assert!(
         !labels

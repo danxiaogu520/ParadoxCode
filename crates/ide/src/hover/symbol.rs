@@ -1,7 +1,7 @@
 //! Symbol hovers: definition resolution, shadowing, and localisation previews.
 
-use super::dynamic::dynamic_signature_hover;
 use super::render::{HoverModel, code_span};
+use super::template::template_signature_hover;
 use crate::localisation::{
     localisation_preview_section, localisation_previews_for_name, symbol_localisation_preview,
     unlabelled_preview_rows,
@@ -77,12 +77,12 @@ pub(crate) fn hover_for_symbol(
                 model.push_section(localisation_preview_section(&previews));
             }
             if let Some(summary) = dynamic_definition_summary(snapshot, kind, name) {
-                let mut signature = dynamic_signature_hover(snapshot, &summary);
+                let mut signature = template_signature_hover(snapshot, &summary);
                 if snapshot.ir().schemas.is_empty()
                     && crate::semantic::dynamic_definition_type(snapshot, kind)
                 {
                     signature.push('\n');
-                    signature.push_str(&crate::dynamic_contracts::contract_hover_line(
+                    signature.push_str(&crate::template_contracts::contract_hover_line(
                         snapshot, kind, name,
                     ));
                 }

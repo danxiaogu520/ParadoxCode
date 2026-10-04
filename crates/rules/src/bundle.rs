@@ -224,9 +224,9 @@ fn parse_configuration(
         }
     }
     let identity: PackageIdentity = serde_json::from_value(metadata.into()).map_err(json_error)?;
-    if identity.source_format_version != 13 {
+    if identity.source_format_version != 14 {
         return Err(BundleError::Validation(format!(
-            "unsupported source_format_version {}; expected 13",
+            "unsupported source_format_version {}; expected 14",
             identity.source_format_version
         )));
     }
@@ -283,7 +283,7 @@ fn parse_rule_file(path: &Path, bytes: &[u8]) -> Result<RuleFile, BundleError> {
 mod tests {
     use super::*;
     const GAME_JSON: &[u8] =
-        br#"{"source_format_version":13,"game_id":"test","target_game_version":"1.0"}"#;
+        br#"{"source_format_version":14,"game_id":"test","target_game_version":"1.0"}"#;
     #[test]
     fn input_order_and_unrelated_files_do_not_affect_the_ir() {
         let a = BundleFile {
@@ -369,7 +369,7 @@ mod tests {
         for game in [
             br#"{"game_id":"test"}"#.as_slice(),
             br#"{"game_id":"test","source_format_version":12}"#,
-            br#"{"game_id":"test","source_format_version":13,"typo":true}"#,
+            br#"{"game_id":"test","source_format_version":14,"typo":true}"#,
         ] {
             assert!(
                 load_bundle(Bundle {

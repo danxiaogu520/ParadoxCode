@@ -10,6 +10,7 @@ VS Code's own transparent-encoding diagnostics are described alongside the serve
 | Code | Registry default severity |
 | --- | --- |
 | [SyntaxError](#syntaxerror) | Error |
+| [AnalysisIncomplete](#analysisincomplete) | Information |
 | [UnknownKey](#unknownkey) | Error |
 | [UnknownLocalisationKey](#unknownlocalisationkey) | Warning |
 | [AmbiguousDefinition](#ambiguousdefinition) | Warning |
@@ -17,7 +18,7 @@ VS Code's own transparent-encoding diagnostics are described alongside the serve
 | [UnknownTexturePath](#unknowntexturepath) | Error |
 | [Cardinality](#cardinality) | Error |
 | [WrongScope](#wrongscope) | Error |
-| [DynamicDefinitionCycle](#dynamicdefinitioncycle) | Error |
+| [DynamicDefinitionCycle](#dynamicdefinitioncycle) | Information |
 | [InvalidDependency](#invaliddependency) | Error |
 | [LogicalContainer](#logicalcontainer) | Warning |
 | [ConstantCondition](#constantcondition) | Warning |
@@ -51,6 +52,12 @@ The script file could not be parsed: an unclosed block or string, a stray
 delimiter, or an operator without a value.
 The range covers the incomplete construct (for a missing value, the `key =`
 that never received one).
+
+## AnalysisIncomplete
+
+Template analysis stopped at a resource or recovery boundary. The message names the unfinished
+work; already proven errors remain visible. This information does not declare the script invalid
+or claim that unchecked statements passed. Completion and hover retain the same coverage state.
 
 ## UnknownKey
 
@@ -119,8 +126,11 @@ command to change the current scope first.
 
 ## DynamicDefinitionCycle
 
-Scripted triggers/effects form an invocation cycle. The message lists the
-cycle path; break it by removing one edge.
+The shared Template query revisited the same binding and scope state when analysing
+this definition with no supplied arguments. This is an informational, unresolved
+analysis result. A potential name-only call cycle does not prove that every
+invocation recurses: guards and argument changes can make concrete calls finite.
+Inspect the actual call's AnalysisIncomplete evidence for its own bindings.
 
 ## InvalidDependency
 

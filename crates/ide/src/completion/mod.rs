@@ -34,6 +34,7 @@ pub fn complete_with_cancellation(
     cancellation.checkpoint()?;
     let Some(input) = input_for_document(snapshot, document) else {
         return Ok(CompletionResult {
+            coverage: Default::default(),
             revision: snapshot.revision(),
             items: Vec::new(),
         });
@@ -43,21 +44,27 @@ pub fn complete_with_cancellation(
     // only requests originating in the localisation document stay quiet.
     if input.format == FileFormat::Localisation {
         return Ok(CompletionResult {
+            coverage: Default::default(),
             revision: snapshot.revision(),
             items: Vec::new(),
         });
     }
     if let Some(items) = dynamic_parameter_completion(snapshot, &input, position, cancellation)? {
         return Ok(CompletionResult {
+            coverage: Default::default(),
             revision: snapshot.revision(),
             items,
         });
     }
-    let items =
-        ir::try_ir_completion(snapshot, &input, position, cancellation)?.unwrap_or_default();
+    let result = ir::try_ir_completion(snapshot, &input, position, cancellation)?;
+    let (items, coverage) = result.map_or_else(
+        || (Vec::new(), Default::default()),
+        |result| (result.value, result.coverage),
+    );
     Ok(CompletionResult {
         revision: snapshot.revision(),
         items,
+        coverage,
     })
 }
 
@@ -94,6 +101,8 @@ fn dynamic_parameter_completion(
         }
         let label = format!("${}$", parameter.name);
         items.push(CompletionItem {
+            is_snippet: false,
+            template_evidence: None,
             label: label.clone(),
             kind: CompletionKind::DynamicParameter,
             detail: if value_context {
@@ -156,8 +165,10 @@ pub fn completion_resolve(snapshot: &AnalysisSnapshot, item: &CompletionItem) ->
     if let Some(index) = item
         .resolve_data
         .as_deref()
-        .and_then(|s| s.strip_prefix("ir-field:"))
-        .and_then(|s| s.parse::<usize>().ok())
+        .and_then(|token| token.strip_prefix("ir-field:"))
+        .and_then(|token| token.split_once(':'))
+        .filter(|(hash, _)| *hash == snapshot.ir_fingerprint())
+        .and_then(|(_, index)| index.parse::<usize>().ok())
         && let Some(field) = snapshot.ir().fields.get(index)
         && let Some(doc) = field.doc
     {

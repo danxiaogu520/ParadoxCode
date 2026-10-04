@@ -1,0 +1,503 @@
+[
+  {
+    "id": "lossless-trivia",
+    "source": "# $IGNORED$\nx = 1\n",
+    "bindings": [],
+    "expected": "# $IGNORED$\nx = 1\n",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "whole-value",
+    "source": "set_emperor = $P$",
+    "bindings": [
+      {
+        "name": "P",
+        "value": "yes"
+      }
+    ],
+    "expected": "set_emperor = yes",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "affixed-value",
+    "source": "name = estate_$P$",
+    "bindings": [
+      {
+        "name": "P",
+        "value": "burghers"
+      }
+    ],
+    "expected": "name = estate_burghers",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "repeated-parameter",
+    "source": "name = $P$_$P$",
+    "bindings": [
+      {
+        "name": "P",
+        "value": "abc"
+      }
+    ],
+    "expected": "name = abc_abc",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "multiple-parameters",
+    "source": "name = $A$_$B$",
+    "bindings": [
+      {
+        "name": "A",
+        "value": "abc"
+      },
+      {
+        "name": "B",
+        "value": "def"
+      }
+    ],
+    "expected": "name = abc_def",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "whole-key",
+    "source": "$P$ = { add_base_tax = 1 }",
+    "bindings": [
+      {
+        "name": "P",
+        "value": "capital"
+      }
+    ],
+    "expected": "capital = { add_base_tax = 1 }",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "affixed-key",
+    "source": "add_base_$K$ = $V$",
+    "bindings": [
+      {
+        "name": "K",
+        "value": "tax"
+      },
+      {
+        "name": "V",
+        "value": "2"
+      }
+    ],
+    "expected": "add_base_tax = 2",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "sign-fragment",
+    "source": "add_prestige = $S$10",
+    "bindings": [
+      {
+        "name": "S",
+        "value": "-"
+      }
+    ],
+    "expected": "add_prestige = -10",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "present-empty",
+    "source": "log = \"a$P$b\"",
+    "bindings": [
+      {
+        "name": "P",
+        "value": ""
+      }
+    ],
+    "expected": "log = \"ab\"",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "missing-value",
+    "source": "log = $P$",
+    "bindings": [],
+    "expected": "log = $P$",
+    "status": "missing",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "present-hole",
+    "source": "[[P] set_emperor = $P$ ]",
+    "bindings": [
+      {
+        "name": "P",
+        "value": null
+      }
+    ],
+    "expected": " set_emperor = $P$ ",
+    "status": "hole",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "positive-present",
+    "source": "[[P] set_emperor = $P$ ]",
+    "bindings": [
+      {
+        "name": "P",
+        "value": "yes"
+      }
+    ],
+    "expected": " set_emperor = yes ",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "positive-absent",
+    "source": "[[P] set_emperor = $P$ ]]outside",
+    "bindings": [],
+    "expected": "]outside",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "positive-empty",
+    "source": "[[P] x = 1 ]",
+    "bindings": [
+      {
+        "name": "P",
+        "value": ""
+      }
+    ],
+    "expected": " x = 1 ",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "negative-absent",
+    "source": "[[!P] x = 1 ]",
+    "bindings": [],
+    "expected": " x = 1 ",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "negative-present",
+    "source": "[[!P] x = 1 ]",
+    "bindings": [
+      {
+        "name": "P",
+        "value": ""
+      }
+    ],
+    "expected": "",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "guard-only",
+    "source": "[[P] x = 1 ]",
+    "bindings": [
+      {
+        "name": "P",
+        "value": "arbitrary"
+      }
+    ],
+    "expected": " x = 1 ",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "nested-guards",
+    "source": "[[A]a [[!B]b ] c ]",
+    "bindings": [
+      {
+        "name": "A",
+        "value": ""
+      }
+    ],
+    "expected": "a b  c ",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "inactive-read",
+    "source": "[[A] $MISSING$ ]",
+    "bindings": [],
+    "expected": "",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "unguarded-forward",
+    "source": "inner = { X = $P$ }",
+    "bindings": [],
+    "expected": "inner = { X = $P$ }",
+    "status": "missing",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "runtime-if-read",
+    "source": "if = { limit = { always = no } add_prestige = $P$ }",
+    "bindings": [],
+    "expected": "if = { limit = { always = no } add_prestige = $P$ }",
+    "status": "missing",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "runtime-or-read",
+    "source": "OR = { always = $A$ always = $B$ }",
+    "bindings": [
+      {
+        "name": "A",
+        "value": "yes"
+      }
+    ],
+    "expected": "OR = { always = yes always = $B$ }",
+    "status": "missing",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "quoted-use",
+    "source": "log = \"prefix_$P$\"",
+    "bindings": [
+      {
+        "name": "P",
+        "value": "界"
+      }
+    ],
+    "expected": "log = \"prefix_界\"",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "quoted-escape",
+    "source": "log = \"a\\\"$P$\"",
+    "bindings": [
+      {
+        "name": "P",
+        "value": "界"
+      }
+    ],
+    "expected": "log = \"a\\\"界\"",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "numeric-name",
+    "source": "always = $1$",
+    "bindings": [
+      {
+        "name": "1",
+        "value": "yes"
+      }
+    ],
+    "expected": "always = yes",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "folded-name",
+    "source": "always = $p$",
+    "bindings": [
+      {
+        "name": "P",
+        "value": "yes"
+      }
+    ],
+    "expected": "always = yes",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "last-binding-wins",
+    "source": "always = $P$",
+    "bindings": [
+      {
+        "name": "P",
+        "value": "no"
+      },
+      {
+        "name": "p",
+        "value": "yes"
+      }
+    ],
+    "expected": "always = yes",
+    "status": "complete",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "cross-token-text",
+    "source": "x = $P$",
+    "bindings": [
+      {
+        "name": "P",
+        "value": "1\ny = { z = yes }"
+      }
+    ],
+    "expected": "x = 1\ny = { z = yes }",
+    "status": "complete",
+    "policy": "provisional-project-text-reference",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "inserted-marker-not-rescanned",
+    "source": "x = $P$",
+    "bindings": [
+      {
+        "name": "P",
+        "value": "$Q$"
+      },
+      {
+        "name": "Q",
+        "value": "yes"
+      }
+    ],
+    "expected": "x = $Q$",
+    "status": "complete",
+    "policy": "provisional-project-text-reference",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "unclosed-marker",
+    "source": "x = $P",
+    "bindings": [],
+    "expected": "x = ",
+    "status": "source_error",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "unclosed-guard",
+    "source": "[[P] x = 1",
+    "bindings": [
+      {
+        "name": "P",
+        "value": ""
+      }
+    ],
+    "expected": " x = 1",
+    "status": "source_error",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "byte-budget",
+    "source": "x = $P$",
+    "bindings": [
+      {
+        "name": "P",
+        "value": "long"
+      }
+    ],
+    "expected": "x = ",
+    "status": "limited",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "max_bytes": 4,
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  },
+  {
+    "id": "step-budget",
+    "source": "abc",
+    "bindings": [],
+    "expected": "a",
+    "status": "limited",
+    "policy": "adopted-project-convention",
+    "engine_evidence": "unverified",
+    "max_steps": 1,
+    "target_game_version": "EU4 1.37.5 (engine run unverified)",
+    "evidence_source": "Owned expected text plus proposal adopted/provisional convention; not an EU4 runtime observation"
+  }
+]

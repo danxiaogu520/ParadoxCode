@@ -45,8 +45,6 @@ pub enum Primary {
     Enum(Argument),
     /// `scope<country>`: a scope expression.
     Scope(Argument),
-    /// `quoted<trigger>`: a quoted script parsed with the named schema.
-    Quoted(Argument),
     /// `path` or `path<gfx>`: a file-path scalar, optionally a path category.
     Path { category: Option<String> },
     /// `'yes'` (constant) or `'monthly_{ref<power>}'` (template).
@@ -332,7 +330,7 @@ impl<'source> Cursor<'source> {
                         };
                         Ok(Primary::Path { category })
                     }
-                    "ref" | "def" | "enum" | "scope" | "quoted" => {
+                    "ref" | "def" | "enum" | "scope" => {
                         self.expect('<')?;
                         let argument = self.parse_argument()?;
                         self.expect('>')?;
@@ -341,9 +339,13 @@ impl<'source> Cursor<'source> {
                             "def" => Primary::Def(argument),
                             "enum" => Primary::Enum(argument),
                             "scope" => Primary::Scope(argument),
-                            _ => Primary::Quoted(argument),
+                            _ => unreachable!("constructor checked above"),
                         })
                     }
+                    "quoted" => Err(self.error(
+                        start,
+                        "`quoted<…>` was removed; script text is consumed only by Templates",
+                    )),
                     _ => Err(self.error(start, format!("unknown type expression `{keyword}`"))),
                 }
             }
@@ -737,9 +739,15 @@ mod tests {
             one("scope<any>"),
             Primary::Scope(Argument::Path(vec![Segment::Name("any".to_owned())]))
         );
-        assert_eq!(
-            one("quoted<trigger>"),
-            Primary::Quoted(Argument::Path(vec![Segment::Name("trigger".to_owned())]))
+    }
+
+    #[test]
+    fn quoted_constructor_is_rejected_with_consumption_guidance() {
+        assert!(
+            parse("quoted<trigger>")
+                .unwrap_err()
+                .message
+                .contains("only by Templates")
         );
     }
 
@@ -760,12 +768,6 @@ mod tests {
             one("ref<$S>"),
             Primary::Ref(Argument::Path(vec![Segment::Param(Param {
                 name: "S".to_owned(),
-            })]))
-        );
-        assert_eq!(
-            one("quoted<$body>"),
-            Primary::Quoted(Argument::Path(vec![Segment::Param(Param {
-                name: "body".to_owned(),
             })]))
         );
     }

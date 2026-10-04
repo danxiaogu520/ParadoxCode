@@ -416,7 +416,7 @@ fn load_index(
     let mut file_fingerprints = BTreeMap::new();
     let mut file_metadata_fingerprints = BTreeMap::new();
     let mut statement = connection.prepare(
-        "SELECT file_id, logical_path, category_id, resolution, syntax_error_count, fingerprint, metadata_fingerprint
+        "SELECT file_id, logical_path, category_id, resolution, syntax_error_count, fingerprint, metadata_fingerprint, reference_coverage_known
          FROM source_files ORDER BY file_id",
     )?;
     let rows = statement.query_map([], |row| {
@@ -428,6 +428,7 @@ fn load_index(
             row.get::<_, i64>(4)?,
             row.get::<_, String>(5)?,
             row.get::<_, Option<String>>(6)?,
+            row.get::<_, bool>(7)?,
         ))
     })?;
     for row in rows {
@@ -439,6 +440,7 @@ fn load_index(
             syntax_error_count,
             fingerprint,
             metadata_fingerprint,
+            reference_coverage_known,
         ) = row?;
         let id = decode_file_id(&id)?;
         if fingerprint.len() != 64 {
@@ -505,6 +507,7 @@ fn load_index(
                 definition_attributes: Vec::new(),
                 flag_writes: Vec::new(),
                 syntax_error_count,
+                reference_coverage_known,
             }),
         );
     }

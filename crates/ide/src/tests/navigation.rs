@@ -2,6 +2,64 @@ use super::support::*;
 use text::AbsPath;
 
 #[test]
+fn deferred_definition_bindings_do_not_block_complete_call_rename() {
+    let root =
+        std::env::temp_dir().join(format!("template-rename-coverage-{}", std::process::id()));
+    std::fs::create_dir_all(root.join("common/scripted_effects")).unwrap();
+    let mut effects = String::from("rename_bool = { set_emperor = $P$ add_prestige = $N$ }\n");
+    for depth in 0..40 {
+        effects.push_str(&format!(
+            "rename_chain{depth} = {{ rename_chain{} = {{ N = $N$ }} }}\n",
+            depth + 1
+        ));
+    }
+    effects.push_str("rename_chain40 = { add_prestige = $N$ }\n");
+    let path = root.join("common/scripted_effects/owned.txt");
+    std::fs::write(&path, &effects).unwrap();
+    let mut host = eu4_host(game::eu4::runtime_rules().unwrap());
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::Project,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().unwrap();
+    let text = "country_event = { immediate = { rename_bool = { P = yes N = 2 } } }";
+    let id = DocumentId::new("file:///tmp/events/rename-coverage.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .unwrap();
+    let cursor = text.find("rename_bool").unwrap() as u32;
+    let plan = rename(&host.snapshot(), &id, cursor, "changed_bool").unwrap();
+    assert_eq!(
+        plan.edits.len(),
+        2,
+        "disk declaration and complete invocation"
+    );
+    let defs = DocumentId::new(format!("file://{}", path.display()));
+    host.open_document(defs, 1, effects, Some(AbsPath::normalize(&path)))
+        .unwrap();
+    let plan = rename(&host.snapshot(), &id, cursor, "changed_bool").unwrap();
+    assert_eq!(
+        plan.edits.len(),
+        2,
+        "overlay declaration retains the same closure"
+    );
+    host.apply_document_changes(
+        &id,
+        2,
+        &[engine::TextChange::full(
+            "country_event = { immediate = { rename_bool = { P = } } }",
+        )],
+    )
+    .unwrap();
+    assert_eq!(
+        rename(&host.snapshot(), &id, cursor, "changed_bool").unwrap_err(),
+        RenameError::Incomplete,
+        "an actual invocation hole still has incomplete coverage"
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn unresolved_symbol_is_diagnosed_without_a_definition() {
     let (host, id) =
         snapshot("country_event = { immediate = { country_event = { id = missing.1 } } }\n");
@@ -263,7 +321,7 @@ fn dynamic_calls_resolve_scalar_and_block_forms_with_overlay_priority() {
         Some(definition_id.clone())
     );
     let scalar_hover = hover(&snapshot, &use_id, scalar_position).expect("dynamic signature hover");
-    assert!(scalar_hover.contents.contains("#### Callable signature"));
+    assert!(scalar_hover.contents.contains("#### Template signature"));
     assert!(scalar_hover.contents.contains("named parameter block"));
     assert!(
         scalar_hover
@@ -741,4 +799,384 @@ fn gfx_sprite_families_and_mesh_font_kinds_are_symbolized() {
     assert_eq!(references.len(), 2, "definition plus mission use");
 
     fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn generated_symbol_from_two_bindings_refuses_partial_rename() {
+    let (mut host, id) = snapshot(
+        "country_event = { id = target.1 immediate = { use_target = { PREFIX = target NUMBER = 1 } } }\n",
+    );
+    let defs = DocumentId::new("file:///tmp/common/scripted_effects/affix_nav.txt");
+    host.open_document(
+        defs,
+        1,
+        "use_target = { country_event = { id = $PREFIX$.$NUMBER$ } }".to_owned(),
+        None,
+    )
+    .unwrap();
+    let text = "country_event = { id = target.1 immediate = { use_target = { PREFIX = target NUMBER = 1 } } }\n";
+    assert_eq!(
+        rename(
+            &host.snapshot(),
+            &id,
+            text.find("target.1").unwrap() as u32,
+            "new.1"
+        )
+        .unwrap_err(),
+        RenameError::Incomplete
+    );
+}
+
+#[test]
+fn whole_operand_script_references_use_full_parent_and_exact_source_map() {
+    let text = "country_event = { id = whole.1 immediate = { use_block = { BODY = \"{ country_event = { id = whole.1 } }\" } } }\n";
+    let (mut host, id) = snapshot(text);
+    host.open_document(
+        DocumentId::new("file:///tmp/common/scripted_effects/whole_operand_nav.txt"),
+        1,
+        "use_block = { hidden_effect = $BODY$ }".to_owned(),
+        None,
+    )
+    .unwrap();
+    let reference = text.rfind("whole.1").unwrap() as u32;
+    let targets = definition(&host.snapshot(), &id, reference);
+    assert_eq!(targets.len(), 1, "{targets:?}");
+    let edits = rename(&host.snapshot(), &id, reference, "changed.1").unwrap();
+    assert_eq!(edits.edits.len(), 2, "{edits:?}");
+    for edit in edits.edits {
+        assert_eq!(
+            &text[edit.location.range.start() as usize..edit.location.range.end() as usize],
+            "whole.1"
+        );
+    }
+}
+
+#[test]
+fn older_snapshot_keeps_template_resolution_after_new_definition_revision() {
+    let (mut host, _) = snapshot("country_event = { immediate = { retained = { P = 1 } } }");
+    let id = DocumentId::new("file:///tmp/common/scripted_effects/snapshot_nav.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "retained = { add_prestige = $P$ }".to_owned(),
+        None,
+    )
+    .unwrap();
+    let old = host.snapshot();
+    let before =
+        crate::semantic::dynamic_definition_summary(&old, "scripted_effect", "retained").unwrap();
+    host.apply_document_changes(
+        &id,
+        2,
+        &[engine::TextChange::full(
+            "retained = { set_country_flag = $P$ }",
+        )],
+    )
+    .unwrap();
+    let fresh = crate::semantic::dynamic_definition_summary(
+        &host.snapshot(),
+        "scripted_effect",
+        "retained",
+    )
+    .unwrap();
+    assert_ne!(before.template, fresh.template);
+    assert_eq!(
+        before.template,
+        crate::semantic::dynamic_definition_summary(&old, "scripted_effect", "retained")
+            .unwrap()
+            .template
+    );
+}
+
+#[test]
+fn inserted_parameter_markers_keep_local_uncertainty_and_independent_errors() {
+    let text = "country_event = { trigger = { marker_check = { P = \"$Q$\" } } }";
+    let (mut host, id) = snapshot(text);
+    host.open_document(
+        DocumentId::new("file:///tmp/common/scripted_triggers/marker_check.txt"),
+        1,
+        "marker_check = { AND = { always = $P$ always = wrong } }".to_owned(),
+        None,
+    )
+    .unwrap();
+    let analysis = crate::analyze_document(&host.snapshot(), &id).unwrap();
+    assert!(
+        analysis
+            .coverage
+            .residuals
+            .contains(&hir::analysis::ResidualReason::TextInterpretation),
+        "{:?}",
+        analysis.coverage
+    );
+    assert!(
+        !analysis
+            .diagnostics
+            .iter()
+            .any(|d| d.message.contains("argument `$Q$`")),
+        "{:?}",
+        analysis.diagnostics
+    );
+    assert!(
+        analysis
+            .diagnostics
+            .iter()
+            .any(|d| d.code == DiagnosticCode::InvalidValue && d.message.contains("always")),
+        "{:?}",
+        analysis.diagnostics
+    );
+}
+
+#[test]
+fn shared_instance_keeps_two_callers_source_ranges_separate() {
+    let text = "country_event = { id = shared.1 immediate = { shared_use = { BODY = \"country_event = { id = shared.1 }\" } shared_use = { BODY = \"country_event = { id = shared.1 }\" } } }";
+    let (mut host, id) = snapshot(text);
+    host.open_document(
+        DocumentId::new("file:///tmp/common/scripted_effects/shared_ranges.txt"),
+        1,
+        "shared_use = { $BODY$ }".to_owned(),
+        None,
+    )
+    .unwrap();
+    let input = crate::support::input_for_document(&host.snapshot(), &id).unwrap();
+    let hir = input.hir.as_ref().unwrap();
+    let calls = hir
+        .properties()
+        .iter()
+        .filter(|p| p.key == "shared_use")
+        .collect::<Vec<_>>();
+    let view = host.snapshot();
+    let token = CancellationToken::new();
+    let first = crate::ir_template::analyse_body(&view, hir, calls[0], None, &token)
+        .unwrap()
+        .unwrap();
+    let second = crate::ir_template::analyse_body(&view, hir, calls[1], None, &token)
+        .unwrap()
+        .unwrap();
+    assert!(
+        std::sync::Arc::ptr_eq(&first, &second),
+        "equal bindings and scope should share semantic work"
+    );
+    let plan = rename(
+        &view,
+        &id,
+        text.find("shared.1").unwrap() as u32,
+        "changed.1",
+    )
+    .unwrap();
+    assert_eq!(plan.edits.len(), 3, "{plan:?}");
+    assert!(plan.edits.iter().all(|edit| &text
+        [edit.location.range.start() as usize..edit.location.range.end() as usize]
+        == "shared.1"));
+}
+
+#[test]
+fn expanded_script_keeps_named_template_call_navigation_and_rename() {
+    let text = "country_event = { id = calls.1 immediate = { call_outer = { BODY = \"call_inner = yes\" } } }";
+    let (mut host, id) = snapshot(text);
+    let defs = DocumentId::new("file:///tmp/common/scripted_effects/call_nav.txt");
+    let declarations = "call_outer = { $BODY$ } call_inner = { add_prestige = 1 }";
+    host.open_document(defs.clone(), 1, declarations.to_owned(), None)
+        .unwrap();
+    let cursor = text.find("call_inner").unwrap() as u32;
+    let locations = definition(&host.snapshot(), &id, cursor);
+    assert_eq!(locations.len(), 1, "{locations:?}");
+    assert_eq!(locations[0].document, Some(defs));
+    let plan = rename(&host.snapshot(), &id, cursor, "call_renamed").unwrap();
+    assert!(
+        plan.edits
+            .iter()
+            .any(|edit| edit.location.document.as_ref() == Some(&id)
+                && edit.location.range.start() == cursor),
+        "{plan:?}"
+    );
+}
+
+#[test]
+fn expanded_named_call_key_still_completes_at_its_authored_position() {
+    let text = "country_event = { id = calls.1 immediate = { call_outer = { BODY = \"call_inner = yes\" } } }";
+    let (mut host, id) = snapshot(text);
+    host.open_document(
+        DocumentId::new("file:///tmp/common/scripted_effects/call_complete.txt"),
+        1,
+        "call_outer = { $BODY$ } call_inner = { add_prestige = 1 }".to_owned(),
+        None,
+    )
+    .unwrap();
+    let cursor = text.find("call_inner").unwrap() as u32 + 6;
+    let completion = complete(&host.snapshot(), &id, cursor);
+    assert!(
+        completion
+            .items
+            .iter()
+            .any(|item| item.label == "call_inner"),
+        "{:?}",
+        completion.items
+    );
+}
+
+#[test]
+fn symbolic_forwarding_keeps_independent_concrete_reference_arguments() {
+    let text = "outer = { inner = { EVENT = fixed.1 DAYS = $DAYS$ } } inner = { country_event = { id = $EVENT$ days = $DAYS$ } }";
+    let (mut host, _) = snapshot("country_event = { id = fixed.1 }");
+    let id = DocumentId::new("file:///tmp/common/scripted_effects/partial_forward.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .unwrap();
+    let cursor = text.find("fixed.1").unwrap() as u32;
+    let locations = definition(&host.snapshot(), &id, cursor);
+    assert_eq!(
+        locations.len(),
+        1,
+        "a symbolic DAY must not erase the independent EVENT reference: {locations:?}"
+    );
+}
+
+#[test]
+fn forwarded_estate_reference_survives_separate_unknown_text_and_calls() {
+    let (mut host, _) = snapshot("country_event = { id = estate_owned.1 }");
+    host.open_document(
+        DocumentId::new("file:///tmp/common/estates/owned.txt"),
+        1,
+        "estate_owned = { }".to_owned(),
+        None,
+    )
+    .unwrap();
+    host.open_document(DocumentId::new("file:///tmp/common/scripted_effects/estate_owned.txt"), 1,
+        "outer_owned = { inner_owned = { ESTATE = $ESTATE$ } if = { limit = { has_country_flag = unknown_$FLAG$ } add_estate_loyalty = { estate = $ESTATE$ loyalty = -10 } } } inner_owned = { change_estate_land_share = { estate = $ESTATE$ share = -5 } }".to_owned(), None).unwrap();
+    let source = "country_event = { id = estate_owned.2 immediate = { outer_owned = { ESTATE = estate_owned } } }";
+    let id = DocumentId::new("file:///tmp/events/estate_owned.txt");
+    host.open_document(id.clone(), 1, source.to_owned(), None)
+        .unwrap();
+    let position = source.rfind("estate_owned").unwrap() as u32;
+    assert_eq!(
+        definition(&host.snapshot(), &id, position).len(),
+        1,
+        "an unrelated unresolved flag cannot erase a proved estate reference"
+    );
+}
+
+#[test]
+fn semantic_instance_survives_caller_edit_and_invalidates_a_negative_symbol_read() {
+    let original = "country_event = { id = memo.1 immediate = { memo_outer = { N = 1 EVENT = missing.1 } add_prestige = 2 } }";
+    let (mut host, id) = snapshot(original);
+    let definitions = DocumentId::new("file:///tmp/common/scripted_effects/memo.txt");
+    host.open_document(
+        definitions,
+        1,
+        "memo_outer = { add_prestige = $N$ country_event = { id = $EVENT$ days = 1 } }".to_owned(),
+        None,
+    )
+    .unwrap();
+    let analyse = |view: &engine::AnalysisSnapshot| {
+        let input = crate::support::input_for_document(view, &id).unwrap();
+        let hir = input.hir.as_ref().unwrap();
+        let call = hir
+            .properties()
+            .iter()
+            .find(|p| p.key == "memo_outer")
+            .unwrap();
+        crate::ir_template::analyse_body(view, hir, call, None, &CancellationToken::new())
+            .unwrap()
+            .unwrap()
+    };
+    let before = analyse(&host.snapshot());
+    host.apply_document_changes(
+        &id,
+        2,
+        &[engine::TextChange::full(
+            "\n\n".to_owned() + &original.replace("add_prestige = 2", "add_prestige = 300"),
+        )],
+    )
+    .unwrap();
+    let after = analyse(&host.snapshot());
+    assert!(
+        std::sync::Arc::ptr_eq(&before, &after),
+        "an unchanged environment and binding must reuse the proved instance"
+    );
+    assert!(
+        after
+            .evidence
+            .iter()
+            .any(|item| item.kind == hir::checking::IssueKind::Value),
+        "the missing event must have a rejection witness"
+    );
+    host.open_document(
+        DocumentId::new("file:///tmp/events/new.txt"),
+        1,
+        "country_event = { id = missing.1 }".to_owned(),
+        None,
+    )
+    .unwrap();
+    let view = host.snapshot();
+    let resolved = analyse(&view);
+    assert!(!std::sync::Arc::ptr_eq(&after, &resolved));
+    assert!(
+        !resolved
+            .evidence
+            .iter()
+            .any(|item| item.kind == hir::checking::IssueKind::Value),
+        "adding a formerly missing event must remove its rejection witness: {:?}",
+        resolved.evidence
+    );
+}
+
+#[test]
+fn parse_frontier_retains_proved_prefix_navigation_and_rejection() {
+    let (mut host, _) = snapshot("country_event = { id = prefix.1 }");
+    let definition_source =
+        "prefix_owned = { country_event = { id = $EVENT$ days = 1 } add_prestige = wrong\n"
+            .to_owned()
+            + &"add_prestige = 1\n".repeat(10_000)
+            + "}";
+    host.open_document(
+        DocumentId::new("file:///tmp/common/scripted_effects/prefix_owned.txt"),
+        1,
+        definition_source,
+        None,
+    )
+    .unwrap();
+    let text =
+        "country_event = { id = prefix.2 immediate = { prefix_owned = { EVENT = prefix.1 } } }";
+    let id = DocumentId::new("file:///tmp/events/prefix_owned.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .unwrap();
+    let view = host.snapshot();
+    let values = diagnostics(&view, &id);
+    assert!(
+        values
+            .iter()
+            .any(|item| item.code == DiagnosticCode::AnalysisIncomplete),
+        "{values:?}"
+    );
+    assert!(
+        values
+            .iter()
+            .any(|item| item.code == DiagnosticCode::InvalidValue),
+        "an earlier rejection remains a proof: {values:?}"
+    );
+    assert_eq!(
+        definition(&view, &id, text.rfind("prefix.1").unwrap() as u32).len(),
+        1,
+        "a tail parse limit cannot erase a proved reference before the frontier"
+    );
+}
+
+#[test]
+fn unresolved_composite_scalar_in_an_earlier_call_does_not_erase_later_script_references() {
+    let text = "country_event = { id = scalar_hole.2 immediate = { scalar_outer = { BODY = \"country_event = { id = scalar_hole.1 }\" } } }";
+    let (mut host, _) = snapshot("country_event = { id = scalar_hole.1 }");
+    host.open_document(DocumentId::new("file:///tmp/common/scripted_effects/scalar_hole.txt"), 1,
+        "scalar_outer = { scalar_inner = yes $BODY$ } scalar_inner = { custom_tooltip = OWNED_$OPTIONAL$_END }".to_owned(), None).unwrap();
+    let id = DocumentId::new("file:///tmp/events/scalar_hole.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .unwrap();
+    assert_eq!(
+        definition(
+            &host.snapshot(),
+            &id,
+            text.rfind("scalar_hole.1").unwrap() as u32
+        )
+        .len(),
+        1,
+        "a scalar composition hole is local to its value context"
+    );
 }

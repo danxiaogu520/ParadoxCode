@@ -1,12 +1,12 @@
 //! Hover pipeline: dispatch from a document position to a structured hover model.
 //!
-//! Producers live in responsibility modules (`symbol`, `rules`, `dynamic`) and all return
+//! Producers live in responsibility modules (`symbol`, `rules`, `template`) and all return
 //! [`HoverModel`] values; Markdown rendering is owned by [`render`].
 
-mod dynamic;
 mod render;
 mod rules;
 mod symbol;
+mod template;
 
 use self::render::{HoverModel, code_span};
 use crate::resolution::{local_parameter_target, semantic_data, symbol_candidates_for_hover};
@@ -67,7 +67,7 @@ pub fn hover_with_cancellation(
         // hover agrees with the completion snippet's tabstops.
         let optional = match (owner_kind, owner_name) {
             (Some(kind), Some(name)) => {
-                dynamic::parameter_presence_required(snapshot, kind, name, &definition.name)
+                template::parameter_presence_required(snapshot, kind, name, &definition.name)
                     .map(|required| !required)
                     .unwrap_or_else(|| {
                         input.hir.as_deref().is_some_and(|hir| {
@@ -97,8 +97,9 @@ pub fn hover_with_cancellation(
                 "required/inferred"
             },
         );
+        let mut coverage = hir::analysis::AnalysisCoverage::default();
         if let Some(owner) = owner_name
-            && let Some(contract) = dynamic::dynamic_parameter_contract_lines(
+            && let Some(contract) = template::template_parameter_contract_lines(
                 snapshot,
                 owner_kind,
                 owner,
@@ -107,9 +108,11 @@ pub fn hover_with_cancellation(
             )?
         {
             section.push('\n');
-            section.push_str(&contract);
+            section.push_str(&contract.value);
+            coverage.merge(&contract.coverage);
         }
         let mut model = HoverModel::new(format!("### parameter {}", code_span(&definition.name)));
+        model.coverage = coverage;
         model.push_section(section);
         return Ok(Some(model.into_hover_with_range(reference.name_range)));
     }
@@ -200,8 +203,13 @@ pub fn hover_with_cancellation(
         return Ok(Some(best.into_hover_with_range(range)));
     }
     cancellation.checkpoint()?;
+    if let Some(model) =
+        rules::template_consumption_hover(snapshot, &input, position, &word, cancellation)?
+    {
+        return Ok(Some(model.into_hover_with_range(range)));
+    }
     let parameter_hover =
-        dynamic::ir_invocation_parameter_hover(snapshot, &input, position, cancellation)?;
+        template::ir_invocation_parameter_hover(snapshot, &input, position, cancellation)?;
     if let Some(model) = parameter_hover {
         return Ok(Some(model.into_hover_with_range(range)));
     }

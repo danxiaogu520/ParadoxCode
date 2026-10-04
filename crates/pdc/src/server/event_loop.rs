@@ -112,7 +112,6 @@ impl LspServer {
                     || !in_flight_parses.is_empty()
                     || !self.pending_diagnostics.is_empty()
                     || !in_flight.is_empty()
-                    || !in_flight_requests.is_empty()
                     || in_flight_initialize.is_some()
                     || in_flight_index.is_some()
                     || in_flight_dependency.is_some()
@@ -128,7 +127,7 @@ impl LspServer {
                     &event_sender,
                     &mut in_flight_background_reindex,
                     ready_logged,
-                    background_busy,
+                    background_busy || !in_flight_requests.is_empty(),
                 );
                 // A due quiet pass may have been launched by the call above. Recompute the
                 // guard before accepting an explicit command so the two full scans never overlap.
@@ -142,7 +141,11 @@ impl LspServer {
                     &mut in_flight_workspace_diagnostics,
                     background_busy,
                 );
-                background_busy = background_busy || in_flight_workspace_diagnostics.is_some();
+                // Queries read immutable snapshots. They must not indefinitely starve
+                // pending closed-file validation; mutation workers still gate its start.
+                background_busy = background_busy
+                    || !in_flight_requests.is_empty()
+                    || in_flight_workspace_diagnostics.is_some();
                 if let Some(task) = in_flight_reindex_command.as_ref()
                     && self.cancelled.contains(&task.request_id)
                 {

@@ -243,3 +243,35 @@ fn ranged_semantic_tokens_skip_tokens_outside_the_viewport() {
             .is_some_and(|_| start == line_start)
     }));
 }
+
+#[test]
+fn consumed_script_tokens_are_projected_but_ordinary_strings_stay_scalar() {
+    let text = "country_event = { immediate = { run_tokens = { BODY = \"capital_scope = { add_base_tax = 1 }\" TEXT = \"capital_scope = { add_base_tax = 1 }\" } } }";
+    let (mut host, id) = snapshot(text);
+    host.open_document(
+        DocumentId::new("file:///tmp/common/scripted_effects/tokens.txt"),
+        1,
+        "run_tokens = { $BODY$ log = $TEXT$ }".to_owned(),
+        None,
+    )
+    .unwrap();
+    let tokens = semantic_tokens(&host.snapshot(), &id);
+    let first = text.find("capital_scope").unwrap() as u32;
+    let last = text.rfind("capital_scope").unwrap() as u32;
+    assert!(
+        tokens
+            .iter()
+            .any(|token| token.range.start() == first
+                && token.token_type == SemanticTokenType::Function),
+        "{tokens:?}"
+    );
+    assert!(!tokens.iter().any(
+        |token| token.range.start() == last && token.token_type == SemanticTokenType::Function
+    ));
+    assert!(
+        tokens
+            .windows(2)
+            .all(|pair| pair[0].range.end() <= pair[1].range.start()),
+        "overlapping tokens: {tokens:?}"
+    );
+}
