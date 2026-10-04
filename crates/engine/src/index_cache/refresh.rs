@@ -5,13 +5,13 @@
 //! previews of unchanged files are carried over, so a refresh can avoid both I/O and parsing for
 //! the common unchanged-source case.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use index::WorkspaceIndex;
 use index::{
-    IndexSymbolFacts, build_file_state, build_file_state_with_ir,
-    build_file_state_with_ir_and_facts, empty_file_state, position_ranges_for_state,
+    SourceLoadContext, build_file_state, build_file_state_with_ir, empty_file_state,
+    position_ranges_for_state, stabilize_symbol_dependent_files,
 };
 use rules::ir::RulesIr;
 use rules::{GameProfile, RuleSet};
@@ -259,7 +259,7 @@ pub(super) fn refresh_cancellable(
     })
 }
 
-/// Rebuild until cross-file symbol facts stabilize, including symbols introduced by Callable
+/// Rebuild until cross-file symbol facts stabilize, including symbols introduced by Template
 /// payloads. Unchanged files must not retain references from an earlier candidate index.
 fn refresh_with_ir_full(
     cache: &IndexCache,
@@ -366,42 +366,39 @@ fn refresh_with_ir_full(
         return Err(IndexCacheError::LimitExceeded("file", MAX_CACHE_FILES));
     }
     let mut final_states = initial;
-    let mut passes = 0;
-    loop {
-        passes += 1;
-        let candidate =
-            WorkspaceIndex::from_shards(final_states.values().map(|state| state.shard_handle()));
-        let facts = IndexSymbolFacts::new(ir, &candidate, &[]);
-        let mut changed = false;
-        let previous = std::mem::take(&mut final_states);
-        for (id, old) in previous {
-            cancellation.checkpoint().map_err(map_workspace_error)?;
-            let Some(source_file) = files.get(&id) else {
-                continue;
-            };
-            let source = sources.get(&id).cloned().unwrap_or_default();
-            let state = build_file_state_with_ir_and_facts(
-                source_file,
-                source,
-                0,
-                rules,
-                profile,
-                ir,
-                &facts,
-                None,
-            );
-            changed |= !state.shard().same_symbol_facts(old.shard());
-            final_states.insert(id, state.cache_only());
-        }
-        if !changed {
-            break;
-        }
-        if passes >= 32 {
-            return Err(IndexCacheError::InvalidData(
-                "IR symbol facts did not stabilize after 32 passes".into(),
-            ));
-        }
-    }
+    let mut candidate =
+        WorkspaceIndex::from_shards(final_states.values().map(|state| state.shard_handle()));
+    let context = SourceLoadContext {
+        limits,
+        previous_files: &files,
+        previous_states: &BTreeMap::new(),
+        rules,
+        profile,
+        ir: Some(ir),
+        parse_cache: None,
+        cancellation,
+        progress: None,
+    };
+    let mut shared_states = final_states
+        .into_iter()
+        .map(|(id, state)| (id, std::sync::Arc::new(state)))
+        .collect();
+    stabilize_symbol_dependent_files(
+        &files,
+        &mut shared_states,
+        &mut candidate,
+        ir,
+        &[],
+        &BTreeSet::new(),
+        &BTreeMap::new(),
+        &context,
+        None,
+    )
+    .map_err(map_workspace_error)?;
+    final_states = shared_states
+        .into_iter()
+        .map(|(id, state)| (id, state.as_ref().clone()))
+        .collect();
     let shards = final_states
         .values()
         .map(|state| state.shard_handle())

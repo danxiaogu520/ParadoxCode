@@ -61,7 +61,8 @@ pub(super) fn lower_parameters(
                 {
                     continue;
                 }
-                let Some(owner_range) = owning_top_level_range(properties, range) else {
+                let Some(owner_range) = owning_definition_range(properties, ir_definitions, range)
+                else {
                     continue;
                 };
                 if ir_definitions.is_some_and(|definitions| {
@@ -90,7 +91,9 @@ pub(super) fn lower_parameters(
         }
     }
     for conditional in conditionals {
-        let Some(owner_range) = owning_top_level_range(properties, conditional.range) else {
+        let Some(owner_range) =
+            owning_definition_range(properties, ir_definitions, conditional.range)
+        else {
             continue;
         };
         if ir_definitions.is_some_and(|definitions| {
@@ -121,7 +124,18 @@ pub(super) fn lower_parameters(
     (definitions, references)
 }
 
-fn owning_top_level_range(properties: &[HirProperty], occurrence: TextRange) -> Option<TextRange> {
+fn owning_definition_range(
+    properties: &[HirProperty],
+    definitions: Option<&[super::HirDefinition]>,
+    occurrence: TextRange,
+) -> Option<TextRange> {
+    if let Some(definitions) = definitions {
+        return definitions
+            .iter()
+            .filter(|definition| range_within(occurrence, definition.range))
+            .min_by_key(|definition| definition.range.len())
+            .map(|definition| definition.range);
+    }
     properties
         .iter()
         .filter(|property| property.top_level && range_within(occurrence, property.range))

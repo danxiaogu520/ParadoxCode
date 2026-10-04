@@ -64,3 +64,28 @@ fn nested_history_and_on_action_blocks_get_scope_hints_from_inherited_context() 
         );
     }
 }
+
+#[test]
+fn consumed_script_scope_hints_share_the_parent_instance() {
+    let text = "country_event = { immediate = { run_hint = { BODY = \"capital_scope = { add_base_tax = 1 }\" TEXT = \"capital_scope = { add_base_tax = 1 }\" } } }";
+    let (mut host, id) = snapshot(text);
+    host.open_document(
+        DocumentId::new("file:///tmp/common/scripted_effects/hints.txt"),
+        1,
+        "run_hint = { $BODY$ log = $TEXT$ }".to_owned(),
+        None,
+    )
+    .unwrap();
+    let hints =
+        scope_inlay_hints_with_cancellation(&host.snapshot(), &id, None, &CancellationToken::new())
+            .unwrap();
+    let first = text.find("capital_scope = {").unwrap() as u32 + "capital_scope = ".len() as u32;
+    let last = text.rfind("capital_scope = {").unwrap() as u32 + "capital_scope = ".len() as u32;
+    assert!(
+        hints
+            .iter()
+            .any(|hint| hint.position == first && hint.scope == "province"),
+        "{hints:?}"
+    );
+    assert!(!hints.iter().any(|hint| hint.position == last));
+}

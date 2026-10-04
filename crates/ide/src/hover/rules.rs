@@ -6,6 +6,102 @@ use crate::types::{CancellationToken, Cancelled};
 use engine::{AnalysisSnapshot, SourceRootKind};
 use text::TextSize;
 
+/// Projects only actual Template script consumptions into ordinary rule hover.
+pub(crate) fn template_consumption_hover(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: TextSize,
+    _word: &str,
+    cancellation: &CancellationToken,
+) -> Result<Option<HoverModel>, Cancelled> {
+    let Some(projection) =
+        crate::ir_template::consumption_at(snapshot, input, position, cancellation)?
+    else {
+        return Ok(None);
+    };
+    let mut models = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
+    for point in &projection.positions {
+        let word_range =
+            crate::support::word_range(&projection.body.rendered.text, point.generated);
+        let word = projection
+            .body
+            .hir
+            .syntax()
+            .text(word_range)
+            .unwrap_or_default();
+        let mut contexts = projection
+            .body
+            .hir
+            .schema_facts()
+            .iter()
+            .filter(|context| contains(context.range, point.generated))
+            .collect::<Vec<_>>();
+        let shortest = contexts.iter().map(|context| context.range.len()).min();
+        contexts.retain(|context| Some(context.range.len()) == shortest);
+        for context in contexts {
+            let parsed = std::sync::Arc::new(projection.body.hir.syntax().clone());
+            let hir = hir::lower_ir_schema_in_range(
+                parsed.clone(),
+                snapshot.ir(),
+                context.schema,
+                context.subtypes.clone(),
+                context.state.clone(),
+                &crate::ir_semantic::WorkspaceFacts { snapshot },
+                context.range,
+            );
+            let mut fragment = input.clone();
+            fragment.source = parsed.source_handle();
+            fragment.parsed = crate::support::ParsedContent::Text(parsed);
+            fragment.hir = Some(std::sync::Arc::new(hir));
+            let mut model = ir_field_hover(
+                snapshot,
+                &fragment,
+                point.generated,
+                word,
+                true,
+                cancellation,
+            )?;
+            if model.is_none() {
+                model = ir_field_hover(
+                    snapshot,
+                    &fragment,
+                    point.generated,
+                    word,
+                    false,
+                    cancellation,
+                )?;
+            }
+            if let Some(mut model) = model {
+                model.coverage.merge(&projection.body.coverage);
+                if seen.insert(model.render()) {
+                    models.push(model);
+                }
+            }
+        }
+    }
+    if models.len() == 1 {
+        let mut model = models.pop().expect("one model");
+        model.push_section(format!(
+            "- Consumed through Template parameter `{}`",
+            projection.parameter
+        ));
+        return Ok(Some(model));
+    }
+    if models.is_empty() {
+        return Ok(None);
+    }
+    let mut model = HoverModel::new(format!(
+        "### Template consumption `{}`",
+        projection.parameter
+    ));
+    model.coverage = projection.body.coverage.clone();
+    for item in models {
+        model.push_section(item.render());
+    }
+    Ok(Some(model))
+}
+
 pub(crate) fn semantic_rule_hover_at(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
@@ -178,7 +274,7 @@ fn ir_field_hover(
         let field = ir.field(*id);
         let value = match field.value {
             rules::ir::FieldValue::Scalar(matcher) => crate::ir_semantic::describe(ir, matcher),
-            rules::ir::FieldValue::Block(schema) | rules::ir::FieldValue::Quoted(schema) => {
+            rules::ir::FieldValue::Block(schema) => {
                 format!("a `{}` block", ir.strings.resolve(ir.schema(schema).name))
             }
             rules::ir::FieldValue::SelfBlock => format!(

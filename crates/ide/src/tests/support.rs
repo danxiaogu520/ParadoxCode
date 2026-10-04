@@ -90,11 +90,24 @@ pub(crate) fn semantic_snapshot_with_constraints(
 }
 
 pub(crate) fn quoted_script_snapshot(text: &str) -> (AnalysisHost, DocumentId) {
-    let mut host = fixture_host(serde_json::json!({"schemas":{"trigger":{"fields":{
-        "foo":{"value":"bool","card":"0..*"},
-        "embedded":{"value":"quoted<trigger>","card":"0..*","doc":"Embedded trigger Script"},
-        "nested":{"value":"quoted<trigger>","card":"0..*"}
-    }}}}));
+    let mut host = fixture_host(serde_json::json!({
+        "traits":{"Template":{}},
+        "types":{"fixture_template":{"impl":{"Template":{"body":"trigger"}},"resolution":"replace"}},
+        "schemas":{
+            "fixture_root":{"fields":{"__templates":{"body":"template_definitions","card":"0..*"}}},
+            "template_definitions":{"map":{"key":"def<fixture_template>","body":"trigger"}},
+            "template_arguments":{"map":{"key":"scalar","value":"scalar"}},
+            "trigger":{"fields":{"foo":{"value":"bool","card":"0..*"}},
+                "patterns":[{"key":"ref<fixture_template>","body":"template_arguments","card":"0..*"}]}
+        }
+    }));
+    host.open_document(
+        DocumentId::new("file:///tmp/template-definitions.txt"),
+        1,
+        "__templates = { embedded = { $BODY$ } nested = { $BODY$ } }".to_owned(),
+        None,
+    )
+    .unwrap();
     let id = DocumentId::new("file:///tmp/events/quoted-script.txt");
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open");

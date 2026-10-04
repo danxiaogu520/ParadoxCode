@@ -1,6 +1,5 @@
 mod completion;
 mod diagnostics;
-mod dynamic_rules;
 mod golden;
 mod hover;
 mod hover_improvements;
@@ -13,4 +12,5 @@ mod scope;
 mod semantic;
 mod semantic_tokens;
 mod support;
+mod template_queries;
 mod transcode;

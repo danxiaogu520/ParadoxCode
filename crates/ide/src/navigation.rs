@@ -299,6 +299,9 @@ pub fn prepare_rename_with_cancellation(
         });
     }
     let target = rename_target(snapshot, document, position, cancellation)?;
+    if target.definition.selection_range.is_empty() {
+        return Err(RenameError::Incomplete.into());
+    }
     let placeholder = input
         .source_text(target.cursor_range)
         .ok_or(RenameError::NoSymbol)?
@@ -393,10 +396,21 @@ pub fn rename_with_cancellation(
         });
     }
     let target = rename_target(snapshot, document, position, cancellation)?;
+    if target.definition.selection_range.is_empty() {
+        return Err(RenameError::Incomplete.into());
+    }
     // Conflict checks must see both the old name (edits) and the new name
     // (collision detection), so both drive the shard prefilter.
     let all = all_semantics_for_symbol(snapshot, cancellation, &[target.name.as_str(), new_name])
         .map_err(|Cancelled| RenameFailure::Cancelled)?;
+    if !all.coverage.is_known()
+        || all.blocked_edits.contains(&(
+            target.kind.to_ascii_lowercase(),
+            target.name.to_ascii_lowercase(),
+        ))
+    {
+        return Err(RenameError::Incomplete.into());
+    }
     check_rename_conflict(snapshot, &all, &target, new_name, cancellation)?;
 
     let mut edits = vec![WorkspaceTextEdit {
@@ -710,6 +724,8 @@ fn document_semantic_workspace(
 ) -> Result<SemanticWorkspace, Cancelled> {
     let semantic = semantic_data_with_cancellation(snapshot, input, cancellation)?;
     let mut all = SemanticWorkspace {
+        coverage: semantic.coverage,
+        blocked_edits: semantic.blocked_edits,
         definitions: semantic.definitions,
         references: semantic.references,
     };

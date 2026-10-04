@@ -36,7 +36,7 @@ pub struct RuleSet {
     game_id: String,
     file_categories: Vec<FileCategory>,
     profile: GameProfile,
-    callable_contexts: FxHashMap<Box<str>, Box<str>>,
+    template_contexts: FxHashMap<Box<str>, Box<str>>,
 }
 impl RuleSet {
     /// Empty scanning catalog for syntax-only hosts.
@@ -60,10 +60,10 @@ impl RuleSet {
             game_id,
             file_categories,
             profile,
-            callable_contexts: FxHashMap::default(),
+            template_contexts: FxHashMap::default(),
         }
     }
-    /// Extracts scanning and Callable metadata without flattening semantic fields.
+    /// Extracts scanning and Template metadata without flattening semantic fields.
     #[must_use]
     pub fn from_ir_catalog(ir: &crate::ir::RulesIr) -> Self {
         use crate::ir::{DocumentParser, FileResolution};
@@ -89,9 +89,9 @@ impl RuleSet {
             .collect();
         let mut rules = Self::from_catalog(ir.game_id().to_owned(), files, ir.game.profile.clone());
         rules.rule_hash = ir.rule_hash();
-        if let Some(callable) = ir.trait_by_name("Callable") {
+        if let Some(template) = ir.trait_by_name("Template") {
             for ty in &ir.types {
-                if let Some(implementation) = ty.trait_impls.iter().find(|i| i.trait_id == callable)
+                if let Some(implementation) = ty.trait_impls.iter().find(|i| i.trait_id == template)
                     && let Some(body) = implementation.arguments.iter().find_map(|(name, value)| {
                         if !ir.strings.resolve(*name).eq_ignore_ascii_case("body") {
                             return None;
@@ -103,7 +103,7 @@ impl RuleSet {
                     })
                 {
                     rules
-                        .callable_contexts
+                        .template_contexts
                         .insert(ir.strings.resolve(ty.name).into(), body.into());
                 }
             }
@@ -120,10 +120,10 @@ impl RuleSet {
     pub fn file_categories(&self) -> &[FileCategory] {
         &self.file_categories
     }
-    /// Declared Callable body context, derived from trait implementation arguments.
+    /// Declared Template body context, derived from trait implementation arguments.
     #[must_use]
     pub fn dynamic_definition_context(&self, kind: &str) -> Option<&str> {
-        self.callable_contexts
+        self.template_contexts
             .get(kind.to_ascii_lowercase().as_str())
             .map(AsRef::as_ref)
     }

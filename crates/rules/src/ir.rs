@@ -367,8 +367,6 @@ pub enum FieldValue {
     Block(SchemaId),
     /// A nested block reusing the enclosing schema.
     SelfBlock,
-    /// A quoted script parsed with this schema instance.
-    Quoted(SchemaId),
 }
 
 /// The shape a field's value takes, for §3.2 dispatch.
@@ -378,8 +376,6 @@ pub enum Shape {
     Scalar,
     /// A nested block.
     Block,
-    /// A quoted script.
-    Quoted,
 }
 
 /// A cardinality `(min, max)`; `None` max means unbounded.
@@ -453,7 +449,7 @@ pub enum Matcher {
     /// One constant scalar, compared case-insensitively.
     Literal(Symbol),
     /// Literal text with `{…}` holes.
-    Template(Box<[TemplatePart]>),
+    Pattern(Box<[PatternPart]>),
     /// An integer, optionally range-bounded.
     Int {
         /// Inclusive lower bound.
@@ -494,8 +490,6 @@ pub enum Matcher {
     Scope(Option<Symbol>),
     /// Any scope link, register, or prefix link.
     Link,
-    /// A quoted script parsed with this schema.
-    Quoted(SchemaId),
     /// Unchecked text.
     Opaque,
     /// Alternatives, tried in written order.
@@ -504,7 +498,7 @@ pub enum Matcher {
 
 /// One piece of a template.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum TemplatePart {
+pub enum PatternPart {
     /// Literal text.
     Text(Symbol),
     /// A `{…}` hole holding one matcher.
@@ -572,7 +566,7 @@ pub struct TraitImpl {
 /// One trait-implementation argument.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TraitArgument {
-    /// A plain argument value (`Callable`'s body schema name).
+    /// A plain argument value (`Template`'s body schema name).
     Text(Symbol),
     /// One localisation or sprite binding contributed by the impl.
     Binding(Binding),
@@ -675,10 +669,8 @@ impl ScopeModel {
         self.links.iter().find(|link| {
             link.pattern.len() == 1
                 && match link.pattern[0] {
-                    TemplatePart::Text(text) => {
-                        strings.resolve(text).eq_ignore_ascii_case(spelling)
-                    }
-                    TemplatePart::Hole(_) => false,
+                    PatternPart::Text(text) => strings.resolve(text).eq_ignore_ascii_case(spelling),
+                    PatternPart::Hole(_) => false,
                 }
         })
     }
@@ -701,7 +693,7 @@ pub struct LinkInfo {
     /// The declared key text (template text), verbatim.
     pub name: Symbol,
     /// The key template.
-    pub pattern: Box<[TemplatePart]>,
+    pub pattern: Box<[PatternPart]>,
     /// Scopes the link may start from.
     pub from: Box<[ScopeRef]>,
     /// The scope the link lands in.
@@ -714,7 +706,7 @@ impl LinkInfo {
     pub fn is_template(&self) -> bool {
         self.pattern
             .iter()
-            .any(|part| matches!(part, TemplatePart::Hole(_)))
+            .any(|part| matches!(part, PatternPart::Hole(_)))
     }
 }
 
@@ -779,13 +771,25 @@ impl GameConfig {
 /// A `ref<…>` matcher may name a symbol that only the
 /// workspace index knows, so the IR asks for it instead of guessing.
 pub trait SymbolFacts {
-    /// Source-ranged body of a uniquely active replacement definition.
+    /// False when a related discovery transaction has not committed stable facts.
+    fn facts_complete(&self) -> bool {
+        true
+    }
+    /// Asset visibility in the immutable view. None means the capability is unavailable.
+    fn asset_member(&self, _category: &str, _name: &str) -> Option<bool> {
+        None
+    }
+    /// Memoization within this immutable fact view; returning None disables cross-query reuse.
+    fn template_memo(&self) -> Option<std::sync::Arc<crate::template::TemplateMemo>> {
+        None
+    }
+    /// Source-ranged body of a uniquely active named Template.
     /// Missing or ambiguous definitions grant no payload interpretation.
-    fn replacement_template(
+    fn template(
         &self,
         type_id: TypeId,
         name: &str,
-    ) -> Option<std::sync::Arc<crate::replacement::Template>> {
+    ) -> Option<std::sync::Arc<crate::template::Template>> {
         let _ = (type_id, name);
         None
     }
@@ -1263,20 +1267,17 @@ impl RulesIr {
 
     /// The shape of a field's value, for §3.2 dispatch.
     ///
-    /// A union of quoted-script branches is still quoted script; a union that
-    /// mixes shapes has no single shape and is reported as `None`.
+    /// Quoted text remains scalar; only Template consumers interpret its content.
     #[must_use]
     pub fn shape(&self, field: FieldId) -> Option<Shape> {
         match self.field(field).value {
             FieldValue::Scalar(matcher) => self.matcher_shape(matcher),
             FieldValue::Block(_) | FieldValue::SelfBlock => Some(Shape::Block),
-            FieldValue::Quoted(_) => Some(Shape::Quoted),
         }
     }
 
     fn matcher_shape(&self, matcher: MatcherId) -> Option<Shape> {
         match self.matcher(matcher) {
-            Matcher::Quoted(_) => Some(Shape::Quoted),
             Matcher::Union(alternatives) => {
                 let mut shape = None;
                 for alternative in alternatives {
@@ -1316,7 +1317,7 @@ impl RulesIr {
     #[must_use]
     pub fn child(&self, field: FieldId, current: SchemaId) -> Option<SchemaId> {
         match self.field(field).value {
-            FieldValue::Block(schema) | FieldValue::Quoted(schema) => Some(schema),
+            FieldValue::Block(schema) => Some(schema),
             FieldValue::SelfBlock => Some(current),
             FieldValue::Scalar(_) => None,
         }
@@ -1348,15 +1349,40 @@ impl RulesIr {
         value: &str,
         facts: &impl SymbolFacts,
     ) -> bool {
+        self.scalar_outcome(matcher, value, facts) == Some(true)
+    }
+
+    /// Three-valued matching: unfinished searches and missing unstable facts are unknown.
+    pub fn scalar_outcome(
+        &self,
+        matcher: MatcherId,
+        value: &str,
+        facts: &impl SymbolFacts,
+    ) -> Option<bool> {
+        let mut no_cancel = || false;
+        let mut budget = crate::pattern::SearchBudget::new(Default::default(), &mut no_cancel);
+        crate::pattern::evaluate(self, matcher, value, &mut budget, &mut |id, text| {
+            let result = self.scalar_primitive(id, text, facts);
+            if !result
+                && !facts.facts_complete()
+                && matches!(self.matcher(id), Matcher::Ref(_) | Matcher::Def { .. })
+            {
+                None
+            } else {
+                Some(result)
+            }
+        })
+    }
+
+    fn scalar_primitive(&self, matcher: MatcherId, value: &str, facts: &impl SymbolFacts) -> bool {
         match self.matcher(matcher) {
-            Matcher::Scalar
-            | Matcher::Opaque
-            | Matcher::Loc
-            | Matcher::Path(_)
-            | Matcher::Quoted(_)
-            | Matcher::Link => !value.is_empty(),
+            Matcher::Scalar | Matcher::Opaque | Matcher::Loc | Matcher::Path(_) | Matcher::Link => {
+                !value.is_empty()
+            }
             Matcher::Literal(text) => self.strings.resolve(*text).eq_ignore_ascii_case(value),
-            Matcher::Template(parts) => self.template_matches(parts, value, facts),
+            Matcher::Pattern(_) | Matcher::Union(_) => {
+                unreachable!("container matchers use bounded search")
+            }
             Matcher::Int { min, max } => value.parse::<i64>().is_ok_and(|parsed| {
                 min.is_none_or(|bound| parsed >= bound) && max.is_none_or(|bound| parsed <= bound)
             }),
@@ -1390,9 +1416,6 @@ impl RulesIr {
             Matcher::Def { type_id, .. } => facts.type_member(*type_id, value),
             Matcher::Enum { id } => self.enum_contains(*id, value),
             Matcher::Scope(scope) => self.scope_matches(scope.as_ref().copied(), value),
-            Matcher::Union(alternatives) => alternatives
-                .iter()
-                .any(|alternative| self.scalar_matches(*alternative, value, facts)),
         }
     }
 
@@ -1442,35 +1465,6 @@ impl RulesIr {
             };
         }
         false
-    }
-
-    fn template_matches(
-        &self,
-        parts: &[TemplatePart],
-        value: &str,
-        facts: &impl SymbolFacts,
-    ) -> bool {
-        let Some((first, rest)) = parts.split_first() else {
-            return value.is_empty();
-        };
-        match first {
-            TemplatePart::Text(text) => {
-                let text = self.strings.resolve(*text);
-                value.len() >= text.len()
-                    && value.is_char_boundary(text.len())
-                    && value[..text.len()].eq_ignore_ascii_case(text)
-                    && self.template_matches(rest, &value[text.len()..], facts)
-            }
-            TemplatePart::Hole(hole) => value
-                .char_indices()
-                .map(|(index, _)| index)
-                .skip(1)
-                .chain(std::iter::once(value.len()))
-                .any(|end| {
-                    self.scalar_matches(*hole, &value[..end], facts)
-                        && self.template_matches(rest, &value[end..], facts)
-                }),
-        }
     }
 }
 

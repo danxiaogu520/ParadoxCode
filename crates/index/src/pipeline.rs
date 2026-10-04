@@ -33,6 +33,7 @@ pub struct IndexSymbolFacts<'a> {
     index: &'a crate::WorkspaceIndex,
     overlays: &'a [Arc<HirFile>],
     excluded_file_ids: Option<&'a BTreeSet<SourceFileId>>,
+    template_memo: Arc<rules::template::TemplateMemo>,
     templates: OnceLock<BTreeMap<String, crate::FlagWriteIndex>>,
 }
 
@@ -48,6 +49,7 @@ impl<'a> IndexSymbolFacts<'a> {
             index,
             overlays,
             excluded_file_ids: None,
+            template_memo: Arc::new(Default::default()),
             templates: OnceLock::new(),
         }
     }
@@ -64,6 +66,7 @@ impl<'a> IndexSymbolFacts<'a> {
             index,
             overlays,
             excluded_file_ids: Some(excluded_file_ids),
+            template_memo: Arc::new(Default::default()),
             templates: OnceLock::new(),
         }
     }
@@ -164,11 +167,15 @@ impl<'a> IndexSymbolFacts<'a> {
 }
 
 impl rules::ir::SymbolFacts for IndexSymbolFacts<'_> {
-    fn replacement_template(
+    fn template_memo(&self) -> Option<Arc<rules::template::TemplateMemo>> {
+        Some(self.template_memo.clone())
+    }
+
+    fn template(
         &self,
         type_id: rules::ir::TypeId,
         name: &str,
-    ) -> Option<Arc<rules::replacement::Template>> {
+    ) -> Option<Arc<rules::template::Template>> {
         let kind = self.ir.strings.resolve(self.ir.type_info(type_id).name);
         let mut overlay = None;
         for hir in self.overlays {
@@ -477,6 +484,38 @@ fn prepare_document_snapshot_impl(
     document
 }
 
+/// Reuses a document's immutable CST during fact rounds; source/version never change.
+pub(crate) fn relower_document_snapshot(
+    rules: &RuleSet,
+    profile: &GameProfile,
+    ir: &RulesIr,
+    roots: &[SourceRoot],
+    mut document: DocumentSnapshot,
+    facts: Option<&dyn SymbolFacts>,
+) -> DocumentSnapshot {
+    let Some((_, Some(path))) = parser_for_document(
+        Some(ir),
+        rules,
+        profile,
+        roots,
+        &document.id,
+        document.path.as_deref(),
+    ) else {
+        return document;
+    };
+    let Some(ParsedSource::Text(parsed)) = &document.parsed else {
+        return document;
+    };
+    record_pipeline_lower();
+    document.hir = Some(Arc::new(match facts {
+        Some(facts) => {
+            lower_shared_with_ir_and_facts(parsed.clone(), &path, rules, profile, ir, facts)
+        }
+        None => lower_shared_with_ir(parsed.clone(), &path, rules, profile, ir),
+    }));
+    document
+}
+
 pub fn unparsed_document(
     id: DocumentId,
     version: Option<i64>,
@@ -486,6 +525,8 @@ pub fn unparsed_document(
 ) -> DocumentSnapshot {
     let line_index = LineIndex::new(&text);
     DocumentSnapshot {
+        fact_dependencies: BTreeSet::new(),
+        fact_coverage: Default::default(),
         id,
         version,
         text: Arc::from(text),
@@ -536,16 +577,17 @@ pub struct SourceLoadContext<'a> {
 /// Relowers files that read workspace symbols against one immutable pass of facts.
 /// Large files are lowered alone; small files use at most four frontends at once,
 /// within the caller's worker limit. This bounds concurrent frontend allocations.
-pub fn replay_symbol_dependent_files(
+pub(crate) fn relower_fact_readers(
     files: &BTreeMap<SourceFileId, SourceFile>,
     states: &BTreeMap<SourceFileId, Arc<FileState>>,
     ir: &RulesIr,
     facts: &(dyn SymbolFacts + Sync),
+    pending: &BTreeSet<SourceFileId>,
     context: &SourceLoadContext<'_>,
 ) -> Result<BTreeMap<SourceFileId, Arc<FileState>>, WorkspaceError> {
     let mut jobs = states
         .iter()
-        .filter(|(_, state)| state.symbol_facts_dependency)
+        .filter(|(id, _)| pending.contains(id))
         .collect::<Vec<_>>();
     // A large CST/HIR can be much larger than its source. Process those on the
     // calling thread before starting workers, so their allocation peaks cannot
@@ -563,6 +605,11 @@ pub fn replay_symbol_dependent_files(
         let Some(file) = files.get(id) else {
             return Ok(None);
         };
+        let tracked = crate::fact_stabilization::TrackingFacts {
+            ir,
+            facts,
+            reads: Mutex::new(BTreeSet::new()),
+        };
         let mut rebuilt = build_file_state_impl(
             file,
             state.source().to_owned(),
@@ -571,9 +618,13 @@ pub fn replay_symbol_dependent_files(
             context.profile,
             context.parse_cache,
             Some(ir),
-            Some(facts),
+            Some(&tracked),
             state.parsed().is_none(),
         );
+        rebuilt.fact_dependencies = tracked
+            .reads
+            .into_inner()
+            .expect("file-local dependency lock poisoned");
         if state.parsed().is_none() {
             rebuilt = rebuilt.cache_only();
         }
@@ -763,6 +814,7 @@ fn load_source_file_job(
         if let Some(previous) = previous
             && context.previous_files.get(&job.file.id) == Some(&job.file)
             && previous.source() == text
+            && (context.ir.is_none() || !previous.symbol_facts_dependency)
         {
             if job.retain_frontend || previous.parsed().is_none() {
                 return Arc::clone(previous);
@@ -921,6 +973,7 @@ fn build_file_state_impl(
             source: Arc::from(source),
             parsed: None,
             hir: None,
+            fact_dependencies: BTreeSet::new(),
             symbol_facts_dependency: false,
             shard: Arc::new(FileIndexShard {
                 file_id: file.id,
@@ -929,6 +982,7 @@ fn build_file_state_impl(
                 dynamic_definitions: Vec::new(),
                 definition_attributes: Vec::new(),
                 flag_writes: Vec::new(),
+                reference_coverage_known: true,
                 syntax_error_count: 0,
             }),
             cached_localisation_previews: None,
@@ -954,6 +1008,7 @@ fn build_file_state_impl(
             dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
+            reference_coverage_known: true,
             syntax_error_count: parsed.errors().len(),
         },
         (None, _) => FileIndexShard {
@@ -963,6 +1018,7 @@ fn build_file_state_impl(
             dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
+            reference_coverage_known: true,
             syntax_error_count: 0,
         },
     };
@@ -974,6 +1030,7 @@ fn build_file_state_impl(
         revision,
         source: shared_source,
         parsed,
+        fact_dependencies: BTreeSet::new(),
         symbol_facts_dependency: hir
             .as_ref()
             .is_some_and(|hir| hir.depends_on_symbol_facts()),
@@ -989,6 +1046,7 @@ pub fn empty_file_state(file: &SourceFile, revision: u64) -> FileState {
         source: Arc::from(""),
         parsed: None,
         hir: None,
+        fact_dependencies: BTreeSet::new(),
         symbol_facts_dependency: false,
         shard: Arc::new(FileIndexShard {
             file_id: file.id,
@@ -997,6 +1055,7 @@ pub fn empty_file_state(file: &SourceFile, revision: u64) -> FileState {
             dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
+            reference_coverage_known: true,
             syntax_error_count: 0,
         }),
         cached_localisation_previews: None,
@@ -1070,6 +1129,7 @@ fn shard_from_parsed(
         dynamic_definitions,
         definition_attributes: hir.definition_attributes().to_vec(),
         flag_writes,
+        reference_coverage_known: hir.analysis_coverage().is_known(),
         syntax_error_count: parsed.errors().len(),
     }
 }

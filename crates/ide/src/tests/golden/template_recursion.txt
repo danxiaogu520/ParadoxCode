@@ -1,0 +1,18 @@
+// case: template_recursion
+// input:
+//   ping = { pong = yes }
+//   pong = { ping = yes }
+//   loop_self = { loop_self = yes }
+//   honest = { add_prestige = 1 }
+//   
+diagnostics:
+- code=DynamicDefinitionCycle severity=Information certainty=unresolved range=0..4
+  message: Template `ping` analysis repeats a binding/scope state with no arguments; expansion remains unknown
+- code=AnalysisIncomplete severity=Information certainty=certain range=9..13
+  message: Template analysis retained an unresolved recursive state
+- code=DynamicDefinitionCycle severity=Information certainty=unresolved range=22..26
+  message: Template `pong` analysis repeats a binding/scope state with no arguments; expansion remains unknown
+- code=AnalysisIncomplete severity=Information certainty=certain range=31..35
+  message: Template analysis retained an unresolved recursive state
+- code=DynamicDefinitionCycle severity=Information certainty=unresolved range=44..53
+  message: Template `loop_self` analysis repeats a binding/scope state with no arguments; expansion remains unknown

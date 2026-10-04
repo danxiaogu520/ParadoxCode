@@ -49,7 +49,7 @@ dependencies, rather than implying that the workspace is a single linear chain.
 | [engine](crates/engine/src/lib.rs) | `hir`, `index`, `parser`, `rules`, `text`, `transcode`, `vfs` |
 | [ide](crates/ide/src/lib.rs) | `engine`, `game`, `hir`, `parser`, `rules`, `text`, `transcode`, `vfs` |
 | [pdc](crates/pdc/src/lib.rs) | `engine`, `game`, `ide`, `parser`, `rules`, `text`, `transcode` |
-| [tools](crates/tools/src/lib.rs) | `engine`, `game`, `ide`, `pdc`, `rules`, `text` |
+| [tools](crates/tools/src/lib.rs) | `engine`, `game`, `ide`, `parser`, `pdc`, `rules`, `text` |
 <!-- generated:crate-dependencies:end -->
 
 Keep user-facing protocol conversion in `pdc`, VS Code UI in the extension, and
@@ -144,9 +144,11 @@ fixtures remain beside their authoritative source.
 
 ## Documentation ownership
 
-Documentation lives beside the implementation it explains. Root READMEs provide orientation
-and links; component guides explain use and stable concepts. Keep both root language entries
-aligned in purpose without copying configuration tables, version numbers, or protocol details.
+Stable documentation lives beside the implementation it explains. Temporary design plans and
+active proposals belong in the repository root, with an explicit proposal status. Root READMEs
+provide orientation and links; component guides explain use and stable concepts. Keep both root
+language entries aligned in purpose without copying configuration tables, version numbers,
+or protocol details.
 
 | Information | Authoritative source | Reader view |
 | --- | --- | --- |
@@ -181,7 +183,7 @@ must remain illustrative; they are never executed by remote documentation checks
 Use issue/PR discussion for implementation decisions and acceptance records. Completed migration
 plans and logs are available in [the merged RulesIr PR](https://github.com/danxiaogu520/ParadoxCode/pull/141)
 and the [immutable migration snapshot](https://github.com/danxiaogu520/ParadoxCode/tree/2626b0a1341a72478f754c171edd53d4d8537b07/docs).
-Active proposals may live beside the affected subsystem with an explicit proposal status;
-[the Template proposal](crates/hir/TEMPLATE-PROPOSAL.md) is not a production contract.
+Keep temporary design plans and active proposals in the repository root;
+[the Template proposal](TEMPLATE-PROPOSAL.md) is not a production contract.
 
 Report security issues through [SECURITY.md](SECURITY.md).

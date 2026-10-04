@@ -23,6 +23,7 @@ Without it, real-server tests build the current debug binary before running.
 | `audit diagnose / sweep / baseline` | [audit/client.rs](src/audit/client.rs) | Real LSP diagnostics, phase/resource measurements and frozen query probes |
 | `audit errors / diff` | [audit/resources.rs](src/audit/resources.rs), [audit/compare.rs](src/audit/compare.rs) | Per-error resource evidence and complete diagnostic/SQLite comparisons |
 | `audit completions` | [audit/completions.rs](src/audit/completions.rs) | Complete IDE candidates before LSP truncation, with a bounded-LSP equality check |
+| `audit templates` | [audit/templates](src/audit/templates/mod.rs) | Owned text/call/finite-domain references and frozen real-LSP editing observations |
 | `perf bench / baseline / ab / profile` | [perf/workflow.rs](src/perf/workflow.rs) | Warmup, repetitions, frozen binaries, comparisons and external profilers |
 | `perf probe / compare` | [perf/client.rs](src/perf/client.rs) | Actual LSP initialization, readiness, open/edit publication and interactive queries |
 | `perf memory` | [perf/memory.rs](src/perf/memory.rs) | Sequential measured-child peak RSS, phase RSS and diagnostic signatures |
@@ -83,6 +84,51 @@ unpaired prefix samples. Equal counts do not approve semantics. Full completion 
 the golden input digest and equality of the first 512 IDE candidates with the recorded LSP set.
 Current exports call IDE directly. An explicitly selected historical `--repo`/`--mode legacy`
 uses an isolated Rust compatibility harness without modifying that checkout's source.
+
+## Template references and editing baselines
+
+```sh
+cargo run --locked -p tools -- audit templates --check-only \
+  --output target/performance-results/template-reference
+cargo run --locked --release -p tools -- audit templates \
+  --server /path/to/frozen/paradoxcode --samples 20 \
+  --output target/performance-results/template-owned
+cargo run --locked --release -p tools -- audit templates \
+  --server /path/to/frozen/paradoxcode --samples 20 \
+  --vanilla-cache /path/to/frozen/vanilla.pdcindex \
+  --output target/performance-results/template-with-vanilla
+```
+
+The owned [text matrix](src/audit/templates/cases.json) records expected text, Missing/Empty/Hole,
+guards, source ranges, resource limits and evidence status. The reference substitutes lossless text
+independently of HIR replay. Its one-pass project profile does not rescan inserted markers, and
+all unobserved EU4 engine behavior stays explicitly unverified. Concrete named-call cases use an
+explicit stack and the ordinary parser after substitution; they retain frame/caller provenance,
+test finite same-name calls and limits, and check the expanded invalid terminal against ordinary
+first-party diagnostics. Scalar argument blocks are supported; general block-argument and engine
+termination semantics remain pending. The [finite relation matrix](src/audit/templates/finite.json)
+exhaustively joins assignments before projecting a parameter, including incompatible witnesses.
+
+These references define the declared project support profile. A runnable EU4 installation is not
+required for this engineering workflow. Engine evidence status is separate from analysis validity:
+unverified engine behavior does not invalidate ordinary queries under adopted project conventions.
+Interpretations outside that support profile retain local conditions or unknown results rather
+than silently choosing the reference's provisional behavior as an engine guarantee.
+
+The [editing trace](src/audit/templates/queries.json) freezes source and UTF-16 cursor anchors.
+Each state queries completion, hover, definition, references, rename, code actions, symbols,
+semantic tokens, inlay hints, text diagnostics and completion resolve when a candidate exists.
+Rename rejection is retained as an observed RPC result. Every other request failure fails the run;
+missing/deduplicated diagnostic publication is recorded without inventing a zero latency.
+The first request is separated from warmed samples. Repeated-response stability, fixture and
+binary hashes, rule/version identity, optional cache identity and sampled process RSS are recorded.
+RSS sampling may require local process-statistics permission; missing samples stay explicit.
+
+`reference.json`, `call-reference.json` and `finite-reference.json` verify owned expectations.
+`baseline.json` records current LSP behavior, including known omissions and deliberate future
+behavior changes; it is not a correctness oracle or a claim that the redesign is complete.
+Re-run with identical frozen binaries, cache and fixtures. Preserve the previous output directory
+when comparing revisions. Failed runs cannot leave the prior baseline marked successful.
 
 ## Performance measurements
 

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use engine::{AnalysisSnapshot, DocumentId, DocumentSource, ParsedSource, SourceFileId};
 use hir::HirFile;
 use hir::lower_shared_with_ir_and_facts;
-use parser::{CstKind, CstNode, FileFormat, ParsedFile, parse};
+use parser::{FileFormat, ParsedFile, parse};
 use rules::{GameProfile, ParserKind};
 use text::{LogicalPath, TextRange, TextSize};
 
@@ -63,7 +63,7 @@ pub(crate) fn input_for_document(
     };
     let hir = if let Some(hir) = document
         .hir_handle()
-        .filter(|hir| !hir.depends_on_symbol_facts())
+        .filter(|hir| !hir.depends_on_symbol_facts() || !document.fact_coverage.is_known())
     {
         Some(hir)
     } else if !snapshot.ir().schemas.is_empty() {
@@ -80,6 +80,12 @@ pub(crate) fn input_for_document(
     } else {
         document.hir_handle()
     };
+    let hir = hir.map(|mut hir| {
+        if !document.fact_coverage.is_known() {
+            Arc::make_mut(&mut hir).merge_analysis_coverage(&document.fact_coverage);
+        }
+        hir
+    });
     let profile = snapshot.game_profile_handle();
     Some(ParsedInput {
         document: Some(id.clone()),
@@ -275,55 +281,6 @@ pub(crate) fn logical_path(snapshot: &AnalysisSnapshot, path: &Path) -> Option<L
                 .and_then(|name| LogicalPath::parse(&name.to_string_lossy()).ok())
         })
 }
-/// Structural properties used by the callable cycle graph.
-#[derive(Clone, Debug)]
-pub(crate) struct ScriptProperty {
-    pub(crate) key: Arc<str>,
-    pub(crate) key_range: TextRange,
-    pub(crate) scalar: Option<(Arc<str>, TextRange)>,
-    pub(crate) block: Vec<ScriptProperty>,
-}
-
-pub(crate) fn script_properties(input: &ParsedInput, parent: CstNode<'_>) -> Vec<ScriptProperty> {
-    let ParsedContent::Text(parsed) = &input.parsed;
-    parent
-        .children()
-        .filter(|node| node.kind() == CstKind::Property)
-        .filter_map(|node| {
-            let key = node.children().find(|child| child.kind() == CstKind::Key)?;
-            let block = node
-                .children()
-                .find(|child| child.kind() == CstKind::Value)
-                .and_then(|value| {
-                    value
-                        .children()
-                        .find(|child| child.kind() == CstKind::Block)
-                });
-            let scalar = property_scalar_node(node).and_then(|scalar| {
-                let raw = parsed.text(scalar.range())?.trim();
-                let value = raw
-                    .strip_prefix('"')
-                    .and_then(|value| value.strip_suffix('"'))
-                    .unwrap_or(raw);
-                Some((engine::intern_shard_string(value), scalar.range()))
-            });
-            Some(ScriptProperty {
-                key: engine::intern_shard_string(parsed.text(key.range())?.trim()),
-                key_range: key.range(),
-                scalar,
-                block: block.map_or_else(Vec::new, |block| script_properties(input, block)),
-            })
-        })
-        .collect()
-}
-
-fn property_scalar_node(node: CstNode<'_>) -> Option<CstNode<'_>> {
-    node.children()
-        .find(|child| child.kind() == CstKind::Value)?
-        .children()
-        .find(|child| matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString))
-}
-
 pub(crate) fn local_location(input: &ParsedInput, range: TextRange) -> Location {
     Location {
         document: input.document.clone(),

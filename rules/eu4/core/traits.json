@@ -1,6 +1,6 @@
 {
   "traits": {
-    "Callable": {},
+    "Template": {},
     "HasIcon": {},
     "Localised": {},
     "ModifierSource": {}

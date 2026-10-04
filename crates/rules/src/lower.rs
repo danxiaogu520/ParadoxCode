@@ -29,8 +29,8 @@ use crate::expr::{self, Argument, Expr, LiteralPart, Param, Primary, ScalarKind,
 use crate::ir::{
     Binding, Card, Control, DefName, DefSpec, DocumentParser, EnumId, EnumInfo, EnumRow, Field,
     FieldId, FieldValue, FileResolution, FileRule, GameConfig, Interner, LinkInfo, Matcher,
-    MatcherId, Provenance, RefTarget, RegisterInfo, RootRule, RulesIr, Schema, SchemaId,
-    ScopeEffect, ScopeModel, ScopeRef, SubtypeInfo, Symbol, TemplatePart, TraitArgument, TraitId,
+    MatcherId, PatternPart, Provenance, RefTarget, RegisterInfo, RootRule, RulesIr, Schema,
+    SchemaId, ScopeEffect, ScopeModel, ScopeRef, SubtypeInfo, Symbol, TraitArgument, TraitId,
     TraitImpl, TraitInfo, TypeId, TypeInfo, TypeResolution,
 };
 use crate::matcher::FileMatcher;
@@ -193,7 +193,7 @@ struct FieldKey {
 enum MatcherKey {
     Scalar,
     Literal(Symbol),
-    Template(Vec<TemplateKey>),
+    Pattern(Vec<PatternKey>),
     Int {
         min: Option<i64>,
         max: Option<i64>,
@@ -216,14 +216,13 @@ enum MatcherKey {
     },
     Scope(Option<Symbol>),
     Link,
-    Quoted(u32),
     Opaque,
     Union(Vec<u32>),
 }
 
-/// A hashable fingerprint of one [`TemplatePart`].
+/// A hashable fingerprint of one [`PatternPart`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum TemplateKey {
+enum PatternKey {
     Text(Symbol),
     Hole(u32),
 }
@@ -913,13 +912,7 @@ impl<'a> Lowering<'a> {
             DraftKey::Expression(raw) => self.lower_expr_text(context, raw),
         };
         let value = if let Some(raw) = spec.value.as_deref() {
-            let quoted = expr::parse(raw)
-                .ok()
-                .and_then(|parsed| self.single_quoted(context, &parsed));
-            match quoted {
-                Some(schema) => FieldValue::Quoted(schema),
-                None => FieldValue::Scalar(self.lower_expr_text(context, raw)),
-            }
+            FieldValue::Scalar(self.lower_expr_text(context, raw))
         } else if let Some(body) = spec.body.as_deref() {
             // `self` stays a self-reference so the arena needs no
             // self-referential schema edge; `child` resolves it against the
@@ -1134,27 +1127,6 @@ impl<'a> Lowering<'a> {
         id
     }
 
-    /// The schema of a single `quoted<…>` alternative, when the whole value is
-    /// one.
-    fn single_quoted(&mut self, context: &FieldContext<'_>, parsed: &Expr) -> Option<SchemaId> {
-        let mut found = None;
-        for alternative in &parsed.alternatives {
-            let Primary::Quoted(argument) = alternative else {
-                return None;
-            };
-            let name = first_name(argument)?;
-            let reference = SchemaRef {
-                name,
-                args: Vec::new(),
-            };
-            let schema = self.ensure_instance(context, &reference)?;
-            if found.replace(schema).is_some() {
-                return None;
-            }
-        }
-        found
-    }
-
     // ---- expressions -----------------------------------------------------
 
     fn opaque(&mut self) -> MatcherId {
@@ -1232,17 +1204,6 @@ impl<'a> Lowering<'a> {
                     Matcher::Scope(Some(self.strings.intern_folded(&name)))
                 }
             }
-            Primary::Quoted(argument) => {
-                let name = first_name(argument).unwrap_or_default();
-                let reference = SchemaRef {
-                    name,
-                    args: Vec::new(),
-                };
-                match self.ensure_instance(context, &reference) {
-                    Some(schema) => Matcher::Quoted(schema),
-                    None => Matcher::Opaque,
-                }
-            }
             Primary::Path { category } => Matcher::Path(
                 category
                     .as_deref()
@@ -1253,17 +1214,17 @@ impl<'a> Lowering<'a> {
                 for part in parts {
                     lowered.push(match part {
                         LiteralPart::Text(text) => {
-                            TemplatePart::Text(self.strings.intern_verbatim(text))
+                            PatternPart::Text(self.strings.intern_verbatim(text))
                         }
                         LiteralPart::Hole(hole) => {
-                            TemplatePart::Hole(self.lower_expr(context, hole))
+                            PatternPart::Hole(self.lower_expr(context, hole))
                         }
                     });
                 }
                 match lowered.as_slice() {
                     [] => Matcher::Literal(self.strings.intern_verbatim("")),
-                    [TemplatePart::Text(text)] => Matcher::Literal(*text),
-                    _ => Matcher::Template(lowered.into_boxed_slice()),
+                    [PatternPart::Text(text)] => Matcher::Literal(*text),
+                    _ => Matcher::Pattern(lowered.into_boxed_slice()),
                 }
             }
             Primary::Param(param) => match self.resolve_param(context, param) {
@@ -1347,13 +1308,13 @@ impl<'a> Lowering<'a> {
         context: &FieldContext<'_>,
         parts: &[LiteralPart],
         at: &At,
-    ) -> Box<[TemplatePart]> {
+    ) -> Box<[PatternPart]> {
         let _ = at;
         let mut lowered = Vec::with_capacity(parts.len());
         for part in parts {
             lowered.push(match part {
-                LiteralPart::Text(text) => TemplatePart::Text(self.strings.intern_verbatim(text)),
-                LiteralPart::Hole(hole) => TemplatePart::Hole(self.lower_expr(context, hole)),
+                LiteralPart::Text(text) => PatternPart::Text(self.strings.intern_verbatim(text)),
+                LiteralPart::Hole(hole) => PatternPart::Hole(self.lower_expr(context, hole)),
             });
         }
         lowered.into_boxed_slice()
@@ -1388,12 +1349,12 @@ fn matcher_key(matcher: &Matcher) -> MatcherKey {
     match matcher {
         Matcher::Scalar => MatcherKey::Scalar,
         Matcher::Literal(text) => MatcherKey::Literal(*text),
-        Matcher::Template(parts) => MatcherKey::Template(
+        Matcher::Pattern(parts) => MatcherKey::Pattern(
             parts
                 .iter()
                 .map(|part| match part {
-                    TemplatePart::Text(text) => TemplateKey::Text(*text),
-                    TemplatePart::Hole(hole) => TemplateKey::Hole(hole.index() as u32),
+                    PatternPart::Text(text) => PatternKey::Text(*text),
+                    PatternPart::Hole(hole) => PatternKey::Hole(hole.index() as u32),
                 })
                 .collect(),
         ),
@@ -1429,7 +1390,6 @@ fn matcher_key(matcher: &Matcher) -> MatcherKey {
         },
         Matcher::Scope(scope) => MatcherKey::Scope(*scope),
         Matcher::Link => MatcherKey::Link,
-        Matcher::Quoted(schema) => MatcherKey::Quoted(schema.index() as u32),
         Matcher::Opaque => MatcherKey::Opaque,
         Matcher::Union(alternatives) => MatcherKey::Union(
             alternatives
@@ -1708,7 +1668,7 @@ mod tests {
     },
     "scripted_effect": {
       "impl": {
-        "Callable": {
+        "Template": {
           "body": "effect"
         }
       }
@@ -1716,7 +1676,7 @@ mod tests {
   },
   "traits": {
     "Localised": {},
-    "Callable": {}
+    "Template": {}
   },
   "scopes": {
     "types": [
@@ -1947,8 +1907,7 @@ mod tests {
             ir.strings().resolve(template.name),
             "event_target:{ref<event_target>}"
         );
-        let [TemplatePart::Text(prefix), TemplatePart::Hole(hole)] = template.pattern.as_ref()
-        else {
+        let [PatternPart::Text(prefix), PatternPart::Hole(hole)] = template.pattern.as_ref() else {
             panic!("the template is text + one hole");
         };
         assert_eq!(ir.strings().resolve(*prefix), "event_target:");
@@ -1976,7 +1935,6 @@ mod tests {
         assert_ne!(scalar[0], block[0]);
         assert!(matches!(ir.field(scalar[0]).value, FieldValue::Scalar(_)));
         assert!(matches!(ir.field(block[0]).value, FieldValue::Block(_)));
-        assert_eq!(ir.lookup(event_body, "desc", Shape::Quoted).count(), 0);
         assert_eq!(
             ir.lookup(event_body, "DESC", Shape::Scalar).count(),
             1,
@@ -2102,7 +2060,7 @@ mod tests {
         for id in ir.schema(file).patterns.iter() {
             let field = ir.field(*id);
             let Matcher::Enum { id } = ir.matcher(field.key) else {
-                assert!(matches!(ir.matcher(field.key), Matcher::Template(_)));
+                assert!(matches!(ir.matcher(field.key), Matcher::Pattern(_)));
                 template_patterns += 1;
                 continue;
             };

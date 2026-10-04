@@ -1,5 +1,5 @@
 use super::support::*;
-use crate::dynamic_contracts::ScopeContract;
+use crate::template_contracts::ScopeContract;
 use text::AbsPath;
 
 /// Opens one scripted-effects file as a project workspace and returns the
@@ -27,8 +27,8 @@ fn ir_sites(
     snapshot: &AnalysisSnapshot,
     owner: &str,
     parameter: &str,
-) -> Vec<crate::ir_callable::ParameterSite> {
-    crate::ir_callable::definition_parameter_sites(
+) -> hir::analysis::Analysis<Vec<crate::ir_template::ParameterSite>> {
+    crate::ir_template::definition_parameter_sites(
         snapshot,
         "scripted_effect",
         owner,
@@ -54,7 +54,52 @@ fn ir_findings(snapshot: &AnalysisSnapshot) -> Vec<crate::Diagnostic> {
 }
 
 #[test]
-fn dynamic_rows_derive_contract_signature_and_value_constraints() {
+fn interactive_scope_queries_do_not_walk_unrelated_definitions() {
+    let mut effects = String::from("focused_country = { add_prestige = 1 }\n");
+    for index in 0..500 {
+        effects.push_str(&format!("unrelated_{index} = {{ add_prestige = 1 }}\n"));
+    }
+    let mut host = eu4_host(game::eu4::runtime_rules().unwrap());
+    host.open_document(
+        DocumentId::new("file:///tmp/common/scripted_effects/focused.txt"),
+        1,
+        effects,
+        None,
+    )
+    .unwrap();
+    let id = DocumentId::new("file:///tmp/events/focused.txt");
+    let text = "province_event = { immediate = { focused_country = yes } }";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .unwrap();
+    let cancellation = CancellationToken::cancel_after(2000);
+    let findings = diagnostics_with_cancellation(&host.snapshot(), &id, &cancellation)
+        .expect("one call's scope query completes without traversing 500 unrelated bodies");
+    assert!(
+        findings.iter().any(|finding| {
+            finding.code == DiagnosticCode::WrongScope
+                && finding.message.contains("focused_country")
+        }),
+        "{findings:?}"
+    );
+    assert!(!cancellation.is_cancelled());
+    let scalar_id = DocumentId::new("file:///tmp/events/focused-scalar.txt");
+    let scalar_text = "country_event = { immediate = { add_prestige = 2 } }";
+    host.open_document(scalar_id.clone(), 1, scalar_text.to_owned(), None)
+        .unwrap();
+    let cancellation = CancellationToken::cancel_after(2000);
+    let result = complete_with_cancellation(
+        &host.snapshot(),
+        &scalar_id,
+        scalar_text.find('2').unwrap() as u32 + 1,
+        &cancellation,
+    )
+    .expect("static value completion does not infer unrelated Template scopes");
+    assert!(result.items.is_empty());
+    assert!(!cancellation.is_cancelled());
+}
+
+#[test]
+fn template_rows_derive_contract_signature_and_value_constraints() {
     let host =
         definitions_snapshot("scale_works = { add_stability = $AMT$ add_manpower = $MP$ }\n");
     let snapshot = host.snapshot();
@@ -70,7 +115,7 @@ fn dynamic_rows_derive_contract_signature_and_value_constraints() {
             .all(|parameter| parameter.required)
     );
     assert_eq!(
-        crate::dynamic_contracts::dynamic_contract(&snapshot, "scripted_effect", "scale_works"),
+        crate::template_contracts::template_contract(&snapshot, "scripted_effect", "scale_works"),
         Some(ScopeContract::Scopes(vec!["country".into()]))
     );
     for (parameter, valid, invalid) in [("AMT", "2", "1.5"), ("MP", "1.5", "1000")] {
@@ -87,7 +132,7 @@ fn dynamic_rows_derive_contract_signature_and_value_constraints() {
 }
 
 #[test]
-fn dynamic_rows_locate_push_container_scope_contradictions() {
+fn template_rows_locate_push_container_scope_contradictions() {
     // `capital` enters in country scope and pushes province; `add_prestige`
     // only runs in country scope, so the nested statement can never execute
     // and the definition itself must be rejected with a located finding.
@@ -95,8 +140,8 @@ fn dynamic_rows_locate_push_container_scope_contradictions() {
     let snapshot = host.snapshot();
 
     assert_eq!(
-        crate::dynamic_contracts::dynamic_contract(&snapshot, "scripted_effect", "bad_push"),
-        Some(ScopeContract::Scopes(vec!["country".into()]))
+        crate::template_contracts::template_contract(&snapshot, "scripted_effect", "bad_push"),
+        Some(ScopeContract::Empty)
     );
     let findings = ir_findings(&snapshot);
     assert!(
@@ -111,7 +156,7 @@ fn dynamic_rows_locate_push_container_scope_contradictions() {
 }
 
 #[test]
-fn dynamic_rows_descend_opaque_entries_into_scope_switches() {
+fn template_rows_descend_opaque_entries_into_scope_switches() {
     // A dynamic scope link (`ROOT`) leaves the entry unknown, yet the
     // scope-switching container inside it still re-targets its children, so
     // the contradiction stays findable while the contract stays open.
@@ -120,8 +165,8 @@ fn dynamic_rows_descend_opaque_entries_into_scope_switches() {
     let snapshot = host.snapshot();
 
     assert_eq!(
-        crate::dynamic_contracts::dynamic_contract(&snapshot, "scripted_effect", "opaque_entry"),
-        Some(ScopeContract::Unconstrained)
+        crate::template_contracts::template_contract(&snapshot, "scripted_effect", "opaque_entry"),
+        Some(ScopeContract::Empty)
     );
     let findings = ir_findings(&snapshot);
     assert!(
@@ -135,17 +180,17 @@ fn dynamic_rows_descend_opaque_entries_into_scope_switches() {
 }
 
 #[test]
-fn dynamic_rows_flag_param_key_dispatch() {
+fn template_rows_flag_param_key_dispatch() {
     let host = definitions_snapshot("dispatcher = { $action$ = yes }\n");
     let snapshot = host.snapshot();
     let sites = ir_sites(&snapshot, "dispatcher", "action");
     assert_eq!(sites.len(), 1);
     assert!(matches!(
         sites[0].domain,
-        crate::ir_callable::Domain::Key { .. }
+        crate::ir_template::Domain::Key { .. }
     ));
     assert_eq!(
-        crate::dynamic_contracts::dynamic_contract(&snapshot, "scripted_effect", "dispatcher"),
+        crate::template_contracts::template_contract(&snapshot, "scripted_effect", "dispatcher"),
         Some(ScopeContract::Unconstrained)
     );
     assert!(sites[0].accepts(&snapshot, "action", "add_prestige"));
@@ -153,7 +198,7 @@ fn dynamic_rows_flag_param_key_dispatch() {
 }
 
 #[test]
-fn dynamic_rows_locate_nested_call_contract_mismatches() {
+fn template_rows_locate_nested_call_contract_mismatches() {
     // `controller` enters in province scope and pushes country; the callee
     // requires province, so the nested call can never run.
     let host = definitions_snapshot(
@@ -163,7 +208,11 @@ fn dynamic_rows_locate_nested_call_contract_mismatches() {
     let snapshot = host.snapshot();
 
     assert_eq!(
-        crate::dynamic_contracts::dynamic_contract(&snapshot, "scripted_effect", "province_helper"),
+        crate::template_contracts::template_contract(
+            &snapshot,
+            "scripted_effect",
+            "province_helper"
+        ),
         Some(ScopeContract::Scopes(vec!["province".into()]))
     );
     let findings = ir_findings(&snapshot);
@@ -178,7 +227,7 @@ fn dynamic_rows_locate_nested_call_contract_mismatches() {
 }
 
 #[test]
-fn dynamic_rows_keep_conditional_parameters_optional() {
+fn template_rows_keep_conditional_parameters_optional() {
     let host = definitions_snapshot(
         "guarded = { add_stability = $AMT$ [[EXTRA] add_manpower = $EXTRA$ ] }\n",
     );
@@ -207,11 +256,12 @@ fn dynamic_rows_keep_conditional_parameters_optional() {
 }
 
 #[test]
-fn dynamic_rows_mark_cycle_participants() {
+fn template_rows_mark_cycle_participants() {
     let host = definitions_snapshot("loop_a = { loop_b = yes }\nloop_b = { loop_a = yes }\n");
     let snapshot = host.snapshot();
     let report =
-        crate::dynamic_cycles::dynamic_cycle_report(&snapshot, &CancellationToken::new()).unwrap();
+        crate::template_recursion::template_recursion_report(&snapshot, &CancellationToken::new())
+            .unwrap();
     for name in ["loop_a", "loop_b"] {
         assert!(report.message("scripted_effect", name).is_some(), "{name}");
     }
@@ -234,7 +284,7 @@ fn site_rows_record_value_site_position_transitions_and_scopes() {
         sites[0].state.current.first(),
         Some(&hir::ScopeValue::known_single("province"))
     );
-    let crate::ir_callable::Domain::Value(matchers) = &sites[0].domain else {
+    let crate::ir_template::Domain::Value(matchers) = &sites[0].domain else {
         panic!("value domain")
     };
     assert!(matchers.iter().any(|matcher| matches!(
@@ -264,7 +314,7 @@ fn site_rows_mark_structural_sub_blocks_and_keep_them_out_of_legacy_sites() {
         );
         assert!(matches!(
             sites[0].domain,
-            crate::ir_callable::Domain::Value(_)
+            crate::ir_template::Domain::Value(_)
         ));
         assert!(!sites[0].accepts(&snapshot, parameter, "missing_country"));
     }
@@ -278,7 +328,7 @@ fn site_rows_record_key_render_affixes() {
     assert_eq!(sites.len(), 1);
     assert!(matches!(
         sites[0].domain,
-        crate::ir_callable::Domain::Key { .. }
+        crate::ir_template::Domain::Key { .. }
     ));
     assert_eq!(
         sites[0].rendered_value("CMD", "add_prestige").as_deref(),
@@ -300,7 +350,7 @@ fn site_rows_record_bare_payload_quoted_sites() {
     assert_eq!(sites.len(), 1);
     assert!(matches!(
         sites[0].domain,
-        crate::ir_callable::Domain::Payload { .. }
+        crate::ir_template::Domain::Template { .. }
     ));
 }
 
@@ -354,7 +404,7 @@ fn site_rows_stamp_conditional_guards() {
         from: vec![],
         previous: vec![],
     };
-    let absent = crate::ir_callable::parameter_sites(
+    let absent = crate::ir_template::parameter_sites(
         &snapshot,
         "scripted_effect",
         "guarded",
@@ -366,7 +416,7 @@ fn site_rows_stamp_conditional_guards() {
     .unwrap();
     assert!(absent.is_empty());
     let bound = std::collections::BTreeMap::from([("SCALE".into(), "yes".into())]);
-    let present = crate::ir_callable::parameter_sites(
+    let present = crate::ir_template::parameter_sites(
         &snapshot,
         "scripted_effect",
         "guarded",

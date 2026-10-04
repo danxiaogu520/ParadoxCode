@@ -43,7 +43,7 @@ export function shouldTriggerFollowupCompletion(item: CompletionLike): boolean {
     if (text?.endsWith(' = ')) {
         return true;
     }
-    // Empty Node/QuotedScript snippets place the final cursor stop inside the newly inserted
+    // Empty block and Template snippets place the final cursor stop inside the newly inserted
     // block. Parameterised scripted-macro snippets also contain `$0`, but their first `$1` stop
     // is a value argument, so they must not trigger a key completion at the wrong position.
     return typeof item.insertText === 'object'

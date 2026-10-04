@@ -49,7 +49,6 @@ pub(crate) fn dynamic_definition_summary(
 #[derive(Clone, Debug)]
 pub(crate) struct ResolvedDynamicDefinition {
     pub(crate) summary: DynamicDefinitionSummary,
-    pub(crate) body_context: String,
 }
 
 pub(crate) fn resolve_dynamic_definition(
@@ -68,16 +67,8 @@ pub(crate) fn resolve_dynamic_definition(
     ) {
         return cached.as_ref().clone();
     }
-    // A worker still observing a superseded definition set must not rebuild:
-    // its insert would be dropped, so the next probe would rerun the scan and
-    // the resolution loop would burn a core. The worker's own results are
-    // destined to be discarded with its revision.
-    if snapshot
-        .query_cache()
-        .is_superseded(engine::CacheDomain::Definitions, revision)
-    {
-        return None;
-    }
+    // An immutable older snapshot still has valid inputs. Cache publication
+    // may be refused, but that must not turn a real definition into a miss.
     let resolved = resolve_dynamic_definition_uncached(snapshot, owner_kind, owner_name);
     snapshot.query_cache().insert(
         revision,
@@ -93,29 +84,7 @@ fn resolve_dynamic_definition_uncached(
     owner_kind: &str,
     owner_name: &str,
 ) -> Option<ResolvedDynamicDefinition> {
-    let body_context = {
-        let ir = snapshot.ir();
-        let ty = ir.type_info(ir.type_by_name(owner_kind)?);
-        ty.trait_impls
-            .iter()
-            .filter(|implementation| Some(implementation.trait_id) == ir.trait_by_name("Callable"))
-            .find_map(|implementation| {
-                implementation
-                    .arguments
-                    .iter()
-                    .find_map(|(name, argument)| {
-                        if ir.strings.resolve(*name) != "body" {
-                            return None;
-                        }
-                        match argument {
-                            rules::ir::TraitArgument::Text(body) => {
-                                Some(ir.strings.resolve(*body).to_owned())
-                            }
-                            _ => None,
-                        }
-                    })
-            })?
-    };
+    hir::template::template_body(snapshot.ir(), snapshot.ir().type_by_name(owner_kind)?)?;
     let mut overlay_candidates = Vec::new();
     for document in snapshot
         .documents()
@@ -136,7 +105,6 @@ fn resolve_dynamic_definition_uncached(
                     &definition.name,
                     definition.range,
                 ),
-                body_context: body_context.clone(),
             });
         }
     }
@@ -162,10 +130,7 @@ fn resolve_dynamic_definition_uncached(
         .index()
         .active_dynamic_definition(owner_kind, owner_name)
         .cloned()?;
-    Some(ResolvedDynamicDefinition {
-        summary,
-        body_context,
-    })
+    Some(ResolvedDynamicDefinition { summary })
 }
 
 fn dynamic_summary_in_hir(
@@ -205,7 +170,10 @@ pub(crate) fn scripted_definition_snippet(
     definition_name: &str,
 ) -> String {
     let Some(summary) = dynamic_definition_summary(snapshot, kind_name, definition_name) else {
-        return format!("{definition_name} = {{\n\t$0\n}}");
+        return format!(
+            "{} = {{\n\t$0\n}}",
+            crate::insertion::snippet_literal(definition_name)
+        );
     };
     if summary.parameters.is_empty() {
         return format!("{definition_name} = yes");
@@ -214,12 +182,15 @@ pub(crate) fn scripted_definition_snippet(
         .parameters
         .iter()
         .filter(|parameter| {
-            crate::dynamic_rules::parameter_effectively_required(snapshot, &summary, parameter)
+            crate::template_presence::parameter_effectively_required(snapshot, &summary, parameter)
         })
         .map(|parameter| parameter.name.as_str())
         .collect::<Vec<_>>();
     if tabstops.is_empty() {
-        return format!("{definition_name} = {{\n\t$0\n}}");
+        return format!(
+            "{} = {{\n\t$0\n}}",
+            crate::insertion::snippet_literal(definition_name)
+        );
     }
     let inner_indent = "\t";
     let last = tabstops.len() - 1;
@@ -232,9 +203,15 @@ pub(crate) fn scripted_definition_snippet(
         } else {
             format!("${}", index + 1)
         };
-        body.push_str(&format!("{inner_indent}{name} = {stop}\n"));
+        body.push_str(&format!(
+            "{inner_indent}{} = {stop}\n",
+            crate::insertion::snippet_literal(name)
+        ));
     }
-    format!("{definition_name} = {{\n{body}}}")
+    format!(
+        "{} = {{\n{body}}}",
+        crate::insertion::snippet_literal(definition_name)
+    )
 }
 
 /// Field-level value semantics of one construct context, as declared by the
@@ -447,7 +424,7 @@ pub(crate) fn dynamic_definition_type(snapshot: &AnalysisSnapshot, type_name: &s
         ir.type_info(id)
             .trait_impls
             .iter()
-            .any(|implementation| Some(implementation.trait_id) == ir.trait_by_name("Callable"))
+            .any(|implementation| Some(implementation.trait_id) == ir.trait_by_name("Template"))
     })
 }
 

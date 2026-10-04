@@ -1369,14 +1369,14 @@ impl SnapshotRequestContext {
             .document(&id)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
         self.ensure_active()?;
-        let (completion_items, is_incomplete) =
-            bounded_results(result.items, MAX_COMPLETION_RESULTS);
+        let (completion_items, truncated) = bounded_results(result.items, MAX_COMPLETION_RESULTS);
+        let is_incomplete = truncated || !result.coverage.is_complete();
         let items = completion_items
             .into_iter()
             .enumerate()
             .map(|(ordinal, item)| {
                 let snippet_supported = self.client_snippets;
-                let insert_text = if snippet_supported {
+                let insert_text = if snippet_supported || !item.is_snippet {
                     item.insert_text
                 } else {
                     let start = usize::try_from(item.replacement_range.start())
@@ -1396,12 +1396,17 @@ impl SnapshotRequestContext {
                     // the analysis tie-break with a case-sensitive label comparison.
                     sort_text: Some(completion_sort_text(item.sort_score, ordinal)),
                     insert_text: Some(insert_text.clone()),
-                    insert_text_format: Some(if snippet_supported && insert_text.contains('$') {
+                    insert_text_format: Some(if snippet_supported && item.is_snippet {
                         InsertTextFormat::SNIPPET
                     } else {
                         InsertTextFormat::PLAIN_TEXT
                     }),
-                    data: item.resolve_data.map(Value::String),
+                    data: item.template_evidence.map_or_else(||item.resolve_data.clone().map(Value::String), |evidence|
+                        Some(serde_json::json!({"template":{
+                            "validation":match evidence.validation {ide::TemplateValidation::Valid=>"valid",ide::TemplateValidation::Invalid=>"invalid",ide::TemplateValidation::Unknown=>"unknown"},
+                            "witness":evidence.witness,"interpretations":evidence.interpretations.iter().map(|proof|serde_json::json!({
+                                "schema":proof.schema,"fields":proof.fields,"container":{"start":proof.container.start(),"end":proof.container.end()},"conditional":proof.conditional
+                            })).collect::<Vec<_>>(),"revision":result.revision},"resolve":item.resolve_data}))),
                     text_edit: Some(CompletionTextEdit::Edit(TextEdit {
                         range: range_to_lsp(
                             document.line_index(),
@@ -1427,13 +1432,29 @@ impl SnapshotRequestContext {
     fn completion_resolve(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<CompletionItem>(params, "completionItem/resolve")?;
         self.ensure_active()?;
+        if params
+            .data
+            .as_ref()
+            .and_then(|data| data.get("template"))
+            .and_then(|data| data.get("revision"))
+            .and_then(Value::as_u64)
+            .is_some_and(|revision| revision != self.snapshot.revision())
+        {
+            return typed_value(params, "completionItem/resolve stale response");
+        }
         let data = params
             .data
             .as_ref()
-            .and_then(Value::as_str)
+            .and_then(|value| {
+                value
+                    .as_str()
+                    .or_else(|| value.get("resolve").and_then(Value::as_str))
+            })
             .unwrap_or_default()
             .to_owned();
         let item = ide::CompletionItem {
+            is_snippet: false,
+            template_evidence: None,
             label: params.label.clone(),
             kind: CompletionKind::Key,
             detail: String::new(),
@@ -2098,17 +2119,7 @@ fn semantic_token_type_index(token_type: SemanticTokenType) -> u32 {
 /// multi-line snippets to the insertion line. A plain-text edit has no such re-indenting, so the
 /// absolute leading whitespace of the insertion line is re-applied to every continuation line.
 pub(crate) fn strip_snippet_placeholders(text: &str, base_indent: &str) -> String {
-    let mut stripped = String::with_capacity(text.len());
-    let mut chars = text.chars().peekable();
-    while let Some(character) = chars.next() {
-        if character == '$' {
-            while chars.peek().is_some_and(|next| next.is_ascii_digit()) {
-                chars.next();
-            }
-        } else {
-            stripped.push(character);
-        }
-    }
+    let stripped = ide::snippet_plain_text(text);
     stripped
         .lines()
         .enumerate()

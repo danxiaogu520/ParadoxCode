@@ -99,6 +99,8 @@ pub(crate) fn uncancelled<T>(result: Result<T, Cancelled>) -> T {
 pub enum DiagnosticCode {
     /// Syntax diagnostics from a format-specific parser.
     Syntax,
+    /// A bounded semantic query did not finish; this is not a source syntax error.
+    AnalysisIncomplete,
     /// A property key is not accepted by the current semantic context.
     UnknownKey,
     /// A localisation key reference has no definition in the workspace or
@@ -167,6 +169,7 @@ impl DiagnosticCode {
     /// Every diagnostic category emitted by the analysis layer, in stable wire order.
     pub const ALL: &'static [Self] = &[
         Self::Syntax,
+        Self::AnalysisIncomplete,
         Self::UnknownKey,
         Self::UnknownLocalisationKey,
         Self::AmbiguousDefinition,
@@ -205,6 +208,7 @@ impl DiagnosticCode {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Syntax => "SyntaxError",
+            Self::AnalysisIncomplete => "AnalysisIncomplete",
             Self::UnknownKey => "UnknownKey",
             Self::UnknownLocalisationKey => "UnknownLocalisationKey",
             Self::AmbiguousDefinition => "AmbiguousDefinition",
@@ -234,6 +238,7 @@ impl DiagnosticCode {
     #[must_use]
     pub const fn severity(self) -> Severity {
         match self {
+            Self::AnalysisIncomplete => Severity::Information,
             // An unknown key is silently ignored by the game, so the authored line is
             // ineffective code; it is an error once the surrounding context is known.
             Self::UnknownKey => Severity::Error,
@@ -257,7 +262,6 @@ impl DiagnosticCode {
             | Self::UnknownTexturePath
             | Self::Cardinality
             | Self::WrongScope
-            | Self::DynamicDefinitionCycle
             // An illegal mission dependency never loads the way the author intends.
             | Self::InvalidDependency
             // An empty contract means the definition is unusable in every
@@ -268,7 +272,7 @@ impl DiagnosticCode {
             // The game still loads cross-class modifier applications, so the
             // scope class of the applied attributes is recorded as information
             // rather than rejected.
-            Self::ModifierScopeMismatch => Severity::Information,
+            Self::ModifierScopeMismatch | Self::DynamicDefinitionCycle => Severity::Information,
             // The game renders the readable text as mojibake, but the master
             // tree convention keeps readable sources on purpose; only files on
             // the release path are flagged, and the file still loads.
@@ -613,6 +617,10 @@ pub struct Symbol {
 /// A completion item returned by the editor-neutral query layer.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompletionItem {
+    /// Explicit protocol insertion semantics; literal dollar signs never imply a snippet.
+    pub is_snippet: bool,
+    /// Template validation and the shared conditional binding witness, when applicable.
+    pub template_evidence: Option<TemplateCompletionEvidence>,
     /// Label shown to the user.
     pub label: String,
     /// Stable broad item kind.
@@ -631,6 +639,25 @@ pub struct CompletionItem {
     pub deprecated: bool,
     /// Opaque token used by `completionItem/resolve` to re-derive documentation on demand.
     pub resolve_data: Option<String>,
+}
+
+/// Evidence for one Template completion proposal. A witness excludes the edited parameter.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TemplateCompletionEvidence {
+    /// Valid, rejected, or unresolved under the current specialization.
+    pub validation: hir::analysis::Validation,
+    /// Other bindings that must be supplied for this proposal to satisfy all usage sites.
+    pub witness: std::collections::BTreeMap<String, String>,
+    /// Container interpretations supporting this proposal, within the returned revision.
+    pub interpretations: Vec<TemplateInterpretation>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TemplateInterpretation {
+    pub schema: usize,
+    pub fields: Vec<usize>,
+    pub container: TextRange,
+    pub conditional: bool,
 }
 
 /// Broad completion item categories independent of LSP enum values.
@@ -665,6 +692,8 @@ pub struct CompletionResult {
     pub revision: u64,
     /// Replacement-aware candidates.
     pub items: Vec<CompletionItem>,
+    /// Coverage of the requested candidate/semantic query.
+    pub coverage: hir::analysis::AnalysisCoverage,
 }
 
 /// Hover information returned by the query layer.
@@ -674,6 +703,8 @@ pub struct Hover {
     pub contents: String,
     /// Token range that produced the hover.
     pub range: Option<TextRange>,
+    /// Coverage of the constraints explained by this hover.
+    pub coverage: hir::analysis::AnalysisCoverage,
 }
 
 /// One source-ranged semantic token produced by the editor-neutral highlighting query.
@@ -793,6 +824,8 @@ pub struct WorkspaceEditPlan {
 /// Reasons a semantic rename is refused.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum RenameError {
+    /// Template reference discovery or inverse source mapping is unfinished.
+    Incomplete,
     /// The cursor is not on a known definition or reference.
     NoSymbol,
     /// The cursor resolves to no definition.
@@ -825,6 +858,7 @@ impl From<RenameError> for RenameFailure {
 impl std::fmt::Display for RenameError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
+            Self::Incomplete => "Template reference closure or source mapping is incomplete",
             Self::NoSymbol => "cursor is not on a renameable symbol",
             Self::Unresolved => "symbol has no unique definition",
             Self::Ambiguous => "symbol has multiple definitions",
@@ -838,6 +872,8 @@ impl std::fmt::Display for RenameError {
 /// A fully analysed file snapshot.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FileAnalysis {
+    /// Coverage of generated facts and diagnostic queries for this file.
+    pub coverage: hir::analysis::AnalysisCoverage,
     /// Snapshot revision used by the query.
     pub revision: u64,
     /// Open document identity, if this is an overlay query.

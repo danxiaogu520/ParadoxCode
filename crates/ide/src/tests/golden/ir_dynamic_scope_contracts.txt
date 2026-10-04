@@ -33,8 +33,12 @@ diagnostics:
   message: `limit` of this `if` is always true; the branch wrapper is redundant
 - code=EmptyScopeContract severity=Error certainty=certain range=525..536
   message: dynamic definition `this_opaque` has an empty inferred entry scope: no scope satisfies every statement in its body
+- code=EmptyScopeContract severity=Error certainty=certain range=598..606
+  message: dynamic definition `or_union` has an empty inferred entry scope: no scope satisfies every statement in its body
 - code=InvalidValue severity=Error certainty=certain range=675..684
   message: invalid value `some_priv` for `has_estate_privilege`
   expected: an `estate_privilege` name
+- code=EmptyScopeContract severity=Error certainty=certain range=710..717
+  message: dynamic definition `or_open` has an empty inferred entry scope: no scope satisfies every statement in its body
 - code=UnknownKey severity=Error certainty=certain range=746..764
   message: unknown key `unknown_branch_key` in a `trigger` block

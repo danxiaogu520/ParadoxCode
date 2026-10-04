@@ -16,7 +16,7 @@ pub enum Scope {
 }
 
 /// A conservative set of possible game scopes.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ScopeValue {
     /// One or more statically known scope spellings. The list is shared
     /// (`ScopeState` clones once per scope fact, so the spellings themselves
@@ -48,7 +48,7 @@ impl ScopeValue {
 }
 
 /// Persistent scope registers at one semantic location.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ScopeState {
     /// Scope at the semantic root.
     pub root: ScopeValue,
@@ -61,7 +61,7 @@ pub struct ScopeState {
 }
 
 impl ScopeState {
-    pub(crate) fn initial(scope: ScopeValue) -> Self {
+    pub fn initial(scope: ScopeValue) -> Self {
         Self {
             root: scope.clone(),
             current: vec![scope],
@@ -117,7 +117,7 @@ pub struct FieldFact {
 /// One scalar value attached directly to a property.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HirScalar {
-    /// Unquoted, trimmed spelling.
+    /// Logical scalar text; quoted strings decode quote and backslash escapes once.
     pub value: String,
     /// Exact source range including quotes when present.
     pub range: TextRange,
@@ -267,7 +267,7 @@ pub struct HirParameterReference {
     pub kind: HirParameterReferenceKind,
 }
 
-pub use rules::replacement::{
+pub use rules::template::{
     Template, TemplateConditional, TemplateFragment, TemplateItem, TemplateProperty, TemplateToken,
     TemplateValue,
 };
@@ -298,6 +298,8 @@ pub enum HirReferenceOrigin {
 /// A lowered file handle.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HirFile {
+    pub(super) analysis_coverage: crate::analysis::AnalysisCoverage,
+    pub(super) overload_facts: Vec<crate::block_checking::OverloadFact>,
     pub(super) syntax: Arc<ParsedFile>,
     pub(super) scope: Scope,
     pub(super) properties: Vec<HirProperty>,
@@ -321,6 +323,39 @@ pub struct HirFile {
 }
 
 impl HirFile {
+    /// Correlated whole-container overload selections and unresolved alternatives.
+    pub fn overload_facts(&self) -> &[crate::block_checking::OverloadFact] {
+        &self.overload_facts
+    }
+
+    /// Coverage of generated semantic facts and represented Template declarations.
+    pub fn analysis_coverage(&self) -> &crate::analysis::AnalysisCoverage {
+        &self.analysis_coverage
+    }
+
+    /// Retains a related transaction frontier without discarding independent evidence.
+    pub fn merge_analysis_coverage(&mut self, coverage: &crate::analysis::AnalysisCoverage) {
+        self.analysis_coverage.merge(coverage);
+    }
+
+    /// Removes facts whose dispatch depends on a failed discovery transaction.
+    /// Syntax and unconditional declarations remain available for editing.
+    pub fn discard_facts_in_ranges(&mut self, ranges: &[text::TextRange]) {
+        let inside = |range: text::TextRange| {
+            ranges
+                .iter()
+                .any(|parent| parent.start() <= range.start() && range.end() <= parent.end())
+        };
+        self.definitions.retain(|def| !inside(def.range));
+        self.references.retain(|reference| !inside(reference.range));
+        self.binding_references
+            .retain(|reference| !inside(reference.range));
+        self.definition_attributes
+            .retain(|attrs| !inside(attrs.definition_range));
+        self.dynamic_templates
+            .retain(|template| !inside(template.definition_range));
+    }
+
     /// Whether lowering consulted workspace symbols, including missing symbols.
     /// Files without such reads can reuse their shard during symbol-fact replay.
     #[must_use]
@@ -370,7 +405,10 @@ impl HirFile {
 
     /// Returns properties fully contained in `range`, in source order.
     /// Source-ordered starts bound the search to this part of the document.
-    pub fn properties_in_range(&self, range: TextRange) -> impl Iterator<Item = &HirProperty> {
+    pub fn properties_in_range(
+        &self,
+        range: TextRange,
+    ) -> impl DoubleEndedIterator<Item = &HirProperty> + Clone {
         let first = self
             .properties
             .partition_point(|property| property.range.start() < range.start());
@@ -388,7 +426,7 @@ impl HirFile {
         &self.localisation_entries
     }
 
-    /// Returns unquoted value tokens that are not property keys.
+    /// Returns scalar value tokens, including quoted list items, that are not property keys.
     #[must_use]
     pub fn bare_values(&self) -> &[HirScalar] {
         &self.bare_values

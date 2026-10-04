@@ -1672,7 +1672,7 @@
     },
     "scripted_effect": {
       "impl": {
-        "Callable": {
+        "Template": {
           "body": "effect"
         }
       },
@@ -1681,7 +1681,7 @@
     "scripted_function": {},
     "scripted_trigger": {
       "impl": {
-        "Callable": {
+        "Template": {
           "body": "trigger"
         }
       },

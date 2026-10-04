@@ -9,7 +9,7 @@ fn bakes_only_the_ir_payload_under_target() {
     fs::create_dir(&source).unwrap();
     fs::write(
         source.join("game.json"),
-        r#"{"game_id":"test","source_format_version":13}"#,
+        r#"{"game_id":"test","source_format_version":14}"#,
     )
     .unwrap();
     fs::write(
@@ -40,7 +40,7 @@ fn invalid_source_refuses_to_create_or_replace_artifacts() {
     fs::create_dir(&source).unwrap();
     fs::write(
         source.join("game.json"),
-        r#"{"game_id":"test","source_format_version":13}"#,
+        r#"{"game_id":"test","source_format_version":14}"#,
     )
     .unwrap();
     fs::write(
@@ -80,7 +80,7 @@ fn invalid_block_form_refuses_to_create_or_replace_artifacts() {
     fs::create_dir(&source).unwrap();
     fs::write(
         source.join("game.json"),
-        r#"{"game_id":"test","source_format_version":13}"#,
+        r#"{"game_id":"test","source_format_version":14}"#,
     )
     .unwrap();
     fs::write(source.join("rules.json"), r#"{"files":{"script":{"path":"","root":"body"}},"schemas":{"body":{"forms":[{"fields":{"missing":"1"}}]}}}"#).unwrap();

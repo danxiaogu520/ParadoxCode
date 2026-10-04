@@ -15,6 +15,120 @@ fn host() -> AnalysisHost {
 }
 
 #[test]
+fn ir_template_long_chain_is_complete_in_diagnostics_completion_and_hover() {
+    let mut host = host();
+    let mut definitions = String::new();
+    for depth in 0..40 {
+        definitions.push_str(&format!(
+            "limit_chain{depth} = {{ limit_chain{} = {{ N = $N$ }} }}\n",
+            depth + 1
+        ));
+    }
+    definitions
+        .push_str("limit_chain40 = { add_prestige = $N$ }\nshort_limit = { add_prestige = $N$ }\n");
+    open(
+        &mut host,
+        "common/scripted_effects/limits.txt",
+        &definitions,
+    );
+    let source = "country_event = { id = limits.1 immediate = { limit_chain0 = { N = wrong } short_limit = { N = wrong } } }";
+    let id = open(&mut host, "events/limits.txt", source);
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results
+            .iter()
+            .all(|d| d.code != DiagnosticCode::AnalysisIncomplete),
+        "{results:?}"
+    );
+    assert!(
+        results
+            .iter()
+            .any(|d| d.code == DiagnosticCode::InvalidValue && d.message.contains("limit_chain0")),
+        "a known rejection survives incomplete work: {results:?}"
+    );
+    let position = source.find("N = wrong").unwrap() as u32;
+    let items = complete(&host.snapshot(), &id, position + 9);
+    assert!(items.coverage.is_complete());
+    let hover = hover(&host.snapshot(), &id, position).expect("parameter hover");
+    assert!(hover.coverage.is_complete());
+    assert!(hover.contents.contains("number"), "{}", hover.contents);
+}
+
+#[test]
+fn ir_template_node_limit_retains_an_early_rejection() {
+    let mut host = host();
+    open(
+        &mut host,
+        "common/scripted_effects/node-limit.txt",
+        "large_limit = { set_emperor = $P$ log = $P$ log = $P$ log = $P$ }",
+    );
+    let snapshot = host.snapshot();
+    let sites = crate::ir_template::parameter_sites_with_budget(
+        &snapshot,
+        "scripted_effect",
+        "large_limit",
+        "P",
+        &std::collections::BTreeMap::from([("P".into(), "wrong".into())]),
+        hir::ScopeState::initial(hir::ScopeValue::known_single("country")),
+        2,
+        &crate::CancellationToken::new(),
+    )
+    .unwrap();
+    assert!(!sites.coverage.is_complete());
+    assert!(
+        sites
+            .iter()
+            .any(|site| !site.accepts(&snapshot, "P", "wrong")),
+        "known rejection survives: {sites:?}"
+    );
+}
+
+#[test]
+fn ir_template_key_completion_checks_the_selected_body_scope() {
+    let mut host = host();
+    open(
+        &mut host,
+        "common/scripted_effects/body-scope.txt",
+        "body_scope = { $TARGET$ = { add_base_tax = 1 } }",
+    );
+    let source =
+        "country_event = { id = structure.1 immediate = { body_scope = { TARGET = cap } } }";
+    let id = open(&mut host, "events/body-scope.txt", source);
+    let position = source.find("TARGET = cap").unwrap() as u32 + 12;
+    let items = complete(&host.snapshot(), &id, position).items;
+    assert!(
+        items.iter().any(|item| item.label == "capital"),
+        "{items:?}"
+    );
+    assert!(
+        !items
+            .iter()
+            .any(|item| item.label == "capital.owner" || item.label == "capital.controller"),
+        "country-target branches reject province effects: {items:?}"
+    );
+}
+
+#[test]
+fn ir_template_splice_validates_the_whole_parent_container() {
+    let mut host = host();
+    open(
+        &mut host,
+        "common/scripted_effects/parent-container.txt",
+        "parent_container = { if = { limit = { always = yes } $BODY$ } }",
+    );
+    let source = "country_event = { id = structure.2 immediate = { parent_container = { BODY = \"limit = { always = yes } add_prestige = 1\" } } }";
+    let id = open(&mut host, "events/parent-container.txt", source);
+    let issues = diagnostics(&host.snapshot(), &id);
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue.code == DiagnosticCode::Cardinality
+                && issue.message.contains("Template `parent_container`")),
+        "fixed and inserted limit count together: {issues:?}"
+    );
+}
+
+#[test]
 fn ir_disk_diagnostics_release_temporary_frontends_and_reuse_interactive_ones() {
     use engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
     use text::{AbsPath, LogicalPath};
@@ -143,11 +257,22 @@ fn ir_empty_custom_tooltips_are_valid_separators_without_relaxing_other_loc_fiel
         &mut host,
         "events/tooltip-separator.txt",
         "country_event = { id = phase5.separator immediate = { \
-         custom_tooltip = phase5.first custom_tooltip = \"\" custom_tooltip = phase5.second } \
+         custom_tooltip = phase5.first custom_tooltip = \"\" custom_tooltip = \" \" custom_tooltip = phase5.second } \
          option = { name = phase5.first } }",
     );
     let items = diagnostics(&host.snapshot(), &id);
     assert!(items.is_empty(), "{items:#?}");
+    assert!(
+        host.snapshot()
+            .document(&id)
+            .unwrap()
+            .hir()
+            .unwrap()
+            .references()
+            .iter()
+            .filter(|reference| reference.kind.as_ref() == "localisation")
+            .all(|reference| !reference.name.trim().is_empty())
+    );
     let invalid = open(
         &mut host,
         "events/tooltip-separator-invalid.txt",
@@ -1384,7 +1509,7 @@ fn open(host: &mut AnalysisHost, path: &str, source: &str) -> DocumentId {
 }
 
 #[test]
-fn ir_callable_quoted_payload_reports_parser_errors_at_argument() {
+fn ir_template_quoted_payload_reports_parser_errors_at_argument() {
     let mut host = host();
     open(
         &mut host,
@@ -1434,7 +1559,7 @@ fn ir_callable_quoted_payload_reports_parser_errors_at_argument() {
 }
 
 #[test]
-fn ir_callable_value_completion_is_independent_of_usage_order() {
+fn ir_template_value_completion_is_independent_of_usage_order() {
     let mut host = host();
     open(
         &mut host,
@@ -1501,7 +1626,7 @@ fn ir_spliced_payloads_do_not_repeat_the_enclosing_guard_requirement() {
             d.code,
             DiagnosticCode::Cardinality | DiagnosticCode::UnknownKey | DiagnosticCode::InvalidValue
         )),
-        "the outer limit is already provided by the callable: {items:#?}"
+        "the outer limit is already provided by the template: {items:#?}"
     );
     let invalid = open(
         &mut host,
@@ -2333,7 +2458,7 @@ fn ir_iterators_preserve_their_trigger_and_effect_vocabularies() {
 }
 
 #[test]
-fn ir_callable_this_retains_the_callers_current_scope() {
+fn ir_template_this_retains_the_callers_current_scope() {
     let mut host = host();
     let id = open(
         &mut host,
@@ -2342,18 +2467,18 @@ fn ir_callable_this_retains_the_callers_current_scope() {
          province_only = { THIS = { change_province_name = \"X\" } }",
     );
     let snapshot = host.snapshot();
-    let report = crate::dynamic_contracts::dynamic_contract_report_view(
+    let report = crate::template_contracts::template_contract_report_view(
         &snapshot,
         &crate::CancellationToken::new(),
     )
     .unwrap();
     assert_eq!(
         report.contract("scripted_effect", "clash"),
-        Some(&crate::dynamic_contracts::ScopeContract::Empty)
+        Some(&crate::template_contracts::ScopeContract::Empty)
     );
     assert_eq!(
         report.contract("scripted_effect", "province_only"),
-        Some(&crate::dynamic_contracts::ScopeContract::Scopes(vec![
+        Some(&crate::template_contracts::ScopeContract::Scopes(vec![
             "province".into()
         ]))
     );
@@ -2400,7 +2525,7 @@ fn ir_register_blocks_enter_the_selected_register_scope() {
 }
 
 #[test]
-fn ir_callable_embedded_substitutions_require_bindings() {
+fn ir_template_embedded_substitutions_require_bindings() {
     let mut host = host();
     open(
         &mut host,
@@ -2458,7 +2583,7 @@ fn ir_logic_constant_lints_require_a_declared_constant_predicate() {
 }
 
 #[test]
-fn ir_callable_quoted_payload_references_navigate_and_rename() {
+fn ir_template_quoted_payload_references_navigate_and_rename() {
     let mut host = host();
     open(
         &mut host,
@@ -2808,7 +2933,7 @@ fn ir_completion_keeps_case_collisions_with_different_value_shapes() {
 }
 
 #[test]
-fn ir_callable_value_overloads_use_the_callers_current_scope() {
+fn ir_template_value_overloads_use_the_callers_current_scope() {
     let mut host = host();
     open(
         &mut host,
@@ -2852,7 +2977,7 @@ fn ir_callable_value_overloads_use_the_callers_current_scope() {
 }
 
 #[test]
-fn ir_callable_payload_symbols_enter_hir_and_follow_overlay_signature_changes() {
+fn ir_template_payload_symbols_enter_hir_and_follow_overlay_signature_changes() {
     let mut host = host();
     let writer = open(
         &mut host,
@@ -3242,24 +3367,24 @@ fn ir_nested_definitions_and_quoted_ranges_use_actual_source_shape() {
         hir.definitions()
     );
     let values = diagnostics(&snapshot, &id);
-    let start = source.find("maybe").unwrap() as u32;
+    for name in ["trigger", "effect"] {
+        assert!(
+            values
+                .iter()
+                .any(|value| value.code == DiagnosticCode::InvalidValue
+                    && value.message.contains(&format!("`{name}` expects a block"))),
+            "{values:#?}"
+        );
+    }
     assert!(
-        values
+        !hir.references()
             .iter()
-            .any(|value| value.code == DiagnosticCode::InvalidValue
-                && value.range.start() == start
-                && value.range.end() == start + 5),
-        "{values:#?}"
-    );
-    let position = source.find("add_prestige").unwrap() as u32 + 3;
-    assert!(
-        hover(&snapshot, &id, position).is_some(),
-        "quoted rule hover"
+            .any(|reference| reference.name == "add_prestige")
     );
 }
 
 #[test]
-fn ir_empty_rhs_and_callable_parameters_complete() {
+fn ir_empty_rhs_and_template_parameters_complete() {
     let mut host = host();
     let source = "country_event = { id = phase4.1 is_triggered_only =  }";
     let id = open(&mut host, "events/rhs.txt", source);
@@ -3541,7 +3666,7 @@ fn ir_file_containers_expose_nested_technology_and_custom_idea_definitions() {
 }
 
 #[test]
-fn ir_inherited_effect_schemas_keep_scope_and_callable_patterns() {
+fn ir_inherited_effect_schemas_keep_scope_and_template_patterns() {
     let mut host = host();
     open(
         &mut host,
@@ -3614,7 +3739,7 @@ fn ir_queries_respect_cancellation() {
 }
 
 #[test]
-fn ir_callable_arguments_follow_definition_value_constraints() {
+fn ir_template_arguments_follow_definition_value_constraints() {
     let mut host = host();
     open(
         &mut host,
@@ -4047,5 +4172,456 @@ fn ir_block_forms_preserve_estate_loyalty_alternatives() {
             .any(|diagnostic| diagnostic.code == DiagnosticCode::Cardinality
                 && diagnostic.message.contains("`estate`")),
         "unconditional required field was weakened"
+    );
+}
+
+#[test]
+fn template_scope_summary_retains_guards_and_actual_calls_activate_them() {
+    let mut host = host();
+    let definitions = "guarded_scope = { add_prestige = 1 [[P] change_province_name = \"X\" ] }";
+    let id = open(
+        &mut host,
+        "common/scripted_effects/guarded-scope.txt",
+        definitions,
+    );
+    assert!(
+        !diagnostics(&host.snapshot(), &id)
+            .iter()
+            .any(|item| item.code == DiagnosticCode::EmptyScopeContract)
+    );
+    let guard = definitions.find("[[P]").unwrap() as u32 + 2;
+    let info = hover(&host.snapshot(), &id, guard).unwrap();
+    assert!(info.contents.contains("optional"), "{info:?}");
+    for (name, argument, invalid) in [
+        ("inactive", "", false),
+        ("active", "P = yes", true),
+        ("hole", "P =", true),
+    ] {
+        let source = format!(
+            "country_event = {{ id = guard.{name} immediate = {{ guarded_scope = {{ {argument} }} }} option = {{ name = guard.{name} }} }}"
+        );
+        let caller = open(
+            &mut host,
+            &format!("events/guard-scope-{name}.txt"),
+            &source,
+        );
+        let values = diagnostics(&host.snapshot(), &caller);
+        assert_eq!(
+            values
+                .iter()
+                .any(|item| item.code == DiagnosticCode::WrongScope),
+            invalid,
+            "{name}: {values:?}"
+        );
+    }
+}
+
+#[test]
+fn template_fixed_callee_errors_are_checked_at_the_outer_call() {
+    let mut host = host();
+    open(
+        &mut host,
+        "common/scripted_effects/fixed-callee.txt",
+        "bad_leaf = { add_prestige = wrong } outer_fixed = { bad_leaf = yes }",
+    );
+    let source = "country_event = { id = fixed.1 immediate = { outer_fixed = yes } option = { name = fixed.1 } }";
+    let id = open(&mut host, "events/fixed-callee.txt", source);
+    let values = diagnostics(&host.snapshot(), &id);
+    assert!(
+        values
+            .iter()
+            .any(|value| value.code == DiagnosticCode::InvalidValue
+                && value.message.contains("add_prestige")),
+        "{values:?}"
+    );
+}
+
+fn overload_host() -> AnalysisHost {
+    super::support::fixture_host(serde_json::json!({
+        "traits":{"Template":{}},"types":{"fixture_template":{"impl":{"Template":{"body":"effect"}},"resolution":"replace"},"flag_a":{},"flag_b":{}},
+        "schemas":{
+            "fixture_root":{"fields":{"__templates":{"body":"definitions","card":"0..*"}}},
+            "definitions":{"map":{"key":"def<fixture_template>","body":"effect"}},
+            "arguments":{"map":{"key":"scalar","value":"scalar"}},
+            "effect":{"fields":{"pick":[
+                {"body":"country_variant","card":"0..*","scope":{"in":["country"],"push":"country"}},
+                {"body":"province_variant","card":"0..*","scope":{"in":["country"],"push":"province"}}
+            ]},"patterns":[{"key":"ref<fixture_template>","body":"arguments","card":"0..*"}]},
+            "country_variant":{"fields":{"a":{"value":"bool","card":"1","scope":{"in":["country"]}},"flag":{"value":"def<flag_a>","card":"0..1"}}},
+            "province_variant":{"fields":{"b":{"value":"bool","card":"1","scope":{"in":["province"]}},"flag":{"value":"def<flag_b>","card":"0..1"}}}
+        }
+    }))
+}
+
+#[test]
+fn complete_block_selects_one_consistent_overload_scope_and_symbol_namespace() {
+    let mut host = overload_host();
+    let source = "country_event = { immediate = { pick = { b = yes flag = chosen } } }";
+    let id = open(&mut host, "events/overload.txt", source);
+    let snapshot = host.snapshot();
+    let input = snapshot.document(&id).unwrap().hir().unwrap();
+    assert!(
+        !diagnostics(&snapshot, &id).iter().any(|item| matches!(
+            item.code,
+            DiagnosticCode::InvalidValue
+                | DiagnosticCode::UnknownKey
+                | DiagnosticCode::WrongScope
+                | DiagnosticCode::Cardinality
+        )),
+        "{:?}",
+        diagnostics(&snapshot, &id)
+    );
+    assert!(
+        input
+            .definitions()
+            .iter()
+            .any(|definition| definition.kind.as_ref() == "flag_b" && definition.name == "chosen")
+    );
+    assert!(
+        !input
+            .definitions()
+            .iter()
+            .any(|definition| definition.kind.as_ref() == "flag_a")
+    );
+    let b = source.find("b =").unwrap() as u32;
+    assert_eq!(
+        input
+            .scope_fact_at(text::TextRange::new(b, b + 1).unwrap())
+            .unwrap()
+            .state
+            .current
+            .first(),
+        Some(&hir::ScopeValue::known_single("province"))
+    );
+    assert_eq!(
+        input.overload_facts()[0].validation,
+        hir::analysis::Validation::Valid
+    );
+}
+
+#[test]
+fn template_block_overloads_cannot_mix_children_or_leak_speculative_facts() {
+    let mut host = overload_host();
+    open(
+        &mut host,
+        "definitions.txt",
+        "__templates = { wrap = { $BODY$ } }",
+    );
+    let valid = "country_event = { immediate = { wrap = { BODY = \"pick = { b = yes flag = chosen }\" } } }";
+    let id = open(&mut host, "events/template-overload.txt", valid);
+    let values = diagnostics(&host.snapshot(), &id);
+    assert!(
+        !values.iter().any(|item| matches!(
+            item.code,
+            DiagnosticCode::InvalidValue
+                | DiagnosticCode::UnknownKey
+                | DiagnosticCode::WrongScope
+                | DiagnosticCode::Cardinality
+        )),
+        "{values:?}"
+    );
+    let view = host.snapshot();
+    let result = complete(&view, &id, valid.find("b = yes").unwrap() as u32 + 5);
+    let yes = result
+        .items
+        .iter()
+        .find(|item| item.label == "yes")
+        .expect("valid bool candidate");
+    let proof = yes
+        .template_evidence
+        .as_ref()
+        .expect("Template candidate evidence");
+    let effect = view.ir().schema_by_name("effect").unwrap();
+    let selected = view
+        .ir()
+        .lookup(effect, "pick", rules::ir::Shape::Block)
+        .nth(1)
+        .unwrap();
+    assert!(
+        proof
+            .interpretations
+            .iter()
+            .any(|proof| proof.schema == effect.index()
+                && proof.fields == vec![selected.index()]
+                && !proof.conditional),
+        "{proof:?}"
+    );
+    let invalid =
+        "country_event = { immediate = { pick = { a = yes b = yes flag = speculative } } }";
+    let id = open(&mut host, "events/mixed-overload.txt", invalid);
+    let snapshot = host.snapshot();
+    let input = snapshot.document(&id).unwrap().hir().unwrap();
+    assert_eq!(
+        input.overload_facts()[0].validation,
+        hir::analysis::Validation::Invalid
+    );
+    assert!(
+        diagnostics(&snapshot, &id)
+            .iter()
+            .any(|item| item.code == DiagnosticCode::InvalidValue
+                && item.message.contains("no rule overload"))
+    );
+    assert!(
+        !input
+            .definitions()
+            .iter()
+            .any(|definition| definition.name == "speculative"),
+        "{:?}",
+        input.definitions()
+    );
+}
+
+#[test]
+fn unknown_script_prefix_does_not_prove_a_suffix_scope_or_value_error() {
+    let mut host = host();
+    let definitions = "fragile = { $BODY$ add_prestige = 1 change_province_name = \"X\" } before_hole = { add_prestige = wrong $BODY$ }";
+    let id = open(
+        &mut host,
+        "common/scripted_effects/open-boundary.txt",
+        definitions,
+    );
+    assert!(
+        !diagnostics(&host.snapshot(), &id)
+            .iter()
+            .any(|value| value.code == DiagnosticCode::EmptyScopeContract),
+        "{:?}",
+        diagnostics(&host.snapshot(), &id)
+    );
+    let source = "country_event = { id = prefix.1 immediate = { fragile = { BODY = \"# the suffix is a comment\" } before_hole = {} } option = { name = prefix.1 } }";
+    let id = open(&mut host, "events/open-boundary.txt", source);
+    let values = diagnostics(&host.snapshot(), &id);
+    assert!(
+        !values
+            .iter()
+            .any(|value| value.code == DiagnosticCode::WrongScope
+                && value.message.contains("fragile")),
+        "{values:?}"
+    );
+    assert!(
+        values
+            .iter()
+            .any(|value| value.code == DiagnosticCode::InvalidValue
+                && value.message.contains("before_hole")),
+        "{values:?}"
+    );
+}
+
+#[test]
+fn ambiguous_callee_binding_maps_are_not_validated_as_statements() {
+    let mut host = host();
+    open(
+        &mut host,
+        "common/scripted_triggers/ambiguous.txt",
+        "ambiguous_leaf = { always = $VALUE$ } ambiguous_leaf = { always = $VALUE$ } relay_ambiguous = { ambiguous_leaf = { VALUE = yes } }",
+    );
+    let source = "country_event = { id = unresolved.1 trigger = { relay_ambiguous = yes } option = { name = unresolved.1 } }";
+    let id = open(&mut host, "events/ambiguous-callee.txt", source);
+    let values = diagnostics(&host.snapshot(), &id);
+    assert!(
+        !values.iter().any(
+            |value| value.code == DiagnosticCode::UnknownKey && value.message.contains("VALUE")
+        ),
+        "{values:?}"
+    );
+    assert!(
+        values
+            .iter()
+            .any(|value| value.code == DiagnosticCode::AnalysisIncomplete),
+        "{values:?}"
+    );
+}
+
+fn script_items_host() -> AnalysisHost {
+    super::support::fixture_host(serde_json::json!({
+        "traits":{"Template":{}},"types":{"fixture_template":{"impl":{"Template":{"body":"effect"}},"resolution":"replace"}},
+        "schemas":{"fixture_root":{"fields":{"__templates":{"body":"definitions","card":"0..*"}}},
+            "definitions":{"map":{"key":"def<fixture_template>","body":"effect"}},"arguments":{"map":{"key":"scalar","value":"scalar"}},
+            "effect":{"fields":{"numbers":{"list":"float","card":"0..*"}},"patterns":[{"key":"ref<fixture_template>","body":"arguments","card":"0..*"}]}}
+    }))
+}
+#[test]
+fn template_items_validate_every_inserted_token_without_treating_the_list_as_one_scalar() {
+    let mut host = script_items_host();
+    open(
+        &mut host,
+        "definitions.txt",
+        "__templates = { list_wrap = { numbers = { $VALUES$ } } }",
+    );
+    for (name, value, invalid) in [
+        ("quoted", "\"1 2\"", false),
+        ("single", "3", false),
+        ("bad", "\"1 wrong 2\"", true),
+        ("quoted_item", "\"1 \\\"wrong\\\" 2\"", true),
+    ] {
+        let source =
+            format!("country_event = {{ immediate = {{ list_wrap = {{ VALUES = {value} }} }} }}");
+        let id = open(&mut host, &format!("events/items-{name}.txt"), &source);
+        let values = diagnostics(&host.snapshot(), &id);
+        assert_eq!(
+            values
+                .iter()
+                .any(|value| value.code == DiagnosticCode::InvalidValue),
+            invalid,
+            "{name}: {values:?}"
+        );
+    }
+}
+#[test]
+fn complete_operand_and_parent_siblings_share_completion_and_hover_context() {
+    let mut host = host();
+    open(
+        &mut host,
+        "common/scripted_effects/operand.txt",
+        "operand = { if = $BLOCK$ } partial = { if = { limit = { always = yes } $BODY$ } }",
+    );
+    let source = r#"country_event = { id = operand.1 immediate = { operand = { BLOCK = "{ limit = { always = yes } add_pr }" } } option = { name = operand.1 } }"#;
+    let id = open(&mut host, "events/operand.txt", source);
+    let items = complete(
+        &host.snapshot(),
+        &id,
+        (source.find("add_pr").unwrap() + 6) as u32,
+    );
+    assert!(
+        items.items.iter().any(|item| item.label == "add_prestige"),
+        "{items:?}"
+    );
+    let source = r#"country_event = { id = partial.1 immediate = { partial = { BODY = "l" } } option = { name = partial.1 } }"#;
+    let id = open(&mut host, "events/partial.txt", source);
+    let items = complete(
+        &host.snapshot(),
+        &id,
+        (source.find("BODY =").unwrap() + 9) as u32,
+    );
+    assert!(
+        !items.items.iter().any(|item| item.label == "limit"),
+        "the fixed sibling already consumes its quota: {items:?}"
+    );
+    assert!(
+        items.items.iter().any(|item| item.label == "log"),
+        "{items:?}"
+    );
+}
+
+#[test]
+fn completion_edit_round_trips_nested_carriers_and_literal_quote_values() {
+    let mut host = super::support::fixture_host(serde_json::json!({
+        "traits":{"Template":{}},"types":{"fixture_template":{"impl":{"Template":{"body":"trigger"}},"resolution":"replace"}},
+        "schemas":{"fixture_root":{"fields":{"__templates":{"body":"definitions","card":"0..*"}}},"definitions":{"map":{"key":"def<fixture_template>","body":"trigger"}},
+            "arguments":{"map":{"key":"scalar","value":"scalar"}},"trigger":{"fields":{"message":{"value":"'a\"b'","card":"0..*"}},"patterns":[{"key":"ref<fixture_template>","body":"arguments","card":"0..*"}]}}
+    }));
+    open(
+        &mut host,
+        "definitions.txt",
+        "__templates = { outer = { $BODY$ } inner = { $TEXT$ } }",
+    );
+    let payload = "message = ";
+    let middle = format!(
+        "inner = {{ TEXT = \"{}\" }}",
+        parser::encode_quoted_script_text(payload)
+    );
+    let source = format!(
+        "trigger = {{ outer = {{ BODY = \"{}\" }} }}",
+        parser::encode_quoted_script_text(&middle)
+    );
+    let id = open(&mut host, "events/nested-carrier.txt", &source);
+    let position = (source.find("message = ").unwrap() + "message = ".len()) as u32;
+    let result = complete(&host.snapshot(), &id, position);
+    let item = result
+        .items
+        .iter()
+        .find(|item| item.label == "a\"b")
+        .expect("literal quote candidate");
+    let text = if item.is_snippet {
+        crate::snippet_plain_text(&item.insert_text)
+    } else {
+        item.insert_text.clone()
+    };
+    let mut applied = source.clone();
+    applied.replace_range(
+        item.replacement_range.start() as usize..item.replacement_range.end() as usize,
+        &text,
+    );
+    let patched = open(&mut host, "events/nested-carrier-applied.txt", &applied);
+    let values = diagnostics(&host.snapshot(), &patched);
+    assert!(
+        !values.iter().any(|value| matches!(
+            value.code,
+            DiagnosticCode::Syntax | DiagnosticCode::InvalidValue | DiagnosticCode::UnknownKey
+        )),
+        "{applied}\n{values:?}"
+    );
+    assert_eq!(
+        item.template_evidence.as_ref().unwrap().validation,
+        hir::analysis::Validation::Valid
+    );
+}
+
+#[test]
+fn unfinished_fact_discovery_does_not_turn_a_negative_key_lookup_into_an_error() {
+    let mut host = super::support::fixture_host(serde_json::json!({
+        "types":{"node":{}},
+        "schemas":{
+            "fixture_root":{"fields":{"seed":{"value":"def<node>","card":"0..*"},"strict":{"body":"strict","card":"0..*"},"independent":{"value":"bool","card":"0..*"}},
+                "patterns":[{"key":"ref<node>","body":"known","card":"0..*"},{"key":"scalar","body":"missing","card":"0..*"}]},
+            "known":{"fields":{"write":{"value":"scalar","card":"1"}}},
+            "missing":{"fields":{"write":{"value":"def<node>","card":"1"}}},
+            "strict":{"patterns":[{"key":"ref<node>","body":"known","card":"0..*"}]}
+        }
+    }));
+    let text = "seed = stable toggle = { write = toggle } strict = { pending_key = { write = valid } } independent = wrong";
+    let id = open(&mut host, "events/pending-facts.txt", text);
+    assert!(
+        !host
+            .snapshot()
+            .document(&id)
+            .unwrap()
+            .fact_coverage
+            .is_known()
+    );
+    let values = diagnostics(&host.snapshot(), &id);
+    assert!(
+        values
+            .iter()
+            .any(|item| item.code == DiagnosticCode::AnalysisIncomplete),
+        "{values:?}"
+    );
+    assert!(
+        !values
+            .iter()
+            .any(|item| item.code == DiagnosticCode::UnknownKey
+                && item.message.contains("pending_key")),
+        "a miss in unfinished facts is unknown: {values:?}"
+    );
+    assert!(
+        values
+            .iter()
+            .any(|item| item.code == DiagnosticCode::InvalidValue
+                && item.message.contains("independent")),
+        "independent rejection must survive: {values:?}"
+    );
+}
+
+#[test]
+fn template_value_rejections_preserve_rule_warning_severity_and_the_actual_value() {
+    let mut host = host();
+    open(
+        &mut host,
+        "common/scripted_effects/advisory.txt",
+        "advisory = { if = { limit = { has_government_attribute = $ATTRIBUTE$ } add_prestige = 1 } }",
+    );
+    let text = "country_event = { id = advisory.1 immediate = { advisory = { ATTRIBUTE = owned_missing_attribute } } }";
+    let id = open(&mut host, "events/advisory.txt", text);
+    let values = diagnostics(&host.snapshot(), &id);
+    let advisory = values
+        .iter()
+        .find(|item| {
+            item.code == DiagnosticCode::InvalidValue
+                && item.message.contains("has_government_attribute")
+        })
+        .expect("reference rejection witness");
+    assert_eq!(advisory.severity, crate::Severity::Warning, "{values:?}");
+    assert!(
+        advisory.message.contains("owned_missing_attribute"),
+        "{advisory:?}"
     );
 }
