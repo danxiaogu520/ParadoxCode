@@ -2467,18 +2467,18 @@ fn ir_template_this_retains_the_callers_current_scope() {
          province_only = { THIS = { change_province_name = \"X\" } }",
     );
     let snapshot = host.snapshot();
-    let report = crate::dynamic_contracts::dynamic_contract_report_view(
+    let report = crate::template_contracts::template_contract_report_view(
         &snapshot,
         &crate::CancellationToken::new(),
     )
     .unwrap();
     assert_eq!(
         report.contract("scripted_effect", "clash"),
-        Some(&crate::dynamic_contracts::ScopeContract::Empty)
+        Some(&crate::template_contracts::ScopeContract::Empty)
     );
     assert_eq!(
         report.contract("scripted_effect", "province_only"),
-        Some(&crate::dynamic_contracts::ScopeContract::Scopes(vec![
+        Some(&crate::template_contracts::ScopeContract::Scopes(vec![
             "province".into()
         ]))
     );

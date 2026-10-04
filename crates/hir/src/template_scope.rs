@@ -2,7 +2,7 @@
 use crate::analysis::{Analysis, AnalysisCoverage, AnalysisLimit, ResidualReason, Validation};
 use crate::{ScopeState, ScopeValue};
 use rules::ir::{Matcher, RulesIr, SchemaId, Shape, SymbolFacts};
-use rules::replacement::{
+use rules::template::{
     TemplateFragment, TemplateInstruction, TemplateOperand, TemplateProgram, TemplateToken,
 };
 use std::{
@@ -224,7 +224,7 @@ fn solve<E>(
                 }
                 let template = ir
                     .type_by_name(&key.kind)
-                    .and_then(|id| facts.replacement_template(id, &key.name));
+                    .and_then(|id| facts.template(id, &key.name));
                 let schema = ir
                     .type_by_name(&key.kind)
                     .and_then(|id| crate::template::template_body(ir, id));

@@ -3,7 +3,7 @@
 //! HIR owns the source-to-schema walk. This module only interprets its cached
 //! facts and does not rebuild semantic context from paths or legacy rules.
 
-use crate::quoted_script::{QuotedScriptParse, QuotedScriptSession};
+use crate::template_parse::{TemplateParse, TemplateParseSession};
 use crate::types::{CancellationToken, Cancelled, Diagnostic, DiagnosticCode, Severity};
 use crate::{semantic::effective_workspace_member_names, support::ParsedInput};
 use engine::AnalysisSnapshot;
@@ -1466,7 +1466,7 @@ fn template_argument_diagnostics(
                 }
                 if !scalar.quoted
                     && sites.iter().any(|site| {
-                        matches!(site.domain, crate::ir_template::Domain::Payload { schema,.. } if ir.schema(schema).items.is_none())
+                        matches!(site.domain, crate::ir_template::Domain::Template { schema,.. } if ir.schema(schema).items.is_none())
                     })
                 {
                     diagnostics.push(Diagnostic::new(DiagnosticCode::InvalidValue, Severity::Warning,
@@ -1474,16 +1474,16 @@ fn template_argument_diagnostics(
                 }
                 if scalar.quoted
                     && sites.iter().any(|site| {
-                        matches!(site.domain, crate::ir_template::Domain::Payload { .. })
+                        matches!(site.domain, crate::ir_template::Domain::Template { .. })
                     })
                 {
                     let source = hir.syntax().source();
                     if let Some(raw) =
                         source.get(scalar.range.start() as usize..scalar.range.end() as usize)
                     {
-                        let mut session = QuotedScriptSession::new(cancellation);
+                        let mut session = TemplateParseSession::new(cancellation);
                         let parsed_payload = session.parse(raw, depth)?;
-                        if let QuotedScriptParse::Limited(reason) = &parsed_payload {
+                        if let TemplateParse::Limited(reason) = &parsed_payload {
                             diagnostics.push(Diagnostic::new(
                                 DiagnosticCode::AnalysisIncomplete,
                                 Severity::Information,
@@ -1491,7 +1491,7 @@ fn template_argument_diagnostics(
                                 reason.message().to_owned(),
                             ));
                         }
-                        if let QuotedScriptParse::Parsed(script) = parsed_payload {
+                        if let TemplateParse::Parsed(script) = parsed_payload {
                             // Syntax belongs to the payload itself, independent of schema
                             // overloads or the number of sites that consume this argument.
                             for error in script.parsed().errors() {
@@ -1601,10 +1601,11 @@ fn template_argument_diagnostics(
             .parameters
             .iter()
             .filter(|parameter| {
-                crate::dynamic_rules::parameter_effectively_required(snapshot, &summary, parameter)
-                    && !counts
-                        .keys()
-                        .any(|name| name.eq_ignore_ascii_case(&parameter.name))
+                crate::template_presence::parameter_effectively_required(
+                    snapshot, &summary, parameter,
+                ) && !counts
+                    .keys()
+                    .any(|name| name.eq_ignore_ascii_case(&parameter.name))
             })
             .map(|parameter| parameter.name.clone())
             .collect::<Vec<_>>();

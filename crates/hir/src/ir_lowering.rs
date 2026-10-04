@@ -925,7 +925,7 @@ fn lower_template_arguments(
     let Some(ty) = ir.type_by_name(kind) else {
         return;
     };
-    let Some(template) = facts.replacement_template(ty, name) else {
+    let Some(template) = facts.template(ty, name) else {
         out.analysis_coverage
             .limits
             .insert(crate::analysis::AnalysisLimit::UnavailableTemplate);
@@ -1105,11 +1105,11 @@ fn lower_template_arguments(
             definition.selection_range,
         ))
     });
-    dedup_payload_references(&mut out.references, reference_start);
-    dedup_payload_references(&mut out.binding_references, binding_start);
+    dedup_template_references(&mut out.references, reference_start);
+    dedup_template_references(&mut out.binding_references, binding_start);
 }
 
-fn dedup_payload_references(references: &mut Vec<HirReference>, previous: usize) {
+fn dedup_template_references(references: &mut Vec<HirReference>, previous: usize) {
     let mut keys = std::collections::BTreeSet::new();
     let mut i = 0;
     references.retain(|reference| {

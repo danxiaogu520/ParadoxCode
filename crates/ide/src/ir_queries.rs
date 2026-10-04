@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 const ENVIRONMENT_BYTES: usize = 8 * 1024 * 1024;
 #[derive(Default)]
-struct MemoEnvironments(Mutex<Vec<(String, Arc<rules::replacement::TemplateMemo>)>>);
+struct MemoEnvironments(Mutex<Vec<(String, Arc<rules::template::TemplateMemo>)>>);
 struct EnvironmentIdentity(String);
 impl Write for EnvironmentIdentity {
     fn write_str(&mut self, text: &str) -> std::fmt::Result {
@@ -88,11 +88,11 @@ impl SymbolFacts for SnapshotSymbolFacts<'_> {
             .eq_ignore_ascii_case("gfx")
             .then(|| self.snapshot.resolve_texture_path(name).is_some())
     }
-    fn template_memo(&self) -> Option<std::sync::Arc<rules::replacement::TemplateMemo>> {
+    fn template_memo(&self) -> Option<std::sync::Arc<rules::template::TemplateMemo>> {
         const KEY: &str = "template:semantic-memo";
         let cache = self.snapshot.query_cache();
         let revision = self.snapshot.revision();
-        if let Some(value) = cache.get::<rules::replacement::TemplateMemo>(revision, KEY) {
+        if let Some(value) = cache.get::<rules::template::TemplateMemo>(revision, KEY) {
             return Some(value);
         }
         const POOL: &str = "template:environment-memos";
@@ -118,12 +118,12 @@ impl SymbolFacts for SnapshotSymbolFacts<'_> {
                 if entries.len() >= 4 || bytes.saturating_add(identity.len()) > ENVIRONMENT_BYTES {
                     entries.clear();
                 }
-                let memo = Arc::new(rules::replacement::TemplateMemo::default());
+                let memo = Arc::new(rules::template::TemplateMemo::default());
                 entries.push((identity, memo.clone()));
                 memo
             }
         } else {
-            Arc::new(rules::replacement::TemplateMemo::default())
+            Arc::new(rules::template::TemplateMemo::default())
         };
         cache.insert(
             revision,
@@ -134,11 +134,11 @@ impl SymbolFacts for SnapshotSymbolFacts<'_> {
         Some(value)
     }
 
-    fn replacement_template(
+    fn template(
         &self,
         type_id: TypeId,
         name: &str,
-    ) -> Option<std::sync::Arc<rules::replacement::Template>> {
+    ) -> Option<std::sync::Arc<rules::template::Template>> {
         let kind = self
             .snapshot
             .ir()

@@ -1,8 +1,8 @@
-//! Binding-aware replacement interpreter shared by indexing and IDE queries.
+//! Binding-aware Template interpreter shared by indexing and IDE queries.
 use crate::analysis::{Analysis, AnalysisCoverage, AnalysisLimit, ResidualReason};
 use crate::{ScopeState, TemplateFragment, TemplateToken};
 use rules::ir::{FieldValue, Matcher, MatcherId, SchemaId, Shape};
-use rules::replacement::{TemplateInstruction, TemplateOperand, TemplateProgram};
+use rules::template::{TemplateInstruction, TemplateOperand, TemplateProgram};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::sync::Arc;
 
@@ -43,8 +43,8 @@ pub enum Domain {
     Value(Vec<MatcherId>),
     /// A key in a specific schema and value shape.
     Key { schema: SchemaId, shape: Shape },
-    /// A complete quoted block or a spliced block fragment.
-    Payload { schema: SchemaId, complete: bool },
+    /// Template script consumption as a complete block or a spliced fragment.
+    Template { schema: SchemaId, complete: bool },
     /// A recursive or unresolved usage grants no concrete constraint.
     Unresolved,
 }
@@ -54,7 +54,7 @@ pub enum Domain {
 pub struct ParameterSite {
     /// Template containing this usage; forwarded definitions can share offsets.
     pub origin: (String, String),
-    /// Matcher, key or payload interpretation.
+    /// Scalar matcher, key or Template consumption.
     pub domain: Domain,
     /// Definition-side token with forwarded substitutions.
     pub token: TemplateToken,
@@ -470,7 +470,7 @@ impl<E> Interpreter<'_, E> {
                         continue;
                     }
                     if let Some(type_id) = self.ir.type_by_name(&kind)
-                        && let Some(template) = self.facts.replacement_template(type_id, &name)
+                        && let Some(template) = self.facts.template(type_id, &name)
                         && let Some(schema) = template_body(self.ir, type_id)
                     {
                         if self.parameter.is_empty() {
@@ -667,7 +667,7 @@ impl<E> Interpreter<'_, E> {
                 }
             }
             TemplateInstruction::Consume(token) => {
-                let domain = Domain::Payload {
+                let domain = Domain::Template {
                     schema,
                     complete: false,
                 };
@@ -716,9 +716,8 @@ impl<E> Interpreter<'_, E> {
                 // its parameter block as effect statements.
                 let callee = fields.iter().find_map(|id| {
                     template_kind(ir, ir.field(*id).key).filter(|kind| {
-                        ir.type_by_name(kind).is_some_and(|type_id| {
-                            self.facts.replacement_template(type_id, &key).is_some()
-                        })
+                        ir.type_by_name(kind)
+                            .is_some_and(|type_id| self.facts.template(type_id, &key).is_some())
                     })
                 });
                 if let Some(kind) = callee {
@@ -975,14 +974,14 @@ fn key_matches(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rules::replacement::{Template, TemplateItem, TemplateProperty, TemplateValue};
+    use rules::template::{Template, TemplateItem, TemplateProperty, TemplateValue};
 
     struct Definitions(BTreeMap<String, Arc<Template>>, rules::ir::TypeId);
     impl rules::ir::SymbolFacts for Definitions {
         fn type_member(&self, ty: rules::ir::TypeId, name: &str) -> bool {
             ty == self.1 && self.0.contains_key(&name.to_ascii_lowercase())
         }
-        fn replacement_template(&self, _: rules::ir::TypeId, name: &str) -> Option<Arc<Template>> {
+        fn template(&self, _: rules::ir::TypeId, name: &str) -> Option<Arc<Template>> {
             self.0.get(&name.to_ascii_lowercase()).cloned()
         }
     }

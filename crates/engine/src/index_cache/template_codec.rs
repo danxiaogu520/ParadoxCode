@@ -236,7 +236,7 @@ impl EncodedTemplate {
         let items = decode_items(self.items, budget)?;
         Ok(Template {
             source: Arc::from(self.source),
-            program: Arc::new(rules::replacement::TemplateProgram::compile(&items)),
+            program: Arc::new(rules::template::TemplateProgram::compile(&items)),
             kind: Arc::from(self.kind),
             name: self.name,
             definition_range: decode_range(self.definition_range)?,

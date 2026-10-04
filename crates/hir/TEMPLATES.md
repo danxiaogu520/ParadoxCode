@@ -1,6 +1,8 @@
 # Template analysis
 
 A `Template` retains its lossless definition body and an immutable arena program.
+The shared model lives in [rules::template](../rules/src/template.rs); workspace
+facts resolve a named body through `SymbolFacts::template`.
 The program records property dispatch, scalar/script consumption, presence guards,
 and recoverable syntax. Rules call this capability `Template`; scalar literal
 matching uses `Pattern`. Quoted text remains an ordinary scalar until an actual
@@ -30,6 +32,10 @@ same program using explicit Any/All continuations and concrete binding/scope
 states. Unknown guards remain conditional. Runtime `OR` still checks every child
 for static legality. Unresolved script prefixes prevent the projection from
 assuming that the suffix keeps its original lexical or scope context.
+
+The IDE projects presence in `template_presence`, scope in `template_contracts`,
+recursion coverage in `template_recursion` and quoted-carrier parsing in `template_parse`.
+A parameter's script consumption domain is `Domain::Template`.
 
 IDE diagnostics, hover and completion request entry scopes for the definitions
 they actually consume. Completion filters candidate names before requesting

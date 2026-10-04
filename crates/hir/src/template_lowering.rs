@@ -57,7 +57,7 @@ fn lower_templates(
             name: definition.name.clone(),
             definition_range: definition.range,
             body_range: block.range(),
-            program: std::sync::Arc::new(rules::replacement::TemplateProgram::compile(&items)),
+            program: std::sync::Arc::new(rules::template::TemplateProgram::compile(&items)),
             items: std::sync::Arc::from(items),
         });
     }

@@ -1,7 +1,7 @@
 //! Bounded finite string relations. Repeated occurrences share one binding.
 //! The same rows can be joined across usage sites; a witness is never chosen independently.
 use crate::analysis::{Analysis, AnalysisCoverage, AnalysisLimit};
-use rules::replacement::TemplateFragment;
+use rules::template::TemplateFragment;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// One consistent assignment of parameter names to strings.

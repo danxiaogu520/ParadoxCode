@@ -1,10 +1,10 @@
-use crate::dynamic_contracts;
-use crate::dynamic_cycles;
 use crate::messages::did_you_mean;
 use crate::resolution::*;
 use crate::semantic::*;
 use crate::suggest::best_suggestion;
 use crate::support::*;
+use crate::template_contracts;
+use crate::template_recursion;
 use crate::types::*;
 use engine::{AnalysisSnapshot, DocumentId, DocumentSource, SourceFileId};
 use hir::Scope;
@@ -255,21 +255,21 @@ pub(crate) fn analyze_input_with_cancellation(
     {
         diagnostics
             .values
-            .extend(dynamic_contracts::dynamic_contract_diagnostics(
+            .extend(template_contracts::template_contract_diagnostics(
                 snapshot,
                 input,
                 cancellation,
             )?);
         diagnostics
             .values
-            .extend(dynamic_contracts::dynamic_call_site_diagnostics(
+            .extend(template_contracts::template_call_site_diagnostics(
                 snapshot,
                 input,
                 cancellation,
             )?);
         diagnostics
             .values
-            .extend(dynamic_cycles::dynamic_cycle_diagnostics(
+            .extend(template_recursion::template_recursion_diagnostics(
                 snapshot,
                 input,
                 cancellation,

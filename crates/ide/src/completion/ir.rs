@@ -248,8 +248,8 @@ fn try_ir_completion_inner(
             || matches!(current, hir::ScopeValue::Known(scopes) if scopes.iter().all(|scope| scope.eq_ignore_ascii_case("any"))))
         && let Some(owner) = hir.definitions().iter().find(|definition| contains(definition.range, position)
             && crate::semantic::dynamic_definition_type(snapshot, &definition.kind))
-        && let crate::dynamic_contracts::ScopeContract::Scopes(scopes) =
-            crate::dynamic_contracts::dynamic_contract_with_cancellation(snapshot, &owner.kind, &owner.name, cancellation)?
+        && let crate::template_contracts::ScopeContract::Scopes(scopes) =
+            crate::template_contracts::template_contract_with_cancellation(snapshot, &owner.kind, &owner.name, cancellation)?
         && scopes.len() == 1
     {
         state.current = vec![hir::ScopeValue::known_single(&scopes[0])];
@@ -384,8 +384,8 @@ fn try_ir_completion_inner(
                 };
                 let template_kind = crate::ir_template::template_kind(ir, matcher);
                 if let Some(kind) = &template_kind
-                    && let crate::dynamic_contracts::ScopeContract::Scopes(expected) =
-                        crate::dynamic_contracts::dynamic_contract_with_cancellation(
+                    && let crate::template_contracts::ScopeContract::Scopes(expected) =
+                        crate::template_contracts::template_contract_with_cancellation(
                             snapshot,
                             kind,
                             &label,
@@ -584,7 +584,7 @@ fn append_template_value_items(
             cancellation,
         )?;
         let scalar_unknown = sites.iter().any(|site| {
-            !matches!(site.domain, crate::ir_template::Domain::Payload { .. })
+            !matches!(site.domain, crate::ir_template::Domain::Template { .. })
                 && site.witness_validation(snapshot, &witness) == hir::analysis::Validation::Unknown
         });
         if scalar_unknown && checked.value == hir::analysis::Validation::Valid {

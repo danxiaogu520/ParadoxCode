@@ -267,7 +267,7 @@ pub struct HirParameterReference {
     pub kind: HirParameterReferenceKind,
 }
 
-pub use rules::replacement::{
+pub use rules::template::{
     Template, TemplateConditional, TemplateFragment, TemplateItem, TemplateProperty, TemplateToken,
     TemplateValue,
 };

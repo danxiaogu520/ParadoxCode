@@ -5,9 +5,6 @@
 
 mod completion;
 mod diagnostics;
-mod dynamic_contracts;
-mod dynamic_cycles;
-mod dynamic_rules;
 mod hover;
 mod hover_card;
 mod inlay;
@@ -20,12 +17,15 @@ mod messages;
 mod mission;
 mod navigation;
 mod quick_fix;
-mod quoted_script;
 mod resolution;
 mod semantic;
 mod semantic_tokens;
 mod suggest;
 mod support;
+mod template_contracts;
+mod template_parse;
+mod template_presence;
+mod template_recursion;
 mod transcode;
 mod types;
 

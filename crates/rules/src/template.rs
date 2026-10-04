@@ -1,4 +1,4 @@
-//! Source-ranged replacement templates shared by lowering and workspace facts.
+//! Source-ranged Template programs shared by lowering and workspace facts.
 
 use std::any::Any;
 use std::sync::Arc;

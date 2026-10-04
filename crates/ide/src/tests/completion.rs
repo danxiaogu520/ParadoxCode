@@ -3574,7 +3574,7 @@ fn dynamic_trigger_completion_filters_by_entry_contract() {
 }
 
 #[test]
-fn dynamic_contract_report_honors_completion_cancellation() {
+fn template_contract_report_honors_completion_cancellation() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -3600,7 +3600,7 @@ fn dynamic_contract_report_honors_completion_cancellation() {
     // contract before the outer query could observe cancellation.
     let cancellation = CancellationToken::cancel_after(1);
     assert!(matches!(
-        crate::dynamic_contracts::dynamic_contract_report_view(&host.snapshot(), &cancellation),
+        crate::template_contracts::template_contract_report_view(&host.snapshot(), &cancellation),
         Err(Cancelled)
     ));
     assert!(cancellation.is_cancelled());

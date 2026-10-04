@@ -33,7 +33,7 @@ pub struct IndexSymbolFacts<'a> {
     index: &'a crate::WorkspaceIndex,
     overlays: &'a [Arc<HirFile>],
     excluded_file_ids: Option<&'a BTreeSet<SourceFileId>>,
-    template_memo: Arc<rules::replacement::TemplateMemo>,
+    template_memo: Arc<rules::template::TemplateMemo>,
     templates: OnceLock<BTreeMap<String, crate::FlagWriteIndex>>,
 }
 
@@ -167,15 +167,15 @@ impl<'a> IndexSymbolFacts<'a> {
 }
 
 impl rules::ir::SymbolFacts for IndexSymbolFacts<'_> {
-    fn template_memo(&self) -> Option<Arc<rules::replacement::TemplateMemo>> {
+    fn template_memo(&self) -> Option<Arc<rules::template::TemplateMemo>> {
         Some(self.template_memo.clone())
     }
 
-    fn replacement_template(
+    fn template(
         &self,
         type_id: rules::ir::TypeId,
         name: &str,
-    ) -> Option<Arc<rules::replacement::Template>> {
+    ) -> Option<Arc<rules::template::Template>> {
         let kind = self.ir.strings.resolve(self.ir.type_info(type_id).name);
         let mut overlay = None;
         for hir in self.overlays {

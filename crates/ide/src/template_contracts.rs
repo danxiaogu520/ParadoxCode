@@ -18,7 +18,7 @@ use crate::types::{CancellationToken, Cancelled, Diagnostic, DiagnosticCode, unc
 
 /// Cache key for the workspace-wide contract report inside the query cache.
 #[cfg(test)]
-const CONTRACT_CACHE_KEY: &str = "dynamic-scope-contracts";
+const CONTRACT_CACHE_KEY: &str = "template:scope-contracts";
 
 /// One inferred entry contract.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -47,7 +47,7 @@ impl ScopeContract {
 /// Workspace-wide inference result for every live dynamic definition.
 #[cfg(test)]
 #[derive(Clone, Debug, Default)]
-pub(crate) struct DynamicContractReport {
+pub(crate) struct TemplateContractReport {
     contracts: BTreeMap<(String, String), ScopeContract>,
     /// Definitions whose template dispatches through a `$param$` key.
     dynamic: BTreeSet<(String, String)>,
@@ -55,7 +55,7 @@ pub(crate) struct DynamicContractReport {
 }
 
 #[cfg(test)]
-impl DynamicContractReport {
+impl TemplateContractReport {
     pub(crate) fn contract(&self, kind: &str, name: &str) -> Option<&ScopeContract> {
         self.contracts
             .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
@@ -64,7 +64,7 @@ impl DynamicContractReport {
 
 /// Returns definition-site diagnostics for dynamic definitions in `input` whose
 /// inferred entry contract is empty.
-pub(crate) fn dynamic_contract_diagnostics(
+pub(crate) fn template_contract_diagnostics(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     cancellation: &CancellationToken,
@@ -114,7 +114,7 @@ pub(crate) fn dynamic_contract_diagnostics(
 /// builtin (the contract's `Any` case), and keys with no rows stay with the
 /// unknown-key lint. Empty contracts are already reported at their definition
 /// site and are not repeated per call site.
-pub(crate) fn dynamic_call_site_diagnostics(
+pub(crate) fn template_call_site_diagnostics(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     cancellation: &CancellationToken,
@@ -235,7 +235,7 @@ pub(crate) fn dynamic_call_site_diagnostics(
 }
 
 /// One definition's shared scope projection, with the caller's cancellation token.
-pub(crate) fn dynamic_contract_with_cancellation(
+pub(crate) fn template_contract_with_cancellation(
     snapshot: &AnalysisSnapshot,
     kind: &str,
     name: &str,
@@ -248,7 +248,7 @@ pub(crate) fn dynamic_contract_with_cancellation(
 
 /// Owned audit convenience for one definition's scope projection.
 #[cfg(test)]
-pub(crate) fn dynamic_contract(
+pub(crate) fn template_contract(
     snapshot: &AnalysisSnapshot,
     kind: &str,
     name: &str,
@@ -263,11 +263,11 @@ pub(crate) fn dynamic_contract(
 
 /// Complete owned audit view; interactive consumers use targeted projections.
 #[cfg(test)]
-pub(crate) fn dynamic_contract_report_view(
+pub(crate) fn template_contract_report_view(
     snapshot: &AnalysisSnapshot,
     cancellation: &CancellationToken,
-) -> Result<std::sync::Arc<DynamicContractReport>, Cancelled> {
-    dynamic_contract_report(snapshot, cancellation)
+) -> Result<std::sync::Arc<TemplateContractReport>, Cancelled> {
+    template_contract_report(snapshot, cancellation)
 }
 
 /// One-line hover summary of a definition's inferred contract.
@@ -353,13 +353,13 @@ fn contract_entry(
 }
 
 #[cfg(test)]
-fn dynamic_contract_report(
+fn template_contract_report(
     snapshot: &AnalysisSnapshot,
     cancellation: &CancellationToken,
-) -> Result<Arc<DynamicContractReport>, Cancelled> {
+) -> Result<Arc<TemplateContractReport>, Cancelled> {
     let revision = snapshot.revision();
     if let Some(cached) =
-        probe_query_cache::<DynamicContractReport>(snapshot, revision, &[CONTRACT_CACHE_KEY])
+        probe_query_cache::<TemplateContractReport>(snapshot, revision, &[CONTRACT_CACHE_KEY])
     {
         return Ok(cached);
     }
@@ -372,11 +372,11 @@ fn dynamic_contract_report(
         .query_cache()
         .is_superseded(engine::CacheDomain::Documents, revision)
     {
-        return Ok(Arc::new(DynamicContractReport::default()));
+        return Ok(Arc::new(TemplateContractReport::default()));
     }
     cancellation.checkpoint()?;
     let report = build_contract_report(snapshot, cancellation)?;
-    if std::env::var("PDC_DEBUG_DYNAMIC_CONTRACTS").is_ok_and(|value| !value.is_empty()) {
+    if std::env::var("PDC_DEBUG_TEMPLATE_CONTRACTS").is_ok_and(|value| !value.is_empty()) {
         let count = |predicate: &dyn Fn(&ScopeContract) -> bool| {
             report
                 .contracts
@@ -407,7 +407,7 @@ fn dynamic_contract_report(
 fn build_contract_report(
     snapshot: &AnalysisSnapshot,
     cancellation: &CancellationToken,
-) -> Result<DynamicContractReport, Cancelled> {
+) -> Result<TemplateContractReport, Cancelled> {
     let mut candidates: Vec<(Arc<str>, String)> = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for definition in snapshot.index().definitions_iter() {
@@ -441,7 +441,7 @@ fn build_contract_report(
             }
         }
     }
-    let mut report = DynamicContractReport::default();
+    let mut report = TemplateContractReport::default();
     for (kind, name) in candidates {
         let entry = contract_entry(snapshot, &kind, &name, cancellation)?;
         let key = (kind.to_ascii_lowercase(), name.to_ascii_lowercase());

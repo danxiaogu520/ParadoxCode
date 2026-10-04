@@ -15,7 +15,7 @@ pub(crate) use hir::template::Domain;
 pub(crate) type BodyAnalysis = hir::template_instance::TemplateInstance;
 
 fn has_structural_reads(template: &hir::Template, snapshot: &AnalysisSnapshot) -> bool {
-    use rules::replacement::{TemplateFragment, TemplateInstruction, TemplateOperand};
+    use rules::template::{TemplateFragment, TemplateInstruction, TemplateOperand};
     let ir = snapshot.ir();
     let schema = ir
         .type_by_name(&template.kind)
@@ -94,9 +94,7 @@ fn analyse_body_with_bindings(
     let Some(type_id) = ir.type_by_name(&kind) else {
         return Ok(None);
     };
-    let Some(template) =
-        rules::ir::SymbolFacts::replacement_template(&facts, type_id, &invocation.key)
-    else {
+    let Some(template) = rules::ir::SymbolFacts::template(&facts, type_id, &invocation.key) else {
         return Ok(None);
     };
     let Some(schema) = hir::template::template_body(ir, type_id) else {
@@ -546,7 +544,7 @@ impl ParameterSite {
                         &WorkspaceFacts { snapshot },
                     )
             }),
-            Domain::Payload { .. } | Domain::Unresolved => true,
+            Domain::Template { .. } | Domain::Unresolved => true,
         }
     }
 
@@ -600,7 +598,7 @@ impl ParameterSite {
                     )
                 })
                 .collect(),
-            Domain::Payload { schema, .. } => {
+            Domain::Template { schema, .. } => {
                 ir.schema(*schema).items.map_or_else(Vec::new, |matcher| {
                     ir_semantic::spellings_with_state(
                         ir,
@@ -753,7 +751,7 @@ impl ParameterSite {
                     Validation::Invalid
                 }
             }
-            Domain::Payload { .. } | Domain::Unresolved => Validation::Unknown,
+            Domain::Template { .. } | Domain::Unresolved => Validation::Unknown,
         }
     }
 

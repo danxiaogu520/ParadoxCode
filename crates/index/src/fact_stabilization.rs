@@ -45,13 +45,9 @@ impl SymbolFacts for TrackingFacts<'_> {
         self.facts.facts_complete()
     }
     // Reusing a memo without replaying its read set would lose dependencies.
-    fn replacement_template(
-        &self,
-        ty: TypeId,
-        name: &str,
-    ) -> Option<Arc<rules::replacement::Template>> {
+    fn template(&self, ty: TypeId, name: &str) -> Option<Arc<rules::template::Template>> {
         self.read(ty, name);
-        self.facts.replacement_template(ty, name)
+        self.facts.template(ty, name)
     }
     fn type_member(&self, ty: TypeId, name: &str) -> bool {
         self.read(ty, name);

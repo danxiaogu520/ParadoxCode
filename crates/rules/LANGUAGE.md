@@ -503,7 +503,7 @@ flat data at compile time; the runtime does no dynamic dispatch.
 - `any` is a reserved word meaning *any scope*; it never appears in `types`.
 - `registers.role` is required: `root`, `current`, `previous`, or `from` selects the runtime state slot. Register spellings are arbitrary; the runtime never infers the role from a name.
 - `registers.chain` is allowed only for `previous` and `from` roles. It means the register concatenates (`prev_prev`, `fromfrom`,
-  …), replacing the hard-coded list in `dynamic_rules.rs` and the hand-written
+  …), replacing the former hard-coded register list and the hand-written
   `prev_prev` entries in `scope_names`.
 - Link keys may be templates (§2), replacing `dynamic_scope_prefixes`;
   `dynamic_value_prefixes` are likewise expressed as value templates

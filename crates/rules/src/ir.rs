@@ -780,16 +780,16 @@ pub trait SymbolFacts {
         None
     }
     /// Memoization within this immutable fact view; returning None disables cross-query reuse.
-    fn template_memo(&self) -> Option<std::sync::Arc<crate::replacement::TemplateMemo>> {
+    fn template_memo(&self) -> Option<std::sync::Arc<crate::template::TemplateMemo>> {
         None
     }
-    /// Source-ranged body of a uniquely active replacement definition.
+    /// Source-ranged body of a uniquely active named Template.
     /// Missing or ambiguous definitions grant no payload interpretation.
-    fn replacement_template(
+    fn template(
         &self,
         type_id: TypeId,
         name: &str,
-    ) -> Option<std::sync::Arc<crate::replacement::Template>> {
+    ) -> Option<std::sync::Arc<crate::template::Template>> {
         let _ = (type_id, name);
         None
     }

@@ -64,7 +64,7 @@ pub(crate) fn ir_invocation_parameter_hover(
     ));
     let mut section = format!(
         "- Presence: `{}`",
-        if crate::dynamic_rules::parameter_effectively_required(snapshot, &summary, parameter) {
+        if crate::template_presence::parameter_effectively_required(snapshot, &summary, parameter) {
             "required"
         } else {
             "optional"
@@ -125,7 +125,7 @@ pub(crate) fn ir_invocation_parameter_hover(
 /// resolves the row by kind (or name alone when the caller does not know the
 /// kind) and replays the parameter's usage-site rows under an any-scope,
 /// showing every conditional branch.
-pub(crate) fn dynamic_parameter_contract_lines(
+pub(crate) fn template_parameter_contract_lines(
     snapshot: &AnalysisSnapshot,
     owner_kind: Option<&str>,
     owner_name: &str,
@@ -182,7 +182,7 @@ fn ir_parameter_contract_lines(
     let mut lines = Vec::new();
     if sites
         .iter()
-        .any(|site| matches!(site.domain, Domain::Payload { .. }))
+        .any(|site| matches!(site.domain, Domain::Template { .. }))
     {
         lines.push(
             "- Payload: quoted script (the caller's raw text is spliced into the body)".into(),
@@ -221,7 +221,7 @@ fn ir_parameter_contract_lines(
                     ));
                 }
             }
-            Domain::Payload { .. } | Domain::Unresolved => {}
+            Domain::Template { .. } | Domain::Unresolved => {}
         }
     }
     if !values.is_empty() {
@@ -273,7 +273,7 @@ fn ir_parameter_value_label(ir: &rules::ir::RulesIr, id: rules::ir::MatcherId) -
 /// and optional group by activation scoping — the same partition that picks
 /// snippet tabstops — so hover, completion, and diagnostics agree on which
 /// parameters an invocation may omit.
-pub(crate) fn dynamic_signature_hover(
+pub(crate) fn template_signature_hover(
     snapshot: &AnalysisSnapshot,
     summary: &engine::DynamicDefinitionSummary,
 ) -> String {
@@ -282,7 +282,7 @@ pub(crate) fn dynamic_signature_hover(
         _ => "named parameter block".to_owned(),
     };
     let required_presence = |parameter: &engine::DynamicParameterSignature| {
-        crate::dynamic_rules::parameter_effectively_required(snapshot, summary, parameter)
+        crate::template_presence::parameter_effectively_required(snapshot, summary, parameter)
     };
     let required = summary
         .parameters
@@ -323,7 +323,7 @@ pub(crate) fn parameter_presence_required(
         .summary
         .template;
     let template = template.as_ref()?;
-    Some(!crate::dynamic_rules::parameter_is_activation_scoped(
+    Some(!crate::template_presence::parameter_is_activation_scoped(
         snapshot, template, parameter,
     ))
 }

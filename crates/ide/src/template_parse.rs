@@ -1,47 +1,48 @@
+//! Bounded decoding and CST parsing of quoted carriers consumed by a Template.
 use parser::{CstNode, QuotedScript};
 
 use crate::types::{CancellationToken, Cancelled};
 
-pub(crate) const MAX_QUOTED_SCRIPT_DEPTH: usize = 32;
-pub(crate) const MAX_QUOTED_SCRIPT_BYTES: usize = 1024 * 1024;
-pub(crate) const MAX_QUOTED_SCRIPT_TOTAL_BYTES: usize = 1024 * 1024;
-pub(crate) const MAX_QUOTED_SCRIPT_NODES: usize = 50_000;
+pub(crate) const MAX_TEMPLATE_PARSE_DEPTH: usize = 32;
+pub(crate) const MAX_TEMPLATE_PARSE_BYTES: usize = 1024 * 1024;
+pub(crate) const MAX_TEMPLATE_PARSE_TOTAL_BYTES: usize = 1024 * 1024;
+pub(crate) const MAX_TEMPLATE_PARSE_NODES: usize = 50_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum QuotedScriptLimit {
+pub(crate) enum TemplateParseLimit {
     Depth,
-    PayloadBytes,
+    CarrierBytes,
     TotalBytes,
     Nodes,
 }
 
-impl QuotedScriptLimit {
+impl TemplateParseLimit {
     pub(crate) const fn message(self) -> &'static str {
         match self {
             Self::Depth => "quoted script nesting exceeds the analysis depth limit",
-            Self::PayloadBytes => "quoted script exceeds the analysis payload limit",
+            Self::CarrierBytes => "quoted script exceeds the analysis payload limit",
             Self::TotalBytes => "quoted scripts exceed the analysis byte budget",
             Self::Nodes => "quoted scripts exceed the analysis node budget",
         }
     }
 }
 
-pub(crate) enum QuotedScriptParse {
+pub(crate) enum TemplateParse {
     Parsed(QuotedScript),
     Opaque,
-    Limited(QuotedScriptLimit),
+    Limited(TemplateParseLimit),
 }
 
 /// Query-local budget for secondary Script parses. The same policy is shared by diagnostics,
 /// completion, hover and navigation so malformed editor input cannot take an unbounded path in
 /// one feature while remaining bounded in another.
-pub(crate) struct QuotedScriptSession<'cancel> {
+pub(crate) struct TemplateParseSession<'cancel> {
     cancellation: &'cancel CancellationToken,
     parsed_bytes: usize,
     parsed_nodes: usize,
 }
 
-impl<'cancel> QuotedScriptSession<'cancel> {
+impl<'cancel> TemplateParseSession<'cancel> {
     pub(crate) const fn new(cancellation: &'cancel CancellationToken) -> Self {
         Self {
             cancellation,
@@ -50,52 +51,48 @@ impl<'cancel> QuotedScriptSession<'cancel> {
         }
     }
 
-    pub(crate) fn parse(
-        &mut self,
-        source: &str,
-        depth: usize,
-    ) -> Result<QuotedScriptParse, Cancelled> {
+    pub(crate) fn parse(&mut self, source: &str, depth: usize) -> Result<TemplateParse, Cancelled> {
         self.cancellation.checkpoint()?;
-        if depth >= MAX_QUOTED_SCRIPT_DEPTH {
-            return Ok(QuotedScriptParse::Limited(QuotedScriptLimit::Depth));
+        if depth >= MAX_TEMPLATE_PARSE_DEPTH {
+            return Ok(TemplateParse::Limited(TemplateParseLimit::Depth));
         }
-        if source.len() > MAX_QUOTED_SCRIPT_BYTES {
-            return Ok(QuotedScriptParse::Limited(QuotedScriptLimit::PayloadBytes));
+        if source.len() > MAX_TEMPLATE_PARSE_BYTES {
+            return Ok(TemplateParse::Limited(TemplateParseLimit::CarrierBytes));
         }
         self.parsed_bytes = self.parsed_bytes.saturating_add(source.len());
-        if self.parsed_bytes > MAX_QUOTED_SCRIPT_TOTAL_BYTES {
-            return Ok(QuotedScriptParse::Limited(QuotedScriptLimit::TotalBytes));
+        if self.parsed_bytes > MAX_TEMPLATE_PARSE_TOTAL_BYTES {
+            return Ok(TemplateParse::Limited(TemplateParseLimit::TotalBytes));
         }
         let script = parser::parse_quoted_script_bounded(
             source,
             parser::ScriptParseBudget {
-                bytes: MAX_QUOTED_SCRIPT_BYTES,
-                nodes: MAX_QUOTED_SCRIPT_NODES.saturating_sub(self.parsed_nodes),
+                bytes: MAX_TEMPLATE_PARSE_BYTES,
+                nodes: MAX_TEMPLATE_PARSE_NODES.saturating_sub(self.parsed_nodes),
                 ..Default::default()
             },
             &mut || self.cancellation.checkpoint(),
         )?;
         let script = match script {
             Ok(Some(script)) => script,
-            Ok(None) => return Ok(QuotedScriptParse::Opaque),
+            Ok(None) => return Ok(TemplateParse::Opaque),
             Err(parser::ScriptParseLimit::Bytes) => {
-                return Ok(QuotedScriptParse::Limited(QuotedScriptLimit::PayloadBytes));
+                return Ok(TemplateParse::Limited(TemplateParseLimit::CarrierBytes));
             }
             Err(parser::ScriptParseLimit::Nodes) => {
-                return Ok(QuotedScriptParse::Limited(QuotedScriptLimit::Nodes));
+                return Ok(TemplateParse::Limited(TemplateParseLimit::Nodes));
             }
             Err(parser::ScriptParseLimit::Depth) => {
-                return Ok(QuotedScriptParse::Limited(QuotedScriptLimit::Depth));
+                return Ok(TemplateParse::Limited(TemplateParseLimit::Depth));
             }
         };
         self.parsed_nodes = self
             .parsed_nodes
             .saturating_add(cst_node_count(script.parsed().root()));
-        if self.parsed_nodes > MAX_QUOTED_SCRIPT_NODES {
-            return Ok(QuotedScriptParse::Limited(QuotedScriptLimit::Nodes));
+        if self.parsed_nodes > MAX_TEMPLATE_PARSE_NODES {
+            return Ok(TemplateParse::Limited(TemplateParseLimit::Nodes));
         }
         self.cancellation.checkpoint()?;
-        Ok(QuotedScriptParse::Parsed(script))
+        Ok(TemplateParse::Parsed(script))
     }
 }
 
@@ -116,22 +113,22 @@ mod tests {
     #[test]
     fn shared_budget_limits_depth_and_accumulated_bytes() {
         let cancellation = CancellationToken::new();
-        let mut session = QuotedScriptSession::new(&cancellation);
+        let mut session = TemplateParseSession::new(&cancellation);
         assert!(matches!(
             session
-                .parse("\"foo = yes\"", MAX_QUOTED_SCRIPT_DEPTH)
+                .parse("\"foo = yes\"", MAX_TEMPLATE_PARSE_DEPTH)
                 .expect("parse"),
-            QuotedScriptParse::Limited(QuotedScriptLimit::Depth)
+            TemplateParse::Limited(TemplateParseLimit::Depth)
         ));
 
-        let large = format!("\"{}\"", "a".repeat(MAX_QUOTED_SCRIPT_TOTAL_BYTES / 2));
+        let large = format!("\"{}\"", "a".repeat(MAX_TEMPLATE_PARSE_TOTAL_BYTES / 2));
         assert!(matches!(
             session.parse(&large, 0).expect("first parse"),
-            QuotedScriptParse::Parsed(_)
+            TemplateParse::Parsed(_)
         ));
         assert!(matches!(
             session.parse(&large, 0).expect("second parse"),
-            QuotedScriptParse::Limited(QuotedScriptLimit::TotalBytes)
+            TemplateParse::Limited(TemplateParseLimit::TotalBytes)
         ));
     }
 }

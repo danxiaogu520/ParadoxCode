@@ -3957,7 +3957,7 @@ fn logic_container_lints_fire_on_degenerate_shapes() {
 }
 
 #[test]
-fn dynamic_cycles_are_reported_at_definition_sites() {
+fn template_recursion_are_reported_at_definition_sites() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -4172,26 +4172,26 @@ fn dynamic_scope_contracts_infer_and_reject_empty_intersections() {
     );
 
     // The inferred contracts behind those diagnostics, via the hover view.
-    use crate::dynamic_contracts::{ScopeContract, contract_hover_line, dynamic_contract};
+    use crate::template_contracts::{ScopeContract, contract_hover_line, template_contract};
     assert_eq!(
-        dynamic_contract(&snapshot, "scripted_effect", "clash"),
+        template_contract(&snapshot, "scripted_effect", "clash"),
         Some(ScopeContract::Empty)
     );
     assert_eq!(
-        dynamic_contract(&snapshot, "scripted_effect", "fine"),
+        template_contract(&snapshot, "scripted_effect", "fine"),
         Some(ScopeContract::Scopes(vec!["country".to_owned()]))
     );
     assert_eq!(
-        dynamic_contract(&snapshot, "scripted_effect", "helper_province"),
+        template_contract(&snapshot, "scripted_effect", "helper_province"),
         Some(ScopeContract::Scopes(vec!["province".to_owned()]))
     );
     assert_eq!(
-        dynamic_contract(&snapshot, "scripted_effect", "root_opaque"),
+        template_contract(&snapshot, "scripted_effect", "root_opaque"),
         Some(ScopeContract::Scopes(vec!["country".to_owned()])),
         "ROOT blocks re-target the event root and must not narrow the entry"
     );
     assert_eq!(
-        dynamic_contract(&snapshot, "scripted_effect", "this_opaque"),
+        template_contract(&snapshot, "scripted_effect", "this_opaque"),
         Some(if snapshot.ir().schemas.is_empty() {
             ScopeContract::Scopes(vec!["country".to_owned()])
         } else {
@@ -4200,12 +4200,12 @@ fn dynamic_scope_contracts_infer_and_reject_empty_intersections() {
         "THIS retains the current scope and its body constrains the IR entry contract"
     );
     assert_eq!(
-        dynamic_contract(&snapshot, "scripted_effect", "or_union"),
+        template_contract(&snapshot, "scripted_effect", "or_union"),
         Some(ScopeContract::Empty),
         "every OR child must be statically legal in the same scope"
     );
     assert_eq!(
-        dynamic_contract(&snapshot, "scripted_effect", "or_open"),
+        template_contract(&snapshot, "scripted_effect", "or_open"),
         Some(ScopeContract::Empty),
         "an unknown OR child cannot hide an independently invalid known child"
     );

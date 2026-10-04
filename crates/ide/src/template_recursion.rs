@@ -17,18 +17,18 @@ use std::{collections::BTreeMap, sync::Arc};
 const CACHE_KEY: &str = "template:definition-recursion-coverage";
 #[cfg(test)]
 #[derive(Clone, Debug, Default)]
-pub(crate) struct DynamicCycleReport {
+pub(crate) struct TemplateRecursionReport {
     entries: BTreeMap<(String, String), String>,
 }
 #[cfg(test)]
-impl DynamicCycleReport {
+impl TemplateRecursionReport {
     pub(crate) fn message(&self, kind: &str, name: &str) -> Option<&str> {
         self.entries
             .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
             .map(String::as_str)
     }
 }
-pub(crate) fn dynamic_cycle_diagnostics(
+pub(crate) fn template_recursion_diagnostics(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     cancellation: &CancellationToken,
@@ -109,12 +109,13 @@ fn cycle_message(
 }
 
 #[cfg(test)]
-pub(crate) fn dynamic_cycle_report(
+pub(crate) fn template_recursion_report(
     snapshot: &AnalysisSnapshot,
     cancellation: &CancellationToken,
-) -> Result<Arc<DynamicCycleReport>, Cancelled> {
+) -> Result<Arc<TemplateRecursionReport>, Cancelled> {
     let revision = snapshot.revision();
-    if let Some(report) = probe_query_cache::<DynamicCycleReport>(snapshot, revision, &[CACHE_KEY])
+    if let Some(report) =
+        probe_query_cache::<TemplateRecursionReport>(snapshot, revision, &[CACHE_KEY])
     {
         return Ok(report);
     }
@@ -122,7 +123,7 @@ pub(crate) fn dynamic_cycle_report(
         .query_cache()
         .is_superseded(engine::CacheDomain::Definitions, revision)
     {
-        return Ok(Arc::new(DynamicCycleReport::default()));
+        return Ok(Arc::new(TemplateRecursionReport::default()));
     }
     let mut names = BTreeSet::new();
     for definition in snapshot.index().definitions_iter() {
@@ -142,7 +143,7 @@ pub(crate) fn dynamic_cycle_report(
             }
         }
     }
-    let mut report = DynamicCycleReport::default();
+    let mut report = TemplateRecursionReport::default();
     for (kind, name) in names {
         if let Some(message) = cycle_message(snapshot, &kind, &name, cancellation)? {
             report.entries.insert(

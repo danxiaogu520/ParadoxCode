@@ -1,4 +1,4 @@
-// case: dynamic_cycles
+// case: template_recursion
 // input:
 //   ping = { pong = yes }
 //   pong = { ping = yes }

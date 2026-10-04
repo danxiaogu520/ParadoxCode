@@ -17,8 +17,8 @@ pub mod format;
 pub mod ir;
 pub mod lower;
 pub mod pattern;
-pub mod replacement;
 pub mod source;
+pub mod template;
 
 mod catalog;
 mod hash;

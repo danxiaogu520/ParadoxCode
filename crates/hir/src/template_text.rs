@@ -1,6 +1,6 @@
 //! Lossless, bounded binding specialization for Template text and source dependencies.
 use crate::analysis::{AnalysisCoverage, AnalysisLimit, ResidualReason};
-use rules::replacement::Template;
+use rules::template::Template;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// One generated source piece and the root binding names that influence it.
@@ -375,7 +375,7 @@ fn scalar_use_positions(
     schema: rules::ir::SchemaId,
     facts: &dyn rules::ir::SymbolFacts,
 ) -> (BTreeSet<u32>, BTreeSet<u32>) {
-    use rules::replacement::{TemplateFragment, TemplateInstruction, TemplateOperand};
+    use rules::template::{TemplateFragment, TemplateInstruction, TemplateOperand};
     let mut result = BTreeSet::new();
     let mut raw = BTreeSet::new();
     let mut pending = vec![(0, schema)];
@@ -457,12 +457,12 @@ fn script_use_positions(
     schema: rules::ir::SchemaId,
     facts: &dyn rules::ir::SymbolFacts,
 ) -> BTreeSet<u32> {
-    use rules::replacement::{TemplateFragment, TemplateInstruction, TemplateOperand};
+    use rules::template::{TemplateFragment, TemplateInstruction, TemplateOperand};
     let mut result = BTreeSet::new();
     let mut pending = vec![(0, schema)];
     while let Some((block, schema)) = pending.pop() {
         for node in template.program.blocks[block].iter() {
-            let mut read = |token: &rules::replacement::TemplateToken| {
+            let mut read = |token: &rules::template::TemplateToken| {
                 for part in &token.fragments {
                     if let TemplateFragment::Parameter { range, .. } = part {
                         result.insert(range.start());
@@ -887,7 +887,7 @@ pub fn render_expanded<E>(
                             },
                         });
                     }
-                    let Some(callee) = facts.replacement_template(type_id, &property.key) else {
+                    let Some(callee) = facts.template(type_id, &property.key) else {
                         rendered
                             .coverage
                             .limits

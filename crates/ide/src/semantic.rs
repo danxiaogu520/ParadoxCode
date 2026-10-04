@@ -182,7 +182,7 @@ pub(crate) fn scripted_definition_snippet(
         .parameters
         .iter()
         .filter(|parameter| {
-            crate::dynamic_rules::parameter_effectively_required(snapshot, &summary, parameter)
+            crate::template_presence::parameter_effectively_required(snapshot, &summary, parameter)
         })
         .map(|parameter| parameter.name.as_str())
         .collect::<Vec<_>>();

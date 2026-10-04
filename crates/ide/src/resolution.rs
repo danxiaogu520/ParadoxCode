@@ -314,7 +314,7 @@ fn ir_reference_is_template(
         return false;
     };
     if summary.parameters.iter().any(|parameter| {
-        crate::dynamic_rules::parameter_effectively_required(snapshot, &summary, parameter)
+        crate::template_presence::parameter_effectively_required(snapshot, &summary, parameter)
     }) {
         return false;
     }

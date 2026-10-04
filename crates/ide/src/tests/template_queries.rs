@@ -1,5 +1,5 @@
 use super::support::*;
-use crate::dynamic_contracts::ScopeContract;
+use crate::template_contracts::ScopeContract;
 use text::AbsPath;
 
 /// Opens one scripted-effects file as a project workspace and returns the
@@ -99,7 +99,7 @@ fn interactive_scope_queries_do_not_walk_unrelated_definitions() {
 }
 
 #[test]
-fn dynamic_rows_derive_contract_signature_and_value_constraints() {
+fn template_rows_derive_contract_signature_and_value_constraints() {
     let host =
         definitions_snapshot("scale_works = { add_stability = $AMT$ add_manpower = $MP$ }\n");
     let snapshot = host.snapshot();
@@ -115,7 +115,7 @@ fn dynamic_rows_derive_contract_signature_and_value_constraints() {
             .all(|parameter| parameter.required)
     );
     assert_eq!(
-        crate::dynamic_contracts::dynamic_contract(&snapshot, "scripted_effect", "scale_works"),
+        crate::template_contracts::template_contract(&snapshot, "scripted_effect", "scale_works"),
         Some(ScopeContract::Scopes(vec!["country".into()]))
     );
     for (parameter, valid, invalid) in [("AMT", "2", "1.5"), ("MP", "1.5", "1000")] {
@@ -132,7 +132,7 @@ fn dynamic_rows_derive_contract_signature_and_value_constraints() {
 }
 
 #[test]
-fn dynamic_rows_locate_push_container_scope_contradictions() {
+fn template_rows_locate_push_container_scope_contradictions() {
     // `capital` enters in country scope and pushes province; `add_prestige`
     // only runs in country scope, so the nested statement can never execute
     // and the definition itself must be rejected with a located finding.
@@ -140,7 +140,7 @@ fn dynamic_rows_locate_push_container_scope_contradictions() {
     let snapshot = host.snapshot();
 
     assert_eq!(
-        crate::dynamic_contracts::dynamic_contract(&snapshot, "scripted_effect", "bad_push"),
+        crate::template_contracts::template_contract(&snapshot, "scripted_effect", "bad_push"),
         Some(ScopeContract::Empty)
     );
     let findings = ir_findings(&snapshot);
@@ -156,7 +156,7 @@ fn dynamic_rows_locate_push_container_scope_contradictions() {
 }
 
 #[test]
-fn dynamic_rows_descend_opaque_entries_into_scope_switches() {
+fn template_rows_descend_opaque_entries_into_scope_switches() {
     // A dynamic scope link (`ROOT`) leaves the entry unknown, yet the
     // scope-switching container inside it still re-targets its children, so
     // the contradiction stays findable while the contract stays open.
@@ -165,7 +165,7 @@ fn dynamic_rows_descend_opaque_entries_into_scope_switches() {
     let snapshot = host.snapshot();
 
     assert_eq!(
-        crate::dynamic_contracts::dynamic_contract(&snapshot, "scripted_effect", "opaque_entry"),
+        crate::template_contracts::template_contract(&snapshot, "scripted_effect", "opaque_entry"),
         Some(ScopeContract::Empty)
     );
     let findings = ir_findings(&snapshot);
@@ -180,7 +180,7 @@ fn dynamic_rows_descend_opaque_entries_into_scope_switches() {
 }
 
 #[test]
-fn dynamic_rows_flag_param_key_dispatch() {
+fn template_rows_flag_param_key_dispatch() {
     let host = definitions_snapshot("dispatcher = { $action$ = yes }\n");
     let snapshot = host.snapshot();
     let sites = ir_sites(&snapshot, "dispatcher", "action");
@@ -190,7 +190,7 @@ fn dynamic_rows_flag_param_key_dispatch() {
         crate::ir_template::Domain::Key { .. }
     ));
     assert_eq!(
-        crate::dynamic_contracts::dynamic_contract(&snapshot, "scripted_effect", "dispatcher"),
+        crate::template_contracts::template_contract(&snapshot, "scripted_effect", "dispatcher"),
         Some(ScopeContract::Unconstrained)
     );
     assert!(sites[0].accepts(&snapshot, "action", "add_prestige"));
@@ -198,7 +198,7 @@ fn dynamic_rows_flag_param_key_dispatch() {
 }
 
 #[test]
-fn dynamic_rows_locate_nested_call_contract_mismatches() {
+fn template_rows_locate_nested_call_contract_mismatches() {
     // `controller` enters in province scope and pushes country; the callee
     // requires province, so the nested call can never run.
     let host = definitions_snapshot(
@@ -208,7 +208,11 @@ fn dynamic_rows_locate_nested_call_contract_mismatches() {
     let snapshot = host.snapshot();
 
     assert_eq!(
-        crate::dynamic_contracts::dynamic_contract(&snapshot, "scripted_effect", "province_helper"),
+        crate::template_contracts::template_contract(
+            &snapshot,
+            "scripted_effect",
+            "province_helper"
+        ),
         Some(ScopeContract::Scopes(vec!["province".into()]))
     );
     let findings = ir_findings(&snapshot);
@@ -223,7 +227,7 @@ fn dynamic_rows_locate_nested_call_contract_mismatches() {
 }
 
 #[test]
-fn dynamic_rows_keep_conditional_parameters_optional() {
+fn template_rows_keep_conditional_parameters_optional() {
     let host = definitions_snapshot(
         "guarded = { add_stability = $AMT$ [[EXTRA] add_manpower = $EXTRA$ ] }\n",
     );
@@ -252,11 +256,12 @@ fn dynamic_rows_keep_conditional_parameters_optional() {
 }
 
 #[test]
-fn dynamic_rows_mark_cycle_participants() {
+fn template_rows_mark_cycle_participants() {
     let host = definitions_snapshot("loop_a = { loop_b = yes }\nloop_b = { loop_a = yes }\n");
     let snapshot = host.snapshot();
     let report =
-        crate::dynamic_cycles::dynamic_cycle_report(&snapshot, &CancellationToken::new()).unwrap();
+        crate::template_recursion::template_recursion_report(&snapshot, &CancellationToken::new())
+            .unwrap();
     for name in ["loop_a", "loop_b"] {
         assert!(report.message("scripted_effect", name).is_some(), "{name}");
     }
@@ -345,7 +350,7 @@ fn site_rows_record_bare_payload_quoted_sites() {
     assert_eq!(sites.len(), 1);
     assert!(matches!(
         sites[0].domain,
-        crate::ir_template::Domain::Payload { .. }
+        crate::ir_template::Domain::Template { .. }
     ));
 }
 
