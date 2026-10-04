@@ -7,7 +7,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-10-04
+## [0.5.1] - 2026-10-04
 
 This release completes the RulesIr migration and shared Template analysis, adds the native
 MCP server and Rust developer tooling, and improves localisation and mission editing.
@@ -42,7 +42,7 @@ is declared through Templates.
 
 - Scripted template capability and query APIs use `Template`; literal string matchers use
   `Pattern`. Quoted script content is consumed through Templates; ordinary fields and mission
-  `trigger`/`effect` no longer have a generic quoted-script overload. Workspace version 0.5.0
+  `trigger`/`effect` no longer have a generic quoted-script overload. Workspace version 0.5.1
   invalidates older persisted caches.
 - Generated Template facts converge in dependency-tracked transactions. Failed discovery
   preserves current syntax and reports incomplete analysis; rename requires complete reference
@@ -77,6 +77,8 @@ is declared through Templates.
 
 ### Fixed
 
+- Updated the runtime brace-expansion dependency from 5.0.9 to 5.0.12 to fix
+  denial-of-service vulnerabilities that blocked the 0.5.0 release build.
 - Mission icon picker keeps cached previews visible after searches, loads every visible image
   batch even when textures are missing, cancels obsolete grid rendering, and selects the current
   search result on Enter. Icon insertion preserves adjacent comments and closing braces.
@@ -98,6 +100,11 @@ is declared through Templates.
   `rules-migrate` converter. Maintained regressions exercise the source and IR directly.
 - The extension's TypeScript transcoder twin, differential vectors, and obsolete transcode contract.
 - Repository `AGENTS.md`; repository policy no longer requires it.
+
+## [0.5.0] - 2026-10-04
+
+Unpublished tag: production dependency auditing blocked the release build. No GitHub
+Release was published. The intended changes are included in 0.5.1.
 
 ## [0.4.2] - 2026-09-23
 
@@ -1336,7 +1343,8 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.2...v0.5.1
 [0.5.0]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.0...v0.4.1
