@@ -29,7 +29,7 @@ interface SpriteWire {
 /** Webview messages sent to the picker. */
 type OutboundMessage =
     | { type: 'catalog'; sprites: SpriteWire[] }
-    | { type: 'images'; textures: Record<string, string> }
+    | { type: 'images'; names: string[]; textures: Record<string, string> }
     | { type: 'error'; message: string }
     /** Localised UI strings; always the first message so no data paint beats it. */
     | ReturnType<typeof webviewI18nMessage>;
@@ -136,7 +136,10 @@ export class MissionIconPickerPanel {
             return;
         }
         const store = MissionPreviewPanel.store();
-        const previews = await store.spriteIconUrls(names.slice(0, 64));
+        const requested = names.slice(0, 64);
+        // Search/tab changes rebuild the tiles, so every requested image is
+        // needed even when the shared store has already cached its preview.
+        const previews = await store.spriteIconUrls(requested, new Set(requested));
         if (MissionIconPickerPanel.panel !== panel) {
             return;
         }
@@ -144,9 +147,9 @@ export class MissionIconPickerPanel {
         for (const [name, preview] of Object.entries(previews)) {
             textures[name] = preview.url;
         }
-        if (Object.keys(textures).length > 0) {
-            MissionIconPickerPanel.post(panel, { type: 'images', textures });
-        }
+        // Acknowledge missing/undecodable textures too, so the webview can
+        // finish every requested tile without leaving it pending forever.
+        MissionIconPickerPanel.post(panel, { type: 'images', names: requested, textures });
     }
 
     /**

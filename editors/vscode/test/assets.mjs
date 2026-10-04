@@ -14,6 +14,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateSync } from 'node:zlib';
 import assert from 'node:assert/strict';
+import { pickerHost } from './icon-picker-harness.mjs';
 
 const require = createRequire(import.meta.url);
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -1037,6 +1038,46 @@ function tgaHeader(width, height, bpp, descriptor) {
         const forced = await store.spriteIconUrls(['mission_base'], new Set(['mission_base']));
         assert.ok(forced.mission_base?.url.startsWith('data:image/png;base64,'));
         assert.deepEqual(await new assets.GameAssetStore(undefined, undefined).spriteIconUrls(['mission_base']), {});
+
+        // Exercise the picker's actual image-request handler with the real
+        // asset store. Searching/clearing the query, switching tabs, and
+        // reopening the panel all create fresh <img>s for cached sprites.
+        const messages = [];
+        const picker = pickerHost(store, (message) => messages.push(message));
+        const newPanel = () => ({ webview: { postMessage: (message) => messages.push(message) } });
+        picker.panel = newPanel();
+
+        for (let repeat = 0; repeat < 2; repeat += 1) {
+            messages.length = 0;
+            await picker.postImages(['mission_base']);
+            assert.equal(messages.length, 1, 'rebuilt tiles must receive cached images');
+            assert.equal(messages[0].type, 'images');
+            assert.equal(messages[0].textures.mission_base, previews.mission_base.url);
+        }
+
+        // A batch can mix warm sprites, newly decoded sprites, and missing
+        // textures; every decodable requested sprite must be returned.
+        messages.length = 0;
+        await picker.postImages(['mission_base', 'gain_mana', 'mission_custom', 'absent']);
+        assert.equal(messages.length, 1);
+        assert.deepEqual(Object.keys(messages[0].textures).sort(), ['gain_mana', 'mission_base']);
+        assert.equal(messages[0].textures.mission_base, previews.mission_base.url);
+        assert.ok(messages[0].textures.gain_mana.startsWith('data:image/png;base64,'));
+
+        picker.panel = newPanel();
+        messages.length = 0;
+        await picker.postImages(['mission_base', 'ui_button']);
+        assert.equal(messages.length, 1, 'a reopened panel must receive images from the shared cache');
+        assert.equal(messages[0].textures.mission_base, previews.mission_base.url);
+        assert.equal(messages[0].textures.ui_button, previews.ui_button.url);
+
+        // Returning cached data must retain the existing request size bound.
+        messages.length = 0;
+        await picker.postImages([...Array(64).fill('mission_base'), 'ui_button']);
+        assert.equal(messages.length, 1);
+        assert.deepEqual(Object.keys(messages[0].textures), ['mission_base']);
+        assert.equal(messages[0].names.length, 64);
+        picker.panel = undefined;
     } finally {
         rmSync(gameRoot, { recursive: true, force: true });
         rmSync(modRoot, { recursive: true, force: true });
@@ -1054,6 +1095,11 @@ function tgaHeader(width, height, bpp, descriptor) {
     assert.deepEqual(insert.iconValueSpanAt('icon = "mission_x"', 12, 1), { line: 1, start: 8, end: 17 });
     // Trailing comments are not part of a bare value.
     assert.deepEqual(insert.iconValueSpanAt('icon = mission_x # conquest', 12, 2), { line: 2, start: 7, end: 16 });
+    for (const suffix of ['#conquest', '}', ']', '=', '<', '>', '!', '?', '"']) {
+        assert.deepEqual(insert.iconValueSpanAt(`icon = mission_x${suffix}`, 12, 2), { line: 2, start: 7, end: 16 });
+    }
+    assert.equal(insert.iconValueSpanAt('icon = # comment', 9, 0), undefined);
+    assert.equal(insert.iconValueSpanAt('icon = }', 7, 0), undefined);
     // Cursor one past the end still binds (the caret sits after the token).
     assert.deepEqual(insert.iconValueSpanAt('\ticon = mission_x', 17, 0), { line: 0, start: 8, end: 17 });
     // Cursor before the value, on another key, or on an empty assignment: no span.
