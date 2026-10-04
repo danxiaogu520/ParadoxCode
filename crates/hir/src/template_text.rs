@@ -22,6 +22,8 @@ pub struct SourcePiece {
     pub binding_source: Option<BindingSource>,
     /// The piece represents a missing or editing value.
     pub hole: bool,
+    /// Inserted markers have no adopted engine rescan interpretation.
+    pub uncertain_text: bool,
     /// Missing text at this use can change the surrounding script structure.
     pub structural_hole: bool,
 }
@@ -41,6 +43,28 @@ pub struct BindingSource {
     pub offsets: std::sync::Arc<[u32]>,
 }
 
+/// A named invocation consumed during expansion. Its key can disappear from
+/// the final text, but navigation and rename still need the authored call edge.
+#[derive(Clone, Debug)]
+pub struct ConsumedCall {
+    pub kind: String,
+    pub name: String,
+    /// Exact parameter and decoded root range; None requires an inverse edit
+    /// that this representation cannot prove.
+    pub source: Option<(String, text::TextRange)>,
+    /// Shared pre-expansion frame for cursor queries on the removed key.
+    pub site: CallSite,
+}
+
+/// A call-key query view from the same rendering operation.
+#[derive(Clone, Debug)]
+pub struct CallSite {
+    pub view: std::sync::Arc<RenderedTemplate>,
+    pub schema: rules::ir::SchemaId,
+    pub state: crate::ScopeState,
+    pub key_range: text::TextRange,
+}
+
 /// Specialized source. Source dependencies remain separate from validation and UI ranges.
 #[derive(Clone, Debug, Default)]
 pub struct RenderedTemplate {
@@ -48,6 +72,8 @@ pub struct RenderedTemplate {
     pub text: String,
     /// Relative source/dependency map.
     pub pieces: Vec<SourcePiece>,
+    /// Root-supplied named invocation keys removed by expansion.
+    pub calls: Vec<ConsumedCall>,
     /// Unresolved Template argument maps are bindings, not script statement containers.
     pub unresolved_bindings: Vec<text::TextRange>,
     /// Virtual holes supplied by a typed trial edit, independent of user text.
@@ -83,11 +109,20 @@ impl RenderedTemplate {
                             && range.start() <= piece.range.end())
             })
     }
+    /// Local text whose interpretation depends on an unverified rescan rule.
+    pub fn has_uncertain_text(&self, range: text::TextRange) -> bool {
+        self.pieces.iter().any(|piece| {
+            piece.uncertain_text
+                && piece.range.start() < range.end()
+                && range.start() < piece.range.end()
+        })
+    }
     /// A free script hole can rewrite the suffix's lexical/container context.
     pub fn has_unresolved_structure(&self, range: text::TextRange) -> bool {
-        self.pieces
-            .iter()
-            .any(|piece| piece.structural_hole && piece.range.start() <= range.end())
+        self.pieces.iter().any(|piece| {
+            (piece.structural_hole || piece.uncertain_text && piece.script)
+                && piece.range.start() <= range.end()
+        })
     }
 }
 
@@ -106,9 +141,11 @@ pub fn render(
         &BTreeSet::new(),
         &BTreeSet::new(),
         byte_limit,
+        &mut || true,
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_with_views(
     template: &Template,
     bindings: &BTreeMap<String, String>,
@@ -117,6 +154,7 @@ fn render_with_views(
     scalar_uses: &BTreeSet<u32>,
     script_uses: &BTreeSet<u32>,
     byte_limit: usize,
+    checkpoint: &mut dyn FnMut() -> bool,
 ) -> RenderedTemplate {
     let mut output = RenderedTemplate::default();
     if template.source.is_empty() {
@@ -142,16 +180,24 @@ fn render_with_views(
     let mut quoted = false;
     let mut comment = false;
     let mut escaped = false;
-    let mut steps = 0;
+    let mut steps = 0usize;
     while offset < source.len() {
         steps += 1;
+        if steps.is_multiple_of(256) && !checkpoint() {
+            break;
+        }
         if steps > 1_000_000 {
             output.coverage.limits.insert(AnalysisLimit::Nodes);
             break;
         }
         let remaining = &source[offset..];
         if !quoted && !comment && remaining.starts_with("[[") {
-            let Some(close) = remaining.find(']') else {
+            let Some(close) = remaining
+                .as_bytes()
+                .iter()
+                .take(byte_limit)
+                .position(|byte| *byte == b']')
+            else {
                 output
                     .coverage
                     .limits
@@ -178,7 +224,12 @@ fn render_with_views(
             .collect::<BTreeSet<_>>();
         let mut binding_name = None;
         let (value, next, hole) = if !comment && remaining.starts_with('$') {
-            let Some(close) = remaining[1..].find('$').map(|i| i + 1) else {
+            let Some(close) = remaining.as_bytes()[1..]
+                .iter()
+                .take(byte_limit)
+                .position(|byte| *byte == b'$')
+                .map(|i| i + 1)
+            else {
                 output
                     .coverage
                     .limits
@@ -282,6 +333,7 @@ fn render_with_views(
                     script: script_uses
                         .contains(&(template.body_range.start() + start as u32 + offset as u32)),
                     parameters: dependencies,
+                    uncertain_text: binding_name.is_some() && value.contains('$'),
                     binding_name,
                     binding_source: None,
                     structural_hole: hole
@@ -596,6 +648,7 @@ pub fn render_expanded<E>(
                 work.push(RenderTask::Exit(identity));
                 let scalar_uses = scalar_use_positions(ir, &template, &bindings, schema);
                 let script_uses = script_use_positions(ir, &template, schema);
+                let mut interrupted = None;
                 let mut rendered = render_with_views(
                     &template,
                     &bindings,
@@ -604,7 +657,17 @@ pub fn render_expanded<E>(
                     &scalar_uses,
                     &script_uses,
                     byte_limit,
+                    &mut || match checkpoint() {
+                        Ok(()) => true,
+                        Err(error) => {
+                            interrupted = Some(error);
+                            false
+                        }
+                    },
                 );
+                if let Some(error) = interrupted {
+                    return Err(error);
+                }
                 for piece in &mut rendered.pieces {
                     if let Some(name) = &piece.binding_name
                         && let (Some(binding), Some(value)) =
@@ -674,16 +737,29 @@ pub fn render_expanded<E>(
                     break;
                 }
                 output.coverage.merge(&rendered.coverage);
-                let parsed =
-                    std::sync::Arc::new(parser::parse(parser::FileFormat::Script, &rendered.text));
+                let parsed = match parser::parse_script_bounded(
+                    &rendered.text,
+                    parser::ScriptParseBudget {
+                        bytes: byte_limit,
+                        ..Default::default()
+                    },
+                    checkpoint,
+                )? {
+                    Ok(parsed) => std::sync::Arc::new(parsed),
+                    Err(limit) => {
+                        output.coverage.limits.insert(parse_limit(limit));
+                        break;
+                    }
+                };
                 let hir = crate::lower_ir_schema(
                     parsed,
                     ir,
                     schema,
                     Default::default(),
                     state.clone(),
-                    facts,
+                    &DispatchFacts(facts),
                 );
+                let call_view = std::sync::Arc::new(rendered.clone());
                 let mut calls = Vec::new();
                 let mut covered = Vec::<text::TextRange>::new();
                 for property in hir.properties() {
@@ -707,6 +783,23 @@ pub fn render_expanded<E>(
                     let Some(type_id) = ir.type_by_name(&kind) else {
                         continue;
                     };
+                    if rendered.pieces.iter().any(|piece| {
+                        piece.binding_source.is_some()
+                            && piece.range.start() < property.key_range.end()
+                            && property.key_range.start() < piece.range.end()
+                    }) {
+                        output.calls.push(ConsumedCall {
+                            kind: kind.clone(),
+                            name: property.key.clone(),
+                            source: binding_range(&rendered, property.key_range),
+                            site: CallSite {
+                                view: call_view.clone(),
+                                schema,
+                                state: state.clone(),
+                                key_range: property.key_range,
+                            },
+                        });
+                    }
                     let Some(callee) = facts.replacement_template(type_id, &property.key) else {
                         rendered
                             .coverage
@@ -876,4 +969,59 @@ pub fn render_expanded<E>(
         }
     }
     Ok(output)
+}
+
+/// Translates syntax resource frontiers without publishing synthetic user errors.
+pub fn parse_limit(limit: parser::ScriptParseLimit) -> AnalysisLimit {
+    match limit {
+        parser::ScriptParseLimit::Bytes => AnalysisLimit::TextBytes,
+        parser::ScriptParseLimit::Nodes => AnalysisLimit::ParseNodes,
+        parser::ScriptParseLimit::Depth => AnalysisLimit::ConsumptionDepth,
+    }
+}
+
+// Dispatch lowering must not instantiate callees recursively while the renderer
+// is building its own explicit task stack.
+struct DispatchFacts<'a>(&'a dyn rules::ir::SymbolFacts);
+impl rules::ir::SymbolFacts for DispatchFacts<'_> {
+    fn type_member(&self, ty: rules::ir::TypeId, name: &str) -> bool {
+        self.0.type_member(ty, name)
+    }
+    fn type_subtype_member(
+        &self,
+        ty: rules::ir::TypeId,
+        subtype: rules::ir::Symbol,
+        name: &str,
+    ) -> bool {
+        self.0.type_subtype_member(ty, subtype, name)
+    }
+}
+
+/// Exact root-relative mapping, including forwarded quoted carriers.
+pub fn binding_range(
+    source: &RenderedTemplate,
+    range: text::TextRange,
+) -> Option<(String, text::TextRange)> {
+    if source.has_hole(range)
+        || source.has_uncertain_text(range)
+        || source.has_unresolved_structure(range)
+    {
+        return None;
+    }
+    for piece in &source.pieces {
+        if piece.range.start() > range.start() || range.end() > piece.range.end() {
+            continue;
+        }
+        let Some(map) = &piece.binding_source else {
+            continue;
+        };
+        let relative = text::TextRange::new(
+            *map.offsets
+                .get((range.start() - piece.range.start()) as usize)?,
+            *map.offsets
+                .get((range.end() - piece.range.start()) as usize)?,
+        )?;
+        return Some((map.parameter.clone(), relative));
+    }
+    None
 }

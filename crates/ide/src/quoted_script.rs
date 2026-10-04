@@ -1,4 +1,4 @@
-use parser::{CstNode, QuotedScript, parse_quoted_script};
+use parser::{CstNode, QuotedScript};
 
 use crate::types::{CancellationToken, Cancelled};
 
@@ -50,10 +50,6 @@ impl<'cancel> QuotedScriptSession<'cancel> {
         }
     }
 
-    pub(crate) const fn cancellation(&self) -> &'cancel CancellationToken {
-        self.cancellation
-    }
-
     pub(crate) fn parse(
         &mut self,
         source: &str,
@@ -70,8 +66,27 @@ impl<'cancel> QuotedScriptSession<'cancel> {
         if self.parsed_bytes > MAX_QUOTED_SCRIPT_TOTAL_BYTES {
             return Ok(QuotedScriptParse::Limited(QuotedScriptLimit::TotalBytes));
         }
-        let Some(script) = parse_quoted_script(source) else {
-            return Ok(QuotedScriptParse::Opaque);
+        let script = parser::parse_quoted_script_bounded(
+            source,
+            parser::ScriptParseBudget {
+                bytes: MAX_QUOTED_SCRIPT_BYTES,
+                nodes: MAX_QUOTED_SCRIPT_NODES.saturating_sub(self.parsed_nodes),
+                ..Default::default()
+            },
+            &mut || self.cancellation.checkpoint(),
+        )?;
+        let script = match script {
+            Ok(Some(script)) => script,
+            Ok(None) => return Ok(QuotedScriptParse::Opaque),
+            Err(parser::ScriptParseLimit::Bytes) => {
+                return Ok(QuotedScriptParse::Limited(QuotedScriptLimit::PayloadBytes));
+            }
+            Err(parser::ScriptParseLimit::Nodes) => {
+                return Ok(QuotedScriptParse::Limited(QuotedScriptLimit::Nodes));
+            }
+            Err(parser::ScriptParseLimit::Depth) => {
+                return Ok(QuotedScriptParse::Limited(QuotedScriptLimit::Depth));
+            }
         };
         self.parsed_nodes = self
             .parsed_nodes

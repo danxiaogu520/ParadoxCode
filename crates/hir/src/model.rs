@@ -382,7 +382,10 @@ impl HirFile {
 
     /// Returns properties fully contained in `range`, in source order.
     /// Source-ordered starts bound the search to this part of the document.
-    pub fn properties_in_range(&self, range: TextRange) -> impl Iterator<Item = &HirProperty> {
+    pub fn properties_in_range(
+        &self,
+        range: TextRange,
+    ) -> impl DoubleEndedIterator<Item = &HirProperty> + Clone {
         let first = self
             .properties
             .partition_point(|property| property.range.start() < range.start());

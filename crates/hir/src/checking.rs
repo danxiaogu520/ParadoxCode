@@ -406,7 +406,10 @@ pub fn check_fragment<E>(
     let mut coverage = hir.analysis_coverage().clone();
     let mut result = Vec::new();
     for error in hir.syntax().errors() {
-        if !source.has_hole(error.range) && !source.has_unresolved_structure(error.range) {
+        if !source.has_hole(error.range)
+            && !source.has_uncertain_text(error.range)
+            && !source.has_unresolved_structure(error.range)
+        {
             result.push(ConstraintEvidence {
                 severity: rules::source::Severity::Error,
                 kind: IssueKind::Syntax,
@@ -440,7 +443,9 @@ pub fn check_fragment<E>(
             continue;
         }
         checkpoint()?;
-        if source.has_hole(scalar.range) || source.has_unresolved_structure(scalar.range) {
+        if (source.has_hole(scalar.range) || source.has_uncertain_text(scalar.range))
+            || source.has_unresolved_structure(scalar.range)
+        {
             coverage.residuals.insert(ResidualReason::Binding);
             continue;
         }
@@ -535,7 +540,7 @@ pub fn check_fragment<E>(
         else {
             continue;
         };
-        if source.has_hole(property.key_range)
+        if (source.has_hole(property.key_range) || source.has_uncertain_text(property.key_range))
             || source.has_unresolved_structure(property.key_range)
         {
             coverage.residuals.insert(ResidualReason::Binding);
@@ -597,7 +602,10 @@ pub fn check_fragment<E>(
         let mut selected = scoped[0];
         for id in &scoped {
             let outcome = match (ir.field(*id).value, property.scalar.as_ref()) {
-                (FieldValue::Scalar(_), Some(scalar)) if source.has_hole(scalar.range) => {
+                (FieldValue::Scalar(_), Some(scalar))
+                    if (source.has_hole(scalar.range)
+                        || source.has_uncertain_text(scalar.range)) =>
+                {
                     Validation::Unknown
                 }
                 (FieldValue::Scalar(matcher), Some(scalar)) => {

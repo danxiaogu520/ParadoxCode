@@ -543,16 +543,17 @@ pub struct SourceLoadContext<'a> {
 /// Relowers files that read workspace symbols against one immutable pass of facts.
 /// Large files are lowered alone; small files use at most four frontends at once,
 /// within the caller's worker limit. This bounds concurrent frontend allocations.
-pub fn replay_symbol_dependent_files(
+pub(crate) fn relower_fact_readers(
     files: &BTreeMap<SourceFileId, SourceFile>,
     states: &BTreeMap<SourceFileId, Arc<FileState>>,
     ir: &RulesIr,
     facts: &(dyn SymbolFacts + Sync),
+    pending: &BTreeSet<SourceFileId>,
     context: &SourceLoadContext<'_>,
 ) -> Result<BTreeMap<SourceFileId, Arc<FileState>>, WorkspaceError> {
     let mut jobs = states
         .iter()
-        .filter(|(_, state)| state.symbol_facts_dependency)
+        .filter(|(id, _)| pending.contains(id))
         .collect::<Vec<_>>();
     // A large CST/HIR can be much larger than its source. Process those on the
     // calling thread before starting workers, so their allocation peaks cannot
@@ -570,6 +571,11 @@ pub fn replay_symbol_dependent_files(
         let Some(file) = files.get(id) else {
             return Ok(None);
         };
+        let tracked = crate::fact_stabilization::TrackingFacts {
+            ir,
+            facts,
+            reads: Mutex::new(BTreeSet::new()),
+        };
         let mut rebuilt = build_file_state_impl(
             file,
             state.source().to_owned(),
@@ -578,9 +584,13 @@ pub fn replay_symbol_dependent_files(
             context.profile,
             context.parse_cache,
             Some(ir),
-            Some(facts),
+            Some(&tracked),
             state.parsed().is_none(),
         );
+        rebuilt.fact_dependencies = tracked
+            .reads
+            .into_inner()
+            .expect("file-local dependency lock poisoned");
         if state.parsed().is_none() {
             rebuilt = rebuilt.cache_only();
         }
@@ -770,6 +780,7 @@ fn load_source_file_job(
         if let Some(previous) = previous
             && context.previous_files.get(&job.file.id) == Some(&job.file)
             && previous.source() == text
+            && (context.ir.is_none() || !previous.symbol_facts_dependency)
         {
             if job.retain_frontend || previous.parsed().is_none() {
                 return Arc::clone(previous);
@@ -928,6 +939,7 @@ fn build_file_state_impl(
             source: Arc::from(source),
             parsed: None,
             hir: None,
+            fact_dependencies: BTreeSet::new(),
             symbol_facts_dependency: false,
             shard: Arc::new(FileIndexShard {
                 file_id: file.id,
@@ -981,6 +993,7 @@ fn build_file_state_impl(
         revision,
         source: shared_source,
         parsed,
+        fact_dependencies: BTreeSet::new(),
         symbol_facts_dependency: hir
             .as_ref()
             .is_some_and(|hir| hir.depends_on_symbol_facts()),
@@ -996,6 +1009,7 @@ pub fn empty_file_state(file: &SourceFile, revision: u64) -> FileState {
         source: Arc::from(""),
         parsed: None,
         hir: None,
+        fact_dependencies: BTreeSet::new(),
         symbol_facts_dependency: false,
         shard: Arc::new(FileIndexShard {
             file_id: file.id,

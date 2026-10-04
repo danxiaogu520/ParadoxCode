@@ -123,12 +123,68 @@ fn closing_quote_is_escaped(source: &str) -> bool {
     slash_count % 2 == 1
 }
 
+/// Bounded quoted consumption with cooperative carrier decoding and parsing.
+pub fn parse_quoted_script_bounded<E>(
+    source: &str,
+    budget: crate::ScriptParseBudget,
+    checkpoint: &mut dyn FnMut() -> Result<(), E>,
+) -> Result<Result<Option<QuotedScript>, crate::ScriptParseLimit>, E> {
+    checkpoint()?;
+    if source.len() > budget.bytes {
+        return Ok(Err(crate::ScriptParseLimit::Bytes));
+    }
+    let Some(payload) = source.strip_prefix('"') else {
+        return Ok(Ok(None));
+    };
+    let closed = source.ends_with('"') && !closing_quote_is_escaped(source);
+    let payload = if closed {
+        payload.strip_suffix('"').unwrap_or(payload)
+    } else {
+        payload
+    };
+    let mut cancelled = None;
+    let decoded =
+        decode_payload_with_checkpoint(payload, source.len(), &mut || match checkpoint() {
+            Ok(()) => true,
+            Err(error) => {
+                cancelled = Some(error);
+                false
+            }
+        });
+    if let Some(error) = cancelled {
+        return Err(error);
+    }
+    let Some((decoded, source_map)) = decoded else {
+        return Ok(Ok(None));
+    };
+    match crate::parse_script_bounded(&decoded, budget, checkpoint)? {
+        Ok(parsed) => Ok(Ok(Some(QuotedScript {
+            parsed,
+            source_map,
+            closed,
+        }))),
+        Err(limit) => Ok(Err(limit)),
+    }
+}
+
 fn decode_payload(payload: &str, source_len: usize) -> Option<(String, QuotedScriptSourceMap)> {
+    decode_payload_with_checkpoint(payload, source_len, &mut || true)
+}
+fn decode_payload_with_checkpoint(
+    payload: &str,
+    source_len: usize,
+    checkpoint: &mut dyn FnMut() -> bool,
+) -> Option<(String, QuotedScriptSourceMap)> {
     let mut decoded = String::with_capacity(payload.len());
     let mut decoded_to_source = Vec::with_capacity(payload.len().saturating_add(1));
     decoded_to_source.push(1);
     let mut offset = 0_usize;
+    let mut work = 0usize;
     while offset < payload.len() {
+        work += 1;
+        if work.is_multiple_of(256) && !checkpoint() {
+            return None;
+        }
         let character = payload[offset..].chars().next()?;
         let character_len = character.len_utf8();
         if character != '\\' {

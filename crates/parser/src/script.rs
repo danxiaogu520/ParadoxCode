@@ -17,7 +17,35 @@ pub(crate) fn parse(source: &str) -> ParseParts {
     }
 }
 
-struct Parser<'source> {
+pub(crate) fn parse_guarded(
+    source: &str,
+    guard: &mut dyn FnMut(usize, usize, usize) -> bool,
+) -> Option<ParseParts> {
+    let mut parser = Parser::new(source);
+    parser.guard = Some(guard);
+    let mark = parser.tree.child_mark();
+    parser.parse_container(None);
+    if parser.stopped {
+        return None;
+    }
+    let children = parser.tree.children_since(mark);
+    parser.node(CstKind::Document, 0, source.len(), children);
+    if parser.stopped {
+        return None;
+    }
+    Some(ParseParts {
+        tree: parser.tree.finish(),
+        tokens: parser.tokens,
+        errors: parser.errors,
+    })
+}
+
+struct Parser<'source, 'guard> {
+    guard: Option<&'guard mut dyn FnMut(usize, usize, usize) -> bool>,
+    work: usize,
+    nodes: usize,
+    depth: usize,
+    stopped: bool,
     source: &'source str,
     position: usize,
     tokens: Vec<SyntaxToken>,
@@ -25,9 +53,14 @@ struct Parser<'source> {
     tree: SyntaxTreeBuilder,
 }
 
-impl<'source> Parser<'source> {
+impl<'source, 'guard> Parser<'source, 'guard> {
     fn new(source: &'source str) -> Self {
         Self {
+            guard: None,
+            work: 0,
+            nodes: 0,
+            depth: 0,
+            stopped: false,
             source,
             position: 0,
             tokens: Vec::new(),
@@ -38,6 +71,8 @@ impl<'source> Parser<'source> {
 
     /// Emits one node whose children are the most recently pushed `child_count` indices.
     fn node(&mut self, kind: CstKind, start: usize, end: usize, child_count: usize) -> u32 {
+        self.check_work(true);
+        self.nodes += 1;
         self.tree.node(kind, super::range(start, end), child_count)
     }
 
@@ -72,7 +107,7 @@ impl<'source> Parser<'source> {
     /// Truncates a quoted token so pathological input cannot flood the message.
     fn snippet(&self, start: usize, end: usize) -> String {
         let text = self.slice(start, end);
-        if text.chars().count() > 24 {
+        if text.chars().nth(24).is_some() {
             let prefix: String = text.chars().take(24).collect();
             format!("{prefix}...")
         } else {
@@ -81,7 +116,12 @@ impl<'source> Parser<'source> {
     }
 
     fn parse_container(&mut self, terminator: Option<u8>) {
+        self.depth += 1;
+        self.check_work(true);
         loop {
+            if !self.check_work(false) {
+                break;
+            }
             self.skip_whitespace();
             if self.position >= self.source.len() || self.tree.is_saturated() {
                 break;
@@ -175,6 +215,7 @@ impl<'source> Parser<'source> {
                 self.push(first);
             }
         }
+        self.depth -= 1;
     }
 
     fn parse_property(&mut self, start: usize, key: u32) -> u32 {
@@ -350,6 +391,9 @@ impl<'source> Parser<'source> {
         while self.position < self.source.len()
             && !matches!(self.source.as_bytes()[self.position], b'\r' | b'\n')
         {
+            if !self.check_work(false) {
+                break;
+            }
             self.position += 1;
         }
         let range = super::range(start, self.position);
@@ -363,6 +407,9 @@ impl<'source> Parser<'source> {
         self.position += 1;
         let mut closed = false;
         while self.position < self.source.len() {
+            if !self.check_work(false) {
+                break;
+            }
             let byte = self.source.as_bytes()[self.position];
             if byte == b'"' {
                 self.position += 1;
@@ -401,6 +448,9 @@ impl<'source> Parser<'source> {
     fn parse_bare(&mut self) -> Option<u32> {
         let start = self.position;
         while self.position < self.source.len() {
+            if !self.check_work(false) {
+                break;
+            }
             let byte = self.source.as_bytes()[self.position];
             if byte.is_ascii_whitespace()
                 || matches!(
@@ -460,6 +510,9 @@ impl<'source> Parser<'source> {
         while self.position < self.source.len()
             && self.source.as_bytes()[self.position].is_ascii_whitespace()
         {
+            if !self.check_work(false) {
+                break;
+            }
             self.position += 1;
         }
     }
@@ -480,6 +533,23 @@ impl<'source> Parser<'source> {
         self.position = self.position.saturating_add(1).min(self.source.len());
         self.tokens
             .push(SyntaxToken::new(kind, super::range(start, self.position)));
+    }
+
+    fn check_work(&mut self, force: bool) -> bool {
+        if self.stopped {
+            return false;
+        }
+        self.work += 1;
+        if (force || self.work.is_multiple_of(256))
+            && self
+                .guard
+                .as_mut()
+                .is_some_and(|guard| !guard(self.position, self.nodes, self.depth))
+        {
+            self.stopped = true;
+            self.position = self.source.len();
+        }
+        !self.stopped
     }
 
     fn peek(&self) -> Option<u8> {

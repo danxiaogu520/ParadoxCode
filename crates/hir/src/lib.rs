@@ -17,6 +17,7 @@ mod model;
 mod parameters;
 mod scope;
 pub mod template;
+pub mod template_instance;
 mod template_lowering;
 pub mod template_relations;
 pub mod template_scope;

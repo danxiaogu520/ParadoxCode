@@ -1,5 +1,5 @@
 //! HIR facts lowered from the compiled Rules IR.
-use parser::{ParsedFile, parse_quoted_script};
+use parser::ParsedFile;
 use rules::ir::{
     DefName, FieldId, Matcher, MatcherId, RefTarget, RootRule, RulesIr, SchemaId, Shape,
     SubtypeSet, SymbolFacts, TypeId,
@@ -856,7 +856,7 @@ fn lower_field_candidate(
 fn lower_template_arguments(
     ir: &RulesIr,
     source: &ParsedFile,
-    path: &LogicalPath,
+    _path: &LogicalPath,
     props: &[HirProperty],
     children: &[usize],
     kind: &str,
@@ -864,216 +864,193 @@ fn lower_template_arguments(
     state: &ScopeState,
     facts: &dyn SymbolFacts,
     out: &mut IrFacts,
-    seen: &mut std::collections::BTreeSet<(u32, u32)>,
+    _seen: &mut std::collections::BTreeSet<(u32, u32)>,
 ) {
-    let bindings = children
-        .iter()
-        .filter_map(|index| {
-            let property = &props[*index];
-            property.scalar.as_ref().map(|scalar| {
-                (
-                    property.key.to_ascii_lowercase(),
-                    crate::template::binding_value(source, scalar),
-                )
+    // Unknown definition-side bindings remain holes. Concrete siblings still
+    // contribute independently provable references.
+    let symbolic_context = out.definitions.iter().any(|definition| {
+        out.template_kinds
+            .contains(&definition.kind.to_ascii_lowercase())
+            && children.iter().any(|index| {
+                definition.range.start() <= props[*index].range.start()
+                    && props[*index].range.end() <= definition.range.end()
             })
-        })
-        .collect();
-    let inputs = crate::template::BindingInputs {
-        values: bindings,
-        present: children
-            .iter()
-            .map(|index| props[*index].key.to_ascii_lowercase())
-            .collect(),
+    });
+    let Some(ty) = ir.type_by_name(kind) else {
+        return;
     };
-    for (ordinal, index) in children.iter().enumerate() {
-        let argument = &props[*index];
-        let Some(scalar) = argument.scalar.as_ref() else {
+    let Some(template) = facts.replacement_template(ty, name) else {
+        out.analysis_coverage
+            .limits
+            .insert(crate::analysis::AnalysisLimit::UnavailableTemplate);
+        return;
+    };
+    let Some(schema) = crate::template::template_body(ir, ty) else {
+        return;
+    };
+    let mut values = std::collections::BTreeMap::new();
+    let mut raw = std::collections::BTreeMap::new();
+    let mut present = std::collections::BTreeSet::new();
+    for index in children {
+        let property = &props[*index];
+        let parameter = property.key.to_ascii_lowercase();
+        present.insert(parameter.clone());
+        if let Some(scalar) = &property.scalar {
+            if symbolic_context && scalar.value.contains('$') {
+                continue;
+            }
+            values.insert(
+                parameter.clone(),
+                crate::template::binding_value(source, scalar),
+            );
+            if let Some(text) = source.text(scalar.range) {
+                raw.insert(parameter, text.to_owned());
+            }
+        }
+    }
+    let body = crate::template_instance::instantiate::<std::convert::Infallible>(
+        ir,
+        facts,
+        template,
+        &values,
+        &raw,
+        &present,
+        schema,
+        state.clone(),
+        &[],
+        crate::template_instance::InstanceGoal::Facts,
+        &mut || Ok(()),
+    )
+    .expect("infallible checkpoint");
+    out.analysis_coverage.merge(&body.coverage);
+    let project = |range| {
+        crate::template_instance::project_source_range(
+            &body.rendered,
+            range,
+            source,
+            children.iter().map(|index| &props[*index]),
+        )
+    };
+    for call in &body.rendered.calls {
+        let Some((parameter, relative)) = &call.source else {
+            out.analysis_coverage
+                .limits
+                .insert(crate::analysis::AnalysisLimit::Output);
             continue;
         };
-        if children[ordinal + 1..].iter().any(|index| {
-            props[*index].key.eq_ignore_ascii_case(&argument.key) && props[*index].scalar.is_some()
-        }) {
+        let Some(range) = crate::template_instance::project_binding_range(
+            parameter,
+            *relative,
+            source,
+            children.iter().map(|index| &props[*index]),
+        ) else {
+            out.analysis_coverage
+                .limits
+                .insert(crate::analysis::AnalysisLimit::Output);
+            continue;
+        };
+        out.references.push(HirReference {
+            kind: call.kind.clone().into(),
+            name: call.name.clone(),
+            range,
+            origin: crate::HirReferenceOrigin::DynamicDefinition,
+            subtype: None,
+        });
+    }
+    let definition_start = out.definitions.len();
+    let reference_start = out.references.len();
+    let binding_start = out.binding_references.len();
+    let mut origins = std::collections::BTreeMap::new();
+    for definition in body.hir.definitions() {
+        if body
+            .rendered
+            .dependencies(definition.selection_range)
+            .is_empty()
+        {
             continue;
         }
-        let sites = crate::template::parameter_sites_with_inputs::<std::convert::Infallible>(
-            ir,
-            facts,
-            kind,
-            name,
-            &argument.key,
-            &inputs,
-            state.clone(),
-            true,
-            &mut || Ok(()),
-        )
-        .expect("infallible checkpoint");
-        out.analysis_coverage.merge(&sites.coverage);
-        let mut payloads = Vec::new();
-        let definitions = out.definitions.len();
-        let references = out.references.len();
-        let bindings = out.binding_references.len();
-        for site in sites {
-            let crate::template::Domain::Payload { schema, .. } = site.domain else {
-                collect_parameter_references(ir, &site, &argument.key, scalar, facts, out);
+        if body.rendered.has_hole(definition.selection_range)
+            || body
+                .rendered
+                .has_unresolved_structure(definition.selection_range)
+        {
+            continue;
+        }
+        let selection = match project(definition.selection_range) {
+            Some(range) => range,
+            None => {
+                // Keep a generated identity for fact discovery, but an empty
+                // selection cannot become a rename edit of an entire argument.
+                out.analysis_coverage
+                    .limits
+                    .insert(crate::analysis::AnalysisLimit::Output);
+                let dependencies = body.rendered.dependencies(definition.selection_range);
+                let Some(scalar) = children
+                    .iter()
+                    .filter_map(|index| {
+                        let arg = &props[*index];
+                        dependencies
+                            .contains(&arg.key.to_ascii_lowercase())
+                            .then_some(arg.scalar.as_ref())
+                            .flatten()
+                    })
+                    .next()
+                else {
+                    continue;
+                };
+                TextRange::empty(scalar.range.start())
+            }
+        };
+        let range = project(definition.range).unwrap_or(selection);
+        origins.insert(definition.range, range);
+        let mut projected = definition.clone();
+        projected.range = range;
+        projected.selection_range = selection;
+        out.definitions.push(projected);
+    }
+    for attributes in body.hir.definition_attributes() {
+        if let Some(range) = origins.get(&attributes.definition_range) {
+            let mut attrs = attributes.clone();
+            attrs.definition_range = *range;
+            out.definition_attributes.push(attrs);
+        }
+    }
+    for (refs, destination) in [
+        (body.hir.references(), &mut out.references),
+        (
+            body.hir.binding_references_for_hover(),
+            &mut out.binding_references,
+        ),
+    ] {
+        for reference in refs {
+            if body.rendered.dependencies(reference.range).is_empty() {
+                continue;
+            }
+            let Some(range) = project(reference.range) else {
+                out.analysis_coverage
+                    .limits
+                    .insert(crate::analysis::AnalysisLimit::Output);
                 continue;
             };
-            if !scalar.quoted {
-                if let Some(matcher) = ir.schema(schema).items {
-                    let mut scalar_site = site.clone();
-                    scalar_site.domain = crate::template::Domain::Value(vec![matcher]);
-                    collect_parameter_references(
-                        ir,
-                        &scalar_site,
-                        &argument.key,
-                        scalar,
-                        facts,
-                        out,
-                    );
-                }
-                continue;
-            }
-            if payloads.contains(&(schema, site.state.clone())) {
-                continue;
-            }
-            payloads.push((schema, site.state.clone()));
-            let schemas = out.schema_facts.len();
-            let fields = out.field_facts.len();
-            let scopes = out.scope_facts.len();
-            lower_quoted_schema(
-                ir,
-                source,
-                scalar.range,
-                schema,
-                path,
-                &site.state,
-                &Default::default(),
-                None,
-                Some(facts),
-                out,
-                seen,
-            );
-            // Payload interpretation is binding-dependent. Keep its symbols in
-            // the index; editor checks replay the destination's complete/partial
-            // contract rather than treating it as an independent source block.
-            out.schema_facts.truncate(schemas);
-            out.field_facts.truncate(fields);
-            out.scope_facts.truncate(scopes);
-            let mut definition_keys = std::collections::BTreeSet::new();
-            let mut i = 0;
-            out.definitions.retain(|definition| {
-                let old = i < definitions;
-                i += 1;
-                old || definition_keys.insert((
-                    definition.kind.clone(),
-                    definition.name.clone(),
-                    definition.range,
-                    definition.selection_range,
-                ))
-            });
-            dedup_payload_references(&mut out.references, references);
-            dedup_payload_references(&mut out.binding_references, bindings);
+            let mut reference = reference.clone();
+            reference.range = range;
+            destination.push(reference);
         }
     }
-}
-
-fn collect_parameter_references(
-    ir: &RulesIr,
-    site: &crate::template::ParameterSite,
-    parameter: &str,
-    scalar: &HirScalar,
-    facts: &dyn SymbolFacts,
-    out: &mut IrFacts,
-) {
-    if scalar.value.contains('$') {
-        return;
-    }
-    let mut value = String::new();
-    let mut spans = Vec::new();
-    for fragment in &site.token.fragments {
-        match fragment {
-            crate::TemplateFragment::Literal(text) => value.push_str(text),
-            crate::TemplateFragment::Parameter { name, .. }
-                if name.eq_ignore_ascii_case(parameter) =>
-            {
-                let start = value.len();
-                value.push_str(&scalar.value);
-                spans.push((start, value.len()));
-            }
-            _ => return,
-        }
-    }
-    let Ok(end) = u32::try_from(value.len()) else {
-        return;
-    };
-    let range = TextRange::new(0, end).expect("rendered token range");
-    let matchers = match &site.domain {
-        crate::template::Domain::Value(matchers) => matchers.clone(),
-        crate::template::Domain::Key { schema, shape } => ir
-            .lookup(*schema, &value, *shape)
-            .map(|id| ir.field(id).key)
-            .collect(),
-        _ => return,
-    };
-    let matching = matchers
-        .iter()
-        .copied()
-        .filter(|matcher| {
-            reference_matches(ir, *matcher, &value, Some(facts), out)
-                || ir.scalar_matches(
-                    *matcher,
-                    &value,
-                    &FactsRef(Some(facts), &out.symbol_facts_dependency),
-                )
-        })
-        .collect::<Vec<_>>();
-    let selected = if matching.is_empty() {
-        matchers
-    } else {
-        matching
-    };
-    let previous = out.references.len();
-    for matcher in selected {
-        if (matcher_has_reference(ir, matcher)
-            || matches!(ir.matcher(matcher), Matcher::Scope(_) | Matcher::Link))
-            && !matcher_contains_definition(ir, matcher)
-        {
-            collect_matcher_refs(ir, matcher, &value, range, Some(facts), out);
-        }
-    }
-    let references = out.references.split_off(previous);
-    for mut reference in references {
-        for (start, end) in &spans {
-            let begin = (reference.range.start() as usize).max(*start);
-            let finish = (reference.range.end() as usize).min(*end);
-            if begin >= finish {
-                continue;
-            }
-            let relative = (begin - start, finish - start);
-            // A partial spelling of a whole target needs an affix-aware edit
-            // contract. Retain exact symbol holes and direct names here so
-            // navigation and rename cannot introduce a doubled affix.
-            if scalar
-                .value
-                .get(relative.0..relative.1)
-                .is_some_and(|text| text.eq_ignore_ascii_case(&reference.name))
-            {
-                reference.range = subrange(scalar.range, &scalar.value, relative.0, relative.1);
-                out.references.push(reference);
-                break;
-            }
-        }
-    }
-}
-
-fn matcher_contains_definition(ir: &RulesIr, id: MatcherId) -> bool {
-    match ir.matcher(id) {
-        Matcher::Def { .. } => true,
-        Matcher::Union(items) => items.iter().any(|item| matcher_contains_definition(ir, *item)),
-        Matcher::Pattern(parts) => parts.iter().any(
-            |part| matches!(part, rules::ir::PatternPart::Hole(m) if matcher_contains_definition(ir, *m)),
-        ),
-        _ => false,
-    }
+    let mut keys = std::collections::BTreeSet::new();
+    let mut i = 0;
+    out.definitions.retain(|definition| {
+        let old = i < definition_start;
+        i += 1;
+        old || keys.insert((
+            definition.kind.clone(),
+            definition.name.clone(),
+            definition.range,
+            definition.selection_range,
+        ))
+    });
+    dedup_payload_references(&mut out.references, reference_start);
+    dedup_payload_references(&mut out.binding_references, binding_start);
 }
 
 fn dedup_payload_references(references: &mut Vec<HirReference>, previous: usize) {
@@ -1090,115 +1067,6 @@ fn dedup_payload_references(references: &mut Vec<HirReference>, previous: usize)
     });
 }
 
-#[allow(clippy::too_many_arguments)]
-fn lower_quoted_schema(
-    ir: &RulesIr,
-    source: &ParsedFile,
-    range: TextRange,
-    schema: SchemaId,
-    path: &LogicalPath,
-    state: &ScopeState,
-    subtypes: &SubtypeSet,
-    instance_def: Option<(TypeId, Option<rules::ir::Symbol>)>,
-    facts: Option<&dyn SymbolFacts>,
-    out: &mut IrFacts,
-    seen: &mut std::collections::BTreeSet<(u32, u32)>,
-) {
-    let Some(raw) = source.text(range) else {
-        return;
-    };
-    let Some(quoted) = parse_quoted_script(raw) else {
-        return;
-    };
-    let collected = crate::collector::collect(quoted.parsed());
-    let properties = collected.properties;
-    let bare_values = collected.bare_values;
-    let children = crate::scope::property_children(&properties);
-    let indices = properties
-        .iter()
-        .enumerate()
-        .filter_map(|(i, p)| p.top_level.then_some(i))
-        .collect::<Vec<_>>();
-    let mut effective_subtypes = if instance_def.is_some() {
-        SubtypeSet::default()
-    } else {
-        subtypes.clone()
-    };
-    if let Some((type_id, Some(subtype))) = instance_def {
-        effective_subtypes.insert(type_id, subtype);
-    }
-    let map_range = |inner: TextRange| {
-        quoted
-            .source_map()
-            .decoded_range(inner)
-            .and_then(|relative| {
-                TextRange::new(
-                    range.start().checked_add(relative.start())?,
-                    range.start().checked_add(relative.end())?,
-                )
-            })
-    };
-    if out.retain_validation_facts {
-        out.schema_facts.push(SchemaFact {
-            range,
-            schema,
-            subtypes: effective_subtypes.clone(),
-            state: state.clone(),
-        });
-    }
-    let schema_start = out.schema_facts.len();
-    let field_start = out.field_facts.len();
-    let scope_start = out.scope_facts.len();
-    let definition_start = out.definitions.len();
-    let reference_start = out.references.len();
-    let binding_start = out.binding_references.len();
-    let attributes_start = out.definition_attributes.len();
-    let guards_start = out.runtime_parameter_guards.len();
-    descend(
-        ir,
-        path,
-        &properties,
-        &bare_values,
-        &children,
-        indices,
-        schema,
-        effective_subtypes,
-        state.clone(),
-        facts,
-        quoted.parsed(),
-        out,
-        seen,
-        quoted.parsed().root().range(),
-        None,
-    );
-    for (branch, guard) in &mut out.runtime_parameter_guards[guards_start..] {
-        *branch = map_range(*branch).unwrap_or(range);
-        *guard = guard.and_then(map_range);
-    }
-    for fact in &mut out.schema_facts[schema_start..] {
-        fact.range = map_range(fact.range).unwrap_or(range);
-    }
-    for fact in &mut out.field_facts[field_start..] {
-        fact.range = map_range(fact.range).unwrap_or(range);
-    }
-    for fact in &mut out.scope_facts[scope_start..] {
-        fact.range = map_range(fact.range).unwrap_or(range);
-        fact.transition = None;
-    }
-    for definition in &mut out.definitions[definition_start..] {
-        definition.range = map_range(definition.range).unwrap_or(range);
-        definition.selection_range = map_range(definition.selection_range).unwrap_or(range);
-    }
-    for reference in &mut out.references[reference_start..] {
-        reference.range = map_range(reference.range).unwrap_or(range);
-    }
-    for reference in &mut out.binding_references[binding_start..] {
-        reference.range = map_range(reference.range).unwrap_or(range);
-    }
-    for attributes in &mut out.definition_attributes[attributes_start..] {
-        attributes.definition_range = map_range(attributes.definition_range).unwrap_or(range);
-    }
-}
 pub(super) fn transition_state(
     ir: &RulesIr,
     mut state: ScopeState,

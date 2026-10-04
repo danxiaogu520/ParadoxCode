@@ -7,6 +7,11 @@
 use std::cell::Cell;
 
 mod documents;
+mod fact_stabilization;
+pub use fact_stabilization::{
+    FactStabilizationReport, SymbolDependency, affected_fact_readers,
+    stabilize_symbol_dependent_files,
+};
 mod index;
 mod pipeline;
 
@@ -21,8 +26,8 @@ pub use pipeline::{
     build_file_state_with_cache, build_file_state_with_ir, build_file_state_with_ir_and_facts,
     empty_file_state, load_source_files, parse_source, position_ranges_for_state,
     prepare_document_snapshot, prepare_document_snapshot_with_ir,
-    prepare_document_snapshot_with_ir_and_facts, replay_symbol_dependent_files, shard_for_source,
-    staged_overlay_document, unparsed_document,
+    prepare_document_snapshot_with_ir_and_facts, shard_for_source, staged_overlay_document,
+    unparsed_document,
 };
 
 thread_local! {

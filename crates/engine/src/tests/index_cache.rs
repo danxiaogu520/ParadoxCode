@@ -1512,3 +1512,149 @@ fn lazy_preferred_language_load_skips_other_languages() {
     assert_eq!(french_values.len(), 1);
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn fact_discovery_crosses_32_rounds_and_retracts_after_root_removal() {
+    let root = temp_root("fact-chain");
+    fs::create_dir_all(root.join("events")).unwrap();
+    fs::write(root.join("events/seed.txt"), "seed = chain_0").unwrap();
+    for i in 1..=40 {
+        fs::write(
+            root.join(format!("events/step_{i}.txt")),
+            format!("chain_{} = {{ write = chain_{i} }}", i - 1),
+        )
+        .unwrap();
+    }
+    fs::write(
+        root.join("events/unrelated.txt"),
+        "unrelated = { write = outsider }",
+    )
+    .unwrap();
+    let file = serde_json::from_value(serde_json::json!({
+        "types": {"node": {}},
+        "files": {"fixture": {"path": "events", "ext": "txt", "root": "root"}},
+        "schemas": {
+            "root": {"fields": {"seed": {"value": "def<node>", "card": "0..*"}}, "patterns": [{"key": "ref<node>", "body": "next", "card": "0..*"}]},
+            "next": {"fields": {"write": {"value": "def<node>", "card": "1"}}}
+        }
+    })).unwrap();
+    let mut profile = game::eu4::first_party_ir().unwrap().game.profile.clone();
+    profile.game_id = "fixture".to_owned();
+    let ir = rules::lower::lower(
+        &[("fixture.json".to_owned(), file)],
+        rules::ir::GameConfig { profile },
+    )
+    .unwrap();
+    let rules = rules::RuleSet::from_ir_catalog(&ir);
+    let mut host = AnalysisHost::with_ir(rules, ir.game.profile.clone(), ir.into());
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Project,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().unwrap();
+    assert!(
+        host.snapshot()
+            .index()
+            .active_definition("node", "chain_40")
+            .is_some()
+    );
+    let unrelated = host
+        .snapshot()
+        .source_file_id_for_path(&AbsPath::normalize(&root.join("events/unrelated.txt")))
+        .unwrap();
+    let untouched = host
+        .snapshot()
+        .file_state(unrelated)
+        .unwrap()
+        .source_handle();
+    fs::remove_file(root.join("events/seed.txt")).unwrap();
+    host.apply_disk_file_changes(&[DiskFileChange {
+        path: AbsPath::normalize(&root.join("events/seed.txt")),
+        kind: DiskFileChangeKind::Deleted,
+    }])
+    .unwrap();
+    assert!(
+        host.snapshot()
+            .index()
+            .active_definition("node", "chain_40")
+            .is_none(),
+        "generated facts must not sustain each other after the seed is removed"
+    );
+    assert!(
+        std::sync::Arc::ptr_eq(
+            &untouched,
+            &host
+                .snapshot()
+                .file_state(unrelated)
+                .unwrap()
+                .source_handle()
+        ),
+        "an unrelated negative lookup must not relower after deleting the seed"
+    );
+    let incremental = host.snapshot();
+    host.refresh_source_roots().unwrap();
+    assert_eq!(incremental.index().shards, host.snapshot().index().shards);
+    fs::write(root.join("events/seed.txt"), "seed = chain_0").unwrap();
+    host.apply_disk_file_changes(&[DiskFileChange {
+        path: AbsPath::normalize(&root.join("events/seed.txt")),
+        kind: DiskFileChangeKind::Created,
+    }])
+    .unwrap();
+    assert!(
+        host.snapshot()
+            .index()
+            .active_definition("node", "chain_40")
+            .is_some(),
+        "negative lookup insertion must invalidate the entire dependent component"
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn oscillating_generated_facts_do_not_commit_a_candidate_index() {
+    let root = temp_root("fact-oscillation");
+    fs::create_dir_all(root.join("events")).unwrap();
+    fs::write(root.join("events/stable.txt"), "seed = stable").unwrap();
+    let file = serde_json::from_value(serde_json::json!({
+        "types":{"node":{}}, "files":{"fixture":{"path":"events","ext":"txt","root":"root"}},
+        "schemas":{
+            "root":{"fields":{"seed":{"value":"def<node>","card":"0..*"}},"patterns":[
+                {"key":"ref<node>","body":"known","card":"0..*"},
+                {"key":"scalar","body":"missing","card":"0..*"}
+            ]},
+            "known":{"fields":{"write":{"value":"scalar","card":"1"}}},
+            "missing":{"fields":{"write":{"value":"def<node>","card":"1"}}}
+        }
+    }))
+    .unwrap();
+    let mut profile = game::eu4::first_party_ir().unwrap().game.profile.clone();
+    profile.game_id = "fixture".to_owned();
+    let ir = rules::lower::lower(
+        &[("fixture.json".to_owned(), file)],
+        rules::ir::GameConfig { profile },
+    )
+    .unwrap();
+    let mut host = AnalysisHost::with_ir(
+        rules::RuleSet::from_ir_catalog(&ir),
+        ir.game.profile.clone(),
+        ir.into(),
+    );
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Project,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().unwrap();
+    let before = host.snapshot();
+    fs::write(
+        root.join("events/toggle.txt"),
+        "toggle = { write = toggle }",
+    )
+    .unwrap();
+    let error = host.refresh_source_roots().unwrap_err();
+    assert!(error.to_string().contains("oscillat"), "{error}");
+    assert_eq!(host.snapshot().revision(), before.revision());
+    assert_eq!(host.snapshot().index(), before.index());
+    fs::remove_dir_all(root).unwrap();
+}

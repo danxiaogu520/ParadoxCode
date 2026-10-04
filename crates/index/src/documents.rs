@@ -36,6 +36,8 @@ pub struct FileState {
     pub hir: Option<Arc<HirFile>>,
     /// Retained after frontend eviction so pure local lowering can skip replay.
     pub symbol_facts_dependency: bool,
+    /// Positive and negative lookup provenance from the last discovery query.
+    pub fact_dependencies: std::collections::BTreeSet<crate::SymbolDependency>,
     pub shard: Arc<FileIndexShard>,
     pub cached_localisation_previews: Option<Arc<Vec<(TextRange, LocalisationPreview)>>>,
 }
@@ -107,6 +109,7 @@ impl FileState {
             source: self.source,
             parsed: None,
             hir: None,
+            fact_dependencies: self.fact_dependencies.clone(),
             symbol_facts_dependency: self.symbol_facts_dependency,
             shard: self.shard,
             cached_localisation_previews,
@@ -130,6 +133,7 @@ impl FileState {
             source: Arc::clone(&self.source),
             parsed: None,
             hir: None,
+            fact_dependencies: self.fact_dependencies.clone(),
             symbol_facts_dependency: self.symbol_facts_dependency,
             shard: Arc::clone(&self.shard),
             cached_localisation_previews,
@@ -159,6 +163,7 @@ impl FileState {
             source: Arc::clone(&self.source),
             parsed: None,
             hir: None,
+            fact_dependencies: self.fact_dependencies.clone(),
             symbol_facts_dependency: self.symbol_facts_dependency,
             shard: Arc::clone(&self.shard),
             cached_localisation_previews: self.cached_localisation_previews.clone(),

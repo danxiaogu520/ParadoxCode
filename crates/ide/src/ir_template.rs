@@ -12,12 +12,7 @@ use crate::types::{CancellationToken, Cancelled};
 
 pub(crate) use hir::template::Domain;
 
-pub(crate) struct BodyAnalysis {
-    pub(crate) rendered: hir::template_text::RenderedTemplate,
-    pub(crate) hir: hir::HirFile,
-    pub(crate) evidence: Vec<hir::checking::ConstraintEvidence>,
-    pub(crate) coverage: hir::analysis::AnalysisCoverage,
-}
+pub(crate) type BodyAnalysis = hir::template_instance::TemplateInstance;
 
 fn has_structural_reads(template: &hir::Template, snapshot: &AnalysisSnapshot) -> bool {
     use rules::replacement::{TemplateFragment, TemplateInstruction, TemplateOperand};
@@ -55,7 +50,8 @@ pub(crate) fn analyse_body(
     invocation: &hir::HirProperty,
     override_value: Option<(&str, &str)>,
     cancellation: &CancellationToken,
-) -> Result<Option<BodyAnalysis>, Cancelled> {
+) -> Result<Option<std::sync::Arc<BodyAnalysis>>, Cancelled> {
+    cancellation.checkpoint()?;
     let overrides = override_value
         .into_iter()
         .map(|(name, value)| (name.to_ascii_lowercase(), value.to_owned()))
@@ -70,7 +66,7 @@ fn analyse_body_with_bindings(
     overrides: &BTreeMap<String, String>,
     markers: &[String],
     cancellation: &CancellationToken,
-) -> Result<Option<BodyAnalysis>, Cancelled> {
+) -> Result<Option<std::sync::Arc<BodyAnalysis>>, Cancelled> {
     let ir = snapshot.ir();
     let Some(field) = source.field_fact_at(invocation.key_range) else {
         return Ok(None);
@@ -97,12 +93,15 @@ fn analyse_body_with_bindings(
     let mut bindings = BTreeMap::new();
     let mut raw = BTreeMap::new();
     let mut present = BTreeSet::new();
-    for argument in source.properties().iter().filter(|argument| {
-        argument.path.len() == invocation.path.len() + 1
-            && argument.path.starts_with(&invocation.path)
-            && invocation.range.start() <= argument.range.start()
-            && argument.range.end() <= invocation.range.end()
-    }) {
+    for argument in source
+        .properties_in_range(invocation.range)
+        .filter(|argument| {
+            argument.path.len() == invocation.path.len() + 1
+                && argument.path.starts_with(&invocation.path)
+                && invocation.range.start() <= argument.range.start()
+                && argument.range.end() <= invocation.range.end()
+        })
+    {
         let name = argument.key.to_ascii_lowercase();
         present.insert(name.clone());
         if let Some(scalar) = &argument.scalar {
@@ -129,7 +128,25 @@ fn analyse_body_with_bindings(
         bindings.insert(name.clone(), value.to_owned());
         present.insert(name);
     }
-    let mut rendered = hir::template_text::render_expanded(
+    let state = invocation_state(source, invocation);
+    // Instances keep root-relative byte maps. Caller locations are supplied at
+    // projection time, so identical bindings/scope may share an instance.
+    let memo = markers
+        .is_empty()
+        .then(|| rules::ir::SymbolFacts::template_memo(&facts))
+        .flatten();
+    let key = memo.as_ref().map(|_| {
+        format!(
+            "instance:{kind}:{}:{schema:?}:{state:?}:{bindings:?}:{raw:?}:{present:?}",
+            invocation.key
+        )
+    });
+    if let (Some(memo), Some(key)) = (&memo, &key)
+        && let Some(body) = memo.get::<BodyAnalysis>(key)
+    {
+        return Ok(Some(body));
+    }
+    let body = std::sync::Arc::new(hir::template_instance::instantiate(
         ir,
         &facts,
         template,
@@ -137,39 +154,53 @@ fn analyse_body_with_bindings(
         &raw,
         &present,
         schema,
-        invocation_state(source, invocation),
-        1024 * 1024,
+        state,
+        markers,
+        hir::template_instance::InstanceGoal::Validation,
         &mut || cancellation.checkpoint(),
-    )?;
-    for marker in markers {
-        for (start, _) in rendered.text.match_indices(marker) {
-            if let Some(range) = text::TextRange::new(start as u32, (start + marker.len()) as u32) {
-                rendered.trial_holes.push(range);
-            }
-        }
-    }
+    )?);
     cancellation.checkpoint()?;
-    let parsed = std::sync::Arc::new(parser::parse(parser::FileFormat::Script, &rendered.text));
-    let hir = hir::lower_ir_schema_with_holes(
-        parsed,
-        ir,
-        schema,
-        Default::default(),
-        invocation_state(source, invocation),
-        &facts,
-        &rendered.trial_holes,
-    );
-    let checked = hir::checking::check_fragment(ir, &hir, &facts, &rendered, &mut || {
-        cancellation.checkpoint()
-    })?;
-    let mut coverage = rendered.coverage.clone();
-    coverage.merge(&checked.coverage);
-    Ok(Some(BodyAnalysis {
-        rendered,
-        hir,
-        evidence: checked.value,
-        coverage,
-    }))
+    if let (Some(memo), Some(key)) = (memo, key) {
+        let bytes = body
+            .rendered
+            .text
+            .len()
+            .saturating_mul(4)
+            .saturating_add(body.rendered.pieces.len().saturating_mul(128))
+            .saturating_add(
+                body.rendered
+                    .pieces
+                    .iter()
+                    .filter_map(|p| p.binding_source.as_ref())
+                    .map(|map| map.offsets.len().saturating_mul(4))
+                    .sum::<usize>(),
+            )
+            .saturating_add(body.hir.syntax().tree().node_count().saturating_mul(256))
+            .saturating_add(
+                body.rendered
+                    .calls
+                    .iter()
+                    .map(|call| call.kind.len() + call.name.len() + 128)
+                    .sum::<usize>(),
+            );
+        let mut views = BTreeSet::new();
+        let trace_bytes = body
+            .rendered
+            .calls
+            .iter()
+            .filter(|call| views.insert(std::sync::Arc::as_ptr(&call.site.view) as usize))
+            .map(|call| {
+                call.site
+                    .view
+                    .text
+                    .len()
+                    .saturating_mul(4)
+                    .saturating_add(call.site.view.pieces.len().saturating_mul(128))
+            })
+            .sum::<usize>();
+        memo.insert(key, body.clone(), bytes.saturating_add(trace_bytes));
+    }
+    Ok(Some(body))
 }
 
 pub(crate) fn evidence_dependencies(
@@ -191,6 +222,29 @@ pub(crate) fn evidence_dependencies(
         }
     }
     dependencies
+}
+
+/// Exact inverse projection for semantic facts and edits. Display fallbacks are
+/// deliberately excluded: a generated identifier may span several bindings.
+pub(crate) fn project_source_range(
+    body: &BodyAnalysis,
+    range: text::TextRange,
+    source: &hir::HirFile,
+    invocation: &hir::HirProperty,
+) -> Option<text::TextRange> {
+    hir::template_instance::project_source_range(
+        &body.rendered,
+        range,
+        source.syntax(),
+        source
+            .properties_in_range(invocation.range)
+            .filter(|argument| {
+                argument.path.len() == invocation.path.len() + 1
+                    && argument.path.starts_with(&invocation.path)
+                    && invocation.range.start() <= argument.range.start()
+                    && argument.range.end() <= invocation.range.end()
+            }),
+    )
 }
 
 pub(crate) fn project_evidence_range(
@@ -371,13 +425,12 @@ pub(crate) fn validate_candidate(
         } else {
             Validation::Valid
         },
-        coverage: body.coverage,
+        coverage: body.coverage.clone(),
     })
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct ParameterSite {
-    pub(crate) origin: (String, String),
     pub(crate) domain: Domain,
     pub(crate) token: TemplateToken,
     pub(crate) state: ScopeState,
@@ -412,6 +465,9 @@ impl ParameterSite {
         parameter: &str,
         value: &str,
     ) -> bool {
+        if value.contains('$') {
+            return true;
+        }
         let Some(rendered) = render_candidate(&self.token, parameter, value) else {
             return true;
         };
@@ -748,7 +804,6 @@ fn map_sites(sites: Analysis<Vec<hir::template::ParameterSite>>) -> Analysis<Vec
         .value
         .into_iter()
         .map(|site| ParameterSite {
-            origin: site.origin,
             domain: site.domain,
             token: site.token,
             state: site.state,
@@ -822,28 +877,7 @@ pub(crate) fn definition_parameter_sites(
     )
     .map(map_sites)
 }
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn parameter_symbol_sites(
-    snapshot: &AnalysisSnapshot,
-    kind: &str,
-    name: &str,
-    parameter: &str,
-    bindings: &BTreeMap<String, String>,
-    state: ScopeState,
-    cancellation: &CancellationToken,
-) -> Result<Analysis<Vec<ParameterSite>>, Cancelled> {
-    hir::template::parameter_symbol_sites(
-        snapshot.ir(),
-        &WorkspaceFacts { snapshot },
-        kind,
-        name,
-        parameter,
-        bindings,
-        state,
-        &mut || cancellation.checkpoint(),
-    )
-    .map(map_sites)
-}
+
 pub(crate) fn missing_parameters(
     snapshot: &AnalysisSnapshot,
     kind: &str,
@@ -975,24 +1009,8 @@ pub(crate) fn parameter_sites_at(
     .map(map_sites)
 }
 
-pub(crate) fn invocation_bindings(
-    hir: &hir::HirFile,
-    invocation: &hir::HirProperty,
-) -> BTreeMap<String, String> {
-    invocation_inputs(hir, invocation).values
-}
-
 pub(crate) fn invocation_state(hir: &hir::HirFile, invocation: &hir::HirProperty) -> ScopeState {
-    hir.field_fact_at(invocation.key_range)
-        .and_then(|field| {
-            hir.schema_facts()
-                .iter()
-                .filter(|fact| {
-                    fact.schema == field.schema
-                        && crate::support::contains(fact.range, invocation.key_range.start())
-                })
-                .min_by_key(|fact| fact.range.len())
-        })
+    hir.scope_fact_at(invocation.key_range)
         .map(|fact| fact.state.clone())
         .unwrap_or(ScopeState {
             root: hir::ScopeValue::Unknown,
@@ -1008,7 +1026,7 @@ pub(crate) struct ConsumedPosition {
     pub(crate) piece: usize,
 }
 pub(crate) struct ConsumptionProjection {
-    pub(crate) body: BodyAnalysis,
+    pub(crate) body: std::sync::Arc<BodyAnalysis>,
     pub(crate) positions: Vec<ConsumedPosition>,
     pub(crate) parameter: String,
     pub(crate) invocation: text::TextRange,
@@ -1164,6 +1182,71 @@ pub(crate) fn consumption_at(
                 });
             }
         }
+        if positions.is_empty() {
+            for call in &body.rendered.calls {
+                let Some((parameter, range)) = &call.source else {
+                    continue;
+                };
+                if !parameter.eq_ignore_ascii_case(&argument.key)
+                    || offset < range.start()
+                    || range.end() < offset
+                {
+                    continue;
+                }
+                let view = &call.site.view;
+                let Some((index, piece)) = view.pieces.iter().enumerate().find(|(_, piece)| {
+                    piece.range.start() <= call.site.key_range.start()
+                        && call.site.key_range.end() <= piece.range.end()
+                        && piece.script
+                }) else {
+                    continue;
+                };
+                let Some(map) = &piece.binding_source else {
+                    continue;
+                };
+                let boundary = map
+                    .offsets
+                    .partition_point(|boundary| *boundary <= offset)
+                    .saturating_sub(1);
+                if map.offsets.get(boundary) != Some(&offset) {
+                    continue;
+                }
+                let parsed =
+                    match parser::parse_script_bounded(&view.text, Default::default(), &mut || {
+                        cancellation.checkpoint()
+                    })? {
+                        Ok(parsed) => std::sync::Arc::new(parsed),
+                        Err(_) => continue,
+                    };
+                let hir = hir::lower_ir_schema_with_holes(
+                    parsed,
+                    snapshot.ir(),
+                    call.site.schema,
+                    Default::default(),
+                    call.site.state.clone(),
+                    &WorkspaceFacts { snapshot },
+                    &view.trial_holes,
+                );
+                let shadow = std::sync::Arc::new(BodyAnalysis {
+                    rendered: view.as_ref().clone(),
+                    hir,
+                    evidence: Vec::new(),
+                    coverage: body.coverage.clone(),
+                });
+                return Ok(Some(ConsumptionProjection {
+                    body: shadow,
+                    positions: vec![ConsumedPosition {
+                        generated: piece.range.start() + boundary as u32,
+                        piece: index,
+                    }],
+                    parameter: argument.key.clone(),
+                    invocation: invocation.key_range,
+                    scalar,
+                    quote_map,
+                    insertion: position,
+                }));
+            }
+        }
         if !positions.is_empty() {
             return Ok(Some(ConsumptionProjection {
                 body,
@@ -1201,12 +1284,34 @@ pub(crate) fn validate_consumption_edit(
     } else {
         (item.insert_text.clone(), Vec::new())
     };
+    if input.source.len().saturating_add(text.len()) > parser::ScriptParseBudget::default().bytes {
+        return Ok(Analysis {
+            value: Validation::Unknown,
+            coverage: hir::analysis::AnalysisCoverage {
+                limits: BTreeSet::from([hir::analysis::AnalysisLimit::TextBytes]),
+                residuals: Default::default(),
+            },
+        });
+    }
     let mut source = input.source.to_string();
     source.replace_range(
         item.replacement_range.start() as usize..item.replacement_range.end() as usize,
         &text,
     );
-    let parsed = std::sync::Arc::new(parser::parse(parser::FileFormat::Script, &source));
+    let parsed = match parser::parse_script_bounded(&source, Default::default(), &mut || {
+        cancellation.checkpoint()
+    })? {
+        Ok(parsed) => std::sync::Arc::new(parsed),
+        Err(limit) => {
+            return Ok(Analysis {
+                value: Validation::Unknown,
+                coverage: hir::analysis::AnalysisCoverage {
+                    limits: BTreeSet::from([hir::template_text::parse_limit(limit)]),
+                    residuals: Default::default(),
+                },
+            });
+        }
+    };
     let Some(path) = input.path.as_ref() else {
         return Ok(Analysis {
             value: Validation::Unknown,
@@ -1269,6 +1374,50 @@ pub(crate) fn validate_consumption_edit(
         } else {
             Validation::Unknown
         },
-        coverage: body.coverage,
+        coverage: body.coverage.clone(),
     })
+}
+
+/// Visits actual script-consuming instances for navigation, coloring and hints.
+pub(crate) fn for_each_consumption(
+    snapshot: &AnalysisSnapshot,
+    input: &crate::support::ParsedInput,
+    cancellation: &CancellationToken,
+    visit: &mut impl FnMut(&hir::HirFile, &hir::HirProperty, &BodyAnalysis) -> Result<(), Cancelled>,
+) -> Result<(), Cancelled> {
+    let Some(source) = input.hir.as_deref() else {
+        return Ok(());
+    };
+    for invocation in source.properties() {
+        cancellation.checkpoint()?;
+        let Some(fact) = source.field_fact_at(invocation.key_range) else {
+            continue;
+        };
+        let Some(kind) = fact
+            .fields
+            .iter()
+            .find_map(|id| template_kind(snapshot.ir(), snapshot.ir().field(*id).key))
+        else {
+            continue;
+        };
+        if source.parameter_references().iter().any(|r| {
+            invocation.range.start() <= r.range.start() && r.range.end() <= invocation.range.end()
+        }) || source.definitions().iter().any(|d| {
+            d.kind.eq_ignore_ascii_case(&kind) && d.selection_range == invocation.key_range
+        }) {
+            continue;
+        }
+        let Some(summary) =
+            crate::semantic::dynamic_definition_summary(snapshot, &kind, &invocation.key)
+        else {
+            continue;
+        };
+        if !needs_body_analysis(snapshot, &summary) {
+            continue;
+        }
+        if let Some(body) = analyse_body(snapshot, source, invocation, None, cancellation)? {
+            visit(source, invocation, &body)?;
+        }
+    }
+    Ok(())
 }

@@ -67,16 +67,8 @@ pub(crate) fn resolve_dynamic_definition(
     ) {
         return cached.as_ref().clone();
     }
-    // A worker still observing a superseded definition set must not rebuild:
-    // its insert would be dropped, so the next probe would rerun the scan and
-    // the resolution loop would burn a core. The worker's own results are
-    // destined to be discarded with its revision.
-    if snapshot
-        .query_cache()
-        .is_superseded(engine::CacheDomain::Definitions, revision)
-    {
-        return None;
-    }
+    // An immutable older snapshot still has valid inputs. Cache publication
+    // may be refused, but that must not turn a real definition into a miss.
     let resolved = resolve_dynamic_definition_uncached(snapshot, owner_kind, owner_name);
     snapshot.query_cache().insert(
         revision,

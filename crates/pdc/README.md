@@ -58,6 +58,13 @@ remain in [the server crate](src/mcp/mod.rs); developer audits and reports are d
 
 ## Local indexes
 
+Template-generated disk facts are discovered in immutable rounds with positive and
+negative lookup dependencies. Scans, disk events and persistent refresh share the
+[index discovery queue](../index/src/fact_stabilization.rs). Disk edits rebuild the
+affected reader component before discovery, so deleted generated facts are revoked.
+Cancelled, oscillating or budget-limited candidates do not replace the committed index.
+
+
 The repository CLI builds persistent indexes and performs guided Vanilla setup. Read its
 current arguments instead of relying on an independently maintained option table:
 

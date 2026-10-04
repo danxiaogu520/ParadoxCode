@@ -61,8 +61,9 @@ under `target/`.
 The semantic memo belongs to one immutable facts view and has a byte bound.
 Snapshot adapters currently use conservative document-domain invalidation;
 negative lookups, overlays, rules and source-root changes must invalidate any
-result that reads them. Cached keys still include binding source ranges until
-all projected results can safely omit them. Persistent compatibility uses the
+result that reads them. Parameter-site memo keys retain binding source ranges. Complete-container
+instances use root-relative maps and share by bindings, presence, schema and scope;
+source locations are supplied separately for each caller. Persistent compatibility uses the
 workspace LSP release version.
 
 Script body and item consumption share the complete parent instance. List inserts
@@ -77,3 +78,30 @@ heuristics. Script quote layers and snippet literal escaping compose separately;
 completion resolve retains its rule identity and refuses to reinterpret stale
 Template evidence. Unresolved callees retain an opaque argument map and a coverage
 limit, never a statement schema guessed from their bindings.
+
+[template_instance.rs](src/template_instance.rs) owns complete-container specialization
+for both index discovery and IDE queries. Navigation, references, coloring and scope
+hints project that same instance through exact root byte maps. A generated name
+spanning multiple bindings cannot become an edit of an arbitrary argument. Rename
+requires known reference discovery and an invertible selection; unfinished closure
+returns an explicit rejection. Shared instances use the immutable view's bounded memo.
+
+Secondary script parsing checks bytes before source allocation and checks nodes,
+nesting and cancellation during token, comment, whitespace and recovery scans.
+Limited parses return a frontier instead of publishing budget damage as user syntax
+errors. Inserted markers carry local text-interpretation uncertainty; independent
+sibling rejection evidence remains available.
+
+[index fact discovery](../index/src/fact_stabilization.rs) records positive and
+negative lookups per file. Rounds read immutable candidates, and only readers of
+changed facts enter subsequent rounds. Disk edits rebuild their transitive reader
+component from base declarations before solving, including outgoing generated facts.
+This prevents deleted seeds from sustaining cycles. Oscillation compares exact fact
+contents and aborts the transaction; histories and work are bounded. Persistent
+refresh uses the same mechanism. Overlay discovery still needs its complete
+transaction and completion-state acceptance.
+
+Consumed named call keys remain in the render trace after their bodies expand.
+Navigation and rename use their exact root binding ranges. Cursor queries on a
+removed key use its shared pre-expansion frame and still validate the real edit
+against the complete root instance. Call frames are counted in memo byte costs.

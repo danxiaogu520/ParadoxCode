@@ -196,6 +196,12 @@ fn parameter_sites_with<E>(
         }),
         state,
     )?;
+    if bindings.values().any(|value| value.contains('$')) {
+        interpreter
+            .coverage
+            .residuals
+            .insert(crate::analysis::ResidualReason::TextInterpretation);
+    }
     Ok(Analysis {
         value: interpreter.sites,
         coverage: interpreter.coverage,

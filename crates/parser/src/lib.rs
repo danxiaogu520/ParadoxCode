@@ -20,7 +20,7 @@ pub use cst::{
 };
 pub use quoted_script::{
     QuotedScript, QuotedScriptSourceMap, decode_quoted_script, encode_quoted_script_text,
-    parse_quoted_script,
+    parse_quoted_script, parse_quoted_script_bounded,
 };
 
 /// One of the reusable Paradox text frontends.
@@ -287,6 +287,74 @@ impl ParsedFile {
 #[must_use]
 pub fn parse(format: FileFormat, source: &str) -> ParsedFile {
     parse_with_revision(format, source, 0)
+}
+
+/// Resource frontier reached by a secondary script parse. No partial CST or
+/// synthetic syntax error is returned as a successfully parsed document.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ScriptParseLimit {
+    Bytes,
+    Nodes,
+    Depth,
+}
+
+/// Limits checked before source allocation and during token/container scanning.
+#[derive(Clone, Copy, Debug)]
+pub struct ScriptParseBudget {
+    pub bytes: usize,
+    pub nodes: usize,
+    pub depth: usize,
+}
+impl Default for ScriptParseBudget {
+    fn default() -> Self {
+        Self {
+            bytes: 1024 * 1024,
+            nodes: 50_000,
+            depth: 128,
+        }
+    }
+}
+
+/// Parses a secondary script with checkpoints during long tokens, comments,
+/// whitespace and node creation. Cancelled/limited candidates are discarded.
+pub fn parse_script_bounded<E>(
+    source: &str,
+    budget: ScriptParseBudget,
+    checkpoint: &mut dyn FnMut() -> Result<(), E>,
+) -> Result<Result<ParsedFile, ScriptParseLimit>, E> {
+    checkpoint()?;
+    if source.len() > budget.bytes {
+        return Ok(Err(ScriptParseLimit::Bytes));
+    }
+    let mut cancellation = None;
+    let mut limit = None;
+    let parts = script::parse_guarded(source, &mut |_, nodes, depth| {
+        if let Err(error) = checkpoint() {
+            cancellation = Some(error);
+            return false;
+        }
+        limit = if depth > budget.depth {
+            Some(ScriptParseLimit::Depth)
+        } else if nodes >= budget.nodes {
+            Some(ScriptParseLimit::Nodes)
+        } else {
+            None
+        };
+        limit.is_none()
+    });
+    if let Some(error) = cancellation {
+        return Err(error);
+    }
+    let Some(parts) = parts else {
+        return Ok(Err(limit.unwrap_or(ScriptParseLimit::Nodes)));
+    };
+    checkpoint()?;
+    Ok(Ok(ParsedFile::from_parts(
+        FileFormat::Script,
+        Arc::from(source),
+        parts,
+        0,
+    )))
 }
 
 fn parse_with_revision(format: FileFormat, source: &str, revision: u64) -> ParsedFile {
@@ -613,6 +681,76 @@ mod tests {
                 parsed.text(error.range).is_some()
                     && usize::try_from(error.range.end()).unwrap_or(usize::MAX) <= source.len()
             }));
+        }
+    }
+}
+
+#[cfg(test)]
+mod bounded_tests {
+    use super::*;
+    #[test]
+    fn limited_parse_never_publishes_budget_damage_as_syntax_errors() {
+        let budget = ScriptParseBudget {
+            bytes: 1024 * 1024,
+            nodes: 40,
+            depth: 8,
+        };
+        let parse = |source: &str| {
+            parse_script_bounded::<std::convert::Infallible>(source, budget, &mut || Ok(()))
+                .unwrap()
+        };
+        assert_eq!(
+            parse(&"{".repeat(10_000)).unwrap_err(),
+            ScriptParseLimit::Depth
+        );
+        assert_eq!(
+            parse(&"a = 1 ".repeat(10_000)).unwrap_err(),
+            ScriptParseLimit::Nodes
+        );
+        assert_eq!(
+            parse(&"a".repeat(1024 * 1024 + 1)).unwrap_err(),
+            ScriptParseLimit::Bytes
+        );
+        assert!(parse("a = { b = 1 }").unwrap().errors().is_empty());
+    }
+    #[test]
+    fn cancellation_interrupts_giant_tokens_comments_whitespace_and_recovery() {
+        for source in [
+            "a".repeat(900_000),
+            format!("#{}", "a".repeat(900_000)),
+            " ".repeat(900_000),
+            "!".repeat(900_000),
+            format!("\"{}\"", "a".repeat(900_000)),
+        ] {
+            let mut checkpoints = 0;
+            let result = parse_script_bounded(&source, Default::default(), &mut || {
+                checkpoints += 1;
+                if checkpoints >= 5 {
+                    Err("cancelled")
+                } else {
+                    Ok(())
+                }
+            });
+            assert_eq!(result.unwrap_err(), "cancelled");
+            assert_eq!(checkpoints, 5);
+        }
+    }
+    #[test]
+    fn bounded_success_matches_ordinary_lossless_parse() {
+        for source in [
+            "a = 1 # comment\nb = { c = \"x\\\"y\" }",
+            "[[P] a = $P$ ]",
+            "a = { missing = ",
+            "rgb { 1 2 3 }",
+        ] {
+            let result = parse_script_bounded::<std::convert::Infallible>(
+                source,
+                Default::default(),
+                &mut || Ok(()),
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!(result, parse(FileFormat::Script, source));
         }
     }
 }

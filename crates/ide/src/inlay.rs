@@ -86,6 +86,73 @@ pub fn scope_inlay_hints_with_cancellation(
             break;
         }
     }
+    let mut projected = std::collections::BTreeMap::<u32, Vec<String>>::new();
+    crate::ir_template::for_each_consumption(
+        snapshot,
+        &input,
+        cancellation,
+        &mut |source, invocation, body| {
+            for property in body.hir.properties() {
+                cancellation.checkpoint()?;
+                if property.scalar.is_some() {
+                    continue;
+                }
+                let Some(value) = property.value_range else {
+                    continue;
+                };
+                let Some(fact) = body.hir.scope_fact_at(property.key_range) else {
+                    continue;
+                };
+                let Some(transition) = &fact.transition else {
+                    continue;
+                };
+                let (Some(ambient), Some(resolved)) = (
+                    concrete_scope(&fact.state.current),
+                    concrete_scope(&transition.current),
+                ) else {
+                    continue;
+                };
+                if ambient.eq_ignore_ascii_case(&resolved) {
+                    continue;
+                }
+                if !body.rendered.pieces.iter().any(|piece| {
+                    (piece.script || piece.binding_source.as_ref().is_some_and(|map| map.script))
+                        && piece.range.start() <= value.start()
+                        && value.start() <= piece.range.end()
+                }) {
+                    continue;
+                }
+                let Some(mapped) = crate::ir_template::project_source_range(
+                    body,
+                    TextRange::empty(value.start()),
+                    source,
+                    invocation,
+                ) else {
+                    continue;
+                };
+                if range.is_some_and(|requested| {
+                    mapped.start() < requested.start() || mapped.start() >= requested.end()
+                }) {
+                    continue;
+                }
+                projected.entry(mapped.start()).or_default().push(resolved);
+            }
+            Ok(())
+        },
+    )?;
+    hints.extend(projected.into_iter().filter_map(|(position, choices)| {
+        let first = choices.first()?;
+        choices
+            .iter()
+            .all(|scope| scope == first)
+            .then(|| ScopeInlayHint {
+                position,
+                scope: first.clone(),
+            })
+    }));
+    hints.sort_by_key(|hint| hint.position);
+    hints.dedup();
+    hints.truncate(MAX_SCOPE_INLAY_HINTS);
     Ok(hints)
 }
 

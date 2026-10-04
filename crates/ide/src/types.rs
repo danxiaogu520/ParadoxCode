@@ -814,6 +814,8 @@ pub struct WorkspaceEditPlan {
 /// Reasons a semantic rename is refused.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum RenameError {
+    /// Template reference discovery or inverse source mapping is unfinished.
+    Incomplete,
     /// The cursor is not on a known definition or reference.
     NoSymbol,
     /// The cursor resolves to no definition.
@@ -846,6 +848,7 @@ impl From<RenameError> for RenameFailure {
 impl std::fmt::Display for RenameError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
+            Self::Incomplete => "Template reference closure or source mapping is incomplete",
             Self::NoSymbol => "cursor is not on a renameable symbol",
             Self::Unresolved => "symbol has no unique definition",
             Self::Ambiguous => "symbol has multiple definitions",

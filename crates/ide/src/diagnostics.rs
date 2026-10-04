@@ -74,6 +74,10 @@ fn file_analysis(
         .as_ref()
         .map(|hir| hir.analysis_coverage().clone())
         .unwrap_or_default();
+    coverage.merge(&semantic.coverage);
+    if !semantic.blocked_edits.is_empty() {
+        coverage.limits.insert(hir::analysis::AnalysisLimit::Output);
+    }
     if diagnostics
         .iter()
         .any(|diagnostic| diagnostic.code == DiagnosticCode::AnalysisIncomplete)
@@ -237,7 +241,7 @@ pub(crate) fn analyze_input_with_cancellation(
     cancellation: &CancellationToken,
 ) -> Result<FileAnalysis, Cancelled> {
     cancellation.checkpoint()?;
-    let semantic = semantic_data(snapshot, input);
+    let semantic = semantic_data_with_cancellation(snapshot, input, cancellation)?;
     cancellation.checkpoint()?;
     // Localisation documents remain parsed and indexed so script-side references, hover, and
     // navigation keep working, but the editor surface deliberately publishes no diagnostics for
