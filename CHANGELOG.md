@@ -7,6 +7,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-04
+
+This release completes the RulesIr migration and shared Template analysis, adds the native
+MCP server and Rust developer tooling, and improves localisation and mission editing.
+Updating rebuilds persisted index and syntax caches. Ordinary fields and mission
+`trigger`/`effect` no longer accept a generic quoted-script overload; quoted script support
+is declared through Templates.
+
 ### Added
 
 - Shared Template programs, correlated parameter constraints and complete-container
@@ -1328,7 +1336,8 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.8...v0.4.0
