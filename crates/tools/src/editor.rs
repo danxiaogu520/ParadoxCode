@@ -542,7 +542,12 @@ pub fn execute(arguments: &[String]) -> Result<String, String> {
                         .env("RUN_VSCODE_HOST_TESTS", "1"),
                 )?;
             } else {
-                for name in ["assets.mjs", "loc-format.mjs", "server-path.mjs"] {
+                for name in [
+                    "assets.mjs",
+                    "icon-picker.mjs",
+                    "loc-format.mjs",
+                    "server-path.mjs",
+                ] {
                     process::run(
                         process::command("node").arg(root.join("editors/vscode/test").join(name)),
                     )?;

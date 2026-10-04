@@ -16,7 +16,8 @@ export interface IconValueSpan {
 /**
  * Matches `icon = <value>` on one script line when `character` sits inside
  * the (quoted or bare) value. Trailing comments after a bare value are not
- * part of the span; an empty value (cursor right after `=`) yields
+ * part of the span, even without separating whitespace. Unquoted values
+ * stop at script delimiters; an empty value (cursor right after `=`) yields
  * `undefined` so the caller inserts at the cursor instead.
  */
 export function iconValueSpanAt(line: string, character: number, lineIndex: number): IconValueSpan | undefined {
@@ -35,7 +36,7 @@ export function iconValueSpanAt(line: string, character: number, lineIndex: numb
         start = prefix[0].length + 1;
         end = prefix[0].length + close;
     } else {
-        const token = rest.match(/^\S+/);
+        const token = rest.match(/^[^\s{}\[\]#=<>!?"]+/);
         if (!token) {
             return undefined;
         }

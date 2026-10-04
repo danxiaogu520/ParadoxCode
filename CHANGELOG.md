@@ -69,6 +69,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Mission icon picker keeps cached previews visible after searches, loads every visible image
+  batch even when textures are missing, cancels obsolete grid rendering, and selects the current
+  search result on Enter. Icon insertion preserves adjacent comments and closing braces.
 - Scripted quoted-payload parser errors are reported at the argument, including escaped and
   UTF-8 content. Parameter value completion no longer depends on definition usage order.
 - Schema instantiation-cap checks no longer accumulate the same call domain repeatedly.

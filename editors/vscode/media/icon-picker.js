@@ -12,7 +12,7 @@
 
     const vscode = acquireVsCodeApi();
 
-    /** Batch size for image requests; the host clamps to the same bound. */
+    /** Batch size for image requests; within the host's request limit. */
     const IMAGE_BATCH = 32;
     /** Tiles appended per animation frame while building a large grid. */
     const RENDER_CHUNK = 400;
@@ -84,10 +84,10 @@
     const observer = new IntersectionObserver((entries) => {
         const wanted = [];
         for (const entry of entries) {
-            observer.unobserve(entry.target);
-            if (wanted.length >= IMAGE_BATCH) {
+            if (!entry.isIntersecting || !grid.contains(entry.target)) {
                 continue;
             }
+            observer.unobserve(entry.target);
             const name = entry.target.dataset.name;
             const img = entry.target.querySelector('img[data-pending="1"]');
             if (name && img && !pendingImages.has(name)) {
@@ -95,8 +95,10 @@
                 wanted.push(name);
             }
         }
-        if (wanted.length > 0) {
-            vscode.postMessage({ type: 'requestImages', names: wanted });
+        // Send every visible tile in bounded batches. Later batches must not
+        // depend on an earlier batch containing a decodable texture.
+        for (let offset = 0; offset < wanted.length; offset += IMAGE_BATCH) {
+            vscode.postMessage({ type: 'requestImages', names: wanted.slice(offset, offset + IMAGE_BATCH) });
         }
     }, { root: grid, rootMargin: '200px' });
 
@@ -166,13 +168,24 @@
     }
 
     let renderQueue = null;
+    let renderFrame = null;
+
+    function resetGrid() {
+        if (renderFrame !== null) {
+            cancelAnimationFrame(renderFrame);
+            renderFrame = null;
+        }
+        renderQueue = null;
+        pendingImages.clear();
+        observer.disconnect();
+        grid.replaceChildren();
+        grid.scrollTop = 0;
+    }
 
     /** Rebuilds the grid in animation-frame chunks so a full-sprite tab
      * (thousands of tiles) never blocks the first paint or the search box. */
     function render() {
-        pendingImages.clear();
-        grid.replaceChildren();
-        observer.disconnect();
+        resetGrid();
         const filtered = sprites.filter(matches);
         count.textContent = filtered.length === sprites.length
             ? t('countAll', filtered.length)
@@ -185,10 +198,11 @@
         }
         messageBox.hidden = true;
         renderQueue = filtered;
-        requestAnimationFrame(drain);
+        renderFrame = requestAnimationFrame(drain);
     }
 
     function drain() {
+        renderFrame = null;
         if (renderQueue === null) {
             return;
         }
@@ -198,7 +212,7 @@
         }
         grid.appendChild(fragment);
         if (renderQueue.length > 0) {
-            requestAnimationFrame(drain);
+            renderFrame = requestAnimationFrame(drain);
         } else {
             renderQueue = null;
         }
@@ -211,29 +225,32 @@
         tab = next;
         tabMission.setAttribute('aria-selected', String(tab === 'mission'));
         tabAll.setAttribute('aria-selected', String(tab === 'all'));
-        render();
+        runSearch();
     }
 
     function showMessage(text) {
+        resetGrid();
         messageBox.textContent = text;
         messageBox.hidden = false;
-        grid.replaceChildren();
-        observer.disconnect();
     }
 
     let searchTimer;
 
+    function runSearch() {
+        clearTimeout(searchTimer);
+        query = search.value.trim().toLowerCase();
+        render();
+    }
+
     search.addEventListener('input', () => {
         clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => {
-            query = search.value.trim().toLowerCase();
-            render();
-        }, 120);
+        searchTimer = setTimeout(runSearch, 120);
     });
 
     search.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
-            const name = grid.querySelector('.tile')?.dataset.name;
+            runSearch();
+            const name = sprites.find(matches)?.name;
             if (name) {
                 vscode.postMessage({ type: 'insert', name });
             }
@@ -271,18 +288,16 @@
             return;
         }
         if (data.type === 'images') {
-            for (const [name, url] of Object.entries(data.textures)) {
+            for (const name of data.names) {
                 const img = pendingImages.get(name);
                 if (img) {
-                    img.src = url;
+                    const url = data.textures[name];
+                    if (url) {
+                        img.src = url;
+                    }
                     delete img.dataset.pending;
                     pendingImages.delete(name);
                 }
-            }
-            // Tiles rendered after a request went out are waiting unseen;
-            // re-observe everything still pending.
-            for (const element of grid.querySelectorAll('img[data-pending="1"]')) {
-                observer.observe(element.closest('.tile'));
             }
             return;
         }
