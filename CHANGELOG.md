@@ -7,7 +7,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Updated the runtime brace-expansion dependency to fix denial-of-service vulnerabilities.
+
 ## [0.5.0] - 2026-10-04
+
+The tag's release build was blocked by production dependency auditing. No GitHub Release
+was published; this section records the attempted release scope.
 
 This release completes the RulesIr migration and shared Template analysis, adds the native
 MCP server and Rust developer tooling, and improves localisation and mission editing.
