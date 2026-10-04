@@ -617,6 +617,8 @@ pub struct Symbol {
 /// A completion item returned by the editor-neutral query layer.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompletionItem {
+    /// Explicit protocol insertion semantics; literal dollar signs never imply a snippet.
+    pub is_snippet: bool,
     /// Template validation and the shared conditional binding witness, when applicable.
     pub template_evidence: Option<TemplateCompletionEvidence>,
     /// Label shown to the user.

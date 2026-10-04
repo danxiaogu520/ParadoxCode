@@ -709,6 +709,10 @@ target/template-after/tools audit diff \
 
 后续 scope/Block 切片：定义 scope 推导的独立递归树已删除，使用共享程序上的显式 Any/All 查询，按当前实参检查 guard 激活，未知 ROOT/FROM 与存在状态保留残余；10,000 层 scope 查询抵达末端。运行时 OR 不免除其中各语句的静态 scope 合法性，新增两个有确切 country/province 冲突的 owned 诊断并更新 golden。整块 Block 重载在同一容器上分别验证，确定解释沿用其 scope/符号类型；未决解释只合并共同事实。自有第二重载合法、跨重载混合拒绝、试算符号不进入 HIR、调用 guard/PRESENT Hole 与未知脚本前缀回归通过。LSP 消费者在未决解释下的候选/来源条件、独占引用闭包和完整预算仍需后续收敛，不能据此宣告阶段 3–6 退出。
 
+消费/编辑切片：补全与 hover 改为同一完整父实例上的消费位置投影，删除补全对任意 quoted token 的独立递归探测，实际 Block operand 与固定兄弟的配额参与候选检查；候选回写临时完整源码后验证相关使用，snippet 孔洞以显式范围传给结构选择，不修改 host/index。插入协议改用显式 snippet 标记，quote 编码与 snippet 字面转义分开，保留根实参及转发 carrier 的层次，嵌套引号含字面双引号的实际客户端插入回归通过。items 消费逐项检查，引用 single item 与 quoted 多项不混为一个 Scalar；quoted Scalar 统一解码引号及反斜线，原始拼写仍从 syntax 读取。resolve 携带不可变 IR 指纹并拒绝过期 Template revision，复用快照已有指纹，避免按候选重复 hash 整份 IR。
+
+第一次完整 Vanilla 检查揭示未决重名 callee 的参数表被误检为语句，43,714 条 on_change_tag_effect 链错误并非可接受的语义变化。已以自有重名 callee 回归修复，保留未决参数表和 UnavailableTemplate 覆盖，而非发布虚假的 mission/key 错误；这一观察及修复必须在重新审计中核对，旧的 57,356 条诊断报告不是验收通过证据。其余引用/重命名等消费者与事实队列、缓存依赖及最终性能仍需阶段出口证明。
+
 ## 实施顺序与 PR 出口
 
 每一步单独可审阅。开发期间可有内部比较开关；最终删除旧生产路径，避免长期维护两份动态语义。未达到该步出口的 PR 保持 draft，不用“基础测试通过”代替功能和语义验收。

@@ -430,8 +430,83 @@ pub fn check_fragment<E>(
             container: overload.container,
         });
     }
+    for scalar in hir.bare_values() {
+        if hir.properties().iter().any(|property| {
+            property.scalar.as_ref().is_some_and(|value| {
+                value.range.start() <= scalar.range.start()
+                    && scalar.range.end() <= value.range.end()
+            })
+        }) {
+            continue;
+        }
+        checkpoint()?;
+        if source.has_hole(scalar.range) || source.has_unresolved_structure(scalar.range) {
+            coverage.residuals.insert(ResidualReason::Binding);
+            continue;
+        }
+        if source
+            .unresolved_bindings
+            .iter()
+            .any(|range| range.start() <= scalar.range.start() && scalar.range.end() <= range.end())
+        {
+            continue;
+        }
+        let Some(context) = hir
+            .schema_facts()
+            .iter()
+            .filter(|context| {
+                context.range.start() <= scalar.range.start()
+                    && scalar.range.end() <= context.range.end()
+            })
+            .min_by_key(|context| context.range.len())
+        else {
+            continue;
+        };
+        if hir.overload_facts().iter().any(|overload| {
+            overload.validation != Validation::Valid
+                && overload.container.start() <= scalar.range.start()
+                && scalar.range.end() <= overload.container.end()
+        }) {
+            continue;
+        }
+        if display
+            .iter()
+            .any(|range| range.start() <= scalar.range.start() && scalar.range.end() <= range.end())
+        {
+            continue;
+        }
+        let checked = ir.schema(context.schema).items.map_or_else(
+            || {
+                if ir.schema(context.schema).open {
+                    Validation::Valid
+                } else {
+                    Validation::Invalid
+                }
+            },
+            |matcher| scalar_validation(ir, matcher, &scalar.value, &context.state, facts),
+        );
+        if checked == Validation::Invalid {
+            result.push(ConstraintEvidence {
+                severity: rules::source::Severity::Error,
+                kind: IssueKind::Value,
+                range: scalar.range,
+                explanation: format!(
+                    "unkeyed value `{}` does not satisfy its container rule",
+                    scalar.value
+                ),
+                container: context.range,
+            });
+        } else if checked == Validation::Unknown {
+            coverage.residuals.insert(ResidualReason::Binding);
+        }
+    }
     let mut counts = std::collections::BTreeMap::<(text::TextRange, usize), u32>::new();
     for property in hir.properties() {
+        if source.unresolved_bindings.iter().any(|range| {
+            range.start() <= property.key_range.start() && property.key_range.end() <= range.end()
+        }) {
+            continue;
+        }
         if hir.overload_facts().iter().any(|overload| {
             overload.validation != Validation::Valid
                 && overload.container.start() <= property.key_range.start()
@@ -562,6 +637,11 @@ pub fn check_fragment<E>(
         *counts.entry((parent.range, selected.index())).or_default() += 1;
     }
     for context in hir.schema_facts() {
+        if source.unresolved_bindings.iter().any(|range| {
+            range.start() <= context.range.start() && context.range.end() <= range.end()
+        }) {
+            continue;
+        }
         if hir.overload_facts().iter().any(|overload| {
             overload.validation != Validation::Valid
                 && overload.container.start() <= context.range.start()

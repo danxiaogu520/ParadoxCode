@@ -101,6 +101,7 @@ fn dynamic_parameter_completion(
         }
         let label = format!("${}$", parameter.name);
         items.push(CompletionItem {
+            is_snippet: false,
             template_evidence: None,
             label: label.clone(),
             kind: CompletionKind::DynamicParameter,
@@ -164,8 +165,10 @@ pub fn completion_resolve(snapshot: &AnalysisSnapshot, item: &CompletionItem) ->
     if let Some(index) = item
         .resolve_data
         .as_deref()
-        .and_then(|s| s.strip_prefix("ir-field:"))
-        .and_then(|s| s.parse::<usize>().ok())
+        .and_then(|token| token.strip_prefix("ir-field:"))
+        .and_then(|token| token.split_once(':'))
+        .filter(|(hash, _)| *hash == snapshot.ir_fingerprint())
+        .and_then(|(_, index)| index.parse::<usize>().ok())
         && let Some(field) = snapshot.ir().fields.get(index)
         && let Some(doc) = field.doc
     {

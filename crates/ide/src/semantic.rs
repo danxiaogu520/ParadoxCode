@@ -178,7 +178,10 @@ pub(crate) fn scripted_definition_snippet(
     definition_name: &str,
 ) -> String {
     let Some(summary) = dynamic_definition_summary(snapshot, kind_name, definition_name) else {
-        return format!("{definition_name} = {{\n\t$0\n}}");
+        return format!(
+            "{} = {{\n\t$0\n}}",
+            crate::insertion::snippet_literal(definition_name)
+        );
     };
     if summary.parameters.is_empty() {
         return format!("{definition_name} = yes");
@@ -192,7 +195,10 @@ pub(crate) fn scripted_definition_snippet(
         .map(|parameter| parameter.name.as_str())
         .collect::<Vec<_>>();
     if tabstops.is_empty() {
-        return format!("{definition_name} = {{\n\t$0\n}}");
+        return format!(
+            "{} = {{\n\t$0\n}}",
+            crate::insertion::snippet_literal(definition_name)
+        );
     }
     let inner_indent = "\t";
     let last = tabstops.len() - 1;
@@ -205,9 +211,15 @@ pub(crate) fn scripted_definition_snippet(
         } else {
             format!("${}", index + 1)
         };
-        body.push_str(&format!("{inner_indent}{name} = {stop}\n"));
+        body.push_str(&format!(
+            "{inner_indent}{} = {stop}\n",
+            crate::insertion::snippet_literal(name)
+        ));
     }
-    format!("{definition_name} = {{\n{body}}}")
+    format!(
+        "{} = {{\n{body}}}",
+        crate::insertion::snippet_literal(definition_name)
+    )
 }
 
 /// Field-level value semantics of one construct context, as declared by the

@@ -16,13 +16,6 @@ pub(crate) enum QuotedScriptLimit {
 }
 
 impl QuotedScriptLimit {
-    pub(crate) const fn analysis_limit(self) -> hir::analysis::AnalysisLimit {
-        match self {
-            Self::Depth => hir::analysis::AnalysisLimit::ConsumptionDepth,
-            Self::PayloadBytes | Self::TotalBytes => hir::analysis::AnalysisLimit::TextBytes,
-            Self::Nodes => hir::analysis::AnalysisLimit::ParseNodes,
-        }
-    }
     pub(crate) const fn message(self) -> &'static str {
         match self {
             Self::Depth => "quoted script nesting exceeds the analysis depth limit",

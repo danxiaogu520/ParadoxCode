@@ -1376,7 +1376,7 @@ impl SnapshotRequestContext {
             .enumerate()
             .map(|(ordinal, item)| {
                 let snippet_supported = self.client_snippets;
-                let insert_text = if snippet_supported {
+                let insert_text = if snippet_supported || !item.is_snippet {
                     item.insert_text
                 } else {
                     let start = usize::try_from(item.replacement_range.start())
@@ -1396,7 +1396,7 @@ impl SnapshotRequestContext {
                     // the analysis tie-break with a case-sensitive label comparison.
                     sort_text: Some(completion_sort_text(item.sort_score, ordinal)),
                     insert_text: Some(insert_text.clone()),
-                    insert_text_format: Some(if snippet_supported && insert_text.contains('$') {
+                    insert_text_format: Some(if snippet_supported && item.is_snippet {
                         InsertTextFormat::SNIPPET
                     } else {
                         InsertTextFormat::PLAIN_TEXT
@@ -1430,6 +1430,16 @@ impl SnapshotRequestContext {
     fn completion_resolve(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<CompletionItem>(params, "completionItem/resolve")?;
         self.ensure_active()?;
+        if params
+            .data
+            .as_ref()
+            .and_then(|data| data.get("template"))
+            .and_then(|data| data.get("revision"))
+            .and_then(Value::as_u64)
+            .is_some_and(|revision| revision != self.snapshot.revision())
+        {
+            return typed_value(params, "completionItem/resolve stale response");
+        }
         let data = params
             .data
             .as_ref()
@@ -1441,6 +1451,7 @@ impl SnapshotRequestContext {
             .unwrap_or_default()
             .to_owned();
         let item = ide::CompletionItem {
+            is_snippet: false,
             template_evidence: None,
             label: params.label.clone(),
             kind: CompletionKind::Key,
@@ -2106,17 +2117,7 @@ fn semantic_token_type_index(token_type: SemanticTokenType) -> u32 {
 /// multi-line snippets to the insertion line. A plain-text edit has no such re-indenting, so the
 /// absolute leading whitespace of the insertion line is re-applied to every continuation line.
 pub(crate) fn strip_snippet_placeholders(text: &str, base_indent: &str) -> String {
-    let mut stripped = String::with_capacity(text.len());
-    let mut chars = text.chars().peekable();
-    while let Some(character) = chars.next() {
-        if character == '$' {
-            while chars.peek().is_some_and(|next| next.is_ascii_digit()) {
-                chars.next();
-            }
-        } else {
-            stripped.push(character);
-        }
-    }
+    let stripped = ide::snippet_plain_text(text);
     stripped
         .lines()
         .enumerate()

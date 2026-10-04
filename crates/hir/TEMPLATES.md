@@ -64,3 +64,16 @@ negative lookups, overlays, rules and source-root changes must invalidate any
 result that reads them. Cached keys still include binding source ranges until
 all projected results can safely omit them. Persistent compatibility uses the
 workspace LSP release version.
+
+Script body and item consumption share the complete parent instance. List inserts
+are parsed as items and every value is checked; an inserted list is not treated
+as one scalar. Consumer cursor/range projections use the same root byte maps and
+quote-carrier ancestry as diagnostics. Ordinary strings are decoded as scalar
+text without starting a script query.
+
+The IDE validates a completion's actual source edit in an isolated frontend.
+Generated snippet holes are explicit trial ranges, rather than user-text marker
+heuristics. Script quote layers and snippet literal escaping compose separately;
+completion resolve retains its rule identity and refuses to reinterpret stale
+Template evidence. Unresolved callees retain an opaque argument map and a coverage
+limit, never a statement schema guessed from their bindings.

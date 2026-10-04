@@ -91,7 +91,7 @@ fn event_file_root_offers_all_entries_with_correct_shapes() {
         "block entries must insert a skeleton: {result:?}"
     );
     assert_eq!(
-        by_label("namespace").expect("namespace").insert_text,
+        crate::snippet_plain_text(&by_label("namespace").expect("namespace").insert_text),
         "namespace = ",
         "leaf entries must insert only the assignment: {result:?}"
     );
@@ -99,7 +99,7 @@ fn event_file_root_offers_all_entries_with_correct_shapes() {
         by_label("normal_or_historical_nations")
             .expect("normal_or_historical_nations")
             .insert_text,
-        "normal_or_historical_nations = ",
+        "normal_or_historical_nations = $0",
         "leaf entries must insert only the assignment: {result:?}"
     );
 }
@@ -2506,7 +2506,7 @@ fn key_completion_inserts_equals_for_scalars_and_skeletons_for_blocks() {
         .iter()
         .find(|item| item.label == "foo")
         .expect("scalar rule item");
-    assert_eq!(foo.insert_text, "foo = ");
+    assert_eq!(crate::snippet_plain_text(&foo.insert_text), "foo = ");
 
     let existing = "trigger = { ba = yes }";
     let mut existing_host = fixture_host(patch.clone());
@@ -2845,7 +2845,7 @@ fn file_root_scaffolds_use_rule_backed_entry_containers() {
         by_label("normal_or_historical_nations")
             .expect("normal_or_historical_nations")
             .insert_text,
-        "normal_or_historical_nations = "
+        "normal_or_historical_nations = $0"
     );
 }
 

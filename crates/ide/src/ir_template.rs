@@ -31,6 +31,7 @@ fn has_structural_reads(template: &hir::Template, snapshot: &AnalysisSnapshot) -
             if matches!(property.value,TemplateOperand::Block(_)) || property.key.fragments.iter().any(|part|matches!(part,TemplateFragment::Parameter{..}))
                 || matches!(&property.value,TemplateOperand::Scalar(token) if token.quoted && token.fragments.iter().any(|part|matches!(part,TemplateFragment::Parameter{..}))) {return true;}
             let key=property.key.fragments.iter().map(|part|match part {TemplateFragment::Literal(text)=>Some(text.as_str()),_=>None}).collect::<Option<String>>();
+            if schema.zip(key.as_ref()).is_some_and(|(schema,key)|hir::checking::field_candidates(ir,schema,key,rules::ir::Shape::Scalar,&WorkspaceFacts{snapshot}).is_empty() && !hir::checking::field_candidates(ir,schema,key,rules::ir::Shape::Block,&WorkspaceFacts{snapshot}).is_empty()) {return true;}
             schema.zip(key).is_some_and(|(schema,key)|hir::checking::field_candidates(ir,schema,&key,rules::ir::Shape::Scalar,&WorkspaceFacts{snapshot})
                 .iter().any(|id|hir::template::template_kind(ir,ir.field(*id).key).is_some()))
         }
@@ -59,7 +60,7 @@ pub(crate) fn analyse_body(
         .into_iter()
         .map(|(name, value)| (name.to_ascii_lowercase(), value.to_owned()))
         .collect();
-    analyse_body_with_bindings(snapshot, source, invocation, &overrides, cancellation)
+    analyse_body_with_bindings(snapshot, source, invocation, &overrides, &[], cancellation)
 }
 
 fn analyse_body_with_bindings(
@@ -67,6 +68,7 @@ fn analyse_body_with_bindings(
     source: &hir::HirFile,
     invocation: &hir::HirProperty,
     overrides: &BTreeMap<String, String>,
+    markers: &[String],
     cancellation: &CancellationToken,
 ) -> Result<Option<BodyAnalysis>, Cancelled> {
     let ir = snapshot.ir();
@@ -127,7 +129,7 @@ fn analyse_body_with_bindings(
         bindings.insert(name.clone(), value.to_owned());
         present.insert(name);
     }
-    let rendered = hir::template_text::render_expanded(
+    let mut rendered = hir::template_text::render_expanded(
         ir,
         &facts,
         template,
@@ -139,15 +141,23 @@ fn analyse_body_with_bindings(
         1024 * 1024,
         &mut || cancellation.checkpoint(),
     )?;
+    for marker in markers {
+        for (start, _) in rendered.text.match_indices(marker) {
+            if let Some(range) = text::TextRange::new(start as u32, (start + marker.len()) as u32) {
+                rendered.trial_holes.push(range);
+            }
+        }
+    }
     cancellation.checkpoint()?;
     let parsed = std::sync::Arc::new(parser::parse(parser::FileFormat::Script, &rendered.text));
-    let hir = hir::lower_ir_schema(
+    let hir = hir::lower_ir_schema_with_holes(
         parsed,
         ir,
         schema,
         Default::default(),
         invocation_state(source, invocation),
         &facts,
+        &rendered.trial_holes,
     );
     let checked = hir::checking::check_fragment(ir, &hir, &facts, &rendered, &mut || {
         cancellation.checkpoint()
@@ -307,7 +317,7 @@ pub(crate) fn validate_candidate(
         });
     }
     let Some(body) =
-        analyse_body_with_bindings(snapshot, source, invocation, witness, cancellation)?
+        analyse_body_with_bindings(snapshot, source, invocation, witness, &[], cancellation)?
     else {
         return Ok(Analysis {
             value: Validation::Unknown,
@@ -480,7 +490,18 @@ impl ParameterSite {
                     )
                 })
                 .collect(),
-            Domain::Payload { .. } | Domain::Unresolved => Vec::new(),
+            Domain::Payload { schema, .. } => {
+                ir.schema(*schema).items.map_or_else(Vec::new, |matcher| {
+                    ir_semantic::spellings_with_state(
+                        ir,
+                        matcher,
+                        snapshot,
+                        rendered_prefix,
+                        Some(&self.state),
+                    )
+                })
+            }
+            Domain::Unresolved => Vec::new(),
         }
     }
 }
@@ -979,4 +1000,275 @@ pub(crate) fn invocation_state(hir: &hir::HirFile, invocation: &hir::HirProperty
             from: Vec::new(),
             previous: Vec::new(),
         })
+}
+
+/// One exact position of a root argument in its complete instantiated parent.
+pub(crate) struct ConsumedPosition {
+    pub(crate) generated: u32,
+    pub(crate) piece: usize,
+}
+pub(crate) struct ConsumptionProjection {
+    pub(crate) body: BodyAnalysis,
+    pub(crate) positions: Vec<ConsumedPosition>,
+    pub(crate) parameter: String,
+    pub(crate) invocation: text::TextRange,
+    scalar: Option<hir::HirScalar>,
+    quote_map: Option<parser::QuotedScriptSourceMap>,
+    insertion: u32,
+}
+impl ConsumptionProjection {
+    pub(crate) fn edit(
+        &self,
+        point: &ConsumedPosition,
+        range: text::TextRange,
+        text: &str,
+        snippet: bool,
+    ) -> Option<(text::TextRange, String)> {
+        let piece = self.body.rendered.pieces.get(point.piece)?;
+        if range.start() < piece.range.start() || range.end() > piece.range.end() {
+            return None;
+        }
+        let map = piece.binding_source.as_ref()?;
+        let (start, end) = (
+            *map.offsets
+                .get((range.start() - piece.range.start()) as usize)?,
+            *map.offsets
+                .get((range.end() - piece.range.start()) as usize)?,
+        );
+        let relative = text::TextRange::new(start, end)?;
+        let range = if let Some(scalar) = &self.scalar {
+            let relative = self
+                .quote_map
+                .as_ref()
+                .map_or(Some(relative), |map| map.decoded_range(relative))?;
+            text::TextRange::new(
+                scalar.range.start() + relative.start(),
+                scalar.range.start() + relative.end(),
+            )?
+        } else {
+            text::TextRange::empty(self.insertion)
+        };
+        let root_quoted = self.quote_map.is_some();
+        let wrap = !root_quoted
+            && (self.scalar.is_none()
+                || text.chars().any(char::is_whitespace)
+                || text.contains('{'));
+        let mut encoded = text.to_owned();
+        for _ in 0..map.quote_layers + usize::from(root_quoted || wrap) {
+            encoded = crate::insertion::quoted_insertion(&encoded, snippet);
+        }
+        if wrap {
+            encoded = format!("\"{encoded}\"");
+        }
+        Some((range, encoded))
+    }
+}
+
+/// Locates script consumption using the shared instance and byte map, never by quoted-string guessing.
+pub(crate) fn consumption_at(
+    snapshot: &AnalysisSnapshot,
+    input: &crate::support::ParsedInput,
+    position: u32,
+    cancellation: &CancellationToken,
+) -> Result<Option<ConsumptionProjection>, Cancelled> {
+    let Some(source) = input.hir.as_deref() else {
+        return Ok(None);
+    };
+    for argument in source.properties().iter().filter(|argument| {
+        argument.operator.is_some()
+            && position > argument.key_range.end()
+            && (argument.scalar.as_ref().is_some_and(|scalar| {
+                scalar.range.start() <= position && position <= scalar.range.end()
+            }) || argument.value_range.is_none()
+                && argument.range.end() <= position
+                && input
+                    .source
+                    .get(argument.range.end() as usize..position as usize)
+                    .is_some_and(|gap| gap.trim().is_empty()))
+    }) {
+        let Some(invocation) = source
+            .properties()
+            .iter()
+            .filter(|invocation| {
+                invocation.path.len() + 1 == argument.path.len()
+                    && argument.path.starts_with(&invocation.path)
+                    && invocation.range.start() <= argument.range.start()
+                    && argument.range.end() <= invocation.range.end()
+            })
+            .min_by_key(|invocation| invocation.range.len())
+        else {
+            continue;
+        };
+        let Some(field) = source.field_fact_at(invocation.key_range) else {
+            continue;
+        };
+        let Some(kind) = field
+            .fields
+            .iter()
+            .find_map(|id| template_kind(snapshot.ir(), snapshot.ir().field(*id).key))
+        else {
+            continue;
+        };
+        let Some(summary) =
+            crate::semantic::dynamic_definition_summary(snapshot, &kind, &invocation.key)
+        else {
+            continue;
+        };
+        if !needs_body_analysis(snapshot, &summary) {
+            continue;
+        }
+        let scalar = argument.scalar.clone();
+        let quote_map = scalar
+            .as_ref()
+            .filter(|scalar| scalar.quoted)
+            .and_then(|scalar| source.syntax().text(scalar.range))
+            .and_then(parser::decode_quoted_script)
+            .map(|(_, map)| map);
+        let offset = scalar
+            .as_ref()
+            .map_or(0, |scalar| position.saturating_sub(scalar.range.start()));
+        let offset = quote_map
+            .as_ref()
+            .map_or(Some(offset), |map| map.source_offset(offset));
+        let Some(offset) = offset else {
+            continue;
+        };
+        let override_value = scalar.is_none().then_some((argument.key.as_str(), ""));
+        let Some(body) = analyse_body(snapshot, source, invocation, override_value, cancellation)?
+        else {
+            continue;
+        };
+        let mut positions = Vec::new();
+        for (index, piece) in body
+            .rendered
+            .pieces
+            .iter()
+            .enumerate()
+            .filter(|(_, piece)| piece.script)
+        {
+            let Some(map) = piece
+                .binding_source
+                .as_ref()
+                .filter(|map| map.parameter.eq_ignore_ascii_case(&argument.key))
+            else {
+                continue;
+            };
+            let boundary = map
+                .offsets
+                .partition_point(|boundary| *boundary <= offset)
+                .saturating_sub(1);
+            if map.offsets.get(boundary) == Some(&offset) {
+                positions.push(ConsumedPosition {
+                    generated: piece.range.start() + boundary as u32,
+                    piece: index,
+                });
+            }
+        }
+        if !positions.is_empty() {
+            return Ok(Some(ConsumptionProjection {
+                body,
+                positions,
+                parameter: argument.key.clone(),
+                invocation: invocation.key_range,
+                scalar,
+                quote_map,
+                insertion: position,
+            }));
+        }
+    }
+    Ok(None)
+}
+
+/// Rebuilds a candidate in the actual source and checks all related uses without mutating the host.
+pub(crate) fn validate_consumption_edit(
+    snapshot: &AnalysisSnapshot,
+    input: &crate::support::ParsedInput,
+    projection: &ConsumptionProjection,
+    item: &crate::CompletionItem,
+    cancellation: &CancellationToken,
+) -> Result<Analysis<hir::analysis::Validation>, Cancelled> {
+    use hir::analysis::Validation;
+    let mut salt = 0;
+    let prefix = loop {
+        let prefix = format!("__pdc_trial_{}_{}", item.replacement_range.start(), salt);
+        if !input.source.contains(&prefix) {
+            break prefix;
+        }
+        salt += 1;
+    };
+    let (text, markers) = if item.is_snippet {
+        crate::insertion::snippet_trial(&item.insert_text, &prefix)
+    } else {
+        (item.insert_text.clone(), Vec::new())
+    };
+    let mut source = input.source.to_string();
+    source.replace_range(
+        item.replacement_range.start() as usize..item.replacement_range.end() as usize,
+        &text,
+    );
+    let parsed = std::sync::Arc::new(parser::parse(parser::FileFormat::Script, &source));
+    let Some(path) = input.path.as_ref() else {
+        return Ok(Analysis {
+            value: Validation::Unknown,
+            coverage: Default::default(),
+        });
+    };
+    let trial = hir::lower_shared_with_ir_and_facts(
+        parsed,
+        path,
+        snapshot.rules(),
+        snapshot.game_profile(),
+        snapshot.ir(),
+        &WorkspaceFacts { snapshot },
+    );
+    let Some(invocation) = trial
+        .properties()
+        .iter()
+        .find(|property| property.key_range == projection.invocation)
+    else {
+        return Ok(Analysis {
+            value: Validation::Invalid,
+            coverage: Default::default(),
+        });
+    };
+    let Some(body) = analyse_body_with_bindings(
+        snapshot,
+        &trial,
+        invocation,
+        &BTreeMap::new(),
+        &markers,
+        cancellation,
+    )?
+    else {
+        return Ok(Analysis {
+            value: Validation::Unknown,
+            coverage: Default::default(),
+        });
+    };
+    let rejected = body
+        .evidence
+        .iter()
+        .filter(|evidence| {
+            !matches!(
+                evidence.kind,
+                hir::checking::IssueKind::LogicalContainer
+                    | hir::checking::IssueKind::ConstantCondition
+                    | hir::checking::IssueKind::MissingLimit
+                    | hir::checking::IssueKind::EmptyBlock
+            )
+        })
+        .any(|evidence| {
+            evidence_dependencies(&body, evidence)
+                .contains(&projection.parameter.to_ascii_lowercase())
+        });
+    Ok(Analysis {
+        value: if rejected {
+            Validation::Invalid
+        } else if markers.is_empty() && body.coverage.is_known() {
+            Validation::Valid
+        } else {
+            Validation::Unknown
+        },
+        coverage: body.coverage,
+    })
 }

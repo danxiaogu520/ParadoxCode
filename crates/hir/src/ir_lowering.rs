@@ -15,6 +15,7 @@ use crate::{
 pub(super) struct IrFacts {
     pub analysis_coverage: crate::analysis::AnalysisCoverage,
     pub overload_facts: Vec<crate::block_checking::OverloadFact>,
+    pub unknown_ranges: Vec<TextRange>,
     pub retain_validation_facts: bool,
     pub symbol_facts_dependency: std::cell::Cell<bool>,
     pub schema_facts: Vec<SchemaFact>,
@@ -54,6 +55,7 @@ pub(super) fn lower(
     let mut out = IrFacts {
         analysis_coverage: Default::default(),
         overload_facts: Vec::new(),
+        unknown_ranges: Vec::new(),
         retain_validation_facts,
         symbol_facts_dependency: std::cell::Cell::new(false),
         schema_facts: vec![],
@@ -220,6 +222,7 @@ fn subtype_names_from_set(ir: &RulesIr, ty: TypeId, set: &SubtypeSet) -> Vec<std
         .collect()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn lower_schema_fragment(
     ir: &RulesIr,
     syntax: &ParsedFile,
@@ -227,18 +230,22 @@ pub(super) fn lower_schema_fragment(
     subtypes: SubtypeSet,
     state: ScopeState,
     facts: &dyn SymbolFacts,
+    root_range: Option<TextRange>,
+    unknown_ranges: &[TextRange],
 ) -> IrFacts {
     let collected = crate::collector::collect(syntax);
     let props = collected.properties;
     let bare_values = collected.bare_values;
     let children = crate::scope::property_children(&props);
+    let root_range = root_range.unwrap_or(syntax.root().range());
     let mut out = IrFacts {
         analysis_coverage: Default::default(),
         overload_facts: Vec::new(),
+        unknown_ranges: unknown_ranges.to_vec(),
         retain_validation_facts: true,
         symbol_facts_dependency: std::cell::Cell::new(false),
         schema_facts: vec![SchemaFact {
-            range: syntax.root().range(),
+            range: root_range,
             schema,
             subtypes: subtypes.clone(),
             state: state.clone(),
@@ -253,17 +260,25 @@ pub(super) fn lower_schema_fragment(
         runtime_parameter_guards: Vec::new(),
     };
     let path = LogicalPath::parse("").expect("empty fragment path");
+    let included = props
+        .iter()
+        .enumerate()
+        .filter(|(_, property)| {
+            root_range.start() <= property.range.start() && property.range.end() <= root_range.end()
+        })
+        .map(|(index, _)| index)
+        .collect::<std::collections::BTreeSet<_>>();
+    let nested = included
+        .iter()
+        .flat_map(|index| children[*index].iter().copied())
+        .collect::<std::collections::BTreeSet<_>>();
     descend(
         ir,
         &path,
         &props,
         &bare_values,
         &children,
-        props
-            .iter()
-            .enumerate()
-            .filter_map(|(i, p)| p.top_level.then_some(i))
-            .collect(),
+        included.difference(&nested).copied().collect(),
         schema,
         subtypes,
         state,
@@ -271,7 +286,7 @@ pub(super) fn lower_schema_fragment(
         syntax,
         &mut out,
         &mut std::collections::BTreeSet::new(),
-        syntax.root().range(),
+        root_range,
         None,
     );
     merge_attribute_summaries(&mut out.definition_attributes);
@@ -410,7 +425,7 @@ fn descend(
                 &state,
                 &candidates,
                 &FactsRef(facts, &out.symbol_facts_dependency),
-                &[],
+                &out.unknown_ranges,
                 template_text,
                 &mut || Ok(()),
             )
@@ -903,6 +918,18 @@ fn lower_template_arguments(
                 continue;
             };
             if !scalar.quoted {
+                if let Some(matcher) = ir.schema(schema).items {
+                    let mut scalar_site = site.clone();
+                    scalar_site.domain = crate::template::Domain::Value(vec![matcher]);
+                    collect_parameter_references(
+                        ir,
+                        &scalar_site,
+                        &argument.key,
+                        scalar,
+                        facts,
+                        out,
+                    );
+                }
                 continue;
             }
             if payloads.contains(&(schema, site.state.clone())) {

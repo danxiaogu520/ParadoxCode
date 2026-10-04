@@ -1426,7 +1426,7 @@ fn template_argument_diagnostics(
                 }
                 if !scalar.quoted
                     && sites.iter().any(|site| {
-                        matches!(site.domain, crate::ir_template::Domain::Payload { .. })
+                        matches!(site.domain, crate::ir_template::Domain::Payload { schema,.. } if ir.schema(schema).items.is_none())
                     })
                 {
                     diagnostics.push(Diagnostic::new(DiagnosticCode::InvalidValue, Severity::Warning,

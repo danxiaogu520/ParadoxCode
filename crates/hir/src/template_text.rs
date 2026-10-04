@@ -12,6 +12,8 @@ pub struct SourcePiece {
     pub range: text::TextRange,
     /// Original definition range; binding insertions point at their source use.
     pub definition_range: text::TextRange,
+    /// This insertion is consumed as script, rather than as an ordinary scalar or key.
+    pub script: bool,
     /// Root bindings read to produce this piece.
     pub parameters: BTreeSet<String>,
     /// Local binding supplying this insertion; guards are separate dependencies.
@@ -29,6 +31,12 @@ pub struct SourcePiece {
 pub struct BindingSource {
     /// Root argument whose bytes supplied this insertion.
     pub parameter: String,
+    /// Quote carriers between generated script and the root decoded argument.
+    pub quote_layers: usize,
+    /// Generated quotes were borrowed from the current carrier rather than inserted within it.
+    pub borrowed_carrier: bool,
+    /// The root value was already consumed as script along this forwarding path.
+    pub script: bool,
     /// One root byte offset for each generated boundary, including the end boundary.
     pub offsets: std::sync::Arc<[u32]>,
 }
@@ -40,6 +48,10 @@ pub struct RenderedTemplate {
     pub text: String,
     /// Relative source/dependency map.
     pub pieces: Vec<SourcePiece>,
+    /// Unresolved Template argument maps are bindings, not script statement containers.
+    pub unresolved_bindings: Vec<text::TextRange>,
+    /// Virtual holes supplied by a typed trial edit, independent of user text.
+    pub trial_holes: Vec<text::TextRange>,
     /// Traversal and interpretation coverage.
     pub coverage: AnalysisCoverage,
 }
@@ -60,13 +72,16 @@ impl RenderedTemplate {
     }
     /// Whether a generated range contains unresolved input.
     pub fn has_hole(&self, range: text::TextRange) -> bool {
-        self.pieces.iter().any(|piece| {
-            piece.hole
-                && ((piece.range.start() < range.end() && range.start() < piece.range.end())
-                    || range.is_empty()
-                        && piece.range.start() <= range.start()
-                        && range.start() <= piece.range.end())
-        })
+        self.trial_holes
+            .iter()
+            .any(|hole| hole.start() < range.end() && range.start() < hole.end())
+            || self.pieces.iter().any(|piece| {
+                piece.hole
+                    && ((piece.range.start() < range.end() && range.start() < piece.range.end())
+                        || range.is_empty()
+                            && piece.range.start() <= range.start()
+                            && range.start() <= piece.range.end())
+            })
     }
     /// A free script hole can rewrite the suffix's lexical/container context.
     pub fn has_unresolved_structure(&self, range: text::TextRange) -> bool {
@@ -89,6 +104,7 @@ pub fn render(
         present,
         &BTreeMap::new(),
         &BTreeSet::new(),
+        &BTreeSet::new(),
         byte_limit,
     )
 }
@@ -99,6 +115,7 @@ fn render_with_views(
     present: &BTreeSet<String>,
     raw: &BTreeMap<String, String>,
     scalar_uses: &BTreeSet<u32>,
+    script_uses: &BTreeSet<u32>,
     byte_limit: usize,
 ) -> RenderedTemplate {
     let mut output = RenderedTemplate::default();
@@ -262,6 +279,8 @@ fn render_with_views(
                     origin: (template.kind.to_string(), template.name.clone()),
                     range,
                     definition_range: origin,
+                    script: script_uses
+                        .contains(&(template.body_range.start() + start as u32 + offset as u32)),
                     parameters: dependencies,
                     binding_name,
                     binding_source: None,
@@ -342,6 +361,69 @@ fn scalar_use_positions(
     result
 }
 
+fn script_use_positions(
+    ir: &rules::ir::RulesIr,
+    template: &Template,
+    schema: rules::ir::SchemaId,
+) -> BTreeSet<u32> {
+    use rules::replacement::{TemplateFragment, TemplateInstruction, TemplateOperand};
+    let mut result = BTreeSet::new();
+    let mut pending = vec![(0, schema)];
+    while let Some((block, schema)) = pending.pop() {
+        for node in template.program.blocks[block].iter() {
+            let mut read = |token: &rules::replacement::TemplateToken| {
+                for part in &token.fragments {
+                    if let TemplateFragment::Parameter { range, .. } = part {
+                        result.insert(range.start());
+                    }
+                }
+            };
+            match node {
+                TemplateInstruction::Consume(token) | TemplateInstruction::Recover(token) => {
+                    read(token)
+                }
+                TemplateInstruction::When { block, .. } => pending.push((*block, schema)),
+                TemplateInstruction::Dispatch(property) => {
+                    let key = property
+                        .key
+                        .fragments
+                        .iter()
+                        .map(|part| match part {
+                            TemplateFragment::Literal(text) => Some(text.as_str()),
+                            _ => None,
+                        })
+                        .collect::<Option<String>>();
+                    let Some(key) = key else {
+                        continue;
+                    };
+                    let fields=ir.fields(schema).into_iter().filter(|id|matches!(ir.matcher(ir.field(*id).key),rules::ir::Matcher::Literal(name) if ir.strings().resolve(*name).eq_ignore_ascii_case(&key))).collect::<Vec<_>>();
+                    match &property.value {
+                        TemplateOperand::Scalar(token)
+                            if fields
+                                .iter()
+                                .any(|id| ir.shape(*id) == Some(rules::ir::Shape::Block))
+                                && !fields
+                                    .iter()
+                                    .any(|id| ir.shape(*id) == Some(rules::ir::Shape::Scalar)) =>
+                        {
+                            read(token)
+                        }
+                        TemplateOperand::Block(block) => {
+                            for field in fields {
+                                if let Some(child) = ir.child(field, schema) {
+                                    pending.push((*block, child));
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+    result
+}
+
 fn append_slice(
     target: &mut RenderedTemplate,
     source: &RenderedTemplate,
@@ -361,11 +443,12 @@ fn append_slice(
     }
     let shift = target.text.len() as i64 - range.start() as i64;
     target.text.push_str(text);
-    for piece in source
-        .pieces
-        .iter()
-        .filter(|piece| piece.range.start() < range.end() && range.start() < piece.range.end())
-    {
+    for piece in source.pieces.iter().filter(|piece| {
+        (piece.range.start() < range.end() && range.start() < piece.range.end())
+            || (piece.range.is_empty()
+                && range.start() <= piece.range.start()
+                && piece.range.end() <= range.end())
+    }) {
         let mut piece = piece.clone();
         let start = piece.range.start().max(range.start());
         let end = piece.range.end().min(range.end());
@@ -381,6 +464,16 @@ fn append_slice(
                 .expect("ordered slice projection");
         piece.parameters.extend(extra.iter().cloned());
         target.pieces.push(piece);
+    }
+    for unresolved in &source.unresolved_bindings {
+        let start = unresolved.start().max(range.start());
+        let end = unresolved.end().min(range.end());
+        if start < end {
+            target.unresolved_bindings.push(
+                text::TextRange::new((start as i64 + shift) as u32, (end as i64 + shift) as u32)
+                    .expect("binding projection"),
+            );
+        }
     }
     target.coverage.merge(&source.coverage);
     true
@@ -445,6 +538,9 @@ pub fn render_expanded<E>(
                     name.clone(),
                     BindingSource {
                         parameter: name.clone(),
+                        quote_layers: 0,
+                        borrowed_carrier: false,
+                        script: false,
                         offsets: std::sync::Arc::from((0..=value.len() as u32).collect::<Vec<_>>()),
                     },
                 )
@@ -499,12 +595,14 @@ pub fn render_expanded<E>(
                 }
                 work.push(RenderTask::Exit(identity));
                 let scalar_uses = scalar_use_positions(ir, &template, &bindings, schema);
+                let script_uses = script_use_positions(ir, &template, schema);
                 let mut rendered = render_with_views(
                     &template,
                     &bindings,
                     &present,
                     &raw,
                     &scalar_uses,
+                    &script_uses,
                     byte_limit,
                 );
                 for piece in &mut rendered.pieces {
@@ -546,12 +644,18 @@ pub fn render_expanded<E>(
                             if let Some(offsets) = mapped {
                                 piece.binding_source = Some(BindingSource {
                                     parameter: binding.parameter.clone(),
+                                    quote_layers: binding.quote_layers,
+                                    borrowed_carrier: raw.is_some_and(|raw| raw == generated),
+                                    script: binding.script || piece.script,
                                     offsets: offsets.into(),
                                 });
                             }
                         }
                     }
 
+                    if piece.binding_source.as_ref().is_some_and(|map| map.script) {
+                        piece.script = true;
+                    }
                     piece.parameters = piece
                         .parameters
                         .iter()
@@ -604,6 +708,18 @@ pub fn render_expanded<E>(
                         continue;
                     };
                     let Some(callee) = facts.replacement_template(type_id, &property.key) else {
+                        rendered
+                            .coverage
+                            .limits
+                            .insert(AnalysisLimit::UnavailableTemplate);
+                        output
+                            .coverage
+                            .limits
+                            .insert(AnalysisLimit::UnavailableTemplate);
+                        if let Some(range) = property.value_range {
+                            rendered.unresolved_bindings.push(range);
+                        }
+                        covered.push(property.range);
                         continue;
                     };
                     let Some(body) = crate::template::template_body(ir, type_id) else {
@@ -656,6 +772,17 @@ pub fn render_expanded<E>(
                             .and_then(parser::decode_quoted_script);
                         let mut projection = Vec::new();
                         let mut root = None;
+                        let mut quote_layers = None;
+                        let mut root_script = false;
+                        let borrowed = rendered
+                            .pieces
+                            .iter()
+                            .find(|piece| {
+                                piece.range.start() <= value.range.start()
+                                    && value.range.end() <= piece.range.end()
+                            })
+                            .and_then(|piece| piece.binding_source.as_ref())
+                            .is_some_and(|source| source.borrowed_carrier);
                         let logical = crate::template::binding_value(hir.syntax(), value);
                         for i in 0..=logical.len() as u32 {
                             let relative = decoded
@@ -667,6 +794,8 @@ pub fn render_expanded<E>(
                                 if piece.range.start() <= absolute && absolute <= piece.range.end()
                                 {
                                     let map = piece.binding_source.as_ref()?;
+                                    quote_layers = Some(map.quote_layers);
+                                    root_script |= map.script || piece.script;
                                     Some((
                                         map.parameter.as_str(),
                                         *map.offsets
@@ -694,6 +823,10 @@ pub fn render_expanded<E>(
                                 name.clone(),
                                 BindingSource {
                                     parameter,
+                                    quote_layers: quote_layers.unwrap_or(0)
+                                        + usize::from(value.quoted && !borrowed),
+                                    borrowed_carrier: false,
+                                    script: root_script,
                                     offsets: projection.into(),
                                 },
                             );

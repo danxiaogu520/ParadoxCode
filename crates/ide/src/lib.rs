@@ -11,6 +11,7 @@ mod dynamic_rules;
 mod hover;
 mod hover_card;
 mod inlay;
+mod insertion;
 mod ir_queries;
 mod ir_semantic;
 mod ir_template;
@@ -78,3 +79,5 @@ pub(crate) use resolution::ALL_SEMANTICS_CALLS;
 pub(crate) use support::input_for_document;
 #[cfg(test)]
 mod tests;
+
+pub use insertion::snippet_plain_text;

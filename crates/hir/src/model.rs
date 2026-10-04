@@ -117,7 +117,7 @@ pub struct FieldFact {
 /// One scalar value attached directly to a property.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HirScalar {
-    /// Unquoted, trimmed spelling.
+    /// Logical scalar text; quoted strings decode quote and backslash escapes once.
     pub value: String,
     /// Exact source range including quotes when present.
     pub range: TextRange,
@@ -400,7 +400,7 @@ impl HirFile {
         &self.localisation_entries
     }
 
-    /// Returns unquoted value tokens that are not property keys.
+    /// Returns scalar value tokens, including quoted list items, that are not property keys.
     #[must_use]
     pub fn bare_values(&self) -> &[HirScalar] {
         &self.bare_values

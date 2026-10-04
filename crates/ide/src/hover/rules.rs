@@ -11,81 +11,95 @@ pub(crate) fn template_consumption_hover(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     position: TextSize,
-    word: &str,
+    _word: &str,
     cancellation: &CancellationToken,
 ) -> Result<Option<HoverModel>, Cancelled> {
-    let Some(source) = input.hir.as_deref() else {
+    let Some(projection) =
+        crate::ir_template::consumption_at(snapshot, input, position, cancellation)?
+    else {
         return Ok(None);
     };
-    for argument in source.properties().iter().filter(|argument| {
-        argument
-            .scalar
-            .as_ref()
-            .is_some_and(|scalar| scalar.quoted && contains(scalar.range, position))
-    }) {
-        let scalar = argument.scalar.as_ref().expect("quoted scalar");
-        let Some(invocation) = source
-            .properties()
+    let mut models = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
+    for point in &projection.positions {
+        let word_range =
+            crate::support::word_range(&projection.body.rendered.text, point.generated);
+        let word = projection
+            .body
+            .hir
+            .syntax()
+            .text(word_range)
+            .unwrap_or_default();
+        let mut contexts = projection
+            .body
+            .hir
+            .schema_facts()
             .iter()
-            .filter(|parent| {
-                parent.path.len() + 1 == argument.path.len()
-                    && parent.range.start() <= argument.range.start()
-                    && argument.range.end() <= parent.range.end()
-            })
-            .min_by_key(|parent| parent.range.len())
-        else {
-            continue;
-        };
-        let Some(body) =
-            crate::ir_template::analyse_body(snapshot, source, invocation, None, cancellation)?
-        else {
-            continue;
-        };
-        let Some(raw) = source.syntax().text(scalar.range) else {
-            continue;
-        };
-        let Some(script) = parser::parse_quoted_script(raw) else {
-            continue;
-        };
-        let Some(offset) = script
-            .source_map()
-            .source_offset(position - scalar.range.start())
-        else {
-            continue;
-        };
-        for piece in &body.rendered.pieces {
-            let Some(mapping) = &piece.binding_source else {
-                continue;
-            };
-            if !mapping.parameter.eq_ignore_ascii_case(&argument.key) {
-                continue;
-            }
-            let index = mapping
-                .offsets
-                .partition_point(|boundary| *boundary <= offset)
-                .saturating_sub(1);
-            if mapping.offsets.get(index) != Some(&offset) {
-                continue;
-            }
-            let generated = piece.range.start() + index as u32;
+            .filter(|context| contains(context.range, point.generated))
+            .collect::<Vec<_>>();
+        let shortest = contexts.iter().map(|context| context.range.len()).min();
+        contexts.retain(|context| Some(context.range.len()) == shortest);
+        for context in contexts {
+            let parsed = std::sync::Arc::new(projection.body.hir.syntax().clone());
+            let hir = hir::lower_ir_schema_in_range(
+                parsed.clone(),
+                snapshot.ir(),
+                context.schema,
+                context.subtypes.clone(),
+                context.state.clone(),
+                &crate::ir_semantic::WorkspaceFacts { snapshot },
+                context.range,
+            );
             let mut fragment = input.clone();
-            fragment.source = body.hir.syntax().source_handle();
-            fragment.parsed =
-                crate::support::ParsedContent::Text(std::sync::Arc::new(body.hir.syntax().clone()));
-            fragment.hir = Some(std::sync::Arc::new(body.hir.clone()));
-            let mut result =
-                ir_field_hover(snapshot, &fragment, generated, word, true, cancellation)?;
-            if result.is_none() {
-                result = ir_field_hover(snapshot, &fragment, generated, word, false, cancellation)?;
+            fragment.source = parsed.source_handle();
+            fragment.parsed = crate::support::ParsedContent::Text(parsed);
+            fragment.hir = Some(std::sync::Arc::new(hir));
+            let mut model = ir_field_hover(
+                snapshot,
+                &fragment,
+                point.generated,
+                word,
+                true,
+                cancellation,
+            )?;
+            if model.is_none() {
+                model = ir_field_hover(
+                    snapshot,
+                    &fragment,
+                    point.generated,
+                    word,
+                    false,
+                    cancellation,
+                )?;
             }
-            if let Some(mut model) = result {
-                model.coverage.merge(&body.coverage);
-                model.push_section(format!("- Consumed by Template `{}`", invocation.key));
-                return Ok(Some(model));
+            if let Some(mut model) = model {
+                model.coverage.merge(&projection.body.coverage);
+                if seen.insert(model.render()) {
+                    models.push(model);
+                }
             }
         }
     }
-    Ok(None)
+    if models.len() == 1 {
+        let mut model = models.pop().expect("one model");
+        model.push_section(format!(
+            "- Consumed through Template parameter `{}`",
+            projection.parameter
+        ));
+        return Ok(Some(model));
+    }
+    if models.is_empty() {
+        return Ok(None);
+    }
+    let mut model = HoverModel::new(format!(
+        "### Template consumption `{}`",
+        projection.parameter
+    ));
+    model.coverage = projection.body.coverage.clone();
+    for item in models {
+        model.push_section(item.render());
+    }
+    Ok(Some(model))
 }
 
 pub(crate) fn semantic_rule_hover_at(

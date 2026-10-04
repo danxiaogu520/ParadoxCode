@@ -84,7 +84,7 @@ fn lowering_retains_property_paths_scalars_and_top_level_identity() {
             .iter()
             .map(|value| value.value.as_str())
             .collect::<Vec<_>>(),
-        ["yes"]
+        ["value", "yes"]
     );
 }
 

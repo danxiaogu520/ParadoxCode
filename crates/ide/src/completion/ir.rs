@@ -1,10 +1,8 @@
 use crate::ir_semantic::{self, WorkspaceFacts};
-use crate::quoted_script::{QuotedScriptParse, QuotedScriptSession};
 use crate::support::{ParsedContent, ParsedInput, word_range};
 use crate::types::{CancellationToken, Cancelled, CompletionItem, CompletionKind};
 use engine::AnalysisSnapshot;
 use hir::analysis::{Analysis, AnalysisCoverage, AnalysisLimit};
-use parser::{CstKind, CstNode, QuotedScript, encode_quoted_script_text};
 use rules::ir::{FieldId, FieldValue, Matcher, MatcherId, RefTarget, Shape};
 use std::collections::BTreeSet;
 use text::{TextRange, TextSize};
@@ -15,9 +13,106 @@ pub(crate) fn try_ir_completion(
     position: TextSize,
     cancellation: &CancellationToken,
 ) -> Result<Option<Analysis<Vec<CompletionItem>>>, Cancelled> {
+    if let Some(projected) =
+        projected_consumption_completion(snapshot, input, position, cancellation)?
+    {
+        return Ok(Some(projected));
+    }
     let mut coverage = AnalysisCoverage::default();
     let items = try_ir_completion_inner(snapshot, input, position, cancellation, 0, &mut coverage)?;
     Ok(items.map(|value| Analysis { value, coverage }))
+}
+
+fn projected_consumption_completion(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: u32,
+    cancellation: &CancellationToken,
+) -> Result<Option<Analysis<Vec<CompletionItem>>>, Cancelled> {
+    let Some(projection) =
+        crate::ir_template::consumption_at(snapshot, input, position, cancellation)?
+    else {
+        return Ok(None);
+    };
+    let mut coverage = projection.body.coverage.clone();
+    let mut items = Vec::new();
+    let mut seen = BTreeSet::new();
+    for point in &projection.positions {
+        cancellation.checkpoint()?;
+        let mut contexts = projection
+            .body
+            .hir
+            .schema_facts()
+            .iter()
+            .filter(|context| contains(context.range, point.generated))
+            .collect::<Vec<_>>();
+        let shortest = contexts.iter().map(|context| context.range.len()).min();
+        contexts.retain(|context| Some(context.range.len()) == shortest);
+        for context in contexts {
+            let parsed = std::sync::Arc::new(projection.body.hir.syntax().clone());
+            let fragment_hir = hir::lower_ir_schema_in_range(
+                parsed.clone(),
+                snapshot.ir(),
+                context.schema,
+                context.subtypes.clone(),
+                context.state.clone(),
+                &WorkspaceFacts { snapshot },
+                context.range,
+            );
+            let mut fragment = input.clone();
+            fragment.source = parsed.source_handle();
+            fragment.parsed = ParsedContent::Text(parsed);
+            fragment.hir = Some(std::sync::Arc::new(fragment_hir));
+            let candidates = try_ir_completion_inner(
+                snapshot,
+                &fragment,
+                point.generated,
+                cancellation,
+                1,
+                &mut coverage,
+            )?
+            .unwrap_or_default();
+            for mut item in candidates {
+                let Some((range, text)) = projection.edit(
+                    point,
+                    item.replacement_range,
+                    &item.insert_text,
+                    item.is_snippet,
+                ) else {
+                    continue;
+                };
+                item.replacement_range = range;
+                item.insert_text = text;
+                let checked = crate::ir_template::validate_consumption_edit(
+                    snapshot,
+                    input,
+                    &projection,
+                    &item,
+                    cancellation,
+                )?;
+                coverage.merge(&checked.coverage);
+                if checked.value == hir::analysis::Validation::Invalid {
+                    continue;
+                }
+                item.template_evidence = Some(crate::types::TemplateCompletionEvidence {
+                    validation: checked.value,
+                    witness: Default::default(),
+                });
+                if seen.insert((
+                    item.label.clone(),
+                    item.replacement_range,
+                    item.insert_text.clone(),
+                    item.is_snippet,
+                )) {
+                    items.push(item);
+                }
+            }
+        }
+    }
+    Ok(Some(Analysis {
+        value: items,
+        coverage,
+    }))
 }
 
 fn try_ir_completion_inner(
@@ -43,64 +138,11 @@ fn try_ir_completion_inner(
     if let Some(items) = path_value_completion(snapshot, input, hir, position, cancellation)? {
         return Ok(Some(items));
     }
-    let (local_source, local_position, quoted_layers) =
-        completion_coordinates(input, position, cancellation, coverage)?;
+    let local_source = input.source.to_string();
+    let local_position = position;
     let local_replacement = word_range(&local_source, local_position);
-    let prefix = local_source
-        .get(
-            usize::try_from(local_replacement.start()).unwrap_or(local_source.len())
-                ..usize::try_from(local_replacement.end()).unwrap_or(local_source.len()),
-        )
-        .unwrap_or_default();
-    let replacement_range =
-        map_completion_range(local_replacement, &quoted_layers).unwrap_or(local_replacement);
-    if let Some((token_start, script)) = quoted_layers.last() {
-        let start = map_completion_range(
-            TextRange::new(*token_start, *token_start).expect("empty token range"),
-            &quoted_layers[..quoted_layers.len() - 1],
-        )
-        .map(|range| range.start());
-        if let Some(schema) = hir
-            .schema_facts()
-            .iter()
-            .find(|fact| Some(fact.range.start()) == start)
-        {
-            // Quoted HIR retains mapped semantic facts, while its properties belong to
-            // the outer document. Complete against the decoded fragment so a missing
-            // scalar after `key =` is still recognized as a value position.
-            let parsed = std::sync::Arc::new(script.parsed().clone());
-            let nested_hir = hir::lower_ir_schema(
-                parsed.clone(),
-                ir,
-                schema.schema,
-                schema.subtypes.clone(),
-                schema.state.clone(),
-                &WorkspaceFacts { snapshot },
-            );
-            let mut fragment = input.clone();
-            fragment.source = parsed.source_handle();
-            fragment.parsed = ParsedContent::Text(parsed);
-            fragment.hir = Some(std::sync::Arc::new(nested_hir));
-            let mut items = try_ir_completion_inner(
-                snapshot,
-                &fragment,
-                local_position,
-                cancellation,
-                depth + 1,
-                coverage,
-            )?
-            .unwrap_or_default();
-            for item in &mut items {
-                item.replacement_range =
-                    map_completion_range(item.replacement_range, &quoted_layers)
-                        .unwrap_or(replacement_range);
-                for _ in &quoted_layers {
-                    item.insert_text = encode_quoted_script_text(&item.insert_text);
-                }
-            }
-            return Ok(Some(items));
-        }
-    }
+    let prefix = input.source_text(local_replacement).unwrap_or_default();
+    let replacement_range = local_replacement;
     let value_property = hir.properties().iter().find(|property| {
         position > property.key_range.end()
             && (position <= property.range.end()
@@ -143,44 +185,6 @@ fn try_ir_completion_inner(
         )?;
         {
             coverage.merge(&constraints.coverage);
-            if !quoted_layers.is_empty() {
-                for site in &constraints {
-                    let crate::ir_template::Domain::Payload { schema, .. } = site.domain else {
-                        continue;
-                    };
-                    let parsed = std::sync::Arc::new(parser::parse(
-                        parser::FileFormat::Script,
-                        &local_source,
-                    ));
-                    let hir = hir::lower_ir_schema(
-                        parsed.clone(),
-                        ir,
-                        schema,
-                        Default::default(),
-                        site.state.clone(),
-                        &WorkspaceFacts { snapshot },
-                    );
-                    let mut fragment = input.clone();
-                    fragment.source = parsed.source_handle();
-                    fragment.parsed = ParsedContent::Text(parsed);
-                    fragment.hir = Some(std::sync::Arc::new(hir));
-                    if let Some(nested) = try_ir_completion_inner(
-                        snapshot,
-                        &fragment,
-                        local_position,
-                        cancellation,
-                        depth + 1,
-                        coverage,
-                    )? {
-                        for mut item in nested {
-                            item.replacement_range =
-                                map_completion_range(item.replacement_range, &quoted_layers)
-                                    .unwrap_or(replacement_range);
-                            items.push(item);
-                        }
-                    }
-                }
-            }
             append_template_value_items(
                 snapshot,
                 &constraints,
@@ -195,9 +199,10 @@ fn try_ir_completion_inner(
                 &mut items,
             )?;
             for item in &mut items {
-                for _ in 0..quoted_layers.len() {
-                    item.insert_text = encode_quoted_script_text(&item.insert_text);
-                }
+                item.insert_text = scalar_insert_text(
+                    &item.insert_text,
+                    property.scalar.as_ref().is_some_and(|scalar| scalar.quoted),
+                );
             }
             return Ok(Some(items));
         }
@@ -215,6 +220,7 @@ fn try_ir_completion_inner(
                 continue;
             }
             items.push(CompletionItem {
+                is_snippet: false,
                 template_evidence: None,
                 label: parameter.name.clone(),
                 kind: CompletionKind::DynamicParameter,
@@ -231,11 +237,6 @@ fn try_ir_completion_inner(
             (a.sort_score, a.label.to_ascii_lowercase())
                 .cmp(&(b.sort_score, b.label.to_ascii_lowercase()))
         });
-        for item in &mut items {
-            for _ in 0..quoted_layers.len() {
-                item.insert_text = encode_quoted_script_text(&item.insert_text);
-            }
-        }
         return Ok(Some(items));
     }
     let contracts = crate::dynamic_contracts::dynamic_contract_report_view(snapshot, cancellation)?;
@@ -341,6 +342,7 @@ fn try_ir_completion_inner(
                     continue;
                 };
                 items.push(CompletionItem {
+                    is_snippet: false,
                     template_evidence: None,
                     label: label.clone(),
                     kind: matcher_kind(ir.matcher(matcher)),
@@ -427,11 +429,13 @@ fn try_ir_completion_inner(
                 let label_text = if assignment
                     && matches!(field.value, FieldValue::Scalar(value) if matches!(ir.matcher(value), Matcher::Path(_)))
                 {
-                    format!("{label} = \"$0\"")
+                    format!("{} = \"$0\"", crate::insertion::snippet_literal(&label))
                 } else {
                     label_text
                 };
                 items.push(CompletionItem {
+                    is_snippet: assignment
+                        && (ir.shape(field_id) == Some(Shape::Block) || label_text.contains("$0")),
                     template_evidence: None,
                     label: label.clone(),
                     kind: if template_kind.is_some() {
@@ -461,8 +465,34 @@ fn try_ir_completion_inner(
                                 ))
                             })),
                     deprecated: field.deprecated,
-                    resolve_data: Some(format!("ir-field:{}", field_id.index())),
+                    resolve_data: Some(format!(
+                        "ir-field:{}:{}",
+                        snapshot.ir_fingerprint(),
+                        field_id.index()
+                    )),
                 });
+            }
+        }
+    }
+    if let Some(property) = value_property.filter(|property| {
+        property.scalar.is_some()
+            || hir.field_fact_at(property.key_range).is_some_and(|field| {
+                !hir::checking::field_candidates(
+                    ir,
+                    field.schema,
+                    &property.key,
+                    Shape::Scalar,
+                    &WorkspaceFacts { snapshot },
+                )
+                .is_empty()
+            })
+    }) {
+        for item in &mut items {
+            if !item.is_snippet {
+                item.insert_text = scalar_insert_text(
+                    &item.insert_text,
+                    property.scalar.as_ref().is_some_and(|scalar| scalar.quoted),
+                );
             }
         }
     }
@@ -480,11 +510,6 @@ fn try_ir_completion_inner(
         exact_labels.insert(item.label.clone())
             && seen.insert((item.label.to_ascii_lowercase(), block))
     });
-    for item in &mut items {
-        for _ in 0..quoted_layers.len() {
-            item.insert_text = encode_quoted_script_text(&item.insert_text);
-        }
-    }
     Ok(Some(items))
 }
 
@@ -582,6 +607,7 @@ fn append_template_value_items(
             format!("value for Template parameter `{parameter}`")
         };
         items.push(CompletionItem {
+            is_snippet: false,
             template_evidence: Some(crate::types::TemplateCompletionEvidence {
                 validation: checked.value,
                 witness,
@@ -641,8 +667,6 @@ fn template_invocation_at<'a>(
         .min_by_key(|(property, _)| property.range.len())
 }
 
-type CompletionCoordinates = (String, TextSize, Vec<(TextSize, QuotedScript)>);
-
 fn path_value_completion(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
@@ -676,6 +700,7 @@ fn path_value_completion(
         for label in labels {
             cancellation.checkpoint()?;
             items.push(CompletionItem {
+                is_snippet: false,
                 template_evidence: None,
                 insert_text: label.to_owned(),
                 label: label.to_owned(),
@@ -690,71 +715,6 @@ fn path_value_completion(
         }
     }
     Ok(Some(items))
-}
-
-fn completion_coordinates(
-    input: &ParsedInput,
-    position: TextSize,
-    cancellation: &CancellationToken,
-    coverage: &mut AnalysisCoverage,
-) -> Result<CompletionCoordinates, Cancelled> {
-    let mut source = input.source.to_string();
-    let mut local_position = position;
-    let mut parsed = match &input.parsed {
-        ParsedContent::Text(parsed) => parsed.clone(),
-    };
-    let mut layers = Vec::new();
-    let mut session = QuotedScriptSession::new(cancellation);
-    loop {
-        cancellation.checkpoint()?;
-        let Some(node) = quoted_at(parsed.root(), local_position) else {
-            break;
-        };
-        let Some(raw) = parsed.text(node.range()) else {
-            break;
-        };
-        let script = match session.parse(raw, layers.len())? {
-            QuotedScriptParse::Parsed(script) => script,
-            QuotedScriptParse::Opaque => break,
-            QuotedScriptParse::Limited(reason) => {
-                coverage.limits.insert(reason.analysis_limit());
-                break;
-            }
-        };
-        let relative = local_position.saturating_sub(node.range().start());
-        let Some(decoded) = script.source_map().source_offset(relative) else {
-            break;
-        };
-        layers.push((node.range().start(), script.clone()));
-        local_position = decoded;
-        source = script.parsed().source().to_owned();
-        parsed = std::sync::Arc::new(script.parsed().clone());
-    }
-    Ok((source, local_position, layers))
-}
-
-fn quoted_at(node: CstNode<'_>, position: TextSize) -> Option<CstNode<'_>> {
-    if node.kind() == CstKind::QuotedString
-        && position >= node.range().start()
-        && position <= node.range().end()
-    {
-        return Some(node);
-    }
-    node.children().find_map(|child| quoted_at(child, position))
-}
-
-fn map_completion_range(
-    mut range: TextRange,
-    layers: &[(TextSize, QuotedScript)],
-) -> Option<TextRange> {
-    for (token_start, script) in layers.iter().rev() {
-        let relative = script.source_map().decoded_range(range)?;
-        range = TextRange::new(
-            token_start.checked_add(relative.start())?,
-            token_start.checked_add(relative.end())?,
-        )?;
-    }
-    Some(range)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -777,6 +737,7 @@ fn append_value_items(
             continue;
         };
         items.push(CompletionItem {
+            is_snippet: false,
             template_evidence: None,
             label: label.clone(),
             kind: matcher_kind(ir.matcher(matcher)),
@@ -799,10 +760,29 @@ fn append_value_items(
             insert_text: label,
             sort_score: rank + 1000 * u32::from(deprecated),
             deprecated,
-            resolve_data: Some(format!("ir-field:{}", field_id.index())),
+            resolve_data: Some(format!(
+                "ir-field:{}:{}",
+                snapshot.ir_fingerprint(),
+                field_id.index()
+            )),
         });
     }
     Ok(())
+}
+
+fn scalar_insert_text(text: &str, quoted: bool) -> String {
+    if quoted {
+        return parser::encode_quoted_script_text(text);
+    }
+    if text.is_empty()
+        || text
+            .chars()
+            .any(|c| c.is_whitespace() || matches!(c, '"' | '#' | '{' | '}' | '='))
+    {
+        format!("\"{}\"", parser::encode_quoted_script_text(text))
+    } else {
+        text.to_owned()
+    }
 }
 
 fn matcher_kind(matcher: &Matcher) -> CompletionKind {
@@ -838,11 +818,14 @@ fn key_insert_text(
         return label.to_owned();
     }
     match shape {
-        Some(Shape::Block) => template_snippet(snapshot, ir, matcher, label)
-            .unwrap_or_else(|| format!("{label} = {{\n\t$0\n}}")),
-        Some(Shape::Scalar) => {
-            template_snippet(snapshot, ir, matcher, label).unwrap_or_else(|| format!("{label} = "))
-        }
+        Some(Shape::Block) => template_snippet(snapshot, ir, matcher, label).unwrap_or_else(|| {
+            format!(
+                "{} = {{\n\t$0\n}}",
+                crate::insertion::snippet_literal(label)
+            )
+        }),
+        Some(Shape::Scalar) => template_snippet(snapshot, ir, matcher, label)
+            .unwrap_or_else(|| format!("{} = $0", crate::insertion::snippet_literal(label))),
         None => format!("{label} = "),
     }
 }

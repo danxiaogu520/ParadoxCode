@@ -4368,3 +4368,153 @@ fn unknown_script_prefix_does_not_prove_a_suffix_scope_or_value_error() {
         "{values:?}"
     );
 }
+
+#[test]
+fn ambiguous_callee_binding_maps_are_not_validated_as_statements() {
+    let mut host = host();
+    open(
+        &mut host,
+        "common/scripted_triggers/ambiguous.txt",
+        "ambiguous_leaf = { always = $VALUE$ } ambiguous_leaf = { always = $VALUE$ } relay_ambiguous = { ambiguous_leaf = { VALUE = yes } }",
+    );
+    let source = "country_event = { id = unresolved.1 trigger = { relay_ambiguous = yes } option = { name = unresolved.1 } }";
+    let id = open(&mut host, "events/ambiguous-callee.txt", source);
+    let values = diagnostics(&host.snapshot(), &id);
+    assert!(
+        !values.iter().any(
+            |value| value.code == DiagnosticCode::UnknownKey && value.message.contains("VALUE")
+        ),
+        "{values:?}"
+    );
+    assert!(
+        values
+            .iter()
+            .any(|value| value.code == DiagnosticCode::AnalysisIncomplete),
+        "{values:?}"
+    );
+}
+
+fn script_items_host() -> AnalysisHost {
+    super::support::fixture_host(serde_json::json!({
+        "traits":{"Template":{}},"types":{"fixture_template":{"impl":{"Template":{"body":"effect"}},"resolution":"replace"}},
+        "schemas":{"fixture_root":{"fields":{"__templates":{"body":"definitions","card":"0..*"}}},
+            "definitions":{"map":{"key":"def<fixture_template>","body":"effect"}},"arguments":{"map":{"key":"scalar","value":"scalar"}},
+            "effect":{"fields":{"numbers":{"list":"float","card":"0..*"}},"patterns":[{"key":"ref<fixture_template>","body":"arguments","card":"0..*"}]}}
+    }))
+}
+#[test]
+fn template_items_validate_every_inserted_token_without_treating_the_list_as_one_scalar() {
+    let mut host = script_items_host();
+    open(
+        &mut host,
+        "definitions.txt",
+        "__templates = { list_wrap = { numbers = { $VALUES$ } } }",
+    );
+    for (name, value, invalid) in [
+        ("quoted", "\"1 2\"", false),
+        ("single", "3", false),
+        ("bad", "\"1 wrong 2\"", true),
+        ("quoted_item", "\"1 \\\"wrong\\\" 2\"", true),
+    ] {
+        let source =
+            format!("country_event = {{ immediate = {{ list_wrap = {{ VALUES = {value} }} }} }}");
+        let id = open(&mut host, &format!("events/items-{name}.txt"), &source);
+        let values = diagnostics(&host.snapshot(), &id);
+        assert_eq!(
+            values
+                .iter()
+                .any(|value| value.code == DiagnosticCode::InvalidValue),
+            invalid,
+            "{name}: {values:?}"
+        );
+    }
+}
+#[test]
+fn complete_operand_and_parent_siblings_share_completion_and_hover_context() {
+    let mut host = host();
+    open(
+        &mut host,
+        "common/scripted_effects/operand.txt",
+        "operand = { if = $BLOCK$ } partial = { if = { limit = { always = yes } $BODY$ } }",
+    );
+    let source = r#"country_event = { id = operand.1 immediate = { operand = { BLOCK = "{ limit = { always = yes } add_pr }" } } option = { name = operand.1 } }"#;
+    let id = open(&mut host, "events/operand.txt", source);
+    let items = complete(
+        &host.snapshot(),
+        &id,
+        (source.find("add_pr").unwrap() + 6) as u32,
+    );
+    assert!(
+        items.items.iter().any(|item| item.label == "add_prestige"),
+        "{items:?}"
+    );
+    let source = r#"country_event = { id = partial.1 immediate = { partial = { BODY = "l" } } option = { name = partial.1 } }"#;
+    let id = open(&mut host, "events/partial.txt", source);
+    let items = complete(
+        &host.snapshot(),
+        &id,
+        (source.find("BODY =").unwrap() + 9) as u32,
+    );
+    assert!(
+        !items.items.iter().any(|item| item.label == "limit"),
+        "the fixed sibling already consumes its quota: {items:?}"
+    );
+    assert!(
+        items.items.iter().any(|item| item.label == "log"),
+        "{items:?}"
+    );
+}
+
+#[test]
+fn completion_edit_round_trips_nested_carriers_and_literal_quote_values() {
+    let mut host = super::support::fixture_host(serde_json::json!({
+        "traits":{"Template":{}},"types":{"fixture_template":{"impl":{"Template":{"body":"trigger"}},"resolution":"replace"}},
+        "schemas":{"fixture_root":{"fields":{"__templates":{"body":"definitions","card":"0..*"}}},"definitions":{"map":{"key":"def<fixture_template>","body":"trigger"}},
+            "arguments":{"map":{"key":"scalar","value":"scalar"}},"trigger":{"fields":{"message":{"value":"'a\"b'","card":"0..*"}},"patterns":[{"key":"ref<fixture_template>","body":"arguments","card":"0..*"}]}}
+    }));
+    open(
+        &mut host,
+        "definitions.txt",
+        "__templates = { outer = { $BODY$ } inner = { $TEXT$ } }",
+    );
+    let payload = "message = ";
+    let middle = format!(
+        "inner = {{ TEXT = \"{}\" }}",
+        parser::encode_quoted_script_text(payload)
+    );
+    let source = format!(
+        "trigger = {{ outer = {{ BODY = \"{}\" }} }}",
+        parser::encode_quoted_script_text(&middle)
+    );
+    let id = open(&mut host, "events/nested-carrier.txt", &source);
+    let position = (source.find("message = ").unwrap() + "message = ".len()) as u32;
+    let result = complete(&host.snapshot(), &id, position);
+    let item = result
+        .items
+        .iter()
+        .find(|item| item.label == "a\"b")
+        .expect("literal quote candidate");
+    let text = if item.is_snippet {
+        crate::snippet_plain_text(&item.insert_text)
+    } else {
+        item.insert_text.clone()
+    };
+    let mut applied = source.clone();
+    applied.replace_range(
+        item.replacement_range.start() as usize..item.replacement_range.end() as usize,
+        &text,
+    );
+    let patched = open(&mut host, "events/nested-carrier-applied.txt", &applied);
+    let values = diagnostics(&host.snapshot(), &patched);
+    assert!(
+        !values.iter().any(|value| matches!(
+            value.code,
+            DiagnosticCode::Syntax | DiagnosticCode::InvalidValue | DiagnosticCode::UnknownKey
+        )),
+        "{applied}\n{values:?}"
+    );
+    assert_eq!(
+        item.template_evidence.as_ref().unwrap().validation,
+        hir::analysis::Validation::Valid
+    );
+}

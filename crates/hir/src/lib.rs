@@ -178,8 +178,51 @@ pub fn lower_ir_schema(
     state: ScopeState,
     facts: &dyn rules::ir::SymbolFacts,
 ) -> HirFile {
+    lower_ir_schema_range_impl(syntax, ir, schema, subtypes, state, facts, None, &[])
+}
+
+/// Lowers a trial instance with explicit virtual-hole byte ranges.
+#[allow(clippy::too_many_arguments)]
+pub fn lower_ir_schema_with_holes(
+    syntax: Arc<ParsedFile>,
+    ir: &rules::ir::RulesIr,
+    schema: rules::ir::SchemaId,
+    subtypes: rules::ir::SubtypeSet,
+    state: ScopeState,
+    facts: &dyn rules::ir::SymbolFacts,
+    holes: &[text::TextRange],
+) -> HirFile {
+    lower_ir_schema_range_impl(syntax, ir, schema, subtypes, state, facts, None, holes)
+}
+
+/// Lowers the original CST inside a selected container without a standalone reparse.
+#[allow(clippy::too_many_arguments)]
+pub fn lower_ir_schema_in_range(
+    syntax: Arc<ParsedFile>,
+    ir: &rules::ir::RulesIr,
+    schema: rules::ir::SchemaId,
+    subtypes: rules::ir::SubtypeSet,
+    state: ScopeState,
+    facts: &dyn rules::ir::SymbolFacts,
+    range: text::TextRange,
+) -> HirFile {
+    lower_ir_schema_range_impl(syntax, ir, schema, subtypes, state, facts, Some(range), &[])
+}
+#[allow(clippy::too_many_arguments)]
+fn lower_ir_schema_range_impl(
+    syntax: Arc<ParsedFile>,
+    ir: &rules::ir::RulesIr,
+    schema: rules::ir::SchemaId,
+    subtypes: rules::ir::SubtypeSet,
+    state: ScopeState,
+    facts: &dyn rules::ir::SymbolFacts,
+    range: Option<text::TextRange>,
+    holes: &[text::TextRange],
+) -> HirFile {
     let collected = collector::collect(&syntax);
-    let ir_facts = ir_lowering::lower_schema_fragment(ir, &syntax, schema, subtypes, state, facts);
+    let ir_facts = ir_lowering::lower_schema_fragment(
+        ir, &syntax, schema, subtypes, state, facts, range, holes,
+    );
     let template_definitions = ir_facts
         .definitions
         .iter()

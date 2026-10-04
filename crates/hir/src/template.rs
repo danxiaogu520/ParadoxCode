@@ -661,13 +661,10 @@ impl<E> Interpreter<'_, E> {
                 }
             }
             TemplateInstruction::Consume(token) => {
-                let domain = ir.schema(schema).items.map_or(
-                    Domain::Payload {
-                        schema,
-                        complete: false,
-                    },
-                    |matcher| Domain::Value(vec![matcher]),
-                );
+                let domain = Domain::Payload {
+                    schema,
+                    complete: false,
+                };
                 self.add(domain, substitute(token, env), &state);
             }
             TemplateInstruction::Dispatch(property) => {
