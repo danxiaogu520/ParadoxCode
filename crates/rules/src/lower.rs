@@ -95,6 +95,153 @@ pub fn lower(sources: &[(String, RuleFile)], game: GameConfig) -> Result<RulesIr
     Ok(Lowering::new(sources, game).run())
 }
 
+/// Validates projected matcher dependencies after source checks, without
+/// recursively invoking the source checker. Ordinary block-body edges are not
+/// matcher dependencies and therefore cannot create a query cycle.
+pub(crate) fn check_queries(sources: &[(String, RuleFile)]) -> Vec<Diagnostic> {
+    let mut lowering = Lowering::new(sources, GameConfig::default());
+    lowering.register_names();
+    lowering.register_types();
+    lowering.fill_types();
+    lowering.fill_scopes();
+    lowering.register_files();
+    // Also validate unused declarations. Parameterized declarations are checked
+    // for their reachable instantiations, as in the ordinary lowering pass.
+    let bases: Vec<_> = lowering
+        .schema_defs
+        .iter()
+        .filter_map(|(base, source)| source.formals.is_empty().then_some(*base))
+        .collect();
+    for base in bases {
+        lowering.instance(base, Vec::new());
+    }
+    lowering.drain_jobs();
+    query_cycle_diagnostics(&lowering.assemble())
+}
+
+fn query_cycle_diagnostics(ir: &RulesIr) -> Vec<Diagnostic> {
+    let mut dependencies = vec![Vec::new(); ir.matchers.len()];
+    for (index, matcher) in ir.matchers.iter().enumerate() {
+        match matcher {
+            Matcher::Union(branches) => {
+                dependencies[index].extend(branches.iter().map(|id| id.index()))
+            }
+            Matcher::Pattern(parts) => {
+                dependencies[index].extend(parts.iter().filter_map(|part| match part {
+                    PatternPart::Hole(id) => Some(id.index()),
+                    PatternPart::Text(_) => None,
+                }))
+            }
+            Matcher::Query(query) => {
+                let exact = match &query.selector {
+                    Some(crate::query::QuerySelector::Literal(key)) => {
+                        ir.schema(query.schema).exact.get(key).filter(|fields| {
+                            fields.iter().any(|id| {
+                                query.shape.is_none_or(|shape| ir.shape(*id) == Some(shape))
+                            })
+                        })
+                    }
+                    _ => None,
+                };
+                let fields = exact.map_or_else(|| ir.fields(query.schema), |ids| ids.to_vec());
+                for field in fields {
+                    if query
+                        .shape
+                        .is_some_and(|shape| ir.shape(field) != Some(shape))
+                    {
+                        continue;
+                    }
+                    // Lookup must resolve the actual source before applying
+                    // filters, so all potentially tested key dependencies count.
+                    dependencies[index].push(ir.field(field).key.index());
+                    if ir.query_field_passes(query, field)
+                        && let Some(projected) = ir.query_projected_matcher(query, field)
+                    {
+                        dependencies[index].push(projected.index());
+                    }
+                }
+            }
+            _ => {}
+        }
+        dependencies[index].sort_unstable();
+        dependencies[index].dedup();
+    }
+    // Peel leaves iteratively. Remaining matchers depend on a cycle; no Rust
+    // recursion or arbitrary body-depth restriction is needed for this check.
+    let mut parents = vec![Vec::new(); dependencies.len()];
+    let mut remaining: Vec<_> = dependencies.iter().map(Vec::len).collect();
+    for (parent, children) in dependencies.iter().enumerate() {
+        for child in children {
+            parents[*child].push(parent);
+        }
+    }
+    let mut pending: Vec<_> = remaining
+        .iter()
+        .enumerate()
+        .filter_map(|(index, count)| (*count == 0).then_some(index))
+        .collect();
+    while let Some(child) = pending.pop() {
+        for parent in &parents[child] {
+            remaining[*parent] -= 1;
+            if remaining[*parent] == 0 {
+                pending.push(*parent);
+            }
+        }
+    }
+    let mut diagnostics = Vec::new();
+    for (index, matcher) in ir.matchers.iter().enumerate() {
+        let Matcher::Query(query) = matcher else {
+            continue;
+        };
+        if remaining[index] == 0 {
+            continue;
+        }
+        let owner = ir.fields.iter().enumerate().find(|(_, field)| {
+            matcher_contains(ir, field.key, index) || matches!(field.value, FieldValue::Scalar(id) if matcher_contains(ir, id, index))
+        }).and_then(|(index, _)| ir.provenance_of(FieldId(index as u32)));
+        diagnostics.push(Diagnostic {
+            code: compile::DiagnosticCode::Parse,
+            severity: Severity::Error,
+            message: format!(
+                "schema query dependency cycle through `{}`",
+                ir.strings.resolve(ir.schema(query.schema).name)
+            ),
+            file: owner.map_or_else(String::new, |origin| {
+                ir.strings.resolve(origin.file).to_owned()
+            }),
+            pointer: owner.map_or_else(
+                || {
+                    format!(
+                        "/schemas/{}",
+                        ir.strings.resolve(ir.schema(query.schema).name)
+                    )
+                },
+                |origin| ir.strings.resolve(origin.pointer).to_owned(),
+            ),
+            column: None,
+        });
+    }
+    diagnostics
+}
+
+fn matcher_contains(ir: &RulesIr, root: MatcherId, target: usize) -> bool {
+    let mut pending = vec![root];
+    while let Some(id) = pending.pop() {
+        if id.index() == target {
+            return true;
+        }
+        match ir.matcher(id) {
+            Matcher::Union(branches) => pending.extend(branches.iter().copied()),
+            Matcher::Pattern(parts) => pending.extend(parts.iter().filter_map(|part| match part {
+                PatternPart::Hole(id) => Some(*id),
+                PatternPart::Text(_) => None,
+            })),
+            _ => {}
+        }
+    }
+    false
+}
+
 /// Provenance of one source position.
 #[derive(Clone, Debug)]
 struct At {
@@ -184,6 +331,7 @@ struct FieldKey {
     doc: Option<Symbol>,
     severity: Severity,
     deprecated: bool,
+    capabilities: Box<[Symbol]>,
     file: Symbol,
     pointer: Symbol,
 }
@@ -218,6 +366,7 @@ enum MatcherKey {
     Link,
     Opaque,
     Union(Vec<u32>),
+    Query(crate::query::FieldQuery),
 }
 
 /// A hashable fingerprint of one [`PatternPart`].
@@ -896,6 +1045,7 @@ impl<'a> Lowering<'a> {
             severity: None,
             deprecated: None,
             override_field: None,
+            capabilities: Vec::new(),
         };
         Box::new([self.lower_pattern(context, &spec, at)])
     }
@@ -969,6 +1119,11 @@ impl<'a> Lowering<'a> {
             doc,
             severity: spec.severity.unwrap_or(Severity::Error),
             deprecated: spec.deprecated.unwrap_or(false),
+            capabilities: spec
+                .capabilities
+                .iter()
+                .map(|name| self.strings.intern_folded(name))
+                .collect(),
         };
         let pointer = self.strings.intern_verbatim(&draft.at.pointer);
         let fingerprint = FieldKey {
@@ -981,6 +1136,7 @@ impl<'a> Lowering<'a> {
             doc: field.doc,
             severity: field.severity,
             deprecated: field.deprecated,
+            capabilities: field.capabilities.clone(),
             file: draft.at.file,
             pointer,
         };
@@ -1227,6 +1383,51 @@ impl<'a> Lowering<'a> {
                     _ => Matcher::Pattern(lowered.into_boxed_slice()),
                 }
             }
+            Primary::Query(query) => {
+                let reference = SchemaRef {
+                    name: query.schema.clone(),
+                    args: Vec::new(),
+                };
+                let Some(schema) = self.ensure_instance(context, &reference) else {
+                    return self.opaque();
+                };
+                Matcher::Query(crate::query::FieldQuery {
+                    schema,
+                    projection: match query.projection {
+                        expr::QueryProjection::Keys => crate::query::QueryProjection::Keys,
+                        expr::QueryProjection::Values => crate::query::QueryProjection::Values,
+                    },
+                    selector: query.selector.as_ref().map(|selector| match selector {
+                        expr::QuerySelector::Literal(key) => {
+                            crate::query::QuerySelector::Literal(self.strings.intern_folded(key))
+                        }
+                        expr::QuerySelector::Sibling(name) => {
+                            crate::query::QuerySelector::Sibling(self.strings.intern_folded(name))
+                        }
+                    }),
+                    scope_accepts: query
+                        .scope_accepts
+                        .as_ref()
+                        .map(|scope| self.strings.intern_folded(scope)),
+                    shape: query.shape.map(|shape| match shape {
+                        expr::QueryShape::Scalar => crate::ir::Shape::Scalar,
+                        expr::QueryShape::Block => crate::ir::Shape::Block,
+                    }),
+                    value_kind_any: query
+                        .value_kind_any
+                        .iter()
+                        .map(|kind| match kind {
+                            expr::QueryValueKind::Int => crate::query::QueryValueKind::Int,
+                            expr::QueryValueKind::Float => crate::query::QueryValueKind::Float,
+                            expr::QueryValueKind::Bool => crate::query::QueryValueKind::Bool,
+                        })
+                        .collect(),
+                    capability: query
+                        .capability
+                        .as_ref()
+                        .map(|capability| self.strings.intern_folded(capability)),
+                })
+            }
             Primary::Param(param) => match self.resolve_param(context, param) {
                 Some(symbol) => match self.type_ids.get(&symbol).copied() {
                     Some(type_id) => Matcher::Ref(RefTarget::Type {
@@ -1347,6 +1548,7 @@ fn card(raw: &str) -> Card {
 /// A hashable fingerprint of one matcher.
 fn matcher_key(matcher: &Matcher) -> MatcherKey {
     match matcher {
+        Matcher::Query(query) => MatcherKey::Query(query.clone()),
         Matcher::Scalar => MatcherKey::Scalar,
         Matcher::Literal(text) => MatcherKey::Literal(*text),
         Matcher::Pattern(parts) => MatcherKey::Pattern(

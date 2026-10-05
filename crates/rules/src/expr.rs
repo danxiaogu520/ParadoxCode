@@ -49,8 +49,58 @@ pub enum Primary {
     Path { category: Option<String> },
     /// `'yes'` (constant) or `'monthly_{ref<power>}'` (template).
     Literal(Vec<LiteralPart>),
+    /// A schema-field key or value projection.
+    Query(FieldQuery),
     /// `$S`: a formal parameter of the enclosing parameterized schema.
     Param(Param),
+}
+
+/// A projection of the declared fields of one schema.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FieldQuery {
+    /// Explicit, non-parameterized source schema name.
+    pub schema: String,
+    /// Key matcher or scalar value matcher of each selected field.
+    pub projection: QueryProjection,
+    /// Optional field selection; required for `valuesof`.
+    pub selector: Option<QuerySelector>,
+    /// Retain declarations accepting this entry scope.
+    pub scope_accepts: Option<String>,
+    /// Retain declarations accepting this script shape.
+    pub shape: Option<QueryShape>,
+    /// Retain declarations with any listed numeric or boolean value branch.
+    pub value_kind_any: Vec<QueryValueKind>,
+    /// Retain declarations advertising this capability.
+    pub capability: Option<String>,
+}
+
+/// Which part of each matching field is projected.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum QueryProjection {
+    Keys,
+    Values,
+}
+
+/// A fixed field name or the scalar value of an enclosing sibling field.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum QuerySelector {
+    Literal(String),
+    Sibling(String),
+}
+
+/// The script shape accepted by a queried field.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum QueryShape {
+    Scalar,
+    Block,
+}
+
+/// The supported scalar kinds for a query's value-kind filter.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum QueryValueKind {
+    Int,
+    Float,
+    Bool,
 }
 
 /// The scalar spellings accepted by `prim` in the grammar.
@@ -318,6 +368,14 @@ impl<'source> Cursor<'source> {
                     return Ok(Primary::Scalar { kind, range });
                 }
                 match keyword.as_str() {
+                    "keysof" | "valuesof" => {
+                        let projection = if keyword == "keysof" {
+                            QueryProjection::Keys
+                        } else {
+                            QueryProjection::Values
+                        };
+                        self.parse_query(projection).map(Primary::Query)
+                    }
                     "path" => {
                         self.skip_whitespace();
                         let category = if self.peek() == Some('<') {
@@ -353,6 +411,111 @@ impl<'source> Cursor<'source> {
                 start,
                 format!("expected a type expression, found `{found}`"),
             )),
+        }
+    }
+
+    fn parse_query(&mut self, projection: QueryProjection) -> Result<FieldQuery, ParseError> {
+        self.expect('<')?;
+        let mut query = FieldQuery {
+            schema: self.read_ident()?,
+            projection,
+            selector: None,
+            scope_accepts: None,
+            shape: None,
+            value_kind_any: Vec::new(),
+            capability: None,
+        };
+        let mut seen = std::collections::BTreeSet::new();
+        loop {
+            self.skip_whitespace();
+            if self.peek() != Some(',') {
+                break;
+            }
+            self.bump();
+            self.skip_whitespace();
+            let offset = self.position;
+            let filter = self.read_ident()?;
+            if !seen.insert(filter.clone()) {
+                return Err(self.error(offset, format!("duplicate query filter `{filter}`")));
+            }
+            self.expect('=')?;
+            match filter.as_str() {
+                "key" => query.selector = Some(self.parse_query_selector()?),
+                "scope_accepts" => query.scope_accepts = Some(self.read_ident()?),
+                "shape" => {
+                    let shape = self.read_ident()?;
+                    query.shape = Some(match shape.as_str() {
+                        "scalar" => QueryShape::Scalar,
+                        "block" => QueryShape::Block,
+                        _ => {
+                            return Err(
+                                self.error(offset, format!("unknown query shape `{shape}`"))
+                            );
+                        }
+                    });
+                }
+                "value_kind_any" => {
+                    self.expect('(')?;
+                    loop {
+                        let kind_offset = self.position;
+                        let kind = self.read_ident()?;
+                        query.value_kind_any.push(match kind.as_str() {
+                            "int" => QueryValueKind::Int,
+                            "float" => QueryValueKind::Float,
+                            "bool" => QueryValueKind::Bool,
+                            _ => {
+                                return Err(self.error(
+                                    kind_offset,
+                                    format!("unknown query value kind `{kind}`"),
+                                ));
+                            }
+                        });
+                        self.skip_whitespace();
+                        if self.peek() != Some('|') {
+                            break;
+                        }
+                        self.bump();
+                    }
+                    self.expect(')')?;
+                }
+                "capability" => query.capability = Some(self.read_ident()?),
+                _ => return Err(self.error(offset, format!("unknown query filter `{filter}`"))),
+            }
+        }
+        self.expect('>')?;
+        if projection == QueryProjection::Values && query.selector.is_none() {
+            return Err(self.error(self.position, "`valuesof` requires a `key` selector"));
+        }
+        Ok(query)
+    }
+
+    fn parse_query_selector(&mut self) -> Result<QuerySelector, ParseError> {
+        self.skip_whitespace();
+        let offset = self.position;
+        if self.peek() == Some('\'') {
+            let parts = self.parse_literal_parts(true)?;
+            let mut literal = String::new();
+            for part in parts {
+                match part {
+                    LiteralPart::Text(text) => literal.push_str(&text),
+                    LiteralPart::Hole(_) => {
+                        return Err(
+                            self.error(offset, "a query key selector must be a constant literal")
+                        );
+                    }
+                }
+            }
+            return Ok(QuerySelector::Literal(literal));
+        }
+        let name = self.read_ident()?;
+        self.skip_whitespace();
+        if name == "sibling" && self.peek() == Some('<') {
+            self.bump();
+            let sibling = self.read_ident()?;
+            self.expect('>')?;
+            Ok(QuerySelector::Sibling(sibling))
+        } else {
+            Ok(QuerySelector::Literal(name))
         }
     }
 
@@ -975,5 +1138,96 @@ mod tests {
             parse_template("owner").expect("parses"),
             vec![LiteralPart::Text("owner".to_owned())]
         );
+    }
+    #[test]
+    fn schema_field_queries_parse() {
+        assert_eq!(
+            one("keysof<source>"),
+            Primary::Query(FieldQuery {
+                schema: "source".into(),
+                projection: QueryProjection::Keys,
+                selector: None,
+                scope_accepts: None,
+                shape: None,
+                value_kind_any: vec![],
+                capability: None,
+            })
+        );
+        let Primary::Query(query) = one(
+            "keysof<source, scope_accepts=country, shape=scalar, value_kind_any=(int|float|bool), capability=exportable>",
+        ) else {
+            panic!("query");
+        };
+        assert_eq!(query.scope_accepts.as_deref(), Some("country"));
+        assert_eq!(query.shape, Some(QueryShape::Scalar));
+        assert_eq!(
+            query.value_kind_any,
+            vec![
+                QueryValueKind::Int,
+                QueryValueKind::Float,
+                QueryValueKind::Bool
+            ]
+        );
+        assert_eq!(query.capability.as_deref(), Some("exportable"));
+    }
+
+    #[test]
+    fn query_literal_and_sibling_selectors_parse() {
+        for (source, expected) in [
+            (
+                "valuesof<source,key=selected>",
+                QuerySelector::Literal("selected".into()),
+            ),
+            (
+                "valuesof<source,key='selected.key'>",
+                QuerySelector::Literal("selected.key".into()),
+            ),
+            (
+                "valuesof<source,key=sibling<on_trigger>,shape=scalar>",
+                QuerySelector::Sibling("on_trigger".into()),
+            ),
+        ] {
+            let Primary::Query(query) = one(source) else {
+                panic!("query");
+            };
+            assert_eq!(query.projection, QueryProjection::Values);
+            assert_eq!(query.selector, Some(expected));
+        }
+        assert_eq!(
+            alts("keysof<source> | valuesof<source,key='yes'>")
+                .alternatives
+                .len(),
+            2
+        );
+        assert!(matches!(
+            one("'prefix_{keysof<source>}'"),
+            Primary::Literal(_)
+        ));
+    }
+
+    #[test]
+    fn malformed_query_filters_are_errors() {
+        for source in [
+            "valuesof<source>",
+            "keysof<source,unknown=true>",
+            "keysof<source,shape=scalar,shape=block>",
+            "keysof<source,scope_accepts=country,scope_accepts=province>",
+            "valuesof<source,key=a,key=b>",
+            "keysof<source,capability=exportable,capability=exportable>",
+            "keysof<source,value_kind_any=(int),value_kind_any=(bool)>",
+            "keysof<source,shape=number>",
+            "keysof<source,value_kind_any=(number)>",
+            "keysof<source,value_kind_any=(int|date)>",
+            "keysof<source,value_kind_any=()>",
+            "keysof<source,value_kind_any=int>",
+            "keysof<source,value_kind_any=(int|)>",
+            "valuesof<source,key=sibling<>>",
+            "valuesof<source,key='a_{int}'>",
+            "keysof<source,>",
+            "keysof<source,shape=scalar",
+            "sibling<selected>",
+        ] {
+            assert!(parse(source).is_err(), "{source}");
+        }
     }
 }

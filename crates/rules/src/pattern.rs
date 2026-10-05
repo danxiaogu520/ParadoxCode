@@ -1,5 +1,6 @@
 //! Bounded, cancellable Pattern search shared by rule and script consumers.
 use crate::ir::{Matcher, MatcherId, PatternPart, RulesIr};
+use crate::query::{FieldQuery, NoQueryContext, QueryContext, QueryProjection, QueryState};
 use std::collections::BTreeSet;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -81,6 +82,20 @@ pub fn evaluate(
     budget: &mut SearchBudget<'_>,
     primitive: &mut impl FnMut(MatcherId, &str) -> Option<bool>,
 ) -> Option<bool> {
+    evaluate_with_context(ir, matcher, value, budget, &NoQueryContext, primitive)
+}
+
+/// Evaluates dependent queries with the SAME depth/work/state/cancellation
+/// budget as unions, patterns and source-key dispatch. Primitive semantics stay
+/// with the caller, including scope, definition and workspace interpretation.
+pub fn evaluate_with_context(
+    ir: &RulesIr,
+    matcher: MatcherId,
+    value: &str,
+    budget: &mut SearchBudget<'_>,
+    context: &impl QueryContext,
+    primitive: &mut impl FnMut(MatcherId, &str) -> Option<bool>,
+) -> Option<bool> {
     if !budget.charge(1, 0) {
         return None;
     }
@@ -93,7 +108,7 @@ pub fn evaluate(
         Matcher::Union(items) => {
             let mut result = Some(false);
             for item in items.iter() {
-                match evaluate(ir, *item, value, budget, primitive) {
+                match evaluate_with_context(ir, *item, value, budget, context, primitive) {
                     Some(true) => {
                         result = Some(true);
                         break;
@@ -107,7 +122,10 @@ pub fn evaluate(
             }
             result
         }
-        Matcher::Pattern(parts) => search(ir, parts, value, budget, primitive).matched,
+        Matcher::Pattern(parts) => {
+            search_with_context(ir, parts, value, budget, context, primitive).matched
+        }
+        Matcher::Query(query) => evaluate_query(ir, query, value, budget, context, primitive),
         _ => {
             if budget.charge(value.len(), 0) {
                 primitive(matcher, value)
@@ -117,6 +135,48 @@ pub fn evaluate(
         }
     };
     budget.depth -= 1;
+    result
+}
+
+pub(crate) fn evaluate_query(
+    ir: &RulesIr,
+    query: &FieldQuery,
+    value: &str,
+    budget: &mut SearchBudget<'_>,
+    context: &impl QueryContext,
+    primitive: &mut impl FnMut(MatcherId, &str) -> Option<bool>,
+) -> Option<bool> {
+    if !budget.charge(
+        ir.schema(query.schema).exact.len() + ir.schema(query.schema).patterns.len(),
+        0,
+    ) {
+        return None;
+    }
+    let mut key_matches =
+        |id, text: &str| evaluate_with_context(ir, id, text, budget, context, primitive);
+    let resolution = if query.projection == QueryProjection::Keys && query.selector.is_none() {
+        ir.query_selected_fields_with(query, value, &mut key_matches)
+    } else {
+        ir.query_fields_with(query, context, &mut key_matches)
+    };
+    match resolution.state {
+        QueryState::Deferred => return None,
+        QueryState::Missing | QueryState::Duplicate | QueryState::Invalid => return Some(false),
+        QueryState::Resolved => {}
+    }
+    let mut result = Some(false);
+    for field in resolution.fields {
+        if let Some(projected) = ir.query_projected_matcher(query, field) {
+            match evaluate_with_context(ir, projected, value, budget, context, primitive) {
+                Some(true) => return Some(true),
+                None => result = None,
+                Some(false) => {}
+            }
+        }
+        if budget.limit.is_some() {
+            break;
+        }
+    }
     result
 }
 
@@ -148,7 +208,19 @@ pub fn search(
     budget: &mut SearchBudget<'_>,
     primitive: &mut impl FnMut(MatcherId, &str) -> Option<bool>,
 ) -> SearchResult {
-    search_except(ir, parts, value, budget, primitive, None)
+    search_with_context(ir, parts, value, budget, &NoQueryContext, primitive)
+}
+
+/// Pattern search retaining a physical sibling context for query holes.
+pub fn search_with_context(
+    ir: &RulesIr,
+    parts: &[PatternPart],
+    value: &str,
+    budget: &mut SearchBudget<'_>,
+    context: &impl QueryContext,
+    primitive: &mut impl FnMut(MatcherId, &str) -> Option<bool>,
+) -> SearchResult {
+    search_except(ir, parts, value, budget, context, primitive, None)
 }
 
 /// A source slice is editable only when all accepting paths agree on its holes.
@@ -159,11 +231,31 @@ pub fn unique_search(
     budget: &mut SearchBudget<'_>,
     primitive: &mut impl FnMut(MatcherId, &str) -> Option<bool>,
 ) -> SearchResult {
-    let first = search(ir, parts, value, budget, primitive);
+    unique_search_with_context(ir, parts, value, budget, &NoQueryContext, primitive)
+}
+
+/// Unique accepting-hole proof retaining the same query context in both searches.
+pub fn unique_search_with_context(
+    ir: &RulesIr,
+    parts: &[PatternPart],
+    value: &str,
+    budget: &mut SearchBudget<'_>,
+    context: &impl QueryContext,
+    primitive: &mut impl FnMut(MatcherId, &str) -> Option<bool>,
+) -> SearchResult {
+    let first = search_with_context(ir, parts, value, budget, context, primitive);
     if first.matched != Some(true) {
         return first;
     }
-    let other = search_except(ir, parts, value, budget, primitive, Some(&first.holes));
+    let other = search_except(
+        ir,
+        parts,
+        value,
+        budget,
+        context,
+        primitive,
+        Some(&first.holes),
+    );
     if other.matched == Some(false) {
         first
     } else {
@@ -174,11 +266,13 @@ pub fn unique_search(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn search_except(
     ir: &RulesIr,
     parts: &[PatternPart],
     value: &str,
     budget: &mut SearchBudget<'_>,
+    context: &impl QueryContext,
     primitive: &mut impl FnMut(MatcherId, &str) -> Option<bool>,
     excluded: Option<&[(MatcherId, usize, usize)]>,
 ) -> SearchResult {
@@ -306,7 +400,14 @@ fn search_except(
                 let PatternPart::Hole(matcher) = parts[part] else {
                     unreachable!()
                 };
-                let matched = evaluate(ir, matcher, &value[start..end], budget, primitive);
+                let matched = evaluate_with_context(
+                    ir,
+                    matcher,
+                    &value[start..end],
+                    budget,
+                    context,
+                    primitive,
+                );
                 if matched != Some(false) {
                     if !budget.charge(1, 1) {
                         break;

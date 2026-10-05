@@ -70,7 +70,13 @@ JSON pointer + column within the expression** (for example: `events.json`,
 
 ```ebnf
 expr      = alt { "|" alt } ;
-alt       = prim [ range ] | ctor "<" arg ">" | "path" [ "<" name ">" ] | literal | param ;
+alt       = prim [ range ] | ctor "<" arg ">" | "path" [ "<" name ">" ] | query | literal | param ;
+query     = ("keysof" | "valuesof") "<" name { "," filter } ">" ;
+filter    = "scope_accepts" "=" name | "shape" "=" ("scalar" | "block")
+          | "value_kind_any" "=" "(" kind { "|" kind } ")"
+          | "capability" "=" name | "key" "=" selector ;
+kind      = "int" | "float" | "bool" ;
+selector  = name | literal | "sibling" "<" name ">" ;
 prim      = "scalar" | "int" | "float" | "bool" | "date" | "loc" | "link" | "opaque" ;
 range     = "[" [ number ] ".." [ number ] "]" ;
 ctor      = "ref" | "def" | "enum" | "scope" | "quoted" ;
@@ -142,6 +148,61 @@ Semantic conventions:
   Script text is interpreted only when a Template use consumes it as a script
   fragment; ordinary fields cannot request a secondary script parse. Shape
   variation between scalar and block uses field-array overloads (§3).
+
+### 2.3 Schema field queries
+
+`keysof<schema, ...>` projects the keys of a declared schema's fields and
+ordered patterns. `valuesof<schema, key=selector, ...>` projects the scalar
+value matcher of the selected source field. `valuesof` MUST include `key`.
+These are ordinary scalar matchers, including inside unions and template holes:
+
+- `keysof<modifier, scope_accepts=country>`
+- `keysof<trigger, shape=scalar, value_kind_any=(int|float|bool)>`
+- `valuesof<trigger, key=sibling<on_trigger>, shape=scalar>`
+- `'prefix_{keysof<modifier>}_suffix'`
+
+Queries retain the source field identity, key matcher, value matcher and source
+provenance. They do not create a second enum or symbol namespace. Exact keys,
+ordered dynamic patterns, enum-backed keys, references and template holes use
+the same matching and workspace facts as the source schema. New source fields
+and dynamic members are therefore visible without regenerating member lists.
+
+The filter vocabulary is fixed. Filters are conjunctive; no arbitrary predicates
+or expression evaluation are supported:
+
+- `scope_accepts=S` asks whether actual scope `S` can use the field, using the
+  ordinary compatibility relation. Unrestricted fields are included. The query
+  does not apply the field's `push` or `set` scope effects.
+- `shape=scalar` or `shape=block` selects ordinary field overloads by shape.
+- `value_kind_any=(int|float|bool)` requires at least one known primitive branch
+  from the listed kinds in the scalar value matcher. Union branches and numeric
+  ranges count. `scalar`, `ref`, `enum`, literals and unresolved domains do not
+  imply a numeric or boolean capability. There is no `number` alias.
+- `capability=name` requires that explicit tag in the source field's
+  `capabilities` list. This separates opt-in command support from operand types.
+- `key=selector` selects one source key. A literal selector may be a bare
+  identifier or a quoted constant; template literals are not selectors.
+
+Lookup selects exact overloads of the requested shape before ordered patterns.
+Only then are scope, value-kind and capability filters applied. A rejected exact
+field of that shape MUST NOT reappear through a broader pattern. Dynamic scalar
+and block overloads keep their ordinary shape dispatch. Values are checked using
+the selected source value matcher, including its ranges, references and unions.
+
+`sibling<name>` reads a single direct scalar field in the same script container.
+The name MUST identify a declared exact sibling in that schema, including fields
+from included mixins. It is valid in direct field key/value expressions and
+schema items, and invalid where no such container is declared (for example a
+scope-link expression or an anonymous map/list child's outer fields). Missing,
+duplicate and non-scalar selectors remain distinct invalid states. Unexpanded
+Template arguments or incomplete workspace evidence remain deferred, not valid.
+No ambient `$name`, `$key` or parent-container lookup is introduced.
+
+Unknown schemas, scopes, filters and kind names, repeated filters, selectors in
+unsupported contexts, and cyclic projected-matcher dependencies are compile
+errors. Ordinary recursive block bodies and queries projecting a schema's
+independent literal keys remain valid. The legacy `control.selector_schema`
+compatibility path uses this same field-query evaluator.
 
 ## 3. Schemas
 
@@ -316,7 +377,8 @@ A `def` of type `event.country` grants the `country` subtype;
 `ref<event.country>` accepts only instances explicitly assigned that subtype.
 Subtype entries are empty objects. They do not carry predicates or trait impls.
 
-All schema fields are available regardless of sibling field values. There is
+Field declarations are available regardless of sibling field values; an explicit
+`valuesof` matcher may depend on a same-container selector (§2.3). There is
 no field `when`/`unless` syntax, subtype `when` predicate, or conditional binding
 selection. Type, shape, scope and cardinality checks still apply. Structural
 alternatives based on field counts use `forms` (§3); script control flow is
