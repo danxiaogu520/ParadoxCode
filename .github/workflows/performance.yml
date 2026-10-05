@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
+  # Explicit benchmark validation without adding heavy work to ordinary PRs.
+  push:
+    branches: ['ci/perf-validation/**']
 
 permissions:
   contents: read
@@ -24,3 +27,11 @@ jobs:
           key: perf-stable
       - name: Run optimized benchmark suite
         run: cargo run --locked -p tools -- perf bench --repeat 3
+      - name: Preserve benchmark reports and raw logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: benchmark-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/perf/runs/
+          if-no-files-found: warn
+          retention-days: 14
