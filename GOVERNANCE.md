@@ -43,8 +43,8 @@ Version tags and published releases are immutable. The release workflow uses the
 short-lived `GITHUB_TOKEN`; Marketplace credentials are kept outside the repository and used only
 for the audited manual publishing step. Maintainers follow `RELEASING.md` for every release.
 Candidate preparation has read-only GitHub permissions and creates no formal tag. Complete CI
-receipts may be reused across squash commits with identical tested trees and check definitions;
-the required main check validates that evidence. Formal tags are created only after a candidate's
+receipts must come from successful manual Full CI on the exact reviewed main commit.
+The reduced core merge check and validation-only branch runs cannot authorize a release. Formal tags are created only after a candidate's
 complete payload, remote staging uploads and publication prerequisites pass. Promotion publishes
 the same artifact bytes; formal tag reservation and immutable publication are the final mutations.
 

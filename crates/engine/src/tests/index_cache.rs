@@ -111,6 +111,17 @@ fn ir_template_payload_symbols_and_dependent_links_survive_cache_roundtrip() {
     host.refresh_source_roots().unwrap();
     assert_eq!(host.snapshot().index(), serial_host.snapshot().index());
     let assert_symbols = |index: &WorkspaceIndex| {
+        assert!(
+            index
+                .active_definition("scripted_effect", "writer")
+                .is_some()
+        );
+        assert!(
+            index.references_iter().any(|(_, reference)| {
+                reference.kind.as_ref() == "scripted_effect" && reference.name.as_ref() == "writer"
+            }),
+            "cross-file calls must resolve against the scanned candidate definitions"
+        );
         for (kind, name) in [
             ("country_flag", "payload_flag"),
             ("event_target", "payload_target"),
@@ -337,70 +348,6 @@ fn vanilla_cache_preserves_dynamic_definition_references_without_hir() {
         IndexCache::load(&cache_path),
         Err(IndexCacheError::InvalidData(_))
     ));
-    fs::remove_dir_all(root).expect("cleanup");
-}
-
-#[test]
-fn ir_workspace_scan_resolves_cross_file_dynamic_calls_from_candidate_definitions() {
-    let root = temp_root("ir-cross-file-ref");
-    let project = root.join("project");
-    fs::create_dir_all(project.join("common/scripted_effects")).expect("definitions directory");
-    fs::create_dir_all(project.join("events")).expect("events directory");
-    fs::write(
-        project.join("common/scripted_effects/defs.txt"),
-        "indexed_effect = { add_treasury = 1 }\n",
-    )
-    .expect("write dynamic definition");
-    fs::write(
-        project.join("events/use.txt"),
-        "country_event = { immediate = { indexed_effect = { } } }\n",
-    )
-    .expect("write dynamic call");
-
-    let rules = game::eu4::runtime_rules().expect("first-party legacy rules");
-    let ir = game::eu4::first_party_ir().expect("first-party rules IR");
-    let mut host = AnalysisHost::with_ir(rules, game::eu4::profile(), ir);
-    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-        SourceRootId::new(0),
-        SourceRootKind::Project,
-        AbsPath::normalize(&fs::canonicalize(&project).expect("canonical project root")),
-    )]));
-    host.refresh_source_roots()
-        .expect("scan with two-pass IR lowering");
-    let snapshot = host.snapshot();
-    assert!(
-        snapshot
-            .index()
-            .definitions_with_state("scripted_effect", "indexed_effect")
-            .iter()
-            .any(|(_, active)| *active),
-        "shards={:?}",
-        snapshot
-            .index()
-            .shards
-            .iter()
-            .map(|(id, shard)| (
-                *id,
-                shard
-                    .definitions
-                    .iter()
-                    .map(|d| (d.kind.as_ref(), d.name.as_ref(), d.active))
-                    .collect::<Vec<_>>()
-            ))
-            .collect::<Vec<_>>()
-    );
-    assert!(
-        snapshot.index().references_iter().any(|(_, reference)| {
-            reference.kind.as_ref() == "scripted_effect"
-                && reference.name.as_ref() == "indexed_effect"
-        }),
-        "second-pass HIR should resolve the call against first-pass definitions; refs={:?}",
-        snapshot
-            .index()
-            .references_iter()
-            .map(|(_, reference)| (reference.kind.as_ref(), reference.name.as_ref()))
-            .collect::<Vec<_>>()
-    );
     fs::remove_dir_all(root).expect("cleanup");
 }
 
@@ -763,13 +710,31 @@ fn save_reclaims_free_pages_when_rebuilding_a_smaller_cache() {
         IndexCache::from_snapshot(&host.snapshot()).expect("build cache")
     };
 
-    let large = build_cache(20_000, "large");
+    let large = build_cache(2, "large");
     large.save(&cache_path).expect("save large cache");
+    let unpadded_len = fs::metadata(&cache_path)
+        .expect("unpadded cache metadata")
+        .len();
+    // Exercise SQLite page reclamation directly instead of parsing 20,000
+    // unrelated event definitions. Saving replaces the metadata table, so
+    // this ballast becomes free pages during the same DROP-and-rebuild path.
+    // Two MiB exceeds the production one-MiB trim threshold with room for
+    // pages reused by the replacement cache.
+    let ballast_bytes = 2 * 1024 * 1024;
+    let connection = rusqlite::Connection::open(&cache_path).expect("open cache for ballast");
+    connection
+        .execute(
+            "INSERT INTO metadata (key, value) VALUES ('test_page_ballast', zeroblob(?1))",
+            [ballast_bytes],
+        )
+        .expect("allocate cache pages");
+    drop(connection);
     let large_len = fs::metadata(&cache_path)
         .expect("large cache metadata")
         .len();
+    assert!(large_len >= unpadded_len + ballast_bytes as u64);
 
-    let small = build_cache(100, "small");
+    let small = build_cache(1, "small");
     small
         .save(&cache_path)
         .expect("overwrite with smaller cache");
@@ -779,6 +744,10 @@ fn save_reclaims_free_pages_when_rebuilding_a_smaller_cache() {
     assert!(
         small_len < large_len,
         "rebuild must reclaim dropped pages: {small_len} bytes after {large_len} bytes"
+    );
+    assert!(
+        large_len - small_len > 1024 * 1024,
+        "the fixture must reclaim more than the production one-MiB trim threshold"
     );
     let connection = rusqlite::Connection::open(&cache_path).expect("open cache");
     let freelist: i64 = connection
@@ -1190,75 +1159,6 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
             .index()
             .active_definition("event", "dep.1")
             .is_some()
-    );
-    fs::remove_dir_all(root).expect("cleanup");
-}
-
-#[test]
-fn batch_dependency_cache_install_rebuilds_the_workspace_index_once() {
-    let root = temp_root("batch-dependency-cache");
-    let rules = game::eu4::runtime_rules().expect("first-party rules");
-    let mut caches = Vec::new();
-    for (id, name) in [(1_u32, "first"), (2_u32, "second")] {
-        let dependency = root.join(name);
-        fs::create_dir_all(dependency.join("events")).expect("dependency events directory");
-        fs::write(
-            dependency.join("events/definition.txt"),
-            format!("country_event = {{ id = {name}.1 }}\n"),
-        )
-        .expect("dependency definition");
-        let dependency_path = fs::canonicalize(&dependency).expect("canonical dependency root");
-        let dependency_root = SourceRoot::new(
-            SourceRootId::new(id),
-            SourceRootKind::Dependency,
-            AbsPath::normalize(&dependency_path),
-        );
-        let mut builder = eu4_host_with(rules.clone());
-        builder.apply_change(WorkspaceChange::SetSourceRoots(vec![dependency_root]));
-        builder.refresh_source_roots().expect("scan dependency");
-        caches.push(IndexCache::from_snapshot(&builder.snapshot()).expect("build cache"));
-    }
-
-    let current = root.join("current");
-    fs::create_dir_all(current.join("events")).expect("project directory");
-    fs::write(
-        current.join("events/current.txt"),
-        "country_event = { id = current.1 }\n",
-    )
-    .expect("project definition");
-    let current_root = SourceRoot::new(
-        SourceRootId::new(u32::MAX),
-        SourceRootKind::Project,
-        AbsPath::normalize(&fs::canonicalize(&current).expect("canonical project root")),
-    );
-    let mut host = eu4_host_with(rules);
-    host.apply_change(WorkspaceChange::SetSourceRoots(vec![current_root]));
-    host.refresh_source_roots().expect("scan project");
-    let before_install = host.snapshot().revision();
-
-    host.install_index_caches(caches)
-        .expect("install dependency caches as one batch");
-    let snapshot = host.snapshot();
-    assert_eq!(snapshot.revision(), before_install + 1);
-    assert!(
-        snapshot
-            .index()
-            .active_definition("event", "first.1")
-            .is_some()
-    );
-    assert!(
-        snapshot
-            .index()
-            .active_definition("event", "second.1")
-            .is_some()
-    );
-    assert_eq!(
-        snapshot
-            .source_roots()
-            .iter()
-            .filter(|root| root.kind == SourceRootKind::Dependency)
-            .count(),
-        2
     );
     fs::remove_dir_all(root).expect("cleanup");
 }

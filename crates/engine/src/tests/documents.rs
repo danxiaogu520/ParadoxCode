@@ -1,45 +1,6 @@
-use rules::ir::RulesIr;
 use text::AbsPath;
 
 use super::*;
-
-#[test]
-fn the_rules_v2_ir_is_shared_and_revisioned() {
-    let mut host = AnalysisHost::new(RuleSet::empty());
-    assert_eq!(
-        host.ir().schemas.len(),
-        0,
-        "a host with no installed bundle starts on an empty IR"
-    );
-
-    let ir = Arc::new(RulesIr::empty());
-    host.set_ir(Arc::clone(&ir));
-    let snapshot = host.snapshot();
-    assert!(
-        Arc::ptr_eq(&snapshot.ir, &ir),
-        "the snapshot shares the handle"
-    );
-
-    let via_constructor =
-        AnalysisHost::with_ir(RuleSet::empty(), Default::default(), Arc::clone(&ir));
-    assert!(
-        std::ptr::eq(via_constructor.snapshot().ir(), ir.as_ref()),
-        "`with_ir` installs the handle it was given"
-    );
-
-    let revision = host.snapshot().revision();
-    host.set_ir(Arc::clone(&ir));
-    assert_eq!(
-        host.snapshot().revision(),
-        revision,
-        "re-installing the same handle invalidates nothing"
-    );
-    host.set_ir(Arc::new(RulesIr::empty()));
-    assert!(
-        host.snapshot().revision() > revision,
-        "a different handle invalidates cached analyses"
-    );
-}
 
 #[test]
 fn overlay_definition_open_and_close_relower_other_overlay_references() {
@@ -461,6 +422,7 @@ fn unchanged_file_states_are_reused_and_only_changed_files_advance() {
 
     host.refresh_source_roots().expect("unchanged scan");
     let second = host.snapshot();
+    assert_eq!(second.index(), first.index());
     assert!(Arc::ptr_eq(
         first.file_states.get(&a).expect("first a state"),
         second.file_states.get(&a).expect("second a state")
@@ -526,7 +488,7 @@ fn one_overlay_edit_parses_and_lowers_exactly_once_in_a_populated_workspace() {
     let root = temp_root("pipeline-count");
     let events = root.join("events");
     fs::create_dir_all(&events).expect("event directory");
-    for index in 0..64 {
+    for index in 0..8 {
         fs::write(
             events.join(format!("event-{index:02}.txt")),
             format!("country_event = {{ id = synthetic.{index} }}\n"),

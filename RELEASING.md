@@ -29,15 +29,20 @@ enter Actions or public releases. Marketplace publication remains a separate man
    failure after bounded retries.
 4. Run local Vanilla acceptance when semantics change. Keep game-derived output local and
    reduce defects to repository-owned fixtures.
-5. Merge only after `Conclusion` succeeds. A main push runs a lightweight evidence check:
-   matching tested source tree, check definitions, resolved Rust toolchain and successful
-   same-repository PR evidence allow reuse. Otherwise it runs the complete quality suite.
+5. Merge only after the reduced core `Conclusion` succeeds. Before preparing a release, dispatch
+   Full CI on main and wait for **Full conclusion** to succeed:
 
-The complete CI suite retains an attempt-specific receipt and the validated VSIX for 90 days. Receipts
-include the actual checked-out merge tree, workflow/run identity, coverage and file digest.
-Failed, cancelled, incomplete, forked, expired or mismatched evidence is not reused. CI jobs
-cannot be marked successful merely because they were skipped. Rerun the complete workflow
-when an attempt lacks its required artifacts; receipts never borrow an older failed attempt.
+   ```sh
+   gh workflow run ci.yml --ref main
+   ```
+
+Full CI must test the exact main commit selected for the candidate. If main changes, validate the
+newer commit or select the already validated exact SHA, subject to the control-definition match.
+Full CI retains all quality jobs, an attempt-specific receipt and validated VSIX for 90 days.
+Receipts bind source/tree, workflow/run, coverage and digest. Quick CI and validation-only branch
+pushes cannot provide release authorization. Failed, cancelled, incomplete, forked, expired,
+non-main or mismatched evidence is rejected. Skipped jobs are never sufficient. Rerun complete
+manual Full CI if required artifacts are missing; receipts cannot borrow another attempt.
 
 ## Build and seal a candidate
 
@@ -89,7 +94,12 @@ receives no publication credential.
 
 It creates or resumes a draft under `candidate-RUN-ATTEMPT`, outside the formal `v*` namespace.
 It uploads the unchanged verified files and compares uploaded names, sizes, GitHub digests,
-source identity and notes. This staging draft is never publicly published.
+source identity and notes. This staging draft is never publicly published. Promotion then refreshes
+the current successful Full CI and candidate attempts for the exact source, and verifies the VSIX
+bytes against its CI receipt, before reserving a formal tag. Invalidated evidence stops publication.
+
+Do not rerun Full CI or candidate preparation during promotion. GitHub has no atomic check-and-tag
+operation; this final refresh narrows that race but cannot eliminate it.
 
 Only after every upload and verification succeeds does it create/push the annotated formal tag
 for the exact candidate commit, then reassign the prepared draft to that tag and publish it as

@@ -250,24 +250,3 @@ pub(crate) fn stale_cache_fixture(container: &std::path::Path) -> std::path::Pat
         .unwrap();
     cache_path
 }
-
-/// Builds a cache whose rule hash matches the embedded first-party rules.
-pub(crate) fn valid_cache_fixture(container: &std::path::Path) -> std::path::PathBuf {
-    let workspace = container.join("workspace");
-    let vanilla = container.join("vanilla");
-    fs::create_dir_all(&workspace).expect("workspace directory");
-    fs::create_dir_all(&vanilla).expect("Vanilla directory");
-    let vanilla = dunce::canonicalize(&vanilla).expect("canonical Vanilla directory");
-    let cache_path = container.join("vanilla.pdcindex");
-
-    let mut host = first_party_host();
-    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-        SourceRootId::new(0),
-        SourceRootKind::Vanilla,
-        AbsPath::normalize(&vanilla),
-    )]));
-    host.refresh_source_roots().expect("scan Vanilla");
-    let cache = IndexCache::from_snapshot(&host.snapshot()).expect("cache");
-    cache.save(&cache_path).expect("save cache");
-    cache_path
-}

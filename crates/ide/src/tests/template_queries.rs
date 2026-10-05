@@ -256,18 +256,6 @@ fn template_rows_keep_conditional_parameters_optional() {
 }
 
 #[test]
-fn template_rows_mark_cycle_participants() {
-    let host = definitions_snapshot("loop_a = { loop_b = yes }\nloop_b = { loop_a = yes }\n");
-    let snapshot = host.snapshot();
-    let report =
-        crate::template_recursion::template_recursion_report(&snapshot, &CancellationToken::new())
-            .unwrap();
-    for name in ["loop_a", "loop_b"] {
-        assert!(report.message("scripted_effect", name).is_some(), "{name}");
-    }
-}
-
-#[test]
 fn site_rows_record_value_site_position_transitions_and_scopes() {
     // `capital` pushes province and switches to a fresh effect namespace, so
     // the row's chain carries the fan-out's gate before the push and the

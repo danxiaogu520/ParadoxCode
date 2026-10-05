@@ -122,87 +122,6 @@ fn grouped_localisation_preview_map_keeps_sorted_lookup_and_replacement_semantic
 }
 
 #[test]
-fn bulk_index_build_retains_every_shard_and_definition() {
-    let first_file = SourceFileId::new(1);
-    let second_file = SourceFileId::new(2);
-    let range = TextRange::new(0, 3).expect("range");
-    let shards = [
-        FileIndexShard {
-            file_id: first_file,
-            definitions: vec![Definition {
-                kind: "event".into(),
-                name: "shared.1".into(),
-                file_id: first_file,
-                range,
-                selection_range: range,
-                active: true,
-            }],
-            references: Vec::new(),
-            dynamic_definitions: Vec::new(),
-            definition_attributes: Vec::new(),
-            flag_writes: Vec::new(),
-            reference_coverage_known: true,
-            syntax_error_count: 0,
-        },
-        FileIndexShard {
-            file_id: second_file,
-            definitions: vec![Definition {
-                kind: "event".into(),
-                name: "shared.1".into(),
-                file_id: second_file,
-                range,
-                selection_range: range,
-                active: true,
-            }],
-            references: Vec::new(),
-            dynamic_definitions: Vec::new(),
-            definition_attributes: Vec::new(),
-            flag_writes: Vec::new(),
-            reference_coverage_known: true,
-            syntax_error_count: 0,
-        },
-    ];
-
-    let index = WorkspaceIndex::from_shards(shards);
-
-    assert!(index.shard(first_file).is_some());
-    assert!(index.shard(second_file).is_some());
-    assert_eq!(index.definitions("event", "SHARED.1").len(), 2);
-}
-
-#[test]
-fn parallel_file_state_materialization_is_deterministic() {
-    let root = temp_root("parallel");
-    let events = root.join("events");
-    fs::create_dir_all(&events).expect("event directory");
-    for index in 0..64 {
-        fs::write(
-            events.join(format!("event-{index:02}.txt")),
-            format!("country_event = {{ id = parallel.{index} }}\n"),
-        )
-        .expect("event fixture");
-    }
-
-    let mut host = eu4_host();
-    host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
-        SourceRoot::new(
-            SourceRootId::new(1),
-            SourceRootKind::Project,
-            AbsPath::normalize(&root),
-        ),
-    ]));
-    let report = host.refresh_source_roots().expect("parallel scan");
-    assert_eq!(report.indexed_files, 64);
-    let first = host.snapshot();
-    assert_eq!(first.index().definitions("event", "parallel.63").len(), 1);
-
-    host.refresh_source_roots()
-        .expect("unchanged parallel scan");
-    assert_eq!(host.snapshot().index(), first.index());
-    fs::remove_dir_all(root).expect("cleanup");
-}
-
-#[test]
 fn type_per_file_definition_is_emitted_once_without_generic_pseudo_members() {
     let root = temp_root("type-per-file");
     let countries = root.join("common/countries");
@@ -431,6 +350,10 @@ fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
             syntax_error_count: 0,
         },
     ]);
+    // Bulk construction retains both shards and case-insensitive lookup entries.
+    assert!(index.shard(first_file).is_some());
+    assert!(index.shard(second_file).is_some());
+    assert_eq!(index.definitions("event", "SHARED.1").len(), 2);
     let tied = BTreeMap::from([(first_file, 10), (second_file, 10)]);
     index.resolve_priorities(&tied);
     assert_eq!(

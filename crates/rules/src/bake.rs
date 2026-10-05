@@ -42,10 +42,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn first_party_bake_is_reproducible_and_round_trips() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4");
-        let first = compile(&root).expect("bake");
-        let second = compile(&root).expect("rebake");
+    fn representative_bake_is_reproducible_and_round_trips() {
+        // Corpus acceptance remains covered by lower::tests and first_party_ir.
+        // Reproducible serialization needs representative fields, not two full
+        // first-party corpus compilations for each test run.
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path();
+        std::fs::write(
+            root.join("game.json"),
+            r#"{"game_id":"test","source_format_version":14}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("rules.json"),
+            r#"{
+                "types": {"event": {}},
+                "files": {"events": {"path": "events", "ext": "txt", "root": "on_actions_file"}},
+                "schemas": {"on_actions_file": {"fields": {
+                    "id": {"value": "def<event>", "card": "1"},
+                    "enabled": {"value": "bool", "card": "0..1"}
+                }}}
+            }"#,
+        )
+        .unwrap();
+        let first = compile(root).expect("bake");
+        let second = compile(root).expect("rebake");
         assert_eq!(first.ir.fingerprint(), second.ir.fingerprint());
         assert_eq!(first.bytes, second.bytes);
         let ir = crate::ir::RulesIr::from_baked(&first.bytes).expect("decode");

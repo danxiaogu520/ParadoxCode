@@ -9,9 +9,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Main CI reuses successful same-repository PR evidence when the tested source tree,
-  check definitions and resolved Rust toolchain match. Missing or mismatched evidence
-  runs the complete suite; the required Conclusion check still verifies coverage.
+- PR and main CI use a reduced Linux core gate targeting roughly two-minute feedback. Full CI
+  remains a pre-release gate targeting roughly five minutes with a smaller representative suite,
+  bounded stress fixtures and modest test optimization. Peripheral scenario matrices are narrower;
+  core behavioral and release-integrity coverage remains. Linux runs the full maintained Rust suite;
+  Windows runs platform-focused regressions and native LSP smoke instead of duplicate full unit parity.
+  Constant Full CI planning no longer builds a Rust control binary before starting actual checks.
+- Full release evidence must come from manual CI on the exact main source commit. Promotion
+  refreshes CI/candidate attempts after staging and binds VSIX bytes to the accepted receipt before
+  formal tag reservation. Fast checks and validation-only branches cannot authorize release.
 - Release candidates build and verify the complete platform inventory before creating
   a formal tag. Publication promotes the sealed payload unchanged, reuses the CI VSIX,
   and resumes matching draft uploads without replacing published assets. Formal tag reservation
