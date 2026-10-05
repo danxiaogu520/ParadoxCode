@@ -47,16 +47,14 @@ jobs:
       full: ${{ steps.plan.outputs.full }}
       reuse_run: ${{ steps.plan.outputs.reuse_run }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      # Full CI always selects every required quality job; no source lookup or
+      # Rust build is needed to emit this constant decision. Receipt validation
+      # below still requires each real quality job to succeed.
       - name: Select complete CI
         id: plan
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: cargo run --locked -p tools --no-default-features -- ci plan
+        run: |
+          echo "full=true" >> "$GITHUB_OUTPUT"
+          echo "reuse_run=0" >> "$GITHUB_OUTPUT"
 
   workflow-lint:
     needs: plan
@@ -122,7 +120,14 @@ jobs:
   rust:
     needs: plan
     if: needs.plan.outputs.full == 'true'
-    name: Rust tests (${{ matrix.os }})
+    name: Rust validation (${{ matrix.os }})
+    env:
+      # Linux runs the complete suite; Windows reuses unoptimized dependency
+      # builds for representative platform tests and a real native LSP binary.
+      CARGO_PROFILE_TEST_OPT_LEVEL: ${{ matrix.os == 'windows-latest' && '0' || '1' }}
+      CARGO_PROFILE_TEST_DEBUG: 0
+      CARGO_PROFILE_DEV_OPT_LEVEL: 0
+      CARGO_PROFILE_DEV_DEBUG: 0
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
@@ -140,14 +145,48 @@ jobs:
       - uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
         with:
           tool: nextest
-      # Full CI covers correctness. The optimized benchmark
-      # suite runs in the scheduled/manual performance workflow.
-      # Clippy already type-checks all targets with the same stable toolchain;
-      # nextest compiles every tested target. Avoid another cold metadata build.
-      # nextest runs unit and integration tests; doc tests need libtest (the
-      # workspace currently has none — this step keeps them covered if added).
-      - run: cargo nextest run --locked --workspace --all-features --no-fail-fast --hide-progress-bar
-      - run: cargo test --locked --workspace --all-features --doc
+      # The complete unit/integration/doc suite stays on Linux. Windows checks
+      # platform boundaries plus a real executable, rather than rebuilding an
+      # optimized copy of every analyzer test target. Release-candidate builds
+      # and binary validation on all five supported targets remain separate.
+      - name: Complete Rust suite (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo nextest run --locked --workspace --all-features --no-fail-fast --hide-progress-bar
+      - name: Complete Rust doctests (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo test --locked --workspace --all-features --doc
+      - name: Representative parser, text and encoding tests (Windows)
+        if: matrix.os == 'windows-latest'
+        run: cargo test --locked -p parser -p text -p transcode --lib
+      - name: Representative path, cache and filesystem regressions (Windows)
+        if: matrix.os == 'windows-latest'
+        run: >-
+          cargo nextest run --locked -p pdc -p engine --lib
+          --no-fail-fast --hide-progress-bar -E '
+          (package(pdc) & (
+          test(uri_round_trip_preserves_unicode_and_spaces)
+          | test(pdcloc_uris_resolve_to_the_backing_file_path)
+          | test(file_uris_decode_client_spelling_variants_identically)
+          | test(unc_paths_round_trip_through_authority_uris)
+          | test(relative_paths_have_no_file_uri)
+          | test(windows_file_uri_normalizes_extended_canonical_paths)
+          | test(windows_file_uri_normalizes_verbatim_unc_paths)
+          | test(memory_transport_runs_real_json_rpc_lifecycle_and_sync)
+          | test(editor_options_load_ordered_dependencies_and_keep_them_read_only)
+          | test(automatic_vanilla_setup_builds_cache_and_records_single_attempt)
+          | test(automatic_discovery_resolves_multiple_candidates_deterministically)
+          )) | (package(engine) & (
+          test(persistent_vanilla_cache_round_trips_and_is_never_rescanned)
+          | test(refreshed_cache_reindexes_changed_files_and_drops_deleted_ones)
+          | test(eu4_legacy_windows1252_text_is_decoded_before_indexing)
+          | test(physical_path_lookup_follows_scan_and_targeted_disk_changes)
+          ))'
+      - name: Build native validation binaries (Windows)
+        if: matrix.os == 'windows-latest'
+        run: cargo build --locked -p pdc -p tools --no-default-features --bins
+      - name: Real native LSP smoke (Windows)
+        if: matrix.os == 'windows-latest'
+        run: target/debug/tools.exe ci candidate-smoke --binary target/debug/paradoxcode.exe
       - name: Install cargo-machete
         if: matrix.os == 'ubuntu-latest'
         uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2

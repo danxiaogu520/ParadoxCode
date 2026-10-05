@@ -112,8 +112,12 @@ can otherwise reach main.
 [Full CI](.github/workflows/ci.yml) is manually dispatched on the exact reviewed main commit before
 release preparation. It retains cross-platform quality jobs, source-bound receipts and validated
 VSIX artifacts. Modest test optimization and bounded fixtures target roughly five-minute feedback,
-including setup, without guaranteeing cold-cache or hosted-runner timing. Tests remain isolated
-in nextest processes. CI-only profiles leave development and release optimization unchanged.
+including setup, without guaranteeing cold-cache or hosted-runner timing. Linux runs the complete
+maintained Rust suite in isolated nextest processes. Windows runs parser/text/encoding tests,
+selected URI/UNC/Unicode, cache, disk and lifecycle regressions, and a real-binary LSP smoke test.
+It deliberately no longer repeats every analyzer unit test or doctest on Windows. Full Windows
+unit parity remains available locally. Windows validation uses unoptimized test/build profiles;
+Linux tests use modest optimization. CI-only overrides leave development and releases unchanged.
 
 Test selection removes repeated file-type completion matrices, peripheral EU4 rule examples,
 detailed trace/cache-progress variants, and duplicate semantic transport examples. Goldens, core

@@ -12,7 +12,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - PR and main CI use a reduced Linux core gate targeting roughly two-minute feedback. Full CI
   remains a pre-release gate targeting roughly five minutes with a smaller representative suite,
   bounded stress fixtures and modest test optimization. Peripheral scenario matrices are narrower;
-  core behavioral, cross-platform and release-integrity coverage remains.
+  core behavioral and release-integrity coverage remains. Linux runs the full maintained Rust suite;
+  Windows runs platform-focused regressions and native LSP smoke instead of duplicate full unit parity.
+  Constant Full CI planning no longer builds a Rust control binary before starting actual checks.
 - Full release evidence must come from manual CI on the exact main source commit. Promotion
   refreshes CI/candidate attempts after staging and binds VSIX bytes to the accepted receipt before
   formal tag reservation. Fast checks and validation-only branches cannot authorize release.
