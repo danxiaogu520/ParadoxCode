@@ -111,6 +111,39 @@ fn safe_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Parse Cargo's human-readable output without letting terminal styling become
+/// part of target identities or metrics. Keep the original log untouched.
+fn bench_metrics(text: &str) -> Result<BTreeMap<String, f64>, String> {
+    let ansi = regex::Regex::new(r"\x1b\[[0-?]*[ -/]*[@-~]").unwrap();
+    let text = ansi.replace_all(text, "");
+    let pattern = regex::Regex::new(r"^\s*(.+?):\s*([0-9]+(?:\.[0-9]+)?) ms\s*$").unwrap();
+    let bench_name =
+        regex::Regex::new(r"^Running\s+(?:.*[/\\])?benches[/\\]([^/\\]+)\.rs\s+\(").unwrap();
+    let mut name = None;
+    let mut metrics = BTreeMap::new();
+
+    for line in text.lines().map(str::trim) {
+        if line.starts_with("Running ") || line.starts_with("Running\t") {
+            // A different Cargo target must not inherit the preceding bench's
+            // identity if its header is unrecognized (for example a unit test).
+            name = bench_name.captures(line).map(|c| c[1].to_owned());
+        }
+
+        if let Some(c) = pattern.captures(line) {
+            let name = name
+                .as_ref()
+                .ok_or("benchmark metric has no target identity")?;
+            let key = format!("{name}/{}", c[1].trim());
+            let value = c[2].parse::<f64>().map_err(|e| e.to_string())?;
+            if metrics.insert(key.clone(), value).is_some() {
+                return Err(format!("duplicate benchmark metric {key}"));
+            }
+        }
+    }
+
+    Ok(metrics)
+}
+
 fn bench(config: &Config, args: &Args, output: &Path) -> Result<Value, String> {
     fs::create_dir_all(output).map_err(|e| e.to_string())?;
 
@@ -124,10 +157,6 @@ fn bench(config: &Config, args: &Args, output: &Path) -> Result<Value, String> {
     } else {
         args.forwarded.clone()
     };
-
-    let pattern = regex::Regex::new(r"^\s*(.+?):\s*([0-9]+(?:\.[0-9]+)?) ms\s*$").unwrap();
-
-    let bench_name = regex::Regex::new(r"Running benches[/\\]([^ .]+)").unwrap();
 
     let mut metrics = BTreeMap::<String, Vec<f64>>::new();
 
@@ -156,34 +185,13 @@ fn bench(config: &Config, args: &Args, output: &Path) -> Result<Value, String> {
         }
 
         if pass > 0 {
-            let mut name = String::new();
-
-            let mut measured = BTreeSet::new();
-
-            for line in text.lines() {
-                if let Some(c) = bench_name.captures(line) {
-                    name = c[1].into();
-                }
-
-                if let Some(c) = pattern.captures(line) {
-                    let key = format!("{name}/{}", c[1].trim());
-
-                    if name.is_empty() {
-                        return Err("benchmark metric has no target identity".into());
-                    }
-
-                    if !measured.insert(key.clone()) {
-                        return Err(format!("duplicate benchmark metric {key}"));
-                    }
-
-                    metrics
-                        .entry(key)
-                        .or_default()
-                        .push(c[2].parse::<f64>().map_err(|e| e.to_string())?);
-                }
-            }
+            let measured =
+                bench_metrics(&text).map_err(|error| format!("{error}; {}", path.display()))?;
 
             eprintln!("benchmark pass {pass}/{repeat}: {} metrics", measured.len());
+            for (key, value) in measured {
+                metrics.entry(key).or_default().push(value);
+            }
         }
     }
 
@@ -862,5 +870,67 @@ process::run(command.current_dir(&config.root))?;
 Ok(output.display().to_string())}
 
         _=>Err(format!("unknown perf command: {name}\n{}",super::HELP)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::bench_metrics;
+
+    #[test]
+    fn benchmark_metrics_accept_plain_and_colored_cargo_output() {
+        let plain = "     Running benches/index_cache.rs (target/release/deps/index_cache-123)\nload: 1.25 ms\n     Running benches/synthetic_workspace.rs (target/release/deps/synthetic_workspace-456)\nload: 2 ms\n";
+        // Cargo colors `Running` separately, placing a reset before ` benches/`.
+        let colored = plain
+            .replace("Running", "\x1b[1m\x1b[92mRunning\x1b[0m")
+            .replace("load:", "\x1b[32mload:\x1b[0m")
+            .replace('\n', "\r\n");
+        let expected = std::collections::BTreeMap::from([
+            ("index_cache/load".to_owned(), 1.25),
+            ("synthetic_workspace/load".to_owned(), 2.0),
+        ]);
+        assert_eq!(bench_metrics(plain).unwrap(), expected);
+        assert_eq!(bench_metrics(&colored).unwrap(), expected);
+    }
+
+    #[test]
+    fn benchmark_metrics_accept_platform_paths_and_spacing() {
+        for path in [
+            "benches/fixture.rs",
+            "benches\\fixture.rs",
+            "crates/engine/benches/fixture.rs",
+            "C:\\repo with spaces\\benches\\fixture.rs",
+        ] {
+            let log =
+                format!("  Running\t{path} (target/release/deps/fixture-123)\n load: 3.5 ms\n");
+            assert_eq!(bench_metrics(&log).unwrap()["fixture/load"], 3.5);
+        }
+    }
+
+    #[test]
+    fn benchmark_metrics_reject_missing_or_stale_target_identity() {
+        for log in [
+            "load: 1 ms\n",
+            "Running benches/fixture.rs (target/release/deps/fixture-123)\nload: 1 ms\nRunning unittests src/lib.rs (target/release/deps/lib-456)\nother: 2 ms\n",
+        ] {
+            assert_eq!(
+                bench_metrics(log).unwrap_err(),
+                "benchmark metric has no target identity"
+            );
+        }
+    }
+
+    #[test]
+    fn benchmark_metrics_reject_duplicate_metrics() {
+        let log = "Running benches/fixture.rs (target/release/deps/fixture-123)\nload: 1 ms\nload: 2 ms\n";
+        assert_eq!(
+            bench_metrics(log).unwrap_err(),
+            "duplicate benchmark metric fixture/load"
+        );
+    }
+
+    #[test]
+    fn benchmark_metrics_do_not_invent_measurements() {
+        assert!(bench_metrics("Finished `bench` profile\nRunning benches/fixture.rs (target/release/deps/fixture-123)\n").unwrap().is_empty());
     }
 }
