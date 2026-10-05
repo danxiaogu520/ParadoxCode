@@ -1,4 +1,3 @@
-pub(crate) use crate::initialize::InitializeCallbacks;
 pub(crate) use crate::{
     AutoVanillaConfiguration, CancellationToken, DiagnosticsCommit, DocumentId, FileUri,
     INVALID_PARAMS, InFlightInitialize, InFlightRequest, IndexCacheLoadRequest,
@@ -6,7 +5,7 @@ pub(crate) use crate::{
     MAX_LSP_HEADER_BYTES, MAX_LSP_MESSAGE_BYTES, REQUEST_CANCELLED, RequestId, ResolvedSourceRoots,
     ServerState, apply_user_vanilla_configuration, bounded_results,
     cancel_initialize_from_notification, cancel_request_from_notification, changed_document_len,
-    diagnostic_result_counts, prepare_initialize_candidate, read_message, resolve_source_roots,
+    diagnostic_result_counts, read_message, resolve_source_roots,
     run_auto_vanilla_setup_with_options, run_index_cache_load_with_options,
     strip_snippet_placeholders,
 };

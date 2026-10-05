@@ -21,6 +21,13 @@ permissions:
 # for flaky network, and short backtraces for failing tests.
 env:
   CARGO_INCREMENTAL: 0
+  # Optimize test hot paths modestly; opt-level 0 repeatedly walks the full IR
+  # too slowly, while opt-level 3 makes cold compilation dominate. Development
+  # binaries here are validation tools, not performance measurements.
+  CARGO_PROFILE_DEV_OPT_LEVEL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_PROFILE_TEST_OPT_LEVEL: 1
+  CARGO_PROFILE_TEST_DEBUG: 0
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
   CI: 1

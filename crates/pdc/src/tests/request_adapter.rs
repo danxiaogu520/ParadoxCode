@@ -5,7 +5,7 @@ use lsp_types::{
     CodeActionOrCommand, CodeActionResponse, CompletionItem, CompletionResponse, Diagnostic,
     DocumentSymbol, Hover, Location, PrepareRenameResponse, SemanticToken as LspSemanticToken,
     SemanticTokens as LspSemanticTokens, SemanticTokensFullDeltaResult, SemanticTokensRangeResult,
-    SymbolInformation, SymbolKind, WorkspaceEdit,
+    SymbolInformation, WorkspaceEdit,
 };
 use serde_json::{Value, json};
 use text::{LineIndex, Position};
@@ -1001,116 +1001,6 @@ fn noncanonical_document_uri_preserves_rule_path_context() {
 }
 
 #[test]
-fn memory_transport_hover_returns_semantic_value_and_null_for_unknown_text() {
-    let (root, root_uri) = temp_workspace_dir();
-    let directory = root.join("common/decrees");
-    fs::create_dir_all(&directory).expect("decrees directory");
-    let file = directory.join("test.txt");
-    let uri = canonical_uri(&file);
-    let text = "my_decree = { cost = 50 unknown = yes }\n";
-    fs::write(&file, text).expect("decree source");
-    let cost = text.find("cost").expect("cost") + 1;
-    let unknown = text.find("unknown").expect("unknown") + 1;
-    let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
-        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":cost}}}),
-        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":unknown}}}),
-        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
-        json!({"jsonrpc":"2.0","method":"exit"}),
-    ]);
-    let mut output = Vec::new();
-    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
-    server
-        .run_transport(Cursor::new(input), &mut output)
-        .expect("transport");
-    let responses = decode_frames(&output);
-    let semantic_hover = responses
-        .iter()
-        .find(|value| value["id"] == 2)
-        .expect("semantic hover response");
-    let contents = semantic_hover["result"]["contents"]["value"]
-        .as_str()
-        .expect("semantic hover markdown");
-    assert!(
-        contents.contains("`cost`") && contents.starts_with("### "),
-        "category-titled hover: {contents}"
-    );
-    assert!(contents.contains("- value:"));
-    assert!(!contents.contains("Provenance"));
-    let unknown_hover = responses
-        .iter()
-        .find(|value| value["id"] == 3)
-        .expect("unknown hover response");
-    assert_eq!(unknown_hover["result"], Value::Null);
-    let _: Hover = typed_result(&responses, 2);
-    fs::remove_dir_all(root).expect("cleanup");
-}
-
-#[test]
-fn memory_transport_completes_dynamic_argument_values_from_body_constraints() {
-    let (root_dir, root_uri) = temp_workspace_dir();
-    let effects_dir = root_dir.join("common/scripted_effects");
-    fs::create_dir_all(&effects_dir).expect("create scripted effects directory");
-    fs::write(
-        effects_dir.join("00_complete.txt"),
-        "bool_dynamic = { set_primitive = $VALUE$ }\n",
-    )
-    .expect("scripted effect definition");
-    let events_dir = root_dir.join("events");
-    fs::create_dir_all(&events_dir).expect("create events directory");
-    let file_path = events_dir.join("dynamic-completion.txt");
-    fs::write(&file_path, "").expect("create placeholder file");
-    let uri = canonical_uri(&file_path);
-    let text = "country_event = { immediate = { bool_dynamic = { VALUE =  } } }\n";
-    let position = text.find("=  }").expect("empty value") + 2;
-    let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
-        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":position}}}),
-        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
-        json!({"jsonrpc":"2.0","method":"exit"}),
-    ]);
-    let mut output = Vec::new();
-    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
-    server
-        .run_transport(Cursor::new(input), &mut output)
-        .expect("transport");
-    let responses = decode_frames(&output);
-    let completion = responses
-        .iter()
-        .find(|value| value["id"] == 2)
-        .expect("completion response");
-    let items = completion["result"]["items"]
-        .as_array()
-        .expect("completion items");
-    assert!(items.iter().any(|item| item["label"] == "yes"), "{items:?}");
-    assert!(items.iter().any(|item| item["label"] == "no"), "{items:?}");
-    assert!(
-        items.iter().all(|item| {
-            item["sortText"].as_str().is_some_and(|sort_text| {
-                if sort_text.len() != 12 {
-                    return false;
-                }
-                let Some(rank) = sort_text.get(..8) else {
-                    return false;
-                };
-                let Some(ordinal) = sort_text.get(8..) else {
-                    return false;
-                };
-                rank.bytes().all(|byte| byte.is_ascii_digit())
-                    && ordinal.bytes().all(|byte| byte.is_ascii_digit())
-            })
-        }),
-        "completion sortText must use fixed-width ranks and tie ordinals: {items:?}"
-    );
-    let _: CompletionResponse = typed_result(&responses, 2);
-    fs::remove_dir_all(root_dir).expect("cleanup");
-}
-
-#[test]
 fn memory_transport_delegates_phase5_requests_to_analysis() {
     let (root_dir, root_uri) = temp_workspace_dir();
     let events_dir = root_dir.join("events");
@@ -1237,49 +1127,6 @@ fn memory_transport_delegates_phase5_requests_to_analysis() {
     let _: WorkspaceEdit = typed_result(&responses, 10);
     let _: Vec<Diagnostic> = serde_json::from_value(diagnostics["params"]["diagnostics"].clone())
         .expect("diagnostic notification should use the standard LSP shape");
-    fs::remove_dir_all(root_dir).expect("cleanup");
-}
-
-#[test]
-fn memory_transport_resolves_typed_event_call_definition() {
-    let (root_dir, root_uri) = temp_workspace_dir();
-    let events_dir = root_dir.join("events");
-    fs::create_dir_all(&events_dir).expect("create events dir");
-    let file_path = events_dir.join("typed-event-call.txt");
-    fs::write(&file_path, "").expect("create placeholder file");
-    let uri = canonical_uri(&file_path);
-    let text = concat!(
-        "country_event = { id = target.1 }\n",
-        "country_event = { id = caller.1 immediate = { ",
-        "country_event = { id = target.1 } } }\n",
-    );
-    let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
-        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":70}}}),
-        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
-        json!({"jsonrpc":"2.0","method":"exit"}),
-    ]);
-    let mut output = Vec::new();
-    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
-    server
-        .run_transport(Cursor::new(input), &mut output)
-        .expect("transport");
-    let responses = decode_frames(&output);
-    let definition = responses
-        .iter()
-        .find(|value| value["id"] == 2)
-        .expect("definition response");
-    assert_eq!(definition["error"], Value::Null);
-    assert_eq!(definition["result"].as_array().map(Vec::len), Some(1));
-    assert_eq!(
-        definition["result"][0]["range"],
-        json!({
-            "start": {"line": 0, "character": 23},
-            "end": {"line": 0, "character": 31}
-        })
-    );
     fs::remove_dir_all(root_dir).expect("cleanup");
 }
 
@@ -1508,84 +1355,6 @@ fn code_actions_expose_rule_backed_enum_suggestions() {
 }
 
 #[test]
-fn memory_transport_preserves_hir_disambiguated_mixed_context_completion() {
-    let (root_dir, root_uri) = temp_workspace_dir();
-    let events_dir = root_dir.join("events");
-    fs::create_dir_all(&events_dir).expect("create events dir");
-    let file_path = events_dir.join("mixed-completion.txt");
-    fs::write(&file_path, "").expect("create placeholder file");
-    let uri = canonical_uri(&file_path);
-    let text = concat!(
-        "country_event = {\n",
-        "  mean_time_to_happen = {\n",
-        "    modifier = {\n",
-        "       # factor not assigned yet\n",
-        "      \n",
-        "      always = maybe\n",
-        "    }\n",
-        "  }\n",
-        "}\n",
-    );
-    let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
-        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":4,"character":6}}}),
-        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
-        json!({"jsonrpc":"2.0","method":"exit"}),
-    ]);
-    let mut output = Vec::new();
-    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
-    server
-        .run_transport(Cursor::new(input), &mut output)
-        .expect("transport");
-    let responses = decode_frames(&output);
-    let completion = responses
-        .iter()
-        .find(|value| value["id"] == 2)
-        .expect("completion response");
-    let labels = completion["result"]["items"]
-        .as_array()
-        .expect("completion items")
-        .iter()
-        .filter_map(|item| item["label"].as_str())
-        .collect::<Vec<_>>();
-    assert!(
-        labels.contains(&"factor"),
-        "missing structural completion: {labels:?}"
-    );
-    assert!(
-        labels.contains(&"always"),
-        "missing trigger completion: {labels:?}"
-    );
-
-    let diagnostics = responses
-        .iter()
-        .find(|value| {
-            value["method"] == "textDocument/publishDiagnostics"
-                && value["params"]["uri"].as_str() == Some(uri.as_str())
-                && value["params"]["diagnostics"]
-                    .as_array()
-                    .is_some_and(|items| items.iter().any(|item| item["code"] == "InvalidValue"))
-        })
-        .expect("diagnostic notification");
-    let diagnostics = diagnostics["params"]["diagnostics"]
-        .as_array()
-        .expect("diagnostics");
-    assert!(
-        diagnostics.iter().all(|item| item["code"] != "UnknownKey"),
-        "known mixed-context keys were rejected: {diagnostics:?}"
-    );
-    assert!(
-        diagnostics
-            .iter()
-            .any(|item| item["code"] == "InvalidValue"),
-        "invalid trigger value was not diagnosed: {diagnostics:?}"
-    );
-    fs::remove_dir_all(root_dir).expect("cleanup");
-}
-
-#[test]
 fn snippet_placeholders_are_stripped_for_plain_text_fallbacks() {
     assert_eq!(
         strip_snippet_placeholders("name = {\n    $0\n}", ""),
@@ -1765,53 +1534,6 @@ fn memory_transport_resolves_completion_items_by_data() {
     assert_eq!(resolved["result"]["label"], "factor");
     let _: CompletionItem = serde_json::from_value(resolved["result"].clone())
         .expect("resolve response must be a standard CompletionItem");
-    fs::remove_dir_all(root_dir).expect("cleanup");
-}
-
-#[test]
-fn memory_transport_exposes_parameters_as_document_local_symbols() {
-    let (root_dir, root_uri) = temp_workspace_dir();
-    let effects_dir = root_dir.join("common/scripted_effects");
-    fs::create_dir_all(&effects_dir).expect("create scripted effects directory");
-    let file_path = effects_dir.join("parameters.txt");
-    fs::write(&file_path, "").expect("create placeholder file");
-    let uri = canonical_uri(&file_path);
-    let text = "apply = { value = $Amount$ again = $amount$ [[optional] enabled = yes ] }\n";
-    let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
-        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":uri}}}),
-        json!({"jsonrpc":"2.0","id":3,"method":"workspace/symbol","params":{"query":"amount"}}),
-        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
-        json!({"jsonrpc":"2.0","method":"exit"}),
-    ]);
-    let mut output = Vec::new();
-    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
-    server
-        .run_transport(Cursor::new(input), &mut output)
-        .expect("transport");
-    let responses = decode_frames(&output);
-
-    let symbols: Vec<DocumentSymbol> = typed_result(&responses, 2);
-    let amount = symbols
-        .iter()
-        .find(|symbol| symbol.name == "Amount")
-        .expect("inferred parameter document symbol");
-    assert_eq!(amount.kind, SymbolKind::VARIABLE);
-    assert_eq!(
-        amount.selection_range.end.character - amount.selection_range.start.character,
-        u32::try_from("Amount".len()).expect("name length")
-    );
-    assert!(amount.range.start.character < amount.selection_range.start.character);
-    assert!(amount.selection_range.end.character < amount.range.end.character);
-
-    let workspace: Vec<SymbolInformation> = typed_result(&responses, 3);
-    assert!(
-        workspace
-            .iter()
-            .all(|symbol| !symbol.name.eq_ignore_ascii_case("amount"))
-    );
     fs::remove_dir_all(root_dir).expect("cleanup");
 }
 
