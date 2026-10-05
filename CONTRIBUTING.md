@@ -6,7 +6,7 @@ This guide owns development setup, validation choices, and documentation mainten
 ## Build and debug
 
 Use the Rust minimum declared in [Cargo.toml](Cargo.toml) or a newer stable toolchain,
-and the Node.js version selected by [CI](.github/workflows/ci.yml) for extension work.
+and the Node.js version selected by [CI](.github/workflows/quick-ci.yml) for extension work.
 Use the committed lockfiles. No machine-local Cargo alias or commit hook is required.
 
 ```sh
@@ -79,7 +79,7 @@ Each validation class has one authority:
 | Class | Authority | Purpose |
 | --- | --- | --- |
 | Developer feedback | Local checkout | Focused tests, deterministic local groups, local Vanilla exploration |
-| Merge gate | [CI](.github/workflows/ci.yml) | Required `Conclusion` check on the reviewed commit |
+| Merge gate | [CI](.github/workflows/quick-ci.yml) | Required `Conclusion` check on the reviewed commit |
 | Scheduled audit | [Security](.github/workflows/security.yml), [Performance](.github/workflows/performance.yml) | Advisory refresh and optimized benchmark runs |
 | Release gate | [Candidate workflow](.github/workflows/release-candidate.yml), [promotion](.github/workflows/release.yml) | Verify complete artifacts before creating a formal tag, then publish those same bytes |
 | Manual acceptance | Maintainer following [RELEASING.md](RELEASING.md) | Clean-profile install and Marketplace publication |
@@ -97,11 +97,35 @@ groups and record exact commands, outcomes, and residual risks. Passing local gr
 replace clean-checkout, cross-platform CI or authorize publication. A local commit does not
 require a full Vanilla sweep, benchmark suite, or network advisory scan.
 
-CI runs on PRs and `main`; its workflow is authoritative for job coverage and tool versions.
-PRs run the full suite, including production npm dependency auditing. A main push can reuse a
-successful same-repository PR result only after its tested tree, check definitions and resolved
-Rust toolchain match. Missing or mismatched evidence runs the full suite. `Conclusion` remains
-required and verifies either complete results or the original source-bound receipt.
+CI runs a deliberately reduced Linux-only merge gate on PRs and `main`. It checks formatting,
+type-checks every workspace crate with all features, runs parser/text/encoding library regressions
+and lightweight CI/release-control regressions, compiles the extension, runs four JavaScript
+behavior suites, and audits production npm dependencies. `Conclusion` requires both jobs to succeed;
+failed, cancelled or skipped jobs fail the gate.
+
+This trades breadth for a roughly two-minute feedback target, not a guarantee for cold caches or
+slow hosted runners. Routine CI omits Windows, broad HIR/rules/engine/IDE/LSP suites, integration
+and doc tests, Clippy, MSRV, rustdoc, fuzzing, repository/artifact policy, VSIX packaging and Cargo
+dependency/typo checks. Run affected local groups before review; regressions outside the core gate
+can otherwise reach main.
+
+[Full CI](.github/workflows/ci.yml) is manually dispatched on the exact reviewed main commit before
+release preparation. It retains cross-platform quality jobs, source-bound receipts and validated
+VSIX artifacts. Modest test optimization and bounded fixtures target roughly five-minute feedback,
+including setup, without guaranteeing cold-cache or hosted-runner timing. Tests remain isolated
+in nextest processes. CI-only profiles leave development and release optimization unchanged.
+
+Test selection removes repeated file-type completion matrices, peripheral EU4 rule examples,
+detailed trace/cache-progress variants, and duplicate semantic transport examples. Goldens, core
+templates/scopes, navigation/rename, lifecycle/cancellation, corruption/recovery and release safety
+remain. The deep Template fixture has 1,024 calls, the overlay fixture eight files, and cache shrink
+uses disposable SQLite pages instead of 20,000 parsed events. Full-corpus acceptance remains;
+double-bake determinism uses a small representative package. Full CI covers the maintained suite,
+not every historical scenario. Quick CI creates no release evidence.
+
+For pre-merge validation of Full CI itself, maintainers can explicitly push the exact reviewed SHA
+to a `ci/full-validation/NAME` branch. Ordinary PRs never trigger this suite. These validation-only
+push receipts are rejected for release preparation, which still requires manual Full CI on main.
 A failing post-merge `Conclusion` receives a focused repair PR. Scheduled audit failures are
 triaged by the maintainer into an actionable issue; they do not block unrelated PRs.
 Release and manual acceptance failures follow the recovery steps in [RELEASING.md](RELEASING.md).

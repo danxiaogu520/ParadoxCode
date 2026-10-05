@@ -1,13 +1,14 @@
-name: CI
+name: Full CI
 
 on:
-  pull_request:
+  workflow_dispatch:
+  # Explicit, non-publishing verification of this workflow before merging it.
+  # Only manual runs from main can authorize release preparation.
   push:
-    branches: [main]
+    branches: ['ci/full-validation/**']
 
-# PRs run the complete quality suite. A main push reuses a successful same-repository
-# PR receipt only when the actual tested tree, check definitions and toolchain match.
-# Missing or mismatched evidence selects full CI; Conclusion remains required.
+# Run the complete quality suite explicitly before preparing a release candidate.
+# Routine PR/push checks live in quick-ci.yml and cannot produce release evidence.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -51,7 +52,7 @@ jobs:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      - name: Select full CI or verified PR evidence
+      - name: Select complete CI
         id: plan
         env:
           GH_TOKEN: ${{ github.token }}
@@ -139,7 +140,7 @@ jobs:
       - uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
         with:
           tool: nextest
-      # PR/push CI keeps the fast correctness path. The optimized benchmark
+      # Full CI covers correctness. The optimized benchmark
       # suite runs in the scheduled/manual performance workflow.
       - run: cargo check --locked --workspace --all-features
       # nextest runs unit and integration tests; doc tests need libtest (the
@@ -189,7 +190,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - run: npm ci --prefix editors/vscode --no-audit --no-fund
-      - name: Audit production dependencies before merge
+      - name: Audit production dependencies
         run: cargo run --locked -p tools --no-default-features -- ci production-audit
       # The extension check compiles with tsc and smoke-tests the preview
       # contract against a cargo-built pdc, so both toolchains are present.
@@ -291,10 +292,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: cargo run --locked -p tools --no-default-features -- ci cancel-matrix-failed
 
-  # Required check: skipped quality jobs are accepted only with validated evidence.
+  # Full-suite receipt: every quality job must succeed.
   # Cancellation, failed planning, and partial execution never become green.
   conclusion:
-    name: Conclusion
+    name: Full conclusion
     needs:
       - plan
       - workflow-lint
@@ -321,7 +322,7 @@ jobs:
         with:
           name: ci-vsix-${{ github.run_attempt }}
           path: target/ci/vsix
-      - name: Verify complete results or their source-bound receipt
+      - name: Verify complete results and record their source-bound receipt
         env:
           GH_TOKEN: ${{ github.token }}
           NEEDS_JSON: ${{ toJson(needs) }}
