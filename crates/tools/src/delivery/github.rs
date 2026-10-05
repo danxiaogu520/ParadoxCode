@@ -1,5 +1,5 @@
-//! Read-only GitHub evidence lookup. Missing, expired or mismatched evidence
-//! falls back to full CI; publication never executes downloaded artifact code.
+//! Read-only GitHub evidence lookup. Releases require source-bound manual Full CI
+//! evidence from main; publication never executes downloaded artifact code.
 use super::*;
 
 pub(super) fn gh(args: &[&str]) -> Result<String, String> {
@@ -146,8 +146,8 @@ pub(super) fn fetch_receipt(
 ) -> Result<(CiReceipt, Value), String> {
     let run = run(repository, id, CI_WORKFLOW)?;
     require(
-        matches!(run["event"].as_str(), Some("push" | "pull_request")),
-        "unexpected CI event",
+        run["event"] == "workflow_dispatch" && run["head_branch"] == "main",
+        "full CI evidence must be manually dispatched from main",
     )?;
     let attempt = run["run_attempt"].as_u64().ok_or("missing attempt")?;
     let directory = root.join(format!("target/ci/evidence/{id}-{attempt}"));
@@ -164,6 +164,9 @@ pub(super) fn fetch_receipt(
         receipt.run_id == id
             && receipt.run_attempt == attempt
             && receipt.head_sha == run["head_sha"]
+            && receipt.tested_sha == receipt.head_sha
+            && receipt.origin_run == id
+            && receipt.origin_attempt == attempt
             && receipt.event == run["event"],
         "CI receipt run identity differs",
     )?;
@@ -179,70 +182,9 @@ pub(super) fn fetch_receipt(
     Ok((receipt, run))
 }
 
-fn find_reusable(root: &Path, repository: &str, sha: &str) -> Result<CiReceipt, String> {
-    let response = api(&format!(
-        "repos/{repository}/commits/{sha}/pulls?per_page=100"
-    ))?;
-    let prs = response
-        .as_array()
-        .ok_or("invalid associated PR response")?;
-    for pr in prs {
-        if pr["merged_at"].is_null()
-            || pr["merge_commit_sha"] != sha
-            || pr["base"]["ref"] != "main"
-            || pr["head"]["repo"]["full_name"] != repository
-            || pr["base"]["repo"]["full_name"] != repository
-        {
-            continue;
-        }
-        let head = pr["head"]["sha"]
-            .as_str()
-            .filter(|s| hex(s, 40))
-            .ok_or("invalid PR head")?;
-        let runs = api(&format!(
-            "repos/{repository}/actions/workflows/ci.yml/runs?event=pull_request&head_sha={head}&per_page=10"
-        ))?;
-        // Only the latest run/attempt is eligible. Never resurrect an earlier green
-        // run after a newer failed, cancelled or pending run.
-        let latest = runs["workflow_runs"]
-            .as_array()
-            .and_then(|r| r.first())
-            .ok_or("no successful PR CI evidence")?;
-        let id = latest["id"].as_u64().ok_or("missing CI run id")?;
-        let (receipt, _) = fetch_receipt(root, repository, id)?;
-        require(
-            receipt.origin_run == id && receipt.origin_attempt == receipt.run_attempt,
-            "PR evidence must come from a complete CI run",
-        )?;
-        return Ok(receipt);
-    }
-    Err("no eligible same-repository merged PR".into())
-}
-
-pub(super) fn ci_plan(root: &Path) -> Result<String, String> {
-    let repository = env("GITHUB_REPOSITORY")?;
-    let sha = git(root, &["rev-parse", "HEAD"])?;
-    let reuse = if env("GITHUB_EVENT_NAME")? == "push" && env("GITHUB_REF")? == "refs/heads/main" {
-        match find_reusable(root, &repository, &sha) {
-            Ok(receipt) => Some(receipt),
-            Err(error) => {
-                eprintln!("Full CI required: {error}");
-                None
-            }
-        }
-    } else {
-        None
-    };
-    output(&[
-        ("full", reuse.is_none().to_string()),
-        (
-            "reuse_run",
-            reuse.as_ref().map_or("0".into(), |r| r.run_id.to_string()),
-        ),
-    ])?;
-    Ok(reuse.map_or("complete CI required".into(), |r| {
-        format!("same tested tree and policy; reuse CI run {}", r.run_id)
-    }))
+pub(super) fn ci_plan(_root: &Path) -> Result<String, String> {
+    output(&[("full", "true".into()), ("reuse_run", "0".into())])?;
+    Ok("complete CI required".into())
 }
 
 pub(super) fn ci_receipt(root: &Path, args: &Args) -> Result<String, String> {
@@ -262,32 +204,11 @@ pub(super) fn ci_receipt(root: &Path, args: &Args) -> Result<String, String> {
             && needs["plan"]["outputs"]["full"] == if reuse_id == 0 { "true" } else { "false" },
         "CI receipt decision differs from its plan",
     )?;
-    let (jobs, origin_run, origin_attempt, vsix) = if reuse_id > 0 {
-        require(
-            REQUIRED
-                .iter()
-                .all(|name| needs[*name]["result"] == "skipped"),
-            "reuse cannot hide a partially executed or failed CI job",
-        )?;
-        let (receipt, _) = fetch_receipt(root, &repository, reuse_id)?;
-        (
-            receipt.jobs,
-            receipt.origin_run,
-            receipt.origin_attempt,
-            receipt.vsix,
-        )
-    } else {
-        let jobs = strict_jobs(&needs)?;
-        let path = args.path("--vsix").ok_or("missing --vsix")?;
-        let version = workspace_version(root)?;
-        verify_vsix(&path, &version)?;
-        (
-            jobs,
-            number("GITHUB_RUN_ID")?,
-            number("GITHUB_RUN_ATTEMPT")?,
-            Asset::from_file(&path)?,
-        )
-    };
+    require(reuse_id == 0, "full CI cannot reuse another run's evidence")?;
+    let jobs = strict_jobs(&needs)?;
+    let path = args.path("--vsix").ok_or("missing --vsix")?;
+    let version = workspace_version(root)?;
+    verify_vsix(&path, &version)?;
     let receipt = CiReceipt {
         schema: SCHEMA,
         repository,
@@ -301,20 +222,10 @@ pub(super) fn ci_receipt(root: &Path, args: &Args) -> Result<String, String> {
         rustc: capture(process::command("rustc").arg("--version"))?,
         version: workspace_version(root)?,
         jobs,
-        origin_run,
-        origin_attempt,
-        vsix,
+        origin_run: number("GITHUB_RUN_ID")?,
+        origin_attempt: number("GITHUB_RUN_ATTEMPT")?,
+        vsix: Asset::from_file(&path)?,
     };
-    // The Actions run's head_sha is the PR head (not necessarily checkout's
-    // synthetic merge SHA). Bind both identities using the event payload.
-    let mut receipt = receipt;
-    if receipt.event == "pull_request" {
-        let event = report::json(Path::new(&env("GITHUB_EVENT_PATH")?))?;
-        receipt.head_sha = event["pull_request"]["head"]["sha"]
-            .as_str()
-            .ok_or("missing PR head SHA")?
-            .into();
-    }
     let destination = report::output(
         root,
         &args
@@ -326,17 +237,18 @@ pub(super) fn ci_receipt(root: &Path, args: &Args) -> Result<String, String> {
         &destination,
         &serde_json::to_value(receipt).map_err(|e| e.to_string())?,
     )?;
-    Ok("required CI evidence recorded".into())
+    Ok("full CI evidence recorded".into())
 }
 
 pub(super) fn successful_ci(root: &Path, repository: &str, sha: &str) -> Result<CiReceipt, String> {
     let runs = api(&format!(
-        "repos/{repository}/actions/workflows/ci.yml/runs?event=push&head_sha={sha}&per_page=10"
+        "repos/{repository}/actions/workflows/ci.yml/runs?event=workflow_dispatch&branch=main&head_sha={sha}&per_page=10"
     ))?;
+    // Never resurrect an older green run after a newer incomplete or failed run.
     let latest = runs["workflow_runs"]
         .as_array()
         .and_then(|r| r.first())
-        .ok_or("source commit has no main CI receipt")?;
+        .ok_or("source commit has no manually dispatched Full CI receipt from main")?;
     require(
         latest["head_branch"] == "main",
         "candidate CI must be a main run",
@@ -345,7 +257,7 @@ pub(super) fn successful_ci(root: &Path, repository: &str, sha: &str) -> Result<
     let (receipt, _) = fetch_receipt(root, repository, id)?;
     require(
         receipt.tested_sha == sha,
-        "main CI receipt is for a different commit",
+        "Full CI receipt is for a different source commit",
     )?;
     Ok(receipt)
 }

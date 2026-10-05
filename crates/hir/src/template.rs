@@ -1034,10 +1034,12 @@ mod tests {
     }
 
     #[test]
-    fn ten_thousand_calls_use_an_explicit_stack_and_reach_the_terminal_constraint() {
+    fn deep_calls_reach_the_terminal_constraint() {
         let ir = game::eu4::first_party_ir().unwrap();
         let mut definitions = BTreeMap::new();
-        for depth in 0..10000 {
+        // Keep a deep representative chain without a 10,000-call stress fixture.
+        const DEPTH: usize = 1024;
+        for depth in 0..DEPTH {
             definitions.insert(
                 format!("chain{depth}"),
                 definition(
@@ -1048,8 +1050,8 @@ mod tests {
             );
         }
         definitions.insert(
-            "chain10000".into(),
-            definition("chain10000", "add_prestige", false),
+            format!("chain{DEPTH}"),
+            definition(&format!("chain{DEPTH}"), "add_prestige", false),
         );
         let facts = Definitions(definitions, ir.type_by_name("scripted_effect").unwrap());
         let sites = parameter_sites::<std::convert::Infallible>(

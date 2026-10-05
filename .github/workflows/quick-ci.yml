@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Deliberately small merge gate. Full CI (ci.yml) remains a manually dispatched
+# release prerequisite; this workflow never produces release-evidence receipts.
+concurrency:
+  group: quick-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: short
+  # The development profile optimizes for interactive server performance. CI
+  # only type-checks the full workspace, so avoid optimizing its build scripts.
+  CARGO_PROFILE_DEV_OPT_LEVEL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_PROFILE_TEST_DEBUG: 0
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  core:
+    name: Rust core checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          shared-key: quick-core
+          cache-on-failure: false
+      - name: Formatting
+        run: |
+          cargo fmt --all -- --check
+          cargo fmt --manifest-path fuzz/Cargo.toml -- --check
+      - name: Type-check every workspace crate
+        run: cargo check --locked --workspace --all-features
+      - name: Parser, text and encoding regressions
+        run: cargo test --locked -p parser -p text -p transcode --lib
+      - name: CI and release trust-boundary regressions
+        run: cargo test --locked -p tools --no-default-features --lib
+
+  vscode:
+    name: Extension core checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+      - run: npm ci --prefix editors/vscode --no-audit --no-fund
+      - run: npm --prefix editors/vscode run compile
+      - name: Asset, icon picker, localisation and server path regressions
+        run: node --test editors/vscode/test/{assets,icon-picker,loc-format,server-path}.mjs
+      - name: Audit production dependencies
+        run: npm --prefix editors/vscode audit --omit=dev --audit-level=high
+
+  conclusion:
+    name: Conclusion
+    needs: [core, vscode]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Require every core check
+        env:
+          CORE_RESULT: ${{ needs.core.result }}
+          VSCODE_RESULT: ${{ needs.vscode.result }}
+        run: |
+          test "$CORE_RESULT" = success
+          test "$VSCODE_RESULT" = success

@@ -75,8 +75,6 @@ pub(crate) use engine::DocumentId;
 #[cfg(test)]
 pub(crate) use ide::CancellationToken;
 #[cfg(test)]
-pub(crate) use initialize::prepare_initialize_candidate;
-#[cfg(test)]
 pub(crate) use protocol::{
     RequestId, cancel_initialize_from_notification, cancel_request_from_notification,
     diagnostic_result_counts,

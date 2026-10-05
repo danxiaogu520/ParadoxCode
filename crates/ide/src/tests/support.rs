@@ -10,7 +10,7 @@ pub(crate) use engine::{
     SourceRootKind, WorkspaceChange,
 };
 pub(crate) use rules::RuleSet;
-pub(crate) use text::{LogicalPath, TextRange};
+pub(crate) use text::TextRange;
 
 pub(crate) fn eu4_host(_catalog: RuleSet) -> AnalysisHost {
     let ir = game::eu4::first_party_ir().expect("embedded IR");

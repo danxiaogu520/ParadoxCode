@@ -36,7 +36,6 @@ fn exact(ir: &RulesIr, schema: SchemaId, key: &str, shape: Shape) -> FieldId {
     field
 }
 
-#[test]
 fn predicates_iterators_and_weighted_branches_keep_their_behavior() {
     let ir = ir();
     let trigger = schema(ir, "trigger");
@@ -92,7 +91,6 @@ fn predicates_iterators_and_weighted_branches_keep_their_behavior() {
     exact(ir, body, "add_prestige", Shape::Scalar);
 }
 
-#[test]
 fn nested_definitions_use_their_actual_body_and_name_source() {
     let ir = ir();
     let missions = schema(ir, "mission_series_body");
@@ -155,7 +153,6 @@ impl SymbolFacts for PowerFacts {
     }
 }
 
-#[test]
 fn inherited_modifiers_and_numeric_trigger_domains_validate_values() {
     let ir = ir();
     let facts = PowerFacts(ir.type_by_name("government_mechanic_power").unwrap());
@@ -187,4 +184,12 @@ fn inherited_modifiers_and_numeric_trigger_domains_validate_values() {
     assert!(ir.enum_contains(numeric, "num_of_revolutionary_guard"));
     assert!(ir.enum_contains(numeric, "always"));
     assert!(!ir.enum_contains(numeric, "primary_culture"));
+}
+
+// One corpus load per test process; each helper keeps its behavior assertions.
+#[test]
+fn first_party_behavior_contracts() {
+    predicates_iterators_and_weighted_branches_keep_their_behavior();
+    nested_definitions_use_their_actual_body_and_name_source();
+    inherited_modifiers_and_numeric_trigger_domains_validate_values();
 }

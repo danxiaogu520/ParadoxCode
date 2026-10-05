@@ -199,6 +199,7 @@ pub(super) fn seal(root: &Path, args: &Args) -> Result<String, String> {
         .path("--directory")
         .unwrap_or_else(|| root.join("target/dist"));
     let assets = asset_inventory(root, &directory, &version)?;
+    verify_ci_vsix(&ci, &assets, &version)?;
     let staging = report::output(
         root,
         &args
@@ -400,6 +401,61 @@ pub(super) fn remote_notes_match(release: &Value, tag: &str, notes: &str) -> Res
     )
 }
 
+// candidate-vsix normalizes the package filename, but never its bytes.
+pub(super) fn verify_ci_vsix(
+    ci: &CiReceipt,
+    assets: &[Asset],
+    version: &str,
+) -> Result<(), String> {
+    let name = format!("paradoxcode-vscode-{version}.vsix");
+    let vsix = assets
+        .iter()
+        .find(|asset| asset.name == name)
+        .ok_or("candidate lacks the CI-validated VSIX")?;
+    require(
+        vsix.bytes == ci.vsix.bytes && vsix.sha256 == ci.vsix.sha256,
+        "candidate VSIX differs from its Full CI receipt",
+    )
+}
+
+fn verify_candidate_ci(ci: &CiReceipt, candidate: &Candidate) -> Result<(), String> {
+    require(
+        ci.origin_run == candidate.ci_run && ci.origin_attempt == candidate.ci_attempt,
+        "candidate CI origin changed",
+    )?;
+    verify_ci_vsix(ci, &candidate.assets, &candidate.version)
+}
+
+fn refresh_promotion_evidence(
+    root: &Path,
+    repository: &str,
+    candidate: &Candidate,
+) -> Result<(), String> {
+    let temporary = tempfile::tempdir_in(root.join("target")).map_err(|e| e.to_string())?;
+    let source = temporary.path().join("source");
+    let source_path = source.to_str().ok_or("non-UTF8 source")?;
+    git(
+        root,
+        &[
+            "worktree",
+            "add",
+            "--detach",
+            source_path,
+            &candidate.source_sha,
+        ],
+    )?;
+    let checks = (|| {
+        let ci = github::successful_ci(&source, repository, &candidate.source_sha)?;
+        verify_candidate_ci(&ci, candidate)?;
+        let run = github::run(repository, candidate.run_id, CANDIDATE_WORKFLOW)?;
+        validate_candidate_run(candidate, &run, repository)
+    })();
+    let cleanup = git(root, &["worktree", "remove", "--force", source_path]);
+    checks?;
+    cleanup?;
+    Ok(())
+}
+
 pub(super) fn promote(root: &Path, args: &Args) -> Result<String, String> {
     require(
         env("GITHUB_EVENT_NAME")? == "workflow_dispatch" && env("GITHUB_REF")? == "refs/heads/main",
@@ -496,10 +552,7 @@ pub(super) fn promote(root: &Path, args: &Args) -> Result<String, String> {
             "candidate workspace version differs",
         )?;
         let ci = github::successful_ci(&source, &repository, &candidate.source_sha)?;
-        require(
-            ci.origin_run == candidate.ci_run && ci.origin_attempt == candidate.ci_attempt,
-            "candidate CI origin changed",
-        )?;
+        verify_candidate_ci(&ci, &candidate)?;
         // This performs no install or package lifecycle scripts and receives no
         // publication credential. A failed endpoint never becomes a green audit.
         production_audit(&source)
@@ -583,8 +636,13 @@ pub(super) fn promote(root: &Path, args: &Args) -> Result<String, String> {
     )?;
     remote_notes_match(&uploaded, draft_tag, &notes)?;
     remote_assets_match(&uploaded, &candidate.assets, true)?;
+    // Staging can take long enough for CI or candidate reruns to supersede the
+    // evidence checked above. Refresh both successful attempts before reserving
+    // the formal tag, including when resuming an already reserved draft.
+    refresh_promotion_evidence(root, &repository, &candidate)?;
     // Every build, test, audit and remote upload verification has now succeeded.
-    // Only formal tag reservation and immutable publication remain.
+    // GitHub has no atomic evidence-check-and-tag operation; only formal tag
+    // reservation and immutable publication remain after this final refresh.
     if existing_tag.is_none() {
         let local = process::command("git")
             .current_dir(root)

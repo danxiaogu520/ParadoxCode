@@ -51,13 +51,13 @@ the complete developer CLI; unsupported analysis commands fail explicitly in lig
 
 The [delivery module](src/delivery.rs) owns strict CI receipts, source/tree/check-policy and
 resolved Rust-toolchain matching, safe GitHub artifact decoding and candidate manifests.
-`ci plan` selects full CI or an eligible same-repository merged-PR receipt. `ci receipt`
-requires every quality job to succeed, or verifies the exact reuse decision and original receipt;
-skipped/failed/partial results cannot manufacture a green check. Receipts and VSIX artifacts are
-bound to the successful run attempt. A missing or expired receipt causes full CI.
+`ci plan` selects complete Full CI. `ci receipt` requires every quality job to succeed;
+skipped, failed or partial results cannot manufacture full evidence. Candidate preparation accepts
+only manual Full CI from main for the exact source commit and run attempt. Quick checks and
+validation-branch pushes cannot authorize release. Missing evidence requires another manual run.
 
 `ci production-audit` audits the npm lockfile without install/lifecycle scripts, fails on high
-advisories or an unavailable endpoint, and uses bounded network retries. It runs before merge,
+advisories or an unavailable endpoint, and uses bounded network retries. Routine CI also audits production dependencies directly with npm. This command runs in Full CI,
 before candidate builds and immediately before promotion; database refreshes do not rerun the
 unit suite or rebuild packages.
 

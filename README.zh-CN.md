@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-[![CI](https://github.com/danxiaogu520/ParadoxCode/actions/workflows/ci.yml/badge.svg)](https://github.com/danxiaogu520/ParadoxCode/actions/workflows/ci.yml)
+[![CI](https://github.com/danxiaogu520/ParadoxCode/actions/workflows/quick-ci.yml/badge.svg)](https://github.com/danxiaogu520/ParadoxCode/actions/workflows/quick-ci.yml)
 [![Release](https://img.shields.io/github/v/release/danxiaogu520/ParadoxCode)](https://github.com/danxiaogu520/ParadoxCode/releases)
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/paradoxcode.paradoxcode-vscode)](https://marketplace.visualstudio.com/items?itemName=paradoxcode.paradoxcode-vscode)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
