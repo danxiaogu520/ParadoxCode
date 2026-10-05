@@ -142,7 +142,8 @@ jobs:
           tool: nextest
       # Full CI covers correctness. The optimized benchmark
       # suite runs in the scheduled/manual performance workflow.
-      - run: cargo check --locked --workspace --all-features
+      # Clippy already type-checks all targets with the same stable toolchain;
+      # nextest compiles every tested target. Avoid another cold metadata build.
       # nextest runs unit and integration tests; doc tests need libtest (the
       # workspace currently has none — this step keeps them covered if added).
       - run: cargo nextest run --locked --workspace --all-features --no-fail-fast --hide-progress-bar
