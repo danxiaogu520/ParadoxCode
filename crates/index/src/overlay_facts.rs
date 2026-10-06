@@ -107,11 +107,34 @@ fn readers(
 }
 
 fn reads_symbols(ir: &RulesIr, matcher: rules::ir::MatcherId) -> bool {
+    reads_symbols_inner(ir, matcher, &mut BTreeSet::new())
+}
+
+fn reads_symbols_inner(
+    ir: &RulesIr,
+    matcher: rules::ir::MatcherId,
+    visited: &mut BTreeSet<rules::ir::MatcherId>,
+) -> bool {
+    // Dependency enumeration is deliberately broader than a query's selected
+    // runtime path. Legal fixed-selector self queries can revisit this matcher.
+    if !visited.insert(matcher) {
+        return false;
+    }
     match ir.matcher(matcher) {
         rules::ir::Matcher::Ref(_) => true,
-        rules::ir::Matcher::Union(parts) => parts.iter().any(|part| reads_symbols(ir, *part)),
+        rules::ir::Matcher::Query(query) => ir.fields(query.schema).into_iter()
+            .filter(|field| query.shape.is_none_or(|shape| ir.shape(*field) == Some(shape)))
+            .any(|field| {
+                // Dispatch reads source keys before metadata filters: even an
+                // excluded dynamic key can shadow a later accepted pattern.
+                reads_symbols_inner(ir, ir.field(field).key, visited)
+                    || ir.query_field_passes(query, field)
+                        && ir.query_projected_matcher(query, field)
+                            .is_some_and(|projected| reads_symbols_inner(ir, projected, visited))
+            }),
+        rules::ir::Matcher::Union(parts) => parts.iter().any(|part| reads_symbols_inner(ir, *part, visited)),
         rules::ir::Matcher::Pattern(parts) => parts.iter().any(
-            |part| matches!(part,rules::ir::PatternPart::Hole(hole) if reads_symbols(ir,*hole)),
+            |part| matches!(part,rules::ir::PatternPart::Hole(hole) if reads_symbols_inner(ir,*hole,visited)),
         ),
         _ => false,
     }
@@ -268,5 +291,56 @@ pub fn stabilize_overlay_facts(
     OverlayFactTransaction {
         documents: candidate,
         report,
+    }
+}
+
+#[cfg(test)]
+mod query_dependency_tests {
+    use super::reads_symbols;
+    use rules::ir::{FieldValue, Shape};
+
+    #[test]
+    fn query_dependencies_include_source_key_and_projected_value() {
+        let source = serde_json::from_str(
+            r#"{
+            "types": { "dynamic_name": {} },
+            "files": { "test": { "path": "test", "ext": "txt", "root": "consumer" } },
+            "schemas": {
+                "recursive": { "fields": {
+                    "selected": { "card": "0..*", "value": "int" },
+                    "dependent": { "card": "0..*", "value": "valuesof<recursive,key=selected>" }
+                } },
+                "source": { "patterns": [{ "key": "ref<dynamic_name>", "card": "0..*", "value": "bool" }] },
+                "priority": { "patterns": [
+                    { "key": "ref<dynamic_name>", "card": "0..*", "value": "scalar" },
+                    { "key": "scalar", "card": "0..*", "value": "int" }
+                ] },
+                "consumer": { "fields": {
+                    "keys": { "card": "0..*", "value": "keysof<source>" },
+                    "values": { "card": "0..*", "value": "valuesof<source,key=chosen>" },
+                    "plain": { "card": "0..*", "value": "bool" },
+                    "self_query": { "card": "0..*", "value": "valuesof<recursive,key=dependent>" },
+                    "filtered_key": { "card": "0..*", "value": "keysof<priority,value_kind_any=(int)>" }
+                } }
+            }
+        }"#,
+        )
+        .unwrap();
+        let ir =
+            rules::lower::lower(&[("query.json".to_owned(), source)], Default::default()).unwrap();
+        let schema = ir.schema_by_name("consumer").unwrap();
+        for (name, expected) in [
+            ("keys", true),
+            ("values", true),
+            ("plain", false),
+            ("self_query", false),
+            ("filtered_key", true),
+        ] {
+            let field = ir.lookup(schema, name, Shape::Scalar).next().unwrap();
+            let FieldValue::Scalar(matcher) = ir.field(field).value else {
+                unreachable!()
+            };
+            assert_eq!(reads_symbols(&ir, matcher), expected, "{name}");
+        }
     }
 }

@@ -29,6 +29,7 @@ use text::LogicalPath;
 
 use crate::matcher::{FileMatcher, is_eu4_date};
 use crate::profile::GameProfile;
+pub use crate::query::{FieldQuery, QueryProjection, QuerySelector, QueryValueKind};
 use crate::source::{ControlKind, Severity};
 
 /// One interned string.
@@ -356,6 +357,9 @@ pub struct Field {
     pub severity: Severity,
     /// Whether the field is deprecated.
     pub deprecated: bool,
+    /// Explicit opt-in metadata for schema-query capability filters.
+    #[serde(default)]
+    pub capabilities: Box<[Symbol]>,
 }
 
 /// What a [`Field`]'s value is.
@@ -370,7 +374,7 @@ pub enum FieldValue {
 }
 
 /// The shape a field's value takes, for §3.2 dispatch.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum Shape {
     /// A scalar.
     Scalar,
@@ -494,6 +498,8 @@ pub enum Matcher {
     Opaque,
     /// Alternatives, tried in written order.
     Union(Box<[MatcherId]>),
+    /// A source-preserving schema field projection.
+    Query(crate::query::FieldQuery),
 }
 
 /// One piece of a template.
@@ -781,6 +787,17 @@ pub trait SymbolFacts {
     }
     /// Memoization within this immutable fact view; returning None disables cross-query reuse.
     fn template_memo(&self) -> Option<std::sync::Arc<crate::template::TemplateMemo>> {
+        None
+    }
+    /// Whether a uniquely active Template can be invoked without arguments.
+    /// None means unavailable or incomplete analysis, never an implicit approval.
+    /// Implementations must stop when the shared query checkpoint returns true.
+    fn template_accepts_no_arguments(
+        &self,
+        _type_id: TypeId,
+        _name: &str,
+        _checkpoint: &mut dyn FnMut() -> bool,
+    ) -> Option<bool> {
         None
     }
     /// Source-ranged body of a uniquely active named Template.
@@ -1359,19 +1376,44 @@ impl RulesIr {
         value: &str,
         facts: &impl SymbolFacts,
     ) -> Option<bool> {
+        self.scalar_outcome_with_context(matcher, value, facts, &())
+    }
+
+    /// Context-aware scalar evaluation, including dependent schema projections.
+    pub fn scalar_outcome_with_context(
+        &self,
+        matcher: MatcherId,
+        value: &str,
+        facts: &impl SymbolFacts,
+        context: &impl crate::query::QueryContext,
+    ) -> Option<bool> {
         let mut no_cancel = || false;
         let mut budget = crate::pattern::SearchBudget::new(Default::default(), &mut no_cancel);
-        crate::pattern::evaluate(self, matcher, value, &mut budget, &mut |id, text| {
-            let result = self.scalar_primitive(id, text, facts);
-            if !result
-                && !facts.facts_complete()
-                && matches!(self.matcher(id), Matcher::Ref(_) | Matcher::Def { .. })
-            {
-                None
-            } else {
-                Some(result)
-            }
-        })
+        crate::pattern::evaluate_with_context(
+            self,
+            matcher,
+            value,
+            &mut budget,
+            &crate::query::QueryContextWithFacts::new(self, facts, context),
+            &mut |id, text| self.scalar_primitive_outcome(id, text, facts),
+        )
+    }
+
+    pub(crate) fn scalar_primitive_outcome(
+        &self,
+        id: MatcherId,
+        text: &str,
+        facts: &impl SymbolFacts,
+    ) -> Option<bool> {
+        let result = self.scalar_primitive(id, text, facts);
+        if !result
+            && !facts.facts_complete()
+            && matches!(self.matcher(id), Matcher::Ref(_) | Matcher::Def { .. })
+        {
+            None
+        } else {
+            Some(result)
+        }
     }
 
     fn scalar_primitive(&self, matcher: MatcherId, value: &str, facts: &impl SymbolFacts) -> bool {
@@ -1380,7 +1422,7 @@ impl RulesIr {
                 !value.is_empty()
             }
             Matcher::Literal(text) => self.strings.resolve(*text).eq_ignore_ascii_case(value),
-            Matcher::Pattern(_) | Matcher::Union(_) => {
+            Matcher::Pattern(_) | Matcher::Union(_) | Matcher::Query(_) => {
                 unreachable!("container matchers use bounded search")
             }
             Matcher::Int { min, max } => value.parse::<i64>().is_ok_and(|parsed| {

@@ -33,16 +33,6 @@ pub(crate) fn has_ir_schema(snapshot: &AnalysisSnapshot, input: &ParsedInput) ->
         .is_some_and(|(_, rule)| rule.parser == rules::ir::DocumentParser::Script)
 }
 
-/// Matches a complete IR matcher, including workspace-backed reference and trait variants.
-pub(crate) fn matcher_matches(
-    ir: &RulesIr,
-    matcher: MatcherId,
-    value: &str,
-    facts: &impl SymbolFacts,
-) -> bool {
-    hir::checking::scalar_matches(ir, matcher, value, facts)
-}
-
 pub(crate) fn matcher_matches_in_snapshot(
     snapshot: &AnalysisSnapshot,
     ir: &RulesIr,
@@ -63,6 +53,19 @@ pub(crate) fn matcher_matches_with_state(
     state: &ScopeState,
 ) -> bool {
     hir::checking::scalar_validation(ir, matcher, value, state, facts)
+        != hir::analysis::Validation::Invalid
+}
+
+/// Validates a scalar against its physical sibling container.
+pub(crate) fn matcher_matches_with_context(
+    ir: &RulesIr,
+    matcher: MatcherId,
+    value: &str,
+    facts: &impl SymbolFacts,
+    state: &ScopeState,
+    context: &impl rules::query::QueryContext,
+) -> bool {
+    hir::checking::scalar_validation_with_context(ir, matcher, value, state, facts, context)
         != hir::analysis::Validation::Invalid
 }
 
@@ -105,6 +108,14 @@ pub(crate) fn describe(ir: &RulesIr, matcher: MatcherId) -> String {
         Matcher::Scope(Some(scope)) => format!("a `{}` scope", ir.strings().resolve(*scope)),
         Matcher::Link => "a scope link or register".into(),
         Matcher::Opaque => "text".into(),
+        Matcher::Query(query) => format!(
+            "{} of `{}`",
+            match query.projection {
+                rules::ir::QueryProjection::Keys => "field keys",
+                rules::ir::QueryProjection::Values => "selected field values",
+            },
+            ir.strings().resolve(ir.schema(query.schema).name),
+        ),
         Matcher::Union(alternatives) => {
             let mut descriptions = alternatives
                 .iter()
@@ -124,29 +135,261 @@ pub(crate) fn spellings(
     prefix: &str,
 ) -> Vec<String> {
     let mut out = Vec::new();
-    spellings_into(ir, matcher, snapshot, prefix, &mut out);
+    spellings_into(
+        ir,
+        matcher,
+        snapshot,
+        prefix,
+        &rules::query::NoQueryContext,
+        &mut out,
+    );
     out.sort_by_key(|value| value.to_ascii_lowercase());
     out.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
     out
 }
 
-pub(crate) fn spellings_with_state(
+/// Enumerates query projections without erasing their source field identities.
+pub(crate) fn projected_matchers(
+    ir: &RulesIr,
+    matcher: MatcherId,
+    snapshot: &AnalysisSnapshot,
+    context: &impl rules::query::QueryContext,
+) -> Vec<(MatcherId, Option<FieldId>)> {
+    fn collect(
+        ir: &RulesIr,
+        matcher: MatcherId,
+        facts: &impl SymbolFacts,
+        context: &impl rules::query::QueryContext,
+        origin: Option<FieldId>,
+        depth: usize,
+        out: &mut Vec<(MatcherId, Option<FieldId>)>,
+    ) {
+        if depth >= 64 {
+            return;
+        }
+        match ir.matcher(matcher) {
+            Matcher::Query(query) => {
+                let resolved = ir.query_fields(query, facts, context);
+                if resolved.state != rules::query::QueryState::Resolved {
+                    return;
+                }
+                for field in resolved.fields {
+                    let projected = match query.projection {
+                        rules::ir::QueryProjection::Keys => Some(ir.field(field).key),
+                        rules::ir::QueryProjection::Values => match ir.field(field).value {
+                            FieldValue::Scalar(value) => Some(value),
+                            _ => None,
+                        },
+                    };
+                    if let Some(projected) = projected {
+                        collect(ir, projected, facts, context, Some(field), depth + 1, out);
+                    }
+                }
+            }
+            Matcher::Union(alternatives) => {
+                for alternative in alternatives {
+                    collect(ir, *alternative, facts, context, origin, depth + 1, out);
+                }
+            }
+            _ => out.push((matcher, origin)),
+        }
+    }
+    let mut out = Vec::new();
+    collect(
+        ir,
+        matcher,
+        &WorkspaceFacts { snapshot },
+        context,
+        None,
+        0,
+        &mut out,
+    );
+    out
+}
+
+/// Whether matcher interpretation needs query context, including Pattern holes.
+pub(crate) fn has_field_query(ir: &RulesIr, matcher: MatcherId) -> bool {
+    match ir.matcher(matcher) {
+        Matcher::Query(_) => true,
+        Matcher::Union(items) => items.iter().any(|id| has_field_query(ir, *id)),
+        Matcher::Pattern(parts) => parts
+            .iter()
+            .any(|part| matches!(part, PatternPart::Hole(id) if has_field_query(ir, *id))),
+        _ => false,
+    }
+}
+
+fn has_value_query(ir: &RulesIr, matcher: MatcherId) -> bool {
+    match ir.matcher(matcher) {
+        Matcher::Query(query) => query.projection == rules::ir::QueryProjection::Values,
+        Matcher::Union(items) => items.iter().any(|id| has_value_query(ir, *id)),
+        Matcher::Pattern(parts) => parts
+            .iter()
+            .any(|part| matches!(part, PatternPart::Hole(id) if has_value_query(ir, *id))),
+        _ => false,
+    }
+}
+
+/// Returns the original declaration supplying a concrete projected spelling.
+pub(crate) fn projected_source(
+    ir: &RulesIr,
+    matcher: MatcherId,
+    spelling: &str,
+    snapshot: &AnalysisSnapshot,
+    context: &impl rules::query::QueryContext,
+) -> Option<FieldId> {
+    if !has_field_query(ir, matcher) {
+        return None;
+    }
+    fn source(
+        ir: &RulesIr,
+        matcher: MatcherId,
+        spelling: &str,
+        snapshot: &AnalysisSnapshot,
+        context: &impl rules::query::QueryContext,
+        depth: usize,
+    ) -> Option<FieldId> {
+        if depth >= 64 {
+            return None;
+        }
+        match ir.matcher(matcher) {
+            Matcher::Pattern(parts) => {
+                let facts = WorkspaceFacts { snapshot };
+                let mut no_cancel = || false;
+                let mut budget =
+                    rules::pattern::SearchBudget::new(Default::default(), &mut no_cancel);
+                let query_context = rules::query::QueryContextWithFacts::new(ir, &facts, context);
+                let result = rules::pattern::unique_search_with_context(
+                    ir,
+                    parts,
+                    spelling,
+                    &mut budget,
+                    &query_context,
+                    &mut |id, text| {
+                        hir::checking::scalar_outcome_with_context(ir, id, text, &facts, context).0
+                    },
+                );
+                result.holes.into_iter().find_map(|(id, start, end)| {
+                    spelling
+                        .get(start..end)
+                        .and_then(|value| source(ir, id, value, snapshot, context, depth + 1))
+                })
+            }
+            Matcher::Union(items) => items
+                .iter()
+                .find_map(|id| source(ir, *id, spelling, snapshot, context, depth + 1)),
+            Matcher::Query(query) => {
+                let facts = WorkspaceFacts { snapshot };
+                let resolved = if query.projection == rules::ir::QueryProjection::Keys
+                    && query.selector.is_none()
+                {
+                    ir.query_selected_fields(query, spelling, &facts, context)
+                } else {
+                    ir.query_fields(query, &facts, context)
+                };
+                resolved.fields.into_iter().find(|field| {
+                    ir.query_projected_matcher(query, *field)
+                        .is_some_and(|projected| {
+                            hir::checking::scalar_outcome_with_context(
+                                ir, projected, spelling, &facts, context,
+                            )
+                            .0 == Some(true)
+                        })
+                })
+            }
+            _ => None,
+        }
+    }
+    // Identity and provenance survive a rejected empty-argument invocation. This
+    // context relaxes only call eligibility, never dispatch or source membership.
+    let context = rules::query::ReferenceQueryContext::new(context);
+    source(ir, matcher, spelling, snapshot, &context, 0)
+}
+
+/// Compatibility controls and authored query matchers share the same projection.
+pub(crate) fn query_spellings(
+    ir: &RulesIr,
+    query: &rules::ir::FieldQuery,
+    snapshot: &AnalysisSnapshot,
+    prefix: &str,
+    state: Option<&ScopeState>,
+    context: &impl rules::query::QueryContext,
+) -> Vec<(String, FieldId)> {
+    let facts = WorkspaceFacts { snapshot };
+    let resolution = ir.query_fields(query, &facts, context);
+    if resolution.state != rules::query::QueryState::Resolved {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for field in resolution.fields {
+        if let Some(matcher) = ir.query_projected_matcher(query, field) {
+            out.extend(
+                spellings_with_context(ir, matcher, snapshot, prefix, state, context)
+                    .into_iter()
+                    .filter(|value| {
+                        let outcome = ir.query_outcome(query, value, &facts, context);
+                        if query.call_args_none {
+                            outcome == Some(true)
+                        } else {
+                            outcome != Some(false)
+                        }
+                    })
+                    .map(|value| (value, field)),
+            );
+        }
+    }
+    out
+}
+
+pub(crate) fn spellings_with_context(
     ir: &RulesIr,
     matcher: MatcherId,
     snapshot: &AnalysisSnapshot,
     prefix: &str,
     state: Option<&ScopeState>,
+    context: &impl rules::query::QueryContext,
 ) -> Vec<String> {
-    if let Matcher::Union(alternatives) = ir.matcher(matcher) {
-        let mut values = alternatives
-            .iter()
-            .flat_map(|alternative| spellings_with_state(ir, *alternative, snapshot, prefix, state))
+    if let Matcher::Query(query) = ir.matcher(matcher) {
+        let mut values = projected_matchers(ir, matcher, snapshot, context)
+            .into_iter()
+            .flat_map(|(projected, _)| {
+                spellings_with_context(ir, projected, snapshot, prefix, state, context)
+            })
+            .filter(|value| {
+                let outcome = hir::checking::scalar_outcome_with_context(
+                    ir,
+                    matcher,
+                    value,
+                    &WorkspaceFacts { snapshot },
+                    context,
+                )
+                .0;
+                if query.call_args_none {
+                    outcome == Some(true)
+                } else {
+                    outcome != Some(false)
+                }
+            })
             .collect::<Vec<_>>();
         values.sort_by_key(|value| value.to_ascii_lowercase());
         values.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
         return values;
     }
-    let mut values = spellings(ir, matcher, snapshot, prefix);
+    if let Matcher::Union(alternatives) = ir.matcher(matcher) {
+        let mut values = alternatives
+            .iter()
+            .flat_map(|alternative| {
+                spellings_with_context(ir, *alternative, snapshot, prefix, state, context)
+            })
+            .collect::<Vec<_>>();
+        values.sort_by_key(|value| value.to_ascii_lowercase());
+        values.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
+        return values;
+    }
+    let mut values = Vec::new();
+    spellings_into(ir, matcher, snapshot, prefix, context, &mut values);
+    values.sort_by_key(|value| value.to_ascii_lowercase());
+    values.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
     if matches!(ir.matcher(matcher), Matcher::Scope(_) | Matcher::Link) {
         // Keep the default list bounded to pairs of static declared links. Dynamic
         // link operands are workspace-sized and must not form a Cartesian product.
@@ -203,11 +446,12 @@ fn spellings_into(
     matcher: MatcherId,
     snapshot: &AnalysisSnapshot,
     prefix: &str,
+    context: &impl rules::query::QueryContext,
     out: &mut Vec<String>,
 ) {
     match ir.matcher(matcher) {
         Matcher::Literal(value) => out.push(ir.strings().resolve(*value).to_owned()),
-        Matcher::Pattern(parts) => pattern_spellings(ir, parts, snapshot, prefix, out),
+        Matcher::Pattern(parts) => pattern_spellings(ir, parts, snapshot, prefix, context, out),
         Matcher::Bool => out.extend(["yes".into(), "no".into()]),
         Matcher::Date => {}
         Matcher::Enum { id } => {
@@ -297,9 +541,12 @@ fn spellings_into(
         Matcher::Loc => out.extend(effective_workspace_member_names(snapshot, "localisation")),
         Matcher::Union(items) => {
             for item in items {
-                spellings_into(ir, *item, snapshot, prefix, out);
+                spellings_into(ir, *item, snapshot, prefix, context, out);
             }
         }
+        Matcher::Query(_) => out.extend(spellings_with_context(
+            ir, matcher, snapshot, prefix, None, context,
+        )),
         Matcher::Scalar
         | Matcher::Int { .. }
         | Matcher::Float { .. }
@@ -314,6 +561,7 @@ fn pattern_spellings(
     parts: &[PatternPart],
     snapshot: &AnalysisSnapshot,
     prefix: &str,
+    context: &impl rules::query::QueryContext,
     out: &mut Vec<String>,
 ) {
     let mut variants = vec![String::new()];
@@ -322,7 +570,7 @@ fn pattern_spellings(
             PatternPart::Text(text) => vec![ir.strings().resolve(*text).to_owned()],
             PatternPart::Hole(matcher) => {
                 let mut values = Vec::new();
-                spellings_into(ir, *matcher, snapshot, "", &mut values);
+                spellings_into(ir, *matcher, snapshot, "", context, &mut values);
                 values.sort_by_key(|value| value.to_ascii_lowercase());
                 values.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
                 values
@@ -396,7 +644,14 @@ fn scope_link_spellings(
                             .iter()
                             .map(|register| ir.strings().resolve(register.name).to_owned()),
                     ),
-                    _ => spellings_into(ir, *matcher, snapshot, "", &mut options),
+                    _ => spellings_into(
+                        ir,
+                        *matcher,
+                        snapshot,
+                        "",
+                        &rules::query::NoQueryContext,
+                        &mut options,
+                    ),
                 }
                 options.sort_by_key(|value| value.to_ascii_lowercase());
                 options.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
@@ -633,6 +888,32 @@ fn cardinality_groups(
     groups
 }
 
+fn append_selector_errors(
+    ir: &RulesIr,
+    failures: impl IntoIterator<Item = (rules::ir::Symbol, rules::query::QueryState)>,
+    context: &hir::query::PropertyQueryContext<'_>,
+    container: TextRange,
+    fallback: TextRange,
+    seen: &mut BTreeSet<(TextRange, rules::ir::Symbol)>,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> bool {
+    let mut failed = false;
+    for (selector, state) in failures {
+        failed = true;
+        if seen.insert((container, selector)) {
+            diagnostics.push(Diagnostic::new(
+                DiagnosticCode::InvalidValue,
+                DiagnosticCode::InvalidValue.severity(),
+                context
+                    .source_range(ir.strings().resolve(selector))
+                    .unwrap_or(fallback),
+                hir::checking::query_selector_explanation(ir, selector, state),
+            ));
+        }
+    }
+    failed
+}
+
 fn schema_diagnostics_at_depth(
     snapshot: &AnalysisSnapshot,
     hir: &HirFile,
@@ -648,6 +929,7 @@ fn schema_diagnostics_at_depth(
     let mut direct_counts =
         BTreeMap::<(TextRange, FieldId), BTreeMap<String, (u32, TextRange)>>::new();
     let mut unbound_keys = BTreeSet::new();
+    let mut selector_errors = BTreeSet::new();
     let properties = hir.properties();
     for overload in hir
         .overload_facts()
@@ -711,19 +993,47 @@ fn schema_diagnostics_at_depth(
         else {
             continue;
         };
+        let context = hir::query::PropertyQueryContext::for_property(properties, property)
+            .defer_templates(owner_range.is_some());
         let candidates = field_fact.fields.clone();
         if candidates.is_empty() {
+            let failures = ir.fields(field_fact.schema).into_iter().flat_map(|id| {
+                hir::checking::query_selector_failures(ir, ir.field(id).key, &facts, &context)
+            });
+            if append_selector_errors(
+                ir,
+                failures,
+                &context,
+                parent_schema.range,
+                property.key_range,
+                &mut selector_errors,
+                &mut diagnostics,
+            ) {
+                continue;
+            }
             if ir.fields(field_fact.schema).into_iter().any(|id| {
-                hir::checking::scalar_outcome(ir, ir.field(id).key, &property.key, &facts)
-                    .0
-                    .is_none()
+                hir::checking::scalar_outcome_with_context(
+                    ir,
+                    ir.field(id).key,
+                    &property.key,
+                    &facts,
+                    &context,
+                )
+                .0
+                .is_none()
             }) {
                 continue;
             }
-            let known = ir
-                .fields(field_fact.schema)
-                .into_iter()
-                .find(|id| matcher_matches(ir, ir.field(*id).key, &property.key, &facts));
+            let known = ir.fields(field_fact.schema).into_iter().find(|id| {
+                matcher_matches_with_context(
+                    ir,
+                    ir.field(*id).key,
+                    &property.key,
+                    &facts,
+                    &parent_schema.state,
+                    &context,
+                )
+            });
             if let Some(id) = known {
                 let expected = match ir.shape(id) {
                     Some(Shape::Scalar) => "a scalar value",
@@ -741,6 +1051,31 @@ fn schema_diagnostics_at_depth(
                         format!("`{}` expects {expected}", property.key),
                     ),
                 ));
+            } else if !ir.schema(field_fact.schema).open
+                && let Some(query_matcher) = ir
+                    .fields(field_fact.schema)
+                    .into_iter()
+                    .map(|field| ir.field(field).key)
+                    .find(|matcher| has_value_query(ir, *matcher))
+            {
+                let expected = projected_matchers(ir, query_matcher, snapshot, &context)
+                    .into_iter()
+                    .map(|(matcher, _)| diagnostic_description(ir, matcher))
+                    .collect::<Vec<_>>()
+                    .join(" or ");
+                diagnostics.push(
+                    Diagnostic::new(
+                        DiagnosticCode::InvalidValue,
+                        DiagnosticCode::InvalidValue.severity(),
+                        property.key_range,
+                        format!("invalid branch value `{}`", property.key),
+                    )
+                    .with_expected(if expected.is_empty() {
+                        describe(ir, query_matcher)
+                    } else {
+                        expected
+                    }),
+                );
             } else if !ir.schema(field_fact.schema).open {
                 let expected = ir
                     .schema(field_fact.schema)
@@ -781,13 +1116,13 @@ fn schema_diagnostics_at_depth(
                     .iter()
                     .copied()
                     .find(|candidate| match ir.field(*candidate).value {
-                        FieldValue::Scalar(matcher) => matcher_matches_with_state(
-                            snapshot,
+                        FieldValue::Scalar(matcher) => matcher_matches_with_context(
                             ir,
                             matcher,
                             &scalar.value,
                             &facts,
                             &parent_schema.state,
+                            &context,
                         ),
                         _ => false,
                     })
@@ -795,12 +1130,13 @@ fn schema_diagnostics_at_depth(
             .unwrap_or(candidates[0]);
         let field = ir.field(selected);
         if let (FieldValue::Scalar(matcher), Some(scalar)) = (field.value, &property.scalar) {
-            let checked = hir::checking::scalar_validation_cancellable(
+            let checked = hir::checking::scalar_validation_cancellable_with_context(
                 ir,
                 matcher,
                 &scalar.value,
                 &parent_schema.state,
                 &facts,
+                &context,
                 &mut || cancellation.checkpoint(),
             )?;
             if !checked.coverage.is_complete() {
@@ -876,15 +1212,27 @@ fn schema_diagnostics_at_depth(
         }
         if let (FieldValue::Scalar(matcher), Some(scalar)) = (field.value, property.scalar.as_ref())
             && !binding_dependent(scalar.range)
-            && !matcher_matches_with_state(
-                snapshot,
+            && !matcher_matches_with_context(
                 ir,
                 matcher,
                 &scalar.value,
                 &facts,
                 &parent_schema.state,
+                &context,
             )
         {
+            let failures = hir::checking::query_selector_failures(ir, matcher, &facts, &context);
+            if append_selector_errors(
+                ir,
+                failures,
+                &context,
+                parent_schema.range,
+                scalar.range,
+                &mut selector_errors,
+                &mut diagnostics,
+            ) {
+                continue;
+            }
             let wrong_scope =
                 matcher_has_scope(ir, matcher) && hir::is_ir_scope_link(ir, &scalar.value);
             let texture = matcher_has_texture_path(ir, matcher);
@@ -1098,7 +1446,20 @@ fn schema_diagnostics_at_depth(
         let Some(matcher) = ir.schema(fact.schema).items else {
             continue;
         };
-        if !matcher_matches_with_state(snapshot, ir, matcher, &value.value, &facts, &fact.state) {
+        let context = hir::query::PropertyQueryContext::in_container(properties, fact.range);
+        if !matcher_matches_with_context(ir, matcher, &value.value, &facts, &fact.state, &context) {
+            let failures = hir::checking::query_selector_failures(ir, matcher, &facts, &context);
+            if append_selector_errors(
+                ir,
+                failures,
+                &context,
+                fact.range,
+                value.range,
+                &mut selector_errors,
+                &mut diagnostics,
+            ) {
+                continue;
+            }
             let overflow = numeric_range_overflow(ir, matcher, &value.value);
             diagnostics.push(
                 Diagnostic::new(
@@ -1597,41 +1958,43 @@ fn template_argument_diagnostics(
                 ));
             }
         }
-        let unconditional = summary
-            .parameters
-            .iter()
-            .filter(|parameter| {
-                crate::template_presence::parameter_effectively_required(
-                    snapshot, &summary, parameter,
-                ) && !counts
-                    .keys()
-                    .any(|name| name.eq_ignore_ascii_case(&parameter.name))
-            })
-            .map(|parameter| parameter.name.clone())
-            .collect::<Vec<_>>();
-        let active = hir::template::missing_parameters_with_inputs(
+        let inputs = crate::ir_template::invocation_inputs(hir, property);
+        let required = hir::template::required_parameters_with_inputs(
             snapshot.ir(),
             &WorkspaceFacts { snapshot },
             &kind,
             &property.key,
-            &crate::ir_template::invocation_inputs(hir, property),
+            &inputs,
             state,
             &mut || cancellation.checkpoint(),
         )?;
-        if !active.coverage.is_complete() {
+        if !required.coverage.is_complete() {
             diagnostics.push(Diagnostic::new(
                 DiagnosticCode::AnalysisIncomplete,
                 Severity::Information,
                 property.key_range,
-                active.coverage.limit_description(),
+                required.coverage.limit_description(),
             ));
         }
-        let missing = unconditional
-            .iter()
-            .chain(active.iter())
-            .filter(|name| !counts.keys().any(|key| key.eq_ignore_ascii_case(name)))
-            .cloned()
-            .collect::<std::collections::BTreeSet<_>>();
+        let mut unconditional = required.unconditional.clone();
+        let mut missing = required.missing.clone();
+        // Preserve signature-only diagnostics when the Template representation is unavailable.
+        // Concrete Template invocations and callable queries share the HIR inference above.
+        if summary.template.is_none() {
+            unconditional.extend(
+                summary
+                    .parameters
+                    .iter()
+                    .filter(|parameter| {
+                        parameter.required
+                            && !inputs
+                                .present
+                                .contains(&parameter.name.to_ascii_lowercase())
+                    })
+                    .map(|parameter| parameter.name.clone()),
+            );
+            missing.extend(unconditional.iter().cloned());
+        }
         if !missing.is_empty() {
             let listed = missing
                 .iter()

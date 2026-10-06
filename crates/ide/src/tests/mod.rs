@@ -1,5 +1,6 @@
 mod completion;
 mod diagnostics;
+mod field_queries;
 mod golden;
 mod hover;
 mod hover_improvements;

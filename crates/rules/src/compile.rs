@@ -101,9 +101,20 @@ pub fn check(sources: &[(String, RuleFile)]) -> Vec<Diagnostic> {
     checker.check_unreachable_overloads();
     checker.check_parameters();
     checker.check_scopes();
+    checker.check_queries();
     checker.check_card_disagreement();
     checker.check_undefined_references();
     checker.check_unused_definitions();
+    if !checker.queries.is_empty()
+        && !checker
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.severity == Severity::Error)
+    {
+        checker
+            .diagnostics
+            .extend(crate::lower::check_queries(sources));
+    }
     let Checker {
         mut diagnostics, ..
     } = checker;
@@ -223,6 +234,29 @@ struct ParamUse {
     what: &'static str,
 }
 
+/// Context retained for dependent selectors until all schemas and mixins exist.
+#[derive(Clone)]
+enum QueryOwner {
+    Schema(String),
+    Mixin(String),
+}
+
+impl QueryOwner {
+    fn name(&self) -> &str {
+        match self {
+            Self::Schema(name) | Self::Mixin(name) => name,
+        }
+    }
+}
+
+#[derive(Clone)]
+struct QueryUse {
+    query: expr::FieldQuery,
+    at: At,
+    owner: Option<QueryOwner>,
+    siblings_allowed: bool,
+}
+
 /// The collected world the checks reason over.
 struct Checker<'a> {
     sources: &'a [(String, RuleFile)],
@@ -237,6 +271,7 @@ struct Checker<'a> {
     references: Vec<Reference>,
     calls: Vec<CallSite>,
     params: Vec<ParamUse>,
+    queries: Vec<QueryUse>,
     /// Files `root` schema names, for schema reachability.
     root_schemas: Vec<String>,
 }
@@ -256,6 +291,7 @@ impl<'a> Checker<'a> {
             references: Vec::new(),
             calls: Vec::new(),
             params: Vec::new(),
+            queries: Vec::new(),
             root_schemas: Vec::new(),
         }
     }
@@ -274,6 +310,7 @@ impl<'a> Checker<'a> {
                         what: "a type expression",
                     });
                 }
+                self.collect_queries(at, &parsed, ctx);
                 Some(parsed)
             }
             Err(failure) => {
@@ -286,6 +323,139 @@ impl<'a> Checker<'a> {
                 None
             }
         }
+    }
+
+    fn collect_queries(&mut self, at: &At, parsed: &Expr, ctx: &ParamCtx) {
+        for alternative in &parsed.alternatives {
+            match alternative {
+                Primary::Query(query) => {
+                    self.references.push(Reference {
+                        kind: RefKind::Schema,
+                        name: query.schema.clone(),
+                        subtype: None,
+                        owner: ctx
+                            .query_owner
+                            .as_ref()
+                            .map(|owner| owner.name().to_owned()),
+                        at: at.clone(),
+                    });
+                    self.queries.push(QueryUse {
+                        query: query.clone(),
+                        at: at.clone(),
+                        owner: ctx.query_owner.clone(),
+                        siblings_allowed: ctx.siblings_allowed,
+                    });
+                }
+                Primary::Literal(parts) => {
+                    for part in parts {
+                        if let expr::LiteralPart::Hole(hole) = part {
+                            self.collect_queries(at, hole, ctx);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Validate query-specific names and dependent selectors after collection.
+    fn check_queries(&mut self) {
+        for usage in &self.queries {
+            if let Some(scope) = &usage.query.scope_accepts
+                && scope != "any"
+                && !self.scope_types.contains(scope)
+            {
+                report(
+                    &mut self.diagnostics,
+                    &usage.at,
+                    DiagnosticCode::ScopeReferenceError,
+                    Severity::Error,
+                    format!("query scope `{scope}` is not declared"),
+                );
+            }
+            if self
+                .schemas
+                .get(&usage.query.schema)
+                .is_some_and(|schema| !schema.formals.is_empty())
+            {
+                report(
+                    &mut self.diagnostics,
+                    &usage.at,
+                    DiagnosticCode::ParameterError,
+                    Severity::Error,
+                    format!(
+                        "query schema `{}` must be non-parameterized",
+                        usage.query.schema
+                    ),
+                );
+            }
+            let Some(expr::QuerySelector::Sibling(sibling)) = &usage.query.selector else {
+                continue;
+            };
+            if !usage.siblings_allowed || usage.owner.is_none() {
+                report_parse(
+                    &mut self.diagnostics,
+                    &usage.at,
+                    None,
+                    "a sibling selector requires a schema field or items context".into(),
+                );
+                continue;
+            }
+            let declared = match &usage.owner {
+                Some(QueryOwner::Schema(name)) => self.schema_has_field(name, sibling),
+                Some(QueryOwner::Mixin(name)) => {
+                    let owners = self
+                        .schemas
+                        .iter()
+                        .filter(|(_, schema)| schema.include.contains(name));
+                    let mut any_owner = false;
+                    let mut all_declared = true;
+                    for (schema, _) in owners {
+                        any_owner = true;
+                        all_declared &= self.schema_has_field(schema, sibling);
+                    }
+                    if any_owner {
+                        all_declared
+                    } else {
+                        self.mixins.get(name).is_some_and(|mixin| {
+                            mixin
+                                .value
+                                .fields
+                                .keys()
+                                .any(|key| key.eq_ignore_ascii_case(sibling))
+                        })
+                    }
+                }
+                None => false,
+            };
+            if !declared {
+                report(
+                    &mut self.diagnostics,
+                    &usage.at,
+                    DiagnosticCode::UndefinedReference,
+                    Severity::Error,
+                    format!("sibling selector names undeclared exact field `{sibling}`"),
+                );
+            }
+        }
+    }
+
+    fn schema_has_field(&self, schema: &str, field: &str) -> bool {
+        self.schemas.get(schema).is_some_and(|schema| {
+            schema
+                .fields
+                .keys()
+                .any(|key| key.eq_ignore_ascii_case(field))
+                || schema.include.iter().any(|name| {
+                    self.mixins.get(name).is_some_and(|mixin| {
+                        mixin
+                            .value
+                            .fields
+                            .keys()
+                            .any(|key| key.eq_ignore_ascii_case(field))
+                    })
+                })
+        })
     }
 
     /// Parses one schema reference (`body` string).
@@ -525,7 +695,13 @@ impl<'a> Checker<'a> {
                     );
                 }
                 match expr::parse_template(name) {
-                    Ok(_) => {}
+                    Ok(parts) => {
+                        for part in parts {
+                            if let expr::LiteralPart::Hole(hole) = part {
+                                self.collect_queries(&at, &hole, &ParamCtx::closed());
+                            }
+                        }
+                    }
                     Err(failure) => report_parse(
                         &mut self.diagnostics,
                         &at,
@@ -608,7 +784,7 @@ impl<'a> Checker<'a> {
                     self.root_schemas.push(name.clone());
                 }
                 Some(RootSpec::Instance(field)) => {
-                    self.collect_field_payload(&at.child("root"), "", &[], field);
+                    self.collect_field_payload(&at.child("root"), "", &ParamCtx::closed(), field);
                 }
                 None => {}
             }
@@ -668,7 +844,7 @@ impl<'a> Checker<'a> {
                 }
                 SchemaSpec::Map { map } => {
                     self.schemas.insert(name.clone(), def);
-                    let ctx = ParamCtx { formals: &[] };
+                    let ctx = ParamCtx::schema(&[], &name, false);
                     let owner = Some(name.as_str());
                     if let Some(parsed) = self.expr(&at.child("map").child("key"), &map.key, &ctx) {
                         self.collect_refs_from_expr(&at.child("map").child("key"), &parsed, owner);
@@ -689,7 +865,13 @@ impl<'a> Checker<'a> {
                 }
                 SchemaSpec::List { list } => {
                     self.schemas.insert(name.clone(), def);
-                    self.expr(&at.child("list"), list, &ParamCtx::closed());
+                    if let Some(parsed) = self.expr(
+                        &at.child("list"),
+                        list,
+                        &ParamCtx::schema(&[], &name, false),
+                    ) {
+                        self.collect_refs_from_expr(&at.child("list"), &parsed, Some(&name));
+                    }
                 }
             }
         }
@@ -716,7 +898,16 @@ impl<'a> Checker<'a> {
                     at: at.clone(),
                 },
             );
-            self.collect_field_map(&at, name, &[], &mixin.fields);
+            self.collect_field_map(
+                &at,
+                name,
+                &ParamCtx {
+                    formals: &[],
+                    query_owner: Some(QueryOwner::Mixin(name.clone())),
+                    siblings_allowed: true,
+                },
+                &mixin.fields,
+            );
         }
 
         for (name, spec) in &file.types {
@@ -891,16 +1082,11 @@ impl<'a> Checker<'a> {
         formals: &[String],
         block: &crate::source::BlockSchema,
     ) {
-        let _ = name;
-        self.collect_field_map(at, name, formals, &block.fields);
+        let ctx = ParamCtx::schema(formals, name, true);
+        self.collect_field_map(at, name, &ctx, &block.fields);
         for (index, pattern) in block.patterns.iter().enumerate() {
             let pattern_at = at.child("patterns").index(index);
-            let ctx = ParamCtx { formals };
-            if let Some(key) = &pattern.key {
-                if let Some(parsed) = self.expr(&pattern_at.child("key"), key, &ctx) {
-                    self.collect_refs_from_expr(&pattern_at.child("key"), &parsed, Some(name));
-                }
-            } else {
+            if pattern.key.is_none() {
                 report(
                     &mut self.diagnostics,
                     &pattern_at,
@@ -909,10 +1095,10 @@ impl<'a> Checker<'a> {
                     "a pattern must declare a `key` type expression".to_owned(),
                 );
             }
-            self.collect_field_payload(&pattern_at, name, formals, pattern);
+            self.collect_field_payload(&pattern_at, name, &ctx, pattern);
         }
         if let Some(items) = &block.items
-            && let Some(parsed) = self.expr(&at.child("items"), items, &ParamCtx::closed())
+            && let Some(parsed) = self.expr(&at.child("items"), items, &ctx)
         {
             self.collect_refs_from_expr(&at.child("items"), &parsed, Some(name));
         }
@@ -922,7 +1108,7 @@ impl<'a> Checker<'a> {
         &mut self,
         at: &At,
         schema: &str,
-        formals: &[String],
+        ctx: &ParamCtx,
         fields: &BTreeMap<String, FieldOverloads>,
     ) {
         for (key, overloads) in fields {
@@ -936,21 +1122,14 @@ impl<'a> Checker<'a> {
                 if indexed {
                     field_at = field_at.index(index);
                 }
-                self.collect_field_payload(&field_at, schema, formals, field);
+                self.collect_field_payload(&field_at, schema, ctx, field);
             }
         }
     }
 
     /// Collects one field specification's mini-syntax, references, calls,
     /// params, and def positions.
-    fn collect_field_payload(
-        &mut self,
-        at: &At,
-        schema: &str,
-        formals: &[String],
-        field: &FieldSpec,
-    ) {
-        let ctx = ParamCtx { formals };
+    fn collect_field_payload(&mut self, at: &At, schema: &str, ctx: &ParamCtx, field: &FieldSpec) {
         let owner = (!schema.is_empty()).then_some(schema);
         if let Some(control) = &field.control {
             if let Some(selector_schema) = &control.selector_schema {
@@ -966,7 +1145,7 @@ impl<'a> Checker<'a> {
                 self.collect_body_ref(
                     &at.child("control").child("selector_schema"),
                     selector_schema,
-                    &ctx,
+                    ctx,
                     owner,
                 );
             }
@@ -1007,31 +1186,31 @@ impl<'a> Checker<'a> {
             );
         }
         if let Some(key) = &field.key
-            && let Some(parsed) = self.expr(&at.child("key"), key, &ctx)
+            && let Some(parsed) = self.expr(&at.child("key"), key, ctx)
         {
-            self.collect_enum_ref(&at.child("key"), &parsed, owner);
+            self.collect_refs_from_expr(&at.child("key"), &parsed, owner);
         }
         let mut payload_count = 0usize;
         if let Some(value) = &field.value {
             payload_count += 1;
-            if let Some(parsed) = self.expr(&at.child("value"), value, &ctx) {
+            if let Some(parsed) = self.expr(&at.child("value"), value, ctx) {
                 self.collect_refs_from_expr(&at.child("value"), &parsed, owner);
             }
         }
         if let Some(body) = &field.body {
             payload_count += 1;
-            self.collect_body_ref(&at.child("body"), body, &ctx, owner);
+            self.collect_body_ref(&at.child("body"), body, ctx, owner);
         }
         if let Some(list) = &field.list {
             payload_count += 1;
-            if let Some(parsed) = self.expr(&at.child("list"), list, &ctx) {
+            if let Some(parsed) = self.expr(&at.child("list"), list, &ctx.without_siblings()) {
                 self.collect_refs_from_expr(&at.child("list"), &parsed, owner);
             }
         }
         if let Some(map) = &field.map {
             payload_count += 1;
             let map_at = at.child("map");
-            let map_ctx = ParamCtx { formals };
+            let map_ctx = ctx.without_siblings();
             if let Some(parsed) = self.expr(&map_at.child("key"), &map.key, &map_ctx) {
                 self.collect_refs_from_expr(&map_at.child("key"), &parsed, owner);
             }
@@ -1186,25 +1365,6 @@ impl<'a> Checker<'a> {
             }
         }
     }
-
-    /// Collects the enum reference of a `map`/`pattern` key expression, if any.
-    fn collect_enum_ref(&mut self, at: &At, parsed: &Expr, owner: Option<&str>) {
-        for alternative in &parsed.alternatives {
-            if let Primary::Enum(argument) = alternative
-                && let Some(name) = first_name(argument)
-            {
-                self.references.push(Reference {
-                    kind: RefKind::Enum,
-                    name,
-                    subtype: None,
-                    owner: owner.map(ToOwned::to_owned),
-                    at: at.clone(),
-                });
-            }
-        }
-    }
-
-    // ---- checks ----------------------------------------------------------
 
     /// Check 2: include conflicts.
     fn check_include_conflicts(&mut self) {
@@ -1742,11 +1902,35 @@ impl<'a> Checker<'a> {
 /// Parameter scope of one walk position.
 struct ParamCtx<'a> {
     formals: &'a [String],
+    query_owner: Option<QueryOwner>,
+    siblings_allowed: bool,
+}
+
+impl<'a> ParamCtx<'a> {
+    fn schema(formals: &'a [String], name: &str, siblings_allowed: bool) -> Self {
+        Self {
+            formals,
+            query_owner: Some(QueryOwner::Schema(name.to_owned())),
+            siblings_allowed,
+        }
+    }
+
+    fn without_siblings(&self) -> Self {
+        Self {
+            formals: self.formals,
+            query_owner: self.query_owner.clone(),
+            siblings_allowed: false,
+        }
+    }
 }
 
 impl ParamCtx<'static> {
     fn closed() -> Self {
-        Self { formals: &[] }
+        Self {
+            formals: &[],
+            query_owner: None,
+            siblings_allowed: false,
+        }
     }
 }
 
@@ -2999,5 +3183,198 @@ mod tests {
             1,
             "{diagnostics:?}"
         );
+    }
+    #[test]
+    fn queries_resolve_schema_scope_and_reachability() {
+        let diagnostics = run(&[(
+            "query.json",
+            r#"{
+            "scopes": { "types": ["country"] },
+            "files": { "test": { "path": "test", "ext": "txt", "root": "root" } },
+            "schemas": {
+                "root": { "fields": { "selected": { "value": "keysof<source,scope_accepts=country,shape=scalar,value_kind_any=(int|float|bool),capability=exportable>" } } },
+                "source": { "fields": { "value": { "value": "int" } } }
+            }
+        }"#,
+        )]);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+
+        let diagnostics = run(&[(
+            "query.json",
+            r#"{
+            "schemas": { "root": { "items": "keysof<missing,scope_accepts=unknown>" } }
+        }"#,
+        )]);
+        assert!(diagnostics.iter().any(|diagnostic| diagnostic.code
+            == DiagnosticCode::UndefinedReference
+            && diagnostic.message.contains("missing")));
+        assert!(diagnostics.iter().any(|diagnostic| diagnostic.code
+            == DiagnosticCode::ScopeReferenceError
+            && diagnostic.message.contains("unknown")));
+    }
+
+    #[test]
+    fn queries_validate_dependent_siblings_in_fields_patterns_and_items() {
+        let diagnostics = run(&[(
+            "query.json",
+            r#"{
+            "files": { "test": { "path": "test", "ext": "txt", "root": "root" } },
+            "schemas": {
+                "root": {
+                    "include": ["selector"],
+                    "fields": { "value": { "value": "valuesof<source,key=sibling<on_trigger>>" } },
+                    "patterns": [{ "key": "valuesof<source,key=sibling<on_trigger>>", "value": "scalar" }],
+                    "items": "valuesof<source,key=sibling<ON_TRIGGER>>"
+                },
+                "source": { "fields": { "value": { "value": "int" } } }
+            },
+            "mixins": { "selector": { "fields": { "on_trigger": { "value": "keysof<source>" } } } }
+        }"#,
+        )]);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    }
+
+    #[test]
+    fn queries_reject_undeclared_or_out_of_context_siblings() {
+        for schema in [
+            r#"{ "fields": { "value": { "value": "valuesof<source,key=sibling<missing>>" } } }"#,
+            r#"{ "items": "valuesof<source,key=sibling<missing>>" }"#,
+            r#"{ "list": "valuesof<source,key=sibling<missing>>" }"#,
+            r#"{ "map": { "key": "valuesof<source,key=sibling<missing>>", "value": "scalar" } }"#,
+            r#"{ "fields": { "on_trigger": { "value": "scalar" }, "value": { "list": "valuesof<source,key=sibling<on_trigger>>" } } }"#,
+            r#"{ "fields": { "on_trigger": { "value": "scalar" }, "value": { "map": { "key": "valuesof<source,key=sibling<on_trigger>>", "value": "scalar" } } } }"#,
+        ] {
+            let json = format!(
+                r#"{{ "schemas": {{ "root": {schema}, "source": {{ "fields": {{ "value": {{ "value": "int" }} }} }} }} }}"#
+            );
+            let diagnostics = run(&[("query.json", &json)]);
+            assert!(
+                diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.severity == Severity::Error
+                        && diagnostic.message.contains("sibling")),
+                "{schema}: {diagnostics:?}"
+            );
+        }
+        let diagnostics = run(&[(
+            "query.json",
+            r#"{
+            "files": { "test": { "path": "test", "ext": "txt", "root": { "value": "valuesof<source,key=sibling<missing>>" } } },
+            "schemas": { "source": { "fields": { "value": { "value": "int" } } } }
+        }"#,
+        )]);
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.severity == Severity::Error
+                    && diagnostic.message.contains("sibling")),
+            "{diagnostics:?}"
+        );
+    }
+
+    #[test]
+    fn queries_validate_mixin_siblings_in_each_including_schema() {
+        let json = r#"{
+            "schemas": {
+                "good": { "include": ["dependent"], "fields": { "selector": { "value": "scalar" } } },
+                "bad": { "include": ["dependent"] },
+                "source": { "fields": { "value": { "value": "int" } } }
+            },
+            "mixins": { "dependent": { "fields": { "value": { "value": "valuesof<source,key=sibling<selector>>" } } } }
+        }"#;
+        let diagnostics = run(&[("query.json", json)]);
+        assert!(
+            diagnostics.iter().any(|diagnostic| diagnostic.code
+                == DiagnosticCode::UndefinedReference
+                && diagnostic.message.contains("selector")),
+            "{diagnostics:?}"
+        );
+        let valid = json.replace("\"bad\": { \"include\": [\"dependent\"] },", "");
+        let diagnostics = run(&[("query.json", &valid)]);
+        assert!(
+            !diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.severity == Severity::Error),
+            "{diagnostics:?}"
+        );
+    }
+
+    #[test]
+    fn queries_in_template_holes_are_validated() {
+        let diagnostics = run(&[(
+            "query.json",
+            r#"{
+            "schemas": { "root": { "fields": { "value": { "value": "'prefix_{keysof<missing>}'" } } } }
+        }"#,
+        )]);
+        assert!(
+            diagnostics.iter().any(|diagnostic| diagnostic.code
+                == DiagnosticCode::UndefinedReference
+                && diagnostic.message.contains("missing")),
+            "{diagnostics:?}"
+        );
+    }
+
+    #[test]
+    fn queries_allow_non_dependent_self_schema_projection() {
+        let diagnostics = run(&[(
+            "query.json",
+            r#"{
+            "files": { "test": { "path": "test", "ext": "txt", "root": "root" } },
+            "schemas": { "root": { "fields": { "value": { "value": "keysof<root>" }, "nested": { "body": "self" } } } }
+        }"#,
+        )]);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    }
+    #[test]
+    fn queries_reject_value_projection_dependency_cycles() {
+        for schemas in [
+            r#"{ "root": { "fields": { "value": { "value": "valuesof<root,key=value>" } } } }"#,
+            r#"{
+                "root": { "fields": { "value": { "value": "valuesof<other,key=value>" } } },
+                "other": { "fields": { "value": { "value": "valuesof<root,key=value>" } } }
+            }"#,
+            r#"{ "root": { "patterns": [{ "key": "keysof<root>", "value": "scalar" }] } }"#,
+        ] {
+            let json = format!(r#"{{ "schemas": {schemas} }}"#);
+            let diagnostics = run(&[("query.json", &json)]);
+            assert!(
+                diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.severity == Severity::Error
+                        && diagnostic.message.contains("cycl")),
+                "{schemas}: {diagnostics:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn queries_do_not_treat_unselected_values_as_dependencies() {
+        let diagnostics = run(&[(
+            "query.json",
+            r#"{
+            "files": { "test": { "path": "test", "ext": "txt", "root": "root" } },
+            "schemas": { "root": { "fields": {
+                "selected": { "value": "int" },
+                "value": { "value": "valuesof<root,key=selected>" },
+                "nested": { "body": "self" }
+            } } }
+        }"#,
+        )]);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    }
+    #[test]
+    fn queries_do_not_depend_on_filtered_out_key_matchers() {
+        let diagnostics = run(&[(
+            "query.json",
+            r#"{
+            "files": { "test": { "path": "test", "ext": "txt", "root": "root" } },
+            "schemas": { "root": {
+                "fields": { "value": { "value": "int" } },
+                "patterns": [{ "key": "keysof<root,shape=scalar>", "body": "self" }]
+            } }
+        }"#,
+        )]);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
     }
 }

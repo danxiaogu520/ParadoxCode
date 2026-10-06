@@ -180,10 +180,107 @@ fn inherited_modifiers_and_numeric_trigger_domains_validate_values() {
         assert!(!ir.scalar_matches(value, "yes", &facts));
     }
 
-    let numeric = ir.enum_by_name("numeric_or_bool_trigger").unwrap();
-    assert!(ir.enum_contains(numeric, "num_of_revolutionary_guard"));
-    assert!(ir.enum_contains(numeric, "always"));
-    assert!(!ir.enum_contains(numeric, "primary_culture"));
+    for name in [
+        "effect__export_to_variable",
+        "trigger__variable_arithmetic_trigger__export_to_variable",
+        "new_diplomatic_action_body__ai_acceptance__add_entry__export_to_variable",
+    ] {
+        let field = exact(ir, schema(ir, name), "value", Shape::Scalar);
+        let rules::ir::FieldValue::Scalar(value) = ir.field(field).value else {
+            panic!("scalar export value")
+        };
+        for accepted in [
+            "trigger_value:num_of_revolutionary_guard",
+            "trigger_value:always",
+        ] {
+            assert!(
+                ir.scalar_matches(value, accepted, &NoSymbolFacts),
+                "{name}: {accepted}"
+            );
+        }
+        assert!(!ir.scalar_matches(value, "trigger_value:primary_culture", &NoSymbolFacts));
+        for excluded in [
+            "advisor_exists",
+            "is_advisor_employed",
+            "highest_supply_limit_in_area",
+            "was_never_end_game_tag_trigger",
+        ] {
+            assert!(
+                !ir.scalar_matches(value, &format!("trigger_value:{excluded}"), &NoSymbolFacts),
+                "{name}: {excluded} needs declared capability or a workspace scripted definition"
+            );
+        }
+        assert!(ir.scalar_matches(
+            value,
+            "trigger_value:test_scripted_trigger",
+            &ModifierFacts(ir)
+        ));
+        assert!(!ir.scalar_matches(value, "trigger_value:test_scripted_trigger", &NoSymbolFacts));
+        assert!(ir.scalar_matches(value, "modifier:global_tax_modifier", &NoSymbolFacts));
+        assert!(ir.scalar_matches(value, "modifier:local_tax_modifier", &NoSymbolFacts));
+        assert!(!ir.scalar_matches(value, "modifier:invented_modifier_name", &NoSymbolFacts));
+    }
+}
+
+struct ModifierFacts<'a>(&'a RulesIr);
+
+impl SymbolFacts for ModifierFacts<'_> {
+    fn template_accepts_no_arguments(
+        &self,
+        type_id: TypeId,
+        name: &str,
+        checkpoint: &mut dyn FnMut() -> bool,
+    ) -> Option<bool> {
+        (!checkpoint()).then(|| self.type_member(type_id, name))
+    }
+
+    fn type_member(&self, type_id: TypeId, name: &str) -> bool {
+        matches!(
+            (
+                self.0.strings().resolve(self.0.type_info(type_id).name),
+                name
+            ),
+            ("government_mechanic_power", "test_power")
+                | ("estate", "estate_test")
+                | ("faction", "test_faction")
+                | ("estate_modifier", "test_estate_modifier")
+                | ("scripted_trigger", "test_scripted_trigger")
+        )
+    }
+}
+
+fn modifier_key_queries_preserve_all_dynamic_families_and_scopes() {
+    let ir = ir();
+    let facts = ModifierFacts(ir);
+    let domain = |name| {
+        let field = exact(ir, schema(ir, name), "which", Shape::Scalar);
+        let rules::ir::FieldValue::Scalar(matcher) = ir.field(field).value else {
+            panic!("scalar modifier selector")
+        };
+        matcher
+    };
+    let global = domain("trigger__has_global_modifier_value");
+    let local = domain("trigger__has_local_modifier_value");
+    assert!(ir.scalar_matches(global, "global_tax_modifier", &facts));
+    assert!(!ir.scalar_matches(global, "local_tax_modifier", &facts));
+    assert!(ir.scalar_matches(local, "local_tax_modifier", &facts));
+    assert!(!ir.scalar_matches(local, "global_tax_modifier", &facts));
+    for name in [
+        "monthly_test_power",
+        "test_influence_modifier",
+        "test_loyalty_modifier",
+        "test_privilege_slots",
+        "test_faction_influence",
+        "test_power_gain_modifier",
+        "test_estate_modifier",
+    ] {
+        assert!(ir.scalar_matches(global, name, &facts), "{name}");
+        assert!(!ir.scalar_matches(local, name, &facts), "{name}");
+        assert!(
+            !ir.scalar_matches(global, name, &NoSymbolFacts),
+            "missing definition: {name}"
+        );
+    }
 }
 
 // One corpus load per test process; each helper keeps its behavior assertions.
@@ -192,4 +289,5 @@ fn first_party_behavior_contracts() {
     predicates_iterators_and_weighted_branches_keep_their_behavior();
     nested_definitions_use_their_actual_body_and_name_source();
     inherited_modifiers_and_numeric_trigger_domains_validate_values();
+    modifier_key_queries_preserve_all_dynamic_families_and_scopes();
 }

@@ -255,6 +255,9 @@ pub struct FieldSpec {
     /// Whether the field is deprecated.
     #[serde(default)]
     pub deprecated: Option<bool>,
+    /// Explicit opt-in tags used by schema-query capability filters.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub capabilities: Vec<String>,
     /// Explicitly overrides a mixin-declared field of the same key.
     #[serde(default, rename = "override")]
     pub override_field: Option<bool>,
@@ -769,6 +772,7 @@ mod tests {
                 severity: None,
                 deprecated: None,
                 override_field: None,
+                capabilities: Vec::new(),
             }))
         );
     }

@@ -1,8 +1,8 @@
 {
   "traits": {
-    "Template": {},
     "HasIcon": {},
     "Localised": {},
-    "ModifierSource": {}
+    "ModifierSource": {},
+    "Template": {}
   }
 }

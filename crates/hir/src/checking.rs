@@ -4,10 +4,19 @@ use crate::{ScopeState, ScopeValue};
 use rules::ir::{
     FieldValue, Matcher, MatcherId, PatternPart, RefTarget, RulesIr, Shape, SymbolFacts,
 };
+use rules::query::{QueryContext, QueryState};
 use rules::source::ControlKind;
 
 struct Facts<'a>(&'a dyn SymbolFacts);
 impl SymbolFacts for Facts<'_> {
+    fn template_accepts_no_arguments(
+        &self,
+        ty: rules::ir::TypeId,
+        name: &str,
+        checkpoint: &mut dyn FnMut() -> bool,
+    ) -> Option<bool> {
+        self.0.template_accepts_no_arguments(ty, name, checkpoint)
+    }
     fn facts_complete(&self) -> bool {
         self.0.facts_complete()
     }
@@ -32,13 +41,124 @@ pub fn field_candidates(
     shape: Shape,
     facts: &dyn SymbolFacts,
 ) -> Vec<rules::ir::FieldId> {
+    field_candidates_with_context(ir, schema, key, shape, facts, &rules::query::NoQueryContext)
+}
+
+/// Shape/key dispatch with the actual source container for sibling selectors.
+pub fn field_candidates_with_context(
+    ir: &RulesIr,
+    schema: rules::ir::SchemaId,
+    key: &str,
+    shape: Shape,
+    facts: &dyn SymbolFacts,
+    context: &impl QueryContext,
+) -> Vec<rules::ir::FieldId> {
     let mut candidates = ir.lookup(schema, key, shape).collect::<Vec<_>>();
     let exact=candidates.iter().copied().filter(|id|matches!(ir.matcher(ir.field(*id).key),Matcher::Literal(name) if ir.strings().resolve(*name).eq_ignore_ascii_case(key))).collect::<Vec<_>>();
     if !exact.is_empty() {
         candidates = exact;
     }
-    candidates.retain(|id| scalar_outcome(ir, ir.field(*id).key, key, facts).0 != Some(false));
+    candidates.retain(|id| {
+        scalar_outcome_with_context(ir, ir.field(*id).key, key, facts, context).0 != Some(false)
+    });
     candidates
+}
+
+/// Concrete selector failures within a rejected matcher. Deferred bindings are
+/// omitted so definition-side templates remain incomplete until instantiation.
+pub fn query_selector_failures(
+    ir: &RulesIr,
+    matcher: MatcherId,
+    facts: &dyn SymbolFacts,
+    context: &impl QueryContext,
+) -> Vec<(rules::ir::Symbol, QueryState)> {
+    let mut pending = vec![matcher];
+    let mut result = Vec::new();
+    let mut visited = std::collections::BTreeSet::new();
+    while let Some(matcher) = pending.pop() {
+        if !visited.insert(matcher) {
+            continue;
+        }
+        match ir.matcher(matcher) {
+            Matcher::Query(query) => {
+                let resolution = ir.query_fields(query, &Facts(facts), context);
+                if let Some(rules::ir::QuerySelector::Sibling(selector)) = query.selector
+                    && matches!(
+                        resolution.state,
+                        QueryState::Missing | QueryState::Duplicate | QueryState::Invalid
+                    )
+                    && !result.iter().any(|(name, _)| *name == selector)
+                {
+                    result.push((selector, resolution.state));
+                }
+                for field in resolution.fields {
+                    pending.extend(ir.query_projected_matcher(query, field));
+                }
+            }
+            Matcher::Union(items) => pending.extend(items.iter().copied()),
+            Matcher::Pattern(parts) => pending.extend(parts.iter().filter_map(|part| match part {
+                PatternPart::Hole(matcher) => Some(*matcher),
+                _ => None,
+            })),
+            _ => {}
+        }
+    }
+    result
+}
+
+/// User-facing explanation shared by ordinary and instantiated query checking.
+pub fn query_selector_explanation(
+    ir: &RulesIr,
+    selector: rules::ir::Symbol,
+    state: QueryState,
+) -> String {
+    let name = ir.strings().resolve(selector);
+    match state {
+        QueryState::Missing => {
+            format!("missing sibling selector `{name}` for dependent field query")
+        }
+        QueryState::Duplicate => {
+            format!("duplicate sibling selector `{name}` for dependent field query")
+        }
+        QueryState::Invalid => {
+            format!("sibling selector `{name}` must be a scalar naming a compatible field")
+        }
+        QueryState::Deferred => format!("sibling selector `{name}` is not bound yet"),
+        QueryState::Resolved => format!("sibling selector `{name}` is resolved"),
+    }
+}
+
+/// Whether every block branch is already constrained by the same authored
+/// dependent value query. A broader fallback or unrelated query cannot disable
+/// the legacy control check.
+pub fn schema_has_sibling_query(
+    ir: &RulesIr,
+    schema: rules::ir::SchemaId,
+    selector_schema: rules::ir::SchemaId,
+    selector: rules::ir::Symbol,
+) -> bool {
+    let branches = ir
+        .fields(schema)
+        .into_iter()
+        .filter(|field| ir.shape(*field) == Some(Shape::Block))
+        .collect::<Vec<_>>();
+    !branches.is_empty()
+        && branches.iter().all(|field| {
+            matches!(ir.matcher(ir.field(*field).key), Matcher::Query(query)
+        if query.projection == rules::ir::QueryProjection::Values
+            && query.schema == selector_schema
+            && query.selector == Some(rules::ir::QuerySelector::Sibling(selector)))
+        })
+}
+
+/// A key may be a value-domain projection, including a query inside a Pattern hole.
+pub fn matcher_has_value_query(ir: &RulesIr, matcher: MatcherId) -> bool {
+    match ir.matcher(matcher) {
+        Matcher::Query(query) => query.projection == rules::ir::QueryProjection::Values,
+        Matcher::Union(items) => items.iter().any(|matcher| matcher_has_value_query(ir, *matcher)),
+        Matcher::Pattern(parts) => parts.iter().any(|part| matches!(part, PatternPart::Hole(matcher) if matcher_has_value_query(ir, *matcher))),
+        _ => false,
+    }
 }
 
 /// Input-scope validation preserves unresolved ambient registers as Unknown.
@@ -117,7 +237,9 @@ fn scalar_primitive(
                     member(&format!("{}{value}", ir.strings().resolve(prefix)))
                 })
         }
-        Matcher::Union(_) | Matcher::Pattern(_) => unreachable!("bounded container search"),
+        Matcher::Query(_) | Matcher::Union(_) | Matcher::Pattern(_) => {
+            unreachable!("bounded container search")
+        }
         _ => ir.scalar_matches(matcher, value, &Facts(facts)),
     };
     if !result && !facts.facts_complete() && matches!(ir.matcher(matcher), Matcher::Ref(_)) {
@@ -134,11 +256,27 @@ pub fn scalar_outcome(
     value: &str,
     facts: &dyn SymbolFacts,
 ) -> (Option<bool>, Option<rules::pattern::SearchLimit>) {
+    scalar_outcome_with_context(ir, matcher, value, facts, &rules::query::NoQueryContext)
+}
+
+/// Scalar proof retaining same-container sibling selection.
+pub fn scalar_outcome_with_context(
+    ir: &RulesIr,
+    matcher: MatcherId,
+    value: &str,
+    facts: &dyn SymbolFacts,
+    context: &impl QueryContext,
+) -> (Option<bool>, Option<rules::pattern::SearchLimit>) {
     let mut no_cancel = || false;
     let mut budget = rules::pattern::SearchBudget::new(Default::default(), &mut no_cancel);
-    let matched = rules::pattern::evaluate(ir, matcher, value, &mut budget, &mut |id, text| {
-        scalar_primitive(ir, id, text, facts)
-    });
+    let matched = rules::pattern::evaluate_with_context(
+        ir,
+        matcher,
+        value,
+        &mut budget,
+        &rules::query::QueryContextWithFacts::new(ir, facts, context),
+        &mut |id, text| scalar_primitive(ir, id, text, facts),
+    );
     (matched, budget.limit)
 }
 
@@ -151,9 +289,14 @@ pub fn pattern_matches(
 ) -> bool {
     let mut no_cancel = || false;
     let mut budget = rules::pattern::SearchBudget::new(Default::default(), &mut no_cancel);
-    rules::pattern::search(ir, parts, value, &mut budget, &mut |id, text| {
-        scalar_primitive(ir, id, text, facts)
-    })
+    rules::pattern::search_with_context(
+        ir,
+        parts,
+        value,
+        &mut budget,
+        &rules::query::QueryContextWithFacts::new(ir, facts, &rules::query::NoQueryContext),
+        &mut |id, text| scalar_primitive(ir, id, text, facts),
+    )
     .matched
         == Some(true)
 }
@@ -301,6 +444,28 @@ pub fn scalar_validation(
     .value
 }
 
+/// Validates a value using its physical sibling properties.
+pub fn scalar_validation_with_context(
+    ir: &RulesIr,
+    matcher: MatcherId,
+    value: &str,
+    state: &ScopeState,
+    facts: &dyn SymbolFacts,
+    context: &impl QueryContext,
+) -> crate::analysis::Validation {
+    scalar_validation_cancellable_with_context::<std::convert::Infallible>(
+        ir,
+        matcher,
+        value,
+        state,
+        facts,
+        context,
+        &mut || Ok(()),
+    )
+    .expect("infallible checkpoint")
+    .value
+}
+
 /// Cancellation and resource coverage belong to the same scalar goal as its proof.
 pub fn scalar_validation_cancellable<E>(
     ir: &RulesIr,
@@ -308,6 +473,28 @@ pub fn scalar_validation_cancellable<E>(
     value: &str,
     state: &ScopeState,
     facts: &dyn SymbolFacts,
+    checkpoint: &mut dyn FnMut() -> Result<(), E>,
+) -> Result<crate::analysis::Analysis<crate::analysis::Validation>, E> {
+    scalar_validation_cancellable_with_context(
+        ir,
+        matcher,
+        value,
+        state,
+        facts,
+        &rules::query::NoQueryContext,
+        checkpoint,
+    )
+}
+
+/// Cancellation-aware proof with physical sibling selector context.
+#[allow(clippy::too_many_arguments)]
+pub fn scalar_validation_cancellable_with_context<E>(
+    ir: &RulesIr,
+    matcher: MatcherId,
+    value: &str,
+    state: &ScopeState,
+    facts: &dyn SymbolFacts,
+    context: &impl QueryContext,
     checkpoint: &mut dyn FnMut() -> Result<(), E>,
 ) -> Result<crate::analysis::Analysis<crate::analysis::Validation>, E> {
     use crate::analysis::Validation;
@@ -320,20 +507,25 @@ pub fn scalar_validation_cancellable<E>(
         }
     };
     let mut budget = rules::pattern::SearchBudget::new(Default::default(), &mut cancelled);
-    let known = rules::pattern::evaluate(ir, matcher, value, &mut budget, &mut |id, text| match ir
-        .matcher(id)
-    {
-        Matcher::Path(Some(category))
-            if ir.strings().resolve(*category).eq_ignore_ascii_case("gfx") =>
-        {
-            facts.asset_member(ir.strings().resolve(*category), text)
-        }
-        Matcher::Scope(expected) => {
-            validation_bool(scope_validation(ir, text, *expected, state, facts))
-        }
-        Matcher::Link => validation_bool(scope_validation(ir, text, None, state, facts)),
-        _ => scalar_primitive(ir, id, text, facts),
-    });
+    let known = rules::pattern::evaluate_with_context(
+        ir,
+        matcher,
+        value,
+        &mut budget,
+        &rules::query::QueryContextWithFacts::new(ir, facts, context),
+        &mut |id, text| match ir.matcher(id) {
+            Matcher::Path(Some(category))
+                if ir.strings().resolve(*category).eq_ignore_ascii_case("gfx") =>
+            {
+                facts.asset_member(ir.strings().resolve(*category), text)
+            }
+            Matcher::Scope(expected) => {
+                validation_bool(scope_validation(ir, text, *expected, state, facts))
+            }
+            Matcher::Link => validation_bool(scope_validation(ir, text, None, state, facts)),
+            _ => scalar_primitive(ir, id, text, facts),
+        },
+    );
     let limit = budget.limit;
     if let Some(error) = error {
         return Err(error);
@@ -461,6 +653,18 @@ pub fn check_fragment<E>(
         }
     }
     let display = display_ranges(ir, hir);
+    let query_unknown = source
+        .trial_holes
+        .iter()
+        .copied()
+        .chain(
+            source
+                .pieces
+                .iter()
+                .filter(|piece| piece.hole || piece.uncertain_text || piece.structural_hole)
+                .map(|piece| piece.range),
+        )
+        .collect::<Vec<_>>();
     for overload in hir.overload_facts().iter().filter(|overload| {
         overload.validation == Validation::Invalid
             && !source.has_unresolved_structure(overload.container)
@@ -528,7 +732,20 @@ pub fn check_fragment<E>(
                     Validation::Invalid
                 }
             },
-            |matcher| scalar_validation(ir, matcher, &scalar.value, &context.state, facts),
+            |matcher| {
+                scalar_validation_with_context(
+                    ir,
+                    matcher,
+                    &scalar.value,
+                    &context.state,
+                    facts,
+                    &crate::query::PropertyQueryContext::in_container(
+                        hir.properties(),
+                        context.range,
+                    )
+                    .with_unknown_ranges(&query_unknown),
+                )
+            },
         );
         if checked == Validation::Invalid {
             result.push(ConstraintEvidence {
@@ -545,6 +762,7 @@ pub fn check_fragment<E>(
             coverage.residuals.insert(ResidualReason::Binding);
         }
     }
+    let mut selector_reported = std::collections::BTreeSet::new();
     let mut counts = std::collections::BTreeMap::<(text::TextRange, usize), u32>::new();
     for property in hir.properties() {
         if source.unresolved_bindings.iter().any(|range| {
@@ -586,12 +804,21 @@ pub fn check_fragment<E>(
             coverage.residuals.insert(ResidualReason::Binding);
             continue;
         }
+        let query_context =
+            crate::query::PropertyQueryContext::for_property(hir.properties(), property)
+                .with_unknown_ranges(&query_unknown);
         let candidates = field
             .fields
             .iter()
             .copied()
             .filter(|id| {
-                let (matched, limit) = scalar_outcome(ir, ir.field(*id).key, &property.key, facts);
+                let (matched, limit) = scalar_outcome_with_context(
+                    ir,
+                    ir.field(*id).key,
+                    &property.key,
+                    facts,
+                    &query_context,
+                );
                 if limit.is_some() {
                     coverage
                         .limits
@@ -603,27 +830,85 @@ pub fn check_fragment<E>(
             })
             .collect::<Vec<_>>();
         if candidates.is_empty() {
+            let selector_failures = ir
+                .lookup(
+                    parent.schema,
+                    &property.key,
+                    if property.scalar.is_some() {
+                        Shape::Scalar
+                    } else {
+                        Shape::Block
+                    },
+                )
+                .flat_map(|field| {
+                    query_selector_failures(ir, ir.field(field).key, facts, &query_context)
+                })
+                .collect::<Vec<_>>();
+            if !selector_failures.is_empty() {
+                for (selector, state) in selector_failures {
+                    if selector_reported.insert((parent.range, selector)) {
+                        result.push(ConstraintEvidence {
+                            severity: rules::source::Severity::Error,
+                            kind: IssueKind::Value,
+                            range: query_context
+                                .source_range(ir.strings().resolve(selector))
+                                .unwrap_or(property.key_range),
+                            explanation: query_selector_explanation(ir, selector, state),
+                            container: parent.range,
+                        });
+                    }
+                }
+                continue;
+            }
             if ir.fields(parent.schema).into_iter().any(|id| {
-                scalar_outcome(ir, ir.field(id).key, &property.key, facts)
-                    .0
-                    .is_none()
+                scalar_outcome_with_context(
+                    ir,
+                    ir.field(id).key,
+                    &property.key,
+                    facts,
+                    &query_context,
+                )
+                .0
+                .is_none()
             }) {
                 coverage.residuals.insert(ResidualReason::Interpretation);
                 continue;
             }
-            let recognized = ir
-                .fields(parent.schema)
-                .into_iter()
-                .any(|id| scalar_matches(ir, ir.field(id).key, &property.key, facts));
+            let recognized = ir.fields(parent.schema).into_iter().any(|id| {
+                scalar_outcome_with_context(
+                    ir,
+                    ir.field(id).key,
+                    &property.key,
+                    facts,
+                    &query_context,
+                )
+                .0 == Some(true)
+            });
+            let value_query = ir
+                .lookup(
+                    parent.schema,
+                    &property.key,
+                    if property.scalar.is_some() {
+                        Shape::Scalar
+                    } else {
+                        Shape::Block
+                    },
+                )
+                .any(|field| matcher_has_value_query(ir, ir.field(field).key));
             result.push(ConstraintEvidence {
                 severity: rules::source::Severity::Error,
-                kind: if recognized {
+                kind: if recognized || value_query {
                     IssueKind::Value
                 } else {
                     IssueKind::Key
                 },
                 range: property.key_range,
-                explanation: if recognized {
+                explanation: if value_query {
+                    format!(
+                        "`{}` does not satisfy its dependent value query",
+                        property.key
+                    )
+                } else if recognized {
                     format!("`{}` has an incompatible value shape", property.key)
                 } else {
                     format!("unknown key `{}`", property.key)
@@ -667,12 +952,13 @@ pub fn check_fragment<E>(
                     Validation::Unknown
                 }
                 (FieldValue::Scalar(matcher), Some(scalar)) => {
-                    let checked = scalar_validation_cancellable(
+                    let checked = scalar_validation_cancellable_with_context(
                         ir,
                         matcher,
                         &scalar.value,
                         &parent.state,
                         facts,
+                        &query_context,
                         checkpoint,
                     )?;
                     coverage.merge(&checked.coverage);
@@ -695,7 +981,34 @@ pub fn check_fragment<E>(
         if !accepted && unknown {
             coverage.residuals.insert(ResidualReason::Binding);
         }
-        if !accepted && !unknown {
+        let selector_failures = if !accepted && !unknown {
+            scoped
+                .iter()
+                .flat_map(|field| match ir.field(*field).value {
+                    FieldValue::Scalar(matcher) => {
+                        query_selector_failures(ir, matcher, facts, &query_context)
+                    }
+                    _ => Vec::new(),
+                })
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
+        if !selector_failures.is_empty() {
+            for (selector, state) in selector_failures {
+                if selector_reported.insert((parent.range, selector)) {
+                    result.push(ConstraintEvidence {
+                        severity: rules::source::Severity::Error,
+                        kind: IssueKind::Value,
+                        range: query_context
+                            .source_range(ir.strings().resolve(selector))
+                            .unwrap_or(property.key_range),
+                        explanation: query_selector_explanation(ir, selector, state),
+                        container: parent.range,
+                    });
+                }
+            }
+        } else if !accepted && !unknown {
             result.push(ConstraintEvidence {
                 severity: ir.field(selected).severity,
                 kind: IssueKind::Value,
@@ -1172,74 +1485,103 @@ pub fn control_lints<E>(
                 }
             }
             ControlKind::Switch => {
-                if let Some(on) = control.on {
-                    let selector = hir
-                        .properties()
-                        .iter()
-                        .find(|child| {
-                            child.path.len() == property.path.len() + 1
-                                && child.path.starts_with(&property.path)
-                                && property.range.start() <= child.range.start()
-                                && child.range.end() <= property.range.end()
-                                && child.key.eq_ignore_ascii_case(ir.strings().resolve(on))
-                        })
-                        .and_then(|child| child.scalar.as_ref())
-                        .filter(|scalar| !binding_dependent(scalar.range));
-                    if let Some(selector) = selector
-                        && let Some(trigger_schema) = control.selector_schema
-                    {
-                        let matchers = ir
-                            .lookup(trigger_schema, &selector.value, Shape::Scalar)
-                            .filter_map(|id| {
-                                let field = ir.field(id);
-                                if !scalar_matches(ir, field.key, &selector.value, facts) {
-                                    return None;
-                                }
-                                match field.value {
-                                    FieldValue::Scalar(matcher) => Some(matcher),
-                                    _ => None,
-                                }
+                let (Some(on), Some(selector_schema)) = (control.on, control.selector_schema)
+                else {
+                    continue;
+                };
+                if ir
+                    .child(fact.fields[0], fact.schema)
+                    .is_some_and(|schema| schema_has_sibling_query(ir, schema, selector_schema, on))
+                {
+                    // Authored dependent matchers own validation and diagnostics. Control
+                    // metadata continues to describe flow, without checking branches twice.
+                    continue;
+                }
+                let unknown = hir
+                    .properties()
+                    .iter()
+                    .flat_map(|child| {
+                        [
+                            child.key_range,
+                            child
+                                .scalar
+                                .as_ref()
+                                .map_or(child.key_range, |scalar| scalar.range),
+                        ]
+                    })
+                    .filter(|range| {
+                        binding_dependent(*range)
+                            || source.is_some_and(|source| {
+                                source.has_hole(*range) || source.has_uncertain_text(*range)
                             })
-                            .collect::<Vec<_>>();
-                        if matchers.is_empty() {
-                            diagnostics.push(ConstraintEvidence::new(
-                                IssueKind::Value,
-                                IssueKind::Value.severity(),
-                                selector.range,
-                                format!("unknown scalar trigger `{}`", selector.value),
-                            ));
-                        } else {
-                            for child in hir.properties().iter().filter(|child| {
-                                child.path.len() == property.path.len() + 1
-                                    && child.path.starts_with(&property.path)
-                                    && property.range.start() <= child.range.start()
-                                    && child.range.end() <= property.range.end()
-                                    && child.scalar.is_none()
-                            }) {
-                                if binding_dependent(child.key_range) {
-                                    continue;
-                                }
-                                if !matchers
+                    })
+                    .collect::<Vec<_>>();
+                let context = crate::query::PropertyQueryContext::in_container(
+                    hir.properties(),
+                    property.value_range.unwrap_or(property.range),
+                )
+                .with_unknown_ranges(&unknown);
+                let mut query =
+                    rules::ir::FieldQuery::new(selector_schema, rules::ir::QueryProjection::Values);
+                query.shape = Some(Shape::Scalar);
+                query.call_args_none = true;
+                query.selector = Some(rules::ir::QuerySelector::Sibling(on));
+                let resolution = ir.query_fields(&query, &Facts(facts), &context);
+                match resolution.state {
+                    QueryState::Deferred => continue,
+                    QueryState::Missing | QueryState::Duplicate | QueryState::Invalid => {
+                        diagnostics.push(ConstraintEvidence::new(
+                            IssueKind::Value,
+                            IssueKind::Value.severity(),
+                            context
+                                .source_range(ir.strings().resolve(on))
+                                .unwrap_or(property.key_range),
+                            query_selector_explanation(ir, on, resolution.state),
+                        ));
+                        continue;
+                    }
+                    QueryState::Resolved => {}
+                }
+                let matchers = resolution
+                    .fields
+                    .into_iter()
+                    .filter_map(|field| ir.query_projected_matcher(&query, field))
+                    .collect::<Vec<_>>();
+                let selector = match context.sibling(ir.strings().resolve(on)) {
+                    rules::query::SiblingValue::Scalar(value) => value,
+                    _ => continue,
+                };
+                for child in hir.properties().iter().filter(|child| {
+                    child.path.len() == property.path.len() + 1
+                        && child.path.starts_with(&property.path)
+                        && property.range.start() <= child.range.start()
+                        && child.range.end() <= property.range.end()
+                        && child.scalar.is_none()
+                }) {
+                    if binding_dependent(child.key_range) {
+                        continue;
+                    }
+                    let outcomes = matchers
+                        .iter()
+                        .map(|matcher| {
+                            scalar_outcome_with_context(ir, *matcher, &child.key, facts, &context).0
+                        })
+                        .collect::<Vec<_>>();
+                    if outcomes.iter().all(|outcome| *outcome == Some(false)) {
+                        diagnostics.push(ConstraintEvidence::new(
+                            IssueKind::Value,
+                            IssueKind::Value.severity(),
+                            child.key_range,
+                            format!(
+                                "expected {} for `{}` branch",
+                                matchers
                                     .iter()
-                                    .any(|matcher| scalar_matches(ir, *matcher, &child.key, facts))
-                                {
-                                    diagnostics.push(ConstraintEvidence::new(
-                                        IssueKind::Value,
-                                        IssueKind::Value.severity(),
-                                        child.key_range,
-                                        format!(
-                                            "expected {} for `{}` branch",
-                                            matchers
-                                                .iter()
-                                                .map(|matcher| matcher_label(ir, *matcher))
-                                                .collect::<Vec<_>>()
-                                                .join(" or "),
-                                            selector.value
-                                        ),
-                                    ));
-                                }
-                            }
-                        }
+                                    .map(|matcher| matcher_label(ir, *matcher))
+                                    .collect::<Vec<_>>()
+                                    .join(" or "),
+                                selector
+                            ),
+                        ));
                     }
                 }
             }

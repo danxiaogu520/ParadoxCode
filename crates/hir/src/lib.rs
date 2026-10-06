@@ -15,6 +15,7 @@ mod collector;
 mod ir_lowering;
 mod model;
 mod parameters;
+pub mod query;
 mod scope;
 pub mod template;
 pub mod template_instance;

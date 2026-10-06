@@ -5,6 +5,45 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use text::TextRange;
 
+/// The direct-call target recognized by Template consumers. Only a Ref key or
+/// the first Template-bearing Ref/Union branch is callable; Pattern holes and
+/// projected query names do not introduce invocation semantics. The name is
+/// always the original property key, including for transformed references.
+/// A true checkpoint stops traversal; callers retain their own limit evidence.
+pub fn template_key_type(
+    ir: &crate::ir::RulesIr,
+    matcher: crate::ir::MatcherId,
+    checkpoint: &mut dyn FnMut() -> bool,
+) -> Option<crate::ir::TypeId> {
+    let template = ir.trait_by_name("Template")?;
+    let root = [matcher];
+    let mut pending = vec![root.iter()];
+    while let Some(items) = pending.last_mut() {
+        let Some(matcher) = items.next() else {
+            pending.pop();
+            continue;
+        };
+        if checkpoint() {
+            return None;
+        }
+        match ir.matcher(*matcher) {
+            crate::ir::Matcher::Ref(crate::ir::RefTarget::Type { type_id, .. }) => {
+                if ir
+                    .type_info(*type_id)
+                    .trait_impls
+                    .iter()
+                    .any(|implementation| implementation.trait_id == template)
+                {
+                    return Some(*type_id);
+                }
+            }
+            crate::ir::Matcher::Union(items) => pending.push(items.iter()),
+            _ => {}
+        }
+    }
+    None
+}
+
 /// One source token retained by a dynamic-definition template.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TemplateToken {
@@ -205,32 +244,50 @@ pub struct TemplateProgram {
 impl TemplateProgram {
     /// Text bindings required independently of presence guards. Forwarding is still a read.
     pub fn unconditional_reads(&self) -> std::collections::BTreeSet<String> {
+        self.unconditional_reads_with_checkpoint(&mut || false)
+            .unwrap_or_default()
+    }
+
+    /// The same summary with a checkpoint for every instruction and token fragment.
+    /// An unfinished or malformed program grants no complete summary.
+    pub fn unconditional_reads_with_checkpoint(
+        &self,
+        checkpoint: &mut dyn FnMut() -> bool,
+    ) -> Option<std::collections::BTreeSet<String>> {
         let mut result = std::collections::BTreeSet::new();
         let mut pending = vec![0];
         while let Some(block) = pending.pop() {
-            for instruction in self.blocks[block].iter() {
-                let mut read = |token: &TemplateToken| {
+            for instruction in self.blocks.get(block)?.iter() {
+                if checkpoint() {
+                    return None;
+                }
+                let mut read = |token: &TemplateToken| -> Option<()> {
                     for part in &token.fragments {
+                        if checkpoint() {
+                            return None;
+                        }
                         if let TemplateFragment::Parameter { name, .. } = part {
                             result.insert(name.to_ascii_lowercase());
                         }
                     }
+                    Some(())
                 };
                 match instruction {
                     TemplateInstruction::When { .. } => {}
-                    TemplateInstruction::Recover(token) => read(token),
-                    TemplateInstruction::Consume(token) => read(token),
+                    TemplateInstruction::Recover(token) | TemplateInstruction::Consume(token) => {
+                        read(token)?
+                    }
                     TemplateInstruction::Dispatch(property) => {
-                        read(&property.key);
+                        read(&property.key)?;
                         match &property.value {
-                            TemplateOperand::Scalar(token) => read(token),
+                            TemplateOperand::Scalar(token) => read(token)?,
                             TemplateOperand::Block(block) => pending.push(*block),
                         }
                     }
                 }
             }
         }
-        result
+        Some(result)
     }
     /// Compiles the source tree once without recursion or expanded call copies.
     pub fn compile(items: &[TemplateItem]) -> Self {

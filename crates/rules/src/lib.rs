@@ -17,6 +17,7 @@ pub mod format;
 pub mod ir;
 pub mod lower;
 pub mod pattern;
+pub mod query;
 pub mod source;
 pub mod template;
 
@@ -42,3 +43,6 @@ pub use runtime::{RuleSet, RulesError};
 
 #[cfg(test)]
 mod catalog_tests;
+
+#[cfg(test)]
+mod query_tests;

@@ -92,6 +92,20 @@ states the constraint (for example `a whole number between 0 and 255` or
 exactly one accepted value is close. Usage of a declaration the game data
 marks deprecated renders with strikethrough.
 
+A dependent field query may instead report a missing, duplicate, or invalid sibling
+selector, such as `on_trigger` in a switch. Supply exactly one scalar selector that
+names a compatible source field. Its branch values are checked only against that
+selected field's value domain. A selector error is reported once per containing
+block instead of repeating unrelated errors for each branch. Unbound Template
+selectors defer this check until their arguments are available.
+
+Queries with `call_args=none`, such as scalar trigger exports and switch selectors,
+also require a selected Template helper to accept an empty argument set. This uses
+the same required-parameter and active-branch inference as a direct invocation;
+guarded optional parameters and literal fallback branches can still be valid.
+Unresolved helper eligibility remains deferred instead of proving an invalid value
+or offering an unverified callable completion.
+
 ## UnknownTexturePath
 
 A `texturefile`/`texturefile1`–`3`, `alphamaskfile`, `effectfile`, or mesh

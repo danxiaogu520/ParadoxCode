@@ -150,6 +150,50 @@ impl SymbolFacts for SnapshotSymbolFacts<'_> {
             .map(std::sync::Arc::new)
     }
 
+    fn template_accepts_no_arguments(
+        &self,
+        type_id: TypeId,
+        name: &str,
+        checkpoint: &mut dyn FnMut() -> bool,
+    ) -> Option<bool> {
+        if !self.facts_complete() || checkpoint() {
+            return None;
+        }
+        let ir = self.snapshot.ir();
+        let kind = ir.strings().resolve(ir.type_info(type_id).name);
+        // A revision-scoped definition cache tracks body edits, overlays and rule replacement.
+        // Unknown/budget-limited answers are deliberately never cached as eligible.
+        let key = format!("template:no-arguments:{kind}:{}", name.to_ascii_lowercase());
+        let revision = self.snapshot.revision();
+        if let Some(eligible) = self.snapshot.query_cache().get::<bool>(revision, &key) {
+            return Some(*eligible);
+        }
+        let required = hir::template::required_parameters_with_inputs(
+            ir,
+            self,
+            kind,
+            name,
+            &hir::template::BindingInputs::default(),
+            hir::ScopeState::initial(hir::ScopeValue::Unknown),
+            &mut || if checkpoint() { Err(()) } else { Ok(()) },
+        )
+        .ok()?;
+        let eligible = if !required.missing.is_empty() {
+            false
+        } else if required.coverage.is_known() {
+            true
+        } else {
+            return None;
+        };
+        self.snapshot.query_cache().insert(
+            revision,
+            engine::CacheDomain::Definitions,
+            key,
+            Arc::new(eligible),
+        );
+        Some(eligible)
+    }
+
     fn type_member(&self, type_id: TypeId, name: &str) -> bool {
         let snapshot = self.snapshot;
         let ir = snapshot.ir();
