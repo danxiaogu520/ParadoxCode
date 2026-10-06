@@ -72,6 +72,8 @@ pub struct FieldQuery {
     pub value_kind_any: Vec<QueryValueKind>,
     /// Retain declarations advertising this capability.
     pub capability: Option<String>,
+    /// Require a scalar call with no supplied arguments.
+    pub call_args_none: bool,
 }
 
 /// Which part of each matching field is projected.
@@ -424,6 +426,7 @@ impl<'source> Cursor<'source> {
             shape: None,
             value_kind_any: Vec::new(),
             capability: None,
+            call_args_none: false,
         };
         let mut seen = std::collections::BTreeSet::new();
         loop {
@@ -478,6 +481,13 @@ impl<'source> Cursor<'source> {
                     }
                     self.expect(')')?;
                 }
+                "call_args" => {
+                    let arguments = self.read_ident()?;
+                    if arguments != "none" {
+                        return Err(self.error(offset, "`call_args` supports only `none`"));
+                    }
+                    query.call_args_none = true;
+                }
                 "capability" => query.capability = Some(self.read_ident()?),
                 _ => return Err(self.error(offset, format!("unknown query filter `{filter}`"))),
             }
@@ -485,6 +495,15 @@ impl<'source> Cursor<'source> {
         self.expect('>')?;
         if projection == QueryProjection::Values && query.selector.is_none() {
             return Err(self.error(self.position, "`valuesof` requires a `key` selector"));
+        }
+        if projection == QueryProjection::Values && query.shape == Some(QueryShape::Block) {
+            return Err(self.error(
+                self.position,
+                "`valuesof` projects scalar values; `shape=block` is invalid",
+            ));
+        }
+        if query.call_args_none && query.shape != Some(QueryShape::Scalar) {
+            return Err(self.error(self.position, "`call_args=none` requires `shape=scalar`"));
         }
         Ok(query)
     }
@@ -1151,10 +1170,11 @@ mod tests {
                 shape: None,
                 value_kind_any: vec![],
                 capability: None,
+                call_args_none: false,
             })
         );
         let Primary::Query(query) = one(
-            "keysof<source, scope_accepts=country, shape=scalar, value_kind_any=(int|float|bool), capability=exportable>",
+            "keysof<source, scope_accepts=country, shape=scalar, value_kind_any=(int|float|bool), capability=exportable, call_args=none>",
         ) else {
             panic!("query");
         };
@@ -1169,6 +1189,7 @@ mod tests {
             ]
         );
         assert_eq!(query.capability.as_deref(), Some("exportable"));
+        assert!(query.call_args_none);
     }
 
     #[test]
@@ -1209,6 +1230,7 @@ mod tests {
     fn malformed_query_filters_are_errors() {
         for source in [
             "valuesof<source>",
+            "valuesof<source,key=x,shape=block>",
             "keysof<source,unknown=true>",
             "keysof<source,shape=scalar,shape=block>",
             "keysof<source,scope_accepts=country,scope_accepts=province>",
@@ -1216,6 +1238,10 @@ mod tests {
             "keysof<source,capability=exportable,capability=exportable>",
             "keysof<source,value_kind_any=(int),value_kind_any=(bool)>",
             "keysof<source,shape=number>",
+            "keysof<source,call_args=none>",
+            "keysof<source,shape=block,call_args=none>",
+            "keysof<source,shape=scalar,call_args=all>",
+            "keysof<source,shape=scalar,call_args=none,call_args=none>",
             "keysof<source,value_kind_any=(number)>",
             "keysof<source,value_kind_any=(int|date)>",
             "keysof<source,value_kind_any=()>",

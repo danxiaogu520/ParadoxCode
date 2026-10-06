@@ -20253,8 +20253,8 @@
       "fields": {
         "value": {
           "card": "1",
-          "doc": "Accepts `trigger_value:<trigger>` for any trigger that evaluates to a number; boolean triggers export 0 or 1.",
-          "value": "enum<export_to_variable_data> | 'trigger_value:{enum<numeric_or_bool_trigger>}' | 'variable:{scalar}' | 'modifier:{scalar}'"
+          "doc": "Exports a declared modifier key or an export-capable scalar trigger, including workspace-defined scripted triggers. Trigger export capability is explicit; scalar operand type alone does not establish exportability. Modifier keys are not filtered by the effective who/current scope.",
+          "value": "enum<export_to_variable_data> | 'trigger_value:{keysof<trigger,shape=scalar,value_kind_any=(int|float|bool),capability=trigger_value_export,call_args=none>}' | 'variable:{scalar}' | 'modifier:{keysof<modifier,shape=scalar>}'"
         },
         "who": {
           "card": "0..1",
@@ -27654,14 +27654,14 @@
       "fields": {
         "on_trigger": {
           "card": "1",
-          "value": "scalar"
+          "value": "keysof<trigger,shape=scalar,call_args=none>"
         }
       },
       "patterns": [
         {
           "body": "effect",
           "card": "1..*",
-          "key": "scalar"
+          "key": "valuesof<trigger,key=sibling<on_trigger>,shape=scalar,call_args=none>"
         }
       ]
     },

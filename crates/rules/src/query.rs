@@ -38,6 +38,9 @@ pub struct FieldQuery {
     pub shape: Option<Shape>,
     pub value_kind_any: Box<[QueryValueKind]>,
     pub capability: Option<Symbol>,
+    /// Opt-in empty-argument invocation proof for scalar source keys.
+    #[serde(default)]
+    pub call_args_none: bool,
 }
 
 impl FieldQuery {
@@ -52,6 +55,7 @@ impl FieldQuery {
             shape: None,
             value_kind_any: Box::new([]),
             capability: None,
+            call_args_none: false,
         }
     }
 }
@@ -70,6 +74,79 @@ pub enum SiblingValue<'a> {
 /// distinguish duplicates and non-scalars rather than selecting an arbitrary one.
 pub trait QueryContext {
     fn sibling(&self, name: &str) -> SiblingValue<'_>;
+
+    /// Validation/completion require call eligibility. Identity-only projections
+    /// may retain a known source target even when its invocation is invalid.
+    fn check_call_arguments(&self) -> bool {
+        true
+    }
+
+    /// Semantic callback used only by an explicit `call_args=none` query.
+    fn template_accepts_no_arguments(
+        &self,
+        _type_id: crate::ir::TypeId,
+        _name: &str,
+        _checkpoint: &mut dyn FnMut() -> bool,
+    ) -> Option<bool> {
+        None
+    }
+}
+
+/// Navigation/provenance projection only: retain normal dispatch, metadata and
+/// membership while preserving a known target with invalid call arguments.
+/// Never use this context for validation, diagnostics, or completion eligibility.
+pub struct ReferenceQueryContext<'a, C: ?Sized> {
+    context: &'a C,
+}
+impl<'a, C: QueryContext + ?Sized> ReferenceQueryContext<'a, C> {
+    pub fn new(context: &'a C) -> Self {
+        Self { context }
+    }
+}
+impl<C: QueryContext + ?Sized> QueryContext for ReferenceQueryContext<'_, C> {
+    fn sibling(&self, name: &str) -> SiblingValue<'_> {
+        self.context.sibling(name)
+    }
+    fn check_call_arguments(&self) -> bool {
+        false
+    }
+}
+
+/// Adds immutable workspace capabilities without replacing physical sibling evidence.
+pub struct QueryContextWithFacts<'a, C: ?Sized> {
+    facts: &'a dyn SymbolFacts,
+    context: &'a C,
+}
+impl<'a, C: QueryContext + ?Sized> QueryContextWithFacts<'a, C> {
+    pub fn new(_ir: &RulesIr, facts: &'a dyn SymbolFacts, context: &'a C) -> Self {
+        Self { facts, context }
+    }
+}
+impl<C: QueryContext + ?Sized> QueryContext for QueryContextWithFacts<'_, C> {
+    fn check_call_arguments(&self) -> bool {
+        self.context.check_call_arguments()
+    }
+    fn sibling(&self, name: &str) -> SiblingValue<'_> {
+        self.context.sibling(name)
+    }
+    fn template_accepts_no_arguments(
+        &self,
+        type_id: crate::ir::TypeId,
+        name: &str,
+        checkpoint: &mut dyn FnMut() -> bool,
+    ) -> Option<bool> {
+        if !self.facts.facts_complete() || checkpoint() {
+            return None;
+        }
+        // A structural Ref/Union target is a call only when the raw property
+        // name belongs to that type. A stable nonmember remains an ordinary key
+        // (for example a literal/Scalar union alternative or transformed ref).
+        if !self.facts.type_member(type_id, name) {
+            return Some(true);
+        }
+        self.facts
+            .template_accepts_no_arguments(type_id, name, checkpoint)
+    }
 }
 
 /// A context-free request has no evidence about physical sibling values.
@@ -147,8 +224,19 @@ impl RulesIr {
         facts: &impl SymbolFacts,
         context: &impl QueryContext,
     ) -> QueryResolution {
-        self.query_fields_with(query, context, &mut |id, text| {
-            self.scalar_outcome_with_context(id, text, facts, context)
+        let mut no_cancel = || false;
+        let mut budget = crate::pattern::SearchBudget::new(Default::default(), &mut no_cancel);
+        let context = QueryContextWithFacts::new(self, facts, context);
+        self.query_fields_with(query, &context, &mut |id, text, no_args| {
+            crate::pattern::evaluate_call_key(
+                self,
+                id,
+                text,
+                &mut budget,
+                &context,
+                no_args,
+                &mut |id, text| self.scalar_primitive_outcome(id, text, facts),
+            )
         })
     }
 
@@ -156,7 +244,7 @@ impl RulesIr {
         &self,
         query: &FieldQuery,
         context: &impl QueryContext,
-        matches: &mut impl FnMut(MatcherId, &str) -> Option<bool>,
+        matches: &mut impl FnMut(MatcherId, &str, bool) -> Option<bool>,
     ) -> QueryResolution {
         let selected = match &query.selector {
             None => None,
@@ -194,8 +282,19 @@ impl RulesIr {
         facts: &impl SymbolFacts,
         context: &impl QueryContext,
     ) -> QueryResolution {
-        self.query_selected_fields_with(query, key, &mut |id, text| {
-            self.scalar_outcome_with_context(id, text, facts, context)
+        let mut no_cancel = || false;
+        let mut budget = crate::pattern::SearchBudget::new(Default::default(), &mut no_cancel);
+        let context = QueryContextWithFacts::new(self, facts, context);
+        self.query_selected_fields_with(query, key, &mut |id, text, no_args| {
+            crate::pattern::evaluate_call_key(
+                self,
+                id,
+                text,
+                &mut budget,
+                &context,
+                no_args,
+                &mut |id, text| self.scalar_primitive_outcome(id, text, facts),
+            )
         })
     }
 
@@ -203,7 +302,7 @@ impl RulesIr {
         &self,
         query: &FieldQuery,
         key: &str,
-        matches: &mut impl FnMut(MatcherId, &str) -> Option<bool>,
+        matches: &mut impl FnMut(MatcherId, &str, bool) -> Option<bool>,
     ) -> QueryResolution {
         let schema = self.schema(query.schema);
         // Shape dispatch precedes metadata filters. An exact key of the
@@ -221,18 +320,32 @@ impl RulesIr {
         {
             // Retain every exact overload of the selected shape. Filters may
             // narrow these actual candidates but cannot expose a fallback.
-            let fields: Vec<_> = fields
+            let mut accepted = Vec::new();
+            let mut deferred = false;
+            for field in fields
                 .iter()
                 .copied()
                 .filter(|id| self.query_field_passes(query, *id))
-                .collect();
-            return if fields.is_empty() {
-                QueryResolution::state(QueryState::Invalid)
-            } else {
+            {
+                match if query.call_args_none {
+                    matches(self.field(field).key, key, true)
+                } else {
+                    Some(true)
+                } {
+                    Some(true) => accepted.push(field),
+                    None => deferred = true,
+                    Some(false) => {}
+                }
+            }
+            return if deferred {
+                QueryResolution::state(QueryState::Deferred)
+            } else if !accepted.is_empty() {
                 QueryResolution {
                     state: QueryState::Resolved,
-                    fields,
+                    fields: accepted,
                 }
+            } else {
+                QueryResolution::state(QueryState::Invalid)
             };
         }
         let candidates = schema.patterns.iter().copied().filter(|id| {
@@ -241,18 +354,25 @@ impl RulesIr {
                 .is_none_or(|shape| self.shape(*id) == Some(shape))
         });
         for field in candidates {
-            let matched = matches(self.field(field).key, key);
+            let matched = matches(self.field(field).key, key, false);
             match matched {
                 None => return QueryResolution::state(QueryState::Deferred),
                 Some(false) => continue,
                 Some(true) => {
-                    return if self.query_field_passes(query, field) {
-                        QueryResolution {
+                    if !self.query_field_passes(query, field) {
+                        return QueryResolution::state(QueryState::Invalid);
+                    }
+                    return match if query.call_args_none {
+                        matches(self.field(field).key, key, true)
+                    } else {
+                        Some(true)
+                    } {
+                        Some(true) => QueryResolution {
                             state: QueryState::Resolved,
                             fields: vec![field],
-                        }
-                    } else {
-                        QueryResolution::state(QueryState::Invalid)
+                        },
+                        Some(false) => QueryResolution::state(QueryState::Invalid),
+                        None => QueryResolution::state(QueryState::Deferred),
                     };
                 }
             }
@@ -265,6 +385,9 @@ impl RulesIr {
     #[must_use]
     pub fn query_field_passes(&self, query: &FieldQuery, field: FieldId) -> bool {
         let source = self.field(field);
+        if query.call_args_none && self.shape(field) != Some(Shape::Scalar) {
+            return false;
+        }
         if query
             .shape
             .is_some_and(|shape| self.shape(field) != Some(shape))
@@ -325,8 +448,13 @@ impl RulesIr {
     ) -> Option<bool> {
         let mut no_cancel = || false;
         let mut budget = crate::pattern::SearchBudget::new(Default::default(), &mut no_cancel);
-        crate::pattern::evaluate_query(self, query, value, &mut budget, context, &mut |id, text| {
-            self.scalar_primitive_outcome(id, text, facts)
-        })
+        crate::pattern::evaluate_query(
+            self,
+            query,
+            value,
+            &mut budget,
+            &QueryContextWithFacts::new(self, facts, context),
+            &mut |id, text| self.scalar_primitive_outcome(id, text, facts),
+        )
     }
 }

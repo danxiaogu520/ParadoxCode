@@ -227,6 +227,7 @@ must be present (checked by the compiler).
 | Field | Required | Source default | Shape | Meaning |
 | --- | --- | --- | --- | --- |
 | `body` | no | `null` | `{"type":["string","null"]}` | Block: schema name (or `"self"`), optionally instantiated. |
+| `capabilities` | no | — | `{"items":{"type":"string"},"type":"array"}` | Explicit opt-in tags used by schema-query capability filters. |
 | `card` | yes | — | `{"type":"string"}` | Cardinality, e.g. `"1"`, `"0..1"`, `"2..5"`. Mandatory: the corpus has no majority value, and the field drives missing/repeated-key diagnostics, so it is never defaulted (D14). |
 | `control` | no | `null` | `{"anyOf":[{"$ref":"#/$defs/ControlSpec"},{"type":"null"}]}` | Control-flow primitive (field attribute, never a global key name). |
 | `def` | no | `null` | `{"anyOf":[{"$ref":"#/$defs/DefSpec"},{"type":"null"}]}` | Defines a symbol instance at this position. |

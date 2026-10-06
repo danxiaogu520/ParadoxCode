@@ -60,6 +60,8 @@ pub struct ParameterSite {
     pub token: TemplateToken,
     /// Scope registers at the usage site.
     pub state: ScopeState,
+    /// Bound physical siblings, including query dependencies inside Pattern holes.
+    pub query_context: crate::query::OwnedQueryContext,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -316,6 +318,146 @@ pub fn missing_parameters_with_inputs<E>(
     })
 }
 
+/// Shared definition-side and active-call requiredness, including original spelling.
+#[derive(Clone, Debug, Default)]
+pub struct RequiredParameters {
+    pub unconditional: BTreeSet<String>,
+    pub missing: BTreeSet<String>,
+}
+
+/// The authoritative required-argument inference for both direct invocations and
+/// empty-argument query eligibility. Nested eligibility requests defer rather
+/// than starting a recursive query/call interpreter.
+#[allow(clippy::too_many_arguments)]
+pub fn required_parameters_with_inputs<E>(
+    ir: &rules::ir::RulesIr,
+    facts: &dyn rules::ir::SymbolFacts,
+    kind: &str,
+    name: &str,
+    inputs: &BindingInputs,
+    state: ScopeState,
+    checkpoint: &mut dyn FnMut() -> Result<(), E>,
+) -> Result<Analysis<RequiredParameters>, E> {
+    let suppressed = RequirednessFacts {
+        facts,
+        dependent: std::cell::Cell::new(false),
+    };
+    let active =
+        missing_parameters_with_inputs(ir, &suppressed, kind, name, inputs, state, checkpoint)?;
+    let mut coverage = active.coverage;
+    if !facts.facts_complete() {
+        coverage.limits.insert(AnalysisLimit::FactStability);
+    }
+    if suppressed.dependent.get() {
+        coverage.limits.insert(AnalysisLimit::DependentQuery);
+    }
+    let mut unconditional = BTreeSet::new();
+    if let Some(template) = ir
+        .type_by_name(kind)
+        .and_then(|ty| facts.template(ty, name))
+    {
+        let mut remaining = 262_144usize;
+        let mut error = None;
+        let reads = template
+            .program
+            .unconditional_reads_with_checkpoint(&mut || {
+                if let Err(failure) = checkpoint() {
+                    error = Some(failure);
+                    return true;
+                }
+                if remaining == 0 {
+                    return true;
+                }
+                remaining -= 1;
+                false
+            });
+        if let Some(error) = error {
+            return Err(error);
+        }
+        if let Some(reads) = reads {
+            for name in template.program.parameters.iter() {
+                checkpoint()?;
+                if remaining == 0 {
+                    coverage.limits.insert(AnalysisLimit::Nodes);
+                    break;
+                }
+                remaining -= 1;
+                if reads.contains(&name.to_ascii_lowercase())
+                    && !inputs
+                        .present
+                        .iter()
+                        .any(|supplied| supplied.eq_ignore_ascii_case(name))
+                {
+                    unconditional.insert(name.to_string());
+                }
+            }
+        } else {
+            coverage.limits.insert(AnalysisLimit::Nodes);
+        }
+    } else {
+        coverage.limits.insert(AnalysisLimit::UnavailableTemplate);
+    }
+    let mut names = BTreeMap::new();
+    for name in unconditional.iter().chain(active.value.iter()) {
+        if !inputs
+            .present
+            .iter()
+            .any(|supplied| supplied.eq_ignore_ascii_case(name))
+        {
+            names
+                .entry(name.to_ascii_lowercase())
+                .or_insert_with(|| name.clone());
+        }
+    }
+    Ok(Analysis {
+        value: RequiredParameters {
+            unconditional,
+            missing: names.into_values().collect(),
+        },
+        coverage,
+    })
+}
+
+struct RequirednessFacts<'a> {
+    facts: &'a dyn rules::ir::SymbolFacts,
+    dependent: std::cell::Cell<bool>,
+}
+impl rules::ir::SymbolFacts for RequirednessFacts<'_> {
+    fn asset_member(&self, category: &str, name: &str) -> Option<bool> {
+        self.facts.asset_member(category, name)
+    }
+    fn facts_complete(&self) -> bool {
+        self.facts.facts_complete()
+    }
+    fn type_member(&self, ty: rules::ir::TypeId, name: &str) -> bool {
+        self.facts.type_member(ty, name)
+    }
+    fn type_subtype_member(
+        &self,
+        ty: rules::ir::TypeId,
+        subtype: rules::ir::Symbol,
+        name: &str,
+    ) -> bool {
+        self.facts.type_subtype_member(ty, subtype, name)
+    }
+    fn template(
+        &self,
+        ty: rules::ir::TypeId,
+        name: &str,
+    ) -> Option<Arc<rules::template::Template>> {
+        self.facts.template(ty, name)
+    }
+    fn template_accepts_no_arguments(
+        &self,
+        _: rules::ir::TypeId,
+        _: &str,
+        _: &mut dyn FnMut() -> bool,
+    ) -> Option<bool> {
+        self.dependent.set(true);
+        None
+    }
+}
+
 type Environment = BTreeMap<String, Vec<TemplateFragment>>;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -355,7 +497,8 @@ enum Task {
         env: Arc<Environment>,
         active: Arc<BTreeSet<String>>,
         state: ScopeState,
-        cases: Option<Vec<MatcherId>>,
+        cases: Option<Domain>,
+        query_context: Arc<crate::query::OwnedQueryContext>,
         origin: (String, String),
     },
 }
@@ -408,15 +551,18 @@ impl<E> Interpreter<'_, E> {
                         let bytes = sites
                             .iter()
                             .map(|site| {
-                                256 + site
-                                    .token
-                                    .fragments
-                                    .iter()
-                                    .map(|fragment| match fragment {
-                                        TemplateFragment::Literal(value) => value.len() + 32,
-                                        TemplateFragment::Parameter { name, .. } => name.len() + 32,
-                                    })
-                                    .sum::<usize>()
+                                256 + site.query_context.estimated_bytes()
+                                    + site
+                                        .token
+                                        .fragments
+                                        .iter()
+                                        .map(|fragment| match fragment {
+                                            TemplateFragment::Literal(value) => value.len() + 32,
+                                            TemplateFragment::Parameter { name, .. } => {
+                                                name.len() + 32
+                                            }
+                                        })
+                                        .sum::<usize>()
                             })
                             .sum();
                         memo.insert(
@@ -475,8 +621,20 @@ impl<E> Interpreter<'_, E> {
                     {
                         if self.parameter.is_empty() {
                             self.require_program(&template.program, env.as_ref(), active.as_ref())?;
+                            if self.budget == 0 {
+                                self.coverage.limits.insert(AnalysisLimit::Nodes);
+                                continue;
+                            }
                         }
                         work.push(Task::Exit(key, site_start, cache_key));
+                        let query_context = Arc::new(active_program_context(
+                            &template.program,
+                            0,
+                            &env,
+                            &active,
+                            self.all_branches,
+                            self.parameter,
+                        ));
                         work.push(Task::Walk {
                             schema,
                             program: template.program.clone(),
@@ -486,6 +644,7 @@ impl<E> Interpreter<'_, E> {
                             active,
                             state,
                             cases: None,
+                            query_context,
                             origin: (kind, name),
                         });
                     } else {
@@ -504,6 +663,7 @@ impl<E> Interpreter<'_, E> {
                     active,
                     state,
                     cases,
+                    query_context,
                     origin,
                 } => {
                     let Some(instruction) =
@@ -522,6 +682,7 @@ impl<E> Interpreter<'_, E> {
                         active: active.clone(),
                         state: state.clone(),
                         cases: cases.clone(),
+                        query_context: query_context.clone(),
                         origin: origin.clone(),
                     });
                     self.instruction(
@@ -531,7 +692,8 @@ impl<E> Interpreter<'_, E> {
                         env.as_ref(),
                         active.as_ref(),
                         state,
-                        cases.as_deref(),
+                        cases.as_ref(),
+                        query_context,
                         origin,
                         &mut work,
                     )?;
@@ -562,7 +724,9 @@ impl<E> Interpreter<'_, E> {
                             .limits
                             .insert(AnalysisLimit::StructuralRecovery);
                     }
-                    TemplateInstruction::Consume(token) => self.required_token(token, env, active),
+                    TemplateInstruction::Consume(token) => {
+                        self.required_token(token, env, active)?
+                    }
                     TemplateInstruction::When {
                         name,
                         negated,
@@ -575,10 +739,10 @@ impl<E> Interpreter<'_, E> {
                         }
                     }
                     TemplateInstruction::Dispatch(property) => {
-                        self.required_token(&property.key, env, active);
+                        self.required_token(&property.key, env, active)?;
                         match &property.value {
                             TemplateOperand::Scalar(token) => {
-                                self.required_token(token, env, active)
+                                self.required_token(token, env, active)?
                             }
                             TemplateOperand::Block(block) => pending.push(*block),
                         }
@@ -594,8 +758,14 @@ impl<E> Interpreter<'_, E> {
         token: &TemplateToken,
         env: &Environment,
         active: &BTreeSet<String>,
-    ) {
+    ) -> Result<(), E> {
         for part in &token.fragments {
+            (self.checkpoint)()?;
+            if self.budget == 0 {
+                self.coverage.limits.insert(AnalysisLimit::Nodes);
+                return Ok(());
+            }
+            self.budget -= 1;
             let TemplateFragment::Parameter { name, range } = part else {
                 continue;
             };
@@ -620,10 +790,20 @@ impl<E> Interpreter<'_, E> {
                     }),
             );
         }
+        Ok(())
     }
-    fn add(&mut self, domain: Domain, token: TemplateToken, state: &ScopeState) {
+    fn add(
+        &mut self,
+        domain: Domain,
+        token: TemplateToken,
+        state: &ScopeState,
+        query_context: &crate::query::OwnedQueryContext,
+    ) {
+        if matches!(domain, Domain::Unresolved) {
+            self.coverage.residuals.insert(ResidualReason::Binding);
+        }
         if token.fragments.iter().any(|part|matches!(part,TemplateFragment::Parameter{name,..} if name.eq_ignore_ascii_case(self.parameter))) {
-            self.sites.push(ParameterSite{origin:self.origin.clone(),domain,token,state:state.clone()});
+            self.sites.push(ParameterSite{origin:self.origin.clone(),domain,token,state:state.clone(),query_context:query_context.clone()});
         }
     }
 
@@ -636,7 +816,8 @@ impl<E> Interpreter<'_, E> {
         env: &Environment,
         active: &BTreeSet<String>,
         state: ScopeState,
-        switch_cases: Option<&[MatcherId]>,
+        switch_cases: Option<&Domain>,
+        query_context: Arc<crate::query::OwnedQueryContext>,
         origin: (String, String),
         work: &mut Vec<Task>,
     ) -> Result<(), E> {
@@ -661,7 +842,8 @@ impl<E> Interpreter<'_, E> {
                         env: Arc::new(env.clone()),
                         active: Arc::new(active.clone()),
                         state: state.clone(),
-                        cases: switch_cases.map(|cases| cases.to_vec()),
+                        cases: switch_cases.cloned(),
+                        query_context: query_context.clone(),
                         origin: origin.clone(),
                     });
                 }
@@ -671,7 +853,12 @@ impl<E> Interpreter<'_, E> {
                     schema,
                     complete: false,
                 };
-                self.add(domain, substitute(token, env), &state);
+                self.add(
+                    domain,
+                    substitute(token, env),
+                    &state,
+                    query_context.as_ref(),
+                );
             }
             TemplateInstruction::Dispatch(property) => {
                 let token = substitute(&property.key, env);
@@ -684,15 +871,31 @@ impl<E> Interpreter<'_, E> {
                     let domain = if shape == Shape::Block
                         && let Some(matchers) = switch_cases
                     {
-                        Domain::Value(matchers.to_vec())
+                        matchers.clone()
                     } else {
-                        Domain::Key { schema, shape }
+                        let keys = ir
+                            .fields(schema)
+                            .into_iter()
+                            .filter(|field| ir.shape(*field) == Some(shape))
+                            .map(|field| ir.field(field).key)
+                            .collect::<Vec<_>>();
+                        if keys.iter().any(|matcher| matcher_has_query(ir, *matcher)) {
+                            query_value_domain(ir, &keys, self.facts, query_context.as_ref())
+                        } else {
+                            Domain::Key { schema, shape }
+                        }
                     };
-                    self.add(domain, token, &state);
+                    self.add(domain, token, &state, query_context.as_ref());
                     return Ok(());
                 };
-                let mut fields =
-                    crate::checking::field_candidates(ir, schema, &key, shape, self.facts);
+                let mut fields = crate::checking::field_candidates_with_context(
+                    ir,
+                    schema,
+                    &key,
+                    shape,
+                    self.facts,
+                    query_context.as_ref(),
+                );
                 let scoped = fields
                     .iter()
                     .copied()
@@ -753,7 +956,13 @@ impl<E> Interpreter<'_, E> {
                             })
                             .collect::<Vec<_>>();
                         if !matchers.is_empty() {
-                            self.add(Domain::Value(matchers), token.clone(), &state);
+                            let domain = query_value_domain(
+                                ir,
+                                &matchers,
+                                self.facts,
+                                query_context.as_ref(),
+                            );
+                            self.add(domain, token.clone(), &state, query_context.as_ref());
                         }
                     }
                     TemplateOperand::Block(block) => {
@@ -772,27 +981,51 @@ impl<E> Interpreter<'_, E> {
                                     ir.field(id).scope.as_ref(),
                                     &key,
                                 );
+                                let child_context = Arc::new(active_program_context(
+                                    &program,
+                                    *block,
+                                    env,
+                                    active,
+                                    self.all_branches,
+                                    self.parameter,
+                                ));
                                 let cases = ir.field(id).control.as_ref().and_then(|control| {
                                     let selector_schema = control.selector_schema?;
                                     let on = ir.strings().resolve(control.on?);
-                                    let selector =
-                                        active_program_scalar(&program, *block, on, env, active)?;
-                                    let matchers = ir
-                                        .lookup(selector_schema, &selector, Shape::Scalar)
-                                        .filter(|id| {
-                                            key_matches(
-                                                ir,
-                                                ir.field(*id).key,
-                                                &selector,
-                                                self.facts,
-                                            )
-                                        })
-                                        .filter_map(|id| match ir.field(id).value {
-                                            FieldValue::Scalar(matcher) => Some(matcher),
-                                            _ => None,
-                                        })
-                                        .collect::<Vec<_>>();
-                                    (!matchers.is_empty()).then_some(matchers)
+                                    let mut query = rules::ir::FieldQuery::new(
+                                        selector_schema,
+                                        rules::ir::QueryProjection::Values,
+                                    );
+                                    query.shape = Some(Shape::Scalar);
+                                    query.call_args_none = true;
+                                    let result = match rules::query::QueryContext::sibling(
+                                        child_context.as_ref(),
+                                        on,
+                                    ) {
+                                        rules::query::SiblingValue::Scalar(selector) => ir
+                                            .query_selected_fields(
+                                                &query,
+                                                selector,
+                                                &Facts(self.facts),
+                                                child_context.as_ref(),
+                                            ),
+                                        rules::query::SiblingValue::Deferred => {
+                                            return Some(Domain::Unresolved);
+                                        }
+                                        _ => return Some(Domain::Value(Vec::new())),
+                                    };
+                                    if result.state == rules::query::QueryState::Deferred {
+                                        return Some(Domain::Unresolved);
+                                    }
+                                    Some(Domain::Value(
+                                        result
+                                            .fields
+                                            .into_iter()
+                                            .filter_map(|field| {
+                                                ir.query_projected_matcher(&query, field)
+                                            })
+                                            .collect(),
+                                    ))
                                 });
                                 work.push(Task::Walk {
                                     schema: child,
@@ -803,6 +1036,7 @@ impl<E> Interpreter<'_, E> {
                                     active: Arc::new(active.clone()),
                                     state: next,
                                     cases,
+                                    query_context: child_context,
                                     origin: origin.clone(),
                                 });
                             }
@@ -815,55 +1049,130 @@ impl<E> Interpreter<'_, E> {
     }
 }
 
-fn active_program_scalar(
-    program: &TemplateProgram,
-    block: usize,
-    key: &str,
-    env: &Environment,
-    active: &BTreeSet<String>,
-) -> Option<String> {
-    let mut pending = vec![(block, program.blocks[block].len())];
-    while let Some((block, index)) = pending.pop() {
-        if index == 0 {
-            continue;
-        }
-        pending.push((block, index - 1));
-        match &program.blocks[block][index - 1] {
-            TemplateInstruction::Dispatch(property)
-                if literal(&substitute(&property.key, env))
-                    .is_some_and(|name| name.eq_ignore_ascii_case(key)) =>
-            {
-                if let TemplateOperand::Scalar(value) = &property.value {
-                    return literal(&substitute(value, env));
-                }
-            }
-            TemplateInstruction::When {
-                name,
-                negated,
-                block,
-            } if active.contains(&name.to_ascii_lowercase()) != *negated => {
-                pending.push((*block, program.blocks[*block].len()))
-            }
-            _ => {}
-        }
+struct Facts<'a>(&'a dyn rules::ir::SymbolFacts);
+impl rules::ir::SymbolFacts for Facts<'_> {
+    fn template_accepts_no_arguments(
+        &self,
+        ty: rules::ir::TypeId,
+        name: &str,
+        checkpoint: &mut dyn FnMut() -> bool,
+    ) -> Option<bool> {
+        self.0.template_accepts_no_arguments(ty, name, checkpoint)
     }
-    None
+    fn facts_complete(&self) -> bool {
+        self.0.facts_complete()
+    }
+    fn type_member(&self, id: rules::ir::TypeId, name: &str) -> bool {
+        self.0.type_member(id, name)
+    }
+    fn type_subtype_member(
+        &self,
+        id: rules::ir::TypeId,
+        subtype: rules::ir::Symbol,
+        name: &str,
+    ) -> bool {
+        self.0.type_subtype_member(id, subtype, name)
+    }
 }
 
-/// Type namespace of a matcher implementing the declared Template trait.
-pub fn template_kind(ir: &rules::ir::RulesIr, matcher: MatcherId) -> Option<String> {
-    match ir.matcher(matcher) {
-        Matcher::Ref(rules::ir::RefTarget::Type { type_id, .. }) => {
-            let template = ir.trait_by_name("Template")?;
-            let info = ir.type_info(*type_id);
-            info.trait_impls
-                .iter()
-                .any(|implementation| implementation.trait_id == template)
-                .then(|| ir.strings().resolve(info.name).to_owned())
+fn active_program_context(
+    program: &TemplateProgram,
+    block: usize,
+    env: &Environment,
+    active: &BTreeSet<String>,
+    all_branches: bool,
+    parameter: &str,
+) -> crate::query::OwnedQueryContext {
+    let mut context = crate::query::OwnedQueryContext::default();
+    let mut pending = vec![block];
+    while let Some(block) = pending.pop() {
+        for instruction in program.blocks[block].iter() {
+            match instruction {
+                TemplateInstruction::Dispatch(property) => {
+                    let key_token = substitute(&property.key, env);
+                    let Some(key) = literal(&key_token) else {
+                        if !key_token.fragments.iter().any(|fragment| matches!(fragment, TemplateFragment::Parameter {name,..} if name.eq_ignore_ascii_case(parameter))) {
+                            context.unknown_key = true;
+                        }
+                        continue;
+                    };
+                    let value = match &property.value {
+                        TemplateOperand::Scalar(value) => literal(&substitute(value, env)).map_or(
+                            crate::query::OwnedSibling::Deferred,
+                            crate::query::OwnedSibling::Scalar,
+                        ),
+                        TemplateOperand::Block(_) => crate::query::OwnedSibling::Invalid,
+                    };
+                    context.insert(key, value);
+                }
+                TemplateInstruction::When { .. } if all_branches => context.unknown_key = true,
+                TemplateInstruction::When {
+                    name,
+                    negated,
+                    block,
+                } if active.contains(&name.to_ascii_lowercase()) != *negated => {
+                    pending.push(*block)
+                }
+                TemplateInstruction::Consume(_) | TemplateInstruction::Recover(_) => {
+                    context.unknown_key = true
+                }
+                _ => {}
+            }
         }
-        Matcher::Union(items) => items.iter().find_map(|id| template_kind(ir, *id)),
-        _ => None,
     }
+    context
+}
+
+fn matcher_has_query(ir: &rules::ir::RulesIr, matcher: MatcherId) -> bool {
+    match ir.matcher(matcher) {
+        Matcher::Query(_) => true,
+        Matcher::Union(items) => items.iter().any(|item| matcher_has_query(ir, *item)),
+        Matcher::Pattern(parts) => parts.iter().any(|part| matches!(part, rules::ir::PatternPart::Hole(matcher) if matcher_has_query(ir, *matcher))),
+        _ => false,
+    }
+}
+
+fn query_value_domain(
+    ir: &rules::ir::RulesIr,
+    matchers: &[MatcherId],
+    facts: &dyn rules::ir::SymbolFacts,
+    context: &impl rules::query::QueryContext,
+) -> Domain {
+    let mut pending = matchers.to_vec();
+    let mut result = Vec::new();
+    let mut visited = BTreeSet::new();
+    while let Some(matcher) = pending.pop() {
+        if !visited.insert(matcher) {
+            continue;
+        }
+        match ir.matcher(matcher) {
+            Matcher::Query(query)
+                if query.projection == rules::ir::QueryProjection::Values
+                    || query.selector.is_some() =>
+            {
+                let selection = ir.query_fields(query, &Facts(facts), context);
+                if selection.state == rules::query::QueryState::Deferred {
+                    return Domain::Unresolved;
+                }
+                if selection.state == rules::query::QueryState::Resolved {
+                    // Retain the original query and source-field provenance. The site
+                    // carries its physical sibling context for all later projections.
+                    result.push(matcher);
+                }
+            }
+            Matcher::Union(items) => pending.extend(items.iter().rev().copied()),
+            _ => result.push(matcher),
+        }
+    }
+    result.sort_unstable();
+    result.dedup();
+    Domain::Value(result)
+}
+
+/// Returns the Template type referenced by a matcher.
+pub fn template_kind(ir: &rules::ir::RulesIr, matcher: MatcherId) -> Option<String> {
+    rules::template::template_key_type(ir, matcher, &mut || false)
+        .map(|type_id| ir.strings().resolve(ir.type_info(type_id).name).to_owned())
 }
 
 fn forward_program(
@@ -962,15 +1271,6 @@ pub fn template_body(ir: &rules::ir::RulesIr, type_id: rules::ir::TypeId) -> Opt
         })
 }
 
-fn key_matches(
-    ir: &rules::ir::RulesIr,
-    matcher: MatcherId,
-    value: &str,
-    facts: &dyn rules::ir::SymbolFacts,
-) -> bool {
-    crate::checking::scalar_matches(ir, matcher, value, facts)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1031,6 +1331,320 @@ mod tests {
             program: Arc::new(TemplateProgram::compile(&items)),
             items: Arc::from(items),
         })
+    }
+
+    fn query_fixture(key_parameter: bool) -> (rules::ir::RulesIr, Definitions, Arc<Template>) {
+        let ir = rules::lower::lower(&[("query.json".into(), serde_json::from_str(r#"{
+          "files":{"test":{"path":"test","ext":"txt","root":"select"}},
+          "traits":{"Template":{}},
+          "types":{"scripted_effect":{"impl":{"Template":{"body":"select"}}}},
+          "schemas":{
+            "select":{"fields":{
+              "on_trigger":{"value":"keysof<triggers,shape=scalar>","card":"0..1"},
+              "value":{"value":"valuesof<triggers,key=sibling<on_trigger>,shape=scalar>","card":"0..*"}
+            },"patterns":[{"key":"valuesof<triggers,key=sibling<on_trigger>,shape=scalar>","body":"empty","card":"0..*"}]},
+            "triggers":{"fields":{"flag":{"value":"bool","card":"0..*"},"count":{"value":"int","card":"0..*"}}},
+            "empty":{}
+          }
+        }"#).unwrap())], Default::default()).unwrap();
+        let mut selector = variable();
+        selector.fragments = vec![TemplateFragment::Parameter {
+            name: Arc::from("SELECT"),
+            range: text::TextRange::empty(0),
+        }];
+        let property = |key, value| {
+            TemplateItem::Property(TemplateProperty {
+                key,
+                value,
+                operator: Some(Arc::from("=")),
+                range: text::TextRange::empty(0),
+            })
+        };
+        let items = vec![
+            property(token("on_trigger"), TemplateValue::Scalar(selector)),
+            if key_parameter {
+                property(
+                    variable(),
+                    TemplateValue::Block {
+                        range: text::TextRange::empty(0),
+                        items: Vec::new(),
+                    },
+                )
+            } else {
+                property(token("value"), TemplateValue::Scalar(variable()))
+            },
+        ];
+        let template = Arc::new(Template {
+            source: Arc::from(if key_parameter {
+                "{ on_trigger = $SELECT$ $N$ = {} }"
+            } else {
+                "{ on_trigger = $SELECT$ value = $N$ }"
+            }),
+            kind: Arc::from("scripted_effect"),
+            name: "query".into(),
+            definition_range: text::TextRange::empty(0),
+            body_range: text::TextRange::empty(0),
+            program: Arc::new(TemplateProgram::compile(&items)),
+            items: items.into(),
+        });
+        let facts = Definitions(
+            BTreeMap::from([("query".into(), template.clone())]),
+            ir.type_by_name("scripted_effect").unwrap(),
+        );
+        (ir, facts, template)
+    }
+
+    #[test]
+    fn query_parameter_domains_follow_bound_siblings_for_values_and_keys() {
+        for key_parameter in [false, true] {
+            let (ir, facts, _) = query_fixture(key_parameter);
+            for (selector, valid, invalid) in [("flag", "yes", "5"), ("count", "5", "yes")] {
+                let sites = parameter_sites::<std::convert::Infallible>(
+                    &ir,
+                    &facts,
+                    "scripted_effect",
+                    "query",
+                    "N",
+                    &BTreeMap::from([("SELECT".into(), selector.into())]),
+                    ScopeState::initial(crate::ScopeValue::Unknown),
+                    &mut || Ok(()),
+                )
+                .unwrap();
+                assert_eq!(sites.value.len(), 1);
+                let Domain::Value(matchers) = &sites.value[0].domain else {
+                    panic!("missing selected query domain: {:?}", sites.value[0].domain);
+                };
+                assert!(
+                    matchers
+                        .iter()
+                        .any(|matcher| ir.scalar_outcome_with_context(
+                            *matcher,
+                            valid,
+                            &facts,
+                            &sites.value[0].query_context
+                        ) == Some(true))
+                );
+                assert!(
+                    !matchers
+                        .iter()
+                        .any(|matcher| ir.scalar_outcome_with_context(
+                            *matcher,
+                            invalid,
+                            &facts,
+                            &sites.value[0].query_context
+                        ) == Some(true))
+                );
+            }
+            let sites = parameter_sites::<std::convert::Infallible>(
+                &ir,
+                &facts,
+                "scripted_effect",
+                "query",
+                "N",
+                &BTreeMap::new(),
+                ScopeState::initial(crate::ScopeValue::Unknown),
+                &mut || Ok(()),
+            )
+            .unwrap();
+            assert!(matches!(sites.value[0].domain, Domain::Unresolved));
+        }
+    }
+
+    #[test]
+    fn query_template_instantiation_revalidates_after_selector_changes() {
+        let (ir, facts, template) = query_fixture(false);
+        for (selector, invalid) in [("flag", false), ("count", true)] {
+            let bindings = BTreeMap::from([
+                ("select".into(), selector.into()),
+                ("n".into(), "yes".into()),
+            ]);
+            let instance = crate::template_instance::instantiate::<std::convert::Infallible>(
+                &ir,
+                &facts,
+                template.clone(),
+                &bindings,
+                &bindings,
+                &bindings
+                    .keys()
+                    .map(|key| key.to_ascii_lowercase())
+                    .collect(),
+                ir.schema_by_name("select").unwrap(),
+                ScopeState::initial(crate::ScopeValue::Unknown),
+                &[],
+                crate::template_instance::InstanceGoal::Validation,
+                &mut || Ok(()),
+            )
+            .unwrap();
+            assert_eq!(
+                instance
+                    .evidence
+                    .iter()
+                    .any(|issue| issue.kind == crate::checking::IssueKind::Value),
+                invalid,
+                "{}: {:?}",
+                instance.rendered.text,
+                instance.evidence
+            );
+        }
+    }
+
+    fn requiredness_fixture() -> (rules::ir::RulesIr, Definitions) {
+        let ir = rules::lower::lower(&[("calls.json".into(), serde_json::from_str(r#"{
+          "traits":{"Template":{}},
+          "types":{"scripted_effect":{"impl":{"Template":{"body":"commands"}}}},
+          "files":{"test":{"path":"test","root":"commands"}},
+          "schemas":{
+            "commands":{"fields":{"integer":{"value":"int","card":"0..*"},"select":{"body":"selection","card":"0..*"}},"patterns":[
+              {"key":"ref<scripted_effect>","value":"bool","card":"0..*"},
+              {"key":"ref<scripted_effect>","body":"arguments","card":"0..*"}
+            ]},
+            "selection":{"patterns":[{"key":"keysof<commands,shape=scalar,call_args=none>","value":"bool","card":"0..*"}]},
+            "arguments":{"open":true}
+          }
+        }"#).unwrap())], Default::default()).unwrap();
+        let required = definition("required", "integer", false);
+        let make = |name: &str, items: Vec<TemplateItem>| {
+            Arc::new(Template {
+                source: Arc::from(""),
+                kind: Arc::from("scripted_effect"),
+                name: name.into(),
+                definition_range: text::TextRange::empty(0),
+                body_range: text::TextRange::empty(0),
+                program: Arc::new(TemplateProgram::compile(&items)),
+                items: items.into(),
+            })
+        };
+        let property = |key: &str, value| {
+            TemplateItem::Property(TemplateProperty {
+                key: token(key),
+                range: text::TextRange::empty(0),
+                operator: Some("=".into()),
+                value,
+            })
+        };
+        let when = |negated: bool, items| {
+            TemplateItem::Conditional(rules::template::TemplateConditional {
+                name: Arc::from("N"),
+                negated,
+                range: text::TextRange::empty(0),
+                items,
+            })
+        };
+        let optional = make("optional", vec![when(false, required.items.to_vec())]);
+        let defaulted = make(
+            "defaulted",
+            vec![
+                when(false, required.items.to_vec()),
+                when(
+                    true,
+                    vec![property("integer", TemplateValue::Scalar(token("5")))],
+                ),
+            ],
+        );
+        let active = make("active", vec![when(true, required.items.to_vec())]);
+        let forwarded = make(
+            "forwarded",
+            vec![property("required", TemplateValue::Scalar(token("yes")))],
+        );
+        let recursive = make(
+            "recursive",
+            vec![property("recursive", TemplateValue::Scalar(token("yes")))],
+        );
+        let query = make(
+            "query",
+            vec![property(
+                "select",
+                TemplateValue::Block {
+                    range: text::TextRange::empty(0),
+                    items: vec![property("optional", TemplateValue::Scalar(token("yes")))],
+                },
+            )],
+        );
+        let definitions = [
+            required, optional, defaulted, active, forwarded, recursive, query,
+        ]
+        .into_iter()
+        .map(|template| (template.name.clone(), template))
+        .collect();
+        let ty = ir.type_by_name("scripted_effect").unwrap();
+        (ir, Definitions(definitions, ty))
+    }
+
+    #[test]
+    fn required_argument_authority_covers_optional_defaulted_active_and_forwarded_reads() {
+        let (ir, facts) = requiredness_fixture();
+        for (name, missing, unconditional) in [
+            ("required", true, true),
+            ("optional", false, false),
+            ("defaulted", false, false),
+            ("active", true, false),
+            ("forwarded", true, false),
+        ] {
+            let result = required_parameters_with_inputs::<std::convert::Infallible>(
+                &ir,
+                &facts,
+                "scripted_effect",
+                name,
+                &BindingInputs::default(),
+                ScopeState::initial(crate::ScopeValue::Unknown),
+                &mut || Ok(()),
+            )
+            .unwrap();
+            assert!(result.coverage.is_known(), "{name}: {:?}", result.coverage);
+            assert_eq!(result.missing.contains("N"), missing, "{name}");
+            assert_eq!(result.unconditional.contains("N"), unconditional, "{name}");
+        }
+        // A present editing hole activates its guard without inventing a missing argument.
+        let result = required_parameters_with_inputs::<std::convert::Infallible>(
+            &ir,
+            &facts,
+            "scripted_effect",
+            "optional",
+            &BindingInputs {
+                present: BTreeSet::from(["n".into()]),
+                ..Default::default()
+            },
+            ScopeState::initial(crate::ScopeValue::Unknown),
+            &mut || Ok(()),
+        )
+        .unwrap();
+        assert!(result.missing.is_empty());
+    }
+
+    #[test]
+    fn required_argument_authority_defers_reentrant_queries_and_recursive_definitions() {
+        let (ir, facts) = requiredness_fixture();
+        for (name, limit) in [
+            ("recursive", AnalysisLimit::RecursiveState),
+            ("query", AnalysisLimit::DependentQuery),
+        ] {
+            let result = required_parameters_with_inputs::<std::convert::Infallible>(
+                &ir,
+                &facts,
+                "scripted_effect",
+                name,
+                &BindingInputs::default(),
+                ScopeState::initial(crate::ScopeValue::Unknown),
+                &mut || Ok(()),
+            )
+            .unwrap();
+            assert!(result.missing.is_empty());
+            assert!(
+                result.coverage.limits.contains(&limit),
+                "{name}: {:?}",
+                result.coverage
+            );
+        }
+        let result = required_parameters_with_inputs(
+            &ir,
+            &facts,
+            "scripted_effect",
+            "required",
+            &BindingInputs::default(),
+            ScopeState::initial(crate::ScopeValue::Unknown),
+            &mut || Err("cancelled"),
+        );
+        assert_eq!(result.unwrap_err(), "cancelled");
     }
 
     #[test]

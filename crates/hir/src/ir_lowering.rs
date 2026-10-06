@@ -13,6 +13,8 @@ use crate::{
 
 #[derive(Clone)]
 pub(super) struct IrFacts {
+    query_context: crate::query::OwnedQueryContext,
+    query_depth: usize,
     pub analysis_coverage: crate::analysis::AnalysisCoverage,
     pub pattern_ambiguous: std::cell::Cell<bool>,
     pub pattern_search_incomplete: std::cell::Cell<bool>,
@@ -32,6 +34,16 @@ pub(super) struct IrFacts {
 }
 struct FactsRef<'a>(Option<&'a dyn SymbolFacts>, &'a std::cell::Cell<bool>);
 impl SymbolFacts for FactsRef<'_> {
+    fn template_accepts_no_arguments(
+        &self,
+        ty: TypeId,
+        name: &str,
+        checkpoint: &mut dyn FnMut() -> bool,
+    ) -> Option<bool> {
+        self.1.set(true);
+        self.0
+            .and_then(|facts| facts.template_accepts_no_arguments(ty, name, checkpoint))
+    }
     fn facts_complete(&self) -> bool {
         self.0.is_none_or(SymbolFacts::facts_complete)
     }
@@ -58,6 +70,8 @@ pub(super) fn lower(
 ) -> IrFacts {
     let children = crate::scope::property_children(props);
     let mut out = IrFacts {
+        query_context: Default::default(),
+        query_depth: 0,
         analysis_coverage: Default::default(),
         pattern_search_incomplete: std::cell::Cell::new(false),
         pattern_ambiguous: std::cell::Cell::new(false),
@@ -256,6 +270,8 @@ pub(super) fn lower_schema_fragment(
     let children = crate::scope::property_children(&props);
     let root_range = root_range.unwrap_or(syntax.root().range());
     let mut out = IrFacts {
+        query_context: Default::default(),
+        query_depth: 0,
         analysis_coverage: Default::default(),
         pattern_search_incomplete: std::cell::Cell::new(false),
         pattern_ambiguous: std::cell::Cell::new(false),
@@ -345,6 +361,16 @@ fn descend(
     container_range: TextRange,
     branch_self_schema: Option<SchemaId>,
 ) {
+    let query_context = crate::query::PropertyQueryContext::from_indices(props, &indices)
+        .with_unknown_ranges(&out.unknown_ranges)
+        .defer_templates(out.definitions.iter().any(|definition| {
+            out.template_kinds
+                .contains(&definition.kind.to_ascii_lowercase())
+                && definition.range.start() <= container_range.start()
+                && container_range.end() <= definition.range.end()
+        }))
+        .to_owned();
+    out.query_context = query_context.clone();
     if let Some(matcher) = ir.schema(schema).items {
         // Only direct list members use this matcher. Nested properties own
         // their values, even when they also contain unkeyed list elements.
@@ -361,6 +387,7 @@ fn descend(
         }
     }
     for index in indices {
+        out.query_context = query_context.clone();
         let p = &props[index];
         let shape = if p.scalar.is_some() {
             Shape::Scalar
@@ -431,11 +458,14 @@ fn descend(
                     field_value_priority(ir, *id) > 0
                         && (reference_matches(ir, matcher, &scalar.value, facts, out)
                             || definitely_non_reference(ir, matcher, &scalar.value)
-                            || ir.scalar_matches(
+                            || crate::checking::scalar_outcome_with_context(
+                                ir,
                                 matcher,
                                 &scalar.value,
                                 &FactsRef(facts, &out.symbol_facts_dependency),
-                            ))
+                                &out.query_context,
+                            )
+                            .0 == Some(true))
                 })
             })
             .or_else(|| candidates.first().copied());
@@ -495,11 +525,14 @@ fn descend(
                     rules::ir::FieldValue::Scalar(matcher) => {
                         reference_matches(ir, matcher, &scalar.value, facts, out)
                             || definitely_non_reference(ir, matcher, &scalar.value)
-                            || ir.scalar_matches(
+                            || crate::checking::scalar_outcome_with_context(
+                                ir,
                                 matcher,
                                 &scalar.value,
                                 &FactsRef(facts, &out.symbol_facts_dependency),
+                                &out.query_context,
                             )
+                            .0 == Some(true)
                     }
                     _ => false,
                 })
@@ -645,6 +678,7 @@ fn descend(
             }
         } else {
             for id in candidates {
+                out.query_context = query_context.clone();
                 lower_field_candidate(
                     ir,
                     path,
@@ -1264,10 +1298,18 @@ fn matcher_accepts_key(
         Matcher::Pattern(parts) => {
             let mut no_cancel = || false;
             let mut budget = rules::pattern::SearchBudget::new(Default::default(), &mut no_cancel);
-            let result =
-                rules::pattern::search(ir, parts, key, &mut budget, &mut |matcher, text| {
-                    Some(matcher_accepts_key(ir, matcher, text, facts, out))
-                });
+            let result = rules::pattern::search_with_context(
+                ir,
+                parts,
+                key,
+                &mut budget,
+                &rules::query::QueryContextWithFacts::new(
+                    ir,
+                    &FactsRef(facts, &out.symbol_facts_dependency),
+                    &out.query_context,
+                ),
+                &mut |matcher, text| Some(matcher_accepts_key(ir, matcher, text, facts, out)),
+            );
             if budget.limit.is_some() {
                 out.pattern_search_incomplete.set(true);
             }
@@ -1307,6 +1349,16 @@ fn matcher_accepts_key(
             })
         }
 
+        Matcher::Query(_) => {
+            crate::checking::scalar_outcome_with_context(
+                ir,
+                matcher_id,
+                key,
+                &FactsRef(facts, &out.symbol_facts_dependency),
+                &out.query_context,
+            )
+            .0 != Some(false)
+        }
         Matcher::Scope(scope) => ir.scope_matches(*scope, key),
         Matcher::Link => link_or_register_matches(ir, key),
         Matcher::Opaque
@@ -1326,7 +1378,7 @@ fn field_value_priority(ir: &RulesIr, field: rules::ir::FieldId) -> u8 {
 
 fn matcher_value_priority(ir: &RulesIr, matcher: MatcherId) -> u8 {
     match ir.matcher(matcher) {
-        Matcher::Loc | Matcher::Ref(_) | Matcher::Enum { .. } => 4,
+        Matcher::Loc | Matcher::Ref(_) | Matcher::Enum { .. } | Matcher::Query(_) => 4,
         Matcher::Literal(_) | Matcher::Bool | Matcher::Int { .. } | Matcher::Date => 3,
         Matcher::Union(items) => items
             .iter()
@@ -1597,7 +1649,72 @@ fn collect_matcher_refs(
     facts: Option<&dyn SymbolFacts>,
     out: &mut IrFacts,
 ) {
+    collect_matcher_refs_with_definitions(ir, id, value, range, facts, out, true);
+}
+
+fn collect_matcher_refs_with_definitions(
+    ir: &RulesIr,
+    id: MatcherId,
+    value: &str,
+    range: TextRange,
+    facts: Option<&dyn SymbolFacts>,
+    out: &mut IrFacts,
+    allow_definitions: bool,
+) {
+    // Relaxed identity matching must never revive declarations from an invalid
+    // outer Pattern. Query projections are always reference-only below.
+    let allow_definitions = allow_definitions
+        && match ir.matcher(id) {
+            Matcher::Pattern(parts) if matcher_contains_query(ir, id) => {
+                pattern_value_holes(ir, parts, value, facts, Some(out), false).is_some()
+            }
+            _ => true,
+        };
     match ir.matcher(id) {
+        Matcher::Query(query) => {
+            if out.query_depth >= 64 {
+                out.pattern_search_incomplete.set(true);
+                return;
+            }
+            out.query_depth += 1;
+            let resolution = if query.projection == rules::ir::QueryProjection::Keys
+                && query.selector.is_none()
+            {
+                ir.query_selected_fields(
+                    query,
+                    value,
+                    &FactsRef(facts, &out.symbol_facts_dependency),
+                    &rules::query::ReferenceQueryContext::new(&out.query_context),
+                )
+            } else {
+                ir.query_fields(
+                    query,
+                    &FactsRef(facts, &out.symbol_facts_dependency),
+                    &rules::query::ReferenceQueryContext::new(&out.query_context),
+                )
+            };
+            if resolution.state == rules::query::QueryState::Deferred {
+                out.analysis_coverage
+                    .residuals
+                    .insert(crate::analysis::ResidualReason::Binding);
+            }
+            for field in resolution.fields {
+                let projected = match query.projection {
+                    rules::ir::QueryProjection::Keys => Some(ir.field(field).key),
+                    rules::ir::QueryProjection::Values => match ir.field(field).value {
+                        rules::ir::FieldValue::Scalar(matcher) => Some(matcher),
+                        _ => None,
+                    },
+                };
+                if let Some(projected) = projected {
+                    // A query projects identity, never the source field's declaration effects.
+                    collect_matcher_refs_with_definitions(
+                        ir, projected, value, range, facts, out, false,
+                    );
+                }
+            }
+            out.query_depth -= 1;
+        }
         Matcher::Ref(RefTarget::Type {
             type_id,
             subtype,
@@ -1626,7 +1743,7 @@ fn collect_matcher_refs(
             origin: HirReferenceOrigin::SemanticTyped,
             subtype: None,
         }),
-        Matcher::Def { type_id, subtype } => push_definition(
+        Matcher::Def { type_id, subtype } if allow_definitions => push_definition(
             ir,
             out,
             *type_id,
@@ -1656,14 +1773,30 @@ fn collect_matcher_refs(
                         if matcher_has_reference(ir, *item)
                             && branch_reference_matches(ir, *item, value, facts, out)
                         {
-                            collect_branch_references(ir, *item, value, range, facts, out);
+                            collect_branch_references(
+                                ir,
+                                *item,
+                                value,
+                                range,
+                                facts,
+                                out,
+                                allow_definitions,
+                            );
                         }
                     }
                 } else {
                     // A scope expression may itself contain typed template holes.
                     for item in definite {
                         if matches!(ir.matcher(item), Matcher::Scope(_) | Matcher::Link) {
-                            collect_matcher_refs(ir, item, value, range, facts, out);
+                            collect_matcher_refs_with_definitions(
+                                ir,
+                                item,
+                                value,
+                                range,
+                                facts,
+                                out,
+                                allow_definitions,
+                            );
                         }
                     }
                 }
@@ -1688,26 +1821,43 @@ fn collect_matcher_refs(
                 // Overlapping subtypes and namespaces can both resolve. Keep
                 // their real targets; HirFile deduplicates identical sites.
                 for selected in typed_matches {
-                    collect_branch_references(ir, selected, value, range, facts, out);
+                    collect_branch_references(
+                        ir,
+                        selected,
+                        value,
+                        range,
+                        facts,
+                        out,
+                        allow_definitions,
+                    );
                 }
             } else if !matches.is_empty() {
                 for selected in matches {
-                    collect_branch_references(ir, selected, value, range, facts, out);
+                    collect_branch_references(
+                        ir,
+                        selected,
+                        value,
+                        range,
+                        facts,
+                        out,
+                        allow_definitions,
+                    );
                 }
             } else if refs.len() == 1 && !alternatives.iter().any(|id| scalar_fallback(ir, *id)) {
-                collect_branch_references(ir, refs[0], value, range, facts, out);
+                collect_branch_references(ir, refs[0], value, range, facts, out, allow_definitions);
             }
         }
         Matcher::Pattern(parts) => {
-            if let Some(holes) = pattern_value_holes(ir, parts, value, facts, Some(out)) {
+            if let Some(holes) = pattern_value_holes(ir, parts, value, facts, Some(out), true) {
                 for (matcher, start, end) in holes {
-                    collect_matcher_refs(
+                    collect_matcher_refs_with_definitions(
                         ir,
                         matcher,
                         &value[start..end],
                         subrange(range, value, start, end),
                         facts,
                         out,
+                        allow_definitions,
                     );
                 }
             }
@@ -1718,16 +1868,17 @@ fn collect_matcher_refs(
                 let segment_range = subrange(range, value, offset, offset + segment.len());
                 for link in &ir.scopes.links {
                     if let Some(holes) =
-                        pattern_value_holes(ir, &link.pattern, segment, facts, Some(out))
+                        pattern_value_holes(ir, &link.pattern, segment, facts, Some(out), true)
                     {
                         for (matcher, start, end) in holes {
-                            collect_matcher_refs(
+                            collect_matcher_refs_with_definitions(
                                 ir,
                                 matcher,
                                 &segment[start..end],
                                 subrange(segment_range, segment, start, end),
                                 facts,
                                 out,
+                                allow_definitions,
                             );
                         }
                     }
@@ -1751,14 +1902,14 @@ fn definitely_non_reference(ir: &RulesIr, id: MatcherId, value: &str) -> bool {
         Matcher::Scope(expected)=>ir.scope_matches(*expected,value)||link_or_register_matches(ir,value),
         Matcher::Link=>link_or_register_matches(ir,value),
         Matcher::Opaque|Matcher::Path(_)|Matcher::Def{..}=>true,
-        Matcher::Pattern(parts)=>pattern_value_holes(ir,parts,value,None,None).is_some()&&!parts.iter().any(|part|matches!(part,rules::ir::PatternPart::Hole(m) if matcher_has_reference(ir,*m))),
+        Matcher::Pattern(parts)=>pattern_value_holes(ir,parts,value,None,None,false).is_some()&&!parts.iter().any(|part|matches!(part,rules::ir::PatternPart::Hole(m) if matcher_has_reference(ir,*m))),
         Matcher::Union(items)=>items.iter().any(|item|definitely_non_reference(ir,*item,value)),
-        Matcher::Ref(_)=>false,
+        Matcher::Ref(_)|Matcher::Query(_)=>false,
     }
 }
 fn matcher_has_reference(ir: &RulesIr, id: MatcherId) -> bool {
     match ir.matcher(id) {
-        Matcher::Ref(_) | Matcher::Loc => true,
+        Matcher::Ref(_) | Matcher::Loc | Matcher::Query(_) => true,
         Matcher::Union(items) => items.iter().any(|item| matcher_has_reference(ir, *item)),
         Matcher::Pattern(parts) => parts.iter().any(
             |part| matches!(part,rules::ir::PatternPart::Hole(m) if matcher_has_reference(ir,*m)),
@@ -1782,7 +1933,7 @@ fn scalar_fallback(ir: &RulesIr, id: MatcherId) -> bool {
 }
 fn matcher_has_typed_reference(ir: &RulesIr, id: MatcherId) -> bool {
     match ir.matcher(id) {
-        Matcher::Ref(_) => true,
+        Matcher::Ref(_) | Matcher::Query(_) => true,
         Matcher::Union(items) => items.iter().any(|item| matcher_has_typed_reference(ir, *item)),
         Matcher::Pattern(parts) => parts.iter().any(
             |part| matches!(part, rules::ir::PatternPart::Hole(m) if matcher_has_typed_reference(ir, *m)),
@@ -1798,9 +1949,19 @@ fn branch_reference_matches(
     out: &IrFacts,
 ) -> bool {
     match ir.matcher(id) {
+        Matcher::Query(_) => {
+            crate::checking::scalar_outcome_with_context(
+                ir,
+                id,
+                value,
+                &FactsRef(facts, &out.symbol_facts_dependency),
+                &rules::query::ReferenceQueryContext::new(&out.query_context),
+            )
+            .0 == Some(true)
+        }
         Matcher::Ref(_) => reference_matches(ir, id, value, facts, out),
         Matcher::Loc => true,
-        Matcher::Pattern(parts) => pattern_value_holes(ir, parts, value, facts, Some(out))
+        Matcher::Pattern(parts) => pattern_value_holes(ir, parts, value, facts, Some(out), true)
             .is_some_and(|holes| {
                 holes.iter().any(|(matcher, start, end)| {
                     matcher_has_reference(ir, *matcher)
@@ -1820,11 +1981,22 @@ fn collect_branch_references(
     range: TextRange,
     facts: Option<&dyn SymbolFacts>,
     out: &mut IrFacts,
+    allow_definitions: bool,
 ) {
     match ir.matcher(id) {
-        Matcher::Ref(_) | Matcher::Loc => collect_matcher_refs(ir, id, value, range, facts, out),
+        Matcher::Ref(_) | Matcher::Loc | Matcher::Query(_) => {
+            collect_matcher_refs_with_definitions(
+                ir,
+                id,
+                value,
+                range,
+                facts,
+                out,
+                allow_definitions,
+            )
+        }
         Matcher::Pattern(parts) => {
-            if let Some(holes) = pattern_value_holes(ir, parts, value, facts, Some(out)) {
+            if let Some(holes) = pattern_value_holes(ir, parts, value, facts, Some(out), true) {
                 for (matcher, start, end) in holes {
                     if matcher_has_reference(ir, matcher) {
                         collect_branch_references(
@@ -1834,6 +2006,7 @@ fn collect_branch_references(
                             subrange(range, value, start, end),
                             facts,
                             out,
+                            allow_definitions,
                         );
                     }
                 }
@@ -1841,7 +2014,7 @@ fn collect_branch_references(
         }
         Matcher::Union(items) => {
             for item in items.iter() {
-                collect_branch_references(ir, *item, value, range, facts, out)
+                collect_branch_references(ir, *item, value, range, facts, out, allow_definitions)
             }
         }
         _ => {}
@@ -1889,12 +2062,22 @@ fn reference_matches(
         }
     }
 }
+fn matcher_contains_query(ir: &RulesIr, matcher: MatcherId) -> bool {
+    match ir.matcher(matcher) {
+        Matcher::Query(_) => true,
+        Matcher::Union(items) => items.iter().any(|matcher| matcher_contains_query(ir, *matcher)),
+        Matcher::Pattern(parts) => parts.iter().any(|part| matches!(part, rules::ir::PatternPart::Hole(matcher) if matcher_contains_query(ir, *matcher))),
+        _ => false,
+    }
+}
+
 fn pattern_value_holes(
     ir: &RulesIr,
     parts: &[rules::ir::PatternPart],
     value: &str,
     facts: Option<&dyn SymbolFacts>,
     out: Option<&IrFacts>,
+    reference_only: bool,
 ) -> Option<Vec<(MatcherId, usize, usize)>> {
     let mut no_cancel = || false;
     let mut budget = rules::pattern::SearchBudget::new(Default::default(), &mut no_cancel);
@@ -1908,10 +2091,41 @@ fn pattern_value_holes(
             Some(matcher_accepts_key(ir, matcher, text, facts, out))
         })
     };
+    let empty = crate::query::OwnedQueryContext {
+        unknown_key: true,
+        ..Default::default()
+    };
+    let context = out.map_or(&empty, |out| &out.query_context);
+    let local_dependency = std::cell::Cell::new(false);
+    let query_facts = FactsRef(
+        facts,
+        out.map_or(&local_dependency, |out| &out.symbol_facts_dependency),
+    );
+    let references = rules::query::ReferenceQueryContext::new(context);
+    // Only reference extraction may retain an invalid call target. The
+    // definitely_non_reference path also uses this search for field candidacy.
+    let context: &dyn rules::query::QueryContext =
+        if reference_only { &references } else { context };
+    let context = rules::query::QueryContextWithFacts::new(ir, &query_facts, context);
+    let query_hole = parts.iter().any(|part| match part {
+        rules::ir::PatternPart::Hole(matcher) => matcher_contains_query(ir, *matcher),
+        _ => false,
+    });
     let result = if multiple {
-        rules::pattern::unique_search(ir, parts, value, &mut budget, &mut primitive)
+        rules::pattern::unique_search_with_context(
+            ir,
+            parts,
+            value,
+            &mut budget,
+            &context,
+            &mut primitive,
+        )
+    } else if query_hole {
+        rules::pattern::search_with_context(ir, parts, value, &mut budget, &context, &mut primitive)
     } else {
-        rules::pattern::search(ir, parts, value, &mut budget, &mut |_, _| Some(true))
+        rules::pattern::search_with_context(ir, parts, value, &mut budget, &context, &mut |_, _| {
+            Some(true)
+        })
     };
     if result.matched.is_none()
         && budget.limit.is_none()

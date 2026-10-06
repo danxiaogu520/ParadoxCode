@@ -28,7 +28,11 @@ fn has_structural_reads(template: &hir::Template, snapshot: &AnalysisSnapshot) -
             let key=property.key.fragments.iter().map(|part|match part {TemplateFragment::Literal(text)=>Some(text.as_str()),_=>None}).collect::<Option<String>>();
             if schema.zip(key.as_ref()).is_some_and(|(schema,key)|hir::checking::field_candidates(ir,schema,key,rules::ir::Shape::Scalar,&WorkspaceFacts{snapshot}).is_empty() && !hir::checking::field_candidates(ir,schema,key,rules::ir::Shape::Block,&WorkspaceFacts{snapshot}).is_empty()) {return true;}
             schema.zip(key).is_some_and(|(schema,key)|hir::checking::field_candidates(ir,schema,&key,rules::ir::Shape::Scalar,&WorkspaceFacts{snapshot})
-                .iter().any(|id|hir::template::template_kind(ir,ir.field(*id).key).is_some()))
+                .iter().any(|id| {
+                    let field = ir.field(*id);
+                    hir::template::template_kind(ir,field.key).is_some() || ir_semantic::has_field_query(ir,field.key)
+                        || matches!(field.value,rules::ir::FieldValue::Scalar(matcher) if ir_semantic::has_field_query(ir, matcher))
+                }))
         }
     }))
 }
@@ -460,6 +464,74 @@ pub(crate) fn candidate_interpretations(
     )
 }
 
+/// Original query declarations used by a concrete Template candidate.
+pub(crate) fn candidate_query_fields(
+    snapshot: &AnalysisSnapshot,
+    source: &hir::HirFile,
+    invocation: &hir::HirProperty,
+    summary: &engine::DynamicDefinitionSummary,
+    witness: &hir::template_relations::Witness,
+    parameter: &str,
+    cancellation: &CancellationToken,
+) -> Result<Vec<FieldId>, Cancelled> {
+    if !needs_body_analysis(snapshot, summary) {
+        return Ok(Vec::new());
+    }
+    let Some(body) =
+        analyse_body_with_bindings(snapshot, source, invocation, witness, &[], cancellation)?
+    else {
+        return Ok(Vec::new());
+    };
+    let ir = snapshot.ir();
+    let parameter = parameter.to_ascii_lowercase();
+    let mut sources = BTreeSet::new();
+    for property in body.hir.properties() {
+        cancellation.checkpoint()?;
+        let key = body
+            .rendered
+            .dependencies(property.key_range)
+            .contains(&parameter);
+        let value = property.scalar.as_ref().is_some_and(|scalar| {
+            body.rendered
+                .dependencies(scalar.range)
+                .contains(&parameter)
+        });
+        if !key && !value {
+            continue;
+        }
+        let Some(fact) = body.hir.field_fact_at(property.key_range) else {
+            continue;
+        };
+        let context =
+            hir::query::PropertyQueryContext::for_property(body.hir.properties(), property);
+        for field in &fact.fields {
+            let field = ir.field(*field);
+            if key {
+                sources.extend(ir_semantic::projected_source(
+                    ir,
+                    field.key,
+                    &property.key,
+                    snapshot,
+                    &context,
+                ));
+            }
+            if value
+                && let (rules::ir::FieldValue::Scalar(matcher), Some(scalar)) =
+                    (field.value, &property.scalar)
+            {
+                sources.extend(ir_semantic::projected_source(
+                    ir,
+                    matcher,
+                    &scalar.value,
+                    snapshot,
+                    &context,
+                ));
+            }
+        }
+    }
+    Ok(sources.into_iter().collect())
+}
+
 fn body_interpretations(
     body: &BodyAnalysis,
     parameter: &str,
@@ -486,6 +558,7 @@ pub(crate) struct ParameterSite {
     pub(crate) domain: Domain,
     pub(crate) token: TemplateToken,
     pub(crate) state: ScopeState,
+    pub(crate) query_context: hir::query::OwnedQueryContext,
 }
 
 impl ParameterSite {
@@ -507,9 +580,15 @@ impl ParameterSite {
         let Domain::Value(matchers) = &self.domain else {
             return true;
         };
-        matchers
-            .iter()
-            .any(|matcher| candidate_matches(snapshot, *matcher, &rendered, &self.state))
+        matchers.iter().any(|matcher| {
+            candidate_matches(
+                snapshot,
+                *matcher,
+                &rendered,
+                &self.state,
+                &self.query_context,
+            )
+        })
     }
     pub(crate) fn accepts(
         &self,
@@ -531,17 +610,20 @@ impl ParameterSite {
                     *matcher,
                     &rendered,
                     &self.state,
+                    &self.query_context,
                     affixes(&self.token, parameter)
                         .is_some_and(|(head, tail)| !head.is_empty() || !tail.is_empty()),
                 )
             }),
             Domain::Key { schema, shape } => ir.lookup(*schema, &rendered, *shape).any(|id| {
                 field_allowed(snapshot, id, &self.state)
-                    && ir_semantic::matcher_matches(
+                    && ir_semantic::matcher_matches_with_context(
                         ir,
                         ir.field(id).key,
                         &rendered,
                         &WorkspaceFacts { snapshot },
+                        &self.state,
+                        &self.query_context,
                     )
             }),
             Domain::Template { .. } | Domain::Unresolved => true,
@@ -573,12 +655,13 @@ impl ParameterSite {
             Domain::Value(matchers) => matchers
                 .iter()
                 .flat_map(|matcher| {
-                    ir_semantic::spellings_with_state(
+                    ir_semantic::spellings_with_context(
                         ir,
                         *matcher,
                         snapshot,
                         rendered_prefix,
                         Some(&self.state),
+                        &self.query_context,
                     )
                 })
                 .collect(),
@@ -589,23 +672,25 @@ impl ParameterSite {
                     ir.shape(*id) == Some(*shape) && field_allowed(snapshot, *id, &self.state)
                 })
                 .flat_map(|id| {
-                    ir_semantic::spellings_with_state(
+                    ir_semantic::spellings_with_context(
                         ir,
                         ir.field(id).key,
                         snapshot,
                         rendered_prefix,
                         Some(&self.state),
+                        &self.query_context,
                     )
                 })
                 .collect(),
             Domain::Template { schema, .. } => {
                 ir.schema(*schema).items.map_or_else(Vec::new, |matcher| {
-                    ir_semantic::spellings_with_state(
+                    ir_semantic::spellings_with_context(
                         ir,
                         matcher,
                         snapshot,
                         rendered_prefix,
                         Some(&self.state),
+                        &self.query_context,
                     )
                 })
             }
@@ -696,12 +781,13 @@ impl ParameterSite {
             Domain::Value(matchers) => {
                 let mut unknown = false;
                 for matcher in matchers {
-                    match hir::checking::scalar_validation(
+                    match hir::checking::scalar_validation_with_context(
                         snapshot.ir(),
                         *matcher,
                         &rendered,
                         &self.state,
                         &WorkspaceFacts { snapshot },
+                        &self.query_context,
                     ) {
                         Validation::Valid => return Validation::Valid,
                         Validation::Unknown => unknown = true,
@@ -721,13 +807,21 @@ impl ParameterSite {
                     .lookup(*schema, &rendered, *shape)
                     .filter(|id| field_allowed(snapshot, *id, &self.state))
                 {
-                    if !ir_semantic::matcher_matches(
+                    match hir::checking::scalar_outcome_with_context(
                         snapshot.ir(),
                         snapshot.ir().field(id).key,
                         &rendered,
                         &WorkspaceFacts { snapshot },
-                    ) {
-                        continue;
+                        &self.query_context,
+                    )
+                    .0
+                    {
+                        Some(true) => {}
+                        None => {
+                            unknown = true;
+                            continue;
+                        }
+                        Some(false) => continue,
                     }
                     let field = snapshot.ir().field(id);
                     if field
@@ -782,20 +876,21 @@ fn candidate_matches(
     matcher: MatcherId,
     value: &str,
     state: &ScopeState,
+    context: &impl rules::query::QueryContext,
 ) -> bool {
     let ir = snapshot.ir();
     match ir.matcher(matcher) {
         Matcher::Loc => crate::semantic::workspace_member(snapshot, "localisation", value),
         Matcher::Union(items) => items
             .iter()
-            .any(|item| candidate_matches(snapshot, *item, value, state)),
-        _ => ir_semantic::matcher_matches_with_state(
-            snapshot,
+            .any(|item| candidate_matches(snapshot, *item, value, state, context)),
+        _ => ir_semantic::matcher_matches_with_context(
             ir,
             matcher,
             value,
             &WorkspaceFacts { snapshot },
             state,
+            context,
         ),
     }
 }
@@ -805,6 +900,7 @@ fn rendered_value_matches(
     matcher: MatcherId,
     value: &str,
     state: &ScopeState,
+    context: &impl rules::query::QueryContext,
     affixed: bool,
 ) -> bool {
     let ir = snapshot.ir();
@@ -816,25 +912,25 @@ fn rendered_value_matches(
                     snapshot,
                     ir.strings().resolve(info.name),
                 ))
-                || ir_semantic::matcher_matches_with_state(
-                    snapshot,
+                || ir_semantic::matcher_matches_with_context(
                     ir,
                     matcher,
                     value,
                     &WorkspaceFacts { snapshot },
                     state,
+                    context,
                 )
         }
         Matcher::Union(items) => items
             .iter()
-            .any(|item| rendered_value_matches(snapshot, *item, value, state, affixed)),
-        _ => ir_semantic::matcher_matches_with_state(
-            snapshot,
+            .any(|item| rendered_value_matches(snapshot, *item, value, state, context, affixed)),
+        _ => ir_semantic::matcher_matches_with_context(
             ir,
             matcher,
             value,
             &WorkspaceFacts { snapshot },
             state,
+            context,
         ),
     }
 }
@@ -859,6 +955,7 @@ fn map_sites(sites: Analysis<Vec<hir::template::ParameterSite>>) -> Analysis<Vec
             domain: site.domain,
             token: site.token,
             state: site.state,
+            query_context: site.query_context,
         })
         .collect();
     Analysis { value, coverage }

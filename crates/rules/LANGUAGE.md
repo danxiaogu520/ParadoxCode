@@ -74,6 +74,7 @@ alt       = prim [ range ] | ctor "<" arg ">" | "path" [ "<" name ">" ] | query 
 query     = ("keysof" | "valuesof") "<" name { "," filter } ">" ;
 filter    = "scope_accepts" "=" name | "shape" "=" ("scalar" | "block")
           | "value_kind_any" "=" "(" kind { "|" kind } ")"
+          | "call_args" "=" "none"
           | "capability" "=" name | "key" "=" selector ;
 kind      = "int" | "float" | "bool" ;
 selector  = name | literal | "sibling" "<" name ">" ;
@@ -174,20 +175,35 @@ or expression evaluation are supported:
   ordinary compatibility relation. Unrestricted fields are included. The query
   does not apply the field's `push` or `set` scope effects.
 - `shape=scalar` or `shape=block` selects ordinary field overloads by shape.
+  `valuesof` projects only scalar values, so explicit `shape=block` is an error.
 - `value_kind_any=(int|float|bool)` requires at least one known primitive branch
   from the listed kinds in the scalar value matcher. Union branches and numeric
   ranges count. `scalar`, `ref`, `enum`, literals and unresolved domains do not
   imply a numeric or boolean capability. There is no `number` alias.
+- `call_args=none` requires explicit `shape=scalar` and proves the selected
+  command can be invoked with no supplied arguments. Template references reuse
+  direct-call required/default/active-branch parameter inference; ordinary
+  fields and non-Template references retain their existing membership. Missing,
+  ambiguous or unfinished Template facts defer instead of granting eligibility.
+  Call targets use the same direct Ref/Union key selection and raw property name
+  as direct invocations. Template references embedded in a source key Pattern
+  remain name matching. This filter is opt-in; ordinary name/reference queries
+  are unchanged.
 - `capability=name` requires that explicit tag in the source field's
   `capabilities` list. This separates opt-in command support from operand types.
 - `key=selector` selects one source key. A literal selector may be a bare
   identifier or a quoted constant; template literals are not selectors.
 
 Lookup selects exact overloads of the requested shape before ordered patterns.
-Only then are scope, value-kind and capability filters applied. A rejected exact
-field of that shape MUST NOT reappear through a broader pattern. Dynamic scalar
+Only then are scope, value-kind, capability and call-argument filters applied.
+A rejected exact field of that shape MUST NOT reappear through a broader pattern. Dynamic scalar
 and block overloads keep their ordinary shape dispatch. Values are checked using
 the selected source value matcher, including its ranges, references and unions.
+
+Projection never inherits source cardinality, control flow, scope mutations or
+declaration effects, including `def<T>` projected through `valuesof`. Navigation
+and hover may retain a known target rejected only by call-argument eligibility;
+validation and completion still require the full query constraint.
 
 `sibling<name>` reads a single direct scalar field in the same script container.
 The name MUST identify a declared exact sibling in that schema, including fields

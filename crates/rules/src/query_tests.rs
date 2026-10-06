@@ -371,3 +371,253 @@ fn acyclic_query_chains_share_depth_and_work_budgets() {
     assert_eq!(budget.limit, Some(SearchLimit::Work));
     assert_eq!(ir.scalar_outcome(id, "yes", &NoSymbolFacts), None);
 }
+
+fn callable_fixture() -> RulesIr {
+    compile(
+        r#"{
+      "traits":{"Template":{}},
+      "types":{"helper":{"impl":{"Template":{"body":"domain"}}},"ordinary":{}},
+      "files":{"test":{"path":"test","root":"consumer"}},
+      "schemas":{
+        "consumer":{"fields":{
+          "selector":{"value":"scalar","card":"0..1"},
+          "call":{"value":"keysof<domain,shape=scalar,call_args=none>","card":"0..1"},
+          "name":{"value":"keysof<domain,shape=scalar>","card":"0..1"},
+          "case":{"value":"valuesof<domain,key=sibling<selector>,shape=scalar,call_args=none>","card":"0..1"},
+          "nested":{"value":"'call:{keysof<domain,shape=scalar,call_args=none>}'","card":"0..1"},
+          "pattern":{"value":"keysof<patterns,shape=scalar,call_args=none>","card":"0..1"},
+          "union":{"value":"keysof<unions,shape=scalar,call_args=none>","card":"0..1"},
+          "stripped":{"value":"keysof<stripped,shape=scalar,call_args=none>","card":"0..1"}
+        }},
+        "domain":{"fields":{"builtin":{"value":"int","card":"0..1"},"blocked":{"body":"empty","card":"0..1"}},"patterns":[
+          {"key":"ref<helper>","value":"bool","card":"0..*"},
+          {"key":"ref<helper>","body":"empty","card":"0..*"},
+          {"key":"ref<ordinary>","value":"int","card":"0..*"}
+        ]},
+        "patterns":{"patterns":[{"key":"'macro_{ref<helper>}'","value":"bool","card":"0..*"}]},
+        "unions":{"patterns":[{"key":"scalar|ref<helper>","value":"bool","card":"0..*"}]},
+        "stripped":{"patterns":[{"key":"ref<helper strip_prefix pre_>","value":"bool","card":"0..*"}]},
+        "empty":{}
+      }
+    }"#,
+    )
+}
+
+struct CallableFacts<'a> {
+    ir: &'a RulesIr,
+    complete: bool,
+}
+impl SymbolFacts for CallableFacts<'_> {
+    fn facts_complete(&self) -> bool {
+        self.complete
+    }
+    fn type_member(&self, ty: TypeId, name: &str) -> bool {
+        if Some(ty) == self.ir.type_by_name("helper") {
+            matches!(
+                name,
+                "required" | "optional" | "defaulted" | "unfinished" | "pre_prefixed"
+            )
+        } else {
+            name == "ordinary"
+        }
+    }
+    fn template_accepts_no_arguments(
+        &self,
+        _: TypeId,
+        name: &str,
+        checkpoint: &mut dyn FnMut() -> bool,
+    ) -> Option<bool> {
+        if checkpoint() {
+            return None;
+        }
+        match name {
+            "required" => Some(false),
+            "optional" | "defaulted" | "pre_prefixed" => Some(true),
+            _ => None,
+        }
+    }
+}
+
+#[test]
+fn no_argument_query_filter_is_opt_in_and_retains_deferred_evidence() {
+    let ir = callable_fixture();
+    let facts = CallableFacts {
+        ir: &ir,
+        complete: true,
+    };
+    for (name, expected) in [
+        ("required", Some(false)),
+        ("optional", Some(true)),
+        ("defaulted", Some(true)),
+        ("unfinished", None),
+        ("builtin", Some(true)),
+        ("ordinary", Some(true)),
+        ("blocked", Some(false)),
+    ] {
+        assert_eq!(
+            ir.scalar_outcome(matcher(&ir, "call"), name, &facts),
+            expected,
+            "{name}"
+        );
+        assert_eq!(
+            ir.scalar_outcome(matcher(&ir, "nested"), &format!("call:{name}"), &facts),
+            expected,
+            "nested {name}"
+        );
+    }
+    assert_eq!(
+        ir.scalar_outcome(matcher(&ir, "name"), "required", &facts),
+        Some(true)
+    );
+    assert_eq!(
+        ir.scalar_outcome(matcher(&ir, "pattern"), "macro_required", &facts),
+        Some(true)
+    );
+    assert_eq!(
+        ir.scalar_outcome(matcher(&ir, "pattern"), "macro_optional", &facts),
+        Some(true)
+    );
+    for (name, expected) in [
+        ("required", Some(false)),
+        ("optional", Some(true)),
+        ("unfinished", None),
+    ] {
+        assert_eq!(
+            ir.scalar_outcome_with_context(
+                matcher(&ir, "case"),
+                "yes",
+                &facts,
+                &Context(SiblingValue::Scalar(name))
+            ),
+            expected,
+            "case {name}"
+        );
+    }
+    assert_eq!(
+        ir.scalar_outcome(
+            matcher(&ir, "call"),
+            "optional",
+            &CallableFacts {
+                ir: &ir,
+                complete: false
+            }
+        ),
+        None
+    );
+}
+
+#[test]
+fn no_argument_queries_use_the_same_union_target_as_direct_template_calls() {
+    let ir = callable_fixture();
+    let facts = CallableFacts {
+        ir: &ir,
+        complete: true,
+    };
+    assert_eq!(
+        ir.scalar_outcome(matcher(&ir, "union"), "required", &facts),
+        Some(false)
+    );
+    assert_eq!(
+        ir.scalar_outcome(matcher(&ir, "union"), "optional", &facts),
+        Some(true)
+    );
+    assert_eq!(
+        ir.scalar_outcome(matcher(&ir, "union"), "unfinished", &facts),
+        None
+    );
+    assert_eq!(
+        ir.scalar_outcome(matcher(&ir, "union"), "ordinary", &facts),
+        Some(true)
+    );
+}
+
+#[test]
+fn no_argument_query_uses_raw_property_name_for_transformed_template_refs() {
+    let ir = callable_fixture();
+    let facts = CallableFacts {
+        ir: &ir,
+        complete: true,
+    };
+    assert_eq!(
+        ir.scalar_outcome(matcher(&ir, "stripped"), "prefixed", &facts),
+        Some(true)
+    );
+}
+
+#[test]
+fn no_argument_query_callback_uses_the_enclosing_search_budget() {
+    let ir = callable_fixture();
+    struct ExpensiveFacts;
+    impl SymbolFacts for ExpensiveFacts {
+        fn type_member(&self, _: TypeId, _: &str) -> bool {
+            true
+        }
+        fn template_accepts_no_arguments(
+            &self,
+            _: TypeId,
+            _: &str,
+            checkpoint: &mut dyn FnMut() -> bool,
+        ) -> Option<bool> {
+            while !checkpoint() {}
+            // A callback cannot turn an exhausted search into a proof.
+            Some(true)
+        }
+    }
+    let mut no_cancel = || false;
+    let mut budget = crate::pattern::SearchBudget::new(
+        crate::pattern::SearchLimits {
+            work: 100,
+            ..Default::default()
+        },
+        &mut no_cancel,
+    );
+    let result = crate::pattern::evaluate_with_context(
+        &ir,
+        matcher(&ir, "call"),
+        "optional",
+        &mut budget,
+        &crate::query::QueryContextWithFacts::new(&ir, &ExpensiveFacts, &NoQueryContext),
+        &mut |id, text| ir.scalar_primitive_outcome(id, text, &ExpensiveFacts),
+    );
+    assert_eq!(result, None);
+    assert_eq!(budget.limit, Some(crate::pattern::SearchLimit::Work));
+}
+
+#[test]
+fn reference_queries_retain_known_ineligible_targets_without_relaxing_validation() {
+    let ir = callable_fixture();
+    let facts = CallableFacts {
+        ir: &ir,
+        complete: true,
+    };
+    let context = crate::query::ReferenceQueryContext::new(&NoQueryContext);
+    for (field, value) in [("call", "required"), ("nested", "call:required")] {
+        assert_eq!(
+            ir.scalar_outcome(matcher(&ir, field), value, &facts),
+            Some(false)
+        );
+        assert_eq!(
+            ir.scalar_outcome_with_context(matcher(&ir, field), value, &facts, &context),
+            Some(true)
+        );
+    }
+    assert_eq!(
+        ir.scalar_outcome_with_context(matcher(&ir, "call"), "blocked", &facts, &context),
+        Some(false)
+    );
+    assert_eq!(
+        ir.scalar_outcome_with_context(matcher(&ir, "call"), "missing", &facts, &context),
+        Some(false)
+    );
+    let selector = Context(SiblingValue::Scalar("required"));
+    let context = crate::query::ReferenceQueryContext::new(&selector);
+    assert_eq!(
+        ir.scalar_outcome_with_context(matcher(&ir, "case"), "yes", &facts, &context),
+        Some(true)
+    );
+    // Source value membership remains mandatory even in an identity projection.
+    assert_eq!(
+        ir.scalar_outcome_with_context(matcher(&ir, "case"), "not_boolean", &facts, &context),
+        Some(false)
+    );
+}

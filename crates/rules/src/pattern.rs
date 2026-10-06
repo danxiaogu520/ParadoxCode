@@ -96,6 +96,38 @@ pub fn evaluate_with_context(
     context: &impl QueryContext,
     primitive: &mut impl FnMut(MatcherId, &str) -> Option<bool>,
 ) -> Option<bool> {
+    evaluate_call_key(ir, matcher, value, budget, context, false, primitive)
+}
+
+/// The same scalar search, optionally proving empty-argument invocation for
+/// direct Template Ref/Union keys. Pattern holes and query projections are names,
+/// not invocation targets; their own authored query constraints still apply.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn evaluate_call_key(
+    ir: &RulesIr,
+    matcher: MatcherId,
+    value: &str,
+    budget: &mut SearchBudget<'_>,
+    context: &impl QueryContext,
+    no_args: bool,
+    primitive: &mut impl FnMut(MatcherId, &str) -> Option<bool>,
+) -> Option<bool> {
+    if no_args {
+        let matched = evaluate_call_key(ir, matcher, value, budget, context, false, primitive);
+        if matched != Some(true) || !context.check_call_arguments() {
+            return matched;
+        }
+        let target = crate::template::template_key_type(ir, matcher, &mut || !budget.charge(1, 0));
+        if budget.limit.is_some() {
+            return None;
+        }
+        let Some(type_id) = target else {
+            return Some(true);
+        };
+        let result =
+            context.template_accepts_no_arguments(type_id, value, &mut || !budget.charge(1, 0));
+        return if budget.limit.is_some() { None } else { result };
+    }
     if !budget.charge(1, 0) {
         return None;
     }
@@ -152,8 +184,9 @@ pub(crate) fn evaluate_query(
     ) {
         return None;
     }
-    let mut key_matches =
-        |id, text: &str| evaluate_with_context(ir, id, text, budget, context, primitive);
+    let mut key_matches = |id, text: &str, no_args| {
+        evaluate_call_key(ir, id, text, budget, context, no_args, primitive)
+    };
     let resolution = if query.projection == QueryProjection::Keys && query.selector.is_none() {
         ir.query_selected_fields_with(query, value, &mut key_matches)
     } else {

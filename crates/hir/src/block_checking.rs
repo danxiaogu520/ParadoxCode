@@ -220,6 +220,10 @@ fn check<E>(
                     continue;
                 }
                 work.push(Task::Finish(context.clone(), target));
+                let query_context =
+                    crate::query::PropertyQueryContext::from_indices(props, &context.indices)
+                        .with_unknown_ranges(unknown_ranges)
+                        .defer_templates(template_text);
                 let mut counts = BTreeMap::<(usize, String), u32>::new();
                 let mut partial = hole(context.range);
                 for index in &context.indices {
@@ -240,12 +244,13 @@ fn check<E>(
                     } else {
                         Shape::Block
                     };
-                    let fields = crate::checking::field_candidates(
+                    let fields = crate::checking::field_candidates_with_context(
                         ir,
                         context.schema,
                         &property.key,
                         shape,
                         facts,
+                        &query_context,
                     );
                     if fields.is_empty() {
                         let unknown = property.value_range.is_none() || property.operator.is_none();
@@ -265,8 +270,13 @@ fn check<E>(
                     for field in fields {
                         let row = add(&mut nodes, alternatives, Node::All(Vec::new()));
                         let spec = ir.field(field);
-                        let (key, limit) =
-                            crate::checking::scalar_outcome(ir, spec.key, &property.key, facts);
+                        let (key, limit) = crate::checking::scalar_outcome_with_context(
+                            ir,
+                            spec.key,
+                            &property.key,
+                            facts,
+                            &query_context,
+                        );
                         if limit.is_some() {
                             coverage.limits.insert(AnalysisLimit::PatternSearch);
                         }
@@ -291,14 +301,16 @@ fn check<E>(
                                 Validation::Unknown
                             }
                             (FieldValue::Scalar(matcher), Some(value)) => {
-                                let checked = crate::checking::scalar_validation_cancellable(
-                                    ir,
-                                    matcher,
-                                    &value.value,
-                                    &context.state,
-                                    facts,
-                                    checkpoint,
-                                )?;
+                                let checked =
+                                    crate::checking::scalar_validation_cancellable_with_context(
+                                        ir,
+                                        matcher,
+                                        &value.value,
+                                        &context.state,
+                                        facts,
+                                        &query_context,
+                                        checkpoint,
+                                    )?;
                                 coverage.merge(&checked.coverage);
                                 checked.value
                             }

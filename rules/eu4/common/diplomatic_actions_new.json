@@ -220,7 +220,7 @@
         "value": {
           "card": "1",
           "doc": "Seeds `ai_value` with a constant before the arithmetic; vanilla AI acceptance writes `value = 1` here.",
-          "value": "enum<export_to_variable_data> | 'trigger_value:{enum<numeric_or_bool_trigger>}' | 'variable:{scalar}' | 'modifier:{scalar}' | int"
+          "value": "enum<export_to_variable_data> | 'trigger_value:{keysof<trigger,shape=scalar,value_kind_any=(int|float|bool),capability=trigger_value_export,call_args=none>}' | 'variable:{scalar}' | 'modifier:{keysof<modifier,shape=scalar>}' | int"
         },
         "who": {
           "card": "0..1",

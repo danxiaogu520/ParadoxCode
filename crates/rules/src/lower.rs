@@ -1422,6 +1422,7 @@ impl<'a> Lowering<'a> {
                             expr::QueryValueKind::Bool => crate::query::QueryValueKind::Bool,
                         })
                         .collect(),
+                    call_args_none: query.call_args_none,
                     capability: query
                         .capability
                         .as_ref()

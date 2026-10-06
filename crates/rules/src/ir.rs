@@ -789,6 +789,17 @@ pub trait SymbolFacts {
     fn template_memo(&self) -> Option<std::sync::Arc<crate::template::TemplateMemo>> {
         None
     }
+    /// Whether a uniquely active Template can be invoked without arguments.
+    /// None means unavailable or incomplete analysis, never an implicit approval.
+    /// Implementations must stop when the shared query checkpoint returns true.
+    fn template_accepts_no_arguments(
+        &self,
+        _type_id: TypeId,
+        _name: &str,
+        _checkpoint: &mut dyn FnMut() -> bool,
+    ) -> Option<bool> {
+        None
+    }
     /// Source-ranged body of a uniquely active named Template.
     /// Missing or ambiguous definitions grant no payload interpretation.
     fn template(
@@ -1383,7 +1394,7 @@ impl RulesIr {
             matcher,
             value,
             &mut budget,
-            context,
+            &crate::query::QueryContextWithFacts::new(self, facts, context),
             &mut |id, text| self.scalar_primitive_outcome(id, text, facts),
         )
     }

@@ -200,6 +200,11 @@ pub fn hover_with_cancellation(
                 }
             }
         }
+        if let Some(source) =
+            rules::query_source_hover(snapshot, &input, position, &word, cancellation)?
+        {
+            best.push_section(source.render());
+        }
         return Ok(Some(best.into_hover_with_range(range)));
     }
     cancellation.checkpoint()?;
