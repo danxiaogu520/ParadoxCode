@@ -41,6 +41,17 @@ impl TrackingFacts<'_> {
     }
 }
 impl SymbolFacts for TrackingFacts<'_> {
+    fn template_accepts_no_arguments(
+        &self,
+        type_id: TypeId,
+        name: &str,
+        checkpoint: &mut dyn FnMut() -> bool,
+    ) -> Option<bool> {
+        // Do not forward the underlying cached answer: every nested Template
+        // read must pass through this transaction's dependency recorder.
+        crate::pipeline::template_accepts_no_arguments(self.ir, self, type_id, name, checkpoint)
+    }
+
     fn facts_complete(&self) -> bool {
         self.facts.facts_complete()
     }
@@ -298,4 +309,90 @@ fn unfinished(message: &str) -> WorkspaceError {
         std::io::ErrorKind::InvalidData,
         message,
     ))
+}
+
+#[cfg(test)]
+mod callable_dependency_tests {
+    use super::*;
+    use rules::template::{
+        Template, TemplateFragment, TemplateItem, TemplateProgram, TemplateProperty, TemplateToken,
+        TemplateValue,
+    };
+    use text::TextRange;
+
+    struct Definitions(BTreeMap<String, Arc<Template>>);
+    impl SymbolFacts for Definitions {
+        fn type_member(&self, _: TypeId, name: &str) -> bool {
+            self.0.contains_key(name)
+        }
+        fn template(&self, _: TypeId, name: &str) -> Option<Arc<Template>> {
+            self.0.get(name).cloned()
+        }
+        fn template_accepts_no_arguments(
+            &self,
+            _: TypeId,
+            _: &str,
+            _: &mut dyn FnMut() -> bool,
+        ) -> Option<bool> {
+            panic!("tracking must analyze with its own read recorder, not forward a cached answer")
+        }
+    }
+
+    fn definition(name: &str, key: &str) -> Arc<Template> {
+        let token = |text: &str| TemplateToken {
+            range: TextRange::empty(0),
+            quoted: false,
+            fragments: vec![TemplateFragment::Literal(text.to_owned())],
+        };
+        let items = vec![TemplateItem::Property(TemplateProperty {
+            range: TextRange::empty(0),
+            key: token(key),
+            operator: Some(Arc::from("=")),
+            value: TemplateValue::Scalar(token("yes")),
+        })];
+        Arc::new(Template {
+            source: Arc::from(""),
+            kind: Arc::from("helper"),
+            name: name.to_owned(),
+            definition_range: TextRange::empty(0),
+            body_range: TextRange::empty(0),
+            program: Arc::new(TemplateProgram::compile(&items)),
+            items: Arc::from(items),
+        })
+    }
+
+    #[test]
+    fn callable_eligibility_records_transitive_template_dependencies() {
+        let source = serde_json::from_str(
+            r#"{
+          "files":{"test":{"path":"test","root":"body"}},
+          "traits":{"Template":{}},
+          "types":{"helper":{"impl":{"Template":{"body":"body"}}}},
+          "schemas":{"body":{
+            "fields":{"always":{"value":"bool","card":"0..*"}},
+            "patterns":[{"key":"ref<helper>","value":"bool","card":"0..*"}]
+          }}
+        }"#,
+        )
+        .unwrap();
+        let ir =
+            rules::lower::lower(&[("query.json".to_owned(), source)], Default::default()).unwrap();
+        let definitions = Definitions(BTreeMap::from([
+            ("outer".to_owned(), definition("outer", "inner")),
+            ("inner".to_owned(), definition("inner", "always")),
+        ]));
+        let facts = TrackingFacts {
+            ir: &ir,
+            facts: &definitions,
+            reads: Mutex::new(BTreeSet::new()),
+        };
+        let kind = ir.type_by_name("helper").unwrap();
+        assert_eq!(
+            facts.template_accepts_no_arguments(kind, "outer", &mut || false),
+            Some(true)
+        );
+        let reads = facts.reads.into_inner().unwrap();
+        assert!(reads.contains(&SymbolDependency::named(&ir, kind, "outer")));
+        assert!(reads.contains(&SymbolDependency::named(&ir, kind, "inner")));
+    }
 }

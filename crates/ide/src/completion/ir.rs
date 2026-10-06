@@ -259,12 +259,21 @@ fn try_ir_completion_inner(
             return Ok(Some(items));
         };
         let facts = WorkspaceFacts { snapshot };
-        let mut candidates = ir
-            .lookup(fact.schema, &property.key, Shape::Scalar)
-            .filter(|field| {
-                ir_semantic::matcher_matches(ir, ir.field(*field).key, &property.key, &facts)
-            })
-            .collect::<Vec<_>>();
+        let query_context =
+            hir::query::PropertyQueryContext::for_property(hir.properties(), property)
+                .defer_templates(
+                    hir.parameter_references()
+                        .iter()
+                        .any(|reference| contains(reference.owner_range, position)),
+                );
+        let mut candidates = hir::checking::field_candidates_with_context(
+            ir,
+            fact.schema,
+            &property.key,
+            Shape::Scalar,
+            &facts,
+            &query_context,
+        );
         if candidates
             .iter()
             .any(|field| matches!(ir.matcher(ir.field(*field).key), Matcher::Literal(_)))
@@ -283,6 +292,25 @@ fn try_ir_completion_inner(
                         })
             })
         });
+        if candidates.iter().any(|id| matches!(ir.field(*id).value, FieldValue::Scalar(matcher) if matches!(ir.matcher(matcher), Matcher::Scalar | Matcher::Opaque)))
+            && let Some(schema) = schema_fact_at_cursor(hir, position)
+            && let Some((on, mut query)) = legacy_switch_query(ir, hir, schema.range)
+            && property.key.eq_ignore_ascii_case(ir.strings().resolve(on))
+        {
+            query.projection = rules::ir::QueryProjection::Keys;
+            query.selector = None;
+            for (label, source) in ir_semantic::query_spellings(ir, &query, snapshot, prefix, scope_state.as_ref(), &query_context) {
+                let Some(rank) = prefix_rank(&label, prefix) else { continue; };
+                let field = ir.field(source);
+                items.push(CompletionItem {
+                    is_snippet: false, template_evidence: None, label: label.clone(), kind: CompletionKind::Key,
+                    detail: ir_semantic::field_context(ir, query.schema, source),
+                    documentation: field.doc.map(|doc| ir.strings().resolve(doc).to_owned()),
+                    replacement_range, insert_text: label, sort_score: rank, deprecated: field.deprecated,
+                    resolve_data: Some(format!("ir-field:{}:{}", snapshot.ir_fingerprint(), source.index())),
+                });
+            }
+        }
         // The current token may be incomplete or belong to another overload.
         // Offer every scalar overload available in the current scope.
         for field_id in candidates.iter().copied() {
@@ -298,6 +326,7 @@ fn try_ir_completion_inner(
                     replacement_range,
                     prefix,
                     scope_state.as_ref(),
+                    &query_context,
                     cancellation,
                     &mut items,
                 )?;
@@ -323,6 +352,7 @@ fn try_ir_completion_inner(
                     replacement_range,
                     prefix,
                     scope_state.as_ref(),
+                    &query_context,
                     cancellation,
                     &mut items,
                 )?;
@@ -336,10 +366,22 @@ fn try_ir_completion_inner(
             return Ok(Some(items));
         };
         let state = scope_state.as_ref().expect("schema fact at cursor");
+        let query_context =
+            hir::query::PropertyQueryContext::in_container(hir.properties(), schema_fact.range)
+                .defer_templates(
+                    hir.parameter_references()
+                        .iter()
+                        .any(|reference| contains(reference.owner_range, position)),
+                );
         if let Some(matcher) = ir.schema(schema_fact.schema).items {
-            for label in
-                ir_semantic::spellings_with_state(ir, matcher, snapshot, prefix, Some(state))
-            {
+            for label in ir_semantic::spellings_with_context(
+                ir,
+                matcher,
+                snapshot,
+                prefix,
+                Some(state),
+                &query_context,
+            ) {
                 cancellation.checkpoint()?;
                 let Some(rank) = prefix_rank(&label, prefix) else {
                     continue;
@@ -375,9 +417,33 @@ fn try_ir_completion_inner(
                 .iter()
                 .find(|property| contains(property.key_range, position));
             let matcher = field.key;
-            for label in
-                ir_semantic::spellings_with_state(ir, matcher, snapshot, prefix, Some(state))
-            {
+            let compatibility = matches!(ir.matcher(matcher), Matcher::Scalar | Matcher::Opaque)
+                .then(|| legacy_switch_query(ir, hir, schema_fact.range))
+                .flatten();
+            let compatibility_spellings = compatibility.as_ref().map(|(_, query)| {
+                ir_semantic::query_spellings(
+                    ir,
+                    query,
+                    snapshot,
+                    prefix,
+                    Some(state),
+                    &query_context,
+                )
+            });
+            let labels = compatibility_spellings.as_ref().map_or_else(
+                || {
+                    ir_semantic::spellings_with_context(
+                        ir,
+                        matcher,
+                        snapshot,
+                        prefix,
+                        Some(state),
+                        &query_context,
+                    )
+                },
+                |items| items.iter().map(|(label, _)| label.clone()).collect(),
+            );
+            for label in labels {
                 cancellation.checkpoint()?;
                 let Some(rank) = prefix_rank(&label, prefix) else {
                     continue;
@@ -441,6 +507,19 @@ fn try_ir_completion_inner(
                 } else {
                     label_text
                 };
+                let source_field_id = compatibility_spellings
+                    .as_ref()
+                    .and_then(|items| {
+                        items
+                            .iter()
+                            .find(|(candidate, _)| candidate.eq_ignore_ascii_case(&label))
+                            .map(|(_, field)| *field)
+                    })
+                    .or_else(|| {
+                        ir_semantic::projected_source(ir, matcher, &label, snapshot, &query_context)
+                    })
+                    .unwrap_or(field_id);
+                let source_field = ir.field(source_field_id);
                 items.push(CompletionItem {
                     is_snippet: assignment
                         && (ir.shape(field_id) == Some(Shape::Block) || label_text.contains("$0")),
@@ -460,11 +539,13 @@ fn try_ir_completion_inner(
                     } else {
                         ir_semantic::field_context(ir, schema_fact.schema, field_id)
                     },
-                    documentation: field.doc.map(|doc| ir.strings().resolve(doc).to_owned()),
+                    documentation: source_field
+                        .doc
+                        .map(|doc| ir.strings().resolve(doc).to_owned()),
                     replacement_range,
                     insert_text: label_text,
                     sort_score: rank
-                        + 1000 * u32::from(field.deprecated)
+                        + 1000 * u32::from(field.deprecated || source_field.deprecated)
                         + 100
                             * u32::from(ir.provenance_of(field_id).is_some_and(|origin| {
                                 !ir.strings().resolve(origin.pointer).starts_with(&format!(
@@ -472,11 +553,11 @@ fn try_ir_completion_inner(
                                     ir.strings().resolve(ir.schema(schema_fact.schema).name)
                                 ))
                             })),
-                    deprecated: field.deprecated,
+                    deprecated: field.deprecated || source_field.deprecated,
                     resolve_data: Some(format!(
                         "ir-field:{}:{}",
                         snapshot.ir_fingerprint(),
-                        field_id.index()
+                        source_field_id.index()
                     )),
                 });
             }
@@ -485,12 +566,13 @@ fn try_ir_completion_inner(
     if let Some(property) = value_property.filter(|property| {
         property.scalar.is_some()
             || hir.field_fact_at(property.key_range).is_some_and(|field| {
-                !hir::checking::field_candidates(
+                !hir::checking::field_candidates_with_context(
                     ir,
                     field.schema,
                     &property.key,
                     Shape::Scalar,
                     &WorkspaceFacts { snapshot },
+                    &hir::query::PropertyQueryContext::for_property(hir.properties(), property),
                 )
                 .is_empty()
             })
@@ -519,6 +601,31 @@ fn try_ir_completion_inner(
             && seen.insert((item.label.to_ascii_lowercase(), block))
     });
     Ok(Some(items))
+}
+
+/// Legacy control metadata projects the same domains as authored field queries.
+fn legacy_switch_query(
+    ir: &rules::ir::RulesIr,
+    hir: &hir::HirFile,
+    container: TextRange,
+) -> Option<(rules::ir::Symbol, rules::ir::FieldQuery)> {
+    let parent = hir
+        .properties()
+        .iter()
+        .find(|property| property.value_range == Some(container))?;
+    let control = hir
+        .field_fact_at(parent.key_range)?
+        .fields
+        .iter()
+        .filter_map(|id| ir.field(*id).control.as_ref())
+        .find(|control| control.kind == rules::source::ControlKind::Switch)?;
+    let on = control.on?;
+    let mut query =
+        rules::ir::FieldQuery::new(control.selector_schema?, rules::ir::QueryProjection::Values);
+    query.shape = Some(Shape::Scalar);
+    query.call_args_none = true;
+    query.selector = Some(rules::ir::QuerySelector::Sibling(on));
+    Some((on, query))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -607,6 +714,22 @@ fn append_template_value_items(
             parameter,
             cancellation,
         )?;
+        let query_sources = crate::ir_template::candidate_query_fields(
+            snapshot,
+            source,
+            invocation,
+            summary,
+            &witness,
+            parameter,
+            cancellation,
+        )?;
+        let mut query_docs = query_sources
+            .iter()
+            .filter_map(|field| snapshot.ir().field(*field).doc)
+            .map(|doc| snapshot.ir().strings().resolve(doc))
+            .collect::<Vec<_>>();
+        query_docs.sort();
+        query_docs.dedup();
         witness.remove(&parameter.to_ascii_lowercase());
         if !emitted.insert((label.clone(), witness.clone())) {
             continue;
@@ -633,12 +756,16 @@ fn append_template_value_items(
             label: label.clone(),
             kind: CompletionKind::Value,
             detail,
-            documentation: None,
+            documentation: (!query_docs.is_empty()).then(|| query_docs.join("\n\n")),
             replacement_range,
             insert_text: label,
             sort_score: rank,
-            deprecated: false,
-            resolve_data: None,
+            deprecated: query_sources
+                .iter()
+                .any(|field| snapshot.ir().field(*field).deprecated),
+            resolve_data: query_sources
+                .first()
+                .map(|field| format!("ir-field:{}:{}", snapshot.ir_fingerprint(), field.index())),
         });
     }
     Ok(())
@@ -746,14 +873,27 @@ fn append_value_items(
     replacement_range: TextRange,
     prefix: &str,
     scope_state: Option<&hir::ScopeState>,
+    query_context: &impl rules::query::QueryContext,
     cancellation: &CancellationToken,
     items: &mut Vec<CompletionItem>,
 ) -> Result<(), Cancelled> {
-    for label in ir_semantic::spellings_with_state(ir, matcher, snapshot, prefix, scope_state) {
+    for label in ir_semantic::spellings_with_context(
+        ir,
+        matcher,
+        snapshot,
+        prefix,
+        scope_state,
+        query_context,
+    ) {
         cancellation.checkpoint()?;
         let Some(rank) = prefix_rank(&label, prefix) else {
             continue;
         };
+        let source_field_id =
+            ir_semantic::projected_source(ir, matcher, &label, snapshot, query_context)
+                .unwrap_or(field_id);
+        let source_field = ir.field(source_field_id);
+        let deprecated = deprecated || source_field.deprecated;
         items.push(CompletionItem {
             is_snippet: false,
             template_evidence: None,
@@ -773,7 +913,10 @@ fn append_value_items(
             } else {
                 ir_semantic::describe(ir, matcher)
             },
-            documentation: doc.map(|doc| ir.strings().resolve(doc).to_owned()),
+            documentation: source_field
+                .doc
+                .or(doc)
+                .map(|doc| ir.strings().resolve(doc).to_owned()),
             replacement_range,
             insert_text: label,
             sort_score: rank + 1000 * u32::from(deprecated),
@@ -781,7 +924,7 @@ fn append_value_items(
             resolve_data: Some(format!(
                 "ir-field:{}:{}",
                 snapshot.ir_fingerprint(),
-                field_id.index()
+                source_field_id.index()
             )),
         });
     }

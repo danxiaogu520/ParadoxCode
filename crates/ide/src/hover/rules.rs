@@ -122,6 +122,61 @@ pub(crate) fn semantic_value_hover_at(
     ir_field_hover(snapshot, input, position, word, false, cancellation)
 }
 
+/// Keeps rule-query source documentation alongside the symbol reached through it.
+pub(crate) fn query_source_hover(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: TextSize,
+    word: &str,
+    cancellation: &CancellationToken,
+) -> Result<Option<HoverModel>, Cancelled> {
+    let Some(hir) = input.hir.as_deref() else {
+        return Ok(None);
+    };
+    let Some(property) = hir
+        .properties()
+        .iter()
+        .filter(|property| contains(property.range, position))
+        .min_by_key(|property| property.range.len())
+    else {
+        return Ok(None);
+    };
+    let Some(fact) = hir.field_fact_at(property.key_range) else {
+        return Ok(None);
+    };
+    let key = contains(property.key_range, position);
+    let context = hir::query::PropertyQueryContext::for_property(hir.properties(), property);
+    let spelling = if key {
+        property.key.as_str()
+    } else {
+        property
+            .scalar
+            .as_ref()
+            .map_or(word, |scalar| scalar.value.as_str())
+    };
+    let ir = snapshot.ir();
+    let projected = fact.fields.iter().any(|id| {
+        let field = ir.field(*id);
+        let matcher = if key {
+            Some(field.key)
+        } else {
+            match field.value {
+                rules::ir::FieldValue::Scalar(matcher) => Some(matcher),
+                _ => None,
+            }
+        };
+        matcher.is_some_and(|matcher| {
+            crate::ir_semantic::projected_source(ir, matcher, spelling, snapshot, &context)
+                .is_some()
+        })
+    });
+    if projected {
+        ir_field_hover(snapshot, input, position, word, key, cancellation)
+    } else {
+        Ok(None)
+    }
+}
+
 /// Provenance for a `texture_path` value hover: the resolved absolute path,
 /// the source root serving it, and whether only the engine's extension
 /// fallback saved the reference.
@@ -316,6 +371,56 @@ fn ir_field_hover(
                 ir.strings.resolve(origin.file),
                 ir.strings.resolve(origin.pointer)
             ));
+        }
+        let query_matcher = if key {
+            Some(field.key)
+        } else {
+            match field.value {
+                rules::ir::FieldValue::Scalar(matcher) => Some(matcher),
+                _ => None,
+            }
+        };
+        if let Some(property) = hir
+            .properties()
+            .iter()
+            .find(|property| property.key_range == fact.range)
+        {
+            let query_context =
+                hir::query::PropertyQueryContext::for_property(hir.properties(), property)
+                    .defer_templates(
+                        hir.parameter_references()
+                            .iter()
+                            .any(|reference| contains(reference.owner_range, position)),
+                    );
+            let spelling = if key {
+                property.key.as_str()
+            } else {
+                property
+                    .scalar
+                    .as_ref()
+                    .map_or(word, |scalar| scalar.value.as_str())
+            };
+            if let Some(source) = query_matcher.and_then(|matcher| {
+                crate::ir_semantic::projected_source(
+                    ir,
+                    matcher,
+                    spelling,
+                    snapshot,
+                    &query_context,
+                )
+            }) {
+                let source_field = ir.field(source);
+                if let Some(doc) = source_field.doc {
+                    documents.push(ir.strings.resolve(doc).to_owned());
+                }
+                if let Some(origin) = ir.provenance_of(source) {
+                    model.push_section(format!(
+                        "Query source: `{}` `{}`",
+                        ir.strings.resolve(origin.file),
+                        ir.strings.resolve(origin.pointer)
+                    ));
+                }
+            }
         }
         if let Some(state) = state {
             let next = hir::transition_ir_scope(ir, state.clone(), field.scope.as_ref(), word);

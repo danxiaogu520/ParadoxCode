@@ -7,7 +7,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Rule expressions `keysof` and `valuesof` share schema-field queries across validation,
+  completion, references and Templates, retaining source documentation and dynamic symbols.
+  Fixed filters cover scope compatibility, field shape, primitive value branches and explicit
+  capabilities; dependent values read a selector in the same script container.
+
 ### Changed
+
+- EU4 modifier selectors now validate country/province modifier keys, including dynamic families.
+  Export and switch domains reuse schema queries and support workspace scripted triggers through
+  their scalar boolean form when no arguments are required. Export modifier spelling is checked;
+  effective `who` scope filtering
+  remains deferred. See [the migration inventory](FIELD-QUERY-MIGRATION.md) for compatibility limits.
 
 - PR and main CI use a reduced Linux core gate targeting roughly two-minute feedback. Full CI
   remains a pre-release gate targeting roughly five minutes with a smaller representative suite,

@@ -167,6 +167,15 @@ impl<'a> IndexSymbolFacts<'a> {
 }
 
 impl rules::ir::SymbolFacts for IndexSymbolFacts<'_> {
+    fn template_accepts_no_arguments(
+        &self,
+        type_id: rules::ir::TypeId,
+        name: &str,
+        checkpoint: &mut dyn FnMut() -> bool,
+    ) -> Option<bool> {
+        template_accepts_no_arguments(self.ir, self, type_id, name, checkpoint)
+    }
+
     fn template_memo(&self) -> Option<Arc<rules::template::TemplateMemo>> {
         Some(self.template_memo.clone())
     }
@@ -228,6 +237,38 @@ impl rules::ir::SymbolFacts for IndexSymbolFacts<'_> {
             name,
             self.ir.strings.resolve(subtype),
         )
+    }
+}
+
+/// Uses the same required-argument analysis as direct invocation diagnostics.
+/// Tracking views call this with themselves so transitive reads are preserved.
+pub(crate) fn template_accepts_no_arguments(
+    ir: &RulesIr,
+    facts: &dyn SymbolFacts,
+    type_id: rules::ir::TypeId,
+    name: &str,
+    checkpoint: &mut dyn FnMut() -> bool,
+) -> Option<bool> {
+    if !facts.facts_complete() || checkpoint() {
+        return None;
+    }
+    let kind = ir.strings().resolve(ir.type_info(type_id).name);
+    let required = hir::template::required_parameters_with_inputs(
+        ir,
+        facts,
+        kind,
+        name,
+        &hir::template::BindingInputs::default(),
+        hir::ScopeState::initial(hir::ScopeValue::Unknown),
+        &mut || if checkpoint() { Err(()) } else { Ok(()) },
+    )
+    .ok()?;
+    if !required.missing.is_empty() {
+        Some(false)
+    } else if required.coverage.is_known() {
+        Some(true)
+    } else {
+        None
     }
 }
 
