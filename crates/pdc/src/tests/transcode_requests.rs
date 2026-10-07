@@ -158,11 +158,13 @@ fn transcode_decode_reports_damaged_content_and_ineligibility() {
     let damaged = b"# comment\nmarker \x11 here\n".to_vec();
     let damaged_path = write_file(&root, "events/damaged.txt", &damaged);
     let markdown = write_file(&root, "docs/readme.md", b"# readme\n");
-    let outside = {
-        let path = std::env::temp_dir().join("pdc-transcode-outside.txt");
-        fs::write(&path, b"name = \"x\"\n").expect("outside fixture");
-        dunce::canonicalize(&path).expect("canonical outside fixture")
-    };
+    let outside_file = tempfile::Builder::new()
+        .prefix("pdc-transcode-outside-")
+        .suffix(".txt")
+        .tempfile()
+        .expect("outside fixture");
+    fs::write(outside_file.path(), b"name = \"x\"\n").expect("outside fixture content");
+    let outside = dunce::canonicalize(outside_file.path()).expect("canonical outside fixture");
 
     let run = run_transcode_session(
         &root,
@@ -186,7 +188,7 @@ fn transcode_decode_reports_damaged_content_and_ineligibility() {
     assert_eq!(run.result(3), &json!({"eligible": false}));
     assert_eq!(run.result(4), &json!({"eligible": false}));
 
-    fs::remove_file(&outside).expect("cleanup outside fixture");
+    outside_file.close().expect("cleanup outside fixture");
     fs::remove_dir_all(root).expect("cleanup");
 }
 

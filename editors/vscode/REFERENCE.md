@@ -251,7 +251,7 @@ Glob patterns for files excluded from workspace discovery.
 
 ### `paradoxcode.localisation.autoOpen`
 
-When an eligible file opens through its decoded `pdcloc://` twin. `needsTranscode` (default): only files that actually participate in transcoding — escaped or damaged forms, or plain text whose quoted CJK a save would encode — while transcode fixed points stay on their normal `file://` view so search, diff, and git keep working; a fixed point that later gains quoted CJK is promoted automatically. `always`: every eligible file opens in the decoded view whatever its bytes look like. `off`: never automatic — open the decoded view by hand.
+Automatic opening policy for the experimental `pdcloc://` decoded view; applies only when `paradoxcode.localisation.transparentEncoding` is enabled. `needsTranscode` (default): escaped or damaged files, or plain text whose quoted CJK a save would encode, enter the decoded view. `always`: every eligible file enters the decoded view. `off`: open the decoded view only by explicit command.
 
 ```json
 {
@@ -282,18 +282,21 @@ Localisation language preference. The first entry is the target language: hover 
 
 ### `paradoxcode.localisation.transparentEncoding`
 
-Master switch for the transparent EU4dll pipeline. On: eligible files open in the decoded view and saves escape-encode quoted strings automatically (scoped form). Off: nothing automatic — the manual Encode File / Decode File commands become available.
+Experimental EU4dll transparent encoding and `pdcloc://` decoded views. Disabled by default. When enabled, eligible files can open in the decoded view and saves encode quoted strings automatically (scoped form). Search, navigation, and agent integration have known limitations. When disabled, use the editor-title Decode File / Encode File buttons for manual disk conversion with a `.pre-transcode.bak` backup. Reload the VS Code window after changing this setting.
 
 ```json
 {
-  "default": true,
+  "default": false,
+  "tags": [
+    "experimental"
+  ],
   "type": "boolean"
 }
 ```
 
 ### `paradoxcode.localisation.transparentScriptGlobs`
 
-Workspace-relative glob patterns of script files eligible for the transparent decoded view (paratranz `latin1eu4` profile). Eligible files whose bytes participate in transcoding open in the decoded view — readable text passes through, escaped strings decode — while transcode fixed points keep their normal file view (see `paradoxcode.localisation.autoOpen`). Default: `**/*.txt`.
+Workspace-relative script glob patterns for the manual Decode File / Encode File buttons and experimental decoded views (paratranz `latin1eu4` profile). Localisation YML files qualify independently. Default: `**/*.txt`; an empty list limits conversion to localisation YML.
 
 ```json
 {
@@ -537,12 +540,12 @@ Publish diagnostics for closed files in the project during workspace validation 
 | `paradoxcode.toggleDebug` | Toggle Debug Mode |
 | `paradoxcode.openDebugOutput` | Open ParadoxCode Debug Output |
 | `paradoxcode.refreshLoadedFiles` | Refresh Loaded Files |
-| `paradoxcode.localisation.openDecoded` | Open in Decoded (Chinese) View |
+| `paradoxcode.localisation.openDecoded` | Open in Decoded (Chinese) View (Experimental) |
 | `paradoxcode.localisation.revealOriginal` | Open the Raw Transcoded File |
 | `paradoxcode.localisation.peekOriginal` | Peek at the Raw Transcoded Form |
 | `paradoxcode.localisation.endPeek` | Back to the Decoded View |
-| `paradoxcode.localisation.encodeFile` | Encode File (EU4dll Escape Form) |
-| `paradoxcode.localisation.decodeFile` | Decode File (Readable Text) |
+| `paradoxcode.localisation.encodeFile` | Encode Quoted Text (EU4dll Escape Form) |
+| `paradoxcode.localisation.decodeFile` | Decode Quoted Text (Readable Text) |
 
 ## Agent tools
 

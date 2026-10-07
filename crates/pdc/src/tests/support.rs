@@ -10,14 +10,13 @@ use engine::{AnalysisHost, IndexCache, SourceRoot, SourceRootId, SourceRootKind,
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-/// Creates a temporary directory for use as a cross-platform workspace root.
+/// Atomically creates a unique workspace directory; callers clean it up explicitly.
 pub(crate) fn temp_workspace_dir() -> (std::path::PathBuf, String) {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let dir = std::env::temp_dir().join(format!("pdc-test-{nonce}"));
-    fs::create_dir_all(&dir).expect("create temp workspace");
+    let dir = tempfile::Builder::new()
+        .prefix("pdc-test-")
+        .tempdir()
+        .expect("create temp workspace")
+        .keep();
     let canonical = dunce::canonicalize(&dir).expect("canonicalize temp workspace");
     (canonical.clone(), file_uri_string(&canonical))
 }
