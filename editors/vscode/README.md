@@ -57,7 +57,29 @@ remembers its hidden set for the session.
 ## Transparent Localisation (Chinese)
 
 Mods running the EU4dll double-byte patch store localisation as escape-tripled bytes. ParadoxCode
-ships the transcoder and edits those files as readable Chinese through the `pdcloc://` view:
+ships a Rust-server-backed transcoder. By default, files keep their ordinary `file://` view:
+
+- Use the editor-title **Decode Quoted Text (Readable Text)** button (down arrow) to write readable
+  strings to disk, or **Encode Quoted Text (EU4dll Escape Form)** (up arrow) to write escaped strings.
+  The buttons apply to `localisation/**/*.yml` and workspace script files matching
+  `paradoxcode.localisation.transparentScriptGlobs` (`**/*.txt` by default).
+- Both buttons operate only inside quoted strings. **Encode Quoted Text** converts readable fragments
+  and preserves existing escape triples byte-for-byte; **Decode Quoted Text** decodes those triples
+  and preserves readable fragments. This also applies when one string is partially transcoded.
+  Comments and other unquoted bytes are never converted, including already-escaped comments
+  in legacy files. Existing escape triples are never encoded again; decoded readable fragments
+  are never decoded again.
+- Save or close any unsaved editor for the file before converting. Each conversion writes a
+  `.pre-transcode.bak` backup next to the original file before changing its bytes. The same
+  commands are available in the Command Palette and Explorer context menu.
+- Damaged escape sequences inside strings refuse the entire conversion and report a byte
+  position. A conversion with no changes writes neither the file nor its backup. Changes made
+  to the file or its editor while conversion is running require a retry.
+
+The automatic transparent pipeline and editable `pdcloc://` decoded views are **experimental**
+and **disabled by default**. Search, navigation, and agent integration have known limitations.
+To opt in, set `paradoxcode.localisation.transparentEncoding` to `true` and reload the VS Code
+window. Changing the switch requires a window reload. When enabled:
 
 - Entry is path-scoped but content-gated: an eligible file — any `localisation/**/*.yml` or a
   script file matching `paradoxcode.localisation.transparentScriptGlobs` (`**/*.txt` by default)
@@ -72,17 +94,15 @@ ships the transcoder and edits those files as readable Chinese through the `pdcl
   escape-encoded on the next save (announced by an informational `LocalisationWillTranscodeOnSave`
   hint).
 - Saving writes the scoped form: escape triples only inside quoted strings, comments and code as
-  readable UTF-8 — the game-side transcoder reads the strings exactly as with whole-file encoding.
-  Partially escaped files self-heal on save. Saving is refused (never double-encoded) when a
+  readable UTF-8. Saving is refused when a
   string already contains escape markers, or holds code points the ecosystem cannot round-trip.
 - Stray escape markers outside every quoted string are damage: the file is shown as-is with a
   `LocalisationMixedEncoding` error anchored at the marker; fix it by hand.
-- While a decoded view is active, the status bar shows **EU4 decoded view**; click it to open the
+- While a decoded view is active, the status bar shows **EU4 decoded view (experimental)**; click it to open the
   raw transcoded file, and use the editor-title eye to peek at the raw bytes momentarily.
-- Turn `paradoxcode.localisation.transparentEncoding` off to disable everything automatic (no
-  `pdcloc://` provider, no redirection, no save-time encoding): the manual **Encode File (EU4dll
-  Escape Form)** and **Decode File (Readable Text)** commands become available instead, each a
-  one-shot disk rewrite with a `.pre-transcode.bak` backup written next to the file.
+- Turn `paradoxcode.localisation.transparentEncoding` off and reload the window to return to
+  the default manual workflow. The decoded-view provider and automatic pipeline are disabled;
+  the **Decode Quoted Text** and **Encode Quoted Text** buttons become available again.
 
 ## Agent tools
 

@@ -147,7 +147,7 @@ pub fn check(root: &Path) -> Result<Vec<String>, String> {
     }
     for (name, default) in [
         ("completion.iconPreview", json!(true)),
-        ("localisation.transparentEncoding", json!(true)),
+        ("localisation.transparentEncoding", json!(false)),
         ("localisation.autoOpen", json!("needsTranscode")),
         ("preview.gameFonts", json!(true)),
         ("preview.chineseFontMod", json!("")),
@@ -547,6 +547,7 @@ pub fn execute(arguments: &[String]) -> Result<String, String> {
                     "icon-picker.mjs",
                     "loc-format.mjs",
                     "server-path.mjs",
+                    "transparent-loc.mjs",
                 ] {
                     process::run(
                         process::command("node").arg(root.join("editors/vscode/test").join(name)),

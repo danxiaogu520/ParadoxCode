@@ -293,7 +293,7 @@ fn escape_triple(code_point: u32, escape_set: EscapeSet) -> (u8, u8, u8) {
 /// Rebuilds the code point from a triple: `sp = (high << 8) | low`, then undo the
 /// compensation encoded in the marker. Markers are self-describing, which is what
 /// makes decoding independent of any escape set.
-fn reconstruct(marker: u32, low: u8, high: u8) -> u32 {
+pub(crate) fn reconstruct(marker: u32, low: u8, high: u8) -> u32 {
     let mut sp = (u32::from(high) << 8) | u32::from(low);
     match marker {
         0x11 => sp = sp.wrapping_sub(0x0E),

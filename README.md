@@ -16,7 +16,8 @@ shared language mechanisms from the EU4 rule package; EU4 is the supported game 
 - Diagnostics, completion, hover, definitions, references, and conflict-aware rename.
 - Error-tolerant parsing, semantic highlighting, scope hints, and conservative formatting.
 - Workspace analysis across your Mod, dependencies, and a local Vanilla index.
-- Mission-tree preview and transparent Chinese localisation transcoding in VS Code.
+- Mission-tree preview and manual Chinese localisation encoding/decoding in VS Code;
+  experimental transparent decoded views are available by opt-in.
 - Read-only workspace queries and draft validation for VS Code agents and MCP clients.
 
 ## Start using it
