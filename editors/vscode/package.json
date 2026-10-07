@@ -978,13 +978,13 @@
         "command": "paradoxcode.localisation.encodeFile",
         "title": "%commands.localisation.encodeFile.title%",
         "category": "ParadoxCode",
-        "icon": "$(arrow-swap)"
+        "icon": "$(arrow-up)"
       },
       {
         "command": "paradoxcode.localisation.decodeFile",
         "title": "%commands.localisation.decodeFile.title%",
         "category": "ParadoxCode",
-        "icon": "$(eye)"
+        "icon": "$(arrow-down)"
       }
     ],
     "menus": {
@@ -1006,23 +1006,41 @@
         },
         {
           "command": "paradoxcode.localisation.openDecoded",
-          "when": "resourceScheme == file && resourceFilename =~ /\\.(yml|txt)$/ && paradoxcode.transcodeEligible",
+          "when": "config.paradoxcode.localisation.transparentEncoding == true && resourceScheme == file && paradoxcode.transcodeEligible",
           "group": "navigation@3"
         },
         {
           "command": "paradoxcode.localisation.peekOriginal",
-          "when": "resourceScheme == pdcloc",
+          "when": "config.paradoxcode.localisation.transparentEncoding == true && resourceScheme == pdcloc",
           "group": "navigation@3"
+        },
+        {
+          "command": "paradoxcode.localisation.decodeFile",
+          "when": "config.paradoxcode.localisation.transparentEncoding == false && resourceScheme == file && paradoxcode.transcodeEligible",
+          "group": "navigation@4"
+        },
+        {
+          "command": "paradoxcode.localisation.encodeFile",
+          "when": "config.paradoxcode.localisation.transparentEncoding == false && resourceScheme == file && paradoxcode.transcodeEligible",
+          "group": "navigation@5"
         }
       ],
       "commandPalette": [
         {
+          "command": "paradoxcode.localisation.openDecoded",
+          "when": "config.paradoxcode.localisation.transparentEncoding == true"
+        },
+        {
+          "command": "paradoxcode.localisation.revealOriginal",
+          "when": "config.paradoxcode.localisation.transparentEncoding == true && resourceScheme == pdcloc"
+        },
+        {
           "command": "paradoxcode.localisation.peekOriginal",
-          "when": "resourceScheme == pdcloc"
+          "when": "config.paradoxcode.localisation.transparentEncoding == true && resourceScheme == pdcloc"
         },
         {
           "command": "paradoxcode.localisation.endPeek",
-          "when": "paradoxcode.peekingRaw"
+          "when": "config.paradoxcode.localisation.transparentEncoding == true && paradoxcode.peekingRaw"
         },
         {
           "command": "paradoxcode.localisation.encodeFile",
@@ -1050,7 +1068,7 @@
       "editor/context": [
         {
           "command": "paradoxcode.localisation.openDecoded",
-          "when": "resourceScheme == file && resourceFilename =~ /\\.(yml|txt)$/ && paradoxcode.transcodeEligible",
+          "when": "config.paradoxcode.localisation.transparentEncoding == true && resourceScheme == file && paradoxcode.transcodeEligible",
           "group": "paradoxcode@1"
         },
         {
@@ -1062,7 +1080,7 @@
       "explorer/context": [
         {
           "command": "paradoxcode.localisation.openDecoded",
-          "when": "resourceFilename =~ /\\.(yml|txt)$/",
+          "when": "config.paradoxcode.localisation.transparentEncoding == true && resourceFilename =~ /\\.(yml|txt)$/ && explorerResourceIsFolder == false",
           "group": "paradoxcode@1"
         },
         {
@@ -1350,7 +1368,10 @@
         },
         "paradoxcode.localisation.transparentEncoding": {
           "type": "boolean",
-          "default": true,
+          "default": false,
+          "tags": [
+            "experimental"
+          ],
           "markdownDescription": "%configuration.localisation.transparentEncoding.description%"
         },
         "paradoxcode.localisation.autoOpen": {

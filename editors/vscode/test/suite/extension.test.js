@@ -89,6 +89,8 @@ suite('ParadoxCode VS Code extension host', () => {
         'paradoxcode.updateIndexCaches',
         'paradoxcode.reloadServer',
         'paradoxcode.openOutput',
+        'paradoxcode.localisation.decodeFile',
+        'paradoxcode.localisation.encodeFile',
       ]) {
         assert.ok(available.includes(command), `missing command ${command}`);
       }
@@ -112,7 +114,11 @@ suite('ParadoxCode VS Code extension host', () => {
       assert.equal(config.get('hover.eventCard'), true);
       assert.deepEqual(config.get('diagnostics.severityOverrides'), {});
       assert.deepEqual(config.get('localisation.preferredLanguages'), []);
-      assert.equal(config.get('localisation.transparentEncoding'), true);
+      assert.equal(config.get('localisation.transparentEncoding'), false);
+      assert.ok(
+        !available.includes('paradoxcode.localisation.openDecoded'),
+        'experimental decoded-view commands must not register by default',
+      );
       assert.deepEqual(config.get('completion.sourceLayers'), [
         'project',
         'dependencies',
@@ -212,7 +218,7 @@ suite('ParadoxCode VS Code extension host', () => {
     assert.equal(chatParticipants.length, 0, 'the @paradox chat participant must stay removed');
   });
 
-  test('mission preview and diagnostic paths resolve pdcloc decoded views', async () => {
+  test('default mission files keep normal views and decoded-path helpers remain compatible', async () => {
     const root = process.env.PDCLOC_HOST_WORKSPACE;
     assert.ok(root, 'the host runner must open the fixture workspace (npm run test:host)');
     const file = path.join(root, 'missions', 'EDG_FDMMissions.txt');
@@ -234,20 +240,20 @@ suite('ParadoxCode VS Code extension host', () => {
         'the fixture workspace folder must be open before the pdcloc eligibility check',
       );
       const decoded = vscode.Uri.file(file).with({ scheme: 'pdcloc' });
-      const document = await vscode.workspace.openTextDocument(decoded);
+      const document = await vscode.workspace.openTextDocument(fixtureUri);
       assert.equal(
         document.languageId,
         'eu4',
-        'decoded mission views must keep the EU4 language (gates the preview context and edit refresh)',
+        'ordinary mission files must keep the EU4 language',
       );
       assert.equal(
         document.uri.scheme,
-        'pdcloc',
-        'the missions file must open through its decoded twin',
+        'file',
+        'the default workflow must use the ordinary file URI',
       );
       const { logicalPath } = require('../../out/previewPanel.js');
       assert.equal(
-        logicalPath(document),
+        logicalPath({ uri: decoded }),
         'missions/EDG_FDMMissions.txt',
         'decoded mission views must resolve to the workspace-relative logical path',
       );
@@ -260,8 +266,8 @@ suite('ParadoxCode VS Code extension host', () => {
       const { openDocumentUriFor } = require('../../out/agent/tools.js');
       assert.equal(
         openDocumentUriFor(vscode.Uri.file(file)).toString(),
-        decoded.toString(),
-        'agent position tools must target the open decoded twin (it carries the live text)',
+        fixtureUri.toString(),
+        'agent position tools must target the ordinary file in the default workflow',
       );
       const closedFile = path.join(root, 'missions', 'ClosedMissions.txt');
       fs.writeFileSync(closedFile, 'closed = {}\n', 'utf8');

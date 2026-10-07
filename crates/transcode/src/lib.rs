@@ -28,6 +28,7 @@
 mod classify;
 mod cp1252;
 mod escape;
+mod quoted;
 mod scoped;
 
 pub use classify::{
@@ -39,6 +40,7 @@ pub use escape::{
     Decoded, InvalidUtf8, decode_file, decode_text, decode_value, encode_file, encode_text,
     file_unencodable_kind, script_roundtrip_is_canonical, unencodable_kind,
 };
+pub use quoted::{QuotedConversionError, decode_quoted_file, encode_quoted_file};
 pub use scoped::{
     ScopedDecoded, ScopedEncodeError, ScopedForm, marker_outside_spans, scan_string_spans,
     scoped_decode_file, scoped_encode_file, scoped_form,

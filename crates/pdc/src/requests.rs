@@ -178,6 +178,10 @@ struct TranscodeDecodeParams {
     /// still decides the transcoding profile; the response classifies exactly
     /// the supplied buffer.
     bytes: Option<String>,
+    /// Manual conversion: decode only quoted escape triples, preserving comments
+    /// and readable fragments byte-for-byte instead of classifying the whole file.
+    #[serde(default)]
+    quoted_only: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -188,6 +192,10 @@ struct TranscodeEncodeParams {
     path: String,
     /// Readable editor-buffer bytes as a hex string.
     bytes: String,
+    /// Manual conversion of disk bytes: keep existing quoted escape triples and
+    /// encode only readable fragments. Comments are never interpreted.
+    #[serde(default)]
+    preserve_escaped: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -435,6 +443,13 @@ impl SnapshotRequestContext {
         let Some(profile) = self.transcode_profile_for(&path) else {
             return Ok(json!({ "eligible": false }));
         };
+        if params.quoted_only {
+            let mut result =
+                quoted_conversion_result(transcode::decode_quoted_file(&bytes, profile));
+            result["eligible"] = Value::Bool(true);
+            result["profile"] = Value::from(transcode_profile_name(profile));
+            return Ok(result);
+        }
         let form = transcode::scoped_form(&bytes, profile);
         let form_name = scoped_form_name(form);
         let profile_name = transcode_profile_name(profile);
@@ -510,6 +525,13 @@ impl SnapshotRequestContext {
                 ),
             ));
         };
+        if params.preserve_escaped {
+            return Ok(quoted_conversion_result(transcode::encode_quoted_file(
+                &bytes,
+                profile,
+                transcode::EscapeSet::Paratranz,
+            )));
+        }
         let text = match std::str::from_utf8(&bytes) {
             Ok(text) => text,
             Err(_) => return Ok(json!({ "refused": "invalidUtf8" })),
@@ -2191,6 +2213,26 @@ fn transcode_profile_name(profile: Profile) -> &'static str {
     match profile {
         Profile::Localisation => "localisation",
         Profile::Script => "script",
+    }
+}
+
+/// Manual conversion is all-or-nothing; refusal metadata never carries output bytes.
+fn quoted_conversion_result(result: Result<Vec<u8>, transcode::QuotedConversionError>) -> Value {
+    match result {
+        Ok(bytes) => json!({ "bytes": encode_hex(&bytes) }),
+        Err(transcode::QuotedConversionError::InvalidUtf8) => {
+            json!({ "refused": "invalidUtf8" })
+        }
+        Err(transcode::QuotedConversionError::BrokenEscape { byte_index }) => {
+            json!({ "refused": "brokenEscape", "offsets": [byte_index] })
+        }
+        Err(transcode::QuotedConversionError::Unencodable { error }) => json!({
+            "refused": "unencodable",
+            "points": error.unencodable.iter().map(|point| json!({
+                "codePoint": point.code_point,
+                "byteIndex": point.byte_index,
+            })).collect::<Vec<_>>(),
+        }),
     }
 }
 

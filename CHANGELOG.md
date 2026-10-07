@@ -9,6 +9,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Editor-title **Decode Quoted Text** and **Encode Quoted Text** buttons for eligible localisation YML
+  and configured script files. Manual conversion keeps the ordinary file view and writes
+  a `.pre-transcode.bak` backup before changing the file on disk.
+
 - Rule expressions `keysof` and `valuesof` share schema-field queries across validation,
   completion, references and Templates, retaining source documentation and dynamic symbols.
   Fixed filters cover scope compatibility, field shape, primitive value branches and explicit
@@ -16,6 +20,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Transparent encoding and `pdcloc://` decoded views are experimental and disabled by default.
+  Explicit opt-in keeps the existing automatic opening policy; reload the VS Code window after
+  changing the switch. Decoded-view entries are hidden while the feature is disabled.
+- Manual encoding converts only readable quoted fragments and preserves existing escape
+  triples; manual decoding does the reverse. Both operations leave comments byte-for-byte
+  unchanged, including legacy escaped comments, and handle partially transcoded strings.
+  Damaged quoted escapes refuse conversion; unchanged results do not rewrite files or backups.
 - EU4 modifier selectors now validate country/province modifier keys, including dynamic families.
   Export and switch domains reuse schema queries and support workspace scripted triggers through
   their scalar boolean form when no arguments are required. Export modifier spelling is checked;
