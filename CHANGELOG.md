@@ -20,6 +20,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Editor titles keep only **Open Mission Tree Preview to the Side**, **Decode Quoted Text** and
+  **Encode Quoted Text**. Mission preview refresh, the mission icon picker, experimental decoded
+  view entry and raw-form peek remain available in the Command Palette, with their existing
+  context-menu entries preserved.
 - Transparent encoding and `pdcloc://` decoded views are experimental and disabled by default.
   Explicit opt-in keeps the existing automatic opening policy; reload the VS Code window after
   changing the switch. Decoded-view entries are hidden while the feature is disabled.

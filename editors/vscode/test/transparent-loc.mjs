@@ -152,14 +152,19 @@ try {
         assert.equal(state.contexts.get('paradoxcode.transcodeEligible'), false);
     });
 
-    await test('explicit opt-in registers the experimental view and hides manual buttons', async () => {
+    await test('explicit opt-in keeps experimental commands in the palette and hides manual buttons', async () => {
         const state = host(root, { transparentEncoding: true });
         state.show(state.document('localisation/demo.yml'));
         await state.activate();
         assert.equal(state.providers.length, 1);
         assert.equal(state.providers[0].scheme, 'pdcloc');
         assert.ok(state.commands.has('paradoxcode.localisation.openDecoded'));
-        assert.equal(visible('editor/title', 'paradoxcode.localisation.openDecoded', state), true);
+        assert.equal(visible('commandPalette', 'paradoxcode.localisation.openDecoded', state), true);
+        const twin = state.document('localisation/demo.yml');
+        twin.uri = twin.uri.with({ scheme: 'pdcloc' });
+        state.active = { document: twin };
+        assert.ok(state.commands.has('paradoxcode.localisation.peekOriginal'));
+        assert.equal(visible('commandPalette', 'paradoxcode.localisation.peekOriginal', state), true);
         assert.equal(visible('editor/title', 'paradoxcode.localisation.decodeFile', state), false);
         assert.equal(visible('editor/title', 'paradoxcode.localisation.encodeFile', state), false);
     });

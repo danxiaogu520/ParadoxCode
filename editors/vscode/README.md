@@ -52,7 +52,9 @@ opening a result jumps to its source definition and centers the canvas on the no
 panel mirrors the canvas layout column by column (`Slot N` blocks wrapping left to right) with a
 checkbox per mission series: hidden series keep their canvas position but drop out of the canvas,
 dependency arrows, search result highlighting, and the diagnostic summary, and each document
-remembers its hidden set for the session.
+remembers its hidden set for the session. Run **Refresh Mission Tree Preview** from the Command
+Palette for a manual refresh. Run **Open Mission Icon Picker** from the Command Palette or the
+mission editor's context menu.
 
 ## Transparent Localisation (Chinese)
 
@@ -99,7 +101,9 @@ window. Changing the switch requires a window reload. When enabled:
 - Stray escape markers outside every quoted string are damage: the file is shown as-is with a
   `LocalisationMixedEncoding` error anchored at the marker; fix it by hand.
 - While a decoded view is active, the status bar shows **EU4 decoded view (experimental)**; click it to open the
-  raw transcoded file, and use the editor-title eye to peek at the raw bytes momentarily.
+  raw transcoded file. Run **Peek at the Raw Transcoded Form** from the Command Palette to peek at
+  the raw bytes momentarily; press Escape to return to the decoded view. **Open in Decoded
+  (Chinese) View (Experimental)** remains available in the Command Palette and context menus.
 - Turn `paradoxcode.localisation.transparentEncoding` off and reload the window to return to
   the default manual workflow. The decoded-view provider and automatic pipeline are disabled;
   the **Decode Quoted Text** and **Encode Quoted Text** buttons become available again.

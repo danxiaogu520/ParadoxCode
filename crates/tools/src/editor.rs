@@ -275,7 +275,7 @@ pub fn check(root: &Path) -> Result<Vec<String>, String> {
         &mut errors,
     );
     require(
-        package["contributes"]["menus"]["editor/title"]
+        package["contributes"]["menus"]["editor/context"]
             .as_array()
             .is_some_and(|a| {
                 a.iter().any(|m| {
@@ -283,7 +283,7 @@ pub fn check(root: &Path) -> Result<Vec<String>, String> {
                         && m["when"] == "paradoxcodeMissionFile"
                 })
             }),
-        "mission icon picker title button missing",
+        "mission icon picker context menu entry missing",
         &mut errors,
     );
     for key in [
