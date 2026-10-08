@@ -24,9 +24,9 @@ pub enum GateAction {
     PolicyChecks,
     /// Run [`crate::check::check_release_artifact`] in-process.
     ArtifactChecks,
-    /// Run native extension contracts, behavior tests, LSP/MCP contracts and packaging.
+    /// Run native extension contracts, behavior tests, LSP contracts and packaging.
     EditorTests,
-    /// Run the real-binary LSP and MCP contract suite.
+    /// Run the real-binary LSP contract suite.
     LspTests,
 }
 

@@ -186,7 +186,7 @@ or protocol details.
 | --- | --- | --- |
 | Published releases and changes | GitHub Releases; `CHANGELOG.md` | Root badges and release links |
 | Rust/tool dependencies | Cargo manifests and lockfiles | Generated crate table above |
-| Extension settings, commands, agent tools | `editors/vscode/package.json` and NLS bundles | [Generated reference](editors/vscode/REFERENCE.md) |
+| Extension settings and commands | `editors/vscode/package.json` and NLS bundles | [Generated reference](editors/vscode/REFERENCE.md) |
 | Rule source fields and serialization | `crates/rules/src/source.rs` | On-demand JSON Schema (`rulec schema`) and generated [source reference](crates/rules/SOURCE-REFERENCE.md) |
 | Rule-language semantics and rationale | [LANGUAGE.md](crates/rules/LANGUAGE.md), compiler tests | Semantic guide; complete examples are validated by the documentation check |
 | Script diagnostic identifiers/default severity | `ide::DiagnosticCode` | Generated index in [diagnostic guide](crates/ide/DIAGNOSTICS.md) |

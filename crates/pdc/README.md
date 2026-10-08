@@ -1,6 +1,6 @@
-# Language-server and MCP integration
+# Language-server integration
 
-The `pdc` crate ships the `paradoxcode` stdio language server and its native MCP adapter.
+The `pdc` crate ships the `paradoxcode` stdio language server.
 For VS Code, start with
 [the extension guide](../../editors/vscode/README.md); source builds follow
 [CONTRIBUTING.md](../../CONTRIBUTING.md#build-and-debug).
@@ -21,40 +21,13 @@ Use [VS Code's generated configuration reference](../../editors/vscode/REFERENCE
 as a guide to shared `paradoxcode` settings, while respecting the server's initialization contract.
 Editor defaults need not equal defaults for an independent LSP client.
 
-## MCP server
+## External MCP integration
 
-The shipped `paradoxcode` executable includes a native stdio MCP adapter:
-
-```json
-{
-  "mcpServers": {
-    "paradoxcode": {
-      "command": "/path/to/paradoxcode",
-      "args": ["mcp", "--workspace", "/path/to/your-mod"]
-    }
-  }
-}
-```
-
-Run `paradoxcode mcp --help` for options. `--server PATH` selects an explicit LSP child;
-the default child is the same executable. `--timeout-ms` controls requests and
-`--vanilla-mode auto|cacheOnly|disabled` controls the Vanilla source policy.
-`PDC_MCP_SERVER`, `PDC_MCP_WORKSPACE` and `PDC_MCP_TIMEOUT_MS` are supported.
-
-Workspace selection uses the explicit path, then file roots supplied by the MCP client,
-then the working directory, excluding the home directory fallback. Root changes reset the
-LSP session. Logs go to stderr; stdout carries newline-delimited JSON-RPC exclusively.
-
-The adapter embeds the extension's `contributes.languageModelTools` declarations, including
-descriptions and input schemas, so it exposes the same script/localisation zones and read-only
-tool surface. Validation reads draft text without writing it to the Mod. Tool errors return
-`isError` content; protocol errors return JSON-RPC errors. Closing stdin gracefully stops the
-LSP child. It shares the bounded [native transport client](src/client.rs) with developer tools.
-
-Real-process MCP initialization, listing, rules, validation, workspace/localisation queries,
-ping and shutdown are covered by `cargo run --locked -p tools -- lsp test`. Runtime requests
-remain in [the server crate](src/mcp/mod.rs); developer audits and reports are documented in
-[tools](../tools/README.md).
+MCP is maintained in the independent `ParadoxCodeMCP` project. Its `paradoxcode-mcp`
+executable connects to this language server over stdio using `--server /path/to/paradoxcode`.
+The language-server executable no longer accepts the `mcp` subcommand. MCP tool declarations,
+client instructions, build configuration, and MCP contract tests live in the separate project.
+The editor-neutral `pdc/*` query requests remain available to external clients.
 
 ## Local indexes
 

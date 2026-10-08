@@ -48,7 +48,7 @@
 import * as fs from 'node:fs/promises';
 import * as nodePath from 'node:path';
 import * as vscode from 'vscode';
-import { acquireAgentClient, withTimeout } from './agent/server';
+import { acquireServerClient, withTimeout } from './serverClient';
 import { globToRegExp } from './paths';
 
 export const PDCLOC_SCHEME = 'pdcloc';
@@ -182,7 +182,7 @@ class TranscodeUnavailableError extends Error {}
 async function sendTranscodeRequest<T>(method: string, params: object): Promise<T> {
     let client;
     try {
-        client = await acquireAgentClient(TRANSCODE_AVAILABILITY_WAIT_MS);
+        client = await acquireServerClient(TRANSCODE_AVAILABILITY_WAIT_MS);
     } catch (error) {
         throw new TranscodeUnavailableError(error instanceof Error ? error.message : String(error));
     }

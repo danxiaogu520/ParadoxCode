@@ -193,5 +193,9 @@
   "ParadoxCode: quoted content needs no further encoding.": "ParadoxCode: quoted content needs no further encoding.",
   "ParadoxCode: quoted content contains no escape sequences to decode.": "ParadoxCode: quoted content contains no escape sequences to decode.",
   "ParadoxCode: encoded readable quoted content in {0}; existing escapes and comments were preserved (backup: {1}).": "ParadoxCode: encoded readable quoted content in {0}; existing escapes and comments were preserved (backup: {1}).",
-  "ParadoxCode: decoded quoted content in {0}; comments were preserved (backup: {1}).": "ParadoxCode: decoded quoted content in {0}; comments were preserved (backup: {1})."
+  "ParadoxCode: decoded quoted content in {0}; comments were preserved (backup: {1}).": "ParadoxCode: decoded quoted content in {0}; comments were preserved (backup: {1}).",
+  "The request was cancelled before the ParadoxCode server became available.": "The request was cancelled before the ParadoxCode server became available.",
+  "The ParadoxCode language server is starting or restarting; retry shortly.": "The ParadoxCode language server is starting or restarting; retry shortly.",
+  "The ParadoxCode language server is not running. Open an EU4 workspace (or run \"ParadoxCode: Reload Language Server\") and retry.": "The ParadoxCode language server is not running. Open an EU4 workspace (or run \"ParadoxCode: Reload Language Server\") and retry.",
+  "{0} timed out after {1}s": "{0} timed out after {1}s"
 }

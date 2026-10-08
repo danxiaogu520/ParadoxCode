@@ -170,52 +170,14 @@ suite('ParadoxCode VS Code extension host', () => {
     assert.deepEqual(walkthrough.steps[3].completionEvents, ['onContext:paradoxcodeVanillaReady']);
   });
 
-  test('agent budget helpers bound lists and text', () => {
-    const { capList, capText, collapseWhitespace } = require('../../out/agent/budget.js');
-    assert.deepEqual(capList([1, 2, 3], 5), { items: [1, 2, 3], omitted: 0 });
-    assert.deepEqual(capList([1, 2, 3, 4], 2), { items: [1, 2], omitted: 2 });
-    assert.equal(capText('short', 10), 'short');
-    const capped = capText('x'.repeat(50), 10);
-    assert.ok(capped.startsWith('x'.repeat(10)));
-    assert.ok(capped.includes('(+40 more characters)'));
-    assert.equal(collapseWhitespace(' a \n\t b  c '), 'a b c');
-  });
-
-  test('agent server accessor reports an unavailable client as a retryable error', async () => {
-    const { acquireAgentClient, setAgentClient } = require('../../out/agent/server.js');
-    setAgentClient(undefined);
+  test('server accessor reports an unavailable client', async () => {
+    const { acquireServerClient, setServerClient } = require('../../out/serverClient.js');
+    setServerClient(undefined);
     await assert.rejects(
-      acquireAgentClient(10),
-      (error) => error instanceof Error && error.name === 'AgentServerUnavailableError'
+      acquireServerClient(10),
+      (error) => error instanceof Error && error.name === 'ServerUnavailableError'
         && /not running/.test(error.message),
     );
-  });
-
-  test('agent tools register on hosts with the Language Model Tools API', () => {
-    const { registerAgentTools } = require('../../out/agent/register.js');
-    const disposables = registerAgentTools();
-    if ('lm' in vscode && typeof vscode.lm?.registerTool === 'function') {
-      assert.equal(disposables.length, 11, 'all eleven agent tools must register');
-      for (const disposable of disposables) {
-        disposable.dispose();
-      }
-    } else {
-      assert.equal(disposables.length, 0);
-    }
-  });
-
-  test('agent tools are prompt-referenceable and carry unique reference names', async () => {
-    const extension = vscode.extensions.getExtension('paradoxcode.paradoxcode-vscode');
-    const contributed = extension.packageJSON.contributes?.languageModelTools ?? [];
-    assert.equal(contributed.length, 11, 'all eleven agent tools must be contributed');
-    const referenceNames = contributed.map((tool) => tool.toolReferenceName);
-    for (const tool of contributed) {
-      assert.equal(tool.canBeReferencedInPrompt, true, `${tool.name} must be prompt-referenceable`);
-      assert.match(tool.toolReferenceName, /^paradox[A-Z]/, `${tool.name} needs a paradox-prefixed reference name`);
-    }
-    assert.equal(new Set(referenceNames).size, referenceNames.length, 'reference names must be unique');
-    const chatParticipants = extension.packageJSON.contributes?.chatParticipants ?? [];
-    assert.equal(chatParticipants.length, 0, 'the @paradox chat participant must stay removed');
   });
 
   test('default mission files keep normal views and decoded-path helpers remain compatible', async () => {
@@ -262,19 +224,6 @@ suite('ParadoxCode VS Code extension host', () => {
         relativeDiagnosticPath(decoded),
         'missions/EDG_FDMMissions.txt',
         'diagnostic ignore patterns must match decoded views by logical path',
-      );
-      const { openDocumentUriFor } = require('../../out/agent/tools.js');
-      assert.equal(
-        openDocumentUriFor(vscode.Uri.file(file)).toString(),
-        fixtureUri.toString(),
-        'agent position tools must target the ordinary file in the default workflow',
-      );
-      const closedFile = path.join(root, 'missions', 'ClosedMissions.txt');
-      fs.writeFileSync(closedFile, 'closed = {}\n', 'utf8');
-      assert.equal(
-        openDocumentUriFor(vscode.Uri.file(closedFile)).toString(),
-        vscode.Uri.file(closedFile).toString(),
-        'closed files must fall back to their on-disk file URI',
       );
     } finally {
       fs.rmSync(path.join(root, 'missions'), { recursive: true, force: true });

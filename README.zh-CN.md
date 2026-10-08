@@ -16,19 +16,19 @@ ParadoxCode 是面向《欧陆风云 IV》模组开发的独立开源语言工�
 - 容错解析、语义高亮、作用域提示和保守格式化。
 - 联合分析当前模组、依赖模组与本地原版索引。
 - VS Code 任务树预览与中文本地化手动编码、解码；透明解码视图为默认关闭的实验性功能。
-- 面向 VS Code agent 和 MCP 客户端的只读查询及草稿校验。
 
 ## 开始使用
 
 从 [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=paradoxcode.paradoxcode-vscode) 安装 ParadoxCode。
 安装、首次使用和故障排查见 [VS Code 使用指南](editors/vscode/README.md#setup)。
-其他编辑器见 [语言服务器接入指南](crates/pdc/README.md)，agent 客户端见 [MCP 指南](crates/pdc/README.md#mcp-server)。
+其他编辑器见 [语言服务器接入指南](crates/pdc/README.md)。
+MCP 集成已拆分到独立的 `ParadoxCodeMCP` 项目，通过外部进程连接本项目的语言服务器。
 
 ## 按问题查找
 
 | 我想做什么 | 文档入口 |
 | --- | --- |
-| 配置扩展 | [自动生成的设置、命令和工具参考](editors/vscode/REFERENCE.md) |
+| 配置扩展 | [自动生成的设置和命令参考](editors/vscode/REFERENCE.md) |
 | 理解诊断 | [诊断指南](crates/ide/DIAGNOSTICS.md) |
 | 编译、测试或贡献 | [贡献指南](CONTRIBUTING.md) |
 | 理解架构 | [架构与 crate 依赖](CONTRIBUTING.md#architecture) |

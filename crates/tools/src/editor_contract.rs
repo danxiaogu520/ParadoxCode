@@ -173,19 +173,6 @@ pub fn data() -> serde_json::Value {
     "paradoxcode.completion.iconPreview",
     "paradoxcode.performance.profile"
   ],
-  "tools": [
-    "paradoxcode_workspace",
-    "paradoxcode_search",
-    "paradoxcode_context",
-    "paradoxcode_diagnostics",
-    "paradoxcode_references",
-    "paradoxcode_symbol_references",
-    "paradoxcode_rules",
-    "paradoxcode_validate_text",
-    "paradoxcode_loc_get",
-    "paradoxcode_loc_search",
-    "paradoxcode_loc_list"
-  ],
   "markers": {
     "src/previewPanel.ts": [
       "show(extensionUri: vscode.Uri, client?: LanguageClient)",

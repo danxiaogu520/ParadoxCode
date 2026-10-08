@@ -341,38 +341,38 @@ fn localisation_search_key_match_modes_address_exact_and_prefix() {
     fs::remove_dir_all(root).expect("cleanup");
 }
 
-fn write_agent_symbol_fixture(root: &std::path::Path) {
+fn write_query_symbol_fixture(root: &std::path::Path) {
     let events = root.join("events");
     fs::create_dir_all(&events).expect("create events directory");
     fs::write(
-        events.join("agent_symbol_test.txt"),
-        "country_event = { id = agent_sym.1 title = agent_sym.1.t desc = agent_sym.1.d }\n",
+        events.join("query_symbol_test.txt"),
+        "country_event = { id = query_sym.1 title = query_sym.1.t desc = query_sym.1.d }\n",
     )
     .expect("write event file");
     let scripted = root.join("common").join("scripted_effects");
     fs::create_dir_all(&scripted).expect("create scripted effects directory");
     fs::write(
-        scripted.join("agent_effects.txt"),
-        "agent_shared_effect = { add_army_tradition = 1 }\nagent_dual_name = { add_army_tradition = 2 }\n",
+        scripted.join("query_effects.txt"),
+        "query_shared_effect = { add_army_tradition = 1 }\nquery_dual_name = { add_army_tradition = 2 }\n",
     )
     .expect("write scripted effect file");
     let triggers = root.join("common").join("scripted_triggers");
     fs::create_dir_all(&triggers).expect("create scripted triggers directory");
     fs::write(
-        triggers.join("agent_triggers.txt"),
-        "agent_dual_name = { always = yes }\n",
+        triggers.join("query_triggers.txt"),
+        "query_dual_name = { always = yes }\n",
     )
     .expect("write scripted trigger file");
     fs::write(
-        events.join("agent_symbol_caller.txt"),
-        "country_event = { id = agent_sym.2 option = { name = opt agent_shared_effect = yes } }\n",
+        events.join("query_symbol_caller.txt"),
+        "country_event = { id = query_sym.2 option = { name = opt query_shared_effect = yes } }\n",
     )
     .expect("write caller file");
     let localisation = root.join("localisation");
     fs::create_dir_all(&localisation).expect("create localisation directory");
     fs::write(
-        localisation.join("agent_l_english.yml"),
-        "l_english:\n agent_sym.1.t:0 \"Title\"\n agent_sym.1.d:0 \"Description\"\n",
+        localisation.join("query_l_english.yml"),
+        "l_english:\n query_sym.1.t:0 \"Title\"\n query_sym.1.d:0 \"Description\"\n",
     )
     .expect("write localisation file");
 }
@@ -380,13 +380,13 @@ fn write_agent_symbol_fixture(root: &std::path::Path) {
 #[test]
 fn symbol_search_finds_script_symbols_and_excludes_localisation_zone() {
     let (root, root_uri) = temp_workspace_dir();
-    write_agent_symbol_fixture(&root);
+    write_query_symbol_fixture(&root);
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"pdc/symbolSearch","params":{"query":"agent_sym"}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/symbolSearch","params":{"query":"query_sym"}}),
         json!({"jsonrpc":"2.0","id":3,"method":"pdc/symbolSearch","params":{"query":"   "}}),
-        json!({"jsonrpc":"2.0","id":4,"method":"pdc/symbolSearch","params":{"query":"agent","limit":0}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"pdc/symbolSearch","params":{"query":"query","limit":0}}),
         json!({"jsonrpc":"2.0","id":5,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
     ]);
@@ -405,7 +405,7 @@ fn symbol_search_finds_script_symbols_and_excludes_localisation_zone() {
     assert!(
         symbols
             .iter()
-            .any(|symbol| symbol["name"] == "agent_sym.1" && symbol["kind"] == "event"),
+            .any(|symbol| symbol["name"] == "query_sym.1" && symbol["kind"] == "event"),
         "expected the fixture event symbol: {search}"
     );
     for symbol in symbols {
@@ -434,14 +434,14 @@ fn symbol_search_finds_script_symbols_and_excludes_localisation_zone() {
 #[test]
 fn symbol_references_resolves_names_without_a_position() {
     let (root, root_uri) = temp_workspace_dir();
-    write_agent_symbol_fixture(&root);
+    write_query_symbol_fixture(&root);
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"pdc/symbolReferences","params":{"name":"agent_shared_effect"}}),
-        json!({"jsonrpc":"2.0","id":3,"method":"pdc/symbolReferences","params":{"name":"agent_sym.1"}}),
-        json!({"jsonrpc":"2.0","id":4,"method":"pdc/symbolReferences","params":{"name":"agent_dual_name"}}),
-        json!({"jsonrpc":"2.0","id":5,"method":"pdc/symbolReferences","params":{"name":"agent_sym.1","kind":"scripted_effect"}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/symbolReferences","params":{"name":"query_shared_effect"}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"pdc/symbolReferences","params":{"name":"query_sym.1"}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"pdc/symbolReferences","params":{"name":"query_dual_name"}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"pdc/symbolReferences","params":{"name":"query_sym.1","kind":"scripted_effect"}}),
         json!({"jsonrpc":"2.0","id":6,"method":"pdc/symbolReferences","params":{"name":"does_not_exist_anywhere"}}),
         json!({"jsonrpc":"2.0","id":7,"method":"pdc/symbolReferences","params":{"name":"  "}}),
         json!({"jsonrpc":"2.0","id":8,"method":"shutdown","params":{}}),
@@ -461,7 +461,7 @@ fn symbol_references_resolves_names_without_a_position() {
     assert_eq!(by_name["result"]["matched"], json!(true), "{by_name}");
     assert_eq!(
         by_name["result"]["symbol"]["name"],
-        "agent_shared_effect".to_string()
+        "query_shared_effect".to_string()
     );
     assert_eq!(
         by_name["result"]["symbol"]["kind"],
@@ -479,7 +479,7 @@ fn symbol_references_resolves_names_without_a_position() {
     assert!(
         references.iter().any(|reference| reference["uri"]
             .as_str()
-            .is_some_and(|uri| uri.ends_with("agent_symbol_caller.txt"))),
+            .is_some_and(|uri| uri.ends_with("query_symbol_caller.txt"))),
         "expected the caller file among references: {by_name}"
     );
     assert_eq!(by_name["result"]["truncated"], json!(false));
@@ -552,7 +552,7 @@ fn symbol_references_resolves_names_without_a_position() {
 #[test]
 fn workspace_summary_reports_identity_roots_and_zone_counts() {
     let (root, root_uri) = temp_workspace_dir();
-    write_agent_symbol_fixture(&root);
+    write_query_symbol_fixture(&root);
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -634,14 +634,14 @@ fn workspace_summary_reports_identity_roots_and_zone_counts() {
 #[test]
 fn workspace_diagnostics_filters_by_parser_zone_and_logical_paths() {
     let (root, root_uri) = temp_workspace_dir();
-    write_agent_symbol_fixture(&root);
+    write_query_symbol_fixture(&root);
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"pdc/workspaceDiagnostics","params":{"limit":32}}),
         json!({"jsonrpc":"2.0","id":3,"method":"pdc/workspaceDiagnostics","params":{"limit":32,"parser":"script"}}),
         json!({"jsonrpc":"2.0","id":4,"method":"pdc/workspaceDiagnostics","params":{"limit":32,"parser":"localisation"}}),
-        json!({"jsonrpc":"2.0","id":5,"method":"pdc/workspaceDiagnostics","params":{"limit":32,"files":["events/agent_symbol_caller.txt"]}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"pdc/workspaceDiagnostics","params":{"limit":32,"files":["events/query_symbol_caller.txt"]}}),
         json!({"jsonrpc":"2.0","id":6,"method":"pdc/workspaceDiagnostics","params":{"limit":32,"parser":"glob"}}),
         json!({"jsonrpc":"2.0","id":7,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
@@ -697,7 +697,7 @@ fn workspace_diagnostics_filters_by_parser_zone_and_logical_paths() {
     assert_eq!(by_file["result"]["total"], json!(1));
     assert_eq!(
         by_file["result"]["items"][0]["logicalPath"],
-        "events/agent_symbol_caller.txt".to_string()
+        "events/query_symbol_caller.txt".to_string()
     );
 
     let invalid_parser = responses

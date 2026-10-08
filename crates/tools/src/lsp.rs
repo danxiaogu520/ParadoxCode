@@ -1,2 +1,2 @@
-//! Shared native LSP client, also used by the shipped MCP adapter.
+//! Shared native LSP client for repository tooling.
 pub use pdc::client::*;

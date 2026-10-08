@@ -1,4 +1,4 @@
-//! Real-binary LSP and MCP contracts using owned, installation-independent fixtures.
+//! Real-binary LSP contracts using owned, installation-independent fixtures.
 use crate::{
     args::Args,
     lsp::{self, Client},
@@ -6,11 +6,9 @@ use crate::{
 };
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
-use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
-use std::process::{Child, Stdio};
-use std::sync::mpsc;
-use std::time::{Duration, Instant};
+use std::process::Stdio;
+use std::time::Duration;
 
 fn ensure(condition: bool, message: &str) -> Result<(), String> {
     if condition {
@@ -43,16 +41,19 @@ pub fn run(root: &Path, explicit: Option<&str>) -> Result<String, String> {
         !String::from_utf8_lossy(&version.stderr).contains("loading compiled"),
         "--version must answer before rules load",
     )?;
-    let unknown = process::command(&binary)
-        .arg("--definitely-unknown")
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|e| e.to_string())?;
-    ensure(
-        !unknown.status.success()
-            && String::from_utf8_lossy(&unknown.stderr).contains("unknown paradoxcode argument"),
-        "unknown arguments must fail before waiting on stdio",
-    )?;
+    for argument in ["--definitely-unknown", "mcp"] {
+        let unknown = process::command(&binary)
+            .arg(argument)
+            .stdin(Stdio::null())
+            .output()
+            .map_err(|e| e.to_string())?;
+        ensure(
+            !unknown.status.success()
+                && String::from_utf8_lossy(&unknown.stderr)
+                    .contains("unknown paradoxcode argument"),
+            "unknown arguments and the removed MCP subcommand must fail before waiting on stdio",
+        )?;
+    }
     let fixture = tempfile::Builder::new()
         .prefix("pdc-e2e-")
         .tempdir()
@@ -248,174 +249,5 @@ pub fn run(root: &Path, explicit: Option<&str>) -> Result<String, String> {
     )?;
     client.close(&document)?;
     client.shutdown()?;
-    mcp(&binary, fixture.path(), &package)?;
-    Ok("LSP and MCP end-to-end contracts passed".into())
-}
-struct Guard(Child);
-impl Drop for Guard {
-    fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
-    }
-}
-fn mcp(binary: &Path, workspace: &Path, package: &Value) -> Result<(), String> {
-    let mut child = Guard(
-        process::command(binary)
-            .args(["mcp", "--workspace"])
-            .arg(workspace)
-            .args(["--vanilla-mode", "disabled"])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
-            .spawn()
-            .map_err(|e| e.to_string())?,
-    );
-    let mut input = child.0.stdin.take().ok_or("missing MCP input")?;
-    let stdout = child.0.stdout.take().ok_or("missing MCP output")?;
-    let (tx, rx) = mpsc::channel();
-    std::thread::spawn(move || {
-        for line in BufReader::new(stdout).lines() {
-            let result = line
-                .map_err(|e| e.to_string())
-                .and_then(|line| serde_json::from_str::<Value>(&line).map_err(|e| e.to_string()));
-            if tx.send(result).is_err() {
-                break;
-            }
-        }
-    });
-    let mut id = 0;
-    let mut request = |method: &str, params: Value| -> Result<Value, String> {
-        id += 1;
-        writeln!(
-            input,
-            "{}",
-            json!({"jsonrpc":"2.0","id":id,"method":method,"params":params})
-        )
-        .and_then(|_| input.flush())
-        .map_err(|e| e.to_string())?;
-        loop {
-            let response = rx
-                .recv_timeout(Duration::from_secs(60))
-                .map_err(|e| e.to_string())??;
-            if response["id"] != id {
-                continue;
-            }
-            if let Some(error) = response.get("error") {
-                return Err(format!("MCP {method}: {error}"));
-            }
-            return response
-                .get("result")
-                .cloned()
-                .ok_or("MCP response missing result".into());
-        }
-    };
-    let initialized = request(
-        "initialize",
-        json!({"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"tools-e2e","version":"1"}}),
-    )?;
-    ensure(
-        initialized["serverInfo"]["name"] == "paradoxcode-mcp"
-            && initialized["protocolVersion"] == "2025-06-18"
-            && initialized["capabilities"]["tools"].is_object()
-            && initialized["instructions"]
-                .as_str()
-                .is_some_and(|s| s.contains("paradoxcode_validate_text")),
-        "MCP initialization contract",
-    )?;
-    // The initialized notification shares the same writer as requests.
-
-    writeln!(
-        input,
-        "{}",
-        json!({"jsonrpc":"2.0","method":"notifications/initialized","params":{}})
-    )
-    .and_then(|_| input.flush())
-    .map_err(|e| e.to_string())?;
-    let mut request = |method: &str, params: Value| -> Result<Value, String> {
-        id += 1;
-        writeln!(
-            input,
-            "{}",
-            json!({"jsonrpc":"2.0","id":id,"method":method,"params":params})
-        )
-        .and_then(|_| input.flush())
-        .map_err(|e| e.to_string())?;
-        let response = rx
-            .recv_timeout(Duration::from_secs(60))
-            .map_err(|e| e.to_string())??;
-        if response["id"] != id {
-            return Err("MCP response id mismatch".into());
-        }
-        if response.get("error").is_some() {
-            return Err(format!("MCP {method}: {}", response["error"]));
-        }
-        Ok(response["result"].clone())
-    };
-    let list = request("tools/list", json!({}))?;
-    let tools = list["tools"].as_array().ok_or("MCP tools missing")?;
-    let expected = package["contributes"]["languageModelTools"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|t| t["name"].as_str().unwrap())
-        .collect::<BTreeSet<_>>();
-    ensure(
-        tools
-            .iter()
-            .map(|t| t["name"].as_str().unwrap())
-            .collect::<BTreeSet<_>>()
-            == expected,
-        "MCP must expose the extension tool surface",
-    )?;
-    for tool in tools {
-        ensure(
-            tool["description"].as_str().is_some_and(|s| !s.is_empty())
-                && tool["inputSchema"]["type"] == "object",
-            "MCP tool description/schema",
-        )?;
-    }
-    for (name, args, expected) in [
-        (
-            "paradoxcode_rules",
-            json!({"key":"add_army_tradition"}),
-            "add_army_tradition",
-        ),
-        ("paradoxcode_rules", json!({}), "at least one"),
-        (
-            "paradoxcode_validate_text",
-            json!({"files":[{"path":"events/mcp_smoke.txt","text":"bad_key = yes\n"}]}),
-            "diagnostic",
-        ),
-        ("paradoxcode_workspace", json!({}), "Game: eu4"),
-        (
-            "paradoxcode_loc_get",
-            json!({"key":"definitely_missing_localisation_key_xyz"}),
-            "No localisation key",
-        ),
-    ] {
-        let result = request("tools/call", json!({"name":name,"arguments":args}))?;
-        ensure(
-            result["isError"] != true
-                && result["content"][0]["type"] == "text"
-                && result["content"][0]["text"]
-                    .as_str()
-                    .is_some_and(|s| s.contains(expected)),
-            "MCP tool execution contract",
-        )?;
-    }
-    ensure(request("ping", json!({}))? == json!({}), "MCP ping")?;
-
-    drop(input);
-    let deadline = Instant::now() + Duration::from_secs(15);
-    loop {
-        if let Some(status) = child.0.try_wait().map_err(|e| e.to_string())? {
-            ensure(status.success(), "MCP must exit cleanly after stdin closes")?;
-            break;
-        }
-        if Instant::now() >= deadline {
-            return Err("MCP did not exit after stdin closed".into());
-        }
-        std::thread::sleep(Duration::from_millis(10));
-    }
-    Ok(())
+    Ok("LSP end-to-end contracts passed".into())
 }

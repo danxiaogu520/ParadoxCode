@@ -193,5 +193,9 @@
   "ParadoxCode: quoted content needs no further encoding.": "ParadoxCode：引号内内容无需进一步编码。",
   "ParadoxCode: quoted content contains no escape sequences to decode.": "ParadoxCode：引号内内容没有需要解码的转义序列。",
   "ParadoxCode: encoded readable quoted content in {0}; existing escapes and comments were preserved (backup: {1}).": "ParadoxCode：已编码 {0} 引号内的可读内容，已有转义序列和注释保持不变（备份：{1}）。",
-  "ParadoxCode: decoded quoted content in {0}; comments were preserved (backup: {1}).": "ParadoxCode：已解码 {0} 引号内的转义序列，注释保持不变（备份：{1}）。"
+  "ParadoxCode: decoded quoted content in {0}; comments were preserved (backup: {1}).": "ParadoxCode：已解码 {0} 引号内的转义序列，注释保持不变（备份：{1}）。",
+  "The request was cancelled before the ParadoxCode server became available.": "请求已取消，ParadoxCode 服务器尚未就绪。",
+  "The ParadoxCode language server is starting or restarting; retry shortly.": "ParadoxCode 语言服务器正在启动或重启，请稍后重试。",
+  "The ParadoxCode language server is not running. Open an EU4 workspace (or run \"ParadoxCode: Reload Language Server\") and retry.": "ParadoxCode 语言服务器未运行。请打开 EU4 工作区（或运行“ParadoxCode: Reload Language Server”）后重试。",
+  "{0} timed out after {1}s": "{0} 在 {1} 秒后超时"
 }

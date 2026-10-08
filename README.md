@@ -18,20 +18,19 @@ shared language mechanisms from the EU4 rule package; EU4 is the supported game 
 - Workspace analysis across your Mod, dependencies, and a local Vanilla index.
 - Mission-tree preview and manual Chinese localisation encoding/decoding in VS Code;
   experimental transparent decoded views are available by opt-in.
-- Read-only workspace queries and draft validation for VS Code agents and MCP clients.
 
 ## Start using it
 
 Install [ParadoxCode from Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=paradoxcode.paradoxcode-vscode).
 The [VS Code guide](editors/vscode/README.md#setup) covers installation, first use, and troubleshooting.
 For another editor, see the [language-server integration guide](crates/pdc/README.md).
-For an agent client, see the [MCP guide](crates/pdc/README.md#mcp-server).
+MCP integration is maintained separately in the `ParadoxCodeMCP` project, which connects to this language server as an external process.
 
 ## Find the right reference
 
 | I want to… | Start here |
 | --- | --- |
-| Configure the extension | [Generated settings, commands, and tool reference](editors/vscode/REFERENCE.md) |
+| Configure the extension | [Generated settings and commands reference](editors/vscode/REFERENCE.md) |
 | Understand a diagnostic | [Diagnostic guide](crates/ide/DIAGNOSTICS.md) |
 | Build, test, or contribute | [Contributor guide](CONTRIBUTING.md) |
 | Understand the architecture | [Architecture and crate dependencies](CONTRIBUTING.md#architecture) |

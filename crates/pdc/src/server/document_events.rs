@@ -155,7 +155,7 @@ impl LspServer {
             method if is_snapshot_request(method) => {
                 // Position-bound requests resolve through open documents; this
                 // lazily stages the disk text for scanned files no editor ever
-                // opened (agent tooling passes bare paths, and decoded views
+                // opened (external clients passes bare paths, and decoded views
                 // sync the `pdcloc://` twin rather than the `file://` URI).
                 self.ensure_snapshot_request_document(params);
                 SnapshotRequestContext::new(
