@@ -34,6 +34,7 @@ ParadoxCode 是面向《欧陆风云 IV》模组开发的独立开源语言工�
 | 理解架构 | [架构与 crate 依赖](CONTRIBUTING.md#architecture) |
 | 维护 EU4 规则 | [规则包指南](rules/README.md)与[语言语义](crates/rules/LANGUAGE.md) |
 | 运行本地语料或性能审计 | [本地实验工具](lab/README.md) |
+| 评审编辑器搜索设计 | [搜索提案：草案，尚未实现](SEARCH-PROPOSAL.md) |
 | 维护或发布项目 | [治理约定](GOVERNANCE.md)与[发布手册](RELEASING.md) |
 
 已发布版本以徽章和 [GitHub Releases](https://github.com/danxiaogu520/ParadoxCode/releases) 为准；
