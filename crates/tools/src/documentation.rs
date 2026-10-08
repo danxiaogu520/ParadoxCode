@@ -105,20 +105,6 @@ fn extension_reference(package: &Value, nls: &Value) -> Result<String, String> {
             cell(&text(command.get("title"), nls)?)
         ));
     }
-    out.push_str("\n## Agent tools\n\nThe MCP adapter uses this same manifest. Input schemas and bounds below belong to the tool definitions.\n\n");
-    for tool in package["contributes"]["languageModelTools"]
-        .as_array()
-        .into_iter()
-        .flatten()
-    {
-        out.push_str(&format!(
-            "### `{}`\n\n{}\n\nPrompt reference: `#{}`.\n\n```json\n{}\n```\n\n",
-            tool["name"].as_str().unwrap_or_default(),
-            text(tool.get("modelDescription"), nls)?,
-            tool["toolReferenceName"].as_str().unwrap_or_default(),
-            pretty(&localized(&tool["inputSchema"], nls)?)?
-        ));
-    }
     Ok(out)
 }
 

@@ -226,11 +226,10 @@ fn selected_game_rejects_a_mismatched_rules_artifact() {
 
 #[test]
 fn position_requests_serve_scanned_files_no_editor_opened() {
-    // Agent tooling (the extension's hover/references tools and the MCP
-    // server, whose pdc instance never receives didOpen) addresses workspace
-    // files by bare `file://` URIs. Position requests must lazily stage the
+    // External clients (including the independent MCP adapter) can address workspace
+    // files by bare `file://` URIs without sending didOpen. Position requests must stage the
     // scanned disk text instead of answering "document is not open".
-    let root = std::env::temp_dir().join(format!("pdc-agent-{}", std::process::id()));
+    let root = std::env::temp_dir().join(format!("pdc-query-{}", std::process::id()));
     let missions = root.join("missions");
     fs::create_dir_all(&missions).expect("create missions fixture dir");
     let path = missions.join("EDG_FDMMissions.txt");
@@ -240,7 +239,7 @@ fn position_requests_serve_scanned_files_no_editor_opened() {
     let root_uri = file_uri_string(&root);
     let unknown_uri = file_uri_string(&root.join("missions").join("missing.txt"));
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"agent-fixture"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"query-fixture"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":4}}}),
         json!({"jsonrpc":"2.0","id":3,"method":"textDocument/references","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":4},"context":{"includeDeclaration":true}}}),

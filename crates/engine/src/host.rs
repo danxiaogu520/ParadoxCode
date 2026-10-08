@@ -1752,7 +1752,7 @@ impl AnalysisHost {
     }
 
     /// Opens a disk-backed document on demand for a request that addresses a
-    /// scanned file no editor ever opened (agent tooling passes bare paths,
+    /// scanned file no editor ever opened (external clients passes bare paths,
     /// and the editor's decoded views open the `pdcloc://` twin instead of the
     /// `file://` URI). The entry mirrors what [`Self::close_document`] leaves
     /// behind, so a later `didOpen` of the same URI still succeeds. Returns
