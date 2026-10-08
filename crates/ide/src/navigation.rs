@@ -173,7 +173,7 @@ pub fn references_with_cancellation(
 
 /// Script-zone definition kinds that currently define the given name, case-insensitively.
 ///
-/// Localisation-file definitions are excluded so name-driven agent queries stay in the script
+/// Localisation-file definitions are excluded so name-driven client queries stay in the script
 /// zone; scripted localisation (`defined_text`) is a script-file definition and is retained.
 #[must_use]
 pub fn symbol_kinds_for_name(snapshot: &AnalysisSnapshot, name: &str) -> Vec<String> {
