@@ -10,6 +10,7 @@ mod localisation;
 mod navigation;
 mod rename;
 mod scope;
+mod search;
 mod semantic;
 mod semantic_tokens;
 mod support;

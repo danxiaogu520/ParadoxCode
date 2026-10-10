@@ -66,8 +66,8 @@ jobs:
           cache-dependency-path: editors/vscode/package-lock.json
       - run: npm ci --prefix editors/vscode --no-audit --no-fund
       - run: npm --prefix editors/vscode run compile
-      - name: Asset, icon picker, localisation and server path regressions
-        run: node --test editors/vscode/test/{assets,icon-picker,loc-format,server-path}.mjs
+      - name: Asset, icon picker, localisation, server path and search regressions
+        run: node --test editors/vscode/test/{assets,icon-picker,loc-format,server-path,search}.mjs
       - name: Audit production dependencies
         run: npm --prefix editors/vscode audit --omit=dev --audit-level=high
 

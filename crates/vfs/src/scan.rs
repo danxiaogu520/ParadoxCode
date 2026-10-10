@@ -625,6 +625,25 @@ pub fn read_source_file(
     .flatten()
 }
 
+/// Reads source text and the metadata of the same opened file for reusable content caches.
+/// Archive entries return their container metadata; ordinary scan readers keep their text-only API.
+pub fn read_source_file_with_metadata(
+    path: &std::path::Path,
+    limits: WorkspaceScanLimits,
+    report: &mut WorkspaceScanReport,
+    source_encoding: SourceEncoding,
+) -> Option<(String, Option<fs::Metadata>)> {
+    read_source_file_with_metadata_cancellable(
+        path,
+        limits,
+        report,
+        &WorkspaceScanToken::new(),
+        source_encoding,
+    )
+    .ok()
+    .flatten()
+}
+
 pub fn read_source_file_cancellable(
     path: &std::path::Path,
     limits: WorkspaceScanLimits,
@@ -632,6 +651,17 @@ pub fn read_source_file_cancellable(
     cancellation: &WorkspaceScanToken,
     source_encoding: SourceEncoding,
 ) -> Result<Option<String>, WorkspaceError> {
+    read_source_file_with_metadata_cancellable(path, limits, report, cancellation, source_encoding)
+        .map(|result| result.map(|(text, _)| text))
+}
+
+fn read_source_file_with_metadata_cancellable(
+    path: &std::path::Path,
+    limits: WorkspaceScanLimits,
+    report: &mut WorkspaceScanReport,
+    cancellation: &WorkspaceScanToken,
+    source_encoding: SourceEncoding,
+) -> Result<Option<(String, Option<fs::Metadata>)>, WorkspaceError> {
     cancellation.checkpoint()?;
     if let Some((zip_path, entry)) = split_archive_path(path) {
         return read_archive_entry(
@@ -641,7 +671,8 @@ pub fn read_source_file_cancellable(
             report,
             cancellation,
             source_encoding,
-        );
+        )
+        .map(|result| result.map(|text| (text, fs::metadata(&zip_path).ok())));
     }
     let file = match fs::File::open(path) {
         Ok(file) => file,
@@ -721,13 +752,10 @@ pub fn read_source_file_cancellable(
         );
         return Ok(None);
     }
-    Ok(decode_source_bytes(
-        &bytes,
-        source_encoding,
-        path,
-        limits,
-        report,
-    ))
+    Ok(
+        decode_source_bytes(&bytes, source_encoding, path, limits, report)
+            .map(|text| (text, Some(metadata))),
+    )
 }
 
 /// Decodes raw source bytes into scan text, recording the same recovery notices for
@@ -1464,6 +1492,42 @@ mod tests {
             std::io::Write::write_all(&mut zip, contents.as_bytes()).expect("write entry");
         }
         zip.finish().expect("finish zip");
+    }
+
+    #[test]
+    fn source_reads_return_opened_file_and_archive_container_metadata() {
+        let root = test_directory("source-read-metadata");
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("owned.txt");
+        fs::write(&path, "\u{feff}owned UTF-8 text\n").unwrap();
+        let mut report = WorkspaceScanReport::default();
+        let (text, metadata) = read_source_file_with_metadata(
+            &path,
+            WorkspaceScanLimits::default(),
+            &mut report,
+            SourceEncoding::Utf8,
+        )
+        .unwrap();
+        assert_eq!(text, "\u{feff}owned UTF-8 text\n");
+        assert_eq!(metadata.unwrap().len(), fs::metadata(&path).unwrap().len());
+        let archive = root.join("owned.zip");
+        write_zip(
+            &archive,
+            &[("localisation/owned.yml", "l_english:\nkey:0 \"owned\"\n")],
+        );
+        let (text, metadata) = read_source_file_with_metadata(
+            &PathBuf::from(format!("{}!localisation/owned.yml", archive.display())),
+            WorkspaceScanLimits::default(),
+            &mut report,
+            SourceEncoding::Utf8,
+        )
+        .unwrap();
+        assert!(text.contains("key:0"));
+        assert_eq!(
+            metadata.unwrap().len(),
+            fs::metadata(&archive).unwrap().len()
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     fn scan_paths(root: &std::path::Path, profile: &GameProfile) -> Vec<(String, String)> {

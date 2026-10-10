@@ -4,18 +4,90 @@
 //! rule field. Repeated containers with the same path must never share selectors.
 use crate::HirProperty;
 use rules::query::{QueryContext, SiblingValue};
+use std::borrow::Cow;
 use text::TextRange;
+
+/// Reuses physical-container membership across queries over one source-ordered file.
+pub struct PropertyQueryIndex<'a> {
+    properties: &'a [HirProperty],
+    parents: Vec<Option<usize>>,
+    children: Vec<Vec<&'a HirProperty>>,
+    roots: Vec<&'a HirProperty>,
+    containers: std::collections::BTreeMap<TextRange, usize>,
+}
+
+impl<'a> PropertyQueryIndex<'a> {
+    pub fn new(properties: &'a [HirProperty]) -> Self {
+        let children = crate::scope::property_children(properties);
+        let mut parents = vec![None; properties.len()];
+        for (parent, children) in children.iter().enumerate() {
+            for &child in children {
+                parents[child] = Some(parent);
+            }
+        }
+        let mut containers = std::collections::BTreeMap::new();
+        for (index, property) in properties.iter().enumerate() {
+            if let Some(range) = property.value_range {
+                containers.entry(range).or_insert(index);
+            }
+        }
+        Self {
+            properties,
+            parents,
+            children: children
+                .into_iter()
+                .map(|indices| {
+                    indices
+                        .into_iter()
+                        .map(|index| &properties[index])
+                        .collect()
+                })
+                .collect(),
+            roots: properties
+                .iter()
+                .filter(|property| property.top_level)
+                .collect(),
+            containers,
+        }
+    }
+
+    pub fn for_property(&self, property: &HirProperty) -> PropertyQueryContext<'_> {
+        let index = self
+            .properties
+            .partition_point(|candidate| candidate.key_range < property.key_range);
+        if !self
+            .properties
+            .get(index)
+            .is_some_and(|candidate| candidate.key_range == property.key_range)
+        {
+            return PropertyQueryContext::for_property(self.properties, property);
+        }
+        let siblings = match self.parents[index] {
+            Some(parent) if self.properties[parent].value_range.is_some() => &self.children[parent],
+            Some(_) => return PropertyQueryContext::for_property(self.properties, property),
+            None => &self.roots,
+        };
+        PropertyQueryContext::borrowed(siblings)
+    }
+
+    pub fn in_container(&self, container: TextRange) -> PropertyQueryContext<'_> {
+        match self.containers.get(&container) {
+            Some(&parent) => PropertyQueryContext::borrowed(&self.children[parent]),
+            None => PropertyQueryContext::in_container(self.properties, container),
+        }
+    }
+}
 
 /// Direct properties in one physical script container.
 pub struct PropertyQueryContext<'a> {
-    properties: Vec<&'a HirProperty>,
+    properties: Cow<'a, [&'a HirProperty]>,
     unknown_ranges: &'a [TextRange],
     defer_templates: bool,
 }
 
 impl<'a> PropertyQueryContext<'a> {
     /// Creates the context containing the supplied property, excluding descendants.
-    pub fn for_property(properties: &'a [HirProperty], property: &'a HirProperty) -> Self {
+    pub fn for_property(properties: &'a [HirProperty], property: &HirProperty) -> Self {
         let parent = properties
             .iter()
             .filter(|parent| {
@@ -62,7 +134,15 @@ impl<'a> PropertyQueryContext<'a> {
 
     fn new(properties: Vec<&'a HirProperty>) -> Self {
         Self {
-            properties,
+            properties: Cow::Owned(properties),
+            unknown_ranges: &[],
+            defer_templates: false,
+        }
+    }
+
+    fn borrowed(properties: &'a [&'a HirProperty]) -> Self {
+        Self {
+            properties: Cow::Borrowed(properties),
             unknown_ranges: &[],
             defer_templates: false,
         }
@@ -104,7 +184,7 @@ impl QueryContext for PropertyQueryContext<'_> {
     fn sibling(&self, name: &str) -> SiblingValue<'_> {
         let mut found = None;
         let mut unknown_key = false;
-        for property in &self.properties {
+        for property in self.properties.iter() {
             if self.unknown(property.key_range)
                 || self.defer_templates && property.key.contains('$')
             {
@@ -185,7 +265,7 @@ impl OwnedQueryContext {
 impl PropertyQueryContext<'_> {
     pub(crate) fn to_owned(&self) -> OwnedQueryContext {
         let mut result = OwnedQueryContext::default();
-        for property in &self.properties {
+        for property in self.properties.iter() {
             if self.unknown(property.key_range)
                 || self.defer_templates && property.key.contains('$')
             {
@@ -278,6 +358,53 @@ mod tests {
             ScopeState::initial(ScopeValue::Unknown),
             &Facts,
         )
+    }
+
+    #[test]
+    fn indexed_queries_preserve_repeated_nested_and_recovered_containers() {
+        let ir = rules();
+        for source in [
+            "group = { on_trigger = tag value = AAA } group = { on_trigger = faith value = catholic }",
+            "group = { on_trigger = tag group = { on_trigger = faith value = catholic } value = AAA }",
+            "group = { on_trigger = flag on_trigger = count value = yes } group = { on_trigger = {} value = yes }",
+            "group = { on_trigger = tag value = AAA group = { on_trigger =",
+        ] {
+            let hir = lower(&ir, source, "root");
+            let index = PropertyQueryIndex::new(hir.properties());
+            for property in hir.properties() {
+                let indexed = index.for_property(property);
+                let scanned = PropertyQueryContext::for_property(hir.properties(), property);
+                for name in ["on_trigger", "value", "group", "missing"] {
+                    assert_eq!(indexed.sibling(name), scanned.sibling(name));
+                    assert_eq!(indexed.source_range(name), scanned.source_range(name));
+                }
+                if let Some(range) = property.value_range {
+                    let indexed = index.in_container(range);
+                    let scanned = PropertyQueryContext::in_container(hir.properties(), range);
+                    for name in ["on_trigger", "value", "group"] {
+                        assert_eq!(indexed.sibling(name), scanned.sibling(name));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn indexed_queries_borrow_siblings_in_large_files() {
+        let ir = rules();
+        let source = "group = { on_trigger = tag value = AAA }\n".repeat(2048);
+        let hir = lower(&ir, &source, "root");
+        let index = PropertyQueryIndex::new(hir.properties());
+        for property in hir.properties() {
+            let context = index.for_property(property);
+            assert!(matches!(context.properties, Cow::Borrowed(_)));
+            if property.top_level {
+                assert_eq!(context.properties.len(), 2048);
+            } else {
+                assert_eq!(context.properties.len(), 2);
+                assert_eq!(context.sibling("on_trigger"), SiblingValue::Scalar("tag"));
+            }
+        }
     }
 
     #[test]

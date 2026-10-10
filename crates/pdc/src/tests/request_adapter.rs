@@ -2149,3 +2149,171 @@ fn hover_card_serves_icon_bound_definition() {
     assert_eq!(value["card"]["asset"]["sprite"], "golden_order_icon");
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn editor_search_transport_reads_complete_values_headers_and_utf16_ranges() {
+    let (root, root_uri) = temp_workspace_dir();
+    fs::create_dir_all(root.join("localisation")).unwrap();
+    let source = format!(
+        "l_simp_chinese:\nkey:0 \"{} 🙂 §R帝国§! 改革尾部\"\n",
+        "a".repeat(1400)
+    );
+    let path = root.join("localisation/header_l_english.yml");
+    fs::write(&path, &source).unwrap();
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/editorSearchContext","params":null}),
+        json!({"jsonrpc":"2.0","id":3,"method":"pdc/editorSearch","params":{"tab":"localisation","query":"帝国 改革尾部","language":"simp_chinese"}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"pdc/editorSearch","params":{"tab":"localisation","query":"帝国","language":"english"}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"pdc/editorSearch","params":{"tab":"localisation","query":""}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"pdc/editorSearch","params":{"tab":"localisation","query":"帝国","offset":50,"revision":0}}),
+        json!({"jsonrpc":"2.0","id":7,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).unwrap();
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .unwrap();
+    let responses = decode_frames(&output);
+    let response = |id| {
+        responses
+            .iter()
+            .find(|value| value["id"] == id)
+            .unwrap()
+            .clone()
+    };
+    assert!(
+        response(2)["result"]["languages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|language| language == "simp_chinese")
+    );
+    let result = response(3);
+    assert_eq!(result["result"]["totalMatches"], 1);
+    let entry = &result["result"]["groups"][0]["versions"][0];
+    assert_eq!(entry["name"], "key");
+    assert_eq!(entry["precision"], "match");
+    assert_eq!(entry["location"]["range"]["start"]["line"], 1);
+    let start = source.lines().nth(1).unwrap().find("帝国").unwrap();
+    let utf16 = source.lines().nth(1).unwrap()[..start]
+        .encode_utf16()
+        .count();
+    assert_eq!(entry["location"]["range"]["start"]["character"], utf16);
+    assert_eq!(response(4)["result"]["totalMatches"], 0);
+    assert_eq!(response(5)["result"]["groups"], json!([]));
+    assert_eq!(response(6)["error"]["code"], -32801);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn editor_search_transport_paginates_and_reports_missing_sources() {
+    let (root, root_uri) = temp_workspace_dir();
+    fs::create_dir_all(root.join("localisation")).unwrap();
+    let mut source = "l_english:\n".to_owned();
+    for index in 0..63 {
+        source.push_str(&format!("key_{index:03}:0 \"needle\"\n"));
+    }
+    fs::write(root.join("localisation/paging_l_english.yml"), source).unwrap();
+    fs::create_dir_all(root.join("notes")).unwrap();
+    fs::write(root.join("notes/free.txt"), "# needle needle\n").unwrap();
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/editorSearch","params":{"tab":"localisation","query":"needle"}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"pdc/editorSearch","params":{"tab":"localisation","query":"needle","roots":[999]}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"pdc/editorSearch","params":{"tab":"localisation","query":"needle","roots":[]}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"pdc/editorSearch","params":{"tab":"text","query":"needle","include":["notes/**"]}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"pdc/editorSearch","params":{"tab":"rules","query":"add_army_tradition","context":"effect","scope":"country"}}),
+        json!({"jsonrpc":"2.0","id":7,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).unwrap();
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .unwrap();
+    let responses = decode_frames(&output);
+    let response = |id| {
+        responses
+            .iter()
+            .find(|value| value["id"] == id)
+            .unwrap()
+            .clone()
+    };
+    let first = response(2);
+    assert_eq!(first["result"]["totalGroups"], 63);
+    assert_eq!(first["result"]["groups"].as_array().unwrap().len(), 50);
+    assert_eq!(first["result"]["nextOffset"], 50);
+    assert_eq!(response(3)["error"]["code"], INVALID_PARAMS);
+    assert_eq!(response(4)["result"]["totalMatches"], 0);
+    assert_eq!(response(5)["result"]["totalGroups"], 1);
+    assert_eq!(response(5)["result"]["totalMatches"], 2);
+    assert!(
+        response(6)["result"]["groups"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|group| group["versions"][0]["name"] == "add_army_tradition")
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn editor_search_transport_uses_unsaved_replacements_and_removes_deleted_entries() {
+    let (root, root_uri) = temp_workspace_dir();
+    fs::create_dir_all(root.join("localisation")).unwrap();
+    fs::create_dir_all(root.join("events")).unwrap();
+    let path = root.join("localisation/overlay_l_english.yml");
+    let disk = "l_english:\nold_key:0 \"disk value\"\n";
+    fs::write(&path, disk).unwrap();
+    let uri = file_uri_string(&path);
+    let event_uri = file_uri_string(&root.join("events/new.txt"));
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"localisation","version":1,"text":"l_simp_chinese:\nnew_key:0 \"新值\"\n"}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":event_uri,"languageId":"eu4","version":1,"text":"country_event = { id = unsaved.1 }\n"}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdc/editorSearchContext"}),
+        json!({"jsonrpc":"2.0","id":3,"method":"pdc/editorSearch","params":{"tab":"localisation","query":"新值","language":"simp_chinese"}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"pdc/editorSearch","params":{"tab":"localisation","query":"disk value"}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":uri,"version":2},"contentChanges":[{"text":"l_simp_chinese:\n"}]}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"pdc/editorSearch","params":{"tab":"localisation","query":"新值"}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).unwrap();
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .unwrap();
+    let responses = decode_frames(&output);
+    let response = |id| {
+        responses
+            .iter()
+            .find(|value| value["id"] == id)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(response(2)["result"]["languages"], json!(["simp_chinese"]));
+    assert!(
+        response(2)["result"]["kinds"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|kind| kind == "event")
+    );
+    let result = response(3);
+    assert_eq!(result["result"]["totalMatches"], 1);
+    assert_eq!(
+        result["result"]["groups"][0]["versions"][0]["name"],
+        "new_key"
+    );
+    assert_eq!(result["result"]["groups"][0]["versions"][0]["version"], 1);
+    assert_eq!(response(4)["result"]["totalMatches"], 0);
+    assert_eq!(response(5)["result"]["totalMatches"], 0);
+    assert_eq!(fs::read_to_string(path).unwrap(), disk);
+    fs::remove_dir_all(root).unwrap();
+}

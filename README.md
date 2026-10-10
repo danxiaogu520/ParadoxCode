@@ -36,6 +36,7 @@ MCP integration is maintained separately in the `ParadoxCodeMCP` project, which 
 | Understand the architecture | [Architecture and crate dependencies](CONTRIBUTING.md#architecture) |
 | Maintain EU4 rules | [Rule-package guide](rules/README.md) and [language semantics](crates/rules/LANGUAGE.md) |
 | Run local corpus/performance audits | [Local experiment tools](lab/README.md) |
+| Review the proposed editor search | [Search proposal — draft, not implemented](SEARCH-PROPOSAL.md) |
 | Maintain or publish the project | [Governance](GOVERNANCE.md) and [release runbook](RELEASING.md) |
 
 Current published versions are shown by the badges above and the

@@ -190,6 +190,7 @@
     "workspaceContains:**/localisation/**/*"
   ],
   "main": "./out/extension.js",
+  "l10n": "./l10n",
   "contributes": {
     "languages": [
       {
@@ -698,6 +699,12 @@
         "title": "%commands.localisation.decodeFile.title%",
         "category": "ParadoxCode",
         "icon": "$(arrow-down)"
+      },
+      {
+        "command": "paradoxcode.openSearch",
+        "title": "%command.openSearch.title%",
+        "category": "ParadoxCode",
+        "icon": "$(search)"
       }
     ],
     "menus": {
@@ -716,6 +723,11 @@
           "command": "paradoxcode.localisation.encodeFile",
           "when": "config.paradoxcode.localisation.transparentEncoding == false && resourceScheme == file && paradoxcode.transcodeEligible",
           "group": "navigation@5"
+        },
+        {
+          "command": "paradoxcode.openSearch",
+          "when": "editorLangId == eu4 || editorLangId == localisation",
+          "group": "navigation@3"
         }
       ],
       "commandPalette": [
@@ -1117,6 +1129,7 @@
     "out/**",
     "node_modules/**",
     "media/**",
+    "l10n/**",
     "syntaxes/**",
     "language-configuration.json",
     "localisation-language-configuration.json",

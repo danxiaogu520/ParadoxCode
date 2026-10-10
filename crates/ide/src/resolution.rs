@@ -506,6 +506,9 @@ pub(crate) fn symbol_candidates(
         .iter()
         .filter(|definition| definition.kind == kind && same_name(&definition.name, name))
         .filter(|definition| {
+            snapshot.source_is_effective(definition.document.as_ref(), definition.file)
+        })
+        .filter(|definition| {
             definition
                 .file
                 .is_none_or(|file| !overlay_files.contains(&file) || definition.document.is_some())
@@ -520,7 +523,9 @@ pub(crate) fn symbol_candidates(
     // when an overlay supplied a same-named semantic definition: merge/unique policies need to
     // see every candidate, while overlay files hide their corresponding disk entries.
     for definition in snapshot.index().definitions(kind, name) {
-        if overlay_files.contains(&definition.file_id) {
+        if overlay_files.contains(&definition.file_id)
+            || !snapshot.source_is_effective(None, Some(definition.file_id))
+        {
             continue;
         }
         candidates.push(index_definition(snapshot, definition));
@@ -546,6 +551,7 @@ pub(crate) fn symbol_candidates_for_hover(
     cancellation: &CancellationToken,
 ) -> Result<Vec<ResolutionDefinition>, Cancelled> {
     let overlay_files = overlay_file_ids(snapshot);
+    let suppressed = snapshot.suppressed_overlay_documents();
     let mut candidates = Vec::new();
     for document in snapshot
         .documents()
@@ -553,6 +559,9 @@ pub(crate) fn symbol_candidates_for_hover(
         .filter(|document| document.source() == DocumentSource::Overlay)
     {
         cancellation.checkpoint()?;
+        if suppressed.contains(document.id()) {
+            continue;
+        }
         let Some(input) = input_for_document(snapshot, document.id()) else {
             continue;
         };
@@ -744,7 +753,9 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
             {
                 context.overlay_files.insert(file);
             }
-            if suppressed.contains(document.id()) {
+            if suppressed.contains(document.id())
+                || !snapshot.source_is_effective(Some(document.id()), None)
+            {
                 continue;
             }
             let Some(input) = input_for_document(snapshot, document.id()) else {
@@ -797,7 +808,12 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
                 .index()
                 .definitions(kind, name)
                 .into_iter()
-                .filter(|definition| !self.overlay_files.contains(&definition.file_id))
+                .filter(|definition| {
+                    !self.overlay_files.contains(&definition.file_id)
+                        && self
+                            .snapshot
+                            .source_is_effective(None, Some(definition.file_id))
+                })
                 .map(|definition| index_definition(self.snapshot, definition)),
         );
         if kind.eq_ignore_ascii_case("localisation") {
@@ -822,62 +838,28 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
 /// shadow itself. The winner is the decoded twin (the surface being edited);
 /// same-scheme spelling twins fall back to id order for determinism. The
 /// losers' disk shards stay hidden either way: `overlay_files` keys paths.
-fn twin_suppressed_overlays(snapshot: &AnalysisSnapshot) -> BTreeSet<DocumentId> {
-    let mut owner: HashMap<&std::path::Path, &DocumentId> = HashMap::new();
-    for document in snapshot
-        .documents()
-        .values()
-        .filter(|document| document.source() == DocumentSource::Overlay)
-    {
-        let Some(path) = document.path() else {
-            continue;
-        };
-        match owner.get(path) {
-            Some(current) if !overlay_twin_replaces(current, document.id()) => {}
-            _ => {
-                owner.insert(path, document.id());
-            }
-        }
-    }
-    snapshot
-        .documents()
-        .values()
-        .filter(|document| document.source() == DocumentSource::Overlay)
-        .filter_map(|document| {
-            let path = document.path()?;
-            owner
-                .get(path)
-                .is_some_and(|owner| *owner != document.id())
-                .then(|| document.id().clone())
-        })
-        .collect()
+pub(crate) fn twin_suppressed_overlays(snapshot: &AnalysisSnapshot) -> BTreeSet<DocumentId> {
+    snapshot.suppressed_overlay_documents()
 }
 
-/// Whether `candidate` takes over the effective-text role of `current` for
-/// one backing path: a decoded `pdcloc://` twin outranks its raw `file://`
-/// twin; twins sharing a scheme resolve to id order so the winner never
-/// depends on map iteration order.
-fn overlay_twin_replaces(current: &DocumentId, candidate: &DocumentId) -> bool {
-    match (
-        is_decoded_view_uri(current.as_str()),
-        is_decoded_view_uri(candidate.as_str()),
-    ) {
-        (false, true) => true,
-        (true, false) => false,
-        _ => candidate > current,
-    }
+/// Common declaration order for point resolution and batched search activity.
+pub(crate) fn resolution_order(
+    priority: u64,
+    path: Option<&LogicalPath>,
+    range: TextRange,
+    selection: TextRange,
+) -> (u64, &str, u32, u32, u32) {
+    (
+        priority,
+        path.map_or("", LogicalPath::as_str),
+        range.start(),
+        range.end(),
+        selection.start(),
+    )
 }
 
-fn is_decoded_view_uri(uri: &str) -> bool {
-    uri.split_once(':')
-        .is_some_and(|(scheme, _)| scheme.eq_ignore_ascii_case("pdcloc"))
-}
-
-/// Retains the highest-priority candidates and orders them oldest-first so the
-/// last entry is the effective definition under the game's
-/// later-definition-wins rule. Priorities order candidates across source
-/// roots; within one priority, file paths and in-file positions approximate
-/// the load order.
+/// Retains the winning source layer and orders its declarations by path and position.
+/// The final declaration is the resolver's effective version.
 pub(crate) fn retain_highest_and_order(
     mut candidates: Vec<ResolutionDefinition>,
 ) -> Vec<ResolutionDefinition> {
@@ -888,39 +870,39 @@ pub(crate) fn retain_highest_and_order(
         .unwrap_or(0);
     candidates.retain(|candidate| candidate.priority == highest);
     candidates.sort_by(|left, right| {
-        symbol_location_sort_key(&left.location)
-            .cmp(&symbol_location_sort_key(&right.location))
-            .then_with(|| {
-                left.selection_range
-                    .start()
-                    .cmp(&right.selection_range.start())
-            })
+        resolution_order(
+            left.priority,
+            left.location.path.as_ref(),
+            left.location.range,
+            left.selection_range,
+        )
+        .cmp(&resolution_order(
+            right.priority,
+            right.location.path.as_ref(),
+            right.location.range,
+            right.selection_range,
+        ))
     });
     candidates
 }
 
 pub(crate) fn definition_priority(snapshot: &AnalysisSnapshot, definition: &DefinitionInfo) -> u64 {
-    if definition.document.is_some() {
-        return 20_000;
+    if let Some(file) = definition.file {
+        return definition_priority_for_file(snapshot, file);
     }
-    let Some(file) = definition
-        .file
-        .and_then(|id| snapshot.source_files().get(&id))
-    else {
-        return 0;
-    };
-    let Some(root) = snapshot
-        .source_roots()
-        .iter()
-        .find(|root| root.id == file.root_id)
-    else {
-        return 0;
-    };
-    match root.kind {
-        engine::SourceRootKind::Vanilla => 0,
-        engine::SourceRootKind::Dependency => 1_000 + u64::from(root.order),
-        engine::SourceRootKind::Project => 10_000 + u64::from(root.order),
-    }
+    definition
+        .document
+        .as_ref()
+        .and_then(|id| snapshot.document(id))
+        .and_then(|document| document.path())
+        .and_then(|path| {
+            snapshot
+                .source_roots()
+                .iter()
+                .filter(|root| path.starts_with(&root.path))
+                .max_by_key(|root| root.path.as_os_str().len())
+        })
+        .map_or(20_000, vfs::root_priority)
 }
 
 pub(crate) fn index_definition(
@@ -1016,12 +998,9 @@ pub(crate) fn definition_priority_for_file(snapshot: &AnalysisSnapshot, id: Sour
     else {
         return 0;
     };
-    match root.kind {
-        engine::SourceRootKind::Vanilla => 0,
-        engine::SourceRootKind::Dependency => 1_000 + u64::from(root.order),
-        engine::SourceRootKind::Project => 10_000 + u64::from(root.order),
-    }
+    vfs::root_priority(root)
 }
+
 pub(crate) fn symbol_at(
     all: &SemanticWorkspace,
     document: &DocumentId,

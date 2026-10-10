@@ -33,6 +33,7 @@ type MemoKey = (Box<str>, Box<str>);
 pub struct ReferenceIndexStore {
     path: PathBuf,
     memo: Mutex<HashMap<MemoKey, MemoEntry>>,
+    attached_stamp: Option<(u64, std::time::SystemTime)>,
 }
 
 impl ReferenceIndexStore {
@@ -44,7 +45,39 @@ impl ReferenceIndexStore {
         Self {
             path: path.to_path_buf(),
             memo: Mutex::new(HashMap::new()),
+            attached_stamp: cache_stamp(path),
         }
+    }
+
+    pub(crate) fn availability_issue(&self) -> Option<String> {
+        let stamp = cache_stamp(&self.path);
+        if stamp.is_none() {
+            return Some(format!(
+                "{}: reference cache is unavailable; restore or reload the index",
+                self.path.display()
+            ));
+        }
+        if stamp != self.attached_stamp {
+            return Some(format!(
+                "{}: reference cache changed after loading; reload the index",
+                self.path.display()
+            ));
+        }
+        let readable = rusqlite::Connection::open_with_flags(
+            &self.path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .and_then(|connection| {
+            connection
+                .prepare("SELECT file_id FROM symbol_references LIMIT 0")
+                .map(|_| ())
+        });
+        readable.err().map(|error| {
+            format!(
+                "{}: reference cache cannot be read: {error}",
+                self.path.display()
+            )
+        })
     }
 
     /// All references for one `(kind, name)` pair, case-insensitive, each
@@ -122,4 +155,9 @@ impl ReferenceIndexStore {
         }
         references
     }
+}
+
+fn cache_stamp(path: &Path) -> Option<(u64, std::time::SystemTime)> {
+    let metadata = std::fs::metadata(path).ok()?;
+    Some((metadata.len(), metadata.modified().ok()?))
 }

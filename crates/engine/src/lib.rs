@@ -8,7 +8,10 @@ mod fingerprint;
 mod host;
 mod index_cache;
 mod query_cache;
+mod search_text;
 mod snapshot;
+mod source_resolution;
+pub use search_text::{SEARCH_FILE_BYTES, SEARCH_TEXT_BYTES, SearchTextFile, SearchTexts};
 /// Structured dependency and source-writing mechanisms, independent of game packages.
 pub mod structure;
 mod texture;
@@ -17,6 +20,7 @@ pub use fingerprint::workspace_context_fingerprint;
 pub use host::AnalysisHost;
 pub use query_cache::{CacheDomain, SnapshotQueryCache};
 pub use snapshot::AnalysisSnapshot;
+pub use source_resolution::prefer_overlay_document;
 pub use texture::{
     TextureCatalog, TextureCatalogChildren, TextureCatalogHit, TextureResolution,
     normalize_asset_path,

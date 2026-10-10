@@ -222,6 +222,7 @@ pub fn check(ext: &Path) -> Result<Vec<String>, String> {
 
     for (name, media, html) in [
         ("missionPreviewStrings", "renderer.js", "index.html"),
+        ("searchPanelStrings", "search.js", "search.html"),
         (
             "missionIconPickerStrings",
             "icon-picker.js",
