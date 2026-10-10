@@ -70,7 +70,7 @@ fn symbol_hover_explains_active_and_shadowed_source_roots() {
             id: SourceRootId::new(2),
             kind: SourceRootKind::Project,
             path: AbsPath::normalize(&current),
-            order: 0,
+            order: 1,
             writable: true,
         },
     ]));

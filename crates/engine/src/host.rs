@@ -1850,6 +1850,7 @@ impl AnalysisHost {
             localisation_previews: Arc::clone(&self.localisation_previews),
             query_cache: Arc::clone(&self.query_cache),
             scan_limits: self.scan_limits,
+            scan_filters: Arc::clone(&self.scan_filters),
             preferred_localisation_languages: Arc::clone(&self.preferred_localisation_languages),
             completion_source_layers: Arc::clone(&self.completion_source_layers),
             texture_catalog: self.texture_catalog(),

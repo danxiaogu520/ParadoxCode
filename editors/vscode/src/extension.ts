@@ -14,6 +14,7 @@ import { FileTeeDebugChannel } from './debugChannel';
 import { registerAgentTools } from './agent/register';
 import { setAgentClient } from './agent/server';
 import { LoadedFilesProvider } from './fileExplorer';
+import { SearchPanel } from './searchPanel';
 import { MissionPreviewPanel } from './previewPanel';
 import { MissionIconPickerPanel } from './iconPickerPanel';
 import {
@@ -221,6 +222,7 @@ function handleServerReady(
     const wasReady = serverReady;
     setServerReady(true);
     updateStatus(readyClient.state);
+    searchPanel?.refresh();
     if (!wasReady) {
         // The main channel deliberately shows only basic output; readiness is
         // the one milestone users wait for during the first index load.
@@ -1636,6 +1638,7 @@ async function installServer(context: vscode.ExtensionContext): Promise<boolean>
 }
 
 let loadedFilesProvider: LoadedFilesProvider;
+let searchPanel: SearchPanel | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? 'none';
@@ -1681,7 +1684,10 @@ export function activate(context: vscode.ExtensionContext): void {
             });
     };
 
+    searchPanel = new SearchPanel(context.extensionUri, () => client, () => serverReady);
     context.subscriptions.push(
+        searchPanel,
+        vscode.commands.registerCommand('paradoxcode.openSearch', () => searchPanel?.show()),
         vscode.commands.registerCommand('paradoxcode.showMissionPreview', () => {
             MissionPreviewPanel.show(context.extensionUri, client);
         }),

@@ -5,14 +5,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use rules::ir::RulesIr;
-use rules::{FileResolutionPolicy, GameProfile, RuleSet};
+use rules::{GameProfile, RuleSet};
 use text::{AbsPath, LogicalPath, TextRange};
 
 use crate::query_cache::SnapshotQueryCache;
 use index::prepare_document_snapshot_with_ir;
 use index::{DocumentSnapshot, FileState, PreparedDocument};
 use index::{LocalisationPreviewMap, Reference, WorkspaceIndex};
-use vfs::scan::root_priority;
 use vfs::{
     DocumentId, DocumentSource, LocalisationPreview, ResolvedCandidate, SourceFile, SourceFileId,
     SourceRoot, SourceRootKind, WorkspaceScanLimits, WorkspaceScanReport,
@@ -43,6 +42,7 @@ pub struct AnalysisSnapshot {
     pub(crate) localisation_previews: Arc<LocalisationPreviewMap>,
     pub(crate) query_cache: Arc<SnapshotQueryCache>,
     pub(crate) scan_limits: WorkspaceScanLimits,
+    pub(crate) scan_filters: Arc<vfs::WorkspaceScanFilters>,
     pub(crate) preferred_localisation_languages: Arc<[String]>,
     pub(crate) completion_source_layers: Arc<[SourceRootKind]>,
     pub(crate) texture_catalog: Arc<crate::texture::TextureCatalog>,
@@ -135,6 +135,16 @@ impl AnalysisSnapshot {
         references
     }
 
+    /// Backing reference stores that no longer represent the installed semantic snapshot.
+    /// Existing query contracts remain unchanged; clients requiring completeness can report these.
+    #[must_use]
+    pub fn reference_source_issues(&self) -> Vec<(vfs::SourceRootId, String)> {
+        self.reference_sources
+            .iter()
+            .filter_map(|(root, store)| store.availability_issue().map(|issue| (*root, issue)))
+            .collect()
+    }
+
     /// Returns the immutable game-specific interpretation selected for this snapshot.
     #[must_use]
     pub fn game_profile(&self) -> &GameProfile {
@@ -207,6 +217,12 @@ impl AnalysisSnapshot {
         &self.source_files
     }
 
+    /// Shares the immutable file catalogue; its identity survives unrelated document edits.
+    #[must_use]
+    pub fn source_files_handle(&self) -> Arc<BTreeMap<SourceFileId, SourceFile>> {
+        Arc::clone(&self.source_files)
+    }
+
     /// Resolves the stable id of one scanned file by physical path.
     ///
     /// The map is maintained by the workspace scan and targeted disk-change pipelines, so the
@@ -247,69 +263,7 @@ impl AnalysisSnapshot {
     /// Resolves one logical path, retaining lower-priority candidates as shadowed entries.
     #[must_use]
     pub fn resolve(&self, logical_path: &LogicalPath) -> Vec<ResolvedCandidate> {
-        let mut candidates = self
-            .source_files
-            .values()
-            .filter(|file| &file.logical_path == logical_path)
-            .map(|file| {
-                let priority = self
-                    .roots
-                    .iter()
-                    .find(|root| root.id == file.root_id)
-                    .map_or(0, root_priority);
-                ResolvedCandidate {
-                    logical_path: logical_path.clone(),
-                    file_id: Some(file.id),
-                    document_id: None,
-                    priority,
-                    resolution: Some(file.resolution),
-                    active: false,
-                }
-            })
-            .collect::<Vec<_>>();
-        for document in self.documents.values() {
-            let Some(path) = document.path() else {
-                continue;
-            };
-            let Some(root) = self.roots.iter().find(|root| path.starts_with(&root.path)) else {
-                continue;
-            };
-            let Ok(relative) = path
-                .strip_prefix(&root.path)
-                .map(|value| LogicalPath::parse(&value.to_string_lossy()))
-            else {
-                continue;
-            };
-            if relative.as_ref().is_ok_and(|value| value == logical_path) {
-                candidates.push(ResolvedCandidate {
-                    logical_path: logical_path.clone(),
-                    file_id: None,
-                    document_id: Some(document.id().clone()),
-                    priority: 20_000,
-                    resolution: None,
-                    active: false,
-                });
-            }
-        }
-        candidates.sort_by_key(|candidate| std::cmp::Reverse(candidate.priority));
-        let overlay_present = candidates
-            .iter()
-            .any(|candidate| candidate.document_id.is_some());
-        if overlay_present {
-            if let Some(first) = candidates.first_mut() {
-                first.active = true;
-            }
-        } else if candidates
-            .first()
-            .is_some_and(|candidate| candidate.resolution == Some(FileResolutionPolicy::Merge))
-        {
-            for candidate in &mut candidates {
-                candidate.active = true;
-            }
-        } else if let Some(first) = candidates.first_mut() {
-            first.active = true;
-        }
-        candidates
+        self.resolution_candidates(logical_path)
     }
 
     /// Returns the current text for a disk file, if it was scanned.
@@ -343,6 +297,12 @@ impl AnalysisSnapshot {
     #[must_use]
     pub const fn scan_limits(&self) -> WorkspaceScanLimits {
         self.scan_limits
+    }
+
+    /// Source-root exclusions shared by discovery and read-only text searches.
+    #[must_use]
+    pub fn scan_filters(&self) -> &vfs::WorkspaceScanFilters {
+        &self.scan_filters
     }
 
     /// Returns the preferred localisation language order. An empty list means the analysis

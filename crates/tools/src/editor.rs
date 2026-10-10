@@ -32,6 +32,16 @@ pub fn check(root: &Path) -> Result<Vec<String>, String> {
         &mut errors,
     );
     require(
+        package["l10n"] == "./l10n",
+        "VS Code must load runtime translations from ./l10n",
+        &mut errors,
+    );
+    require(
+        strings(&package["files"]).contains("l10n/**"),
+        "VSIX must include runtime translation bundles",
+        &mut errors,
+    );
+    require(
         package["dependencies"]["vscode-languageclient"].is_string(),
         "vscode-languageclient must remain a runtime dependency",
         &mut errors,
@@ -453,9 +463,11 @@ fn package_contract(root: &Path) -> Result<(), String> {
         "node_modules/vscode-languageclient/lib/node/main.js",
         "node_modules/vscode-jsonrpc/lib/node/main.js",
         "node_modules/vscode-languageserver-protocol/lib/common/api.js",
+        "l10n/bundle.l10n.json",
+        "l10n/bundle.l10n.zh-cn.json",
     ] {
         if !files.contains(file) {
-            return Err(format!("VSIX runtime dependency omitted: {file}"));
+            return Err(format!("VSIX runtime asset omitted: {file}"));
         }
     }
     if files.iter().any(|f| {
@@ -547,6 +559,7 @@ pub fn execute(arguments: &[String]) -> Result<String, String> {
                     "icon-picker.mjs",
                     "loc-format.mjs",
                     "server-path.mjs",
+                    "search.mjs",
                     "transparent-loc.mjs",
                 ] {
                     process::run(

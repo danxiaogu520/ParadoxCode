@@ -87,6 +87,7 @@ function host(root, settings = {}) {
             return require(id);
         },
     }, { filename: compiled });
+    state.navigate = uri => exports.openTextDocumentForNavigation(uri);
     state.activate = () => exports.activateTransparentLocalisation({ subscriptions: [] }, { appendLine() {} });
     state.document = (relative) => ({
         uri: Uri.file(join(root, relative)), isDirty: false, getText: () => 'name = "x"\n',
@@ -167,6 +168,17 @@ try {
         assert.equal(visible('commandPalette', 'paradoxcode.localisation.peekOriginal', state), true);
         assert.equal(visible('editor/title', 'paradoxcode.localisation.decodeFile', state), false);
         assert.equal(visible('editor/title', 'paradoxcode.localisation.encodeFile', state), false);
+    });
+
+    await test('search navigation preserves a raw file even when decoded auto-open is enabled', async () => {
+        const state = host(root, { transparentEncoding: true, autoOpen: 'always' });
+        await state.activate();
+        const document = state.document('localisation/navigation.yml');
+        await state.navigate(document.uri);
+        state.show(document); state.emit('open', document);
+        await Promise.resolve(); await Promise.resolve();
+        assert.equal(state.requests.length, 0);
+        assert.equal(state.opens.length, 0);
     });
 
     await test('manual decode and encode update ordinary files and preserve the input backup', async () => {

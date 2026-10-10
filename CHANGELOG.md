@@ -9,6 +9,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A unified ParadoxCode search panel for rules, definitions, localisation values/keys and full
+  text, with independent tab state, source and override filters, references, pagination and
+  precise navigation. Searches include unsaved buffers and preserve existing decoded views.
+
 - Editor-title **Decode Quoted Text** and **Encode Quoted Text** buttons for eligible localisation YML
   and configured script files. Manual conversion keeps the ordinary file view and writes
   a `.pre-transcode.bak` backup before changing the file on disk.
@@ -20,8 +24,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Editor titles keep only **Open Mission Tree Preview to the Side**, **Decode Quoted Text** and
-  **Encode Quoted Text**. Mission preview refresh, the mission icon picker, experimental decoded
+- Editor titles retain **Open Mission Tree Preview to the Side**, **Decode Quoted Text** and
+  **Encode Quoted Text**, alongside the new search entry. Mission preview refresh, the mission icon picker, experimental decoded
   view entry and raw-form peek remain available in the Command Palette, with their existing
   context-menu entries preserved.
 - Transparent encoding and `pdcloc://` decoded views are experimental and disabled by default.
@@ -52,6 +56,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and immutable publication follow verification of every staging upload.
 - CI control and packaging commands support a lightweight tools build without analyzer
   dependencies. Production dependency auditing also runs before merge and tag creation.
+
+### Fixed
+
+- Large script diagnostics avoid repeated whole-file scans of sibling containers, control
+  blocks and display-only ranges, allowing full Vanilla validation to complete.
+- Runtime extension translations are registered and included in VSIX packages.
+- Opening a dependency buffer preserves its configured load priority; merge files retain
+  contributions from other source roots.
 
 ## [0.5.1] - 2026-10-04
 
