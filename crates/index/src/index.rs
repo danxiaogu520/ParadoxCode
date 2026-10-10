@@ -827,6 +827,11 @@ impl WorkspaceIndex {
             .filter_map(|pointer| self.definition_at(*pointer))
     }
 
+    /// Retained semantic type names without walking every definition bucket.
+    pub fn definition_kinds(&self) -> impl Iterator<Item = &str> {
+        self.definitions.keys().map(AsRef::as_ref)
+    }
+
     /// Iterates every retained definition pointer together with its resolution activity.
     ///
     /// Lets analysis layers build their own membership views (for example a per-revision

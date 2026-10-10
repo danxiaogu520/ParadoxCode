@@ -642,6 +642,19 @@ function commandResource(uri: vscode.Uri | undefined): vscode.Uri | undefined {
  */
 const manualRawViews = new Set<string>();
 
+/** Navigation opens ordinary files without starting an automatic decoded-view takeover. */
+export async function openTextDocumentForNavigation(uri: vscode.Uri): Promise<vscode.TextDocument> {
+    const key = uri.toString();
+    const pinned = uri.scheme === 'file' && !manualRawViews.has(key);
+    if (pinned) manualRawViews.add(key);
+    try {
+        return await vscode.workspace.openTextDocument(uri);
+    } catch (error) {
+        if (pinned) manualRawViews.delete(key);
+        throw error;
+    }
+}
+
 interface TextTabSlot {
     tab: vscode.Tab;
     group: vscode.TabGroup;

@@ -20,7 +20,6 @@ pnpm-debug.log*
 /.codex/
 /.codex-toml-check/
 /.mimocode/
-/.zcode/
 
 # Generated VS Code extension assets
 /editors/vscode/out/

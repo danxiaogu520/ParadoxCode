@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{cspSource}}; script-src 'nonce-{{nonce}}';">
+<link rel="stylesheet" href="{{styleUri}}"></head>
+<body>
+<nav id="tabs" role="tablist" data-i18n-aria-label="tabs">
+<button role="tab" data-tab="rules" data-i18n="rules"></button>
+<button role="tab" data-tab="definitions" data-i18n="definitions"></button>
+<button role="tab" data-tab="localisation" data-i18n="localisation" aria-selected="true"></button>
+<button role="tab" data-tab="text" data-i18n="text"></button>
+</nav>
+<main role="tabpanel">
+<p id="rule-source" class="metadata" hidden></p>
+<form id="form"><label for="query" data-i18n="query"></label>
+<div class="query-row"><input id="query" type="search" maxlength="1024" autocomplete="off" data-i18n-placeholder="placeholder"><button type="submit" data-i18n="search"></button><button id="cancel" type="button" data-i18n="cancel" hidden></button></div>
+<div id="filters">
+<label id="language-filter"><span data-i18n="language"></span><select id="language"></select></label>
+<label id="mode-filter"><span data-i18n="searchIn"></span><select id="mode"><option value="value" data-i18n="value"></option><option value="key" data-i18n="key"></option></select></label>
+<label id="status-filter"><span data-i18n="versions"></span><select id="status"><option value="all" data-i18n="allVersions"></option><option value="active" data-i18n="active"></option><option value="overridden" data-i18n="overridden"></option></select></label>
+<label id="kind-filter"><span data-i18n="kind"></span><select id="kind"></select></label>
+<label id="context-filter"><span data-i18n="context"></span><select id="context"></select></label>
+<label id="scope-filter"><span data-i18n="scope"></span><select id="scope"></select></label>
+<label id="caseSensitive-filter"><input id="caseSensitive" type="checkbox"><span data-i18n="caseSensitive"></span></label>
+</div>
+<details id="paths"><summary data-i18n="paths"></summary>
+<label id="include-filter"><span data-i18n="include"></span><input id="include" type="text" data-i18n-placeholder="pathHint"></label>
+<label id="exclude-filter"><span data-i18n="exclude"></span><input id="exclude" type="text" data-i18n-placeholder="pathHint"></label>
+</details>
+<details id="sources"><summary data-i18n="sources"></summary><div id="roots"></div></details>
+</form>
+<div id="active-filters"></div>
+<div class="actions"><button id="back" data-i18n="back" hidden></button><button id="search-text" data-i18n="searchText" hidden></button><button id="retry" data-i18n="retry" hidden></button></div>
+<p id="status-message" role="status" aria-live="polite"></p>
+<ul id="limitations"></ul>
+<div id="results" data-i18n-aria-label="results"></div>
+<button id="more" data-i18n="more" hidden></button>
+</main><script nonce="{{nonce}}" src="{{scriptUri}}"></script></body></html>

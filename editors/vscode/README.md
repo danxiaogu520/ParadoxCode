@@ -42,6 +42,36 @@ Localisation is indexed for lookup/navigation and receives transparent-encoding 
 it does not publish server diagnostics or completion items. Script rename is restricted to writable
 Mod sources, and formatting refuses malformed input it cannot safely preserve.
 
+## Search
+
+Use the editor-title search button or **ParadoxCode: Search** to open the retained search panel.
+Rules, definitions, localisation, and full text keep separate queries and filters. The first open
+uses selected editor text; focusing an existing panel preserves its query. Source checkboxes
+select the current Mod, individual dependencies, and Vanilla independently.
+
+Localisation searches complete readable values, including text beyond hover previews. Multiple
+words must all occur; switch to key mode for key lookup. Languages come from entry headers and
+an explicit language never falls back to another language. Definition search ranks exact,
+prefix, substring, and subsequence matches. Version filters retain the workspace's coverage state
+when a higher-priority source is hidden. Copy and find-references are separate result actions;
+references open a returnable view and count semantic uses rather than ordinary text occurrences.
+
+Full text includes readable files outside semantic definition categories, comments, and strings.
+Unsaved Markdown and other text buffers participate even when they are outside the language
+server’s document selectors. Source-control and ParadoxCode cache metadata are excluded.
+Path filters use source-relative globs, separated by commas; exclusions take precedence. Expand
+a match to inspect nearby lines. Searches use editor buffers, and navigation preserves existing
+decoded-document identities without saving or transcoding a source file. Results open in a
+text-editor group beside the panel. If an editor represents characters differently, navigation
+relocates a unique literal or explicitly opens the source line instead of using an unsafe column.
+
+Loading another page requires the same workspace and query snapshot. Edits refresh results;
+cancelled requests cannot overwrite newer input. Coverage notices identify unavailable source
+files, text budgets, and output limits. Such results are partial, including when no available
+file matches. Cached semantic definitions do not imply that full localisation values or file
+contents are available. This implementation is undergoing the full
+[search acceptance matrix](../../SEARCH-PROPOSAL.md#验收矩阵).
+
 ## Mission Preview
 
 Open a mission file under `common/missions` or `missions`, then choose **Open Mission Tree Preview

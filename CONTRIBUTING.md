@@ -99,7 +99,7 @@ require a full Vanilla sweep, benchmark suite, or network advisory scan.
 
 CI runs a deliberately reduced Linux-only merge gate on PRs and `main`. It checks formatting,
 type-checks every workspace crate with all features, runs parser/text/encoding library regressions
-and lightweight CI/release-control regressions, compiles the extension, runs four JavaScript
+and lightweight CI/release-control regressions, compiles the extension, runs five JavaScript
 behavior suites, and audits production npm dependencies. `Conclusion` requires both jobs to succeed;
 failed, cancelled or skipped jobs fail the gate.
 

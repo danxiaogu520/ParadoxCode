@@ -546,3 +546,4 @@ Publish diagnostics for closed files in the project during workspace validation 
 | `paradoxcode.localisation.endPeek` | Back to the Decoded View |
 | `paradoxcode.localisation.encodeFile` | Encode Quoted Text (EU4dll Escape Form) |
 | `paradoxcode.localisation.decodeFile` | Decode Quoted Text (Readable Text) |
+| `paradoxcode.openSearch` | Search |

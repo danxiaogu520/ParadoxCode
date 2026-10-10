@@ -1,0 +1,30 @@
+body { color: var(--vscode-foreground); background: var(--vscode-editor-background); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); padding: 16px; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+button, input, select { font: inherit; }
+button { cursor: pointer; border: 1px solid var(--vscode-button-border, transparent); padding: 5px 10px; color: var(--vscode-button-foreground); background: var(--vscode-button-background); }
+button:hover { background: var(--vscode-button-hoverBackground); }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
+input, select { padding: 5px; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); min-width: 0; }
+nav { display: flex; gap: 4px; border-bottom: 1px solid var(--vscode-panel-border); margin-bottom: 16px; flex-wrap: wrap; }
+nav button { color: var(--vscode-foreground); background: transparent; border-bottom: 2px solid transparent; }
+nav button[aria-selected="true"] { border-bottom-color: var(--vscode-focusBorder); font-weight: bold; }
+.query-row { display: flex; gap: 8px; margin: 6px 0 12px; }
+#query { flex: 1; }
+#filters, #roots, #active-filters, .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+#filters label { display: flex; gap: 5px; align-items: center; }
+#sources { margin: 12px 0; }
+#roots { margin-top: 8px; }
+#roots label { display: flex; gap: 5px; align-items: center; }
+#active-filters { margin: 12px 0; }
+#status-message, .metadata { color: var(--vscode-descriptionForeground); }
+#limitations { padding-left: 20px; }
+.result { border-top: 1px solid var(--vscode-panel-border); padding: 12px 0; overflow-wrap: anywhere; }
+.result .heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.result .open { font-weight: bold; background: transparent; color: var(--vscode-textLink-foreground); padding-left: 0; }
+.result .metadata, .result .snippet { margin: 6px 0; }
+.result .snippet { white-space: pre-wrap; }
+.result details { margin-top: 8px; }
+.result .actions button { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+mark { background: var(--vscode-editor-findMatchHighlightBackground); color: inherit; border: 1px solid var(--vscode-editor-findMatchHighlightBorder, transparent); }
+#more { margin-top: 16px; }

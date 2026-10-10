@@ -7,6 +7,8 @@ export interface WorkspaceFileRoot {
     path: string;
     order: number;
     writable: boolean;
+    /** Optional display name from the existing dependency configuration. */
+    name?: string;
 }
 
 export interface WorkspaceFileItem {

@@ -18,6 +18,7 @@ mod mission;
 mod navigation;
 mod quick_fix;
 mod resolution;
+pub mod search;
 mod semantic;
 mod semantic_tokens;
 mod suggest;

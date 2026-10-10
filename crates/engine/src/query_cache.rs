@@ -11,7 +11,10 @@
 //! revisions are discarded as soon as a newer revision is observed; an old worker that finishes
 //! later cannot repopulate the cache with stale data.
 //!
-//! Entries use three invalidation lineages, each tracking its own revision.
+//! Ordinary results use three invalidation lineages, each tracking its own revision.
+//! Two single-slot input memos additionally retain source ownership or localisation files;
+//! callers validate overlay identities, file stamps and policy before reusing those inputs.
+//! Memo replacement rejects workers older than the current document watermark.
 //! Document edits used to clear the whole cache, so every keystroke discarded
 //! workspace-scale indexes (member-name lists, the localisation key index) and rebuilt them
 //! from scratch. Index-domain entries now survive document revisions: an entry built from
@@ -47,6 +50,15 @@ pub enum CacheDomain {
     /// Derived from the dynamic-definition set (index plus declaring overlays);
     /// invalidated when a declaring document commits or the index advances.
     Definitions,
+    /// One disk text corpus; index changes and caller watch epochs invalidate it.
+    SearchTexts,
+    /// One full-value localisation corpus, invalidated with document revisions.
+    SearchLocalisations,
+    /// One ownership view, keyed by immutable index state and validated overlay paths.
+    SourceOwnership,
+    /// One previous localisation corpus used only after callers validate every source input.
+    /// Retained across revisions to share unchanged file data, never served as an unchecked result.
+    SearchLocalisationReuse,
 }
 
 /// Bounded snapshot-scoped cache keyed by `(revision, domain, key)`.
@@ -86,6 +98,10 @@ struct CacheState {
     documents: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
     frontends: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
     definitions: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
+    search_texts: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
+    search_localisations: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
+    search_localisation_reuse: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
+    source_ownership: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
 }
 
 impl CacheState {
@@ -95,6 +111,10 @@ impl CacheState {
             CacheDomain::Documents => &mut self.documents,
             CacheDomain::Frontends => &mut self.frontends,
             CacheDomain::Definitions => &mut self.definitions,
+            CacheDomain::SearchTexts => &mut self.search_texts,
+            CacheDomain::SearchLocalisations => &mut self.search_localisations,
+            CacheDomain::SearchLocalisationReuse => &mut self.search_localisation_reuse,
+            CacheDomain::SourceOwnership => &mut self.source_ownership,
         }
     }
 }
@@ -118,6 +138,10 @@ impl SnapshotQueryCache {
                 documents: FxHashMap::default(),
                 frontends: FxHashMap::default(),
                 definitions: FxHashMap::default(),
+                search_texts: FxHashMap::default(),
+                search_localisations: FxHashMap::default(),
+                search_localisation_reuse: FxHashMap::default(),
+                source_ownership: FxHashMap::default(),
             }),
             capacity,
             id: NEXT_CACHE_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
@@ -148,12 +172,16 @@ impl SnapshotQueryCache {
     /// definitions-domain entries answer at their revision and every later one:
     /// only an advance of their own domain can clear them, so a reader still
     /// observing an older revision (a slow workspace-wide pass) hits views built
-    /// for the same underlying state.
+    /// for the same underlying state. Input memo domains require callers to validate
+    /// source stamps or overlay identities before using their retained data.
     pub fn get<T: Send + Sync + 'static>(&self, revision: u64, key: &str) -> Option<Arc<T>> {
         let state = self
             .state
             .read()
             .expect("snapshot query cache lock poisoned");
+        if let Some(value) = state.search_localisation_reuse.get(key) {
+            return Arc::clone(value).downcast::<T>().ok();
+        }
         if state.documents_revision == Some(revision)
             && let Some(value) = state.documents.get(key)
         {
@@ -161,6 +189,25 @@ impl SnapshotQueryCache {
         }
         if state.documents_revision == Some(revision)
             && let Some(value) = state.frontends.get(key)
+        {
+            return Arc::clone(value).downcast::<T>().ok();
+        }
+        if state.documents_revision == Some(revision)
+            && let Some(value) = state.search_localisations.get(key)
+        {
+            return Arc::clone(value).downcast::<T>().ok();
+        }
+        if state
+            .index_revision
+            .is_some_and(|current| revision >= current)
+            && let Some(value) = state.source_ownership.get(key)
+        {
+            return Arc::clone(value).downcast::<T>().ok();
+        }
+        if state
+            .index_revision
+            .is_some_and(|current| revision >= current)
+            && let Some(value) = state.search_texts.get(key)
         {
             return Arc::clone(value).downcast::<T>().ok();
         }
@@ -181,7 +228,8 @@ impl SnapshotQueryCache {
         None
     }
 
-    /// Stores `value` under `(revision, domain, key)`; an existing key is never replaced.
+    /// Stores `value` under `(revision, domain, key)`. Ordinary query entries are immutable;
+    /// validated single-slot input memos replace their previous value at the same key.
     ///
     /// An insert from a revision the domain has already advanced past is dropped: a
     /// stale worker finishing late must not repopulate the cache with results derived
@@ -198,17 +246,37 @@ impl SnapshotQueryCache {
     ) {
         let mut state = self.write();
         match domain {
-            CacheDomain::Documents | CacheDomain::Frontends => match state.documents_revision {
-                Some(current) if revision < current => return,
-                Some(current) if revision > current => {
-                    state.documents.clear();
-                    state.frontends.clear();
-                    state.documents_revision = Some(revision);
+            CacheDomain::SourceOwnership => {
+                if state
+                    .documents_revision
+                    .is_some_and(|current| revision < current)
+                {
+                    return;
                 }
-                None => state.documents_revision = Some(revision),
-                _ => {}
-            },
-            CacheDomain::Index => match state.index_revision {
+                state.index_revision.get_or_insert(revision);
+            }
+            CacheDomain::SearchLocalisationReuse => {
+                if state
+                    .documents_revision
+                    .is_some_and(|current| revision < current)
+                {
+                    return;
+                }
+            }
+            CacheDomain::Documents | CacheDomain::Frontends | CacheDomain::SearchLocalisations => {
+                match state.documents_revision {
+                    Some(current) if revision < current => return,
+                    Some(current) if revision > current => {
+                        state.documents.clear();
+                        state.frontends.clear();
+                        state.search_localisations.clear();
+                        state.documents_revision = Some(revision);
+                    }
+                    None => state.documents_revision = Some(revision),
+                    _ => {}
+                }
+            }
+            CacheDomain::Index | CacheDomain::SearchTexts => match state.index_revision {
                 Some(current) if revision < current => return,
                 // An insert above `current` proves no index advance happened since
                 // (an advance clears the domain and moves the watermark), so the
@@ -228,11 +296,22 @@ impl SnapshotQueryCache {
         }
         let capacity = match domain {
             CacheDomain::Frontends => self.capacity.min(32),
+            CacheDomain::SearchTexts
+            | CacheDomain::SearchLocalisations
+            | CacheDomain::SearchLocalisationReuse
+            | CacheDomain::SourceOwnership => 1,
             _ => self.capacity,
         };
         let entries = state.map(domain);
         if entries.len() >= capacity && !entries.contains_key(key.as_str()) {
             entries.clear();
+        }
+        if matches!(
+            domain,
+            CacheDomain::SourceOwnership | CacheDomain::SearchLocalisationReuse
+        ) {
+            entries.insert(Box::from(key), value);
+            return;
         }
         entries
             .entry(Box::from(key))
@@ -247,6 +326,8 @@ impl SnapshotQueryCache {
             .is_none_or(|current| revision > current)
         {
             state.index.clear();
+            state.search_texts.clear();
+            state.source_ownership.clear();
             state.index_revision = Some(revision);
         }
         if state
@@ -262,6 +343,7 @@ impl SnapshotQueryCache {
         {
             state.documents.clear();
             state.frontends.clear();
+            state.search_localisations.clear();
             state.documents_revision = Some(revision);
         }
     }
@@ -279,6 +361,7 @@ impl SnapshotQueryCache {
         {
             state.documents.clear();
             state.frontends.clear();
+            state.search_localisations.clear();
             state.documents_revision = Some(revision);
         }
     }
@@ -312,8 +395,12 @@ impl SnapshotQueryCache {
             .read()
             .expect("snapshot query cache lock poisoned");
         let watermark = match domain {
-            CacheDomain::Index => state.index_revision,
-            CacheDomain::Documents | CacheDomain::Frontends => state.documents_revision,
+            CacheDomain::Index | CacheDomain::SearchTexts => state.index_revision,
+            CacheDomain::Documents
+            | CacheDomain::Frontends
+            | CacheDomain::SearchLocalisations
+            | CacheDomain::SearchLocalisationReuse
+            | CacheDomain::SourceOwnership => state.documents_revision,
             CacheDomain::Definitions => state.definitions_revision,
         };
         watermark.is_some_and(|current| revision < current)
@@ -326,7 +413,14 @@ impl SnapshotQueryCache {
             .state
             .read()
             .expect("snapshot query cache lock poisoned");
-        state.index.len() + state.documents.len() + state.frontends.len() + state.definitions.len()
+        state.index.len()
+            + state.documents.len()
+            + state.frontends.len()
+            + state.definitions.len()
+            + state.search_texts.len()
+            + state.search_localisations.len()
+            + state.search_localisation_reuse.len()
+            + state.source_ownership.len()
     }
 
     /// Returns whether the cache holds no entries.
@@ -591,5 +685,103 @@ mod tests {
         // An index advance clears the domain too: index files declare.
         cache.advance_to(7);
         assert!(cache.get::<Vec<u32>>(6, "dynamic-rule-rows").is_none());
+    }
+}
+
+#[cfg(test)]
+mod search_text_cache_tests {
+    use super::*;
+
+    #[test]
+    fn reusable_file_memos_survive_edits_but_reject_late_workers() {
+        let cache = SnapshotQueryCache::new();
+        cache.advance_to(1);
+        cache.insert(
+            1,
+            CacheDomain::SearchLocalisationReuse,
+            "reuse".into(),
+            Arc::new(1_u32),
+        );
+        cache.advance_documents(2);
+        assert_eq!(*cache.get::<u32>(2, "reuse").unwrap(), 1);
+        cache.insert(
+            2,
+            CacheDomain::SearchLocalisationReuse,
+            "reuse".into(),
+            Arc::new(2_u32),
+        );
+        assert_eq!(
+            *cache.get::<u32>(2, "reuse").unwrap(),
+            2,
+            "the validated memo advances at the same key"
+        );
+        cache.advance_to(3);
+        cache.insert(
+            3,
+            CacheDomain::SearchLocalisationReuse,
+            "new-reuse".into(),
+            Arc::new(3_u32),
+        );
+        cache.insert(
+            1,
+            CacheDomain::SearchLocalisationReuse,
+            "late".into(),
+            Arc::new(7_u32),
+        );
+        assert!(
+            cache.get::<u32>(3, "reuse").is_none(),
+            "only one file memo is retained"
+        );
+        assert!(cache.get::<u32>(3, "late").is_none());
+        assert_eq!(*cache.get::<u32>(3, "new-reuse").unwrap(), 3);
+    }
+
+    #[test]
+    fn materialized_corpora_have_one_slot_and_observe_their_input_revisions() {
+        let cache = SnapshotQueryCache::new();
+        let first = Arc::new(vec![1_u8]);
+        let released = Arc::downgrade(&first);
+        cache.insert(1, CacheDomain::SearchTexts, "roots-a".into(), first);
+        cache.insert(1, CacheDomain::Documents, "cheap".into(), Arc::new(7_u8));
+        cache.insert(
+            1,
+            CacheDomain::SearchTexts,
+            "roots-b".into(),
+            Arc::new(vec![2_u8]),
+        );
+        assert!(released.upgrade().is_none());
+        assert!(cache.get::<Vec<u8>>(1, "roots-a").is_none());
+        assert_eq!(*cache.get::<u8>(1, "cheap").unwrap(), 7);
+        let localisation = Arc::new(vec![4_u8]);
+        let old_localisation = Arc::downgrade(&localisation);
+        cache.insert(
+            1,
+            CacheDomain::SearchLocalisations,
+            "loc-a".into(),
+            localisation,
+        );
+        cache.insert(
+            1,
+            CacheDomain::SearchLocalisations,
+            "loc-b".into(),
+            Arc::new(vec![5_u8]),
+        );
+        assert!(old_localisation.upgrade().is_none());
+        assert!(cache.get::<Vec<u8>>(1, "roots-b").is_some());
+        cache.advance_documents(2);
+        assert!(
+            cache.get::<Vec<u8>>(2, "roots-b").is_some(),
+            "disk corpora survive buffer-only edits"
+        );
+        assert!(cache.get::<Vec<u8>>(2, "loc-b").is_none());
+        cache.advance_to(3);
+        assert!(cache.get::<Vec<u8>>(3, "roots-b").is_none());
+        cache.insert(
+            1,
+            CacheDomain::SearchTexts,
+            "stale".into(),
+            Arc::new(vec![3_u8]),
+        );
+        assert!(cache.get::<Vec<u8>>(2, "stale").is_none());
     }
 }

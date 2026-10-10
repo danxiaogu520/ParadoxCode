@@ -86,5 +86,6 @@
   "configuration.localisation.autoOpen.description": "Automatic opening policy for the experimental `pdcloc://` decoded view; applies only when `paradoxcode.localisation.transparentEncoding` is enabled. `needsTranscode` (default): escaped or damaged files, or plain text whose quoted CJK a save would encode, enter the decoded view. `always`: every eligible file enters the decoded view. `off`: open the decoded view only by explicit command.",
   "configuration.localisation.transparentScriptGlobs.description": "Workspace-relative script glob patterns for the manual Decode File / Encode File buttons and experimental decoded views (paratranz `latin1eu4` profile). Localisation YML files qualify independently. Default: `**/*.txt`; an empty list limits conversion to localisation YML.",
   "commands.localisation.encodeFile.title": "Encode Quoted Text (EU4dll Escape Form)",
-  "commands.localisation.decodeFile.title": "Decode Quoted Text (Readable Text)"
+  "commands.localisation.decodeFile.title": "Decode Quoted Text (Readable Text)",
+  "command.openSearch.title": "Search"
 }

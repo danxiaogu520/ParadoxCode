@@ -28,16 +28,16 @@ impl SourceRootId {
     }
 }
 
-/// A source root ordered by the future overlay resolver.
+/// An ordered game-data source root.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SourceRoot {
     /// Stable identity.
     pub id: SourceRootId,
-    /// Root kind; resolution order is implemented in a later phase.
+    /// Source identity role; load priority is determined by `order`.
     pub kind: SourceRootKind,
     /// Canonical filesystem path.
     pub path: AbsPath,
-    /// Explicit low-to-high order among roots of the same kind.
+    /// Globally unique low-to-high load order, independent of root kind.
     pub order: u32,
     /// Whether this root is allowed to own generated or edited files.
     pub writable: bool,

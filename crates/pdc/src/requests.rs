@@ -1,3 +1,5 @@
+mod search;
+
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
@@ -321,6 +323,10 @@ impl SnapshotRequestContext {
             "workspace/symbol" => self.workspace_symbols(params),
             "pdc/workspaceDiagnostics" => self.workspace_diagnostics(params),
             "pdc/workspaceFiles" => self.workspace_files(params),
+            "pdc/editorSearchContext" => self.editor_search_context(params),
+            "pdc/editorSearch" => self.editor_search(params),
+            "pdc/editorSearchReferences" => self.editor_search_references(params),
+            "pdc/editorSearchDetail" => self.editor_search_detail(params),
             "pdc/classifyPaths" => self.classify_paths(params),
             "pdc/textDiagnostics" => self.text_diagnostics(params),
             "pdc/transcodeDecode" => self.transcode_decode(params),

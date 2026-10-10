@@ -86,5 +86,6 @@
   "configuration.localisation.autoOpen.description": "实验性 `pdcloc://` 解码视图的自动打开策略；仅在启用 `paradoxcode.localisation.transparentEncoding` 后生效。`needsTranscode`（默认）：转码或受损文件，以及引号内含保存时需要编码的中文的可读文件，进入解码视图。`always`：所有符合条件的文件进入解码视图。`off`：仅通过明确的命令手动打开解码视图。",
   "configuration.localisation.transparentScriptGlobs.description": "手动“解码文件 / 编码文件”按钮及实验性解码视图适用的脚本 glob（相对工作区，paratranz `latin1eu4` 档）。本地化 YML 不受此列表限制。默认：`**/*.txt`；空列表表示仅转换本地化 YML。",
   "commands.localisation.encodeFile.title": "编码引号内文本（EU4dll 转码形态）",
-  "commands.localisation.decodeFile.title": "解码引号内文本（可读文本）"
+  "commands.localisation.decodeFile.title": "解码引号内文本（可读文本）",
+  "command.openSearch.title": "搜索"
 }
