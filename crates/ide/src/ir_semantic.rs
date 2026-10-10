@@ -931,6 +931,7 @@ fn schema_diagnostics_at_depth(
     let mut unbound_keys = BTreeSet::new();
     let mut selector_errors = BTreeSet::new();
     let properties = hir.properties();
+    let query_index = hir::query::PropertyQueryIndex::new(properties);
     for overload in hir
         .overload_facts()
         .iter()
@@ -993,7 +994,8 @@ fn schema_diagnostics_at_depth(
         else {
             continue;
         };
-        let context = hir::query::PropertyQueryContext::for_property(properties, property)
+        let context = query_index
+            .for_property(property)
             .defer_templates(owner_range.is_some());
         let candidates = field_fact.fields.clone();
         if candidates.is_empty() {
@@ -1446,7 +1448,7 @@ fn schema_diagnostics_at_depth(
         let Some(matcher) = ir.schema(fact.schema).items else {
             continue;
         };
-        let context = hir::query::PropertyQueryContext::in_container(properties, fact.range);
+        let context = query_index.in_container(fact.range);
         if !matcher_matches_with_context(ir, matcher, &value.value, &facts, &fact.state, &context) {
             let failures = hir::checking::query_selector_failures(ir, matcher, &facts, &context);
             if append_selector_errors(

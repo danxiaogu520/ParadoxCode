@@ -718,10 +718,7 @@ pub fn check_fragment<E>(
         }) {
             continue;
         }
-        if display
-            .iter()
-            .any(|range| range.start() <= scalar.range.start() && scalar.range.end() <= range.end())
-        {
+        if display.contains(scalar.range) {
             continue;
         }
         let checked = ir.schema(context.schema).items.map_or_else(
@@ -778,9 +775,7 @@ pub fn check_fragment<E>(
             continue;
         }
         checkpoint()?;
-        if display.iter().any(|range| {
-            range.start() < property.range.start() && property.range.end() <= range.end()
-        }) {
+        if display.contains_descendant(property.range) {
             continue;
         }
         let Some(field) = hir.field_fact_at(property.key_range) else {
@@ -1052,9 +1047,7 @@ pub fn check_fragment<E>(
             continue;
         }
         checkpoint()?;
-        if display.iter().any(|range| {
-            range.start() < context.range.start() && context.range.end() <= range.end()
-        }) {
+        if display.contains_descendant(context.range) {
             continue;
         }
         if source.has_hole(context.range) || source.has_unresolved_structure(context.range) {
@@ -1137,21 +1130,54 @@ pub fn check_fragment<E>(
     })
 }
 
-fn display_ranges(ir: &RulesIr, hir: &crate::HirFile) -> Vec<text::TextRange> {
-    hir.properties()
-        .iter()
-        .filter(|property| {
-            hir.field_fact_at(property.key_range).is_some_and(|fact| {
-                fact.fields.iter().any(|id| {
-                    ir.field(*id)
-                        .control
-                        .as_ref()
-                        .is_some_and(|control| control.kind == ControlKind::DisplayOnly)
+/// Prefix maxima answer containment without revisiting earlier display-only blocks.
+struct DisplayRanges(Vec<(text::TextSize, text::TextSize)>);
+
+impl DisplayRanges {
+    fn new(mut ranges: Vec<text::TextRange>) -> Self {
+        ranges.sort_by_key(|range| range.start());
+        let mut maximum = 0;
+        Self(
+            ranges
+                .into_iter()
+                .map(|range| {
+                    maximum = maximum.max(range.end());
+                    (range.start(), maximum)
+                })
+                .collect(),
+        )
+    }
+
+    fn contains_descendant(&self, range: text::TextRange) -> bool {
+        let end = self.0.partition_point(|(start, _)| *start < range.start());
+        end.checked_sub(1)
+            .is_some_and(|index| range.end() <= self.0[index].1)
+    }
+
+    fn contains(&self, range: text::TextRange) -> bool {
+        let end = self.0.partition_point(|(start, _)| *start <= range.start());
+        end.checked_sub(1)
+            .is_some_and(|index| range.end() <= self.0[index].1)
+    }
+}
+
+fn display_ranges(ir: &RulesIr, hir: &crate::HirFile) -> DisplayRanges {
+    DisplayRanges::new(
+        hir.properties()
+            .iter()
+            .filter(|property| {
+                hir.field_fact_at(property.key_range).is_some_and(|fact| {
+                    fact.fields.iter().any(|id| {
+                        ir.field(*id)
+                            .control
+                            .as_ref()
+                            .is_some_and(|control| control.kind == ControlKind::DisplayOnly)
+                    })
                 })
             })
-        })
-        .map(|property| property.range)
-        .collect()
+            .map(|property| property.range)
+            .collect(),
+    )
 }
 fn matcher_key_label(ir: &RulesIr, id: MatcherId) -> String {
     match ir.matcher(id) {
@@ -1193,8 +1219,7 @@ fn constant_control_value(
             return None;
         }
         let children = hir
-            .properties()
-            .iter()
+            .properties_in_range(property.range)
             .filter(|child| {
                 child.path.len() == property.path.len() + 1
                     && child.path.starts_with(&property.path)
@@ -1252,9 +1277,7 @@ pub fn control_lints<E>(
         })
     };
     for property in hir.properties() {
-        if display.iter().any(|range| {
-            range.start() < property.range.start() && property.range.end() <= range.end()
-        }) {
+        if display.contains_descendant(property.range) {
             continue;
         }
         checkpoint()?;
@@ -1273,8 +1296,7 @@ pub fn control_lints<E>(
         match control.kind {
             ControlKind::Logic => {
                 let children = hir
-                    .properties()
-                    .iter()
+                    .properties_in_range(property.range)
                     .filter(|child| {
                         child.path.len() == property.path.len() + 1
                             && child.path.starts_with(&property.path)
@@ -1358,7 +1380,7 @@ pub fn control_lints<E>(
             ControlKind::Branch | ControlKind::BranchContinue => {
                 if let Some(guard) = control.guard {
                     let guard_name = ir.strings().resolve(guard);
-                    if let Some(guard) = hir.properties().iter().find(|child| {
+                    if let Some(guard) = hir.properties_in_range(property.range).find(|child| {
                         child.path.len() == property.path.len() + 1
                             && child.path.starts_with(&property.path)
                             && property.range.start() <= child.range.start()
@@ -1370,7 +1392,7 @@ pub fn control_lints<E>(
                             if value { format!("`{guard_name}` of this `{}` is always true; the branch wrapper is redundant", property.key) }
                             else { format!("`{guard_name}` of this `{}` is always false; the branch can never run", property.key) }));
                     }
-                    if !hir.properties().iter().any(|child| {
+                    if !hir.properties_in_range(property.range).any(|child| {
                         child.path.len() == property.path.len() + 1
                             && child.path.starts_with(&property.path)
                             && property.range.start() <= child.range.start()
@@ -1384,7 +1406,7 @@ pub fn control_lints<E>(
                             format!("`{}` without `{guard_name}` executes its body unconditionally; the condition belongs in a `{guard_name}` block", property.key),
                         ));
                     }
-                    if !hir.properties().iter().any(|child| {
+                    if !hir.properties_in_range(property.range).any(|child| {
                         child.path.len() == property.path.len() + 1
                             && child.path.starts_with(&property.path)
                             && property.range.start() <= child.range.start()
@@ -1498,8 +1520,7 @@ pub fn control_lints<E>(
                     continue;
                 }
                 let unknown = hir
-                    .properties()
-                    .iter()
+                    .properties_in_range(property.range)
                     .flat_map(|child| {
                         [
                             child.key_range,
@@ -1551,7 +1572,7 @@ pub fn control_lints<E>(
                     rules::query::SiblingValue::Scalar(value) => value,
                     _ => continue,
                 };
-                for child in hir.properties().iter().filter(|child| {
+                for child in hir.properties_in_range(property.range).filter(|child| {
                     child.path.len() == property.path.len() + 1
                         && child.path.starts_with(&property.path)
                         && property.range.start() <= child.range.start()
@@ -1586,7 +1607,7 @@ pub fn control_lints<E>(
                 }
             }
             ControlKind::Guard | ControlKind::DisplayOnly => {
-                let has_children = hir.properties().iter().any(|child| {
+                let has_children = hir.properties_in_range(property.range).any(|child| {
                     child.path.len() == property.path.len() + 1
                         && child.path.starts_with(&property.path)
                         && property.range.start() <= child.range.start()
@@ -1626,6 +1647,29 @@ fn matcher_label(ir: &RulesIr, id: MatcherId) -> String {
 mod pattern_budget_tests {
     use super::*;
     use crate::analysis::{AnalysisLimit, Validation};
+
+    #[test]
+    fn display_containment_keeps_own_boundaries_and_nested_prefix_maxima() {
+        let ranges = DisplayRanges::new(vec![
+            text::TextRange::new(10, 100).unwrap(),
+            text::TextRange::new(20, 30).unwrap(),
+            text::TextRange::new(120, 140).unwrap(),
+        ]);
+        for (start, end, descendant) in [
+            (10, 100, false),
+            (20, 30, true),
+            (40, 100, true),
+            (40, 101, false),
+            (101, 110, false),
+            (120, 140, false),
+            (121, 140, true),
+        ] {
+            let range = text::TextRange::new(start, end).unwrap();
+            assert_eq!(ranges.contains_descendant(range), descendant);
+        }
+        assert!(ranges.contains(text::TextRange::new(10, 100).unwrap()));
+        assert!(!DisplayRanges::new(Vec::new()).contains(text::TextRange::empty(0)));
+    }
 
     #[test]
     fn unfinished_pattern_preserves_unknown_and_an_independent_scalar_rejection() {
