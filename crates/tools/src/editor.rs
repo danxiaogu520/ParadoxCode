@@ -364,73 +364,13 @@ pub fn check(root: &Path) -> Result<Vec<String>, String> {
     require(
         package["engines"]["vscode"] == "^1.99.0"
             && package["devDependencies"]["@types/vscode"] == "1.99.0",
-        "language-model tool API version contract drifted",
+        "VS Code engine and type versions must stay aligned",
         &mut errors,
     );
-    let tools = package["contributes"]["languageModelTools"]
-        .as_array()
-        .ok_or("missing agent tools")?;
-    require(
-        tools.len() == strings(&contract["tools"]).len(),
-        "agent tool count drifted",
-        &mut errors,
-    );
-    let mut references = BTreeSet::new();
-    for name in strings(&contract["tools"]) {
-        let tool = tools
-            .iter()
-            .find(|t| t["name"] == name)
-            .ok_or_else(|| format!("missing agent tool {name}"))?;
+    for contribution in ["languageModelTools", "chatParticipants"] {
         require(
-            tool["modelDescription"]
-                .as_str()
-                .is_some_and(|s| s.len() >= 40)
-                && tool["inputSchema"]["type"] == "object"
-                && tool["canBeReferencedInPrompt"] == true
-                && tool["when"] == "paradoxcodeServerRunning",
-            format!("invalid agent declaration {name}"),
-            &mut errors,
-        );
-        require(
-            tool["toolReferenceName"]
-                .as_str()
-                .is_some_and(|s| !s.is_empty() && references.insert(s)),
-            format!("invalid/duplicate tool reference {name}"),
-            &mut errors,
-        );
-    }
-    require(
-        !package["contributes"]["chatParticipants"]
-            .as_array()
-            .is_some_and(|a| a.iter().any(|c| c["id"] == "paradoxcode.modding")),
-        "retired chat participant must not return",
-        &mut errors,
-    );
-    let native = pdc::mcp::tool_manifest();
-    require(
-        native
-            .iter()
-            .map(|t| t["name"].as_str().unwrap())
-            .collect::<BTreeSet<_>>()
-            == tools
-                .iter()
-                .map(|t| t["name"].as_str().unwrap())
-                .collect::<BTreeSet<_>>(),
-        "native MCP and extension tool surfaces differ",
-        &mut errors,
-    );
-    for marker in [
-        "paradoxcode_validate_text",
-        "paradoxcode_rules",
-        "paradoxcode_search",
-        "paradoxcode_loc_get",
-        "paradoxcode_loc_list",
-        "UnknownLocalisationKey",
-        "Zone discipline",
-    ] {
-        require(
-            pdc::mcp::INSTRUCTIONS.contains(marker),
-            format!("missing MCP instruction {marker}"),
+            package["contributes"].get(contribution).is_none(),
+            format!("extension must not contribute {contribution}"),
             &mut errors,
         );
     }

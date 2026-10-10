@@ -1,4 +1,4 @@
-//! Protocol boundary for the editor search panel; agent requests retain their contracts.
+//! Protocol boundary for the editor search panel; external-client requests retain their contracts.
 use super::*;
 use ide::search::{editor_definitions, editor_localisations_with_epoch, editor_name_score};
 

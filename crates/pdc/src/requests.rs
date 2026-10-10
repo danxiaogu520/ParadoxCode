@@ -69,8 +69,8 @@ const MAX_CLASSIFIED_PATHS: usize = 4_096;
 const MAX_WORKSPACE_FILES: usize = 32_768;
 const MAX_TEXT_DIAGNOSTIC_FILES: usize = 16;
 const MAX_TEXT_DIAGNOSTIC_BYTES: usize = 16 * 1024 * 1024;
-const DEFAULT_AGENT_SEARCH_LIMIT: usize = 20;
-const MAX_AGENT_SEARCH_LIMIT: usize = 50;
+const DEFAULT_QUERY_SEARCH_LIMIT: usize = 20;
+const MAX_QUERY_SEARCH_LIMIT: usize = 50;
 const MAX_SYMBOL_SEARCH_LIMIT: usize = 100;
 const MAX_RULE_DOCUMENTATION_CHARS: usize = 400;
 
@@ -98,9 +98,9 @@ fn trimmed_search_filter(value: Option<&str>) -> Option<&str> {
     value.map(str::trim).filter(|value| !value.is_empty())
 }
 
-/// Resolves the agent-search limit: defaulted, bounded, and never zero.
-fn agent_search_limit(limit: Option<usize>) -> Result<usize, RpcError> {
-    symbol_search_limit_inner(limit, MAX_AGENT_SEARCH_LIMIT)
+/// Resolves the query-search limit: defaulted, bounded, and never zero.
+fn query_search_limit(limit: Option<usize>) -> Result<usize, RpcError> {
+    symbol_search_limit_inner(limit, MAX_QUERY_SEARCH_LIMIT)
 }
 
 /// Resolves the script-symbol search limit: defaulted, bounded to 100, and never zero.
@@ -110,7 +110,7 @@ fn symbol_search_limit(limit: Option<usize>) -> Result<usize, RpcError> {
 
 fn symbol_search_limit_inner(limit: Option<usize>, max: usize) -> Result<usize, RpcError> {
     match limit {
-        None => Ok(DEFAULT_AGENT_SEARCH_LIMIT),
+        None => Ok(DEFAULT_QUERY_SEARCH_LIMIT),
         Some(0) => Err(RpcError::new(
             INVALID_PARAMS,
             "search limit must be at least 1",
@@ -595,7 +595,7 @@ impl SnapshotRequestContext {
                 "rule search requires at least one of context, key, or scope",
             ));
         }
-        let limit = agent_search_limit(params.limit)?;
+        let limit = query_search_limit(params.limit)?;
         self.ensure_active()?;
 
         let context_query = context.map(str::to_ascii_lowercase);
@@ -693,7 +693,7 @@ impl SnapshotRequestContext {
         let key_match = params
             .key_match
             .map_or(LocalisationKeyMatch::Substring, LocalisationKeyMatch::from);
-        let limit = agent_search_limit(params.limit)?;
+        let limit = query_search_limit(params.limit)?;
         self.ensure_active()?;
 
         let result = localisation_search_with_cancellation(
@@ -725,7 +725,7 @@ impl SnapshotRequestContext {
         Ok(serde_json::json!({ "hits": hits, "truncated": result.truncated }))
     }
 
-    /// One agent-facing location: the file URI, a 1-based line, and the logical path when the
+    /// One client-facing location: the file URI, a 1-based line, and the logical path when the
     /// location sits in an indexed disk file.
     fn location_value(&self, location: &ide::Location) -> Result<Value, RpcError> {
         let lsp = location_to_lsp(&self.snapshot, location).ok_or_else(|| {
@@ -742,7 +742,7 @@ impl SnapshotRequestContext {
     }
 
     /// Bounded script-zone symbol discovery. Reuses the `workspace/symbol` scoring (prefix,
-    /// substring, then fuzzy) while excluding localisation-file definitions, keeping agent
+    /// substring, then fuzzy) while excluding localisation-file definitions, keeping client
     /// search in the script zone; scripted localisation (`defined_text`) stays searchable.
     fn symbol_search(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<SymbolSearchParams>(params, "symbol search")?;
@@ -864,7 +864,7 @@ impl SnapshotRequestContext {
         }))
     }
 
-    /// Agent-facing workspace orientation: game identity, embedded rule hash, source roots,
+    /// Client-facing workspace orientation: game identity, embedded rule hash, source roots,
     /// file counts by parser zone, and the last scan's counters. Intentionally parameterless
     /// like `pdc/workspaceFiles`.
     fn workspace_summary(&self, params: Option<&Value>) -> Result<Value, RpcError> {

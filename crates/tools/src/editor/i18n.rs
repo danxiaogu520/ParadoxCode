@@ -146,9 +146,10 @@ pub fn check(ext: &Path) -> Result<Vec<String>, String> {
 
     let brand = Regex::new(r"^ParadoxCode(?: \$\([-\w~]+\))?$").unwrap();
 
-    for path in report::files(&ext.join("src"))?.into_iter().filter(|p| {
-        p.extension().is_some_and(|s| s == "ts") && !p.starts_with(ext.join("src/agent"))
-    }) {
+    for path in report::files(&ext.join("src"))?
+        .into_iter()
+        .filter(|p| p.extension().is_some_and(|s| s == "ts"))
+    {
         let source = fs::read_to_string(&path).map_err(|e| e.to_string())?;
 
         let file = path.strip_prefix(ext).unwrap().to_string_lossy();

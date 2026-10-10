@@ -75,8 +75,8 @@ function host(root, settings = {}) {
         exports, Buffer, setTimeout, clearTimeout,
         require(id) {
             if (id === 'vscode') return vscode;
-            if (id === './agent/server') return {
-                acquireAgentClient: async () => ({
+            if (id === './serverClient') return {
+                acquireServerClient: async () => ({
                     async sendRequest(method, params) {
                         state.requests.push({ method, params });
                         return state.respond(method, params);

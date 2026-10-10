@@ -3,7 +3,7 @@
 [Project overview](../../README.md) · [简体中文入口](../../README.zh-CN.md)
 
 This guide owns installation, editor workflows, and troubleshooting. Settings, defaults,
-commands, and agent tools come from the [generated extension reference](REFERENCE.md).
+and commands come from the [generated extension reference](REFERENCE.md).
 
 ## Setup
 
@@ -109,7 +109,7 @@ ships a Rust-server-backed transcoder. By default, files keep their ordinary `fi
   to the file or its editor while conversion is running require a retry.
 
 The automatic transparent pipeline and editable `pdcloc://` decoded views are **experimental**
-and **disabled by default**. Search, navigation, and agent integration have known limitations.
+and **disabled by default**. Search and navigation have known limitations.
 To opt in, set `paradoxcode.localisation.transparentEncoding` to `true` and reload the VS Code
 window. Changing the switch requires a window reload. When enabled:
 
@@ -137,13 +137,6 @@ window. Changing the switch requires a window reload. When enabled:
 - Turn `paradoxcode.localisation.transparentEncoding` off and reload the window to return to
   the default manual workflow. The decoded-view provider and automatic pipeline are disabled;
   the **Decode Quoted Text** and **Encode Quoted Text** buttons become available again.
-
-## Agent tools
-
-The running language server supplies read-only workspace queries and in-memory draft validation.
-Use the [generated tool reference](REFERENCE.md#agent-tools) for names, input schemas, and prompt references.
-If tools are absent after extension activation, run **Developer: Reload Window** once.
-External clients use the [MCP entry point](../../crates/pdc/README.md#mcp-server).
 
 ## Configuration
 

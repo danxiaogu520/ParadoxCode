@@ -11,8 +11,7 @@ import {
 } from 'vscode-languageclient/node';
 
 import { FileTeeDebugChannel } from './debugChannel';
-import { registerAgentTools } from './agent/register';
-import { setAgentClient } from './agent/server';
+import { setServerClient } from './serverClient';
 import { LoadedFilesProvider } from './fileExplorer';
 import { SearchPanel } from './searchPanel';
 import { MissionPreviewPanel } from './previewPanel';
@@ -1381,9 +1380,9 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
         }
         client = createClient(resolution);
         const currentClient = client;
-        // Publish the fresh instance for the agent tool layer before start() resolves:
-        // tools poll for a Running client, so early calls simply wait.
-        setAgentClient(currentClient);
+        // Publish the fresh instance before start() resolves so editor requests can wait
+        // for a Running client without capturing an instance from before a restart.
+        setServerClient(currentClient);
         currentClient.onDidChangeState((event) => {
             if (client !== currentClient) {
                 return;
@@ -1444,7 +1443,7 @@ async function stopClient(loadedFiles?: LoadedFilesProvider): Promise<void> {
     if (client) {
         const previous = client;
         client = undefined;
-        setAgentClient(undefined);
+        setServerClient(undefined);
         updateStatus(State.Stopped);
         log.appendLine('language server client stopped');
         try {
@@ -1653,11 +1652,6 @@ export function activate(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
         loadedFilesProvider,
         vscode.window.registerTreeDataProvider('paradoxcode.loadedFiles', loadedFilesProvider),
-        // Agent tools are read-only queries over the shared language-server client; they
-        // register whenever the host exposes the Language Model Tools API and stay inert
-        // (never invoked) on hosts without a chat provider. The tools are prompt-referenceable
-        // (#paradoxSearch, #paradoxValidate, …) so agent sessions can list and enable them.
-        ...registerAgentTools(),
     );
 
     // Transparent localisation (pdcloc:// decoded views) is independent of the

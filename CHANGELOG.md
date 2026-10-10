@@ -24,8 +24,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- MCP moves to the independent `ParadoxCodeMCP` project with its own executable, tool
+  manifest, build, and tests. Configure `paradoxcode-mcp --server /path/to/paradoxcode`
+  instead of `paradoxcode mcp`; the language server retains its editor-neutral query API.
+- VS Code's Agent tool registrations, prompt references, and tool declarations are removed.
+  Editor transcoding uses a general language-server client accessor.
 - Editor titles retain **Open Mission Tree Preview to the Side**, **Decode Quoted Text** and
-  **Encode Quoted Text**, alongside the new search entry. Mission preview refresh, the mission icon picker, experimental decoded
+  **Encode Quoted Text**, alongside the new search entry. Mission preview refresh, the mission
+  icon picker, experimental decoded
   view entry and raw-form peek remain available in the Command Palette, with their existing
   context-menu entries preserved.
 - Transparent encoding and `pdcloc://` decoded views are experimental and disabled by default.

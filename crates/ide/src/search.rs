@@ -1,4 +1,4 @@
-//! Snapshot-bound editor search. Agent query contracts remain separate.
+//! Snapshot-bound editor search. External-client query contracts remain separate.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;

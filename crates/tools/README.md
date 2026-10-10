@@ -1,7 +1,7 @@
 # Repository tools
 
 `tools` owns developer commands, local performance measurements, semantic audits, real-process
-LSP/MCP contracts, extension validation, documentation and release/CI orchestration. Run it
+LSP contracts, extension validation, documentation and release/CI orchestration. Run it
 from the repository root:
 
 ```sh
@@ -29,18 +29,18 @@ Without it, real-server tests build the current debug binary before running.
 | `perf memory` | [perf/memory.rs](src/perf/memory.rs) | Sequential measured-child peak RSS, phase RSS and diagnostic signatures |
 | `perf init / status / import-corpus / control` | [perf/workflow.rs](src/perf/workflow.rs) | Environment checks, owned local inputs and native comparison workflows |
 | `editor check / compile / test / package` | [editor.rs](src/editor.rs) | Static contracts, translations, TypeScript compilation, behavior tests and VSIX packaging |
-| `lsp test` | [e2e.rs](src/e2e.rs) | Real-binary startup, semantic tokens, mission payloads, document changes, queries and MCP |
+| `lsp test` | [e2e.rs](src/e2e.rs) | Real-binary startup, semantic tokens, mission payloads, document changes, and queries |
 | `fuzz smoke` | [ci.rs](src/ci.rs) | Bounded nightly runs over every registered target |
 | `gates / check / documentation / release / ci` | Adjacent Rust modules | Local test groups, policy, generated views and CI/release workflows |
 
-The LSP transport client lives in [pdc](../pdc/src/client.rs) so the shipped MCP adapter can share
-it without depending on developer tools. The MCP product entry is `paradoxcode mcp`; see
-[its guide](../pdc/README.md#mcp-server). Tools invoke installed `node`, TypeScript, VSCE, VS Code, Cargo,
+The LSP transport client lives in [pdc](../pdc/src/client.rs) and is shared by developer audits,
+measurements, and transport tests. MCP has its own build and contract suite in the independent
+`ParadoxCodeMCP` project. Tools invoke installed `node`, TypeScript, VSCE, VS Code, Cargo,
 profilers and GitHub CLI with argument vectors. These remain external runtimes/toolchains.
 
 The extension's actual JavaScript behavior tests remain under
 [editors/vscode/test](../../editors/vscode/test). `tools editor test unit` runs those tests and
-the LSP/MCP contracts; `contract` adds package inventory checks; `ci` also produces a VSIX.
+the LSP contracts; `contract` adds package inventory checks; `ci` also produces a VSIX.
 `host` explicitly launches the VS Code/Electron suite. Normal CI groups do not download Electron.
 
 ## CI evidence and release promotion

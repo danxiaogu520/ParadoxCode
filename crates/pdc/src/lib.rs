@@ -7,7 +7,6 @@
 pub mod client;
 mod dependency;
 mod initialize;
-pub mod mcp;
 mod protocol;
 mod requests;
 mod server;
