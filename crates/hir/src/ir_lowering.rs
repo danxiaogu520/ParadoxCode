@@ -257,6 +257,8 @@ fn subtype_names_from_set(ir: &RulesIr, ty: TypeId, set: &SubtypeSet) -> Vec<std
 pub(super) fn lower_schema_fragment(
     ir: &RulesIr,
     syntax: &ParsedFile,
+    props: &[HirProperty],
+    bare_values: &[HirScalar],
     schema: SchemaId,
     subtypes: SubtypeSet,
     state: ScopeState,
@@ -264,10 +266,7 @@ pub(super) fn lower_schema_fragment(
     root_range: Option<TextRange>,
     unknown_ranges: &[TextRange],
 ) -> IrFacts {
-    let collected = crate::collector::collect(syntax);
-    let props = collected.properties;
-    let bare_values = collected.bare_values;
-    let children = crate::scope::property_children(&props);
+    let children = crate::scope::property_children(props);
     let root_range = root_range.unwrap_or(syntax.root().range());
     let mut out = IrFacts {
         query_context: Default::default(),
@@ -310,8 +309,8 @@ pub(super) fn lower_schema_fragment(
     descend(
         ir,
         &path,
-        &props,
-        &bare_values,
+        props,
+        bare_values,
         &children,
         included.difference(&nested).copied().collect(),
         schema,
@@ -364,10 +363,11 @@ fn descend(
     let query_context = crate::query::PropertyQueryContext::from_indices(props, &indices)
         .with_unknown_ranges(&out.unknown_ranges)
         .defer_templates(out.definitions.iter().any(|definition| {
-            out.template_kinds
-                .contains(&definition.kind.to_ascii_lowercase())
-                && definition.range.start() <= container_range.start()
+            definition.range.start() <= container_range.start()
                 && container_range.end() <= definition.range.end()
+                && out
+                    .template_kinds
+                    .contains(&definition.kind.to_ascii_lowercase())
         }))
         .to_owned();
     out.query_context = query_context.clone();
@@ -487,10 +487,11 @@ fn descend(
         let mut fork = false;
         if p.scalar.is_none() && candidates.len() > 1 {
             let template_text = out.definitions.iter().any(|definition| {
-                out.template_kinds
-                    .contains(&definition.kind.to_ascii_lowercase())
-                    && definition.range.start() <= p.range.start()
+                definition.range.start() <= p.range.start()
                     && p.range.end() <= definition.range.end()
+                    && out
+                        .template_kinds
+                        .contains(&definition.kind.to_ascii_lowercase())
             });
             let checked = crate::block_checking::select_overloads::<std::convert::Infallible>(
                 ir,
@@ -547,10 +548,11 @@ fn descend(
             && shape == Shape::Block
             && !crate::parameters::delimited_parameters(&p.key, p.key_range, '$').is_empty()
             && out.definitions.iter().any(|definition| {
-                out.template_kinds
-                    .contains(&definition.kind.to_ascii_lowercase())
-                    && definition.range.start() <= p.range.start()
+                definition.range.start() <= p.range.start()
                     && p.range.end() <= definition.range.end()
+                    && out
+                        .template_kinds
+                        .contains(&definition.kind.to_ascii_lowercase())
             })
         {
             // A replacement can supply a scope key. Retain symbols reachable through the
@@ -642,14 +644,21 @@ fn descend(
             if let Some(first) = branches.first() {
                 macro_rules! common {
                     ($field:ident) => {
-                        out.$field = first
-                            .$field
-                            .iter()
-                            .filter(|item| {
-                                branches.iter().all(|branch| branch.$field.contains(item))
-                            })
-                            .cloned()
-                            .collect();
+                        // Every branch starts with the identical immutable prefix.
+                        // Intersect only its additions; comparing the whole prefix
+                        // per overload made large files pay quadratic scan costs.
+                        let prefix = base.$field.len();
+                        out.$field.extend(
+                            first.$field[prefix..]
+                                .iter()
+                                .filter(|item| {
+                                    base.$field.contains(item)
+                                        || branches
+                                            .iter()
+                                            .all(|branch| branch.$field[prefix..].contains(item))
+                                })
+                                .cloned(),
+                        );
                     };
                 }
                 common!(field_facts);
@@ -949,12 +958,12 @@ fn lower_template_arguments(
     // Unknown definition-side bindings remain holes. Concrete siblings still
     // contribute independently provable references.
     let symbolic_context = out.definitions.iter().any(|definition| {
-        out.template_kinds
+        children.iter().any(|index| {
+            definition.range.start() <= props[*index].range.start()
+                && props[*index].range.end() <= definition.range.end()
+        }) && out
+            .template_kinds
             .contains(&definition.kind.to_ascii_lowercase())
-            && children.iter().any(|index| {
-                definition.range.start() <= props[*index].range.start()
-                    && props[*index].range.end() <= definition.range.end()
-            })
     });
     let Some(ty) = ir.type_by_name(kind) else {
         return;

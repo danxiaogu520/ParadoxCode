@@ -8,7 +8,7 @@ use hir::{
 };
 use rules::{GameProfile, RuleSet, ir::RulesIr};
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use vfs::{DocumentId, DocumentSource, SourceFileId, SourceRoot, WorkspaceScanToken};
 
 #[derive(Clone, Copy, Debug)]
@@ -228,7 +228,7 @@ pub fn stabilize_overlay_facts(
             let tracked = TrackingFacts {
                 ir,
                 facts: &facts,
-                reads: Mutex::new(BTreeSet::new()),
+                reads: Default::default(),
             };
             let mut next = crate::pipeline::relower_document_snapshot(
                 rules,
@@ -238,10 +238,7 @@ pub fn stabilize_overlay_facts(
                 doc.clone(),
                 Some(&tracked),
             );
-            next.fact_dependencies = tracked
-                .reads
-                .into_inner()
-                .expect("overlay-local dependency lock poisoned");
+            next.fact_dependencies = tracked.into_reads();
             batch.push((id.clone(), next));
         }
         if failed {

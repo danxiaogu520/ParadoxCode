@@ -5,7 +5,7 @@
 
 use crate::template_parse::{TemplateParse, TemplateParseSession};
 use crate::types::{CancellationToken, Cancelled, Diagnostic, DiagnosticCode, Severity};
-use crate::{semantic::effective_workspace_member_names, support::ParsedInput};
+use crate::{semantic::workspace_member_names_cached, support::ParsedInput};
 use engine::AnalysisSnapshot;
 use hir::{HirFile, ScopeState, ScopeValue};
 use rules::ir::{
@@ -143,7 +143,7 @@ pub(crate) fn spellings(
         &rules::query::NoQueryContext,
         &mut out,
     );
-    out.sort_by_key(|value| value.to_ascii_lowercase());
+    out.sort_by(|left, right| crate::support::ascii_case_cmp(left, right));
     out.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
     out
 }
@@ -371,7 +371,7 @@ pub(crate) fn spellings_with_context(
                 }
             })
             .collect::<Vec<_>>();
-        values.sort_by_key(|value| value.to_ascii_lowercase());
+        values.sort_by(|left, right| crate::support::ascii_case_cmp(left, right));
         values.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
         return values;
     }
@@ -382,13 +382,13 @@ pub(crate) fn spellings_with_context(
                 spellings_with_context(ir, *alternative, snapshot, prefix, state, context)
             })
             .collect::<Vec<_>>();
-        values.sort_by_key(|value| value.to_ascii_lowercase());
+        values.sort_by(|left, right| crate::support::ascii_case_cmp(left, right));
         values.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
         return values;
     }
     let mut values = Vec::new();
     spellings_into(ir, matcher, snapshot, prefix, context, &mut values);
-    values.sort_by_key(|value| value.to_ascii_lowercase());
+    values.sort_by(|left, right| crate::support::ascii_case_cmp(left, right));
     values.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
     if matches!(ir.matcher(matcher), Matcher::Scope(_) | Matcher::Link) {
         // Keep the default list bounded to pairs of static declared links. Dynamic
@@ -420,7 +420,7 @@ pub(crate) fn spellings_with_context(
                 }
             }
         }
-        values.sort_by_key(|value| value.to_ascii_lowercase());
+        values.sort_by(|left, right| crate::support::ascii_case_cmp(left, right));
         values.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
     }
     if let Matcher::Scope(expected) = ir.matcher(matcher) {
@@ -507,21 +507,27 @@ fn spellings_into(
                 );
             }
             out.extend(
-                effective_workspace_member_names(snapshot, name)
-                    .into_iter()
+                workspace_member_names_cached(snapshot, name)
+                    .iter()
                     .filter(|member| {
                         let subtype_ok = subtype.is_none_or(|subtype| {
                             facts.type_subtype_member(*type_id, subtype, member)
                         });
                         subtype_ok
+                            && crate::support::ascii_case_contains(
+                                strip
+                                    .and_then(|strip| strip_prefix_case_insensitive(member, strip))
+                                    .unwrap_or(member),
+                                prefix,
+                            )
                             && strip.is_none_or(|strip| {
                                 strip_prefix_case_insensitive(member, strip).is_some()
                             })
                     })
                     .map(|member| {
                         strip.map_or(member.clone(), |strip| {
-                            strip_prefix_case_insensitive(&member, strip)
-                                .unwrap_or(&member)
+                            strip_prefix_case_insensitive(member, strip)
+                                .unwrap_or(member)
                                 .to_owned()
                         })
                     }),
@@ -530,7 +536,12 @@ fn spellings_into(
 
         Matcher::Def { type_id, .. } => {
             let name = ir.strings().resolve(ir.type_info(*type_id).name);
-            out.extend(effective_workspace_member_names(snapshot, name));
+            out.extend(
+                workspace_member_names_cached(snapshot, name)
+                    .iter()
+                    .filter(|name| crate::support::ascii_case_contains(name, prefix))
+                    .cloned(),
+            );
             out.extend(
                 ir.type_info(*type_id)
                     .builtin
@@ -538,7 +549,12 @@ fn spellings_into(
                     .map(|member| ir.strings().resolve(*member).to_owned()),
             );
         }
-        Matcher::Loc => out.extend(effective_workspace_member_names(snapshot, "localisation")),
+        Matcher::Loc => out.extend(
+            workspace_member_names_cached(snapshot, "localisation")
+                .iter()
+                .filter(|name| crate::support::ascii_case_contains(name, prefix))
+                .cloned(),
+        ),
         Matcher::Union(items) => {
             for item in items {
                 spellings_into(ir, *item, snapshot, prefix, context, out);
@@ -571,7 +587,7 @@ fn pattern_spellings(
             PatternPart::Hole(matcher) => {
                 let mut values = Vec::new();
                 spellings_into(ir, *matcher, snapshot, "", context, &mut values);
-                values.sort_by_key(|value| value.to_ascii_lowercase());
+                values.sort_by(|left, right| crate::support::ascii_case_cmp(left, right));
                 values.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
                 values
             }

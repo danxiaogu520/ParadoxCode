@@ -84,6 +84,29 @@ pub struct RenderedTemplate {
     pub coverage: AnalysisCoverage,
 }
 
+#[derive(Eq, Hash, PartialEq)]
+struct FrameKey {
+    schema: rules::ir::SchemaId,
+    state: crate::ScopeState,
+    holes: Vec<text::TextRange>,
+    text: String,
+}
+
+#[derive(Eq, Hash, PartialEq)]
+struct RenderKey {
+    template: usize,
+    schema: rules::ir::SchemaId,
+    bindings: BTreeMap<String, String>,
+    raw: BTreeMap<String, String>,
+    present: BTreeSet<String>,
+}
+
+struct RenderFrame {
+    // Keep pointer identity alive for the entire local cache lifetime.
+    _owner: std::sync::Arc<Template>,
+    rendered: RenderedTemplate,
+}
+
 impl RenderedTemplate {
     /// Binding dependencies intersecting a generated range.
     pub fn dependencies(&self, range: text::TextRange) -> BTreeSet<String> {
@@ -368,20 +391,38 @@ fn render_with_views(
     output
 }
 
-fn scalar_use_positions(
+/// Classifies each program block/schema pair once. Overloads can converge on
+/// the same child schema; revisiting it duplicates both workspace lookups and
+/// every descendant traversal without adding any source positions.
+fn binding_use_positions(
     ir: &rules::ir::RulesIr,
     template: &Template,
     bindings: &BTreeMap<String, String>,
     schema: rules::ir::SchemaId,
     facts: &dyn rules::ir::SymbolFacts,
-) -> (BTreeSet<u32>, BTreeSet<u32>) {
+) -> (BTreeSet<u32>, BTreeSet<u32>, BTreeSet<u32>) {
     use rules::template::{TemplateFragment, TemplateInstruction, TemplateOperand};
-    let mut result = BTreeSet::new();
+    let mut scalar = BTreeSet::new();
     let mut raw = BTreeSet::new();
+    let mut script = BTreeSet::new();
     let mut pending = vec![(0, schema)];
+    let mut visited = BTreeSet::new();
     while let Some((block, schema)) = pending.pop() {
+        if !visited.insert((block, schema)) {
+            continue;
+        }
         for instruction in template.program.blocks[block].iter() {
+            let read = |token: &rules::template::TemplateToken, positions: &mut BTreeSet<u32>| {
+                for part in &token.fragments {
+                    if let TemplateFragment::Parameter { range, .. } = part {
+                        positions.insert(range.start());
+                    }
+                }
+            };
             match instruction {
+                TemplateInstruction::Consume(token) | TemplateInstruction::Recover(token) => {
+                    read(token, &mut script);
+                }
                 TemplateInstruction::When { block, .. } => pending.push((*block, schema)),
                 TemplateInstruction::Dispatch(property) => {
                     let key = property
@@ -415,107 +456,21 @@ fn scalar_use_positions(
                         facts,
                     ))
                     .collect::<Vec<_>>();
+                    let accepts_scalar = fields
+                        .iter()
+                        .any(|id| ir.shape(*id) == Some(rules::ir::Shape::Scalar));
+                    let accepts_block = fields
+                        .iter()
+                        .any(|id| ir.shape(*id) == Some(rules::ir::Shape::Block));
                     match &property.value {
-                        TemplateOperand::Scalar(token)
-                            if fields
-                                .iter()
-                                .any(|id| ir.shape(*id) == Some(rules::ir::Shape::Scalar))
-                                && !fields
-                                    .iter()
-                                    .any(|id| ir.shape(*id) == Some(rules::ir::Shape::Block)) =>
-                        {
-                            for fragment in &token.fragments {
-                                if let TemplateFragment::Parameter { range, .. } = fragment {
-                                    result.insert(range.start());
-                                }
-                            }
+                        TemplateOperand::Scalar(token) if accepts_scalar && !accepts_block => {
+                            read(token, &mut scalar);
                             if !token.quoted && token.fragments.len() == 1 {
                                 raw.insert(token.range.start());
                             }
                         }
-                        TemplateOperand::Block(block) => {
-                            for id in fields {
-                                if let Some(child) = ir.child(id, schema) {
-                                    pending.push((*block, child));
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-    (result, raw)
-}
-
-fn script_use_positions(
-    ir: &rules::ir::RulesIr,
-    template: &Template,
-    bindings: &BTreeMap<String, String>,
-    schema: rules::ir::SchemaId,
-    facts: &dyn rules::ir::SymbolFacts,
-) -> BTreeSet<u32> {
-    use rules::template::{TemplateFragment, TemplateInstruction, TemplateOperand};
-    let mut result = BTreeSet::new();
-    let mut pending = vec![(0, schema)];
-    while let Some((block, schema)) = pending.pop() {
-        for node in template.program.blocks[block].iter() {
-            let mut read = |token: &rules::template::TemplateToken| {
-                for part in &token.fragments {
-                    if let TemplateFragment::Parameter { range, .. } = part {
-                        result.insert(range.start());
-                    }
-                }
-            };
-            match node {
-                TemplateInstruction::Consume(token) | TemplateInstruction::Recover(token) => {
-                    read(token)
-                }
-                TemplateInstruction::When { block, .. } => pending.push((*block, schema)),
-                TemplateInstruction::Dispatch(property) => {
-                    let key = property
-                        .key
-                        .fragments
-                        .iter()
-                        .map(|part| match part {
-                            TemplateFragment::Literal(text) => Some(text.as_str()),
-                            TemplateFragment::Parameter { name, .. } => {
-                                bindings.get(&name.to_ascii_lowercase()).map(String::as_str)
-                            }
-                        })
-                        .collect::<Option<Vec<_>>>()
-                        .map(|parts| parts.concat());
-                    let Some(key) = key else {
-                        continue;
-                    };
-                    let fields = crate::checking::field_candidates(
-                        ir,
-                        schema,
-                        &key,
-                        rules::ir::Shape::Scalar,
-                        facts,
-                    )
-                    .into_iter()
-                    .chain(crate::checking::field_candidates(
-                        ir,
-                        schema,
-                        &key,
-                        rules::ir::Shape::Block,
-                        facts,
-                    ))
-                    .collect::<Vec<_>>();
-                    match &property.value {
-                        TemplateOperand::Scalar(token)
-                            if fields
-                                .iter()
-                                .any(|id| ir.shape(*id) == Some(rules::ir::Shape::Block))
-                                && !fields
-                                    .iter()
-                                    .any(|id| ir.shape(*id) == Some(rules::ir::Shape::Scalar)) =>
-                        {
-                            read(token)
+                        TemplateOperand::Scalar(token) if accepts_block && !accepts_scalar => {
+                            read(token, &mut script);
                         }
                         TemplateOperand::Block(block) => {
                             for field in fields {
@@ -530,7 +485,7 @@ fn script_use_positions(
             }
         }
     }
-    result
+    (scalar, raw, script)
 }
 
 fn append_slice(
@@ -629,6 +584,35 @@ pub fn render_expanded<E>(
     byte_limit: usize,
     checkpoint: &mut dyn FnMut() -> Result<(), E>,
 ) -> Result<RenderedTemplate, E> {
+    render_expanded_impl(
+        ir,
+        facts,
+        template,
+        bindings,
+        raw,
+        present,
+        schema,
+        state,
+        byte_limit,
+        16 * 1024 * 1024,
+        checkpoint,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_expanded_impl<E>(
+    ir: &rules::ir::RulesIr,
+    facts: &dyn rules::ir::SymbolFacts,
+    template: std::sync::Arc<Template>,
+    bindings: &BTreeMap<String, String>,
+    raw: &BTreeMap<String, String>,
+    present: &BTreeSet<String>,
+    schema: rules::ir::SchemaId,
+    state: crate::ScopeState,
+    byte_limit: usize,
+    frame_cache_bytes: usize,
+    checkpoint: &mut dyn FnMut() -> Result<(), E>,
+) -> Result<RenderedTemplate, E> {
     let mut output = RenderedTemplate::default();
     if bindings.values().any(|value| value.len() > byte_limit)
         || raw.values().any(|value| value.len() > byte_limit)
@@ -666,6 +650,12 @@ pub fn render_expanded<E>(
         schema,
         state: Box::new(state),
     }];
+    // One query reads one immutable facts view. Repeated frames have already
+    // recorded their reads in that query, so local reuse needs no opaque global
+    // memo or cross-file dependency replay. Charge retained CST/HIR conservatively.
+    let mut frame_hirs = std::collections::HashMap::new();
+    let mut frame_renders = std::collections::HashMap::<RenderKey, RenderFrame>::new();
+    let mut frame_bytes = 0usize;
     let mut frames = 0;
     let mut processed_bytes = 0usize;
     let mut visiting = std::collections::HashSet::new();
@@ -712,31 +702,92 @@ pub fn render_expanded<E>(
                     break;
                 }
                 work.push(RenderTask::Exit(identity));
-                let (scalar_uses, raw_scalar_uses) =
-                    scalar_use_positions(ir, &template, &bindings, schema, &DispatchFacts(facts));
-                let script_uses =
-                    script_use_positions(ir, &template, &bindings, schema, &DispatchFacts(facts));
-                let mut interrupted = None;
-                let mut rendered = render_with_views(
-                    &template,
-                    &bindings,
-                    &present,
-                    &raw,
-                    &scalar_uses,
-                    &raw_scalar_uses,
-                    &script_uses,
-                    byte_limit,
-                    &mut || match checkpoint() {
-                        Ok(()) => true,
-                        Err(error) => {
-                            interrupted = Some(error);
-                            false
-                        }
-                    },
-                );
-                if let Some(error) = interrupted {
-                    return Err(error);
-                }
+                let render_key = RenderKey {
+                    template: std::sync::Arc::as_ptr(&template) as usize,
+                    schema,
+                    bindings: bindings.clone(),
+                    raw: raw.clone(),
+                    present: present.clone(),
+                };
+                let mut rendered = if let Some(cached) = frame_renders.get(&render_key) {
+                    cached.rendered.clone()
+                } else {
+                    let (scalar_uses, raw_scalar_uses, script_uses) =
+                        if template.program.parameters.is_empty() && !template.source.contains('$')
+                        {
+                            // Literal bodies have no insertion whose consumption
+                            // kind needs classification. Their ordinary dispatch
+                            // and transitive calls are still lowered below.
+                            (BTreeSet::new(), BTreeSet::new(), BTreeSet::new())
+                        } else {
+                            binding_use_positions(
+                                ir,
+                                &template,
+                                &bindings,
+                                schema,
+                                &DispatchFacts(facts),
+                            )
+                        };
+                    let mut interrupted = None;
+                    let rendered = render_with_views(
+                        &template,
+                        &bindings,
+                        &present,
+                        &raw,
+                        &scalar_uses,
+                        &raw_scalar_uses,
+                        &script_uses,
+                        byte_limit,
+                        &mut || match checkpoint() {
+                            Ok(()) => true,
+                            Err(error) => {
+                                interrupted = Some(error);
+                                false
+                            }
+                        },
+                    );
+                    if let Some(error) = interrupted {
+                        return Err(error);
+                    }
+                    let bytes = template
+                        .source
+                        .len()
+                        .saturating_mul(128)
+                        .saturating_add(1024)
+                        .saturating_add(rendered.text.len().saturating_mul(32))
+                        .saturating_add(
+                            (bindings.len() + raw.len() + present.len()).saturating_mul(128),
+                        )
+                        .saturating_add(rendered.pieces.len().saturating_mul(512))
+                        .saturating_add(
+                            bindings
+                                .iter()
+                                .chain(&raw)
+                                .map(|(key, value)| key.len() + value.len())
+                                .sum::<usize>()
+                                .saturating_mul(8),
+                        )
+                        .saturating_add(
+                            present
+                                .iter()
+                                .map(String::len)
+                                .sum::<usize>()
+                                .saturating_mul(8),
+                        );
+                    if rendered.coverage.limits.is_empty()
+                        && bytes <= frame_cache_bytes.saturating_sub(frame_bytes)
+                    {
+                        frame_bytes += bytes;
+                        frame_renders.insert(
+                            render_key,
+                            RenderFrame {
+                                _owner: template.clone(),
+                                rendered: rendered.clone(),
+                            },
+                        );
+                    }
+                    rendered
+                };
                 for piece in &mut rendered.pieces {
                     if let Some(name) = &piece.binding_name
                         && let (Some(binding), Some(value)) =
@@ -807,37 +858,68 @@ pub fn render_expanded<E>(
                     break;
                 }
                 output.coverage.merge(&rendered.coverage);
-                let progress = parser::parse_script_prefix_bounded(
-                    &rendered.text,
-                    parser::ScriptParseBudget {
-                        bytes: byte_limit,
-                        ..Default::default()
-                    },
-                    checkpoint,
-                )?;
-                if let Some((limit, frontier)) = progress.frontier {
-                    rendered.coverage.limits.insert(parse_limit(limit));
-                    rendered.frontiers.push(frontier);
-                    if let Some(range) = text::TextRange::new(frontier, rendered.text.len() as u32)
-                    {
-                        rendered.trial_holes.push(range);
-                    }
-                }
-                let Some(parsed) = progress.parsed else {
-                    output.coverage.merge(&rendered.coverage);
-                    output.frontiers.push(output.text.len() as u32);
-                    break;
-                };
-                let parsed = std::sync::Arc::new(parsed);
-                let hir = crate::lower_ir_schema_with_holes(
-                    parsed,
-                    ir,
+                let frame_key = FrameKey {
                     schema,
-                    Default::default(),
-                    state.clone(),
-                    &DispatchFacts(facts),
-                    &rendered.trial_holes,
-                );
+                    state: state.clone(),
+                    holes: rendered.trial_holes.clone(),
+                    text: rendered.text.clone(),
+                };
+                let hir = if let Some(cached) = frame_hirs.get(&frame_key) {
+                    std::sync::Arc::clone(cached)
+                } else {
+                    let progress = parser::parse_script_prefix_bounded(
+                        &rendered.text,
+                        parser::ScriptParseBudget {
+                            bytes: byte_limit,
+                            ..Default::default()
+                        },
+                        checkpoint,
+                    )?;
+                    if let Some((limit, frontier)) = progress.frontier {
+                        rendered.coverage.limits.insert(parse_limit(limit));
+                        rendered.frontiers.push(frontier);
+                        if let Some(range) =
+                            text::TextRange::new(frontier, rendered.text.len() as u32)
+                        {
+                            rendered.trial_holes.push(range);
+                        }
+                    }
+                    let Some(parsed) = progress.parsed else {
+                        output.coverage.merge(&rendered.coverage);
+                        output.frontiers.push(output.text.len() as u32);
+                        break;
+                    };
+                    let parsed = std::sync::Arc::new(parsed);
+                    let hir = crate::lower_ir_schema_with_holes(
+                        parsed,
+                        ir,
+                        schema,
+                        Default::default(),
+                        state.clone(),
+                        &DispatchFacts(facts),
+                        &rendered.trial_holes,
+                    );
+                    let hir = std::sync::Arc::new(hir);
+                    let bytes = rendered
+                        .text
+                        .len()
+                        .saturating_mul(128)
+                        .saturating_add(1024)
+                        .saturating_add(
+                            (state.current.len() + state.from.len() + state.previous.len())
+                                .saturating_mul(std::mem::size_of::<crate::ScopeValue>()),
+                        )
+                        .saturating_add(hir.properties().len().saturating_mul(2048));
+                    // Partial parses add frontiers to this rendering operation;
+                    // keep them transient so a hit cannot omit that evidence.
+                    if progress.frontier.is_none()
+                        && bytes <= frame_cache_bytes.saturating_sub(frame_bytes)
+                    {
+                        frame_bytes += bytes;
+                        frame_hirs.insert(frame_key, hir.clone());
+                    }
+                    hir
+                };
                 let call_view = std::sync::Arc::new(rendered.clone());
                 let mut calls = Vec::new();
                 let mut covered = Vec::<text::TextRange>::new();
@@ -1055,6 +1137,7 @@ pub fn render_expanded<E>(
             }
         }
     }
+
     Ok(output)
 }
 
@@ -1235,5 +1318,170 @@ mod value_context_tests {
                 .any(|piece| piece.script && piece.uncertain_text)
         );
         assert!(script.has_unresolved_structure(text::TextRange::new(end, end + 12).unwrap()));
+    }
+}
+
+#[cfg(test)]
+mod frame_reuse_tests {
+    use super::*;
+    use rules::ir::{SymbolFacts, TypeId};
+    use std::cell::{Cell, RefCell};
+    use std::sync::Arc;
+
+    struct Facts {
+        templates: BTreeMap<String, Arc<Template>>,
+        reads: RefCell<BTreeSet<(TypeId, String)>>,
+        members: Cell<usize>,
+    }
+    impl SymbolFacts for Facts {
+        fn type_member(&self, ty: TypeId, name: &str) -> bool {
+            self.members.set(self.members.get() + 1);
+            self.reads
+                .borrow_mut()
+                .insert((ty, name.to_ascii_lowercase()));
+            self.templates.contains_key(name) || name == "AAA"
+        }
+        fn template(&self, ty: TypeId, name: &str) -> Option<Arc<Template>> {
+            self.reads
+                .borrow_mut()
+                .insert((ty, name.to_ascii_lowercase()));
+            self.templates.get(name).cloned()
+        }
+    }
+
+    fn fixture() -> (rules::ir::RulesIr, Facts) {
+        fixture_source(
+            "leaf = { hit = $P$ hit = absent } outer = { leaf = { p = AAA } leaf = { p = AAA } leaf = { p = BBB } leaf = { } leaf = { } }",
+        )
+    }
+
+    fn fixture_source(source: &str) -> (rules::ir::RulesIr, Facts) {
+        let ir = rules::lower::lower(&[("frames.json".into(), serde_json::from_value(serde_json::json!({
+            "files":{"test":{"path":"test","root":"definitions"}},
+            "traits":{"Template":{}},
+            "types":{"helper":{"impl":{"Template":{"body":"body"}}},"country":{}},
+            "schemas":{
+                "definitions":{"patterns":[{"key":"def<helper>","body":"body","card":"0..*"}]},
+                "body":{"fields":{"hit":{"value":"ref<country>","card":"0..*"},"nested":{"body":"body","card":"0..*"}},
+                    "patterns":[{"key":"ref<helper>","body":"body","card":"0..*"}]}
+            }
+        })).unwrap())], Default::default()).unwrap();
+        let hir = crate::lower_shared_with_ir(
+            Arc::new(parser::parse(parser::FileFormat::Script, source)),
+            &text::LogicalPath::parse("test/frames.txt").unwrap(),
+            &rules::RuleSet::from_ir_catalog(&ir),
+            &ir.game.profile,
+            &ir,
+        );
+        let templates = hir
+            .dynamic_templates()
+            .iter()
+            .map(|t| (t.name.clone(), Arc::new(t.clone())))
+            .collect();
+        (
+            ir,
+            Facts {
+                templates,
+                reads: Default::default(),
+                members: Default::default(),
+            },
+        )
+    }
+
+    fn expand(
+        ir: &rules::ir::RulesIr,
+        facts: &Facts,
+        bytes: usize,
+        memo: usize,
+    ) -> RenderedTemplate {
+        render_expanded_impl::<std::convert::Infallible>(
+            ir,
+            facts,
+            facts.templates["outer"].clone(),
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
+            ir.schema_by_name("body").unwrap(),
+            crate::ScopeState::initial(crate::ScopeValue::Unknown),
+            bytes,
+            memo,
+            &mut || Ok(()),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn reuse_preserves_bindings_holes_source_maps_and_positive_and_negative_reads() {
+        let (ir, facts) = fixture();
+        let plain = expand(&ir, &facts, 4096, 0);
+        let plain_reads = facts.reads.take();
+        let plain_members = facts.members.replace(0);
+        let reused = expand(&ir, &facts, 4096, 16 * 1024 * 1024);
+        assert_eq!(format!("{plain:?}"), format!("{reused:?}"));
+        assert_eq!(plain_reads, facts.reads.take());
+        assert!(
+            facts.members.get() < plain_members,
+            "fixture must exercise reuse"
+        );
+        assert!(reused.text.contains("hit = AAA"));
+        assert!(reused.text.contains("hit = BBB"));
+        assert!(reused.pieces.iter().any(|piece| piece.hole));
+        let country = ir.type_by_name("country").unwrap();
+        assert!(plain_reads.contains(&(country, "aaa".into())));
+        assert!(plain_reads.contains(&(country, "absent".into())));
+    }
+
+    #[test]
+    fn reuse_preserves_resource_frontiers_and_cancellation() {
+        let (ir, facts) = fixture();
+        let plain = expand(&ir, &facts, 96, 0);
+        let reused = expand(&ir, &facts, 96, 16 * 1024 * 1024);
+        assert_eq!(format!("{plain:?}"), format!("{reused:?}"));
+        assert!(!reused.coverage.limits.is_empty());
+        assert!(!reused.frontiers.is_empty());
+        for memo in [0, 16 * 1024 * 1024] {
+            let mut remaining = 6;
+            let result = render_expanded_impl(
+                &ir,
+                &facts,
+                facts.templates["outer"].clone(),
+                &Default::default(),
+                &Default::default(),
+                &Default::default(),
+                ir.schema_by_name("body").unwrap(),
+                crate::ScopeState::initial(crate::ScopeValue::Unknown),
+                4096,
+                memo,
+                &mut || {
+                    remaining -= 1;
+                    if remaining == 0 {
+                        Err("cancelled")
+                    } else {
+                        Ok(())
+                    }
+                },
+            );
+            assert_eq!(result.unwrap_err(), "cancelled");
+        }
+    }
+
+    #[test]
+    fn reused_rendering_still_reapplies_partial_parse_frontiers() {
+        let source = format!(
+            "leaf = {{ {} hit = AAA {} }} outer = {{ leaf = {{ }} leaf = {{ }} }}",
+            "nested = { ".repeat(140),
+            "} ".repeat(140),
+        );
+        let (ir, facts) = fixture_source(&source);
+        let plain = expand(&ir, &facts, 4096, 0);
+        let reused = expand(&ir, &facts, 4096, 16 * 1024 * 1024);
+        assert_eq!(format!("{plain:?}"), format!("{reused:?}"));
+        assert!(
+            reused
+                .coverage
+                .limits
+                .contains(&parse_limit(parser::ScriptParseLimit::Depth))
+        );
+        assert!(!reused.frontiers.is_empty());
     }
 }

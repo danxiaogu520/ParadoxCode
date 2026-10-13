@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-10-14
+
 ### Added
 
 - A unified ParadoxCode search panel for rules, definitions, localisation values/keys and full
@@ -23,6 +25,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   capabilities; dependent values read a selector in the same script container.
 
 ### Changed
+
+- Startup reuses the immutable rule identity and catalog; cold indexing records symbol
+  dependencies without repeated allocations, and navigation positions share per-file storage.
+- Cold indexing reuses positive and negative symbol membership within each immutable fact
+  round. Template expansion shares repeated rendering and semantic frames within a bounded
+  query-local cache, deduplicates converging block/schema traversals, and collects CST facts
+  once per fragment while preserving dependency reads, source maps and resource frontiers.
+- Completion filters workspace spellings before copying them, reuses unchanged membership
+  across edits, and counts bounded fields once per container. Workspace diagnostic fingerprints
+  reuse unchanged indexed contributions.
+- Mission previews cache title layouts, avoid repeated Steam/font discovery on interactive
+  requests, and cancel superseded refreshes. Performance fixtures now enable the production IR.
 
 - MCP moves to the independent `ParadoxCodeMCP` project with its own executable, tool
   manifest, build, and tests. Configure `paradoxcode-mcp --server /path/to/paradoxcode`
@@ -1407,7 +1421,8 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.2...v0.5.1
 [0.5.0]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.1...v0.4.2

@@ -38,6 +38,39 @@ fn workspace_member_index_tracks_overlay_open_and_close() {
         ["overlay_effect"]
     );
 
+    let names = crate::semantic::workspace_member_names_cached(&host.snapshot(), "scripted_effect");
+    host.apply_document_changes(
+        &id,
+        2,
+        &[engine::TextChange::full(
+            "overlay_effect = { add_prestige = 2 }\n",
+        )],
+    )
+    .expect("edit body");
+    assert!(
+        std::sync::Arc::ptr_eq(
+            &names,
+            &crate::semantic::workspace_member_names_cached(&host.snapshot(), "scripted_effect")
+        ),
+        "a body edit preserves namespace membership"
+    );
+    let old = host.snapshot();
+    host.apply_document_changes(
+        &id,
+        3,
+        &[engine::TextChange::full("renamed_effect = { }\n")],
+    )
+    .expect("rename definition");
+    assert_eq!(
+        &*crate::semantic::workspace_member_names_cached(&host.snapshot(), "scripted_effect"),
+        &["renamed_effect"]
+    );
+    assert_eq!(
+        &*crate::semantic::workspace_member_names_cached(&old, "scripted_effect"),
+        &["overlay_effect"],
+        "an older worker retains its own namespace inputs"
+    );
+
     host.close_document(&id)
         .expect("close scripted-effect overlay");
     assert_eq!(

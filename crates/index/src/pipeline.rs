@@ -73,10 +73,9 @@ impl<'a> IndexSymbolFacts<'a> {
 
     fn has_member(&self, kind: &str, name: &str) -> bool {
         self.index
-            .definitions_with_state(kind, name)
-            .iter()
+            .definitions_with_state_iter(kind, name)
             .any(|(definition, active)| {
-                *active
+                active
                     && self
                         .excluded_file_ids
                         .is_none_or(|files| !files.contains(&definition.file_id))
@@ -129,8 +128,7 @@ impl<'a> IndexSymbolFacts<'a> {
 
     fn has_subtype(&self, kind: &str, instance: &str, subtype: &str) -> bool {
         self.index
-            .definitions_with_state(kind, instance)
-            .into_iter()
+            .definitions_with_state_iter(kind, instance)
             .filter(|(definition, active)| {
                 *active
                     && self
@@ -212,7 +210,6 @@ impl rules::ir::SymbolFacts for IndexSymbolFacts<'_> {
             .active_dynamic_definition(kind, name)?
             .template
             .clone()
-            .map(Arc::new)
     }
 
     fn type_member(&self, type_id: rules::ir::TypeId, name: &str) -> bool {
@@ -649,7 +646,7 @@ pub(crate) fn relower_fact_readers(
         let tracked = crate::fact_stabilization::TrackingFacts {
             ir,
             facts,
-            reads: Mutex::new(BTreeSet::new()),
+            reads: Default::default(),
         };
         let mut rebuilt = build_file_state_impl(
             file,
@@ -662,10 +659,7 @@ pub(crate) fn relower_fact_readers(
             Some(&tracked),
             state.parsed().is_none(),
         );
-        rebuilt.fact_dependencies = tracked
-            .reads
-            .into_inner()
-            .expect("file-local dependency lock poisoned");
+        rebuilt.fact_dependencies = tracked.into_reads();
         if state.parsed().is_none() {
             rebuilt = rebuilt.cache_only();
         }
@@ -1210,7 +1204,8 @@ fn collect_dynamic_definitions(hir: &HirFile, _rules: &RuleSet) -> Vec<DynamicDe
             parameters,
             template: hir
                 .dynamic_template(&definition.kind, &definition.name, definition.range)
-                .cloned(),
+                .cloned()
+                .map(Arc::new),
         });
     }
     summaries.sort_by_key(|summary| summary.definition_range);

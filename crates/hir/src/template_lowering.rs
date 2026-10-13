@@ -233,6 +233,10 @@ fn find_node(node: CstNode<'_>, kind: CstKind, range: TextRange) -> Option<CstNo
     if node.kind() == kind && node.range() == range {
         return Some(node);
     }
+    if !range_within(range, node.range()) {
+        return None;
+    }
     node.children()
+        .filter(|child| range_within(range, child.range()))
         .find_map(|child| find_node(child, kind, range))
 }

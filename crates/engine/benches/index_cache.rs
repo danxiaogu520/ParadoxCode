@@ -160,8 +160,11 @@ fn display_millis(duration: Duration) -> f64 {
 fn main() {
     let count = file_count();
     let fixture = SyntheticVanilla::create(count);
-    let mut builder =
-        AnalysisHost::with_profile(game::eu4::bootstrap_rules(), game::eu4::profile());
+    let mut builder = AnalysisHost::with_ir(
+        game::eu4::bootstrap_rules(),
+        game::eu4::profile(),
+        game::eu4::first_party_ir().expect("first-party IR"),
+    );
     builder.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
@@ -195,7 +198,11 @@ fn main() {
         IndexCache::load_cancellable_for_install(&cache_path, &WorkspaceScanToken::new())
             .expect("load cache")
     });
-    let mut host = AnalysisHost::with_profile(game::eu4::bootstrap_rules(), game::eu4::profile());
+    let mut host = AnalysisHost::with_ir(
+        game::eu4::bootstrap_rules(),
+        game::eu4::profile(),
+        game::eu4::first_party_ir().expect("first-party IR"),
+    );
     let (install, _) = measured(|| host.install_index_cache(cache).expect("install cache"));
     black_box(host.snapshot());
 
@@ -219,8 +226,11 @@ fn main() {
     let dense_files = dense_file_count();
     let dense_entries = dense_entries();
     let dense_fixture = DenseVanilla::create(dense_files, dense_entries);
-    let mut dense_builder =
-        AnalysisHost::with_profile(game::eu4::bootstrap_rules(), game::eu4::profile());
+    let mut dense_builder = AnalysisHost::with_ir(
+        game::eu4::bootstrap_rules(),
+        game::eu4::profile(),
+        game::eu4::first_party_ir().expect("first-party IR"),
+    );
     dense_builder.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
@@ -249,8 +259,11 @@ fn main() {
         IndexCache::load_cancellable_for_install(&dense_cache_path, &WorkspaceScanToken::new())
             .expect("load dense cache")
     });
-    let mut dense_host =
-        AnalysisHost::with_profile(game::eu4::bootstrap_rules(), game::eu4::profile());
+    let mut dense_host = AnalysisHost::with_ir(
+        game::eu4::bootstrap_rules(),
+        game::eu4::profile(),
+        game::eu4::first_party_ir().expect("first-party IR"),
+    );
     let (dense_install, _) = measured(|| {
         dense_host
             .install_index_cache(dense_cache)
@@ -287,8 +300,11 @@ fn main() {
     let mixed_current_files = mixed_current_file_count();
     let mixed_current_entries = mixed_current_entries();
     let mixed_current_fixture = DenseVanilla::create(mixed_current_files, mixed_current_entries);
-    let mut mixed_host =
-        AnalysisHost::with_profile(game::eu4::bootstrap_rules(), game::eu4::profile());
+    let mut mixed_host = AnalysisHost::with_ir(
+        game::eu4::bootstrap_rules(),
+        game::eu4::profile(),
+        game::eu4::first_party_ir().expect("first-party IR"),
+    );
     mixed_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(u32::MAX),
         SourceRootKind::Project,
