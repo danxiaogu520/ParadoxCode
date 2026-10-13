@@ -78,7 +78,11 @@ fn document_id(path: &Path) -> DocumentId {
 fn main() {
     let count = file_count();
     let fixture = SyntheticWorkspace::create(count);
-    let mut host = AnalysisHost::with_profile(game::eu4::bootstrap_rules(), game::eu4::profile());
+    let mut host = AnalysisHost::with_ir(
+        game::eu4::bootstrap_rules(),
+        game::eu4::profile(),
+        game::eu4::first_party_ir().expect("first-party IR"),
+    );
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::Project,

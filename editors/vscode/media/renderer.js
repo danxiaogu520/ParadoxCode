@@ -140,6 +140,7 @@
     let groupWidths = new WeakMap();
     let externalWidths = new Map();
     let externalByNode = new Map();
+    let titleLayouts = new WeakMap();
 
     // Pointer and wheel events can arrive much faster than the browser can
     // paint. Coalescing them into one frame keeps a large tree from being
@@ -161,6 +162,7 @@
         FONT_FAMILY = getComputedStyle(document.body).fontFamily || 'sans-serif';
         groupWidths = new WeakMap();
         externalWidths.clear();
+        titleLayouts = new WeakMap();
     }
 
     // VS Code changes the webview theme by updating body attributes. Refresh
@@ -353,6 +355,7 @@
 
     function setPreview(next) {
         preview = next;
+        titleLayouts = new WeakMap();
         externalByNode = new Map();
         for (const external of next.external || []) {
             const key = `${external.tree}:${external.mission}`;
@@ -476,6 +479,7 @@
     const fontBook = { english: null, chinese: null };
 
     function setFonts(fonts) {
+        titleLayouts = new WeakMap();
         for (const id of ['english', 'chinese']) {
             const payload = fonts && fonts[id];
             if (!payload) {
@@ -499,9 +503,13 @@
                 kernings.set(`${row[0]},${row[1]}`, row[2]);
             }
             const atlas = new Image();
-            atlas.onload = () => scheduleDraw();
+            atlas.onload = () => {
+                titleLayouts = new WeakMap();
+                scheduleDraw();
+            };
             atlas.onerror = () => {
                 fontBook[id] = null;
+                titleLayouts = new WeakMap();
                 scheduleDraw();
             };
             atlas.src = payload.atlasUrl;
@@ -942,6 +950,18 @@
     // frame's lower slot in textured mode); otherwise the same styled
     // pipeline falls back to the system font. The raw id stays visible
     // (dimmed) when a localised title is shown.
+    function titleLines(node, label, width, layout) {
+        let cached = titleLayouts.get(node);
+        if (!cached || cached.width !== width || cached.zoom !== zoom
+            || cached.font !== layout.font || cached.sysFont !== layout.sysFont) {
+            const lines = styledLines(label, width, layout).slice(0, 2);
+            cached = { width, zoom, font: layout.font, sysFont: layout.sysFont,
+                lines: lines.map((tokens) => ({ tokens, width: lineWidth(tokens, layout) })) };
+            titleLayouts.set(node, cached);
+        }
+        return cached.lines;
+    }
+
     function drawNodeTitle(node, pos, w, textured) {
         const title = node.title ? node.title.value : '';
         const label = title || node.id;
@@ -968,9 +988,9 @@
                     sysFont: `bold ${Math.max(8, 10 * zoom)}px ${FONT_FAMILY}`,
                 };
             const lineHeight = (font ? font.lineHeight : 11) * zoom;
-            const lines = styledLines(label, slotW, layout).slice(0, 2);
-            lines.forEach((tokens, index) => {
-                drawStyledLine(tokens, slotX + (slotW - lineWidth(tokens, layout)) / 2, slotY + index * lineHeight, layout);
+            const lines = titleLines(node, label, slotW, layout);
+            lines.forEach((line, index) => {
+                drawStyledLine(line.tokens, slotX + (slotW - line.width) / 2, slotY + index * lineHeight, layout);
             });
             return;
         }
@@ -991,11 +1011,11 @@
                 sysFont: `${Math.max(9, 11 * zoom)}px ${FONT_FAMILY}`,
             };
         const lineHeight = (font ? font.lineHeight : 13) * zoom;
-        const lines = styledLines(label, w - 12, layout).slice(0, 2);
+        const lines = titleLines(node, label, w - 12, layout);
         const blockHeight = lines.length * lineHeight;
         const startY = pos.y + h / 2 - blockHeight / 2;
-        lines.forEach((tokens, index) => {
-            drawStyledLine(tokens, pos.x + (w - lineWidth(tokens, layout)) / 2, startY + index * lineHeight, layout);
+        lines.forEach((line, index) => {
+            drawStyledLine(line.tokens, pos.x + (w - line.width) / 2, startY + index * lineHeight, layout);
         });
         if (title) {
             ctx.fillStyle = COLORS.dim;

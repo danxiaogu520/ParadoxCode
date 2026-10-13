@@ -496,6 +496,7 @@ pub fn execute(arguments: &[String]) -> Result<String, String> {
             } else {
                 for name in [
                     "assets.mjs",
+                    "preview.mjs",
                     "icon-picker.mjs",
                     "loc-format.mjs",
                     "server-path.mjs",

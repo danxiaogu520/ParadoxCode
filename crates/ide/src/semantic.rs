@@ -151,7 +151,10 @@ fn dynamic_summary_in_hir(
         name: name.to_owned(),
         definition_range: owner_range,
         parameters,
-        template: hir.dynamic_template(kind, name, owner_range).cloned(),
+        template: hir
+            .dynamic_template(kind, name, owner_range)
+            .cloned()
+            .map(Arc::new),
     }
 }
 
@@ -257,7 +260,19 @@ pub(crate) fn effective_workspace_member_names(
 /// The source index and live overlays are immutable for a snapshot revision.  Keeping this
 /// normalized name vector in the snapshot query cache avoids rewalking every definition for each
 /// completion request and gives the prefix index below one stable backing allocation.
-fn workspace_member_names_cached(snapshot: &AnalysisSnapshot, type_name: &str) -> Arc<Vec<String>> {
+#[derive(Default)]
+struct MemberNamesMemo(std::sync::Mutex<Option<(MemberNamesInputs, Arc<Vec<String>>)>>);
+
+#[derive(Eq, PartialEq)]
+struct MemberNamesInputs {
+    hidden: std::collections::BTreeSet<SourceFileId>,
+    overlays: Vec<String>,
+}
+
+pub(crate) fn workspace_member_names_cached(
+    snapshot: &AnalysisSnapshot,
+    type_name: &str,
+) -> Arc<Vec<String>> {
     let revision = snapshot.revision();
     let lowered = lowered_type_name(type_name);
     if let Some(cached) = probe_query_cache::<Vec<String>>(
@@ -267,9 +282,56 @@ fn workspace_member_names_cached(snapshot: &AnalysisSnapshot, type_name: &str) -
     ) {
         return cached;
     }
-    let names = Arc::new(effective_workspace_member_names_uncached(
-        snapshot, type_name,
-    ));
+    let memo_key = format!("workspace-member-inputs:{lowered}");
+    let cache = snapshot.query_cache();
+    let memo = cache
+        .get::<MemberNamesMemo>(revision, &memo_key)
+        .unwrap_or_else(|| {
+            let memo = Arc::new(MemberNamesMemo::default());
+            cache.insert(
+                revision,
+                engine::CacheDomain::Index,
+                memo_key.clone(),
+                memo.clone(),
+            );
+            cache.get(revision, &memo_key).unwrap_or(memo)
+        });
+    let kinds = workspace_member_kinds(snapshot, type_name);
+    let inputs = MemberNamesInputs {
+        hidden: overlay_file_ids(snapshot),
+        overlays: if completion_overlay_allowed(snapshot) {
+            snapshot
+                .documents()
+                .values()
+                .filter(|document| document.source() == DocumentSource::Overlay)
+                .filter_map(|document| document.hir())
+                .flat_map(|hir| hir.definitions())
+                .filter(|definition| {
+                    kinds
+                        .iter()
+                        .any(|kind| definition.kind.eq_ignore_ascii_case(kind))
+                })
+                .map(|definition| definition.name.to_string())
+                .collect()
+        } else {
+            Vec::new()
+        },
+    };
+    // The index-owned memo survives edits, but is reusable only after checking
+    // every overlay input that influences this namespace. This also covers
+    // ordinary definitions (flags, localisation), not just Template owners.
+    let names = {
+        let mut previous = memo.0.lock().expect("member names memo lock poisoned");
+        if let Some((_, names)) = previous.as_ref().filter(|(old, _)| old == &inputs) {
+            names.clone()
+        } else {
+            let names = Arc::new(effective_workspace_member_names_uncached(
+                snapshot, type_name,
+            ));
+            *previous = Some((inputs, names.clone()));
+            names
+        }
+    };
     snapshot.query_cache().insert(
         revision,
         engine::CacheDomain::Documents,
@@ -330,7 +392,7 @@ fn effective_workspace_member_names_uncached(
                 .map(|definition| definition.name.to_string()),
         );
     }
-    names.sort_by_key(|name| name.to_ascii_lowercase());
+    names.sort_by(|left, right| ascii_case_cmp(left, right));
     names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
     names
 }

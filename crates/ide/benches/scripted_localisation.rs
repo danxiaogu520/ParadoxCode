@@ -62,9 +62,10 @@ fn main() {
             .expect("write scripted-localisation fixture");
     }
 
-    let mut host = AnalysisHost::with_profile(
+    let mut host = AnalysisHost::with_ir(
         game::eu4::runtime_rules().expect("first-party rules"),
         game::eu4::profile(),
+        game::eu4::first_party_ir().expect("first-party IR"),
     );
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),

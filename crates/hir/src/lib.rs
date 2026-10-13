@@ -223,7 +223,16 @@ fn lower_ir_schema_range_impl(
 ) -> HirFile {
     let collected = collector::collect(&syntax);
     let ir_facts = ir_lowering::lower_schema_fragment(
-        ir, &syntax, schema, subtypes, state, facts, range, holes,
+        ir,
+        &syntax,
+        &collected.properties,
+        &collected.bare_values,
+        schema,
+        subtypes,
+        state,
+        facts,
+        range,
+        holes,
     );
     let template_definitions = ir_facts
         .definitions

@@ -30,6 +30,40 @@ use vfs::{DocumentId, DocumentSource, SourceFile};
 /// actually changed. Overlays without a backing source file fall back to a
 /// content hash (any edit then invalidates every cached file).
 pub fn workspace_context_fingerprint(snapshot: &AnalysisSnapshot) -> u64 {
+    const KEY: &str = "workspace-context:fingerprint";
+    const SHARDS: &str = "workspace-context:shard-fingerprints";
+    let cache = snapshot.query_cache();
+    let revision = snapshot.revision();
+    if let Some(fingerprint) = cache.get::<u64>(revision, KEY) {
+        return *fingerprint;
+    }
+    // Shards are immutable for the index generation. Template debug hashing is
+    // expensive, so an ordinary buffer edit must not hash every closed file again.
+    let contributions = cache
+        .get::<BTreeMap<crate::SourceFileId, u64>>(revision, SHARDS)
+        .unwrap_or_else(|| {
+            let contributions = Arc::new(
+                snapshot
+                    .source_files()
+                    .keys()
+                    .map(|id| {
+                        (
+                            *id,
+                            snapshot
+                                .file_state(*id)
+                                .map_or(u64::MAX, |state| state.shard.contribution_fingerprint()),
+                        )
+                    })
+                    .collect::<BTreeMap<_, _>>(),
+            );
+            cache.insert(
+                revision,
+                crate::CacheDomain::Index,
+                SHARDS.to_owned(),
+                contributions.clone(),
+            );
+            contributions
+        });
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     snapshot.rules().rule_hash().to_hex().hash(&mut hasher);
     snapshot.ir_fingerprint().hash(&mut hasher);
@@ -75,15 +109,23 @@ pub fn workspace_context_fingerprint(snapshot: &AnalysisSnapshot) -> u64 {
                 continue;
             }
         }
-        match snapshot.file_state(*id) {
-            Some(state) => state.shard.contribution_fingerprint().hash(&mut hasher),
-            None => u64::MAX.hash(&mut hasher),
-        }
+        contributions
+            .get(id)
+            .copied()
+            .unwrap_or(u64::MAX)
+            .hash(&mut hasher);
     }
     for text in unbacked_overlays {
         hash_text(text, &mut hasher);
     }
-    hasher.finish()
+    let fingerprint = hasher.finish();
+    cache.insert(
+        revision,
+        crate::CacheDomain::Documents,
+        KEY.to_owned(),
+        Arc::new(fingerprint),
+    );
+    fingerprint
 }
 
 fn overlay_contribution_fingerprint(
