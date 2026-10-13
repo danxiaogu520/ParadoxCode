@@ -147,7 +147,6 @@ impl SymbolFacts for SnapshotSymbolFacts<'_> {
         crate::semantic::resolve_dynamic_definition(self.snapshot, kind, name)?
             .summary
             .template
-            .map(std::sync::Arc::new)
     }
 
     fn template_accepts_no_arguments(

@@ -102,9 +102,10 @@ fn main() {
     let title_keys = title_count();
     let fixture = DenseLocalisation::create(files, entries);
 
-    let mut host = AnalysisHost::with_profile(
+    let mut host = AnalysisHost::with_ir(
         eu4::runtime_rules().expect("first-party rules"),
         eu4::profile(),
+        eu4::first_party_ir().expect("first-party IR"),
     );
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),

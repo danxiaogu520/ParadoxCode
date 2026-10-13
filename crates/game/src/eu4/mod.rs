@@ -13,6 +13,7 @@ use std::sync::Arc;
 use rules::ir::RulesIr;
 use rules::{GameProfile, RuleSet};
 
+static FIRST_PARTY_RULES: OnceLock<RuleSet> = OnceLock::new();
 static FIRST_PARTY_PROFILE: OnceLock<GameProfile> = OnceLock::new();
 static FIRST_PARTY_IR: OnceLock<Result<Arc<RulesIr>, String>> = OnceLock::new();
 
@@ -38,7 +39,9 @@ pub fn first_party_ir() -> Result<Arc<RulesIr>, rules::RulesError> {
 /// The file-scanning catalog for the active IR. No legacy semantic source is loaded.
 pub fn runtime_rules() -> Result<RuleSet, rules::RulesError> {
     let ir = first_party_ir()?;
-    Ok(RuleSet::from_ir_catalog(&ir))
+    Ok(FIRST_PARTY_RULES
+        .get_or_init(|| RuleSet::from_shared_ir_catalog(&ir))
+        .clone())
 }
 
 fn source_ir() -> Result<Arc<RulesIr>, rules::RulesError> {

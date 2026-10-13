@@ -55,9 +55,10 @@ fn main() {
         .expect("write overlay fixture file");
     }
 
-    let mut host = AnalysisHost::with_profile(
+    let mut host = AnalysisHost::with_ir(
         eu4::runtime_rules().expect("first-party rules"),
         eu4::profile(),
+        eu4::first_party_ir().expect("first-party IR"),
     );
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
@@ -111,10 +112,15 @@ fn main() {
         let _ = hover(&snapshot, current, hover_position);
     });
     let completion_cold = timed(|| {
-        let _ = complete(&snapshot, current, completion_position);
+        let result = complete(&snapshot, current, completion_position);
+        assert!(
+            !result.items.is_empty(),
+            "the fixture must exercise semantic completion"
+        );
+        std::hint::black_box(result);
     });
     let completion_warm = measured(30, || {
-        let _ = complete(&snapshot, current, completion_position);
+        std::hint::black_box(complete(&snapshot, current, completion_position));
     });
 
     println!(

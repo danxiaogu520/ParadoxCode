@@ -2,6 +2,62 @@ use super::*;
 use text::AbsPath;
 
 #[test]
+fn cached_workspace_fingerprint_tracks_overlay_bodies_and_disk_replacement() {
+    let root = temp_root("context-fingerprint");
+    let effects = root.join("common/scripted_effects");
+    fs::create_dir_all(&effects).unwrap();
+    let path = effects.join("effect.txt");
+    let source = "shared_effect = { add_prestige = 1 }\n";
+    fs::write(&path, source).unwrap();
+    let mut host = eu4_host();
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::Project,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().unwrap();
+    let fingerprint = |host: &AnalysisHost| crate::workspace_context_fingerprint(&host.snapshot());
+    let disk = fingerprint(&host);
+    assert_eq!(disk, fingerprint(&host));
+    let id = DocumentId::new("file:///overlay/common/scripted_effects/effect.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        source.to_owned(),
+        Some(AbsPath::normalize(&path)),
+    )
+    .unwrap();
+    assert_eq!(
+        disk,
+        fingerprint(&host),
+        "opening unchanged source preserves the exported context"
+    );
+    let old = host.snapshot();
+    host.apply_document_changes(
+        &id,
+        2,
+        &[TextChange::full("shared_effect = { add_prestige = 2 }\n")],
+    )
+    .unwrap();
+    assert_ne!(
+        disk,
+        fingerprint(&host),
+        "a Template body edit invalidates cross-file diagnostics"
+    );
+    assert_eq!(disk, crate::workspace_context_fingerprint(&old));
+    host.close_document(&id).unwrap();
+    assert_eq!(disk, fingerprint(&host));
+    fs::write(&path, "replacement_effect = { }\n").unwrap();
+    host.refresh_source_roots().unwrap();
+    assert_ne!(
+        disk,
+        fingerprint(&host),
+        "an index change discards closed-file contributions"
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn replayed_index_matches_full_rebuild_for_references_flags_and_shadowing() {
     let first = SourceFileId::new(1);
     let second = SourceFileId::new(2);
@@ -76,6 +132,22 @@ fn grouped_position_map_keeps_sorted_lookup_and_replacement_semantics() {
     assert_eq!(map.len(), 2);
     assert_eq!(map.get((first, first_range)), Some(&replacement));
     assert_eq!(map.get((second, second_range)), Some(&second_position));
+
+    let snapshot = map.clone();
+    assert!(std::ptr::eq(
+        map.get((first, first_range)).unwrap(),
+        snapshot.get((first, first_range)).unwrap()
+    ));
+    map.merge(PositionMap::from_entries([(
+        (first, first_range),
+        first_position,
+    )]));
+    assert_eq!(map.get((first, first_range)), Some(&first_position));
+    assert_eq!(snapshot.get((first, first_range)), Some(&replacement));
+    assert!(std::ptr::eq(
+        map.get((second, second_range)).unwrap(),
+        snapshot.get((second, second_range)).unwrap()
+    ));
 
     map.replace_file(first, [(first_range, first_position)]);
     assert_eq!(map.len(), 2);

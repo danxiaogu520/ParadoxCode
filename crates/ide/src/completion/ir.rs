@@ -237,8 +237,9 @@ fn try_ir_completion_inner(
             });
         }
         items.sort_by(|a, b| {
-            (a.sort_score, a.label.to_ascii_lowercase())
-                .cmp(&(b.sort_score, b.label.to_ascii_lowercase()))
+            a.sort_score
+                .cmp(&b.sort_score)
+                .then_with(|| crate::support::ascii_case_cmp(&a.label, &b.label))
         });
         return Ok(Some(items));
     }
@@ -401,6 +402,37 @@ fn try_ir_completion_inner(
                 });
             }
         }
+        let current_property = hir
+            .properties()
+            .iter()
+            .find(|property| contains(property.key_range, position));
+        // Cardinality only matters for bounded fields. Count the existing
+        // (key, shape) pairs once instead of walking the document per candidate.
+        let mut existing_counts = rustc_hash::FxHashMap::default();
+        if ir
+            .fields(schema_fact.schema)
+            .iter()
+            .any(|id| ir.field(*id).card.max.is_some())
+        {
+            for property in hir.properties().iter().filter(|property| {
+                current_property.is_none_or(|current| current.key_range != property.key_range)
+                    && crate::support::contains(schema_fact.range, property.key_range.start())
+            }) {
+                let Some(fact) = hir
+                    .field_fact_at(property.key_range)
+                    .filter(|fact| fact.schema == schema_fact.schema)
+                else {
+                    continue;
+                };
+                for shape in [None, Some(Shape::Scalar), Some(Shape::Block)] {
+                    if fact.fields.iter().any(|id| ir.shape(*id) == shape) {
+                        *existing_counts
+                            .entry((property.key.to_ascii_lowercase(), shape))
+                            .or_insert(0_u32) += 1;
+                    }
+                }
+            }
+        }
         for field_id in ir.fields(schema_fact.schema) {
             cancellation.checkpoint()?;
             let field = ir.field(field_id);
@@ -412,10 +444,6 @@ fn try_ir_completion_inner(
             }) {
                 continue;
             }
-            let current_property = hir
-                .properties()
-                .iter()
-                .find(|property| contains(property.key_range, position));
             let matcher = field.key;
             let compatibility = matches!(ir.matcher(matcher), Matcher::Scalar | Matcher::Opaque)
                 .then(|| legacy_switch_query(ir, hir, schema_fact.range))
@@ -443,12 +471,12 @@ fn try_ir_completion_inner(
                 },
                 |items| items.iter().map(|(label, _)| label.clone()).collect(),
             );
+            let template_kind = crate::ir_template::template_kind(ir, matcher);
             for label in labels {
                 cancellation.checkpoint()?;
                 let Some(rank) = prefix_rank(&label, prefix) else {
                     continue;
                 };
-                let template_kind = crate::ir_template::template_kind(ir, matcher);
                 if let Some(kind) = &template_kind
                     && let crate::template_contracts::ScopeContract::Scopes(expected) =
                         crate::template_contracts::template_contract_with_cancellation(
@@ -467,27 +495,13 @@ fn try_ir_completion_inner(
                         continue;
                     }
                 }
-                let existing_count = hir
-                    .properties()
-                    .iter()
-                    .filter(|property| {
-                        property.key.eq_ignore_ascii_case(&label)
-                            && current_property
-                                .is_none_or(|current| current.key_range != property.key_range)
-                            && crate::support::contains(
-                                schema_fact.range,
-                                property.key_range.start(),
-                            )
-                            && hir.field_fact_at(property.key_range).is_some_and(|fact| {
-                                fact.schema == schema_fact.schema
-                                    && fact
-                                        .fields
-                                        .iter()
-                                        .any(|id| ir.shape(*id) == ir.shape(field_id))
-                            })
-                    })
-                    .count() as u32;
-                if field.card.max.is_some_and(|max| existing_count >= max) {
+                if field.card.max.is_some_and(|max| {
+                    existing_counts
+                        .get(&(label.to_ascii_lowercase(), ir.shape(field_id)))
+                        .copied()
+                        .unwrap_or(0)
+                        >= max
+                }) {
                     continue;
                 }
                 let assignment =
@@ -587,8 +601,9 @@ fn try_ir_completion_inner(
         }
     }
     items.sort_by(|a, b| {
-        (a.sort_score, a.label.to_ascii_lowercase())
-            .cmp(&(b.sort_score, b.label.to_ascii_lowercase()))
+        a.sort_score
+            .cmp(&b.sort_score)
+            .then_with(|| crate::support::ascii_case_cmp(&a.label, &b.label))
     });
     let mut seen = std::collections::BTreeSet::new();
     let mut exact_labels = std::collections::BTreeSet::new();
@@ -956,11 +971,12 @@ fn matcher_kind(matcher: &Matcher) -> CompletionKind {
 }
 
 fn prefix_rank(label: &str, prefix: &str) -> Option<u32> {
-    let label = label.to_ascii_lowercase();
-    let prefix = prefix.to_ascii_lowercase();
-    if label.starts_with(&prefix) {
+    if label
+        .get(..prefix.len())
+        .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+    {
         Some(0)
-    } else if label.contains(&prefix) {
+    } else if crate::support::ascii_case_contains(label, prefix) {
         Some(100)
     } else {
         None

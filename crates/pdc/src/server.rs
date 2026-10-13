@@ -857,7 +857,7 @@ impl LspServer {
         if let Some(ir) = game::compiled_ir(&profile)? {
             Self::try_new_with_ir(
                 options,
-                RuleSet::from_ir_catalog(&ir),
+                RuleSet::from_shared_ir_catalog(&ir),
                 ir.game.profile.clone(),
                 ir,
             )

@@ -66,6 +66,16 @@ impl RuleSet {
     /// Extracts scanning and Template metadata without flattening semantic fields.
     #[must_use]
     pub fn from_ir_catalog(ir: &crate::ir::RulesIr) -> Self {
+        Self::from_ir_catalog_with_hash(ir, ir.rule_hash())
+    }
+
+    /// Catalog for an immutable runtime arena, reusing its canonical identity.
+    #[must_use]
+    pub fn from_shared_ir_catalog(ir: &std::sync::Arc<crate::ir::RulesIr>) -> Self {
+        Self::from_ir_catalog_with_hash(ir, crate::ir::RulesIr::shared_rule_hash(ir))
+    }
+
+    fn from_ir_catalog_with_hash(ir: &crate::ir::RulesIr, hash: RuleHash) -> Self {
         use crate::ir::{DocumentParser, FileResolution};
         let files = ir
             .files
@@ -88,7 +98,7 @@ impl RuleSet {
             })
             .collect();
         let mut rules = Self::from_catalog(ir.game_id().to_owned(), files, ir.game.profile.clone());
-        rules.rule_hash = ir.rule_hash();
+        rules.rule_hash = hash;
         if let Some(template) = ir.trait_by_name("Template") {
             for ty in &ir.types {
                 if let Some(implementation) = ty.trait_impls.iter().find(|i| i.trait_id == template)

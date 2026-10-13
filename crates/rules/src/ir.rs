@@ -917,6 +917,30 @@ fn hash_debug(hasher: &mut Sha256, value: &impl fmt::Debug) {
 }
 
 impl RulesIr {
+    /// Canonical identity of an immutable shared arena. Weak references ensure
+    /// `Arc::get_mut`/`make_mut` cannot mutate a memoized allocation in place.
+    /// Compiler-owned mutable arenas continue to use `rule_hash` directly.
+    #[must_use]
+    pub fn shared_rule_hash(ir: &std::sync::Arc<Self>) -> crate::RuleHash {
+        type Entry = (std::sync::Weak<RulesIr>, crate::RuleHash);
+        static IDENTITIES: std::sync::Mutex<Vec<Entry>> = std::sync::Mutex::new(Vec::new());
+        let mut identities = IDENTITIES.lock().expect("rules identity lock poisoned");
+        identities.retain(|(owner, _)| owner.strong_count() > 0);
+        let owner = std::sync::Arc::downgrade(ir);
+        if let Some((_, hash)) = identities
+            .iter()
+            .find(|(cached, _)| std::sync::Weak::ptr_eq(cached, &owner))
+        {
+            return *hash;
+        }
+        let hash = ir.rule_hash();
+        if identities.len() >= 8 {
+            identities.remove(0);
+        }
+        identities.push((owner, hash));
+        hash
+    }
+
     /// Returns a stable SHA-256 fingerprint of the compiled rules-v2 content.
     ///
     /// Arena order is preserved where it is semantically observable. The
@@ -1513,6 +1537,24 @@ impl RulesIr {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shared_identity_cannot_survive_mutation_or_alias_another_arena() {
+        let mut ir = std::sync::Arc::new(RulesIr::empty());
+        let original = RulesIr::shared_rule_hash(&ir);
+        assert_eq!(original, ir.rule_hash());
+        assert_eq!(original, RulesIr::shared_rule_hash(&ir.clone()));
+        assert!(std::sync::Arc::get_mut(&mut ir).is_none());
+        let mutable = std::sync::Arc::make_mut(&mut ir);
+        mutable.game_id = mutable.strings.intern_verbatim("changed");
+        let changed = RulesIr::shared_rule_hash(&ir);
+        assert_ne!(changed, original);
+        assert_eq!(changed, ir.rule_hash());
+        assert_eq!(
+            RulesIr::shared_rule_hash(&std::sync::Arc::new(RulesIr::empty())),
+            original
+        );
+    }
 
     #[test]
     fn interning_folds_identity_and_keeps_text() {

@@ -1,6 +1,7 @@
 //! Read, validate, and decode Vanilla cache databases.
 
-use std::collections::{BTreeMap, HashSet};
+use rustc_hash::FxHashSet;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -527,17 +528,28 @@ fn load_index(
     // files). Validation semantics are identical: a position range must belong to a
     // definition or reference of the same file, and a preview range must belong to a
     // localisation definition of the same file.
-    let mut known_ranges = HashSet::with_capacity(definition_count.saturating_add(reference_count));
-    let mut localisation_ranges = HashSet::with_capacity(definition_count);
+    // Lazy-reference installation cannot validate position membership because
+    // it intentionally omits most reference rows. Do not construct or probe
+    // the million-entry strict-validation set in that mode.
+    let mut known_ranges = FxHashSet::default();
+    if rules.is_none() {
+        known_ranges.reserve(definition_count.saturating_add(reference_count));
+    }
+    let mut localisation_ranges =
+        FxHashSet::with_capacity_and_hasher(definition_count, Default::default());
     for shard in shards.values() {
         for definition in &shard.definitions {
-            known_ranges.insert((definition.file_id, definition.range));
+            if rules.is_none() {
+                known_ranges.insert((definition.file_id, definition.range));
+            }
             if definition.kind.eq_ignore_ascii_case("localisation") {
                 localisation_ranges.insert((definition.file_id, definition.range));
             }
         }
-        for reference in &shard.references {
-            known_ranges.insert((shard.file_id, reference.range));
+        if rules.is_none() {
+            for reference in &shard.references {
+                known_ranges.insert((shard.file_id, reference.range));
+            }
         }
     }
     progress.report(definition_count.saturating_add(reference_count));
@@ -553,7 +565,7 @@ fn load_index(
     let positions = load_navigation_positions(connection)?;
     progress.report(positions.len());
     for ((file_id, range), position) in &positions {
-        if !known_ranges.contains(&(file_id, range)) && rules.is_none() {
+        if rules.is_none() && !known_ranges.contains(&(file_id, range)) {
             return Err(IndexCacheError::InvalidData(format!(
                 "navigation position references unknown range {}..{}",
                 range.start(),
@@ -760,7 +772,7 @@ fn load_dynamic_definitions(
             name,
             definition_range,
             parameters: Vec::new(),
-            template,
+            template: template.map(Arc::new),
         });
         rows_loaded = rows_loaded.saturating_add(1);
     }
@@ -832,7 +844,7 @@ fn load_dynamic_definitions(
 fn load_localisation_previews(
     connection: &Connection,
     shards: &BTreeMap<SourceFileId, Arc<FileIndexShard>>,
-    localisation_ranges: &HashSet<(SourceFileId, TextRange)>,
+    localisation_ranges: &FxHashSet<(SourceFileId, TextRange)>,
     lazy_mode: bool,
     preferred_localisation_languages: &[String],
 ) -> Result<LocalisationPreviewMap, IndexCacheError> {

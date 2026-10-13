@@ -140,12 +140,16 @@ export class MissionPreviewPanel {
     private static requestSequence = 0;
     private static previewUri: string | undefined;
     private static previewVersion: number | undefined;
+    private static pendingRequest: vscode.CancellationTokenSource | undefined;
 
     /** Closes the preview panel (extension deactivation). */
     public static dispose(): void {
         MissionPreviewPanel.panel?.dispose();
         MissionPreviewPanel.panel = undefined;
         MissionPreviewPanel.requestSequence += 1;
+        MissionPreviewPanel.pendingRequest?.cancel();
+        MissionPreviewPanel.pendingRequest?.dispose();
+        MissionPreviewPanel.pendingRequest = undefined;
         MissionPreviewPanel.previewUri = undefined;
         MissionPreviewPanel.previewVersion = undefined;
     }
@@ -180,7 +184,11 @@ export class MissionPreviewPanel {
         );
         MissionPreviewPanel.postOptions(panel);
         panel.onDidDispose(() => {
-            MissionPreviewPanel.panel = undefined;
+            if (MissionPreviewPanel.panel === panel) {
+                MissionPreviewPanel.pendingRequest?.cancel();
+                MissionPreviewPanel.requestSequence += 1;
+                MissionPreviewPanel.panel = undefined;
+            }
         });
 
         panel.webview.onDidReceiveMessage((message: InboundMessage) => {
@@ -204,6 +212,7 @@ export class MissionPreviewPanel {
         }
         MissionPreviewPanel.postOptions(panel);
         const requestId = ++MissionPreviewPanel.requestSequence;
+        MissionPreviewPanel.pendingRequest?.cancel();
         // The preview pins to the most recently focused mission document:
         // focusing a non-mission file keeps the pinned tree on screen instead
         // of clearing it, while focusing another mission document re-targets
@@ -251,6 +260,8 @@ export class MissionPreviewPanel {
             });
             return;
         }
+        const cancellation = new vscode.CancellationTokenSource();
+        MissionPreviewPanel.pendingRequest = cancellation;
         try {
             const payload = (await client.sendRequest(
                 'pdc/missionPreview',
@@ -260,6 +271,7 @@ export class MissionPreviewPanel {
                     uri: documentUri,
                     version: documentVersion,
                 },
+                cancellation.token,
             )) as MissionPreview;
             // A response is only useful when it still describes the document/version that was
             // captured.  This prevents a slow preview request from repainting a newer edit.
@@ -277,10 +289,18 @@ export class MissionPreviewPanel {
             MissionPreviewPanel.post(panel, { type: 'preview', payload });
             void MissionPreviewPanel.postAssets(panel, payload);
         } catch (error) {
+            if (cancellation.token.isCancellationRequested || requestId !== MissionPreviewPanel.requestSequence || panel !== MissionPreviewPanel.panel) {
+                return;
+            }
             MissionPreviewPanel.post(panel, {
                 type: 'error',
                 message: error instanceof Error ? error.message : String(error),
             });
+        } finally {
+            if (MissionPreviewPanel.pendingRequest === cancellation) {
+                MissionPreviewPanel.pendingRequest = undefined;
+            }
+            cancellation.dispose();
         }
     }
 
@@ -291,6 +311,8 @@ export class MissionPreviewPanel {
     /** Client-side asset store, rebuilt when its source directories change. */
     private static assetStore: GameAssetStore | undefined;
     private static assetStoreKey: string | undefined;
+    private static assetConfigurationKey: string | undefined;
+    private static assetDiscoveryTime = 0;
     /** Fonts are large payloads: post them once per store generation and panel. */
     private static postedFonts: { panel: vscode.WebviewPanel; key: string } | undefined;
     /** Sprites are incremental payloads too: the names the receiving panel
@@ -306,12 +328,25 @@ export class MissionPreviewPanel {
      * directories change. Shared with the hover texture preview middleware. */
     public static store(): GameAssetStore {
         const config = vscode.workspace.getConfiguration('paradoxcode');
-        const gameDirectory = findGameDirectory(config.get<string>('gameDirectory', '')) ?? '';
         const gameFonts = config.get<boolean>('preview.gameFonts', true);
+        const configuredGame = config.get<string>('gameDirectory', '');
+        const configuredFont = config.get<string>('preview.chineseFontMod', '');
+        const configuredMod = config.get<string>('modDirectory', '');
+        const folders = (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath);
+        const configurationKey = JSON.stringify([configuredGame, configuredFont, configuredMod, gameFonts, folders]);
+        const now = Date.now();
+        // Workshop discovery performs synchronous filesystem reads. Keep it
+        // off every hover, completion resolve and preview edit; periodically
+        // discover newly installed fonts while settings changes take effect immediately.
+        if (MissionPreviewPanel.assetStore && MissionPreviewPanel.assetConfigurationKey === configurationKey
+            && now - MissionPreviewPanel.assetDiscoveryTime < 30_000) {
+            return MissionPreviewPanel.assetStore;
+        }
+        const gameDirectory = findGameDirectory(configuredGame) ?? '';
         // The Chinese bitmap font is not shipped with the game: resolve the
         // mod that remaps vic_18 (setting override > newest workshop match).
         const chineseFontDirectory = gameFonts
-            ? findChineseFontMod(gameDirectory || undefined, config.get<string>('preview.chineseFontMod', ''))
+            ? findChineseFontMod(gameDirectory || undefined, configuredFont)
             : undefined;
         // The mod side of the texture lookup: an explicit mod directory,
         // else the workspace folders — the same roots the server treats as
@@ -334,6 +369,8 @@ export class MissionPreviewPanel {
             );
             MissionPreviewPanel.assetStoreKey = key;
         }
+        MissionPreviewPanel.assetConfigurationKey = configurationKey;
+        MissionPreviewPanel.assetDiscoveryTime = now;
         return MissionPreviewPanel.assetStore;
     }
 

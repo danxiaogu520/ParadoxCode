@@ -11,6 +11,22 @@ use text::{LogicalPath, TextRange, TextSize};
 
 use crate::types::*;
 
+/// ASCII folding without allocating temporary lowercase strings. Unicode bytes
+/// retain their original spelling, matching `to_ascii_lowercase` semantics.
+pub(crate) fn ascii_case_cmp(left: &str, right: &str) -> std::cmp::Ordering {
+    left.bytes()
+        .map(|byte| byte.to_ascii_lowercase())
+        .cmp(right.bytes().map(|byte| byte.to_ascii_lowercase()))
+}
+
+pub(crate) fn ascii_case_contains(value: &str, fragment: &str) -> bool {
+    fragment.is_empty()
+        || value
+            .as_bytes()
+            .windows(fragment.len())
+            .any(|window| window.eq_ignore_ascii_case(fragment.as_bytes()))
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct ParsedInput {
     pub(crate) document: Option<DocumentId>,

@@ -114,7 +114,7 @@ impl AnalysisHost {
         Self {
             revision: 0,
             rules: Arc::new(rules),
-            ir_fingerprint: Arc::from(ir.fingerprint()),
+            ir_fingerprint: Arc::from(RulesIr::shared_rule_hash(&ir).to_hex()),
             ir,
             profile: Arc::new(profile),
             roots: Arc::from([]),
@@ -193,7 +193,7 @@ impl AnalysisHost {
     pub fn set_ir(&mut self, ir: Arc<RulesIr>) {
         if !Arc::ptr_eq(&self.ir, &ir) {
             let invalidated_cache_roots = self.installed_caches.clone();
-            self.ir_fingerprint = Arc::from(ir.fingerprint());
+            self.ir_fingerprint = Arc::from(RulesIr::shared_rule_hash(&ir).to_hex());
             self.ir = ir;
             let mut files = self.source_files.as_ref().clone();
             let mut states = BTreeMap::new();
@@ -731,11 +731,7 @@ impl AnalysisHost {
         let existing_positions = self.index.position_ranges();
         let existing_position_count = existing_positions.len();
         let mut position_ranges = cached_positions;
-        position_ranges.extend(
-            existing_positions
-                .iter()
-                .map(|(key, position)| (key, *position)),
-        );
+        position_ranges.merge(existing_positions.clone());
         debug_assert_eq!(
             position_ranges.len(),
             cached_position_count.saturating_add(existing_position_count),

@@ -16,7 +16,7 @@ use vfs::{LocalisationPreview, SourceFileId, WorkspaceError, WorkspaceScanToken}
 /// the same deterministic lookup semantics while storing only one vector allocation per file.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct PositionMap {
-    by_file: BTreeMap<SourceFileId, Vec<(TextRange, PositionRange)>>,
+    by_file: BTreeMap<SourceFileId, Arc<Vec<(TextRange, PositionRange)>>>,
     len: usize,
 }
 
@@ -74,7 +74,7 @@ impl PositionMap {
             return;
         }
         self.len = self.len.saturating_add(entries.len());
-        self.by_file.insert(file_id, entries);
+        self.by_file.insert(file_id, Arc::new(entries));
     }
 
     /// Merges entries, replacing an existing value with the later value for a duplicate range.
@@ -91,15 +91,29 @@ impl PositionMap {
 
     /// Merges another map without flattening its already grouped vectors.
     pub fn merge(&mut self, other: Self) {
-        self.merge_grouped(other.by_file);
+        for (file_id, additions) in other.by_file {
+            if let Some(previous) = self.by_file.remove(&file_id) {
+                let mut merged = Arc::unwrap_or_clone(previous);
+                merged.extend(additions.iter().copied());
+                self.by_file
+                    .insert(file_id, Arc::new(sort_position_entries(merged)));
+            } else {
+                self.by_file.insert(file_id, additions);
+            }
+        }
+        self.recount_len();
     }
 
     fn merge_grouped(&mut self, grouped: BTreeMap<SourceFileId, Vec<(TextRange, PositionRange)>>) {
         for (file_id, additions) in grouped {
-            let mut merged = self.by_file.remove(&file_id).unwrap_or_default();
+            let mut merged = self
+                .by_file
+                .remove(&file_id)
+                .map(Arc::unwrap_or_clone)
+                .unwrap_or_default();
             merged.extend(additions);
             let merged = sort_position_entries(merged);
-            self.by_file.insert(file_id, merged);
+            self.by_file.insert(file_id, Arc::new(merged));
         }
         self.recount_len();
     }
@@ -125,7 +139,7 @@ impl PositionMap {
             let entries = sort_position_entries(entries);
             map.len = map.len.saturating_add(entries.len());
             if !entries.is_empty() {
-                map.by_file.insert(file_id, entries);
+                map.by_file.insert(file_id, Arc::new(entries));
             }
         }
         map
@@ -152,7 +166,7 @@ impl PositionMap {
     }
 
     fn recount_len(&mut self) {
-        self.len = self.by_file.values().map(Vec::len).sum();
+        self.len = self.by_file.values().map(|entries| entries.len()).sum();
     }
 }
 
@@ -173,7 +187,8 @@ impl<'map> IntoIterator for &'map PositionMap {
 
 /// Iterator returned by [`PositionMap::iter`].
 pub struct PositionMapIter<'map> {
-    outer: std::collections::btree_map::Iter<'map, SourceFileId, Vec<(TextRange, PositionRange)>>,
+    outer:
+        std::collections::btree_map::Iter<'map, SourceFileId, Arc<Vec<(TextRange, PositionRange)>>>,
     current_file: Option<SourceFileId>,
     current: Option<std::slice::Iter<'map, (TextRange, PositionRange)>>,
 }
@@ -513,7 +528,7 @@ pub struct DynamicDefinitionSummary {
     /// Parameters in first-use order.
     pub parameters: Vec<DynamicParameterSignature>,
     /// Reusable body semantics, when the definition could be lowered as a dynamic template.
-    pub template: Option<Template>,
+    pub template: Option<Arc<Template>>,
 }
 
 /// One symbol definition retained in an index shard.
@@ -775,13 +790,21 @@ impl WorkspaceIndex {
     /// priority-resolution state from the pointer buckets.
     #[must_use]
     pub fn definitions_with_state(&self, kind: &str, name: &str) -> Vec<(&Definition, bool)> {
+        self.definitions_with_state_iter(kind, name).collect()
+    }
+
+    /// Probes one symbol bucket without allocating a temporary candidate vector.
+    pub fn definitions_with_state_iter<'a>(
+        &'a self,
+        kind: &str,
+        name: &str,
+    ) -> impl Iterator<Item = (&'a Definition, bool)> + 'a {
         self.definition_bucket(kind, name)
             .iter()
             .filter_map(|pointer| {
                 self.definition_at(*pointer)
                     .map(|definition| (definition, pointer.active))
             })
-            .collect()
     }
 
     /// Returns the pointer bucket for one `(kind, name)` without allocating a key.
@@ -1074,16 +1097,11 @@ impl WorkspaceIndex {
         priorities: &BTreeMap<SourceFileId, u64>,
         cancellation: &WorkspaceScanToken,
     ) -> Result<(), WorkspaceError> {
-        let keys = self
-            .definitions
-            .iter()
-            .flat_map(|(kind, by_name)| {
-                by_name.keys().map(move |name| (kind.clone(), name.clone()))
-            })
-            .collect::<Vec<_>>();
-        for key in &keys {
-            cancellation.checkpoint()?;
-            self.resolve_definition_buckets(std::slice::from_ref(key), priorities);
+        for by_name in self.definitions.values_mut() {
+            for values in by_name.values_mut() {
+                cancellation.checkpoint()?;
+                Self::resolve_pointer_bucket(values, &self.shards, priorities);
+            }
         }
         Ok(())
     }
@@ -1199,49 +1217,50 @@ impl WorkspaceIndex {
         priorities: &BTreeMap<SourceFileId, u64>,
     ) {
         for key in keys {
-            let Some(highest) = self
-                .definitions
-                .get(key.0.as_ref())
-                .and_then(|by_name| by_name.get(key.1.as_ref()))
-                .and_then(|values| {
-                    values
-                        .iter()
-                        .map(|pointer| priorities.get(&pointer.file_id).copied().unwrap_or(0))
-                        .max()
-                })
-            else {
-                continue;
-            };
-            let updates = self
-                .definitions
-                .get(key.0.as_ref())
-                .and_then(|by_name| by_name.get(key.1.as_ref()))
-                .expect("checked above")
-                .iter()
-                .map(|pointer| {
-                    let file_id = pointer.file_id;
-                    self.shards
-                        .get(&file_id)
-                        .and_then(|shard| shard.definitions.get(pointer.ordinal))
-                        .map(|_definition| {
-                            // A higher-priority root's definition shadows lower-priority ones.
-                            priorities.get(&file_id).copied().unwrap_or(0) == highest
-                        })
-                })
-                .collect::<Vec<_>>();
             if let Some(values) = self
                 .definitions
                 .get_mut(key.0.as_ref())
                 .and_then(|by_name| by_name.get_mut(key.1.as_ref()))
             {
-                for (pointer, update) in values.iter_mut().zip(updates) {
-                    if let Some(active) = update {
-                        pointer.active = active;
-                    }
-                }
+                Self::resolve_pointer_bucket(values, &self.shards, priorities);
             }
-            self.sort_definition_buckets(std::slice::from_ref(key));
         }
+    }
+
+    fn resolve_pointer_bucket(
+        values: &mut [DefinitionPointer],
+        shards: &BTreeMap<SourceFileId, Arc<FileIndexShard>>,
+        priorities: &BTreeMap<SourceFileId, u64>,
+    ) {
+        // Most symbols have one owner. No priority comparison or allocation
+        // is needed for that bucket, even when the index has millions of names.
+        if let [pointer] = values {
+            if shards
+                .get(&pointer.file_id)
+                .and_then(|shard| shard.definitions.get(pointer.ordinal))
+                .is_some()
+            {
+                pointer.active = true;
+            }
+            return;
+        }
+        let Some(highest) = values
+            .iter()
+            .map(|pointer| priorities.get(&pointer.file_id).copied().unwrap_or(0))
+            .max()
+        else {
+            return;
+        };
+        for pointer in values.iter_mut() {
+            if shards
+                .get(&pointer.file_id)
+                .and_then(|shard| shard.definitions.get(pointer.ordinal))
+                .is_some()
+            {
+                pointer.active = priorities.get(&pointer.file_id).copied().unwrap_or(0) == highest;
+            }
+        }
+        values.sort_by_key(|pointer| (!pointer.active, pointer.file_id));
     }
 
     fn sort_definition_buckets(&mut self, keys: &[(Box<str>, Box<str>)]) {

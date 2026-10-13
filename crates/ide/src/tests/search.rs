@@ -239,14 +239,14 @@ fn editor_search_localisation_retains_all_sources_versions_and_header_languages(
     assert!(
         shared
             .iter()
-            .any(|entry| !entry.active && localisation_matches(&entry.value(), "vanilla"))
+            .any(|entry| !entry.active && localisation_matches(entry.value(), "vanilla"))
     );
     let french = data
         .entries
         .iter()
         .find(|entry| entry.key() == "long_value" && entry.language() == "french")
         .unwrap();
-    assert!(localisation_matches(&french.value(), "tail Empire"));
+    assert!(localisation_matches(french.value(), "tail Empire"));
     assert!(!french.value().contains('§'));
     assert!(french.value().contains("[Root.GetName]"));
     let position = editor_localisation_match_location(french, "Empire").unwrap();
@@ -259,7 +259,7 @@ fn editor_search_localisation_retains_all_sources_versions_and_header_languages(
         .iter()
         .find(|entry| entry.language() == "simp_chinese")
         .unwrap();
-    assert!(localisation_matches(&chinese.value(), "帝国 改革"));
+    assert!(localisation_matches(chinese.value(), "帝国 改革"));
     assert_eq!(
         editor_localisation_languages(&data),
         vec!["english", "french", "simp_chinese"]
@@ -524,7 +524,7 @@ fn editor_search_transcoded_hits_map_to_original_and_decoded_document_ranges() {
         .iter()
         .find(|entry| entry.key() == "encoded")
         .unwrap();
-    assert!(localisation_matches(&entry.value(), "帝国"));
+    assert!(localisation_matches(entry.value(), "帝国"));
     let hit = editor_localisation_match_location(entry, "帝国").unwrap();
     assert_eq!(
         &source[hit.range.start() as usize..hit.range.end() as usize],

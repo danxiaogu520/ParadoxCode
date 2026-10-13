@@ -16,6 +16,7 @@ pub struct SymbolDependency {
     pub name: Option<String>,
 }
 impl SymbolDependency {
+    #[cfg(test)]
     fn named(ir: &RulesIr, ty: TypeId, name: &str) -> Self {
         Self {
             kind: ir
@@ -30,14 +31,43 @@ impl SymbolDependency {
 pub(crate) struct TrackingFacts<'a> {
     pub(crate) ir: &'a RulesIr,
     pub(crate) facts: &'a (dyn SymbolFacts + Sync),
-    pub(crate) reads: Mutex<BTreeSet<SymbolDependency>>,
+    pub(crate) reads:
+        Mutex<rustc_hash::FxHashMap<TypeId, rustc_hash::FxHashMap<String, Option<bool>>>>,
 }
 impl TrackingFacts<'_> {
     fn read(&self, ty: TypeId, name: &str) {
-        self.reads
+        let folded = if name.bytes().any(|byte| byte.is_ascii_uppercase()) {
+            std::borrow::Cow::Owned(name.to_ascii_lowercase())
+        } else {
+            std::borrow::Cow::Borrowed(name)
+        };
+        let mut reads = self
+            .reads
             .lock()
+            .expect("file-local dependency lock poisoned");
+        let names = reads.entry(ty).or_default();
+        if !names.contains_key(folded.as_ref()) {
+            names.insert(folded.into_owned(), None);
+        }
+    }
+
+    pub(crate) fn into_reads(self) -> BTreeSet<SymbolDependency> {
+        self.reads
+            .into_inner()
             .expect("file-local dependency lock poisoned")
-            .insert(SymbolDependency::named(self.ir, ty, name));
+            .into_iter()
+            .flat_map(|(ty, names)| {
+                let kind = self
+                    .ir
+                    .strings
+                    .resolve(self.ir.type_info(ty).name)
+                    .to_ascii_lowercase();
+                names.into_keys().map(move |name| SymbolDependency {
+                    kind: kind.clone(),
+                    name: Some(name),
+                })
+            })
+            .collect()
     }
 }
 impl SymbolFacts for TrackingFacts<'_> {
@@ -61,8 +91,32 @@ impl SymbolFacts for TrackingFacts<'_> {
         self.facts.template(ty, name)
     }
     fn type_member(&self, ty: TypeId, name: &str) -> bool {
-        self.read(ty, name);
-        self.facts.type_member(ty, name)
+        let folded = if name.bytes().any(|byte| byte.is_ascii_uppercase()) {
+            std::borrow::Cow::Owned(name.to_ascii_lowercase())
+        } else {
+            std::borrow::Cow::Borrowed(name)
+        };
+        {
+            let reads = self
+                .reads
+                .lock()
+                .expect("file-local dependency lock poisoned");
+            if let Some(Some(answer)) = reads.get(&ty).and_then(|names| names.get(folded.as_ref()))
+            {
+                return *answer;
+            }
+        }
+        // This adapter belongs to one file and one immutable discovery round.
+        // Retain negative answers too: a repeated miss still records a dependency,
+        // but need not repeat the workspace's namespace/pattern search.
+        let answer = self.facts.type_member(ty, name);
+        self.reads
+            .lock()
+            .expect("file-local dependency lock poisoned")
+            .entry(ty)
+            .or_default()
+            .insert(folded.into_owned(), Some(answer));
+        answer
     }
     fn type_subtype_member(&self, ty: TypeId, subtype: Symbol, name: &str) -> bool {
         self.read(ty, name);
@@ -320,6 +374,76 @@ mod callable_dependency_tests {
     };
     use text::TextRange;
 
+    #[test]
+    fn member_reuse_keeps_negative_reads_and_expires_with_the_fact_round() {
+        struct Members {
+            present: TypeId,
+            calls: std::sync::atomic::AtomicUsize,
+            visible: bool,
+        }
+        impl SymbolFacts for Members {
+            fn type_member(&self, ty: TypeId, name: &str) -> bool {
+                self.calls
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                self.visible && ty == self.present && name.eq_ignore_ascii_case("known")
+            }
+        }
+        let ir = rules::lower::lower(
+            &[(
+                "members.json".to_owned(),
+                serde_json::from_value(serde_json::json!({"types":{"one":{},"two":{}}})).unwrap(),
+            )],
+            Default::default(),
+        )
+        .unwrap();
+        let one = ir.type_by_name("one").unwrap();
+        let two = ir.type_by_name("two").unwrap();
+        let members = Members {
+            present: one,
+            calls: Default::default(),
+            visible: true,
+        };
+        let tracked = TrackingFacts {
+            ir: &ir,
+            facts: &members,
+            reads: Default::default(),
+        };
+        for _ in 0..4 {
+            assert!(tracked.type_member(one, "KNOWN"));
+            assert!(tracked.type_member(one, "known"));
+            assert!(!tracked.type_member(one, "missing"));
+            assert!(!tracked.type_member(two, "known"));
+            // A different fact capability must retain, rather than erase, the
+            // cached member answer and its dependency.
+            tracked.template(one, "known");
+        }
+        assert_eq!(members.calls.load(std::sync::atomic::Ordering::Relaxed), 3);
+        assert_eq!(
+            tracked.into_reads(),
+            BTreeSet::from([
+                SymbolDependency::named(&ir, one, "known"),
+                SymbolDependency::named(&ir, one, "missing"),
+                SymbolDependency::named(&ir, two, "known"),
+            ])
+        );
+        let next = Members {
+            visible: false,
+            ..members
+        };
+        let tracked = TrackingFacts {
+            ir: &ir,
+            facts: &next,
+            reads: Default::default(),
+        };
+        assert!(!tracked.type_member(one, "known"));
+        assert_eq!(next.calls.load(std::sync::atomic::Ordering::Relaxed), 4);
+        assert!(
+            tracked
+                .into_reads()
+                .contains(&SymbolDependency::named(&ir, one, "known"))
+        );
+    }
+
     struct Definitions(BTreeMap<String, Arc<Template>>);
     impl SymbolFacts for Definitions {
         fn type_member(&self, _: TypeId, name: &str) -> bool {
@@ -384,14 +508,14 @@ mod callable_dependency_tests {
         let facts = TrackingFacts {
             ir: &ir,
             facts: &definitions,
-            reads: Mutex::new(BTreeSet::new()),
+            reads: Default::default(),
         };
         let kind = ir.type_by_name("helper").unwrap();
         assert_eq!(
             facts.template_accepts_no_arguments(kind, "outer", &mut || false),
             Some(true)
         );
-        let reads = facts.reads.into_inner().unwrap();
+        let reads = facts.into_reads();
         assert!(reads.contains(&SymbolDependency::named(&ir, kind, "outer")));
         assert!(reads.contains(&SymbolDependency::named(&ir, kind, "inner")));
     }
