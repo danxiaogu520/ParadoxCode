@@ -498,6 +498,10 @@ impl Default for WorkspaceScanLimits {
 /// Classification of a recoverable source-root scan problem.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WorkspaceScanIssueKind {
+    /// Examined file is outside the active game scan profile.
+    OutsideProfile,
+    /// Scan profile permits the file but no rule category classifies it.
+    Unclassified,
     /// A directory entry was a symbolic link and was not followed.
     SymlinkSkipped,
     /// A subtree exceeded the configured nesting limit.
@@ -534,6 +538,14 @@ pub struct WorkspaceScanIssue {
 /// Summary of the most recent successful bounded workspace scan.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct WorkspaceScanReport {
+    /// Live roots examined; installed persistent caches are not scanned.
+    pub scanned_roots: Vec<SourceRootId>,
+    /// Examined files excluded by the profile or rule classification.
+    pub excluded_files: usize,
+    /// Informational exclusions, independent of recoverable scan problems.
+    pub excluded_entries: Vec<WorkspaceScanIssue>,
+    /// Exclusions omitted after the bounded detail budget.
+    pub omitted_exclusions: usize,
     /// Regular files examined before rules classification.
     pub discovered_files: usize,
     /// Classified, readable files added to the workspace after decoding.

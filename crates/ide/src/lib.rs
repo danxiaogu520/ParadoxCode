@@ -43,8 +43,8 @@ pub use hover_card::{
 pub use inlay::{MAX_SCOPE_INLAY_HINTS, scope_inlay_hints_with_cancellation};
 pub use localisation::{
     LocalisationKeyMatch, LocalisationSearchHit, LocalisationSearchResult,
-    localisation_search_with_cancellation, scripted_localisation_names,
-    scripted_localisation_names_with_cancellation,
+    localisation_search_page_with_cancellation, localisation_search_with_cancellation,
+    scripted_localisation_names, scripted_localisation_names_with_cancellation,
 };
 pub use navigation::{
     definition, definition_with_cancellation, document_symbols, document_symbols_with_cancellation,

@@ -333,6 +333,7 @@ pub(crate) fn prepare_initialize_candidate(
                     work_done_progress_options: WorkDoneProgressOptions::default(),
                 }),
             ),
+            experimental: Some(serde_json::json!({"pdcQueryPagination":true,"pdcHiddenEventOptions":true,"pdcScanDetails":true})),
             ..ServerCapabilities::default()
         },
         server_info: Some(ServerInfo {

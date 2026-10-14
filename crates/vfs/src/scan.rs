@@ -15,6 +15,23 @@ use crate::model::{
     WorkspaceScanToken,
 };
 
+pub fn record_scan_exclusion(
+    report: &mut WorkspaceScanReport,
+    limits: WorkspaceScanLimits,
+    kind: WorkspaceScanIssueKind,
+    path: PathBuf,
+    detail: String,
+) {
+    report.excluded_files = report.excluded_files.saturating_add(1);
+    if report.excluded_entries.len() < limits.max_reported_issues {
+        report
+            .excluded_entries
+            .push(WorkspaceScanIssue { kind, path, detail });
+    } else {
+        report.omitted_exclusions = report.omitted_exclusions.saturating_add(1);
+    }
+}
+
 pub fn record_scan_issue(
     report: &mut WorkspaceScanReport,
     limits: WorkspaceScanLimits,
@@ -315,6 +332,13 @@ fn collect_disk_files(
         }
         scan.report.discovered_files = scan.report.discovered_files.saturating_add(1);
         if !scan.profile.allows_scan_file(&relative) {
+            record_scan_exclusion(
+                scan.report,
+                scan.limits,
+                WorkspaceScanIssueKind::OutsideProfile,
+                path,
+                "file is outside the active game scan profile".to_owned(),
+            );
             continue;
         }
         let logical = LogicalPath::parse(&relative)
