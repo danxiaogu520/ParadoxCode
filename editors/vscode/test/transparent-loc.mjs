@@ -27,7 +27,7 @@ function host(root, settings = {}) {
     };
     const state = {
         contexts: new Map(), commands: new Map(), providers: [], requests: [], messages: [], opens: [],
-        settings, active: undefined,
+        settings, active: undefined, wholeFileTranscode: true,
         emit(name, value) { for (const callback of callbacks[name] ?? []) callback(value); },
         show(document) { this.active = document ? { document } : undefined; this.emit('active', this.active); },
     };
@@ -36,6 +36,10 @@ function host(root, settings = {}) {
         Disposable: class { constructor(dispose) { this.dispose = dispose; } static from() { return { dispose() {} }; } },
         EventEmitter: class { event = () => ({ dispose() {} }); fire() {} dispose() {} },
         StatusBarAlignment: { Left: 1 },
+        Diagnostic: class { constructor(range, message, severity) { Object.assign(this, { range, message, severity }); } },
+        Range: class { constructor(...args) { this.args = args; } },
+        DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2 },
+        FileSystemError: { NoPermissions: message => new Error(message), Unavailable: message => new Error(message) },
         l10n: { t: (message, ...args) => message.replace(/\{(\d+)\}/g, (_, i) => args[i]) },
         commands: {
             registerCommand(name, callback) { state.commands.set(name, callback); return { dispose() {} }; },
@@ -77,6 +81,7 @@ function host(root, settings = {}) {
             if (id === 'vscode') return vscode;
             if (id === './serverClient') return {
                 acquireServerClient: async () => ({
+                    initializeResult: { capabilities: { experimental: { pdcWholeFileTranscode: state.wholeFileTranscode } } },
                     async sendRequest(method, params) {
                         state.requests.push({ method, params });
                         return state.respond(method, params);
@@ -184,7 +189,7 @@ try {
     await test('manual decode and encode update ordinary files and preserve the input backup', async () => {
         const state = host(root);
         const document = state.document('localisation/manual.yml');
-        const readable = Buffer.from('l_english:\n KEY:0 "中文"\n');
+        const readable = Buffer.from('l_english:\n # 中文注释\n 中文键:0 "中文"\n');
         const escaped = Buffer.from('l_english:\n KEY:0 "\x10-N\x10‡e"\n');
         mkdirSync(dirname(document.uri.fsPath), { recursive: true });
         writeFileSync(document.uri.fsPath, escaped);
@@ -195,13 +200,63 @@ try {
         assert.deepEqual(readFileSync(document.uri.fsPath), readable);
         assert.deepEqual(readFileSync(`${document.uri.fsPath}.pre-transcode.bak`), escaped);
         state.respond = (method) => method === 'pdc/transcodeDecode'
-            ? { eligible: true, form: 'plain', bytes: readable.toString('hex'), quotedCjk: true }
+            ? { eligible: true, form: 'plain', bytes: readable.toString('hex'), needsEncoding: true }
             : { bytes: escaped.toString('hex') };
         await state.commands.get('paradoxcode.localisation.encodeFile')(document.uri);
         assert.deepEqual(readFileSync(document.uri.fsPath), escaped);
         assert.deepEqual(readFileSync(`${document.uri.fsPath}.pre-transcode.bak`), readable);
         assert.equal(state.opens.length, 0);
         assert.equal(document.uri.scheme, 'file');
+        for (const { params } of state.requests) assert.deepEqual(Object.keys(params).sort(), ['bytes', 'path']);
+    });
+
+    await test('manual conversion rejects an old server before requesting or writing bytes', async () => {
+        const state = host(root);
+        state.wholeFileTranscode = false;
+        const document = state.document('events/old-server.txt');
+        mkdirSync(dirname(document.uri.fsPath), { recursive: true });
+        writeFileSync(document.uri.fsPath, '# 中文注释\n中文 = "x"\n');
+        const original = readFileSync(document.uri.fsPath);
+        state.show(document);
+        await state.activate();
+        await state.commands.get('paradoxcode.localisation.encodeFile')(document.uri);
+        assert.equal(state.requests.length, 0);
+        assert.deepEqual(readFileSync(document.uri.fsPath), original);
+        assert.match(state.messages.at(-1), /updated ParadoxCode server/i);
+        assert.throws(() => readFileSync(`${document.uri.fsPath}.pre-transcode.bak`), /ENOENT/);
+    });
+
+    await test('damaged comment refuses manual conversion and preserves file and backup', async () => {
+        const state = host(root);
+        const document = state.document('events/damaged-comment.txt');
+        mkdirSync(dirname(document.uri.fsPath), { recursive: true });
+        const original = Buffer.from('# \x10\nname = "x"\n');
+        writeFileSync(document.uri.fsPath, original);
+        state.show(document);
+        await state.activate();
+        state.respond = () => ({ refused: 'brokenEscape', offsets: [2], bytes: original.toString('hex') });
+        await state.commands.get('paradoxcode.localisation.decodeFile')(document.uri);
+        assert.deepEqual(readFileSync(document.uri.fsPath), original);
+        assert.match(state.messages.at(-1), /byte 2/i);
+        assert.throws(() => readFileSync(`${document.uri.fsPath}.pre-transcode.bak`), /ENOENT/);
+    });
+
+    await test('transparent saves use the same whole-file request and preserve refusal behavior', async () => {
+        const state = host(root, { transparentEncoding: true, autoOpen: 'off' });
+        await state.activate();
+        const real = state.document('events/transparent.txt').uri;
+        mkdirSync(dirname(real.fsPath), { recursive: true });
+        const readable = Buffer.from('# 中文注释\n中文 = "中文"\n');
+        const encoded = Buffer.from('# \x10-N\nkey = "\x10-N"\n');
+        writeFileSync(real.fsPath, readable);
+        state.respond = () => ({ bytes: encoded.toString('hex') });
+        await state.providers[0].provider.writeFile(real.with({ scheme: 'pdcloc' }), readable);
+        assert.deepEqual(readFileSync(real.fsPath), encoded);
+        assert.equal(state.requests.at(-1).method, 'pdc/transcodeEncode');
+        assert.deepEqual(Object.keys(state.requests.at(-1).params).sort(), ['bytes', 'path']);
+        state.respond = () => ({ refused: 'unencodable', points: [{ codePoint: 0x1f600 }] });
+        await assert.rejects(() => state.providers[0].provider.writeFile(real.with({ scheme: 'pdcloc' }), Buffer.from('# 😀\n')), /cannot be round-tripped/);
+        assert.deepEqual(readFileSync(real.fsPath), encoded);
     });
 
     await test('manual conversion refuses unsaved edits before requesting a codec or writing', async () => {

@@ -133,8 +133,8 @@ fn open_script(host: &mut AnalysisHost, name: &str, text: String) -> DocumentId 
 }
 
 #[test]
-fn scoped_shaped_text_is_not_mixed_encoding() {
-    // A scoped file's char layer: one escaped string, one readable string, a
+fn mixed_whole_file_text_is_not_an_encoding_error() {
+    // A mixed file's char layer: one escaped string, one readable string, a
     // readable comment. Escape markers sit only inside the quoted span, so no
     // mixed-encoding error, no orphan warnings, nothing to fix.
     let escaped = transcode::encode_text(
@@ -145,41 +145,46 @@ fn scoped_shaped_text_is_not_mixed_encoding() {
     let text =
         format!("# \u{6CE8}\u{91CA}\r\nname = \"{escaped}\"\r\ntitle = \"\u{5E1D}\u{56FD}\"\r\n");
     let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
-    let id = open_script(&mut host, "scoped.txt", text);
+    let id = open_script(&mut host, "mixed.txt", text);
     let codes = transcode_codes(&host, &id);
     assert!(
         !codes.contains(&DiagnosticCode::LocalisationMixedEncoding)
             && !codes.contains(&DiagnosticCode::LocalisationBrokenEscapeSequence)
             && !codes.contains(&DiagnosticCode::LocalisationUnencodableCodePoint),
-        "scoped-shaped text must stay diagnosis-free, got {codes:?}"
+        "mixed whole-file text must stay diagnosis-free, got {codes:?}"
     );
 }
 
 #[test]
-fn marker_outside_strings_is_a_mixed_error() {
-    // A marker in code position (outside quotes and comments) anchors the
-    // mixed-encoding error at itself.
+fn valid_escape_triples_outside_strings_are_supported() {
     let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
+    let encoded = transcode::encode_text("中文", transcode::EscapeSet::Paratranz).expect("encode");
     let id = open_script(
         &mut host,
-        "damaged.txt",
-        "name = \"x\"\r\na \u{0010}AB\r\n".to_owned(),
+        "mixed.txt",
+        format!("# {encoded}\nname = 中文\n"),
     );
+    let codes = transcode_codes(&host, &id);
+    assert!(!codes.contains(&DiagnosticCode::LocalisationMixedEncoding));
+    assert!(!codes.contains(&DiagnosticCode::LocalisationBrokenEscapeSequence));
+}
+
+#[test]
+fn damaged_escape_in_a_comment_reports_its_position() {
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
+    let id = open_script(&mut host, "damaged.txt", "# note \u{0010}\n".to_owned());
     let diagnostics = diagnostics(&host.snapshot(), &id);
-    let error = diagnostics
+    let diagnostic = diagnostics
         .iter()
-        .find(|diagnostic| diagnostic.code == DiagnosticCode::LocalisationMixedEncoding)
-        .expect("out-of-span marker must be a mixed-encoding error");
-    assert_eq!(error.severity, Severity::Error);
-    assert!(error.message.contains("outside every quoted string"));
-    // Anchored at the marker byte (14 bytes precede it in `name = "x"\r\na `).
-    assert_eq!(error.range.start(), 14);
+        .find(|diagnostic| diagnostic.code == DiagnosticCode::LocalisationBrokenEscapeSequence)
+        .expect("comment damage must be reported");
+    assert_eq!(diagnostic.range.start(), 7);
 }
 
 #[test]
 fn in_span_orphan_markers_report_as_repairable_warnings() {
     // A marker with no payload inside a string is an orphan, not damage: the
-    // scoped path passes it through and reports it for manual repair.
+    // conversion refuses it and reports the byte position for manual repair.
     let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = open_script(
         &mut host,
@@ -195,9 +200,8 @@ fn in_span_orphan_markers_report_as_repairable_warnings() {
 }
 
 #[test]
-fn unencodable_code_points_outside_strings_are_not_flagged() {
-    // Scoped saving keeps everything outside strings verbatim, so a refusal
-    // only applies inside a quoted span.
+fn unencodable_code_points_in_comments_are_flagged() {
+    // Whole-file saving also checks comments.
     let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
     let id = open_script(
         &mut host,
@@ -206,7 +210,7 @@ fn unencodable_code_points_outside_strings_are_not_flagged() {
     );
     let codes = transcode_codes(&host, &id);
     assert!(
-        !codes.contains(&DiagnosticCode::LocalisationUnencodableCodePoint),
-        "comment-position characters are never escaped, got {codes:?}"
+        codes.contains(&DiagnosticCode::LocalisationUnencodableCodePoint),
+        "whole-file conversion must check comment-position characters, got {codes:?}"
     );
 }

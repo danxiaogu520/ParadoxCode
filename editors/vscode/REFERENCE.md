@@ -251,7 +251,7 @@ Glob patterns for files excluded from workspace discovery.
 
 ### `paradoxcode.localisation.autoOpen`
 
-Automatic opening policy for the experimental `pdcloc://` decoded view; applies only when `paradoxcode.localisation.transparentEncoding` is enabled. `needsTranscode` (default): escaped or damaged files, or plain text whose quoted CJK a save would encode, enter the decoded view. `always`: every eligible file enters the decoded view. `off`: open the decoded view only by explicit command.
+Automatic opening policy for the experimental `pdcloc://` decoded view; applies only when `paradoxcode.localisation.transparentEncoding` is enabled. `needsTranscode` (default): escaped or damaged files, or plain text whose text anywhere in the file a save would encode, enter the decoded view. `always`: every eligible file enters the decoded view. `off`: open the decoded view only by explicit command.
 
 ```json
 {
@@ -282,7 +282,7 @@ Localisation language preference. The first entry is the target language: hover 
 
 ### `paradoxcode.localisation.transparentEncoding`
 
-Experimental EU4dll transparent encoding and `pdcloc://` decoded views. Disabled by default. When enabled, eligible files can open in the decoded view and saves encode quoted strings automatically (scoped form). Search and navigation have known limitations. When disabled, use the editor-title Decode File / Encode File buttons for manual disk conversion with a `.pre-transcode.bak` backup. Reload the VS Code window after changing this setting.
+Experimental EU4dll transparent encoding and `pdcloc://` decoded views. Disabled by default. When enabled, eligible files can open in the decoded view and saves encode the entire file automatically, including comments, identifiers and strings. Search and navigation have known limitations. When disabled, use the editor-title Decode File / Encode File buttons for manual disk conversion with a `.pre-transcode.bak` backup. Reload the VS Code window after changing this setting.
 
 ```json
 {
@@ -544,6 +544,6 @@ Publish diagnostics for closed files in the project during workspace validation 
 | `paradoxcode.localisation.revealOriginal` | Open the Raw Transcoded File |
 | `paradoxcode.localisation.peekOriginal` | Peek at the Raw Transcoded Form |
 | `paradoxcode.localisation.endPeek` | Back to the Decoded View |
-| `paradoxcode.localisation.encodeFile` | Encode Quoted Text (EU4dll Escape Form) |
-| `paradoxcode.localisation.decodeFile` | Decode Quoted Text (Readable Text) |
+| `paradoxcode.localisation.encodeFile` | Encode Entire File (EU4dll Escape Form) |
+| `paradoxcode.localisation.decodeFile` | Decode Entire File (Readable Text) |
 | `paradoxcode.openSearch` | Search |

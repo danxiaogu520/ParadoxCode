@@ -8,7 +8,7 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
-use transcode::{EscapeSet, Profile, encode_file, scoped_encode_file};
+use transcode::{EscapeSet, Profile, encode_file};
 
 use super::*;
 
@@ -105,227 +105,121 @@ fn encode_request(path: &Path, bytes: &[u8]) -> Value {
 }
 
 #[test]
-fn transcode_decode_dispatches_plain_whole_and_scoped_forms() {
+fn transcode_complete_files_and_mixed_input_round_trip() {
     let (root, root_uri) = temp_workspace_dir();
-    let plain = write_file(&root, "events/plain.txt", READABLE_SCRIPT.as_bytes());
-    let whole_bytes = encode_file(READABLE_LOC, Profile::Localisation, EscapeSet::Paratranz)
-        .expect("whole-encoded fixture");
-    let whole = write_file(&root, "localisation/test_l_english.yml", &whole_bytes);
-    let scoped_bytes = scoped_encode_file(READABLE_SCRIPT, Profile::Script, EscapeSet::Paratranz)
-        .expect("scoped-encoded fixture");
-    let scoped = write_file(&root, "events/scoped.txt", &scoped_bytes);
-
+    let script = write_file(&root, "events/plain.txt", READABLE_SCRIPT.as_bytes());
+    let loc = write_file(
+        &root,
+        "localisation/test_l_english.yml",
+        READABLE_LOC.as_bytes(),
+    );
+    let whole_script = encode_file(READABLE_SCRIPT, Profile::Script, EscapeSet::Paratranz).unwrap();
+    let whole_loc = encode_file(READABLE_LOC, Profile::Localisation, EscapeSet::Paratranz).unwrap();
+    let unquoted = encode_file("# 中\n", Profile::Script, EscapeSet::Paratranz).unwrap();
+    let escaped_word = encode_file("中文", Profile::Script, EscapeSet::Paratranz).unwrap();
+    let mixed = [
+        "# 中文注释\nname = \"".as_bytes(),
+        &escaped_word,
+        "内容\"\n".as_bytes(),
+    ]
+    .concat();
     let run = run_transcode_session(
         &root,
         &root_uri,
         json!({}),
         vec![
-            decode_request(&plain),
-            decode_request(&whole),
-            decode_request(&scoped),
+            decode_request(&script),
+            encode_request(&script, READABLE_SCRIPT.as_bytes()),
+            decode_request_with_bytes(&script, &whole_script),
+            encode_request(&script, &whole_script),
+            decode_request_with_bytes(&script, &unquoted),
+            decode_request_with_bytes(&script, &mixed),
+            encode_request(&loc, READABLE_LOC.as_bytes()),
+            decode_request_with_bytes(&loc, &whole_loc),
+            decode_request_with_bytes(&script, "# 中文注释\nname = \"x\"\n".as_bytes()),
         ],
     );
-
-    // Plain form passes the bytes through and flags the quoted CJK a save would encode.
-    let result = run.result(2);
-    assert_eq!(result["eligible"], json!(true));
-    assert_eq!(result["profile"], json!("script"));
-    assert_eq!(result["form"], json!("plain"));
-    assert_eq!(result["bytes"], json!(hex(READABLE_SCRIPT.as_bytes())));
-    assert_eq!(result["broken"], json!(0));
-    assert_eq!(result["quotedCjk"], json!(true));
-
-    // Whole form decodes back to the readable localisation text.
-    let result = run.result(3);
-    assert_eq!(result["profile"], json!("localisation"));
-    assert_eq!(result["form"], json!("whole"));
-    assert_eq!(result["bytes"], json!(hex(READABLE_LOC.as_bytes())));
-    assert_eq!(result["quotedCjk"], json!(false));
-
-    // Scoped form (readable CJK comment outside the spans) resolves only inside strings.
-    let result = run.result(4);
-    assert_eq!(result["profile"], json!("script"));
-    assert_eq!(result["form"], json!("scoped"));
-    assert_eq!(result["bytes"], json!(hex(READABLE_SCRIPT.as_bytes())));
-
-    fs::remove_dir_all(root).expect("cleanup");
-}
-
-#[test]
-fn transcode_decode_reports_damaged_content_and_ineligibility() {
-    let (root, root_uri) = temp_workspace_dir();
-    // A marker byte (0x10..=0x13) outside every quoted span marks damaged content.
-    let damaged = b"# comment\nmarker \x11 here\n".to_vec();
-    let damaged_path = write_file(&root, "events/damaged.txt", &damaged);
-    let markdown = write_file(&root, "docs/readme.md", b"# readme\n");
-    let outside_file = tempfile::Builder::new()
-        .prefix("pdc-transcode-outside-")
-        .suffix(".txt")
-        .tempfile()
-        .expect("outside fixture");
-    fs::write(outside_file.path(), b"name = \"x\"\n").expect("outside fixture content");
-    let outside = dunce::canonicalize(outside_file.path()).expect("canonical outside fixture");
-
-    let run = run_transcode_session(
-        &root,
-        &root_uri,
-        json!({}),
-        vec![
-            decode_request(&damaged_path),
-            decode_request(&markdown),
-            decode_request(&outside),
-        ],
-    );
-
-    let result = run.result(2);
-    assert_eq!(result["form"], json!("damaged"));
-    assert_eq!(result["bytes"], json!(hex(&damaged)));
+    assert_eq!(run.result(2)["needsEncoding"], json!(true));
+    assert_eq!(run.result(3)["bytes"], hex(&whole_script));
+    assert_eq!(run.result(4)["bytes"], hex(READABLE_SCRIPT.as_bytes()));
+    assert_eq!(run.result(5)["bytes"], hex(&whole_script));
+    assert_eq!(run.result(6)["bytes"], hex("# 中\n".as_bytes()));
     assert_eq!(
-        result["damagedAt"],
-        json!(damaged.iter().position(|b| *b == 0x11))
+        run.result(7)["bytes"],
+        hex("# 中文注释\nname = \"中文内容\"\n".as_bytes())
     );
-
-    assert_eq!(run.result(3), &json!({"eligible": false}));
-    assert_eq!(run.result(4), &json!({"eligible": false}));
-
-    outside_file.close().expect("cleanup outside fixture");
+    assert_eq!(run.result(8)["bytes"], hex(&whole_loc));
+    assert_eq!(run.result(9)["bytes"], hex(READABLE_LOC.as_bytes()));
+    assert_eq!(
+        run.result(10)["needsEncoding"],
+        json!(true),
+        "comment-only CJK participates"
+    );
     fs::remove_dir_all(root).expect("cleanup");
 }
 
 #[test]
-fn transcode_decode_classifies_supplied_buffer_bytes_over_disk() {
+fn transcode_refuses_damage_anywhere_without_partial_output() {
     let (root, root_uri) = temp_workspace_dir();
-    // On disk: pure ASCII — a fixed point the transparent view must leave alone.
-    let ascii_script = write_file(&root, "events/plain.txt", b"name = \"x\"\n");
-    let ascii_loc = write_file(&root, "localisation/plain_l_english.yml", b"l_english:\n");
-    let whole_bytes = encode_file(READABLE_LOC, Profile::Localisation, EscapeSet::Paratranz)
-        .expect("whole-encoded fixture");
-
+    let script = write_file(&root, "events/plain.txt", b"name = \"x\"\n");
+    let loc = write_file(&root, "localisation/plain.yml", b"l_english:\n");
     let run = run_transcode_session(
         &root,
         &root_uri,
         json!({}),
         vec![
-            // Unsaved readable buffer over the ASCII script file: judged as
-            // plain with quoted CJK a save would encode.
-            decode_request_with_bytes(&ascii_script, READABLE_SCRIPT.as_bytes()),
-            // Unsaved readable buffer with CJK only outside the quoted span:
-            // plain and a fixed point again.
-            decode_request_with_bytes(&ascii_script, "# 中文注释\nname = \"x\"\n".as_bytes()),
-            // Unsaved already-escaped buffer: classified and decoded as whole.
-            decode_request_with_bytes(&ascii_loc, &whole_bytes),
-            // Without `bytes` the on-disk content still decides.
-            decode_request(&ascii_script),
-            // Malformed hex is a protocol error, not a classification.
+            encode_request(&script, "# 😀\nname = \"x\"\n".as_bytes()),
+            encode_request(&script, b"# \x10\n"),
+            decode_request_with_bytes(&script, b"# \x10\n"),
+            encode_request(&loc, b"# \xff\nname = \"x\"\n"),
+            decode_request_with_bytes(&loc, b"# \xff\n"),
             json!({"method":"pdc/transcodeDecode","params":{
-                "path":ascii_script.to_string_lossy(),
-                "bytes":"abc",
-            }}),
+            "path":script.to_string_lossy(), "quotedOnly":true}}),
+            json!({"method":"pdc/transcodeEncode","params":{
+            "path":script.to_string_lossy(), "bytes":"", "preserveEscaped":true}}),
         ],
     );
-
-    let result = run.result(2);
-    assert_eq!(result["form"], json!("plain"));
-    assert_eq!(result["quotedCjk"], json!(true));
-    assert_eq!(result["bytes"], json!(hex(READABLE_SCRIPT.as_bytes())));
-
-    let result = run.result(3);
-    assert_eq!(result["form"], json!("plain"));
-    assert_eq!(result["quotedCjk"], json!(false));
+    assert_eq!(run.result(2)["refused"], "unencodable");
+    assert!(run.result(2).get("bytes").is_none());
+    assert_eq!(run.result(3)["refused"], "brokenEscape");
+    assert_eq!(run.result(3)["offsets"], json!([2]));
+    assert!(run.result(3).get("bytes").is_none());
+    assert_eq!(run.result(4)["form"], "damaged");
+    assert_eq!(run.result(4)["refused"], "brokenEscape");
     assert_eq!(
-        result["bytes"],
-        json!(hex("# 中文注释\nname = \"x\"\n".as_bytes()))
+        run.result(4)["bytes"],
+        hex(b"# \x10\n"),
+        "only original bytes are returned for repair"
     );
-
-    let result = run.result(4);
-    assert_eq!(result["profile"], json!("localisation"));
-    assert_eq!(result["form"], json!("whole"));
-    assert_eq!(result["bytes"], json!(hex(READABLE_LOC.as_bytes())));
-
-    let result = run.result(5);
-    assert_eq!(result["form"], json!("plain"));
-    assert_eq!(result["quotedCjk"], json!(false));
-    assert_eq!(result["bytes"], json!(hex(b"name = \"x\"\n")));
-
-    assert_eq!(run.error(6)["code"], json!(-32602));
-
+    assert_eq!(run.result(5)["refused"], "invalidUtf8");
+    assert_eq!(run.result(6)["refused"], "invalidUtf8");
+    assert_eq!(run.error(7)["code"], -32602, "removed options are rejected");
+    assert_eq!(run.error(8)["code"], -32602);
     fs::remove_dir_all(root).expect("cleanup");
 }
 
 #[test]
-fn transcode_decode_accepts_pdcloc_uris_and_rejects_relative_paths() {
+fn transcode_buffer_precedence_and_path_eligibility_are_preserved() {
     let (root, root_uri) = temp_workspace_dir();
-    let plain = write_file(&root, "events/plain.txt", READABLE_SCRIPT.as_bytes());
-    let pdcloc_uri = FileUri::parse(&file_uri_string(&plain).replacen("file:", "pdcloc:", 1))
-        .expect("pdcloc URI parses")
-        .as_str()
-        .to_owned();
-
+    let script = write_file(&root, "events/plain.txt", b"name = \"x\"\n");
+    let markdown = write_file(&root, "docs/readme.md", b"# readme\n");
     let run = run_transcode_session(
         &root,
         &root_uri,
         json!({}),
         vec![
-            json!({"method":"pdc/transcodeDecode","params":{"path":pdcloc_uri}}),
-            json!({"method":"pdc/transcodeDecode","params":{"path":"events/plain.txt"}}),
+            decode_request(&script),
+            decode_request_with_bytes(&script, READABLE_SCRIPT.as_bytes()),
+            decode_request(&markdown),
+            json!({"method":"pdc/transcodeDecode","params":{
+            "path":script.to_string_lossy(), "bytes":"abc"}}),
         ],
     );
-
-    let result = run.result(2);
-    assert_eq!(result["form"], json!("plain"));
-    assert_eq!(result["bytes"], json!(hex(READABLE_SCRIPT.as_bytes())));
-    assert_eq!(run.error(3)["code"], json!(-32602));
-
-    fs::remove_dir_all(root).expect("cleanup");
-}
-
-#[test]
-fn transcode_encode_round_trips_and_refuses_the_three_guards() {
-    let (root, root_uri) = temp_workspace_dir();
-    let file = write_file(&root, "events/draft.txt", b"");
-    let loc_file = write_file(&root, "localisation/draft_l_english.yml", b"");
-
-    let run = run_transcode_session(
-        &root,
-        &root_uri,
-        json!({}),
-        vec![
-            encode_request(&file, READABLE_SCRIPT.as_bytes()),
-            // Iron rule ②: an escape marker inside a quoted string would double-encode.
-            encode_request(&file, b"name = \"\x10abc\"\n"),
-            // Beyond-BMP character inside a quoted string cannot round-trip.
-            encode_request(&file, "name = \"😀\"\n".as_bytes()),
-            // The editor buffer must be valid UTF-8.
-            encode_request(&file, b"\xff\xfe"),
-            // Localisation profile takes the whole-file encoder.
-            encode_request(&loc_file, READABLE_LOC.as_bytes()),
-        ],
-    );
-
-    let encoded = hex(
-        &scoped_encode_file(READABLE_SCRIPT, Profile::Script, EscapeSet::Paratranz)
-            .expect("expected scoped bytes"),
-    );
-    assert_eq!(run.result(2), &json!({"bytes": encoded}));
-
-    let refused = run.result(3);
-    assert_eq!(refused["refused"], json!("alreadyEscaped"));
-    assert_eq!(refused["offsets"], json!([8]));
-
-    let refused = run.result(4);
-    assert_eq!(refused["refused"], json!("unencodable"));
-    let points = refused["points"].as_array().expect("unencodable points");
-    assert_eq!(points.len(), 1);
-    assert_eq!(points[0]["codePoint"], json!(0x1F600));
-
-    assert_eq!(run.result(5), &json!({"refused": "invalidUtf8"}));
-
-    let encoded_loc = hex(
-        &encode_file(READABLE_LOC, Profile::Localisation, EscapeSet::Paratranz)
-            .expect("expected whole bytes"),
-    );
-    assert_eq!(run.result(6), &json!({"bytes": encoded_loc}));
-
+    assert_eq!(run.result(2)["needsEncoding"], false);
+    assert_eq!(run.result(3)["bytes"], hex(READABLE_SCRIPT.as_bytes()));
+    assert_eq!(run.result(3)["needsEncoding"], true);
+    assert_eq!(run.result(4)["eligible"], false);
+    assert_eq!(run.error(5)["code"], -32602);
     fs::remove_dir_all(root).expect("cleanup");
 }
 

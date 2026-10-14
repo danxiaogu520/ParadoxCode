@@ -1,12 +1,12 @@
-//! The no-double-transcode gate: decides whether a buffer is readable text, escaped
-//! text, a mix of both, or a transformation-free fixed point, before any encode or
-//! decode is allowed to run.
+//! Content classification for analysis and legacy whole-escaped detection.
+//! Whole-file buffer conversion validates each triple directly, supports readable
+//! and escaped mixtures, and does not require the legacy triple-count threshold.
 
 use crate::Profile;
 use crate::cp1252;
 
-/// Content classification of a buffer. Every transformation entry point must check
-/// this first: encode only accepts `Readable`/`Ascii`, decode only accepts `Escaped`.
+/// Content classification of a buffer. The idempotent whole-file buffer APIs
+/// independently validate input and accept valid mixtures without double encoding.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Classification {
     /// Raw CJK text that the game cannot display as-is. Encode (never decode).

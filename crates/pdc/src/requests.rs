@@ -35,7 +35,7 @@ use rules::ParserKind;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use text::{LineIndex, LogicalPath, Position, TextRange};
-use transcode::{Profile, ScopedEncodeError, ScopedForm};
+use transcode::Profile;
 
 use crate::protocol::{
     RpcError, cancelled_error, completion_kind,
@@ -200,10 +200,6 @@ struct TranscodeDecodeParams {
     /// still decides the transcoding profile; the response classifies exactly
     /// the supplied buffer.
     bytes: Option<String>,
-    /// Manual conversion: decode only quoted escape triples, preserving comments
-    /// and readable fragments byte-for-byte instead of classifying the whole file.
-    #[serde(default)]
-    quoted_only: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -214,10 +210,6 @@ struct TranscodeEncodeParams {
     path: String,
     /// Readable editor-buffer bytes as a hex string.
     bytes: String,
-    /// Manual conversion of disk bytes: keep existing quoted escape triples and
-    /// encode only readable fragments. Comments are never interpreted.
-    #[serde(default)]
-    preserve_escaped: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -450,13 +442,9 @@ impl SnapshotRequestContext {
         Ok(Value::Array(results))
     }
 
-    /// Classifies/decodes one file for the transparent-localisation view: `plain`/`damaged`
-    /// bytes pass through unchanged, `whole` takes the legacy whole-file decoder, and
-    /// `scoped` resolves escape triples inside quoted strings only. The bytes come from
-    /// disk unless the caller supplies a `bytes` buffer (an unsaved editor buffer) to
-    /// classify instead. Nothing is written; the client owns the file bytes, the write
-    /// gate, and the presentation of the refusal metadata (`broken`, `damagedAt`,
-    /// `quotedCjk`).
+    /// Decodes escape triples throughout one file, including comments and bare
+    /// text. Refusals contain no transformed output; damaged views retain original
+    /// bytes for repair. Supplied buffer bytes take precedence over disk contents.
     fn transcode_decode(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<TranscodeDecodeParams>(params, "transcode decode")?;
         self.ensure_active()?;
@@ -481,66 +469,42 @@ impl SnapshotRequestContext {
         let Some(profile) = self.transcode_profile_for(&path) else {
             return Ok(json!({ "eligible": false }));
         };
-        if params.quoted_only {
-            let mut result =
-                quoted_conversion_result(transcode::decode_quoted_file(&bytes, profile));
-            result["eligible"] = Value::Bool(true);
-            result["profile"] = Value::from(transcode_profile_name(profile));
-            return Ok(result);
-        }
-        let form = transcode::scoped_form(&bytes, profile);
-        let form_name = scoped_form_name(form);
         let profile_name = transcode_profile_name(profile);
-        let (bytes, broken, damaged_at, quoted_cjk) = match form {
-            ScopedForm::Plain | ScopedForm::Damaged => {
-                let damaged_at = (form == ScopedForm::Damaged)
-                    .then(|| transcode::marker_outside_spans(&bytes).first().copied())
-                    .flatten();
-                let quoted_cjk = form == ScopedForm::Plain && has_quoted_cjk(&bytes);
-                (bytes, 0usize, damaged_at, quoted_cjk)
-            }
-            ScopedForm::WholeEscaped => match transcode::decode_file(&bytes, profile) {
-                Err(_) => {
-                    return Ok(transcode_decode_refusal(profile_name, form_name));
-                }
-                Ok(decoded) => (
-                    decoded.text.into_bytes(),
-                    decoded.broken_sequences.len(),
-                    None,
-                    false,
-                ),
-            },
-            ScopedForm::Scoped => match transcode::scoped_decode_file(&bytes, profile) {
-                Err(_) => {
-                    return Ok(transcode_decode_refusal(profile_name, form_name));
-                }
-                Ok(decoded) => (
-                    decoded.text.into_bytes(),
-                    decoded.in_span_broken.len(),
-                    None,
-                    false,
-                ),
-            },
+        let has_markers = bytes.iter().any(|byte| (0x10..=0x13).contains(byte));
+        let form = if !has_markers {
+            "plain"
+        } else if transcode::classify_file(&bytes, profile) == transcode::Classification::Escaped {
+            "whole"
+        } else {
+            "mixed"
         };
-        let mut result = json!({
-            "eligible": true,
-            "profile": profile_name,
-            "form": form_name,
-            "bytes": encode_hex(&bytes),
-            "broken": broken,
-            "quotedCjk": quoted_cjk,
-        });
-        if let Some(damaged_at) = damaged_at {
-            result["damagedAt"] = Value::from(damaged_at);
+        match transcode::decode_buffer(&bytes, profile) {
+            Ok(decoded) => {
+                let needs_encoding = !has_markers
+                    && transcode::encode_buffer(&bytes, profile, transcode::EscapeSet::Paratranz)
+                        .map_or(true, |encoded| encoded != bytes);
+                Ok(json!({
+                    "eligible": true, "profile": profile_name, "form": form,
+                    "bytes": encode_hex(&decoded), "broken": 0,
+                    "needsEncoding": needs_encoding,
+                }))
+            }
+            Err(transcode::FileConversionError::InvalidUtf8) => Ok(json!({
+                "eligible": true, "profile": profile_name, "form": "damaged",
+                "error": "invalid-utf8", "refused": "invalidUtf8",
+            })),
+            Err(transcode::FileConversionError::BrokenEscape { byte_index }) => Ok(json!({
+                "eligible": true, "profile": profile_name, "form": "damaged",
+                "bytes": encode_hex(&bytes), "broken": 1, "damagedAt": byte_index,
+                "needsEncoding": false, "refused": "brokenEscape", "offsets": [byte_index],
+            })),
+            Err(error) => Ok(file_conversion_result(Err(error))),
         }
-        Ok(result)
     }
 
-    /// Encodes readable text into scoped-escaped bytes for one file. The three refusal
-    /// shapes mirror the extension's save gate: `invalidUtf8` (buffer is not UTF-8),
-    /// `alreadyEscaped` (iron rule ② — in-span escape markers would double-encode), and
-    /// `unencodable` (code points the EU4 ecosystem cannot round-trip). Nothing is
-    /// written; the client receives the encoded bytes and persists them itself.
+    /// Encodes readable content throughout the file, preserving valid existing
+    /// triples. Invalid localisation UTF-8, damaged triples or unencodable text
+    /// refuse the entire operation; nothing is written by the server.
     fn transcode_encode(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<TranscodeEncodeParams>(params, "transcode encode")?;
         self.ensure_active()?;
@@ -557,41 +521,14 @@ impl SnapshotRequestContext {
         let Some(profile) = self.transcode_profile_for(&path) else {
             return Err(RpcError::new(
                 INVALID_PARAMS,
-                format!(
-                    "path is not eligible for transparent localisation: {}",
-                    params.path
-                ),
+                format!("path is not eligible for transcoding: {}", params.path),
             ));
         };
-        if params.preserve_escaped {
-            return Ok(quoted_conversion_result(transcode::encode_quoted_file(
-                &bytes,
-                profile,
-                transcode::EscapeSet::Paratranz,
-            )));
-        }
-        let text = match std::str::from_utf8(&bytes) {
-            Ok(text) => text,
-            Err(_) => return Ok(json!({ "refused": "invalidUtf8" })),
-        };
-        match transcode::scoped_encode_file(text, profile, transcode::EscapeSet::Paratranz) {
-            Ok(encoded) => Ok(json!({ "bytes": encode_hex(&encoded) })),
-            Err(ScopedEncodeError::AlreadyEscaped { positions }) => Ok(json!({
-                "refused": "alreadyEscaped",
-                "offsets": positions,
-            })),
-            Err(ScopedEncodeError::Unencodable { error }) => Ok(json!({
-                "refused": "unencodable",
-                "points": error
-                    .unencodable
-                    .iter()
-                    .map(|point| json!({
-                        "codePoint": point.code_point,
-                        "byteIndex": point.byte_index,
-                    }))
-                    .collect::<Vec<_>>(),
-            })),
-        }
+        Ok(file_conversion_result(transcode::encode_buffer(
+            &bytes,
+            profile,
+            transcode::EscapeSet::Paratranz,
+        )))
     }
 
     /// Transparent-localisation eligibility of an absolute path: localisation yml under a
@@ -2271,15 +2208,6 @@ fn transcode_target_path(raw: &str) -> Result<std::path::PathBuf, RpcError> {
     Ok(path)
 }
 
-fn scoped_form_name(form: ScopedForm) -> &'static str {
-    match form {
-        ScopedForm::Plain => "plain",
-        ScopedForm::WholeEscaped => "whole",
-        ScopedForm::Scoped => "scoped",
-        ScopedForm::Damaged => "damaged",
-    }
-}
-
 fn transcode_profile_name(profile: Profile) -> &'static str {
     match profile {
         Profile::Localisation => "localisation",
@@ -2288,16 +2216,16 @@ fn transcode_profile_name(profile: Profile) -> &'static str {
 }
 
 /// Manual conversion is all-or-nothing; refusal metadata never carries output bytes.
-fn quoted_conversion_result(result: Result<Vec<u8>, transcode::QuotedConversionError>) -> Value {
+fn file_conversion_result(result: Result<Vec<u8>, transcode::FileConversionError>) -> Value {
     match result {
         Ok(bytes) => json!({ "bytes": encode_hex(&bytes) }),
-        Err(transcode::QuotedConversionError::InvalidUtf8) => {
+        Err(transcode::FileConversionError::InvalidUtf8) => {
             json!({ "refused": "invalidUtf8" })
         }
-        Err(transcode::QuotedConversionError::BrokenEscape { byte_index }) => {
+        Err(transcode::FileConversionError::BrokenEscape { byte_index }) => {
             json!({ "refused": "brokenEscape", "offsets": [byte_index] })
         }
-        Err(transcode::QuotedConversionError::Unencodable { error }) => json!({
+        Err(transcode::FileConversionError::Unencodable { error }) => json!({
             "refused": "unencodable",
             "points": error.unencodable.iter().map(|point| json!({
                 "codePoint": point.code_point,
@@ -2305,15 +2233,6 @@ fn quoted_conversion_result(result: Result<Vec<u8>, transcode::QuotedConversionE
             })).collect::<Vec<_>>(),
         }),
     }
-}
-
-fn transcode_decode_refusal(profile_name: &str, form_name: &str) -> Value {
-    json!({
-        "eligible": true,
-        "profile": profile_name,
-        "form": form_name,
-        "error": "invalid-utf8",
-    })
 }
 
 /// Lowercases hex, matching the differential-vector wire convention used across the
@@ -2342,22 +2261,6 @@ fn decode_hex(value: &str) -> Option<Vec<u8>> {
     }
     Some(output)
 }
-
-/// Whether any quoted string holds raw CJK — the content a plain-form save encodes.
-/// Non-UTF-8 input cannot hold CJK on the CP1252 byte layer and reports `false`.
-fn has_quoted_cjk(bytes: &[u8]) -> bool {
-    let Ok(text) = std::str::from_utf8(bytes) else {
-        return false;
-    };
-    transcode::scan_string_spans(bytes)
-        .iter()
-        .any(|&(start, end)| {
-            // Span boundaries sit on ASCII quote bytes, so byte offsets are char-safe.
-            let span = &text[start..end.min(text.len())];
-            span.chars().any(|c| transcode::is_raw_cjk(u32::from(c)))
-        })
-}
-
 #[cfg(test)]
 mod pagination_tests {
     use super::*;
