@@ -45,7 +45,7 @@
 | raw view / raw form | 原始视图 / 原始形态 | 磁盘上的转码形态 |
 | peek | 窥视 | 窥视原始转码形态（临时切换） |
 | escape marker / escape triplet | 逃逸标记 / 逃逸三元组 | EU4dll 编码单元 |
-| scoped form | scoped 形态 | 只转码引号内内容的形态（技术名保留 scoped） |
+| whole-file form | 全文转码形态 | 注释、标识符和字符串均参与转码 |
 | encode / decode | 编码 / 解码 | 手动转码命令动词 |
 | follow-up completion | 后续补全 | 补全项插入后再次请求建议列表 |
 | vanilla index cache | 原版索引缓存 | |

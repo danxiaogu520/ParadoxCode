@@ -18,8 +18,8 @@
 //!   variants all decode correctly regardless of the configured [`EscapeSet`].
 //! * Encoding rejects code points the ecosystem cannot round-trip (`U+0100..=U+0FFF`
 //!   and `U+10000+`) with a structured [`EncodeError`] instead of silently mangling.
-//! * [`classify_file`] gates every transformation so escaped text is never encoded twice
-//!   and readable text is never decoded.
+//! * [`encode_buffer`] / [`decode_buffer`] convert the entire file, preserve already
+//!   converted runs, and reject damaged escape triples before producing any output.
 //!
 //! Algorithm provenance: `matanki-saito/EU4SpecialEscape` (MIT) via the paratranz
 //! official gist `special-escape.js`; calibrated byte-for-byte against the deployed
@@ -28,8 +28,7 @@
 mod classify;
 mod cp1252;
 mod escape;
-mod quoted;
-mod scoped;
+mod file;
 
 pub use classify::{
     Classification, ClassificationCounts, classify_file, classify_text, classify_text_counts,
@@ -40,16 +39,12 @@ pub use escape::{
     Decoded, InvalidUtf8, decode_file, decode_text, decode_value, encode_file, encode_text,
     file_unencodable_kind, script_roundtrip_is_canonical, unencodable_kind,
 };
-pub use quoted::{QuotedConversionError, decode_quoted_file, encode_quoted_file};
-pub use scoped::{
-    ScopedDecoded, ScopedEncodeError, ScopedForm, marker_outside_spans, scan_string_spans,
-    scoped_decode_file, scoped_encode_file, scoped_form,
-};
+pub use file::{FileConversionError, decode_buffer, encode_buffer};
 
 /// Bumped whenever encoding output for identical input changes (escape set adjustments,
 /// compensation fixes). Consumers that persist decoded text (index caches, previews)
 /// must invalidate their entries when this value changes.
-pub const TRANSCODE_VERSION: u32 = 1;
+pub const TRANSCODE_VERSION: u32 = 2;
 
 /// Selects the byte-level shape of escaped content: BOM/CRLF yml files versus raw
 /// single-byte script files. See the crate docs for the exact differences.

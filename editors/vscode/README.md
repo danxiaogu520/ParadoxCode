@@ -91,52 +91,35 @@ mission editor's context menu.
 Mods running the EU4dll double-byte patch store localisation as escape-tripled bytes. ParadoxCode
 ships a Rust-server-backed transcoder. By default, files keep their ordinary `file://` view:
 
-- Use the editor-title **Decode Quoted Text (Readable Text)** button (down arrow) to write readable
-  strings to disk, or **Encode Quoted Text (EU4dll Escape Form)** (up arrow) to write escaped strings.
-  The buttons apply to `localisation/**/*.yml` and workspace script files matching
+- Use the editor-title **Decode Entire File (Readable Text)** button (down arrow) to write
+  readable text to disk, or **Encode Entire File (EU4dll Escape Form)** (up arrow) to write
+  escaped bytes. Comments, identifiers and strings are all converted. The buttons apply to
+  `localisation/**/*.yml` and workspace script files matching
   `paradoxcode.localisation.transparentScriptGlobs` (`**/*.txt` by default).
-- Both buttons operate only inside quoted strings. **Encode Quoted Text** converts readable fragments
-  and preserves existing escape triples byte-for-byte; **Decode Quoted Text** decodes those triples
-  and preserves readable fragments. This also applies when one string is partially transcoded.
-  Comments and other unquoted bytes are never converted, including already-escaped comments
-  in legacy files. Existing escape triples are never encoded again; decoded readable fragments
-  are never decoded again.
-- Save or close any unsaved editor for the file before converting. Each conversion writes a
-  `.pre-transcode.bak` backup next to the original file before changing its bytes. The same
-  commands are available in the Command Palette and Explorer context menu.
-- Damaged escape sequences inside strings refuse the entire conversion and report a byte
-  position. A conversion with no changes writes neither the file nor its backup. Changes made
-  to the file or its editor while conversion is running require a retry.
+- Encoding preserves existing valid triples and converts every readable run. Decoding resolves
+  every triple and preserves readable UTF-8. Partially converted files converge without double
+  encoding. No quote-only mode or protocol option remains.
+- Save or close unsaved editors before converting. Each changed conversion writes the original
+  bytes to `.pre-transcode.bak`. No-op conversions write neither the file nor the backup. Edits
+  made while conversion is running require a retry.
+- Invalid localisation UTF-8, damaged triples anywhere in the file, and unencodable characters
+  anywhere in an encode input refuse the entire conversion and report input positions.
+- The connected server must advertise `pdcWholeFileTranscode`. Older servers are rejected before
+  conversion; update the server together with the extension.
 
-The automatic transparent pipeline and editable `pdcloc://` decoded views are **experimental**
-and **disabled by default**. Search and navigation have known limitations.
-To opt in, set `paradoxcode.localisation.transparentEncoding` to `true` and reload the VS Code
-window. Changing the switch requires a window reload. When enabled:
+Automatic transparent encoding and editable `pdcloc://` views are **experimental** and
+**disabled by default**. Search and navigation have known limitations. Enable
+`paradoxcode.localisation.transparentEncoding` and reload the window to opt in:
 
-- Entry is path-scoped but content-gated: an eligible file — any `localisation/**/*.yml` or a
-  script file matching `paradoxcode.localisation.transparentScriptGlobs` (`**/*.txt` by default)
-  — takes over the raw tab and opens in the decoded view only when it actually participates in
-  transcoding: an escaped or damaged form, or plain text whose quoted CJK a save would encode.
-  Transcode fixed points (no escape markers, no quoted CJK) stay on their ordinary `file://` view
-  so search, diff, git, and timeline keep working on them; a fixed point that later grows quoted
-  CJK is promoted to the decoded view automatically. Files rendered inside a diff editor are
-  never taken over. `paradoxcode.localisation.autoOpen` picks the policy: `needsTranscode` (this
-  behaviour, the default), `always` (the legacy takeover of every eligible file whatever its
-  bytes look like), or `off`. Plain readable files pass through unchanged; their quoted CJK is
-  escape-encoded on the next save (announced by an informational `LocalisationWillTranscodeOnSave`
-  hint).
-- Saving writes the scoped form: escape triples only inside quoted strings, comments and code as
-  readable UTF-8. Saving is refused when a
-  string already contains escape markers, or holds code points the ecosystem cannot round-trip.
-- Stray escape markers outside every quoted string are damage: the file is shown as-is with a
-  `LocalisationMixedEncoding` error anchored at the marker; fix it by hand.
-- While a decoded view is active, the status bar shows **EU4 decoded view (experimental)**; click it to open the
-  raw transcoded file. Run **Peek at the Raw Transcoded Form** from the Command Palette to peek at
-  the raw bytes momentarily; press Escape to return to the decoded view. **Open in Decoded
-  (Chinese) View (Experimental)** remains available in the Command Palette and context menus.
-- Turn `paradoxcode.localisation.transparentEncoding` off and reload the window to return to
-  the default manual workflow. The decoded-view provider and automatic pipeline are disabled;
-  the **Decode Quoted Text** and **Encode Quoted Text** buttons become available again.
+- `needsTranscode` opens eligible files when escaped/damaged content or text that saving would
+  convert occurs anywhere in the file. This includes comment-only CJK and bare identifiers.
+  `always` opens every eligible file; `off` requires an explicit command. Diff editors remain raw.
+- The decoded view uses the same whole-file codec as the manual buttons. Saving encodes the
+  entire file; valid existing triples are preserved. Damaged sequences and unencodable characters
+  prevent writes. Legacy files containing both readable text and escaped strings can be decoded
+  and saved into the complete file form.
+- The status bar and **Peek at the Raw Transcoded Form** command expose the original bytes.
+  Turn transparent encoding off and reload to return to the manual buttons.
 
 ## Configuration
 

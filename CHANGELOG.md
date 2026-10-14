@@ -7,6 +7,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Manual encode/decode and experimental transparent saves now convert the entire file,
+  including comments, identifiers and strings. Valid existing triples and readable runs
+  remain idempotent; damaged sequences and unencodable input refuse the complete operation.
+- Removed quote-only transcoding APIs and protocol options. Updated clients require the
+  `pdcWholeFileTranscode` server capability; older servers must be upgraded before conversion.
+
 ## [0.5.2] - 2026-10-14
 
 ### Added
