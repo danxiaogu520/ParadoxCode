@@ -7,6 +7,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-10-15
+
+### Added
+
+- Rule, symbol, localisation and symbol-reference queries support offset/revision
+  continuation and reject stale pages. Reference results include exact source ranges.
+- Workspace summaries identify source roots, distinguish live scans from cached roots
+  and report bounded details for files excluded by the scan profile or rule categories.
+
 ### Changed
 
 - Manual encode/decode and experimental transparent saves now convert the entire file,
@@ -14,6 +23,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   remain idempotent; damaged sequences and unencodable input refuse the complete operation.
 - Removed quote-only transcoding APIs and protocol options. Updated clients require the
   `pdcWholeFileTranscode` server capability; older servers must be upgraded before conversion.
+
+### Fixed
+
+- Hidden EU4 country and province events no longer require an `option` block when their
+  direct `hidden` setting is `yes`. Visible events and other required fields retain validation;
+  `hidden = no` is accepted.
+- Localisation query pages preserve deduplicated effective values, and valid empty files
+  remain included in workspace indexing.
 
 ## [0.5.2] - 2026-10-14
 
