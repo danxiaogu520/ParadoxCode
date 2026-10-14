@@ -977,6 +977,7 @@ impl AnalysisHost {
             if self.installed_caches.contains(&root.id) {
                 continue;
             }
+            report.scanned_roots.push(root.id);
             let mut paths = Vec::new();
             collect_whitelisted_files(
                 &root.path,
@@ -994,6 +995,13 @@ impl AnalysisHost {
                 let Some((category_id, category_parser, category_resolution)) =
                     self.active_category(&logical)
                 else {
+                    vfs::scan::record_scan_exclusion(
+                        &mut report,
+                        limits,
+                        vfs::WorkspaceScanIssueKind::Unclassified,
+                        physical.as_path().to_path_buf(),
+                        "no active rule category classifies this file".to_owned(),
+                    );
                     continue;
                 };
                 let source_file = SourceFile {

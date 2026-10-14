@@ -1298,6 +1298,31 @@ fn schema_diagnostics_at_depth(
             diagnostics.push(diagnostic);
         }
     }
+    let hidden_event_bodies = hir
+        .properties()
+        .iter()
+        .filter(|parent| {
+            snapshot.rules().game_id() == "eu4"
+                && parent.top_level
+                && (parent.key.eq_ignore_ascii_case("country_event")
+                    || parent.key.eq_ignore_ascii_case("province_event"))
+        })
+        .filter_map(|parent| {
+            let body = parent.value_range?;
+            hir.properties_in_range(parent.range)
+                .any(|child| {
+                    child.path.len() == parent.path.len() + 1
+                        && child.path.starts_with(&parent.path)
+                        && child.key.eq_ignore_ascii_case("hidden")
+                        && child.operator.as_deref() == Some("=")
+                        && child
+                            .scalar
+                            .as_ref()
+                            .is_some_and(|scalar| scalar.value.eq_ignore_ascii_case("yes"))
+                })
+                .then_some(body)
+        })
+        .collect::<std::collections::BTreeSet<_>>();
     for fact in hir.schema_facts() {
         if hir.overload_facts().iter().any(|overload| {
             overload.validation != hir::analysis::Validation::Valid
@@ -1376,11 +1401,18 @@ fn schema_diagnostics_at_depth(
             if applicable.is_empty() {
                 continue;
             }
-            let min = applicable
-                .iter()
-                .map(|id| ir.field(*id).card.min)
-                .max()
-                .unwrap_or(0);
+            let hidden_event_option = ir.strings.resolve(schema.name) == "event_body"
+                && matcher_key_name(ir, *key) == "option"
+                && hidden_event_bodies.contains(&fact.range);
+            let min = if hidden_event_option {
+                0
+            } else {
+                applicable
+                    .iter()
+                    .map(|id| ir.field(*id).card.min)
+                    .max()
+                    .unwrap_or(0)
+            };
             let max = if applicable.iter().any(|id| ir.field(*id).card.max.is_none()) {
                 None
             } else {
