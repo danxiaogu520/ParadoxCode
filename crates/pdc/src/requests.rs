@@ -10,7 +10,7 @@ use ide::{
     CancellationToken, Cancelled, CompletionKind, LocalisationKeyMatch, SemanticToken,
     SemanticTokenType, complete_with_cancellation, completion_resolve,
     definition_with_cancellation, document_symbols_with_cancellation, hover_with_cancellation,
-    localisation_search_with_cancellation, localisation_values_by_key,
+    localisation_search_page_with_cancellation, localisation_values_by_key,
     prepare_rename_with_cancellation, quick_fixes_with_cancellation, references_with_cancellation,
     rename_with_cancellation, scope_inlay_hints_with_cancellation,
     semantic_tokens_in_range_with_cancellation, semantic_tokens_with_cancellation,
@@ -94,6 +94,26 @@ mod completion_sort_tests {
 
 /// Trims a search filter and drops it when empty, so whitespace-only filters behave like
 /// absent filters instead of matching everything (or nothing).
+fn validate_query_page(
+    snapshot: &AnalysisSnapshot,
+    offset: usize,
+    revision: Option<u64>,
+) -> Result<(), RpcError> {
+    if offset > 1_000_000 {
+        return Err(RpcError::new(
+            INVALID_PARAMS,
+            "query offset exceeds 1000000",
+        ));
+    }
+    if offset > 0 && revision != Some(snapshot.revision()) {
+        return Err(RpcError::new(
+            -32801,
+            "workspace changed or revision missing; restart the query",
+        ));
+    }
+    Ok(())
+}
+
 fn trimmed_search_filter(value: Option<&str>) -> Option<&str> {
     value.map(str::trim).filter(|value| !value.is_empty())
 }
@@ -203,6 +223,9 @@ struct TranscodeEncodeParams {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct RuleSearchParams {
+    #[serde(default)]
+    offset: usize,
+    revision: Option<u64>,
     context: Option<String>,
     key: Option<String>,
     scope: Option<String>,
@@ -230,6 +253,9 @@ impl From<LocalisationKeyMatchWire> for LocalisationKeyMatch {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct LocalisationSearchParams {
+    #[serde(default)]
+    offset: usize,
+    revision: Option<u64>,
     key: Option<String>,
     text: Option<String>,
     /// How `key` is matched: `substring` (default), `exact`, or `prefix`.
@@ -241,6 +267,9 @@ struct LocalisationSearchParams {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct SymbolSearchParams {
+    #[serde(default)]
+    offset: usize,
+    revision: Option<u64>,
     query: String,
     limit: Option<usize>,
 }
@@ -248,6 +277,9 @@ struct SymbolSearchParams {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct SymbolReferencesParams {
+    #[serde(default)]
+    offset: usize,
+    revision: Option<u64>,
     name: String,
     /// Optional symbol kind used to disambiguate names defined under several kinds.
     kind: Option<String>,
@@ -586,6 +618,7 @@ impl SnapshotRequestContext {
     /// rule set is consulted.
     fn rule_search(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<RuleSearchParams>(params, "rule search")?;
+        validate_query_page(&self.snapshot, params.offset, params.revision)?;
         let context = trimmed_search_filter(params.context.as_deref());
         let key = trimmed_search_filter(params.key.as_deref());
         let scope = trimmed_search_filter(params.scope.as_deref());
@@ -603,6 +636,7 @@ impl SnapshotRequestContext {
         let scope_query = scope.map(str::to_ascii_lowercase);
         let mut entries = Vec::new();
         let mut truncated = false;
+        let mut matched = 0usize;
         let ir = self.snapshot.ir();
 
         for schema in &ir.schemas {
@@ -656,6 +690,10 @@ impl SnapshotRequestContext {
                 }) {
                     continue;
                 }
+                matched += 1;
+                if matched <= params.offset {
+                    continue;
+                }
                 if entries.len() == limit {
                     truncated = true;
                     break;
@@ -674,7 +712,9 @@ impl SnapshotRequestContext {
                 break;
             }
         }
-        Ok(serde_json::json!({"rules":entries,"truncated":truncated}))
+        Ok(
+            serde_json::json!({"revision":self.snapshot.revision(),"nextOffset":truncated.then_some(params.offset + entries.len()),"rules":entries,"truncated":truncated}),
+        )
     }
 
     /// Bounded search over indexed localisation definitions by key and/or value substring.
@@ -682,6 +722,7 @@ impl SnapshotRequestContext {
     /// preview and logical file path.
     fn localisation_search(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<LocalisationSearchParams>(params, "localisation search")?;
+        validate_query_page(&self.snapshot, params.offset, params.revision)?;
         let key = trimmed_search_filter(params.key.as_deref());
         let text = trimmed_search_filter(params.text.as_deref());
         if key.is_none() && text.is_none() {
@@ -696,11 +737,12 @@ impl SnapshotRequestContext {
         let limit = query_search_limit(params.limit)?;
         self.ensure_active()?;
 
-        let result = localisation_search_with_cancellation(
+        let result = localisation_search_page_with_cancellation(
             &self.snapshot,
             key,
             text,
             key_match,
+            params.offset,
             limit,
             &self.cancellation,
         )
@@ -722,7 +764,9 @@ impl SnapshotRequestContext {
                 })
             })
             .collect::<Vec<_>>();
-        Ok(serde_json::json!({ "hits": hits, "truncated": result.truncated }))
+        Ok(
+            serde_json::json!({ "revision":self.snapshot.revision(), "nextOffset":result.truncated.then_some(params.offset + hits.len()), "hits": hits, "truncated": result.truncated }),
+        )
     }
 
     /// One client-facing location: the file URI, a 1-based line, and the logical path when the
@@ -737,6 +781,7 @@ impl SnapshotRequestContext {
         Ok(serde_json::json!({
             "uri": lsp.uri.as_str(),
             "line": lsp.range.start.line + 1,
+            "range": lsp.range,
             "path": location.path.as_ref().map(|path| path.as_str()),
         }))
     }
@@ -746,6 +791,7 @@ impl SnapshotRequestContext {
     /// search in the script zone; scripted localisation (`defined_text`) stays searchable.
     fn symbol_search(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<SymbolSearchParams>(params, "symbol search")?;
+        validate_query_page(&self.snapshot, params.offset, params.revision)?;
         let query = trimmed_search_filter(Some(params.query.as_str()))
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "symbol search requires a query"))?;
         let limit = symbol_search_limit(params.limit)?;
@@ -755,17 +801,22 @@ impl SnapshotRequestContext {
                 .map_err(cancelled_error)?;
         let mut hits = Vec::new();
         let mut truncated = false;
+        let mut matched = 0usize;
         for symbol in symbols {
             if symbol.kind.eq_ignore_ascii_case("localisation") {
+                continue;
+            }
+            let Some(lsp) = location_to_lsp(&self.snapshot, &symbol.location) else {
+                continue;
+            };
+            matched += 1;
+            if matched <= params.offset {
                 continue;
             }
             if hits.len() == limit {
                 truncated = true;
                 break;
             }
-            let Some(lsp) = location_to_lsp(&self.snapshot, &symbol.location) else {
-                continue;
-            };
             hits.push(serde_json::json!({
                 "name": symbol.name,
                 "kind": symbol.kind,
@@ -774,7 +825,9 @@ impl SnapshotRequestContext {
                 "path": symbol.location.path.as_ref().map(|path| path.as_str()),
             }));
         }
-        Ok(serde_json::json!({ "symbols": hits, "truncated": truncated }))
+        Ok(
+            serde_json::json!({ "revision":self.snapshot.revision(), "nextOffset":truncated.then_some(params.offset + hits.len()), "symbols": hits, "truncated": truncated }),
+        )
     }
 
     /// Name-addressed find-references for script-zone symbols: resolves the active winner for
@@ -782,6 +835,7 @@ impl SnapshotRequestContext {
     /// reference locations without needing an open document or a cursor position.
     fn symbol_references(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<SymbolReferencesParams>(params, "symbol references")?;
+        validate_query_page(&self.snapshot, params.offset, params.revision)?;
         let name = trimmed_search_filter(Some(params.name.as_str()))
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "symbol references requires a name"))?;
         let kind = trimmed_search_filter(params.kind.as_deref());
@@ -844,7 +898,7 @@ impl SnapshotRequestContext {
         let total = references.len();
         let mut items = Vec::new();
         let mut truncated = false;
-        for reference in &references {
+        for reference in references.iter().skip(params.offset) {
             if items.len() == limit {
                 truncated = true;
                 break;
@@ -852,6 +906,8 @@ impl SnapshotRequestContext {
             items.push(self.location_value(reference)?);
         }
         Ok(serde_json::json!({
+            "revision": self.snapshot.revision(),
+            "nextOffset": truncated.then_some(params.offset + items.len()),
             "matched": true,
             "symbol": {
                 "name": name,
@@ -886,6 +942,7 @@ impl SnapshotRequestContext {
                     SourceRootKind::Project => "project",
                 };
                 serde_json::json!({
+                    "id": root.id.get(),
                     "kind": kind,
                     "path": root.path,
                     "order": root.order,
@@ -922,17 +979,25 @@ impl SnapshotRequestContext {
             "irHash": self.snapshot.ir_fingerprint(),
             "revision": self.snapshot.revision(),
             "roots": roots,
+            "fileCountsScope": "all indexed roots",
             "fileCounts": {
                 "script": script_files,
                 "localisation": localisation_files,
                 "total": self.snapshot.source_files().len(),
             },
             "scan": {
+                "scope": "live roots; installed caches excluded",
+                "rootIds": scan.scanned_roots.iter().map(|root|root.get()).collect::<Vec<_>>(),
+                "excludedFiles": scan.excluded_files,
+                "omittedExclusions": scan.omitted_exclusions,
+                "excludedEntries": scan.excluded_entries.iter().map(|issue| json!({"path":issue.path,"reason":format!("{:?}",issue.kind),"detail":issue.detail})).collect::<Vec<_>>(),
                 "discoveredFiles": scan.discovered_files,
                 "indexedFiles": scan.indexed_files,
                 "legacyEncodedFiles": scan.legacy_encoded_files,
                 "skippedEntries": scan.skipped_entries,
                 "issues": scan.issues.len(),
+                "omittedIssues": scan.omitted_issues,
+                "details": scan.issues.iter().map(|issue| json!({"path":issue.path,"reason":format!("{:?}",issue.kind),"detail":issue.detail})).collect::<Vec<_>>(),
             },
             "symbols": {
                 "definitions": definitions,
@@ -2291,4 +2356,144 @@ fn has_quoted_cjk(bytes: &[u8]) -> bool {
             let span = &text[start..end.min(text.len())];
             span.chars().any(|c| transcode::is_raw_cjk(u32::from(c)))
         })
+}
+
+#[cfg(test)]
+mod pagination_tests {
+    use super::*;
+    use crate::tests::{first_party_host, temp_workspace_dir};
+    use engine::{SourceRoot, SourceRootId, WorkspaceChange};
+    use text::AbsPath;
+
+    fn context(host: &engine::AnalysisHost) -> SnapshotRequestContext {
+        SnapshotRequestContext::new(
+            host.snapshot(),
+            CancellationToken::new(),
+            false,
+            Arc::new(HashSet::new()),
+            Arc::new(BTreeMap::new()),
+            Arc::new(GlobIncludePatterns::default()),
+            Arc::new(SemanticTokensCache::default()),
+        )
+    }
+
+    #[test]
+    fn named_queries_page_without_repeating_winners_and_reject_stale_revisions() {
+        let (root, _) = temp_workspace_dir();
+        for directory in [
+            "common/scripted_effects",
+            "events",
+            "localisation",
+            "common/custom_gui",
+        ] {
+            std::fs::create_dir_all(root.join(directory)).unwrap();
+        }
+        let definitions = (0..55)
+            .map(|n| format!("query_page_effect_{n} = {{ add_prestige = 1 }}\n"))
+            .collect::<String>();
+        std::fs::write(root.join("common/scripted_effects/pages.txt"), definitions).unwrap();
+        let localisation = format!(
+            "\u{feff}l_english:\n{}",
+            (0..55)
+                .map(|n| format!(" query_page_{n}:0 \"Page {n}\"\n"))
+                .collect::<String>()
+        );
+        std::fs::write(root.join("localisation/pages_l_english.yml"), localisation).unwrap();
+        std::fs::write(root.join("common/custom_gui/empty.txt"), "").unwrap();
+        std::fs::write(root.join("events/outside_profile.md"), "Notes").unwrap();
+        std::fs::write(
+            root.join("events/caller.txt"),
+            format!(
+                "country_event = {{ id = query_page.1 hidden = yes immediate = {{ {} }} }}",
+                "query_page_effect_0 = yes ".repeat(60)
+            ),
+        )
+        .unwrap();
+        let mut host = first_party_host();
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::Project,
+            AbsPath::normalize(&root),
+        )]));
+        host.refresh_source_roots().unwrap();
+        let query = context(&host);
+        let revision = query.snapshot.revision();
+        for (method, base, array, expected) in [
+            (
+                "pdc/symbolSearch",
+                json!({"query":"query_page_effect","limit":17}),
+                "symbols",
+                55,
+            ),
+            (
+                "pdc/localisationSearch",
+                json!({"key":"query_page_","keyMatch":"prefix","limit":17}),
+                "hits",
+                55,
+            ),
+            (
+                "pdc/symbolReferences",
+                json!({"name":"query_page_effect_0","kind":"scripted_effect","limit":17}),
+                "references",
+                61,
+            ),
+        ] {
+            let mut params = base;
+            let mut found = Vec::new();
+            loop {
+                let page = query.dispatch(method, Some(&params)).unwrap();
+                found.extend(page[array].as_array().unwrap().iter().cloned());
+                let Some(next) = page["nextOffset"].as_u64() else {
+                    break;
+                };
+                params["offset"] = json!(next);
+                params["revision"] = json!(revision);
+            }
+            assert_eq!(found.len(), expected, "{method}");
+            let unique = found
+                .iter()
+                .map(Value::to_string)
+                .collect::<std::collections::BTreeSet<_>>();
+            assert_eq!(unique.len(), expected, "{method}");
+            params["offset"] = json!(1);
+            params["revision"] = json!(revision + 1);
+            assert_eq!(
+                query.dispatch(method, Some(&params)).unwrap_err().code,
+                -32801
+            );
+        }
+        let first = query
+            .dispatch(
+                "pdc/ruleSearch",
+                Some(&json!({"context":"effect","key":"add_prestige","limit":1})),
+            )
+            .unwrap();
+        let next = first["nextOffset"]
+            .as_u64()
+            .expect("multiple applicable rules");
+        let second = query.dispatch("pdc/ruleSearch", Some(&json!({"context":"effect","key":"add_prestige","limit":1,"offset":next,"revision":revision}))).unwrap();
+        assert_ne!(first["rules"][0]["id"], second["rules"][0]["id"]);
+        let summary = query.dispatch("pdc/workspaceSummary", None).unwrap();
+        assert_eq!(summary["roots"][0]["id"], 1);
+        assert_eq!(summary["scan"]["rootIds"], json!([1]));
+        assert!(
+            summary["scan"]["excludedEntries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|item| item["path"]
+                    .as_str()
+                    .unwrap()
+                    .ends_with("events/outside_profile.md"))
+        );
+        let files = query.dispatch("pdc/workspaceFiles", None).unwrap();
+        assert!(
+            files["files"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|file| file["logicalPath"] == "common/custom_gui/empty.txt")
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }

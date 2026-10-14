@@ -205,6 +205,28 @@ pub fn localisation_search_with_cancellation(
     limit: usize,
     cancellation: &CancellationToken,
 ) -> Result<LocalisationSearchResult, Cancelled> {
+    localisation_search_page_with_cancellation(
+        snapshot,
+        key,
+        value,
+        key_match,
+        0,
+        limit,
+        cancellation,
+    )
+}
+
+/// Searches a deterministic localisation page without materializing the preceding hits.
+pub fn localisation_search_page_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    key: Option<&str>,
+    value: Option<&str>,
+    key_match: LocalisationKeyMatch,
+    offset: usize,
+    limit: usize,
+    cancellation: &CancellationToken,
+) -> Result<LocalisationSearchResult, Cancelled> {
+    let mut matched = 0usize;
     let value_query = value.map(str::to_ascii_lowercase);
     let mut hits = Vec::new();
     let mut seen_keys = BTreeSet::new();
@@ -241,6 +263,10 @@ pub fn localisation_search_with_cancellation(
             if !preview.value.to_ascii_lowercase().contains(query) {
                 continue;
             }
+        }
+        matched += 1;
+        if matched <= offset {
+            continue;
         }
         if hits.len() == limit {
             truncated = true;

@@ -3688,3 +3688,46 @@ fn template_value_rejections_preserve_rule_warning_severity_and_the_actual_value
         "{advisory:?}"
     );
 }
+
+#[test]
+fn hidden_events_do_not_require_options_but_visible_events_do() {
+    for kind in ["country_event", "province_event"] {
+        for (body, required) in [
+            ("hidden = yes immediate = { }", false),
+            ("hidden = yes trigger = { always = no }", false),
+            ("hidden = no", true),
+            ("", true),
+            ("trigger = { always = no }", true),
+            ("immediate = { hidden_effect = { log = hidden } }", true),
+        ] {
+            let mut host = host();
+            let source = format!("{kind} = {{ id = hidden_probe.1 {body} }}");
+            let id = open(&mut host, "events/hidden_probe.txt", &source);
+            let results = diagnostics(&host.snapshot(), &id);
+            assert_eq!(
+                results
+                    .iter()
+                    .any(|d| d.code == DiagnosticCode::Cardinality && d.message.contains("option")),
+                required,
+                "{source}: {results:?}"
+            );
+        }
+    }
+    let mut host = host();
+    let id = open(
+        &mut host,
+        "events/hidden_invalid.txt",
+        "country_event = { hidden = yes immediate = { add_prestige = wrong } }",
+    );
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results
+            .iter()
+            .any(|d| d.code == DiagnosticCode::Cardinality && d.message.contains("id"))
+    );
+    assert!(
+        results
+            .iter()
+            .any(|d| d.code == DiagnosticCode::InvalidValue)
+    );
+}

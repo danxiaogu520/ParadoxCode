@@ -312,9 +312,8 @@
         },
         "hidden": {
           "card": "0..1",
-          "doc": "If yes, the event runs in the background without popping up for the player.",
-          "severity": "warning",
-          "value": "'yes'"
+          "doc": "If yes, the event runs in the background without popping up for the player; option blocks are optional.",
+          "value": "bool"
         },
         "id": {
           "card": "1",
@@ -366,7 +365,7 @@
         "option": {
           "body": "event_body__option",
           "card": "1..*",
-          "doc": "A selectable choice; points to its localisation text and holds effects, availability triggers, ai_chance, highlight and goto.",
+          "doc": "A selectable choice; points to its localisation text and holds effects, availability triggers, ai_chance, highlight and goto. Required for visible events; optional when hidden = yes.",
           "override": true
         },
         "picture": [
