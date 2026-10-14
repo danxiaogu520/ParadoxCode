@@ -1,49 +1,9 @@
 // Transparent localisation read/write for EU4dll-transcoded files.
-//
-// The `pdcloc://` scheme mirrors a `file://` URI over the same real path and
-// is the one view the user edits: readFile shows readable CJK everywhere
-// (legacy whole-escaped files decode wholesale; scoped files decode only
-// their quoted strings, keeping comments readable), and writeFile
-// scoped-encodes on save — escape triples land inside quoted strings only, so
-// the game-side transcoder reads the strings exactly as with whole-file
-// encoding while comments and code stay readable UTF-8 on disk. The language
-// server receives the decoded text through normal document sync (it resolves
-// `pdcloc://` URIs to the backing path, so the virtual document hides the
-// on-disk shard and every position is a decoded-view position — no offset
-// mapping).
-//
-// The codec itself lives in the language server: classification, decode, and
-// encode travel over the `pdc/transcodeDecode` / `pdc/transcodeEncode`
-// requests (byte payloads as hex), so this file owns only the provider
-// plumbing, the client-side eligibility gates (path checks for menus, plus a
-// charset prescreen for auto-open decisions — never a codec decision, the
-// server always confirms), the save gate's error presentation, and file
-// persistence. A missing server fails closed — eligible files are never
-// written without the encode guard.
-//
-// Entry is path-scoped but content-gated: an eligible file (localisation yml
-// or the configured script globs) opens through its pdcloc:// twin only when
-// it actually participates in transcoding — an escaped or damaged form, or a
-// plain form whose quoted CJK a save would encode. Transcode fixed points (no
-// escape markers, no quoted CJK) stay on their `file://` URI untouched, so
-// VS Code search, diff, git, and timeline keep working on them; a fixed point
-// that later grows text a save would rewrite is promoted to its twin at that
-// moment (debounced), closing the typed-CJK gap without hijacking files that
-// have nothing to transcode. Plain readable files pass through unchanged (a
-// save encodes their quoted CJK), damaged files pass through with an error,
-// and only the server-side classifier decides which decode applies — never
-// the caller.
-//
-// Iron rule ② (never encode twice / decode twice) is enforced by the
-// server-side encoder — a save is refused outright when a string already
-// contains escape markers, with the reason surfaced to the user.
-//
-// Opening an eligible file takes over its tab instead of adding a second
-// one: the decoded view is shown in the raw tab's own slot (preview
-// state included) and the raw tab is closed. `revealOriginal` pins the raw
-// form the same way, and `peekOriginal` flips the slot momentarily — Esc or
-// an editor-group switch flips it back (escape triples never contain newline
-// bytes, so the cursor line survives every flip).
+// The pdcloc:// view decodes the entire backing file and saves the entire file
+// through the server codec. Comments, identifiers and strings share one codec;
+// valid existing triples are preserved on encoding and readable UTF-8 survives
+// decoding. File/profile eligibility and original-byte backups remain client
+// responsibilities. All conversion covers the complete file.
 
 import * as fs from 'node:fs/promises';
 import * as nodePath from 'node:path';
@@ -134,38 +94,38 @@ const TRANSCODE_REQUEST_TIMEOUT_MS = 120_000;
 /** Pause after the last edit before a watched buffer is judged for promotion. */
 const TRANSCODE_PROMOTION_DEBOUNCE_MS = 700;
 
-/** How a buffer relates to the scoped form, mirroring the server's classifier. */
-type ScopedForm = 'plain' | 'whole' | 'scoped' | 'damaged';
+/** How a buffer relates to the whole-file form, mirroring the server's classifier. */
+type TranscodeForm = 'plain' | 'whole' | 'mixed' | 'damaged';
 
 interface TranscodeDecodeResponse {
     eligible?: boolean;
     profile?: 'localisation' | 'script';
-    form?: ScopedForm;
+    form?: TranscodeForm;
     bytes?: string;
     broken?: number;
     damagedAt?: number;
-    quotedCjk?: boolean;
+    needsEncoding?: boolean;
     error?: 'invalid-utf8';
 }
 
 /** Server-controlled encode answer: either `bytes`, or `refused` with its payload. */
 interface TranscodeEncodeResponse {
     bytes?: string;
-    refused?: 'alreadyEscaped' | 'unencodable' | 'invalidUtf8' | 'brokenEscape';
+    refused?: 'unencodable' | 'invalidUtf8' | 'brokenEscape';
     offsets?: number[];
     points?: { codePoint?: number; byteIndex?: number }[];
 }
 
 /** What a successful decode produced — the bytes to show plus read metadata. */
 export interface DecodedView {
-    form: ScopedForm;
+    form: TranscodeForm;
     bytes: Uint8Array;
-    /** Orphan markers the decoder passed through (whole-file or in-span). */
+    /** Damaged markers in the unchanged original bytes. */
     broken: number;
     /** First input byte offset of damage, for anchoring the damaged-form error. */
     damagedAt: number | undefined;
-    /** Plain form whose quoted CJK a save would encode. */
-    quotedCjk: boolean;
+    /** Plain form whose text a save would encode. */
+    needsEncoding: boolean;
 }
 
 function hexToBytes(hex: string): Uint8Array {
@@ -185,6 +145,11 @@ async function sendTranscodeRequest<T>(method: string, params: object): Promise<
         client = await acquireServerClient(TRANSCODE_AVAILABILITY_WAIT_MS);
     } catch (error) {
         throw new TranscodeUnavailableError(error instanceof Error ? error.message : String(error));
+    }
+    if (client.initializeResult?.capabilities.experimental?.pdcWholeFileTranscode !== true) {
+        throw new TranscodeUnavailableError(vscode.l10n.t(
+            'Whole-file transcoding requires an updated ParadoxCode server. Update the server and retry.',
+        ));
     }
     try {
         return await withTimeout(
@@ -228,13 +193,13 @@ async function transcodeDecode(
         bytes: hexToBytes(response.bytes),
         broken: typeof response.broken === 'number' ? response.broken : 0,
         damagedAt: typeof response.damagedAt === 'number' ? response.damagedAt : undefined,
-        quotedCjk: response.quotedCjk === true,
+        needsEncoding: response.needsEncoding === true,
     };
 }
 
 type EncodeOutcome =
     | { bytes: Uint8Array }
-    | { alreadyEscaped: number[] }
+    | { brokenEscape: number[] }
     | { unencodable: { codePoint: number }[] }
     | 'invalid-utf8';
 
@@ -252,8 +217,8 @@ async function transcodeEncode(real: vscode.Uri, bytes: Uint8Array): Promise<Enc
     if (typeof response.bytes === 'string') {
         return { bytes: hexToBytes(response.bytes) };
     }
-    if (response.refused === 'alreadyEscaped') {
-        return { alreadyEscaped: Array.isArray(response.offsets) ? response.offsets : [] };
+    if (response.refused === 'brokenEscape') {
+        return { brokenEscape: Array.isArray(response.offsets) ? response.offsets : [] };
     }
     if (response.refused === 'invalidUtf8') {
         return 'invalid-utf8';
@@ -276,59 +241,46 @@ async function transcodeEncode(real: vscode.Uri, bytes: Uint8Array): Promise<Enc
 // ---------------------------------------------------------------------------
 
 /**
- * Conservative client-side prescreen mirroring the only signal characters the
- * server classifier reads: escape markers (U+0010..=U+0013) and raw CJK-range
- * code points. A buffer with neither is a transcode fixed point — the server
- * can only answer `plain` without quoted CJK for it — so the (large) majority
- * of ASCII files never costs a server round-trip. This never makes a codec
- * decision: anything carrying a signal is still classified server-side.
+ * Conservative client-side prescreen: escape markers or any non-ASCII content
+ * can require whole-file conversion or refusal. The server makes the final
+ * profile-aware decision. Plain ASCII/BOM files remain ordinary documents.
  */
 function hasTranscodeSignal(text: string): boolean {
     for (const character of text) {
         const codePoint = character.codePointAt(0) ?? 0;
-        if ((codePoint >= 0x10 && codePoint <= 0x13) || isRawCjkCodePoint(codePoint)) {
+        if ((codePoint >= 0x10 && codePoint <= 0x13) || (codePoint > 0x7f && codePoint !== 0xfeff)) {
             return true;
         }
     }
     return false;
 }
 
-/** Mirror of the server's `transcode::is_raw_cjk` — keep the ranges in sync. */
-function isRawCjkCodePoint(codePoint: number): boolean {
-    return (
-        (codePoint >= 0x2e80 && codePoint <= 0x9fff) // CJK radicals, kana, unified ideographs, Yi
-        || (codePoint >= 0xac00 && codePoint <= 0xd7af) // Hangul syllables
-        || (codePoint >= 0xf900 && codePoint <= 0xfaff) // CJK compatibility ideographs
-        || (codePoint >= 0xff00 && codePoint <= 0xffef) // fullwidth forms
-        || (codePoint >= 0x20000 && codePoint <= 0x2fa1f) // supplementary planes B-F + compat supplement
-        || (codePoint >= 0x30000 && codePoint <= 0x3134f) // plane G+
-    );
-}
+
 
 /**
  * Whether the transparent view would do work for this classification: the
  * decoded form differs from the raw bytes, or a save through the twin would
  * rewrite them. Only such files may take over a `file://` tab; transcode
- * fixed points (`plain` without quoted CJK) stay on their real URI so VS Code
+ * fixed points (`plain` without text) stay on their real URI so VS Code
  * search, diff, git, and timeline keep working on them.
  */
 function needsDecodedView(view: DecodedView): boolean {
     return (
         view.form === 'whole'
-        || view.form === 'scoped'
+        || view.form === 'mixed'
         || view.form === 'damaged'
-        || (view.form === 'plain' && view.quotedCjk)
+        || (view.form === 'plain' && view.needsEncoding)
     );
 }
 
 /**
  * Whether `buffer` is exactly the state the auto-promotion may act on: a
- * plain form whose quoted CJK a save would encode. Unlike `needsDecodedView`
+ * plain form whose text a save would encode. Unlike `needsDecodedView`
  * this is safe for a mid-edit buffer — the raw save a promotion performs is
  * byte-preserving here, so nothing is rewritten behind the user's back.
  */
 function needsSaveTimeEncoding(view: DecodedView): boolean {
-    return view.form === 'plain' && view.quotedCjk;
+    return view.form === 'plain' && view.needsEncoding;
 }
 
 /** How aggressively eligible files are moved onto their decoded twin. */
@@ -445,7 +397,7 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
         } catch (error) {
             this.logTranscodeFailure('read', real, error);
             throw vscode.FileSystemError.Unavailable(
-                vscode.l10n.t('the decoded view needs the ParadoxCode language server; it is starting or not running — retry shortly.'),
+                vscode.l10n.t('ParadoxCode: {0}', error instanceof Error ? error.message : String(error)),
             );
         }
         if (view === 'invalid-utf8') {
@@ -478,7 +430,7 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
         } catch (error) {
             this.logTranscodeFailure('save', real, error);
             throw vscode.FileSystemError.Unavailable(
-                vscode.l10n.t('saving the decoded view needs the ParadoxCode language server; it is starting or not running — retry shortly.'),
+                vscode.l10n.t('ParadoxCode: {0}', error instanceof Error ? error.message : String(error)),
             );
         }
         if (encoded === 'invalid-utf8') {
@@ -489,15 +441,12 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
             void vscode.window.showErrorMessage(vscode.l10n.t('ParadoxCode: {0}', message));
             throw vscode.FileSystemError.NoPermissions(message);
         }
-        if ('alreadyEscaped' in encoded) {
+        if ('brokenEscape' in encoded) {
             const message = vscode.l10n.t(
-                'Refused to save: {0} escape marker(s) already sit inside quoted strings — '
-                + 'encoding them again would double-encode. Undo the paste (or decode the text) first.',
-                encoded.alreadyEscaped.length,
+                'Refused to save: a damaged escape sequence occurs at byte {0}. Fix it first.',
+                encoded.brokenEscape[0] ?? 0,
             );
-            this.log.appendLine(
-                `transparentLoc: refused save of ${real.fsPath} (in-span escape markers)`,
-            );
+            this.log.appendLine(`transparentLoc: refused save of ${real.fsPath} (${message})`);
             void vscode.window.showErrorMessage(vscode.l10n.t('ParadoxCode: {0}', message));
             throw vscode.FileSystemError.NoPermissions(message);
         }
@@ -585,18 +534,16 @@ class PdclocFileSystemProvider implements vscode.FileSystemProvider {
             diagnostic = new vscode.Diagnostic(
                 new vscode.Range(line, 0, line, 0),
                 vscode.l10n.t(
-                    'Stray EU4dll escape marker(s) outside every quoted string — the file is damaged '
-                    + 'and shown as-is. Move them inside a string or remove them.',
+                    'A damaged EU4dll escape sequence occurs in this file. The original bytes are shown for repair.',
                 ),
                 vscode.DiagnosticSeverity.Error,
             );
             diagnostic.code = 'LocalisationMixedEncoding';
-        } else if (view.form === 'plain' && view.quotedCjk) {
+        } else if (view.form === 'plain' && view.needsEncoding) {
             diagnostic = new vscode.Diagnostic(
                 new vscode.Range(0, 0, 0, 0),
                 vscode.l10n.t(
-                    'Quoted CJK text stays readable here; saving encodes it into EU4dll escape '
-                    + 'triples inside the strings (comments and code stay readable on disk).',
+                    'This text stays readable here; saving encodes the entire file, including comments and unquoted text.',
                 ),
                 vscode.DiagnosticSeverity.Information,
             );
@@ -760,7 +707,7 @@ async function openDecodedView(uri: vscode.Uri | undefined): Promise<void> {
     }
     // Eligibility is the only gate for this explicit command: readFile
     // dispatches on the actual form — plain files pass through byte-identical,
-    // escaped and scoped files decode, damaged files show as-is with an error.
+    // escaped and mixed files decode, damaged files show as-is with an error.
     // Carry the cursor over: a search jump lands on the raw file first (with
     // its match selection), and the flip to the twin must not strand the user
     // at the top of the file instead of their target.
@@ -959,9 +906,7 @@ async function convertFileManually(
         const original = await fs.readFile(real.fsPath);
         const response = await sendTranscodeRequest<TranscodeEncodeResponse & { eligible?: boolean }>(
             direction === 'encode' ? 'pdc/transcodeEncode' : 'pdc/transcodeDecode',
-            direction === 'encode'
-                ? { path: real.fsPath, bytes: bytesToHex(original), preserveEscaped: true }
-                : { path: real.fsPath, bytes: bytesToHex(original), quotedOnly: true },
+            { path: real.fsPath, bytes: bytesToHex(original) },
         );
         if (response?.eligible === false) {
             void vscode.window.showErrorMessage(vscode.l10n.t(
@@ -972,13 +917,13 @@ async function convertFileManually(
         }
         if (response?.refused === 'invalidUtf8') {
             void vscode.window.showErrorMessage(vscode.l10n.t(
-                'ParadoxCode: refused to {0} — a quoted string is not valid UTF-8.', verb,
+                'ParadoxCode: refused to {0} — the file is not valid UTF-8.', verb,
             ));
             return;
         }
         if (response?.refused === 'brokenEscape') {
             void vscode.window.showErrorMessage(vscode.l10n.t(
-                'ParadoxCode: refused to {0} — a damaged escape sequence sits inside a quoted string at byte {1}. Fix it first.',
+                'ParadoxCode: refused to {0} — a damaged escape sequence occurs at byte {1}. Fix it first.',
                 verb, response.offsets?.[0] ?? 0,
             ));
             return;
@@ -987,7 +932,7 @@ async function convertFileManually(
             const points = response.points ?? [];
             const examples = points.map((point) => formatCodePoint(point.codePoint ?? 0)).slice(0, 8).join(', ');
             void vscode.window.showErrorMessage(vscode.l10n.t(
-                'ParadoxCode: refused to {0} — {1} unencodable code point(s) inside strings ({2}).',
+                'ParadoxCode: refused to {0} — {1} unencodable code point(s) in the file ({2}).',
                 verb, points.length, examples,
             ));
             return;
@@ -998,8 +943,8 @@ async function convertFileManually(
         const converted = hexToBytes(response.bytes);
         if (original.equals(converted)) {
             void vscode.window.showInformationMessage(direction === 'encode'
-                ? vscode.l10n.t('ParadoxCode: quoted content needs no further encoding.')
-                : vscode.l10n.t('ParadoxCode: quoted content contains no escape sequences to decode.'));
+                ? vscode.l10n.t('ParadoxCode: the file needs no further encoding.')
+                : vscode.l10n.t('ParadoxCode: the file contains no escape sequences to decode.'));
             return;
         }
         if (hasDirtyDocument(real) || !original.equals(await fs.readFile(real.fsPath))) {
@@ -1011,11 +956,11 @@ async function convertFileManually(
         const backup = `${real.fsPath}.pre-transcode.bak`;
         await fs.writeFile(backup, original);
         await fs.writeFile(real.fsPath, converted);
-        log.appendLine(`transparentLoc: ${direction}d quoted content in ${real.fsPath} (backup: ${backup})`);
+        log.appendLine(`transparentLoc: ${direction}d the entire file ${real.fsPath} (backup: ${backup})`);
         void vscode.window.showInformationMessage(direction === 'encode'
-            ? vscode.l10n.t('ParadoxCode: encoded readable quoted content in {0}; existing escapes and comments were preserved (backup: {1}).',
+            ? vscode.l10n.t('ParadoxCode: encoded the entire file {0}; existing escape sequences were preserved (backup: {1}).',
                 nodePath.basename(real.fsPath), nodePath.basename(backup))
-            : vscode.l10n.t('ParadoxCode: decoded quoted content in {0}; comments were preserved (backup: {1}).',
+            : vscode.l10n.t('ParadoxCode: decoded the entire file {0}, including comments and unquoted text (backup: {1}).',
                 nodePath.basename(real.fsPath), nodePath.basename(backup)));
     } catch (error) {
         if (error instanceof TranscodeUnavailableError) {
@@ -1040,7 +985,7 @@ function reportManualTranscodeFailure(
     log.appendLine(`transparentLoc: manual ${verb} of ${real.fsPath} failed: ${message}`);
     void vscode.window.showErrorMessage(
         vscode.l10n.t(
-            'ParadoxCode: manual transcoding needs the ParadoxCode language server; it is starting or not running — retry shortly.',
+            'ParadoxCode: {0}', message,
         ),
     );
 }
@@ -1080,7 +1025,7 @@ async function adoptDecodedView(
     const text = document.getText();
     if (!hasTranscodeSignal(text)) {
         // Fixed point by construction: no markers and no CJK anywhere means
-        // the classifier can only answer `plain` without quoted CJK.
+        // the classifier can only answer `plain` without text.
         watchedPassThrough.add(key);
         return;
     }
@@ -1116,8 +1061,8 @@ async function adoptDecodedView(
 }
 
 /**
- * Promotes a watched pass-through document the moment its buffer grows quoted
- * CJK a save would encode — without this the typed-CJK gap would reopen and
+ * Promotes a watched pass-through document when any part of its buffer grows
+ * text a save would encode — without this the typed-CJK gap would reopen and
  * the next raw save would bypass the encode guard. The buffer is saved first
  * (the promoted shape is byte-preserving on a raw save), then the tab flips to
  * the twin keeping the cursor position: at swap time the twin content is
@@ -1186,7 +1131,7 @@ async function promoteWatchedDocument(
  * Opens the decoded view when an eligible file is opened through its raw
  * path, taking over the raw tab instead of adding a second one. The path
  * decides scope; the content gate decides whether the twin adds anything —
- * transcode fixed points pass through untouched, whole-escaped and scoped
+ * transcode fixed points pass through untouched, whole-escaped and mixed
  * files decode, and damaged files show as-is with an error (the form dispatch
  * lives in readFile, never here). This also adopts files the moment they land
  * on an eligible path (Save As from an untitled buffer, a file moved into
@@ -1247,7 +1192,7 @@ async function maybeAutoOpenDecodedView(
  * the master switch: on, the `pdcloc://` FileSystemProvider, decoded-view
  * commands, automatic content-gated redirection (see
  * `paradoxcode.localisation.autoOpen`), the status-bar indicator, and
- * save-time scoped encoding are all active; off, only the manual one-shot
+ * save-time whole-file encoding are all active; off, only the manual one-shot
  * encode/decode commands remain (their menus hide through the same config
  * check). When the artifact is missing the feature degrades to a log line,
  * never an error.

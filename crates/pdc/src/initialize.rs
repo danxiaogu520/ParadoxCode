@@ -285,7 +285,7 @@ pub(crate) fn prepare_initialize_candidate(
             host.snapshot().source_files().len()
         ));
     }
-    let result = serde_json::to_value(InitializeResult {
+    let mut result = serde_json::to_value(InitializeResult {
         capabilities: ServerCapabilities {
             text_document_sync: Some(TextDocumentSyncCapability::Options(
                 TextDocumentSyncOptions {
@@ -345,6 +345,7 @@ pub(crate) fn prepare_initialize_candidate(
         code: INTERNAL_ERROR,
         message: format!("failed to serialize initialize result: {error}"),
     })?;
+    result["capabilities"]["experimental"]["pdcWholeFileTranscode"] = serde_json::Value::Bool(true);
     Ok(PreparedInitialize {
         host,
         result,
