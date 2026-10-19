@@ -87,7 +87,7 @@ pub fn inventory(root: &Path) -> Result<Inventory, String> {
                     if member.is_dir() {
                         continue;
                     }
-                    let name = normalized(member.name());
+                    let name = normalized(&member.name().map_err(|e| e.to_string())?);
                     result
                         .files
                         .entry(name.to_lowercase())
