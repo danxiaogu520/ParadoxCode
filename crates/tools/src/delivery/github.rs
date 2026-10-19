@@ -104,12 +104,13 @@ pub(super) fn unpack_flat(bytes: &[u8], destination: &Path, max_bytes: u64) -> R
     fs::create_dir_all(destination).map_err(|e| e.to_string())?;
     for index in 0..zip.len() {
         let mut file = zip.by_index(index).map_err(|e| e.to_string())?;
+        let name = file.name().map_err(|e| e.to_string())?.into_owned();
         require(
-            plain_name(file.name()) && !file.is_dir() && !file.is_symlink(),
+            plain_name(&name) && !file.is_dir() && !file.is_symlink(),
             "evidence archive must contain flat regular files",
         )?;
         require(
-            names.insert(file.name().to_owned()),
+            names.insert(name.clone()),
             "duplicate evidence archive entry",
         )?;
         total = total
@@ -122,7 +123,7 @@ pub(super) fn unpack_flat(bytes: &[u8], destination: &Path, max_bytes: u64) -> R
         let mut data = Vec::new();
         file.read_to_end(&mut data).map_err(|e| e.to_string())?;
         require(data.len() as u64 == file.size(), "truncated evidence entry")?;
-        release::atomic_write(&destination.join(file.name()), &data).map_err(|e| e.to_string())?;
+        release::atomic_write(&destination.join(name), &data).map_err(|e| e.to_string())?;
     }
     let actual = report::files(destination)?
         .iter()

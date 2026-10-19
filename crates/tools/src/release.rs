@@ -443,7 +443,11 @@ fn verify_zip(path: &Path, binary: &str, limits: &ServerLimits) -> Result<(), Re
     let entry = archive
         .by_index(0)
         .map_err(|error| ReleaseError::Verification(error.to_string()))?;
-    if entry.name() != binary {
+    if entry
+        .name()
+        .map_err(|error| ReleaseError::Verification(error.to_string()))?
+        != binary
+    {
         return Err(ReleaseError::Verification(format!(
             "{}: expected executable name {binary}",
             path.display()
