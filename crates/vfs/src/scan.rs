@@ -553,7 +553,19 @@ fn collect_zip_entries(
     };
     // Zip payloads already use the game-data layout (`interface/foo.gfx`), so entry
     // names map to logical paths verbatim.
-    let mut names: Vec<String> = archive.file_names().map(ToOwned::to_owned).collect();
+    let mut names = Vec::with_capacity(archive.len());
+    for name in archive.file_names() {
+        match name {
+            Ok(name) => names.push(name.into_owned()),
+            Err(error) => record_scan_issue(
+                report,
+                limits,
+                WorkspaceScanIssueKind::FileUnreadable,
+                zip_path.to_owned(),
+                format!("zip entry name could not be decoded: {error}"),
+            ),
+        }
+    }
     names.sort();
     for name in names {
         cancellation.checkpoint()?;
@@ -1573,6 +1585,58 @@ mod tests {
                 (logical.as_str().to_owned(), physical.display().to_string())
             })
             .collect()
+    }
+
+    #[test]
+    fn archive_reads_preserve_unicode_names_and_enforce_decompressed_bounds() {
+        let root = test_directory("archive-read-compatibility");
+        let profile = profile_with_archives(&[], &["dlc"], &["gfx"]);
+        let name = "interface/écran.gfx";
+        let contents = "spriteTypes = { }\n";
+        let limit = contents.len() as u64;
+        for (label, method) in [
+            ("stored", zip::CompressionMethod::Stored),
+            ("deflated", zip::CompressionMethod::Deflated),
+        ] {
+            let case_root = root.join(label);
+            fs::create_dir_all(case_root.join("dlc")).expect("archive directory");
+            let path = case_root.join("dlc/fixture.zip");
+            let mut writer = zip::ZipWriter::new(fs::File::create(&path).expect("create zip"));
+            writer
+                .start_file(
+                    name,
+                    zip::write::SimpleFileOptions::default().compression_method(method),
+                )
+                .expect("start unicode entry");
+            std::io::Write::write_all(&mut writer, contents.as_bytes()).expect("write entry");
+            writer.finish().expect("finish zip");
+
+            let paths = scan_paths(&case_root, &profile);
+            assert_eq!(paths.len(), 1, "{label}");
+            assert_eq!(paths[0].0, name, "{label}");
+            assert_eq!(
+                read_archive_entry_bytes(&path, name, limit).as_deref(),
+                Some(contents.as_bytes()),
+                "{label}"
+            );
+            assert!(read_archive_entry_bytes(&path, name, limit - 1).is_none());
+            assert!(read_archive_entry_bytes(&path, "interface/missing.gfx", limit).is_none());
+
+            let mut report = WorkspaceScanReport::default();
+            assert_eq!(
+                read_source_file(
+                    std::path::Path::new(&paths[0].1),
+                    WorkspaceScanLimits::default(),
+                    &mut report,
+                    SourceEncoding::Utf8,
+                )
+                .as_deref(),
+                Some(contents),
+                "{label}"
+            );
+            assert!(report.issues.is_empty(), "{label}: {:?}", report.issues);
+        }
+        fs::remove_dir_all(root).expect("cleanup");
     }
 
     #[test]

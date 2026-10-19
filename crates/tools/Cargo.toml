@@ -27,7 +27,7 @@ engine = { path = "../engine", optional = true }
 ide = { path = "../ide", optional = true }
 flate2 = "1"
 tar = "0.4"
-zip = { version = "8", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.5", default-features = false, features = ["deflate"] }
 semver = "1"
 sha2 = "0.11"
 toml = "1.1.3"

@@ -279,6 +279,25 @@ fn downloaded_evidence_rejects_traversal_nested_and_oversized_files() {
     );
 }
 #[test]
+fn downloaded_evidence_rejects_symlinks() {
+    let root = tempfile::tempdir().unwrap();
+    let destination = root.path().join("evidence");
+    let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    writer
+        .add_symlink(
+            "ci.json",
+            "../outside.json",
+            zip::write::SimpleFileOptions::default(),
+        )
+        .unwrap();
+    let bytes = writer.finish().unwrap().into_inner();
+
+    let error = github::unpack_flat(&bytes, &destination, 1024).unwrap_err();
+    assert_eq!(error, "evidence archive must contain flat regular files");
+    assert!(fs::read_dir(&destination).unwrap().next().is_none());
+    assert!(!root.path().join("outside.json").exists());
+}
+#[test]
 fn downloaded_evidence_never_reuses_stale_missing_files() {
     let root = fixture();
     let dir = root.path().join("target/evidence");
