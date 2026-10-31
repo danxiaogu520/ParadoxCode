@@ -267,8 +267,9 @@ pub fn script_roundtrip_is_canonical(text: &str) -> bool {
 }
 
 /// Splits a 4-digit code point into its escape triple: marker selection from escape
-/// set membership, then the `low += 0x0E` / `high -= 0x09` compensation so that set
-/// members never appear raw inside the triple.
+/// set membership, then the ecosystem's `low += 0x0E` / `high -= 0x09`
+/// compensation. A compensated payload can itself belong to the input escape
+/// set: low 0x2F becomes 0x3D ('=').
 fn escape_triple(code_point: u32, escape_set: EscapeSet) -> (u8, u8, u8) {
     let low = (code_point & 0xFF) as u8;
     let high = (code_point >> 8) as u8;
