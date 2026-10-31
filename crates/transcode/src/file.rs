@@ -125,11 +125,13 @@ fn escape_at(
             (high_end, low, high)
         }
     };
-    // A valid triple never consumes an escape-set structural byte, including
-    // quote, comment, whitespace and line boundaries.
-    if [low, high]
-        .iter()
-        .any(|byte| crate::EscapeSet::Paratranz.contains(*byte))
+    // The input escape set is not a blacklist of output bytes: compensating
+    // low 0x2F produces '=' (e.g. 是), and the historical 0x21 variant produces
+    // '/'. Accept those payloads only when the marker carries low compensation.
+    // Other structural bytes still cannot swallow quotes or line boundaries.
+    let compensated_delimiter = matches!(input[start], 0x11 | 0x13) && matches!(low, b'=' | b'/');
+    if (EscapeSet::Paratranz.contains(low) && !compensated_delimiter)
+        || EscapeSet::Paratranz.contains(high)
     {
         return Err(broken());
     }
@@ -269,6 +271,52 @@ mod tests {
     }
 
     #[test]
+    fn compensated_delimiters_are_valid_payloads() {
+        // Canonical low 0x2F becomes '='; the historical 0x21 variant becomes
+        // '/'. Markers 0x11 and 0x13 both carry low-byte compensation.
+        for (triple, readable) in [
+            (b"\x11=f", "是"),
+            (b"\x13=R", "\u{5B2F}"),
+            (b"\x11/N", "両"),
+            (b"\x13/R", "\u{5B21}"),
+        ] {
+            let input = [b"name = \"".as_slice(), triple, b"\"\n"].concat();
+            let expected = format!("name = \"{readable}\"\n");
+            for profile in [Profile::Script, Profile::Localisation] {
+                assert_eq!(decode_buffer(&input, profile).unwrap(), expected.as_bytes());
+                for set in [EscapeSet::Paratranz, EscapeSet::DllFull] {
+                    assert_eq!(encode_buffer(&input, profile, set).unwrap(), input);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn complete_file_conversion_accepts_every_encodable_bmp_scalar() {
+        for code_point in 0x1000..=0xFFFF {
+            let Some(character) = char::from_u32(code_point) else {
+                continue;
+            };
+            let readable = character.to_string();
+            for profile in [Profile::Script, Profile::Localisation] {
+                for set in [EscapeSet::Paratranz, EscapeSet::DllFull] {
+                    let encoded = encode_file(&readable, profile, set).unwrap();
+                    assert_eq!(
+                        decode_buffer(&encoded, profile).as_deref(),
+                        Ok(readable.as_bytes()),
+                        "decode U+{code_point:04X}, {profile:?}, {set:?}"
+                    );
+                    assert_eq!(
+                        encode_buffer(&encoded, profile, set).as_deref(),
+                        Ok(encoded.as_slice()),
+                        "preserve U+{code_point:04X}, {profile:?}, {set:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn comments_and_bare_text_have_the_same_refusals_as_strings() {
         for text in ["# 😀\n", "value = 😀\n", "name = \"😀\"\n"] {
             assert!(matches!(
@@ -279,9 +327,16 @@ mod tests {
         for bytes in [
             b"# \x10\n".as_slice(),
             b"name = \"\x10\"\n".as_slice(),
+            b"name = \"\x11\"\n".as_slice(),
+            b"name = \"\x13\"\n".as_slice(),
+            b"# \x11\nf".as_slice(),
+            b"# \x13\rf".as_slice(),
             b"\x10".as_slice(),
         ] {
-            let offset = bytes.iter().position(|byte| *byte == 0x10).unwrap();
+            let offset = bytes
+                .iter()
+                .position(|byte| (0x10..=0x13).contains(byte))
+                .unwrap();
             for profile in [Profile::Script, Profile::Localisation] {
                 assert_eq!(
                     decode_buffer(bytes, profile),

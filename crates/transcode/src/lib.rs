@@ -58,8 +58,9 @@ pub enum Profile {
     Script,
 }
 
-/// The set of byte values that must not appear raw inside an escape triple, because
-/// the game parser treats them as delimiters. Membership only affects which triples
+/// Source byte values that trigger compensation when encoding an escape triple.
+/// Compensated payload bytes can still belong to this set (0x2F becomes 0x3D),
+/// so it is not an output-byte blacklist. Membership only affects which triples
 /// encoding emits; decoding is universal over all sets.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum EscapeSet {

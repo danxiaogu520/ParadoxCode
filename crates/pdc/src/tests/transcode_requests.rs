@@ -12,8 +12,10 @@ use transcode::{EscapeSet, Profile, encode_file};
 
 use super::*;
 
-const READABLE_SCRIPT: &str = "# 注释保持可读\nname = \"中文内容\"\n";
-const READABLE_LOC: &str = "l_english:\n KEY:0 \"中文内容\"\n";
+// 是 and 支 contain low 0x2F: their compensated '=' payload must not be
+// misclassified as damage by the whole-file requests used by the editor.
+const READABLE_SCRIPT: &str = "# 支持中文注释\nname = \"是否支持中文内容\"\n";
+const READABLE_LOC: &str = "l_english:\n KEY:0 \"是否支持中文内容\"\n";
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
