@@ -7,6 +7,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Whole-file transcoding accepts valid compensated `=` payloads in characters such
+  as 是 and 支, and `/` payloads from the historical 0x21 escape variant. Manual
+  conversion and transparent views no longer report these sequences as damaged.
+
 ## [0.5.3] - 2026-10-15
 
 ### Added
