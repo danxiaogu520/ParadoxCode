@@ -13,6 +13,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   as 是 and 支, and `/` payloads from the historical 0x21 escape variant. Manual
   conversion and transparent views no longer report these sequences as damaged.
 
+### Security
+
+- Update Zstandard compression dependencies to fix RUSTSEC-2026-0391,
+  RUSTSEC-2026-0398, RUSTSEC-2026-0403 and RUSTSEC-2026-0410.
+
 ## [0.5.3] - 2026-10-15
 
 ### Added
