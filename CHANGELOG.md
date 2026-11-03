@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-11-04
+
 ### Fixed
 
 - Whole-file transcoding accepts valid compensated `=` payloads in characters such
@@ -15,6 +17,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 
+- Upgrade the ZIP dependency to 9.0.5 to resolve extraction advisories
+  RUSTSEC-2026-0367, RUSTSEC-2026-0368 and RUSTSEC-2026-0369. Archive readers
+  handle fallible filename decoding and retain bounded reads and symlink rejection.
 - Update Zstandard compression dependencies to fix RUSTSEC-2026-0391,
   RUSTSEC-2026-0398, RUSTSEC-2026-0403 and RUSTSEC-2026-0410.
 
