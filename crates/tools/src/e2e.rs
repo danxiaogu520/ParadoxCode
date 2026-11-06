@@ -249,5 +249,46 @@ pub fn run(root: &Path, explicit: Option<&str>) -> Result<String, String> {
     )?;
     client.close(&document)?;
     client.shutdown()?;
+    completion_replay(root, &binary, fixture.path())?;
     Ok("LSP end-to-end contracts passed".into())
+}
+
+fn completion_replay(root: &Path, binary: &Path, workspace: &Path) -> Result<(), String> {
+    let definitions = workspace.join("common/scripted_effects");
+    let events = workspace.join("events");
+    std::fs::create_dir_all(&definitions).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&events).map_err(|e| e.to_string())?;
+    std::fs::write(
+        definitions.join("completion.txt"),
+        "replay_embed = { $BODY$ }\n",
+    )
+    .map_err(|e| e.to_string())?;
+    let source = format!(
+        "# 中文😀\r\ncountry_event = {{ immediate = {{ replay_embed = {{ BODY = \"add_prestige = 1\" }} }} }}\r\n{}",
+        "country_event = { immediate = { add_prestige = 1 } }\r\n".repeat(2_000)
+    );
+    std::fs::write(events.join("completion.txt"), source).map_err(|e| e.to_string())?;
+    let trace = workspace.join("completion-trace.json");
+    report::write(
+        &trace,
+        &json!({"cases":[{"path":"events/completion.txt","needle":"add_prestige"}]}),
+    )?;
+    crate::perf::completion::execute(&[
+        "--root".into(),
+        root.display().to_string(),
+        "--workspace".into(),
+        workspace.display().to_string(),
+        "--trace".into(),
+        trace.display().to_string(),
+        "--server".into(),
+        binary.display().to_string(),
+        "--samples".into(),
+        "12".into(),
+        "--reindex".into(),
+        "--output".into(),
+        root.join("target/performance-results/lsp-completion-e2e.json")
+            .display()
+            .to_string(),
+    ])?;
+    Ok(())
 }

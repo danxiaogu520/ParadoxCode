@@ -77,8 +77,8 @@ pub fn uri(path: &Path) -> Result<String, String> {
 pub struct Client {
     child: Child,
     input: Option<ChildStdin>,
-    incoming: mpsc::Receiver<Result<Value, String>>,
-    pending: VecDeque<Value>,
+    incoming: mpsc::Receiver<Result<(Value, Instant), String>>,
+    pending: VecDeque<(Value, Instant)>,
     pub notifications: Vec<Value>,
     stderr: Arc<Mutex<String>>,
     next_id: u64,
@@ -118,7 +118,7 @@ impl Client {
             loop {
                 match read_frame(&mut reader) {
                     Ok(Some(value)) => {
-                        if sender.send(Ok(value)).is_err() {
+                        if sender.send(Ok((value, Instant::now()))).is_err() {
                             break;
                         }
                     }
@@ -156,12 +156,12 @@ impl Client {
     fn send(&mut self, value: &Value) -> Result<(), String> {
         write_frame(self.input.as_mut().ok_or("LSP input closed")?, value)
     }
-    fn receive(&mut self, deadline: Instant) -> Result<Value, String> {
+    fn receive(&mut self, deadline: Instant) -> Result<(Value, Instant), String> {
         loop {
             let remaining = deadline
                 .checked_duration_since(Instant::now())
                 .ok_or("LSP timeout")?;
-            let value = self
+            let (value, received_at) = self
                 .incoming
                 .recv_timeout(remaining)
                 .map_err(|e| format!("LSP receive: {e}\n{}", self.stderr()))??;
@@ -189,10 +189,10 @@ impl Client {
                         return Err("LSP notification limit exceeded".into());
                     }
                     self.notifications.push(value.clone());
-                    return Ok(value);
+                    return Ok((value, received_at));
                 }
             } else {
-                return Ok(value);
+                return Ok((value, received_at));
             }
         }
     }
@@ -214,13 +214,13 @@ impl Client {
         let deadline = Instant::now() + timeout;
         let mut results = std::collections::BTreeMap::new();
         while results.len() < ids.len() {
-            let value = self.receive(deadline)?;
+            let (value, received_at) = self.receive(deadline)?;
             if value.get("method").is_some() {
                 continue;
             }
             let id = value["id"].as_u64().ok_or("invalid batch response ID")?;
             if !ids.contains(&id) {
-                self.pending.push_back(value);
+                self.pending.push_back((value, received_at));
                 continue;
             }
             if let Some(error) = value.get("error") {
@@ -250,30 +250,48 @@ impl Client {
         params: Value,
         timeout: Duration,
     ) -> Result<Value, String> {
+        let id = self.send_request(method, params)?;
+        let (value, _) = self.wait_response(id, timeout)?;
+        if let Some(error) = value.get("error") {
+            return Err(format!("{method}: {error}"));
+        }
+        value
+            .get("result")
+            .cloned()
+            .ok_or_else(|| format!("{method}: response has no result"))
+    }
+
+    /// Sends a request without waiting, so editing traces can cancel it in flight.
+    pub fn send_request(&mut self, method: &str, params: Value) -> Result<u64, String> {
         let id = self.next_id;
         self.next_id += 1;
-        self.send(&request_value(id, method, params.clone()))?;
+        self.send(&request_value(id, method, params))?;
+        Ok(id)
+    }
+
+    /// Returns the complete response (including RPC errors) and the time its
+    /// frame was read, independent of when the caller drains queued responses.
+    pub fn wait_response(
+        &mut self,
+        id: u64,
+        timeout: Duration,
+    ) -> Result<(Value, Instant), String> {
         let deadline = Instant::now() + timeout;
         loop {
-            let value = if let Some(index) = self.pending.iter().position(|v| v["id"] == id) {
-                self.pending.remove(index).unwrap()
-            } else {
-                self.receive(deadline)?
-            };
+            let (value, received_at) =
+                if let Some(index) = self.pending.iter().position(|(v, _)| v["id"] == id) {
+                    self.pending.remove(index).unwrap()
+                } else {
+                    self.receive(deadline)?
+                };
             if value.get("method").is_some() {
                 continue;
             }
             if value["id"] != id {
-                self.pending.push_back(value);
+                self.pending.push_back((value, received_at));
                 continue;
             }
-            if let Some(error) = value.get("error") {
-                return Err(format!("{method}: {error}"));
-            }
-            return value
-                .get("result")
-                .cloned()
-                .ok_or_else(|| format!("{method}: response has no result"));
+            return Ok((value, received_at));
         }
     }
     pub fn wait_notification(
@@ -300,9 +318,9 @@ impl Client {
             {
                 return Ok(value["params"].clone());
             }
-            let value = self.receive(deadline)?;
+            let (value, received_at) = self.receive(deadline)?;
             if value.get("method").is_none() {
-                self.pending.push_back(value);
+                self.pending.push_back((value, received_at));
             }
         }
     }

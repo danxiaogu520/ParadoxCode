@@ -8,6 +8,83 @@ use crate::server::WATCHED_BULK_CAP;
 use super::*;
 
 #[test]
+fn cancellation_reaches_a_snapshot_request_while_initial_scan_is_parked() {
+    let (root, root_uri) = temp_workspace_dir();
+    fs::create_dir_all(root.join("events")).unwrap();
+    let source = root.join("events/queued-completion.txt");
+    fs::write(&source, "country_event = { id = queued.1 }").unwrap();
+    let uri = canonical_uri(&source);
+    let output = SharedOutput::new();
+    let parked = Latch::default();
+    let release = Latch::default();
+    let gate_parked = parked.clone();
+    let gate_release = release.clone();
+    let spent = std::sync::atomic::AtomicBool::new(false);
+    let gate = std::sync::Arc::new(move || {
+        if !spent.swap(true, std::sync::atomic::Ordering::AcqRel) {
+            gate_parked.set();
+            gate_release.wait();
+        }
+    });
+    let mut server = eu4_server(InitializeOptions).unwrap().with_scan_gate(gate);
+    let observed_output = output.clone();
+    // Always release the scan even on failure, so the regression cannot hang
+    // the test runner. The scan gate, rather than corpus size, forces the race.
+    let observer = std::thread::spawn(move || {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let cancelled_before_release = loop {
+            if observed_output
+                .frames()
+                .iter()
+                .any(|value| value["id"] == 2 && value["error"]["code"] == REQUEST_CANCELLED)
+            {
+                break true;
+            }
+            if std::time::Instant::now() >= deadline {
+                break false;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        };
+        release.set();
+        cancelled_before_release
+    });
+    let wait_for_scan: ReadAction = Some(Box::new(move || parked.wait()));
+    let input = ScriptedReader::new([
+        (
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{},"initializationOptions":{"vanillaMode":"disabled"}}}),
+            None,
+        ),
+        (
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            wait_for_scan,
+        ),
+        (
+            json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":18}}}),
+            None,
+        ),
+        (
+            json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":2}}),
+            None,
+        ),
+        (
+            json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+            None,
+        ),
+        (json!({"jsonrpc":"2.0","method":"exit"}), None),
+    ]);
+    let result = server.run_transport(input, output.clone());
+    let cancelled_before_release = observer.join().unwrap();
+    result.unwrap();
+    let responses = output.frames();
+    assert!(
+        cancelled_before_release,
+        "queued completion cancellation must not wait for the scan it is queued behind"
+    );
+    assert_eq!(responses.iter().filter(|value| value["id"] == 2).count(), 1);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn execute_reindex_workspace_refreshes_sources_and_reports_capability() {
     let (root, root_uri) = temp_workspace_dir();
     fs::create_dir_all(root.join("events")).expect("events directory");

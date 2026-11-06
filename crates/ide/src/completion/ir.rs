@@ -146,26 +146,39 @@ fn try_ir_completion_inner(
     let local_replacement = word_range(&local_source, local_position);
     let prefix = input.source_text(local_replacement).unwrap_or_default();
     let replacement_range = local_replacement;
-    let value_property = hir.properties().iter().find(|property| {
-        position > property.key_range.end()
-            && (position <= property.range.end()
-                || (property.value_range.is_none()
-                    && input
-                        .source
-                        .get(property.range.end() as usize..position as usize)
-                        .is_some_and(|gap| gap.trim().is_empty())))
-            && property.operator.is_some()
-            && !schema_fact_at_cursor(hir, position).is_some_and(|active| {
-                hir.field_fact_at(property.key_range).is_some_and(|field| {
-                    !hir.schema_facts()
-                        .iter()
-                        .any(|parent| parent.schema == field.schema && parent.range == active.range)
+    let cursor_schema = schema_fact_at_cursor(hir, position);
+    // A projected fragment retains the original CST and its outer properties.
+    // Only keys inside the active container can own the scalar being edited;
+    // an enclosing block outside the fragment is not a scalar value context.
+    let value_property = hir
+        .properties()
+        .iter()
+        .filter(|property| {
+            cursor_schema.is_none_or(|schema| {
+                schema.range.start() <= property.key_range.start()
+                    && property.key_range.end() <= schema.range.end()
+            })
+        })
+        .find(|property| {
+            position > property.key_range.end()
+                && (position <= property.range.end()
+                    || (property.value_range.is_none()
+                        && input
+                            .source
+                            .get(property.range.end() as usize..position as usize)
+                            .is_some_and(|gap| gap.trim().is_empty())))
+                && property.operator.is_some()
+                && !cursor_schema.is_some_and(|active| {
+                    hir.field_fact_at(property.key_range).is_some_and(|field| {
+                        !hir.schema_facts().iter().any(|parent| {
+                            parent.schema == field.schema && parent.range == active.range
+                        })
+                    })
                 })
-            })
-            && !property.value_range.is_some_and(|range| {
-                !range.is_empty() && hir.schema_facts().iter().any(|fact| fact.range == range)
-            })
-    });
+                && !property.value_range.is_some_and(|range| {
+                    !range.is_empty() && hir.schema_facts().iter().any(|fact| fact.range == range)
+                })
+        });
     let mut items = Vec::new();
     if let Some((invocation, summary)) = template_invocation_at(ir, snapshot, hir, position)
         && let Some(property) = value_property.filter(|property| {

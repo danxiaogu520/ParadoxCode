@@ -17,6 +17,84 @@ fn query_input_reuses_the_document_hir_handle() {
 }
 
 #[test]
+fn cached_disk_queries_refresh_symbol_facts_after_an_overlay_changes() {
+    use std::{fs, sync::Arc};
+
+    let root = temp_root("cached-disk-symbol-facts");
+    fs::create_dir_all(root.join("common/scripted_effects")).unwrap();
+    fs::create_dir_all(root.join("events")).unwrap();
+    let definition_path = root.join("common/scripted_effects/defs.txt");
+    let definition = "old_effect = { add_prestige = 1 }";
+    fs::write(&definition_path, definition).unwrap();
+    let caller_path = root.join("events/caller.txt");
+    let caller_text = "country_event = { immediate = { old_effect = yes } }";
+    fs::write(&caller_path, caller_text).unwrap();
+    let mut host = eu4_host(game::eu4::bootstrap_rules());
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::Project,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().unwrap();
+    let caller = DocumentId::new("file:///cached/events/caller.txt");
+    host.open_document(
+        caller.clone(),
+        1,
+        caller_text.to_owned(),
+        Some(AbsPath::normalize(&caller_path)),
+    )
+    .unwrap();
+    host.close_document(&caller).unwrap();
+    let disk_hir = host
+        .snapshot()
+        .document(&caller)
+        .unwrap()
+        .hir_handle()
+        .unwrap();
+    assert!(disk_hir.depends_on_symbol_facts());
+    assert!(
+        disk_hir
+            .references()
+            .iter()
+            .any(|reference| reference.name == "old_effect")
+    );
+    let owner = DocumentId::new("file:///cached/common/scripted_effects/defs.txt");
+    host.open_document(
+        owner.clone(),
+        1,
+        "new_effect = { add_prestige = 1 }".to_owned(),
+        Some(AbsPath::normalize(&definition_path)),
+    )
+    .unwrap();
+    let snapshot = host.snapshot();
+    assert_eq!(
+        snapshot.document(&caller).unwrap().source(),
+        engine::DocumentSource::Disk
+    );
+    assert!(Arc::ptr_eq(
+        &disk_hir,
+        &snapshot.document(&caller).unwrap().hir_handle().unwrap()
+    ));
+    let input = input_for_document(&snapshot, &caller).unwrap();
+    assert!(
+        !input
+            .hir
+            .unwrap()
+            .references()
+            .iter()
+            .any(|reference| reference.name == "old_effect")
+    );
+    assert!(diagnostics(&snapshot, &caller).iter().any(|item| {
+        item.code == DiagnosticCode::UnknownKey && item.message.contains("`old_effect`")
+    }));
+    host.close_document(&owner).unwrap();
+    assert!(!diagnostics(&host.snapshot(), &caller).iter().any(|item| {
+        item.code == DiagnosticCode::UnknownKey && item.message.contains("`old_effect`")
+    }));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn identity_only_host_does_not_guess_eu4_semantics_from_game_id() {
     let mut host = AnalysisHost::new(game::eu4::bootstrap_rules());
     let id = DocumentId::new("file:///tmp/events/generic.txt");

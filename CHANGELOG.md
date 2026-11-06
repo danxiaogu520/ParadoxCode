@@ -7,6 +7,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Completion in large files and quoted script arguments avoids reparsing unrelated text
+  for every candidate. Queued completion requests allow newer edits and cancellation
+  through, and cached closed files no longer add semantic work to each edit.
+- Nested block keys inside quoted script arguments complete correctly through hidden
+  effects and loop wrappers.
+
 ## [0.5.4] - 2026-11-04
 
 ### Fixed

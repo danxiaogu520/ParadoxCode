@@ -103,7 +103,7 @@ suite('ParadoxCode VS Code extension host', () => {
       assert.deepEqual(config.get('ignoreFilePatterns'), []);
       assert.deepEqual(config.get('ignoreDirectories'), []);
       assert.equal(config.get('server.installPolicy'), 'auto');
-      assert.equal(config.get('vanilla.mode'), 'auto');
+      assert.equal(config.inspect('vanilla.mode').defaultValue, 'auto');
       assert.equal(config.get('preview.refreshMode'), 'always');
       assert.equal(config.get('preview.showExternalPrerequisites'), true);
       assert.equal(config.get('preview.showDiagnostics'), true);
@@ -172,12 +172,13 @@ suite('ParadoxCode VS Code extension host', () => {
 
   test('server accessor reports an unavailable client', async () => {
     const { acquireServerClient, setServerClient } = require('../../out/serverClient.js');
+    const previous = await acquireServerClient(5_000).catch(() => undefined);
     setServerClient(undefined);
-    await assert.rejects(
+    try { await assert.rejects(
       acquireServerClient(10),
       (error) => error instanceof Error && error.name === 'ServerUnavailableError'
         && /not running/.test(error.message),
-    );
+    ); } finally { setServerClient(previous); }
   });
 
   test('default mission files keep normal views and decoded-path helpers remain compatible', async () => {
@@ -229,4 +230,60 @@ suite('ParadoxCode VS Code extension host', () => {
       fs.rmSync(path.join(root, 'missions'), { recursive: true, force: true });
     }
   });
+  test('replays completion through the editor after Unicode and CRLF edits', async function () {
+    this.timeout(120_000);
+    const server = process.env.PDC_COMPLETION_SERVER;
+    if (!server) { this.skip(); return; }
+    const root = process.env.PDCLOC_HOST_WORKSPACE;
+    const samples = [];
+    try {
+      const { acquireServerClient } = require('../../out/serverClient.js');
+      await acquireServerClient(30_000);
+      const definition = path.join(root, 'common', 'scripted_effects', 'completion_host.txt');
+      const file = path.join(root, 'events', 'completion_host.txt');
+      fs.mkdirSync(path.dirname(definition), { recursive: true });
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(definition, 'host_embed = { $BODY$ }\n');
+      const source = '# 中文😀\r\ncountry_event = { immediate = { host_embed = { BODY = "add_pre" } } }\r\n'
+        + 'country_event = { immediate = { add_prestige = 1 } }\r\n'.repeat(2000);
+      fs.writeFileSync(file, source);
+      const definitionDocument = await vscode.workspace.openTextDocument(definition);
+      await vscode.window.showTextDocument(definitionDocument);
+      const document = await vscode.workspace.openTextDocument(file);
+      await vscode.window.showTextDocument(document);
+      const offset = source.indexOf('add_pre');
+      let width = 'add_pre'.length;
+      const request = async () => vscode.commands.executeCommand(
+        'vscode.executeCompletionItemProvider', document.uri, document.positionAt(offset + width),
+      );
+      const deadline = Date.now() + 30_000;
+      let initial;
+      do {
+        initial = await request();
+        if (initial?.items.some((item) => (typeof item.label === 'string' ? item.label : item.label.label) === 'add_prestige')) break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } while (Date.now() < deadline);
+      assert.ok(initial?.items.some((item) => (typeof item.label === 'string' ? item.label : item.label.label) === 'add_prestige'));
+      for (let index = 0; index < 30; index++) {
+        const prefix = 'add_prestige'.slice(0, 1 + index % 11);
+        const edit = new vscode.WorkspaceEdit();
+        edit.replace(document.uri, new vscode.Range(document.positionAt(offset), document.positionAt(offset + width)), prefix);
+        const started = performance.now();
+        assert.equal(await vscode.workspace.applyEdit(edit), true);
+        width = prefix.length;
+        const result = await request();
+        const elapsedMs = performance.now() - started;
+        assert.ok(result?.items.some((item) => (typeof item.label === 'string' ? item.label : item.label.label) === 'add_prestige'), `missing completion after edit ${index}`);
+        samples.push({ prefix, elapsedMs, items: result.items.length, version: document.version });
+      }
+      if (process.env.PDC_COMPLETION_REPORT) {
+        fs.mkdirSync(path.dirname(process.env.PDC_COMPLETION_REPORT), { recursive: true });
+        fs.writeFileSync(process.env.PDC_COMPLETION_REPORT, JSON.stringify({ samples, platform: process.platform, vscode: vscode.version, limits: 'Editor command through middleware and LSP; excludes suggest-widget painting.' }, null, 2));
+      }
+    } finally {
+      fs.rmSync(path.join(root, 'events', 'completion_host.txt'), { force: true });
+      fs.rmSync(path.join(root, 'common', 'scripted_effects', 'completion_host.txt'), { force: true });
+    }
+  });
+
 });

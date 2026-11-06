@@ -168,6 +168,10 @@ when comparing revisions. Failed runs cannot leave the prior baseline marked suc
 cargo run --locked -p tools -- perf bench --repeat 3 -- -p engine --bench index_cache --locked
 cargo run --locked -p tools -- perf probe --no-cache
 cargo run --locked -p tools -- perf compare --workspace /path/to/mod --cache /path/to/cache.pdcindex
+cargo run --locked --release -p tools -- perf completion \
+  --workspace /path/to/mod --trace /path/to/completion-trace.json \
+  --server /path/to/paradoxcode --cache /path/to/vanilla.pdcindex \
+  --samples 100 --reindex --output target/performance-results/completion.json
 cargo run --locked -p tools -- perf baseline before --skip-sweep --repeat 3
 cargo run --locked -p tools -- perf ab before --bench-only --repeat 3 --fail-over 10
 cargo run --locked -p tools -- perf profile bench:index_cache --flavor samply
@@ -181,6 +185,25 @@ Benchmark logs, individual runs and medians are retained. A/B rejects mismatched
 inventories and records diagnostic work differences separately. Timings still need repeated
 runs and semantic review. Failed or missing samples remain explicit; unobserved/deduplicated
 publications never become zero-latency measurements.
+
+`perf completion` replays existing files as editor overlays, leaving their disk text untouched.
+The trace is `{"cases":[{"path":"events/example.txt","needle":"add_prestige","occurrence":0}]}`;
+`occurrence` selects the zero-based occurrence of the ASCII token in decoded source. It records
+the first open, repeated settled queries, incremental typing with cancellation, and optional
+overlap with reindexing. `--full-text` instead stresses full-document change notifications.
+Response timestamps are captured by the stdout reader before queued responses are drained.
+P50/P95/P99 use nearest ranks; canceled responses and empty results have separate counts, and
+small-sample P99 is the maximum. The final typing result must match the settled result, and
+unchanged-document responses must agree after removing snapshot revision metadata.
+Optional diagnostic publication waits are bounded by `--publication-timeout-ms` (2 seconds);
+missing publications are recorded. A reindex made obsolete by an edit is recorded explicitly.
+The report includes source/binary hashes, source-root inventory and initialization options.
+
+`tools lsp test` includes an owned Unicode/CRLF completion replay with overlapping edits and
+reindexing. `tools editor test host --server /path/to/paradoxcode` exercises 30 actual VS Code
+completion-provider requests after edits and writes `target/performance-results/editor-completion-host.json`.
+It uses a temporary workspace and profile. This measures the editor command, middleware and
+LSP round trip; suggest-widget painting and native Windows execution require separate measurements.
 
 `perf sweep --cold` uses a new dedicated cache path. Native cache construction is recorded as
 `cache_build_ms`; the report explicitly identifies fresh construction followed by server loading.

@@ -479,7 +479,7 @@ impl AnalysisHost {
         )
     }
 
-    /// Re-lowers every parsed document against one candidate fact set. Overlay definitions can
+    /// Re-lowers parsed overlays against one candidate fact set. Overlay definitions can
     /// affect references and subtype gates in other open documents, so changing the overlay
     /// definition set must update those HIR snapshots atomically as well.
     fn relower_documents_with_overlay_facts(&mut self) {
@@ -1582,11 +1582,12 @@ impl AnalysisHost {
                 received: version,
             });
         }
-        // The staged replacement carries no HIR yet, so overlay resolution
-        // falls back to the index text for this document; definition-derived
-        // entries must move with it when the outgoing text declared anything.
+        // Staging removes the outgoing HIR while keeping its index file
+        // hidden. Further edits to already-staged text change no facts until
+        // a prepared HIR commits, so other overlays need no repeated replay.
         let declares_dynamic_definitions = self.document_declares_dynamic_definitions(current);
-        let contributes_symbol_facts = self.document_contributes_symbol_facts(current);
+        let contributes_symbol_facts =
+            current.hir().is_some() && self.document_contributes_symbol_facts(current);
         let document = staged_overlay_document(id.clone(), version, text, current.path.clone());
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
         if contributes_symbol_facts {

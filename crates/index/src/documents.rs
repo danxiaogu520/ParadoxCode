@@ -257,7 +257,9 @@ impl DocumentSnapshot {
         self.parsed.as_ref()
     }
 
-    /// Returns the HIR built for this exact document version.
+    /// Returns the HIR built for this exact document version. Disk candidates
+    /// retain a frontend across overlay changes; symbol-dependent queries
+    /// must lower it against their current workspace facts.
     #[must_use]
     pub fn hir(&self) -> Option<&HirFile> {
         self.hir.as_deref()
