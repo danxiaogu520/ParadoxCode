@@ -83,6 +83,32 @@ fn analyse_body_with_bindings(
     markers: &[String],
     cancellation: &CancellationToken,
 ) -> Result<Option<std::sync::Arc<BodyAnalysis>>, Cancelled> {
+    analyse_body_with_argument_edit(
+        snapshot,
+        source,
+        invocation,
+        overrides,
+        markers,
+        None,
+        cancellation,
+    )
+}
+
+struct ArgumentEdit {
+    key_range: text::TextRange,
+    value: String,
+    raw: String,
+}
+
+fn analyse_body_with_argument_edit(
+    snapshot: &AnalysisSnapshot,
+    source: &hir::HirFile,
+    invocation: &hir::HirProperty,
+    overrides: &BTreeMap<String, String>,
+    markers: &[String],
+    edit: Option<&ArgumentEdit>,
+    cancellation: &CancellationToken,
+) -> Result<Option<std::sync::Arc<BodyAnalysis>>, Cancelled> {
     let ir = snapshot.ir();
     let Some(field) = source.field_fact_at(invocation.key_range) else {
         return Ok(None);
@@ -118,7 +144,10 @@ fn analyse_body_with_bindings(
     {
         let name = argument.key.to_ascii_lowercase();
         present.insert(name.clone());
-        if let Some(scalar) = &argument.scalar {
+        if let Some(edit) = edit.filter(|edit| edit.key_range == argument.key_range) {
+            bindings.insert(name.clone(), edit.value.clone());
+            raw.insert(name, edit.raw.clone());
+        } else if let Some(scalar) = &argument.scalar {
             bindings.insert(
                 name.clone(),
                 hir::template::binding_value(source.syntax(), scalar),
@@ -1179,6 +1208,7 @@ pub(crate) struct ConsumptionProjection {
     pub(crate) positions: Vec<ConsumedPosition>,
     pub(crate) parameter: String,
     pub(crate) invocation: text::TextRange,
+    argument: text::TextRange,
     scalar: Option<hir::HirScalar>,
     quote_map: Option<parser::QuotedScriptSourceMap>,
     insertion: u32,
@@ -1390,6 +1420,7 @@ pub(crate) fn consumption_at(
                     }],
                     parameter: argument.key.clone(),
                     invocation: invocation.key_range,
+                    argument: argument.key_range,
                     scalar,
                     quote_map,
                     insertion: position,
@@ -1402,6 +1433,7 @@ pub(crate) fn consumption_at(
                 positions,
                 parameter: argument.key.clone(),
                 invocation: invocation.key_range,
+                argument: argument.key_range,
                 scalar,
                 quote_map,
                 insertion: position,
@@ -1411,7 +1443,7 @@ pub(crate) fn consumption_at(
     Ok(None)
 }
 
-/// Rebuilds a candidate in the actual source and checks all related uses without mutating the host.
+/// Rebinds the edited argument and checks all related uses in the original call context.
 pub(crate) fn validate_consumption_edit(
     snapshot: &AnalysisSnapshot,
     input: &crate::support::ParsedInput,
@@ -1421,6 +1453,37 @@ pub(crate) fn validate_consumption_edit(
     cancellation: &CancellationToken,
 ) -> Result<Analysis<hir::analysis::Validation>, Cancelled> {
     use hir::analysis::Validation;
+    cancellation.checkpoint()?;
+    let Some(original) = input.hir.as_deref() else {
+        return Ok(Analysis {
+            value: Validation::Unknown,
+            coverage: Default::default(),
+        });
+    };
+    let Some(invocation) = original.property_at_key_range(projection.invocation) else {
+        return Ok(Analysis {
+            value: Validation::Invalid,
+            coverage: Default::default(),
+        });
+    };
+    // Only the argument's token changes. Keep the caller's schema, scope,
+    // siblings and other bindings rather than lowering the whole file for
+    // every candidate. Nested carriers still pass through the same decoder
+    // and Template instance validation below.
+    let range = projection
+        .scalar
+        .as_ref()
+        .map_or(text::TextRange::empty(projection.insertion), |scalar| {
+            scalar.range
+        });
+    if item.replacement_range.start() < range.start() || item.replacement_range.end() > range.end()
+    {
+        return Ok(Analysis {
+            value: Validation::Invalid,
+            coverage: Default::default(),
+        });
+    }
+    let mut raw = input.source_text(range).unwrap_or_default().to_owned();
     let mut salt = 0;
     let prefix = loop {
         let prefix = format!("__pdc_trial_{}_{}", item.replacement_range.start(), salt);
@@ -1443,15 +1506,16 @@ pub(crate) fn validate_consumption_edit(
             },
         });
     }
-    let mut source = input.source.to_string();
-    source.replace_range(
-        item.replacement_range.start() as usize..item.replacement_range.end() as usize,
+    raw.replace_range(
+        (item.replacement_range.start() - range.start()) as usize
+            ..(item.replacement_range.end() - range.start()) as usize,
         &text,
     );
+    let source = format!("value = {raw}");
     let parsed = match parser::parse_script_bounded(&source, Default::default(), &mut || {
         cancellation.checkpoint()
     })? {
-        Ok(parsed) => std::sync::Arc::new(parsed),
+        Ok(parsed) => parsed,
         Err(limit) => {
             return Ok(Analysis {
                 value: Validation::Unknown,
@@ -1462,36 +1526,42 @@ pub(crate) fn validate_consumption_edit(
             });
         }
     };
-    let Some(path) = input.path.as_ref() else {
+    let scalar = parsed
+        .root()
+        .children()
+        .find(|node| node.kind() == parser::CstKind::Property)
+        .and_then(|node| {
+            node.children()
+                .find(|node| node.kind() == parser::CstKind::Value)
+        })
+        .and_then(|node| {
+            node.children().find(|node| {
+                matches!(
+                    node.kind(),
+                    parser::CstKind::BareValue | parser::CstKind::QuotedString
+                )
+            })
+        });
+    let Some(scalar) = scalar else {
         return Ok(Analysis {
             value: Validation::Unknown,
             coverage: Default::default(),
         });
     };
-    let trial = hir::lower_shared_with_ir_and_facts(
-        parsed,
-        path,
-        snapshot.rules(),
-        snapshot.game_profile(),
-        snapshot.ir(),
-        &WorkspaceFacts { snapshot },
-    );
-    let Some(invocation) = trial
-        .properties()
-        .iter()
-        .find(|property| property.key_range == projection.invocation)
-    else {
-        return Ok(Analysis {
-            value: Validation::Invalid,
-            coverage: Default::default(),
-        });
+    let raw = parsed.text(scalar.range()).unwrap_or_default().to_owned();
+    let value = parser::decode_quoted_script(&raw).map_or_else(|| raw.clone(), |(value, _)| value);
+    let edit = ArgumentEdit {
+        key_range: projection.argument,
+        value,
+        raw,
     };
-    let Some(body) = analyse_body_with_bindings(
+    let Some(body) = analyse_body_with_argument_edit(
         snapshot,
-        &trial,
+        original,
         invocation,
         &BTreeMap::new(),
         &markers,
+        Some(&edit),
         cancellation,
     )?
     else {

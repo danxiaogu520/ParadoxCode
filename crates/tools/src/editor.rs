@@ -488,10 +488,16 @@ pub fn execute(arguments: &[String]) -> Result<String, String> {
                 return Err(errors.join("\n"));
             }
             if group == "host" {
+                let binary = process::server(&root, args.get("--server"))?;
                 process::run(
                     process::command("node")
                         .arg(root.join("editors/vscode/test/host.mjs"))
-                        .env("RUN_VSCODE_HOST_TESTS", "1"),
+                        .env("RUN_VSCODE_HOST_TESTS", "1")
+                        .env("PDC_COMPLETION_SERVER", binary)
+                        .env(
+                            "PDC_COMPLETION_REPORT",
+                            root.join("target/performance-results/editor-completion-host.json"),
+                        ),
                 )?;
             } else {
                 for name in [
