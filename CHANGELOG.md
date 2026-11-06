@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-11-06
+
 ### Fixed
 
 - Completion in large files and quoted script arguments avoids reparsing unrelated text
@@ -1470,7 +1472,10 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.4...v0.5.5
+[0.5.4]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.3...v0.5.4
+[0.5.3]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.2...v0.5.1
 [0.5.0]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.4.2...v0.5.0
