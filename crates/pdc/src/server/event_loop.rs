@@ -18,6 +18,47 @@ fn message_id_label(message: &Value) -> String {
     }
 }
 
+/// Completion requests waiting for a fresh snapshot must not keep cancellation
+/// or newer edits out of the transport. Other queries retain their position in
+/// the edit stream; lifecycle messages also keep their ordered drain semantics.
+fn can_read_past_deferred(messages: &VecDeque<Value>) -> bool {
+    messages.iter().all(|message| {
+        message["method"] == "textDocument/completion"
+            || (is_execute_command_message(message)
+                && matches!(
+                    message["params"]["command"].as_str(),
+                    Some("pdc/reindexWorkspace" | "reindexWorkspace")
+                ))
+    })
+}
+
+fn is_edit_or_cancel_notification(message: &Value) -> bool {
+    message.get("id").is_none()
+        && matches!(
+            message.get("method").and_then(Value::as_str),
+            Some("textDocument/didOpen" | "textDocument/didChange" | "$/cancelRequest")
+        )
+}
+
+fn take_cancelled_deferred_request(
+    notification: &Value,
+    messages: &mut VecDeque<Value>,
+) -> Option<(RequestId, Value)> {
+    if notification["method"] != "$/cancelRequest" {
+        return None;
+    }
+    let id = RequestId::parse(notification.get("params")?.get("id")?).ok()?;
+    let position = messages.iter().position(|message| {
+        message
+            .get("id")
+            .and_then(|value| RequestId::parse(value).ok())
+            .as_ref()
+            == Some(&id)
+    })?;
+    let request = messages.remove(position)?;
+    Some((id, request["id"].clone()))
+}
+
 impl LspServer {
     /// Emits one `pdc/trace` scheduling-decision notification while the client
     /// asked for verbose tracing; a single string compare otherwise.
@@ -304,6 +345,11 @@ impl LspServer {
                         let dependency_load_busy = in_flight_dependency.is_some();
                         let execute_command_busy =
                             background_busy && is_execute_command_message(&message);
+                        let ordered_after_deferred = !deferred_messages.is_empty()
+                            && message.get("method").is_some()
+                            && !is_snapshot_request_message(&message)
+                            && !is_execute_command_message(&message)
+                            && !is_edit_or_cancel_notification(&message);
                         // `exit` terminates the loop immediately and cancels every in-flight
                         // task, so it must wait while a watched-file refresh (or document
                         // parse) is about to republish diagnostics; otherwise the client's
@@ -316,6 +362,7 @@ impl LspServer {
                                 || ((scan_busy || vanilla_load_busy || dependency_load_busy)
                                     && is_snapshot_request_message(&message))
                                 || execute_command_busy
+                                || ordered_after_deferred
                                 || (initialize_busy && !is_initialize_control_message(&message)))
                         {
                             self.trace_decision(
@@ -383,6 +430,17 @@ impl LspServer {
                                     write_message(&mut output, &response)?;
                                 }
                                 cancel_request_from_notification(&message, &in_flight_requests);
+                                if let Some((request_id, id)) = take_cancelled_deferred_request(
+                                    &message,
+                                    &mut deferred_messages,
+                                ) {
+                                    self.cancelled.remove(&request_id);
+                                    write_message(
+                                        &mut output,
+                                        &RpcError::new(REQUEST_CANCELLED, "request was cancelled")
+                                            .response(id),
+                                    )?;
+                                }
                                 cancel_initialize_from_notification(
                                     &message,
                                     in_flight_initialize.as_ref(),
@@ -1603,7 +1661,10 @@ impl LspServer {
                         },
                     )?;
                 }
-                if !reader_active && !draining_shutdown && deferred_messages.is_empty() {
+                if !reader_active
+                    && !draining_shutdown
+                    && can_read_past_deferred(&deferred_messages)
+                {
                     read_sender.send(()).map_err(|_| {
                         LspError::Protocol("LSP transport reader stopped unexpectedly".to_owned())
                     })?;

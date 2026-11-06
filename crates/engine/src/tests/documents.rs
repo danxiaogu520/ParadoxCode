@@ -3,6 +3,128 @@ use text::AbsPath;
 use super::*;
 
 #[test]
+fn staging_an_overlay_does_not_relower_cached_disk_documents() {
+    let root = temp_root("closed-document-staging");
+    fs::create_dir_all(root.join("common/scripted_effects")).unwrap();
+    fs::create_dir_all(root.join("events")).unwrap();
+    fs::write(
+        root.join("common/scripted_effects/defs.txt"),
+        "cached_effect = { add_prestige = 1 }",
+    )
+    .unwrap();
+    let path = root.join("events/cached.txt");
+    let source = "country_event = { immediate = { cached_effect = yes } }";
+    fs::write(&path, source).unwrap();
+    let mut host = eu4_host();
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::Project,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().unwrap();
+    let cached = DocumentId::new("file:///cached/events/cached.txt");
+    host.open_document(
+        cached.clone(),
+        1,
+        source.to_owned(),
+        Some(AbsPath::normalize(&path)),
+    )
+    .unwrap();
+    host.close_document(&cached).unwrap();
+    let disk_hir = host
+        .snapshot()
+        .document(&cached)
+        .unwrap()
+        .hir_handle()
+        .unwrap();
+    assert!(disk_hir.depends_on_symbol_facts());
+    ::index::reset_pipeline_counts();
+    host.stage_open_document(
+        DocumentId::new("file:///cached/events/editing.txt"),
+        1,
+        "country_event = { immediate = { add_pre } }".to_owned(),
+        None,
+    )
+    .unwrap();
+    assert_eq!(
+        ::index::pipeline_counts(),
+        (0, 0),
+        "closed files must not add semantic work to each staged edit"
+    );
+    let view = host.snapshot();
+    let disk = view.document(&cached).unwrap();
+    assert_eq!(disk.source(), DocumentSource::Disk);
+    assert!(Arc::ptr_eq(&disk_hir, &disk.hir_handle().unwrap()));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn successive_unparsed_edits_do_not_repeat_overlay_fact_transactions() {
+    let root = temp_root("coalesced-overlay-facts");
+    fs::create_dir_all(root.join("common/scripted_effects")).unwrap();
+    let path = root.join("common/scripted_effects/defs.txt");
+    let definition = "temporary_effect = { add_prestige = 1 }";
+    fs::write(&path, definition).unwrap();
+    let mut host = eu4_host();
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::Project,
+        AbsPath::normalize(&root),
+    )]));
+    host.refresh_source_roots().unwrap();
+    let owner = DocumentId::new("file:///coalesced/common/scripted_effects/defs.txt");
+    let caller = DocumentId::new("file:///coalesced/events/caller.txt");
+    host.open_document(
+        owner.clone(),
+        1,
+        definition.to_owned(),
+        Some(AbsPath::normalize(&path)),
+    )
+    .unwrap();
+    host.open_document(
+        caller.clone(),
+        1,
+        "country_event = { immediate = { temporary_effect = yes } }".to_owned(),
+        None,
+    )
+    .unwrap();
+    host.stage_document_text(&owner, 2, "renamed_effect = { }".to_owned())
+        .unwrap();
+    assert!(
+        !host
+            .snapshot()
+            .document(&caller)
+            .unwrap()
+            .hir()
+            .unwrap()
+            .references()
+            .iter()
+            .any(|reference| reference.name == "temporary_effect")
+    );
+    ::index::reset_pipeline_counts();
+    host.stage_document_text(&owner, 3, definition.to_owned())
+        .unwrap();
+    assert_eq!(
+        ::index::pipeline_counts(),
+        (0, 0),
+        "already-staged text supplies the same absent facts until preparation commits"
+    );
+    let prepared = host.snapshot().prepare_document(&owner).unwrap();
+    assert!(host.commit_prepared_document(prepared));
+    assert!(
+        host.snapshot()
+            .document(&caller)
+            .unwrap()
+            .hir()
+            .unwrap()
+            .references()
+            .iter()
+            .any(|reference| reference.name == "temporary_effect")
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn overlay_definition_open_and_close_relower_other_overlay_references() {
     let root = temp_root("overlay-ir-facts");
     let scripted = root.join("common/scripted_effects");

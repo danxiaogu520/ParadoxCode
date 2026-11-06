@@ -94,13 +94,14 @@ fn readers(
     documents
         .iter()
         .filter(|(_, doc)| {
-            doc.fact_dependencies.iter().any(|read| {
-                if read.name.is_none() {
-                    kinds.contains(read.kind.as_str())
-                } else {
-                    wildcard.contains(read.kind.as_str()) || changed.contains(read)
-                }
-            })
+            doc.source == DocumentSource::Overlay
+                && doc.fact_dependencies.iter().any(|read| {
+                    if read.name.is_none() {
+                        kinds.contains(read.kind.as_str())
+                    } else {
+                        wildcard.contains(read.kind.as_str()) || changed.contains(read)
+                    }
+                })
         })
         .map(|(id, _)| id.clone())
         .collect()
@@ -171,6 +172,12 @@ pub fn stabilize_overlay_facts(
     let mut report = OverlayFactReport::default();
     let mut failed = false;
     for (id, doc) in &mut base {
+        // Closed/disk candidates retain syntax for on-demand queries. They
+        // supply no overlay facts, and rebuilding them here makes each edit
+        // pay for every document the editor has ever opened.
+        if doc.source != DocumentSource::Overlay {
+            continue;
+        }
         if cancellation.checkpoint().is_err() {
             failed = true;
             break;
@@ -275,7 +282,10 @@ pub fn stabilize_overlay_facts(
     }
     if failed {
         report.coverage.limits.insert(AnalysisLimit::FactStability);
-        for doc in base.values_mut() {
+        for doc in base
+            .values_mut()
+            .filter(|doc| doc.source == DocumentSource::Overlay)
+        {
             doc.fact_coverage.merge(&report.coverage);
             if let Some(hir) = &mut doc.hir {
                 let hir = Arc::make_mut(hir);

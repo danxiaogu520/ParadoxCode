@@ -664,6 +664,235 @@ fn quoted_script_completion_distinguishes_keys_values_and_escapes_snippets() {
 }
 
 #[test]
+fn quoted_script_completion_does_not_reparse_unrelated_events_per_candidate() {
+    let mut host = eu4_host(game::eu4::runtime_rules().unwrap());
+    host.open_document(
+        DocumentId::new("file:///tmp/common/scripted_effects/completion-latency.txt"),
+        1,
+        "embedded = { $BODY$ }".to_owned(),
+        None,
+    )
+    .unwrap();
+    let id = DocumentId::new("file:///tmp/events/completion-latency.txt");
+    let mut source =
+        r#"country_event = { immediate = { embedded = { BODY = "add_pre" } } }"#.to_owned();
+    let position = (source.find("add_pre").unwrap() + "add_pre".len()) as u32;
+    source.push_str(&"\ncountry_event = { immediate = { add_prestige = 1 } }".repeat(2_000));
+    host.open_document(id.clone(), 1, source, None).unwrap();
+    // Parsing the unrelated events again consumes this allowance even for a
+    // single candidate. Argument-local trials leave it available to the
+    // Template interpreter and its validation of all uses of BODY.
+    let cancellation = CancellationToken::cancel_after(8_000);
+    let result = complete_with_cancellation(&host.snapshot(), &id, position, &cancellation)
+        .expect("a parameter edit must not reparse the surrounding file per candidate");
+    let item = result
+        .items
+        .iter()
+        .find(|item| item.label == "add_prestige")
+        .expect("semantic script completion");
+    assert!(item.template_evidence.is_some());
+    assert!(!cancellation.is_cancelled());
+}
+
+#[test]
+fn quoted_script_completion_rebinds_only_the_edited_argument() {
+    let mut host = eu4_host(game::eu4::runtime_rules().unwrap());
+    host.open_document(
+        DocumentId::new("file:///tmp/common/scripted_effects/argument-trials.txt"),
+        1,
+        "embedded = { $BODY$ } both_scopes = { $BODY$ capital = { $BODY$ } }".to_owned(),
+        None,
+    )
+    .unwrap();
+    // Bare tokens become quoted script arguments when a statement/snippet is
+    // inserted. Duplicate names retain source order.
+    for (index, arguments, expected) in [
+        (0, "BODY = @", false),
+        (1, "BODY = add_pre@", true),
+        (2, "BODY = \"add_pre@\"", true),
+        (3, "BODY = \"add_pre@\" BODY = \"add_stability = 1\"", false),
+        (4, "BODY = \"add_stability = 1\" BODY = \"add_pre@\"", true),
+    ] {
+        let position = arguments.find('@').unwrap();
+        let arguments = arguments.replace('@', "");
+        let prefix = "country_event = { immediate = { embedded = { ";
+        let source = format!("{prefix}{arguments} }} }} }}");
+        let id = DocumentId::new(format!("file:///tmp/events/argument-trial-{index}.txt"));
+        host.open_document(id.clone(), 1, source, None).unwrap();
+        let result = complete(&host.snapshot(), &id, (prefix.len() + position) as u32);
+        assert_eq!(
+            result.items.iter().any(|item| item.label == "add_prestige"),
+            expected,
+            "case {index}: {result:?}"
+        );
+    }
+    let source = r#"country_event = { immediate = { both_scopes = { BODY = "add_pre" } } }"#;
+    let id = DocumentId::new("file:///tmp/events/argument-trial-scopes.txt");
+    host.open_document(id.clone(), 1, source.to_owned(), None)
+        .unwrap();
+    let result = complete(
+        &host.snapshot(),
+        &id,
+        (source.find("add_pre").unwrap() + 7) as u32,
+    );
+    assert!(
+        !result.items.iter().any(|item| item.label == "add_prestige"),
+        "the edited argument must be valid at every consumption site: {result:?}"
+    );
+}
+
+#[test]
+fn quoted_script_completion_preserves_unicode_crlf_and_nested_carrier_edits() {
+    for newline in ["\n", "\r\n"] {
+        for depth in 0..4 {
+            for unfinished in [false, true] {
+                let mut payload = format!(r"# 中文😀 \\\ path{newline}foo = y{newline}");
+                for _ in 0..depth {
+                    payload = format!(
+                        "nested = {{ BODY = \"{}\" }}",
+                        parser::encode_quoted_script_text(&payload)
+                    );
+                }
+                let encoded = parser::encode_quoted_script_text(&payload);
+                let mut source =
+                    format!("# 中文😀{newline}trigger = {{ embedded = {{ BODY = \"{encoded}");
+                if !unfinished {
+                    source.push_str("\" } }");
+                }
+                let position = (source.find("foo = y").unwrap() + "foo = y".len()) as u32;
+                let (mut host, id) = quoted_script_snapshot(&source);
+                let result = complete(&host.snapshot(), &id, position);
+                let item = result
+                    .items
+                    .iter()
+                    .find(|item| item.label == "yes")
+                    .expect("nested boolean completion");
+                assert!(source.is_char_boundary(item.replacement_range.start() as usize));
+                assert!(source.is_char_boundary(item.replacement_range.end() as usize));
+                assert_eq!(
+                    &source[item.replacement_range.start() as usize
+                        ..item.replacement_range.end() as usize],
+                    "y"
+                );
+                if !unfinished {
+                    source.replace_range(
+                        item.replacement_range.start() as usize
+                            ..item.replacement_range.end() as usize,
+                        &item.insert_text,
+                    );
+                    host.apply_document_changes(&id, 2, &[engine::TextChange::full(source)])
+                        .unwrap();
+                    assert!(
+                        !diagnostics(&host.snapshot(), &id)
+                            .iter()
+                            .any(|finding| matches!(
+                                finding.code,
+                                DiagnosticCode::Syntax
+                                    | DiagnosticCode::InvalidValue
+                                    | DiagnosticCode::UnknownKey
+                            ))
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn quoted_script_completion_bounds_edits_for_generated_damaged_utf8_inputs() {
+    let fragments = [
+        "fo",
+        "foo = y",
+        "foo = ",
+        "foo = {",
+        "$",
+        "# 中文😀\r\nfoo = n",
+        "foo = \"no",
+        "nested = { BODY = ",
+    ];
+    let mut seed = 0x517c_c1b7_u32;
+    for index in 0..128 {
+        seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        let fragment = fragments[seed as usize % fragments.len()];
+        let mut payload = fragment.to_owned();
+        for _ in 0..((seed >> 8) % 4) {
+            payload = format!(
+                "nested = {{ BODY = \"{}\" }}",
+                parser::encode_quoted_script_text(&payload)
+            );
+        }
+        let encoded = parser::encode_quoted_script_text(&payload);
+        let source = format!(
+            "# 中文😀\\\\{index}\r\ntrigger = {{ embedded = {{ BODY = \"{encoded}{}",
+            if seed & 1 == 0 { "\" } }" } else { "" }
+        );
+        let cursor = source
+            .find(fragment)
+            .map(|offset| offset + fragment.len())
+            .unwrap_or(source.len());
+        let (host, id) = quoted_script_snapshot(&source);
+        let result = complete_with_cancellation(
+            &host.snapshot(),
+            &id,
+            cursor as u32,
+            &CancellationToken::cancel_after(50_000),
+        )
+        .expect("bounded generated editing input");
+        for item in result.items {
+            let range =
+                item.replacement_range.start() as usize..item.replacement_range.end() as usize;
+            assert!(
+                source.get(range.clone()).is_some(),
+                "invalid UTF-8 edit for seed {seed}"
+            );
+            let mut applied = source.clone();
+            applied.replace_range(range, &crate::snippet_plain_text(&item.insert_text));
+            let _ = parser::parse(parser::FileFormat::Script, &applied);
+        }
+    }
+}
+
+#[test]
+fn consumed_script_completes_an_existing_block_key_inside_a_loop() {
+    for definition in [
+        "loop_body = { $BODY$ }",
+        "loop_body = { hidden_effect = { $BODY$ } }",
+        "loop_body = { hidden_effect = { set_variable = { which = TestLoopCounter value = $COUNT$ } while = { limit = { check_variable = { which = TestLoopCounter value = 1 } } $BODY$ subtract_variable = { which = TestLoopCounter value = 1 } } } }",
+    ] {
+        let mut host = eu4_host(game::eu4::runtime_rules().unwrap());
+        host.open_document(
+            DocumentId::new("file:///tmp/common/religions/loop-completion.txt"),
+            1,
+            "test_group = { shiite = { } }".to_owned(),
+            None,
+        )
+        .unwrap();
+        host.open_document(
+            DocumentId::new("file:///tmp/common/scripted_effects/loop-completion.txt"),
+            1,
+            definition.to_owned(),
+            None,
+        )
+        .unwrap();
+        let source = r#"country_event = { immediate = { loop_body = { COUNT = 1 BODY = "random_owned_province = { limit = { religion = shiite } spawn_rebels = { type = religious_rebels size = 1 } }" } } }"#
+            .replace("COUNT = 1", if definition.contains("$COUNT$") { "COUNT = 1" } else { "" });
+        for key in ["spawn_rebels", "spawn_reb"] {
+            let source = source.replace("spawn_rebels", key);
+            let id = DocumentId::new(format!("file:///tmp/events/loop-completion-{key}.txt"));
+            host.open_document(id.clone(), 1, source.clone(), None)
+                .unwrap();
+            let position = (source.find(key).unwrap() + key.len()) as u32;
+            let result = complete(&host.snapshot(), &id, position);
+            assert!(
+                result.items.iter().any(|item| item.label == "spawn_rebels"),
+                "{definition}\n{result:#?}\n{:?}",
+                diagnostics(&host.snapshot(), &id)
+            );
+        }
+    }
+}
+
+#[test]
 fn quoted_script_completion_survives_incomplete_payload_syntax() {
     let text = "trigger = { embedded = { BODY = \"\n foo = \n";
     let (host, id) = quoted_script_snapshot(text);
