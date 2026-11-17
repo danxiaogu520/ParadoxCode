@@ -614,8 +614,12 @@ impl FlagWriteIndex {
         if self.open {
             return FlagWriteMembership::Open;
         }
-        let lowered = member.to_ascii_lowercase();
-        if self.literals.contains(lowered.as_str()) {
+        let lowered = if member.bytes().any(|byte| byte.is_ascii_uppercase()) {
+            std::borrow::Cow::Owned(member.to_ascii_lowercase())
+        } else {
+            std::borrow::Cow::Borrowed(member)
+        };
+        if self.literals.contains(lowered.as_ref()) {
             return FlagWriteMembership::Literal;
         }
         if self.patterns.iter().any(|(prefix, suffix)| {
@@ -746,6 +750,8 @@ pub struct WorkspaceIndex {
     /// Nested so lookups probe with borrowed strings: kind spellings as written, folded
     /// names inside. Nested BTree iteration preserves the previous `(kind, name)` order.
     definitions: BTreeMap<Box<str>, BTreeMap<Box<str>, Vec<DefinitionPointer>>>,
+    /// Only buckets containing generated names; membership probes avoid a full index walk.
+    pattern_keys: BTreeSet<(Box<str>, Box<str>)>,
     /// Lowercased dynamic kind -> write-site view for flag-style membership.
     flag_writes: BTreeMap<Box<str>, FlagWriteIndex>,
     /// Cached UTF-16 positions for files whose source text is not retained, such as Vanilla.
@@ -869,6 +875,13 @@ impl WorkspaceIndex {
                 self.definition_at(*pointer)
                     .map(|definition| (definition, pointer.active))
             })
+    }
+
+    /// Generated-name definitions with the same live priority state as ordinary lookup.
+    pub fn pattern_definition_identities(&self) -> impl Iterator<Item = (&Definition, bool)> {
+        self.pattern_keys
+            .iter()
+            .flat_map(|(kind, name)| self.definitions_with_state_iter(kind, name))
     }
 
     /// Returns the name folding applied by definition lookups: symbol names are
@@ -1161,6 +1174,9 @@ impl WorkspaceIndex {
         let mut affected = self.remove_shard_entries(file_id);
         for (ordinal, definition) in shard.definitions.iter().enumerate() {
             let key = self.definition_key(definition);
+            if definition.name.contains('$') {
+                self.pattern_keys.insert(key.clone());
+            }
             self.definitions
                 .entry(key.0.clone())
                 .or_default()
@@ -1203,6 +1219,7 @@ impl WorkspaceIndex {
                 });
             if remove_bucket && let Some(by_name) = self.definitions.get_mut(key.0.as_ref()) {
                 by_name.remove(key.1.as_ref());
+                self.pattern_keys.remove(key);
                 if by_name.is_empty() {
                     self.definitions.remove(key.0.as_ref());
                 }
@@ -1280,12 +1297,17 @@ impl WorkspaceIndex {
         cancellation: &WorkspaceScanToken,
     ) -> Result<(), WorkspaceError> {
         self.definitions.clear();
+        self.pattern_keys.clear();
         self.flag_writes.clear();
         for (file_id, shard) in &self.shards {
             cancellation.checkpoint()?;
             for (ordinal, definition) in shard.definitions.iter().enumerate() {
                 cancellation.checkpoint()?;
                 let (kind_key, name_key) = self.definition_key(definition);
+                if definition.name.contains('$') {
+                    self.pattern_keys
+                        .insert((kind_key.clone(), name_key.clone()));
+                }
                 self.definitions
                     .entry(kind_key)
                     .or_default()
@@ -1348,5 +1370,63 @@ impl WorkspaceIndex {
             Box::from(definition.kind.as_ref()),
             Box::from(folded.as_ref()),
         )
+    }
+}
+
+#[cfg(test)]
+mod pattern_tests {
+    use super::*;
+
+    fn shard(id: u64, names: &[&str]) -> FileIndexShard {
+        let file_id = SourceFileId::new(id);
+        FileIndexShard {
+            file_id,
+            definitions: names
+                .iter()
+                .enumerate()
+                .map(|(i, name)| Definition {
+                    kind: "flag".into(),
+                    name: (*name).into(),
+                    file_id,
+                    range: TextRange::empty(i as u32),
+                    selection_range: TextRange::empty(i as u32),
+                    active: true,
+                })
+                .collect(),
+            references: vec![],
+            dynamic_definitions: vec![],
+            definition_attributes: vec![],
+            flag_writes: vec![],
+            syntax_error_count: 0,
+            reference_coverage_known: true,
+        }
+    }
+    fn assert_equivalent(index: &WorkspaceIndex) {
+        let expected = index
+            .definition_identities()
+            .filter(|(d, _)| d.name.contains('$'))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            index.pattern_definition_identities().collect::<Vec<_>>(),
+            expected
+        );
+    }
+    #[test]
+    fn generated_buckets_follow_replacement_removal_and_priority_resolution() {
+        let mut index = WorkspaceIndex::from_shards([
+            shard(1, &["plain", "FLAG_$who$", "last"]),
+            shard(2, &["flag_$who$", "other_$id$"]),
+        ]);
+        let priorities = BTreeMap::from([(SourceFileId::new(1), 1), (SourceFileId::new(2), 2)]);
+        assert_equivalent(&index);
+        index.resolve_priorities(&priorities);
+        assert_equivalent(&index);
+        index.replace_shard_resolved(Arc::new(shard(2, &["ordinary", "new_$id$"])), &priorities);
+        assert_equivalent(&index);
+        index.remove_shard_resolved(SourceFileId::new(1), &priorities);
+        assert_equivalent(&index);
+        index.replace_shard(shard(2, &["ordinary"]));
+        assert_equivalent(&index);
+        assert!(index.pattern_definition_identities().next().is_none());
     }
 }

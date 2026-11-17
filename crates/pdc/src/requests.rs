@@ -8,7 +8,7 @@ use game::mission::Severity;
 use game::mission::geometry::{self, ArrowGlyph};
 use ide::{
     CancellationToken, Cancelled, CompletionKind, LocalisationKeyMatch, SemanticToken,
-    SemanticTokenType, complete_with_cancellation, completion_resolve,
+    SemanticTokenType, complete_for_protocol_with_cancellation, completion_resolve,
     definition_with_cancellation, document_symbols_with_cancellation, hover_with_cancellation,
     localisation_search_page_with_cancellation, localisation_values_by_key,
     prepare_rename_with_cancellation, quick_fixes_with_cancellation, references_with_cancellation,
@@ -1392,8 +1392,13 @@ impl SnapshotRequestContext {
 
     fn completion(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let (id, position) = self.document_position(params)?;
-        let result = complete_with_cancellation(&self.snapshot, &id, position, &self.cancellation)
-            .map_err(cancelled_error)?;
+        let result = complete_for_protocol_with_cancellation(
+            &self.snapshot,
+            &id,
+            position,
+            &self.cancellation,
+        )
+        .map_err(cancelled_error)?;
         let document = self
             .snapshot
             .document(&id)
@@ -2384,10 +2389,8 @@ mod pagination_tests {
                 .as_array()
                 .unwrap()
                 .iter()
-                .any(|item| item["path"]
-                    .as_str()
-                    .unwrap()
-                    .ends_with("events/outside_profile.md"))
+                .any(|item| std::path::Path::new(item["path"].as_str().unwrap())
+                    .ends_with(std::path::Path::new("events").join("outside_profile.md")))
         );
         let files = query.dispatch("pdc/workspaceFiles", None).unwrap();
         assert!(

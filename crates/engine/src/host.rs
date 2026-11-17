@@ -48,6 +48,7 @@ pub struct AnalysisHost {
     roots: Arc<[SourceRoot]>,
     workspace_root: Option<AbsPath>,
     documents: Arc<BTreeMap<DocumentId, DocumentSnapshot>>,
+    prepared_bases: Arc<BTreeMap<DocumentId, PreparedDocument>>,
     source_files: Arc<BTreeMap<SourceFileId, SourceFile>>,
     source_file_paths: Arc<HashMap<AbsPath, SourceFileId>>,
     file_states: Arc<BTreeMap<SourceFileId, Arc<FileState>>>,
@@ -120,6 +121,7 @@ impl AnalysisHost {
             roots: Arc::from([]),
             workspace_root: None,
             documents: Arc::new(BTreeMap::new()),
+            prepared_bases: Arc::default(),
             source_files: Arc::new(BTreeMap::new()),
             source_file_paths: Arc::new(HashMap::new()),
             file_states: Arc::new(BTreeMap::new()),
@@ -483,9 +485,11 @@ impl AnalysisHost {
     /// affect references and subtype gates in other open documents, so changing the overlay
     /// definition set must update those HIR snapshots atomically as well.
     fn relower_documents_with_overlay_facts(&mut self) {
-        if self.ir.files.is_empty() {
-            return;
-        }
+        self.relower_documents_with_overlay_replay(None);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn audit_full_overlay_replay(&mut self) {
         let excluded = overlay_source_file_ids(&self.documents, &self.source_files);
         let transaction = index::stabilize_overlay_facts(
             &self.documents,
@@ -497,6 +501,27 @@ impl AnalysisHost {
             &excluded,
             Default::default(),
             &WorkspaceScanToken::new(),
+        );
+        self.documents = Arc::new(transaction.documents);
+    }
+
+    fn relower_documents_with_overlay_replay(&mut self, replay: Option<index::OverlayReplay>) {
+        if self.ir.files.is_empty() {
+            return;
+        }
+        let excluded = overlay_source_file_ids(&self.documents, &self.source_files);
+        let transaction = index::stabilize_overlay_facts_with_memo(
+            &self.documents,
+            &self.rules,
+            &self.profile,
+            &self.ir,
+            &self.roots,
+            &self.index,
+            &excluded,
+            Default::default(),
+            &WorkspaceScanToken::new(),
+            Some(self.snapshot().shared_template_memo()),
+            replay,
         );
         self.documents = Arc::new(transaction.documents);
     }
@@ -1589,9 +1614,17 @@ impl AnalysisHost {
         let contributes_symbol_facts =
             current.hir().is_some() && self.document_contributes_symbol_facts(current);
         let document = staged_overlay_document(id.clone(), version, text, current.path.clone());
+        let mut affected = index::affected_overlay_fact_readers(
+            &self.documents,
+            &current.hir().into_iter().collect::<Vec<_>>(),
+        );
+        affected.insert(id.clone());
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
         if contributes_symbol_facts {
-            self.relower_documents_with_overlay_facts();
+            self.relower_documents_with_overlay_replay(Some(index::OverlayReplay {
+                affected,
+                prepared_base: None,
+            }));
         }
         self.advance_document_revision();
         if declares_dynamic_definitions {
@@ -1619,9 +1652,23 @@ impl AnalysisHost {
         let declares_dynamic_definitions =
             self.document_declares_dynamic_definitions(&prepared.document);
         let contributes_symbol_facts = self.document_contributes_symbol_facts(&prepared.document);
+        let mut affected = index::affected_overlay_fact_readers(
+            &self.documents,
+            &prepared.document.hir().into_iter().collect::<Vec<_>>(),
+        );
+        affected.insert(id.clone());
+        let prepared_base = prepared
+            .has_base_hir(&self.ir, &self.rules, &self.profile, &self.roots)
+            .then(|| id.clone());
+        if prepared_base.is_some() {
+            Arc::make_mut(&mut self.prepared_bases).insert(id.clone(), prepared.clone());
+        }
         Arc::make_mut(&mut self.documents).insert(id, prepared.document);
         if contributes_symbol_facts || !self.ir.files.is_empty() {
-            self.relower_documents_with_overlay_facts();
+            self.relower_documents_with_overlay_replay(Some(index::OverlayReplay {
+                affected,
+                prepared_base,
+            }));
         }
         // Only the overlay document map changes here, so index-derived cache
         // entries stay valid; a full advance would wipe them on every
@@ -1704,6 +1751,7 @@ impl AnalysisHost {
 
     /// Closes an overlay and restores its current disk candidate when available.
     pub fn close_document(&mut self, id: &DocumentId) -> Result<(), DocumentError> {
+        Arc::make_mut(&mut self.prepared_bases).remove(id);
         let Some(current) = self.documents.get(id) else {
             return Err(DocumentError::NotOpen(id.clone()));
         };
@@ -1847,6 +1895,7 @@ impl AnalysisHost {
             roots: Arc::clone(&self.roots),
             workspace_root: self.workspace_root.clone(),
             documents: Arc::clone(&self.documents),
+            prepared_bases: Arc::clone(&self.prepared_bases),
             source_files: Arc::clone(&self.source_files),
             source_file_paths: Arc::clone(&self.source_file_paths),
             file_states: Arc::clone(&self.file_states),

@@ -296,22 +296,23 @@ pub enum HirReferenceOrigin {
 }
 
 /// A lowered file handle.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct HirFile {
+    pub(super) symbol_reads: Option<Arc<crate::memo_facts::Receipts>>,
     pub(super) analysis_coverage: crate::analysis::AnalysisCoverage,
     pub(super) overload_facts: Vec<crate::block_checking::OverloadFact>,
     pub(super) syntax: Arc<ParsedFile>,
     pub(super) scope: Scope,
-    pub(super) properties: Vec<HirProperty>,
-    pub(super) localisation_entries: Vec<HirLocalisationEntry>,
-    pub(super) bare_values: Vec<HirScalar>,
+    pub(super) properties: Arc<Vec<HirProperty>>,
+    pub(super) localisation_entries: Arc<Vec<HirLocalisationEntry>>,
+    pub(super) bare_values: Arc<Vec<HirScalar>>,
     pub(super) definitions: Vec<HirDefinition>,
     pub(super) references: Vec<HirReference>,
     pub(super) scope_facts: Vec<ScopeFact>,
     pub(super) schema_facts: Vec<SchemaFact>,
     pub(super) field_facts: Vec<FieldFact>,
-    pub(super) unknown_constructs: Vec<HirUnknownConstruct>,
-    pub(super) parameter_conditionals: Vec<HirParameterConditional>,
+    pub(super) unknown_constructs: Arc<Vec<HirUnknownConstruct>>,
+    pub(super) parameter_conditionals: Arc<Vec<HirParameterConditional>>,
     pub(super) parameter_definitions: Vec<HirParameterDefinition>,
     pub(super) parameter_references: Vec<HirParameterReference>,
     pub(super) dynamic_templates: Vec<Template>,
@@ -322,7 +323,47 @@ pub struct HirFile {
     pub(super) runtime_parameter_guards: Vec<(TextRange, Option<TextRange>)>,
 }
 
+// Read receipts are reuse metadata. A memo hit can record a smaller read set
+// than a cold evaluation while producing the same semantic model.
+impl PartialEq for HirFile {
+    fn eq(&self, other: &Self) -> bool {
+        self.analysis_coverage == other.analysis_coverage
+            && self.overload_facts == other.overload_facts
+            && self.syntax == other.syntax
+            && self.scope == other.scope
+            && self.properties == other.properties
+            && self.localisation_entries == other.localisation_entries
+            && self.bare_values == other.bare_values
+            && self.definitions == other.definitions
+            && self.references == other.references
+            && self.scope_facts == other.scope_facts
+            && self.schema_facts == other.schema_facts
+            && self.field_facts == other.field_facts
+            && self.unknown_constructs == other.unknown_constructs
+            && self.parameter_conditionals == other.parameter_conditionals
+            && self.parameter_definitions == other.parameter_definitions
+            && self.parameter_references == other.parameter_references
+            && self.dynamic_templates == other.dynamic_templates
+            && self.definition_attributes == other.definition_attributes
+            && self.uses_ir == other.uses_ir
+            && self.symbol_facts_dependency == other.symbol_facts_dependency
+            && self.binding_references == other.binding_references
+            && self.runtime_parameter_guards == other.runtime_parameter_guards
+    }
+}
+impl Eq for HirFile {}
+
 impl HirFile {
+    /// Checks whether a model lowered under the same source/rules context can
+    /// be reused with a new immutable facts view. Negative reads are checked too.
+    pub fn symbol_facts_match(&self, facts: &dyn rules::ir::SymbolFacts) -> bool {
+        self.symbol_reads.as_ref().is_some_and(|reads| {
+            reads
+                .validate_and_replay(facts, &mut || Ok::<(), std::convert::Infallible>(()))
+                .expect("infallible checkpoint")
+        })
+    }
+
     /// Correlated whole-container overload selections and unresolved alternatives.
     pub fn overload_facts(&self) -> &[crate::block_checking::OverloadFact] {
         &self.overload_facts

@@ -30,8 +30,8 @@ pub use texture::{
 pub use index::{
     Definition, DocumentSnapshot, DynamicDefinitionSummary, DynamicParameterSignature,
     FileIndexShard, FileState, FlagWrite, FlagWriteIndex, FlagWriteMembership,
-    LocalisationPreviewMap, LocalisationPreviewMapIter, ParsedSource, PositionMap, PositionMapIter,
-    PreparedDocument, Reference, WorkspaceIndex,
+    LocalisationPreviewMap, LocalisationPreviewMapIter, OverlaySymbols, ParsedSource, PositionMap,
+    PositionMapIter, PreparedDocument, Reference, WorkspaceIndex,
 };
 pub use index_cache::{IndexCache, IndexCacheError, IndexCacheMetadata};
 pub use vfs::{

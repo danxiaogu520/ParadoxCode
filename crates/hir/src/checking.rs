@@ -53,11 +53,12 @@ pub fn field_candidates_with_context(
     facts: &dyn SymbolFacts,
     context: &impl QueryContext,
 ) -> Vec<rules::ir::FieldId> {
-    let mut candidates = ir.lookup(schema, key, shape).collect::<Vec<_>>();
-    let exact=candidates.iter().copied().filter(|id|matches!(ir.matcher(ir.field(*id).key),Matcher::Literal(name) if ir.strings().resolve(*name).eq_ignore_ascii_case(key))).collect::<Vec<_>>();
-    if !exact.is_empty() {
-        candidates = exact;
-    }
+    let exact = ir.lookup_exact(schema, key, shape).filter(|id| matches!(ir.matcher(ir.field(*id).key), Matcher::Literal(name) if ir.strings().resolve(*name).eq_ignore_ascii_case(key))).collect::<Vec<_>>();
+    let mut candidates = if exact.is_empty() {
+        ir.lookup(schema, key, shape).collect::<Vec<_>>()
+    } else {
+        exact
+    };
     candidates.retain(|id| {
         scalar_outcome_with_context(ir, ir.field(*id).key, key, facts, context).0 != Some(false)
     });
@@ -855,7 +856,7 @@ pub fn check_fragment<E>(
                 }
                 continue;
             }
-            if ir.fields(parent.schema).into_iter().any(|id| {
+            if ir.lookup_key(parent.schema, &property.key).any(|id| {
                 scalar_outcome_with_context(
                     ir,
                     ir.field(id).key,
@@ -869,7 +870,7 @@ pub fn check_fragment<E>(
                 coverage.residuals.insert(ResidualReason::Interpretation);
                 continue;
             }
-            let recognized = ir.fields(parent.schema).into_iter().any(|id| {
+            let recognized = ir.lookup_key(parent.schema, &property.key).any(|id| {
                 scalar_outcome_with_context(
                     ir,
                     ir.field(id).key,
@@ -1080,14 +1081,8 @@ pub fn check_fragment<E>(
                 container: context.range,
             });
         }
-        let mut families = std::collections::BTreeMap::<usize, Vec<rules::ir::FieldId>>::new();
-        for id in ir.fields(context.schema) {
-            families
-                .entry(ir.field(id).key.index())
-                .or_default()
-                .push(id);
-        }
-        for ids in families.values() {
+        let families = crate::cardinality::families(ir, context.schema);
+        for ids in families.iter() {
             let minimum = ids
                 .iter()
                 .map(|id| ir.field(*id).card.min)

@@ -16,6 +16,15 @@ pub fn template_key_type(
     checkpoint: &mut dyn FnMut() -> bool,
 ) -> Option<crate::ir::TypeId> {
     let template = ir.trait_by_name("Template")?;
+    // Most field keys are literal matchers. They cannot call a Template and
+    // need no traversal stack.
+    if !matches!(
+        ir.matcher(matcher),
+        crate::ir::Matcher::Ref(crate::ir::RefTarget::Type { .. }) | crate::ir::Matcher::Union(_)
+    ) {
+        let _ = checkpoint();
+        return None;
+    }
     let root = [matcher];
     let mut pending = vec![root.iter()];
     while let Some(items) = pending.last_mut() {
@@ -149,8 +158,9 @@ pub struct TemplateMemo {
 }
 #[derive(Default)]
 struct TemplateMemoState {
-    entries: std::collections::HashMap<String, Arc<dyn Any + Send + Sync>>,
+    entries: std::collections::HashMap<String, (Arc<dyn Any + Send + Sync>, usize)>,
     bytes: usize,
+    evictions: usize,
 }
 impl Default for TemplateMemo {
     fn default() -> Self {
@@ -161,6 +171,19 @@ impl Default for TemplateMemo {
     }
 }
 impl TemplateMemo {
+    /// Entry count, estimated retained bytes and wholesale evictions.
+    pub fn statistics(&self) -> (usize, usize, usize) {
+        self.state.lock().map_or((0, 0, 0), |state| {
+            (state.entries.len(), state.bytes, state.evictions)
+        })
+    }
+    /// Creates an explicitly byte-bounded memo for a longer-lived fact cache.
+    pub fn with_max_bytes(max_bytes: usize) -> Self {
+        Self {
+            state: Mutex::new(Default::default()),
+            max_bytes,
+        }
+    }
     /// Reads a typed, proven reusable result from this immutable view.
     pub fn get<T: Any + Send + Sync>(&self, key: &str) -> Option<Arc<T>> {
         self.state
@@ -168,6 +191,7 @@ impl TemplateMemo {
             .ok()?
             .entries
             .get(key)?
+            .0
             .clone()
             .downcast()
             .ok()
@@ -184,9 +208,31 @@ impl TemplateMemo {
         if state.bytes.saturating_add(cost) > self.max_bytes {
             state.entries.clear();
             state.bytes = 0;
+            state.evictions += 1;
         }
         state.bytes = state.bytes.saturating_add(cost);
-        state.entries.insert(key, value);
+        state.entries.insert(key, (value, cost));
+    }
+
+    /// Replaces a dependency-validated entry after its fact receipts changed.
+    pub fn replace<T: Any + Send + Sync>(&self, key: String, value: Arc<T>, bytes: usize) {
+        let Ok(mut state) = self.state.lock() else {
+            return;
+        };
+        let cost = bytes.saturating_add(key.len());
+        if cost > self.max_bytes {
+            return;
+        }
+        if let Some((_, old_cost)) = state.entries.remove(&key) {
+            state.bytes = state.bytes.saturating_sub(old_cost);
+        }
+        if state.bytes.saturating_add(cost) > self.max_bytes {
+            state.entries.clear();
+            state.bytes = 0;
+            state.evictions += 1;
+        }
+        state.bytes = state.bytes.saturating_add(cost);
+        state.entries.insert(key, (value, cost));
     }
 }
 

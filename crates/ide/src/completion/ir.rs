@@ -4,7 +4,9 @@ use crate::types::{CancellationToken, Cancelled, CompletionItem, CompletionKind}
 use engine::AnalysisSnapshot;
 use hir::analysis::{Analysis, AnalysisCoverage, AnalysisLimit};
 use rules::ir::{FieldId, FieldValue, Matcher, MatcherId, RefTarget, Shape};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, VecDeque};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use text::{TextRange, TextSize};
 
 pub(crate) fn try_ir_completion(
@@ -13,8 +15,25 @@ pub(crate) fn try_ir_completion(
     position: TextSize,
     cancellation: &CancellationToken,
 ) -> Result<Option<Analysis<Vec<CompletionItem>>>, Cancelled> {
+    try_ir_completion_goal(snapshot, input, position, cancellation, false)
+}
+pub(crate) fn try_ir_completion_for_protocol(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: TextSize,
+    cancellation: &CancellationToken,
+) -> Result<Option<Analysis<Vec<CompletionItem>>>, Cancelled> {
+    try_ir_completion_goal(snapshot, input, position, cancellation, true)
+}
+fn try_ir_completion_goal(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: TextSize,
+    cancellation: &CancellationToken,
+    protocol: bool,
+) -> Result<Option<Analysis<Vec<CompletionItem>>>, Cancelled> {
     if let Some(projected) =
-        projected_consumption_completion(snapshot, input, position, cancellation)?
+        projected_consumption_completion(snapshot, input, position, cancellation, protocol)?
     {
         return Ok(Some(projected));
     }
@@ -28,6 +47,42 @@ fn projected_consumption_completion(
     input: &ParsedInput,
     position: u32,
     cancellation: &CancellationToken,
+    protocol: bool,
+) -> Result<Option<Analysis<Vec<CompletionItem>>>, Cancelled> {
+    projected_consumption_completion_goal(
+        snapshot,
+        input,
+        position,
+        cancellation,
+        validation_workers(),
+        protocol,
+    )
+}
+
+#[cfg(test)]
+fn projected_consumption_completion_with_workers(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: u32,
+    cancellation: &CancellationToken,
+    max_workers: usize,
+) -> Result<Option<Analysis<Vec<CompletionItem>>>, Cancelled> {
+    projected_consumption_completion_goal(
+        snapshot,
+        input,
+        position,
+        cancellation,
+        max_workers,
+        false,
+    )
+}
+fn projected_consumption_completion_goal(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: TextSize,
+    cancellation: &CancellationToken,
+    max_workers: usize,
+    protocol: bool,
 ) -> Result<Option<Analysis<Vec<CompletionItem>>>, Cancelled> {
     let Some(projection) =
         crate::ir_template::consumption_at(snapshot, input, position, cancellation)?
@@ -35,6 +90,8 @@ fn projected_consumption_completion(
         return Ok(None);
     };
     let mut coverage = projection.body.coverage.clone();
+    let incomplete = AtomicBool::new(!coverage.is_complete());
+    let validator = crate::ir_template::ConsumptionEditValidator::new(snapshot, input, &projection);
     let mut items = Vec::new();
     let mut seen = BTreeSet::new();
     for point in &projection.positions {
@@ -72,35 +129,20 @@ fn projected_consumption_completion(
                 &mut coverage,
             )?
             .unwrap_or_default();
-            for mut item in candidates {
-                let Some((range, text)) = projection.edit(
-                    point,
-                    item.replacement_range,
-                    &item.insert_text,
-                    item.is_snippet,
-                ) else {
-                    continue;
-                };
-                item.replacement_range = range;
-                item.insert_text = text;
-                let mut interpretations = Vec::new();
-                let checked = crate::ir_template::validate_consumption_edit(
-                    snapshot,
-                    input,
-                    &projection,
-                    &item,
-                    &mut interpretations,
-                    cancellation,
-                )?;
-                coverage.merge(&checked.coverage);
-                if checked.value == hir::analysis::Validation::Invalid {
-                    continue;
-                }
-                item.template_evidence = Some(crate::types::TemplateCompletionEvidence {
-                    validation: checked.value,
-                    witness: Default::default(),
-                    interpretations,
-                });
+            if !coverage.is_complete() {
+                incomplete.store(true, Ordering::Release);
+            }
+            let checked = validate_projected_candidates(
+                candidates,
+                &projection,
+                point,
+                &validator,
+                cancellation,
+                max_workers,
+                protocol.then_some(&incomplete),
+            )?;
+            coverage.merge(&checked.coverage);
+            for item in checked.value {
                 if seen.insert((
                     item.label.clone(),
                     item.replacement_range,
@@ -116,6 +158,170 @@ fn projected_consumption_completion(
         value: items,
         coverage,
     }))
+}
+
+// Extra workers are shared by concurrent requests. The caller also validates
+// one chunk, so a typing burst cannot multiply the helper-thread budget.
+fn validation_workers() -> usize {
+    std::thread::available_parallelism()
+        .map_or(1, usize::from)
+        .saturating_sub(1)
+        .clamp(1, 6)
+}
+fn extra_validation_workers() -> &'static AtomicUsize {
+    static WORKERS: std::sync::OnceLock<AtomicUsize> = std::sync::OnceLock::new();
+    WORKERS.get_or_init(|| AtomicUsize::new(validation_workers() - 1))
+}
+
+struct ValidationWorkerPermit;
+impl ValidationWorkerPermit {
+    fn acquire() -> Option<Self> {
+        let mut free = extra_validation_workers().load(Ordering::Relaxed);
+        while free > 0 {
+            match extra_validation_workers().compare_exchange_weak(
+                free,
+                free - 1,
+                Ordering::AcqRel,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => return Some(Self),
+                Err(current) => free = current,
+            }
+        }
+        None
+    }
+}
+impl Drop for ValidationWorkerPermit {
+    fn drop(&mut self) {
+        extra_validation_workers().fetch_add(1, Ordering::Release);
+    }
+}
+
+fn validate_projected_candidates(
+    candidates: Vec<CompletionItem>,
+    projection: &crate::ir_template::ConsumptionProjection,
+    point: &crate::ir_template::ConsumedPosition,
+    validator: &crate::ir_template::ConsumptionEditValidator<'_>,
+    cancellation: &CancellationToken,
+    max_workers: usize,
+    incomplete: Option<&AtomicBool>,
+) -> Result<Analysis<Vec<CompletionItem>>, Cancelled> {
+    let work = |candidates: Vec<CompletionItem>,
+                validator: &mut crate::ir_template::ConsumptionEditValidator<'_>| {
+        let mut coverage = AnalysisCoverage::default();
+        let mut items = Vec::new();
+        for mut item in candidates {
+            let Some((range, text)) = projection.edit(
+                point,
+                item.replacement_range,
+                &item.insert_text,
+                item.is_snippet,
+            ) else {
+                continue;
+            };
+            item.replacement_range = range;
+            item.insert_text = text;
+            let mut interpretations = Vec::new();
+            let checked = if incomplete.is_some_and(|known| known.load(Ordering::Acquire)) {
+                validator.validate_with_known_frontier(&item, &mut interpretations, cancellation)?
+            } else {
+                validator.validate(&item, &mut interpretations, cancellation)?
+            };
+            if !checked.coverage.is_complete()
+                && let Some(known) = incomplete
+            {
+                known.store(true, Ordering::Release);
+            }
+            coverage.merge(&checked.coverage);
+            if checked.value == hir::analysis::Validation::Invalid {
+                continue;
+            }
+            item.template_evidence = Some(crate::types::TemplateCompletionEvidence {
+                validation: checked.value,
+                witness: Default::default(),
+                interpretations,
+            });
+            items.push(item);
+        }
+        Ok::<_, Cancelled>(Analysis {
+            value: items,
+            coverage,
+        })
+    };
+    let desired = (candidates.len() / 128).min(max_workers).max(1);
+    let permits = (1..desired)
+        .map_while(|_| ValidationWorkerPermit::acquire())
+        .collect::<Vec<_>>();
+    if permits.is_empty() {
+        return work(candidates, &mut validator.clone());
+    }
+    let mut source = candidates.into_iter();
+    let mut chunks: VecDeque<(usize, Vec<CompletionItem>)> = VecDeque::new();
+    while source.len() > 0 {
+        chunks.push_back((chunks.len(), source.by_ref().take(32).collect()));
+    }
+    // Expansions discover actual frontiers early. Output still uses original
+    // chunk ordinals, so scheduling cannot change ordering or first-wins data.
+    let (mut priority, remaining): (VecDeque<_>, VecDeque<_>) =
+        chunks.into_iter().partition(|(_, chunk)| {
+            chunk
+                .iter()
+                .any(|item: &CompletionItem| item.kind == CompletionKind::DynamicDefinition)
+        });
+    priority.extend(remaining);
+    let queue = Mutex::new(priority);
+    let worker = || {
+        let mut validator = validator.clone();
+        let mut results = Vec::new();
+        loop {
+            let next = queue
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .pop_front();
+            let Some((ordinal, chunk)) = next else {
+                break;
+            };
+            results.push((ordinal, work(chunk, &mut validator)?));
+        }
+        Ok::<_, Cancelled>(results)
+    };
+    let results = std::thread::scope(|scope| {
+        let handles = permits
+            .into_iter()
+            .map(|permit| {
+                let worker = &worker;
+                scope.spawn(move || {
+                    let _permit = permit;
+                    worker()
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut results = vec![worker()];
+        for handle in handles {
+            results.push(
+                handle
+                    .join()
+                    .unwrap_or_else(|panic| std::panic::resume_unwind(panic)),
+            );
+        }
+        results
+    });
+    let mut batches = Vec::new();
+    for result in results {
+        batches.extend(result?);
+    }
+    batches.sort_unstable_by_key(|(ordinal, _)| *ordinal);
+    let mut merged = Analysis {
+        value: Vec::new(),
+        coverage: AnalysisCoverage::default(),
+    };
+    // Ordered batches preserve the original candidate order,
+    // including first-wins deduplication and the evidence attached to each item.
+    for (_, result) in batches {
+        merged.coverage.merge(&result.coverage);
+        merged.value.extend(result.value);
+    }
+    Ok(merged)
 }
 
 fn try_ir_completion_inner(
@@ -485,6 +691,20 @@ fn try_ir_completion_inner(
                 |items| items.iter().map(|(label, _)| label.clone()).collect(),
             );
             let template_kind = crate::ir_template::template_kind(ir, matcher);
+            let detail = if let Matcher::Enum { id: enum_id } = ir.matcher(matcher) {
+                ir.strings()
+                    .resolve(ir.enums[enum_id.index()].name)
+                    .to_owned()
+            } else {
+                ir_semantic::field_context(ir, schema_fact.schema, field_id)
+            };
+            let provenance_rank = 100
+                * u32::from(ir.provenance_of(field_id).is_some_and(|origin| {
+                    !ir.strings().resolve(origin.pointer).starts_with(&format!(
+                        "/schemas/{}/fields/",
+                        ir.strings().resolve(ir.schema(schema_fact.schema).name)
+                    ))
+                }));
             for label in labels {
                 cancellation.checkpoint()?;
                 let Some(rank) = prefix_rank(&label, prefix) else {
@@ -559,13 +779,7 @@ fn try_ir_completion_inner(
                     } else {
                         matcher_kind(ir.matcher(matcher))
                     },
-                    detail: if let Matcher::Enum { id: enum_id } = ir.matcher(matcher) {
-                        ir.strings()
-                            .resolve(ir.enums[enum_id.index()].name)
-                            .to_owned()
-                    } else {
-                        ir_semantic::field_context(ir, schema_fact.schema, field_id)
-                    },
+                    detail: detail.clone(),
                     documentation: source_field
                         .doc
                         .map(|doc| ir.strings().resolve(doc).to_owned()),
@@ -573,13 +787,7 @@ fn try_ir_completion_inner(
                     insert_text: label_text,
                     sort_score: rank
                         + 1000 * u32::from(field.deprecated || source_field.deprecated)
-                        + 100
-                            * u32::from(ir.provenance_of(field_id).is_some_and(|origin| {
-                                !ir.strings().resolve(origin.pointer).starts_with(&format!(
-                                    "/schemas/{}/fields/",
-                                    ir.strings().resolve(ir.schema(schema_fact.schema).name)
-                                ))
-                            })),
+                        + provenance_rank,
                     deprecated: field.deprecated || source_field.deprecated,
                     resolve_data: Some(format!(
                         "ir-field:{}:{}",
@@ -613,13 +821,10 @@ fn try_ir_completion_inner(
             }
         }
     }
-    items.sort_by(|a, b| {
-        a.sort_score
-            .cmp(&b.sort_score)
-            .then_with(|| crate::support::ascii_case_cmp(&a.label, &b.label))
-    });
-    let mut seen = std::collections::BTreeSet::new();
-    let mut exact_labels = std::collections::BTreeSet::new();
+    items.sort_by_cached_key(|item| (item.sort_score, item.label.to_ascii_lowercase()));
+    // Retain order is observable; the sets are only membership probes.
+    let mut seen = rustc_hash::FxHashSet::default();
+    let mut exact_labels = rustc_hash::FxHashSet::default();
     items.retain(|item| {
         let block = item
             .insert_text
@@ -1039,10 +1244,7 @@ fn template_snippet(
         return None;
     }
     let kind = ir.strings().resolve(info.name);
-    crate::semantic::dynamic_definition_summary(snapshot, kind, name)?;
-    Some(crate::semantic::scripted_definition_snippet(
-        snapshot, kind, name,
-    ))
+    crate::semantic::definition_snippet_if_present(snapshot, kind, name)
 }
 
 fn contains(range: TextRange, position: TextSize) -> bool {
@@ -1065,6 +1267,89 @@ fn schema_fact_at_cursor(hir: &hir::HirFile, position: TextSize) -> Option<&hir:
 #[cfg(test)]
 mod tests {
     use super::*;
+    use engine::DocumentId;
+
+    #[test]
+    fn parallel_consumption_completion_preserves_order_proofs_and_coverage() {
+        let mut host = engine::AnalysisHost::with_ir(
+            game::eu4::runtime_rules().unwrap(),
+            game::eu4::profile(),
+            game::eu4::first_party_ir().unwrap(),
+        );
+        host.open_document(
+            DocumentId::new("file:///parallel/common/scripted_effects/definitions.txt"),
+            1,
+            "cycle = { cycle = yes } embedded = { $BODY$ } both_scopes = { $BODY$ capital = { $BODY$ } } prefix_shared = { set_variable = { which = counter value = 1 } while = { limit = { check_variable = { which = counter value = 1 } } $BODY$ subtract_variable = { which = counter value = 1 } } }".to_owned(),
+            None,
+        )
+        .unwrap();
+        for (index, call) in [
+            "embedded = { BODY = \"@ \" }",
+            "embedded = { BODY = \"add_@\" BODY = \"add_stability = 1\" }",
+            "embedded = { BODY = \"add_stability = 1\" BODY = \"add_@\" }",
+            "both_scopes = { BODY = \"add_@\" }",
+            "prefix_shared = { BODY = \"random_owned_province = { limit = { religion = shiite } @ }\" }",
+            "prefix_shared = { BODY = \"random_owned_province = { limit = { religion = shiite } @ = { type = religious_rebels size = 1 } }\" }",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let source = format!("# 中文😀\r\ncountry_event = {{ immediate = {{ {call} }} }}");
+            let position = source.find('@').unwrap() as u32;
+            let id = DocumentId::new(format!("file:///parallel/events/{index}.txt"));
+            host.open_document(id.clone(), 1, source.replace('@', ""), None)
+                .unwrap();
+            let snapshot = host.snapshot();
+            let input = crate::support::input_for_document(&snapshot, &id).unwrap();
+            let sequential = projected_consumption_completion_with_workers(
+                &snapshot,
+                &input,
+                position,
+                &CancellationToken::new(),
+                1,
+            )
+            .unwrap()
+            .unwrap();
+            let parallel = projected_consumption_completion_with_workers(
+                &snapshot,
+                &input,
+                position,
+                &CancellationToken::new(),
+                4,
+            )
+            .unwrap()
+            .unwrap();
+            if index == 0 {
+                assert!(sequential.value.len() > 512);
+                let projection = crate::ir_template::consumption_at(&snapshot, &input, position, &CancellationToken::new()).unwrap().unwrap();
+                assert!(crate::ir_template::ConsumptionEditValidator::new(&snapshot, &input, &projection).has_render_plan());
+            }
+            let reference = crate::ir_template::with_full_template_rendering(|| {
+                projected_consumption_completion_with_workers(&snapshot, &input, position, &CancellationToken::new(), 1)
+            }).unwrap().unwrap();
+            assert_eq!(sequential.value, reference.value, "full render candidate proofs: case {index}");
+            assert_eq!(sequential.coverage, reference.coverage, "full render coverage: case {index}");
+            let protocol=projected_consumption_completion_goal(&snapshot,&input,position,&CancellationToken::new(),4,true).unwrap().unwrap();
+            assert_eq!(protocol.value,reference.value,"protocol item proofs: case {index}");
+            assert_eq!(protocol.coverage.is_complete(),reference.coverage.is_complete(),"protocol incomplete flag: case {index}");
+            assert_eq!(
+                parallel.value, sequential.value,
+                "candidate order and proofs: case {index}"
+            );
+            assert_eq!(
+                parallel.coverage, sequential.coverage,
+                "coverage: case {index}"
+            );
+            let cancelled = CancellationToken::new();
+            cancelled.cancel();
+            assert!(
+                projected_consumption_completion_with_workers(
+                    &snapshot, &input, position, &cancelled, 4,
+                )
+                .is_err()
+            );
+        }
+    }
 
     #[test]
     fn matcher_kind_covers_ir_value_families() {

@@ -31,6 +31,26 @@ pub fn complete_with_cancellation(
     position: TextSize,
     cancellation: &CancellationToken,
 ) -> Result<CompletionResult, Cancelled> {
+    complete_goal(snapshot, document, position, cancellation, false)
+}
+/// Computes identical protocol items and the same incomplete/complete flag.
+/// Once an actual frontier is known, independent rejection proofs need not
+/// enumerate further frontier reasons for items that cannot be returned.
+pub fn complete_for_protocol_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    document: &DocumentId,
+    position: TextSize,
+    cancellation: &CancellationToken,
+) -> Result<CompletionResult, Cancelled> {
+    complete_goal(snapshot, document, position, cancellation, true)
+}
+fn complete_goal(
+    snapshot: &AnalysisSnapshot,
+    document: &DocumentId,
+    position: TextSize,
+    cancellation: &CancellationToken,
+    protocol: bool,
+) -> Result<CompletionResult, Cancelled> {
     cancellation.checkpoint()?;
     let Some(input) = input_for_document(snapshot, document) else {
         return Ok(CompletionResult {
@@ -56,7 +76,11 @@ pub fn complete_with_cancellation(
             items,
         });
     }
-    let result = ir::try_ir_completion(snapshot, &input, position, cancellation)?;
+    let result = if protocol {
+        ir::try_ir_completion_for_protocol(snapshot, &input, position, cancellation)?
+    } else {
+        ir::try_ir_completion(snapshot, &input, position, cancellation)?
+    };
     let (items, coverage) = result.map_or_else(
         || (Vec::new(), Default::default()),
         |result| (result.value, result.coverage),

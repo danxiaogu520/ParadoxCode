@@ -9,6 +9,10 @@ use std::sync::Arc;
 use text::TextRange;
 
 mod cst;
+mod incremental;
+pub use incremental::{
+    QuotedScriptEdit, parse_script_after_quoted_edit, prepare_script_quoted_edit,
+};
 pub mod format;
 mod localisation;
 mod quoted_script;

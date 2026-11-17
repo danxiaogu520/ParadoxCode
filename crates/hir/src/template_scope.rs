@@ -94,6 +94,62 @@ pub fn entry_scopes<E>(
     name: &str,
     checkpoint: &mut dyn FnMut() -> Result<(), E>,
 ) -> Result<Analysis<EntryScopeSummary>, E> {
+    checkpoint()?;
+    let Some(memo) = facts.shared_template_memo() else {
+        return entry_scopes_uncached(ir, facts, kind, name, checkpoint);
+    };
+    let key = format!(
+        "scope-entry:{}:{}",
+        kind.to_ascii_lowercase(),
+        name.to_ascii_lowercase()
+    );
+    if let Some(cached) = memo.get::<CachedEntryScopes>(&key)
+        && cached.reads.validate_and_replay(facts, checkpoint)?
+    {
+        return Ok(cached.checked.clone());
+    }
+    let recording = crate::memo_facts::RecordingFacts::new(facts);
+    let checked = entry_scopes_uncached(ir, &recording, kind, name, checkpoint)?;
+    let reads = recording.finish();
+    checkpoint()?;
+    // Missing/cyclic/recovered programs stay unresolved in an identical fact
+    // view. Do not freeze a work-budget frontier that warm subqueries can advance.
+    if !checked.coverage.limits.contains(&AnalysisLimit::Nodes) {
+        let bytes = reads
+            .bytes()
+            .saturating_add(
+                checked
+                    .value
+                    .conditions
+                    .iter()
+                    .map(|s| s.len() + 64)
+                    .sum::<usize>(),
+            )
+            .saturating_add(1024);
+        memo.replace(
+            key,
+            Arc::new(CachedEntryScopes {
+                checked: checked.clone(),
+                reads,
+            }),
+            bytes,
+        );
+    }
+    Ok(checked)
+}
+
+struct CachedEntryScopes {
+    checked: Analysis<EntryScopeSummary>,
+    reads: crate::memo_facts::Receipts,
+}
+
+fn entry_scopes_uncached<E>(
+    ir: &RulesIr,
+    facts: &dyn SymbolFacts,
+    kind: &str,
+    name: &str,
+    checkpoint: &mut dyn FnMut() -> Result<(), E>,
+) -> Result<Analysis<EntryScopeSummary>, E> {
     let mut summary = EntryScopeSummary::default();
     let mut coverage = AnalysisCoverage::default();
     for scope in &ir.scopes.types {

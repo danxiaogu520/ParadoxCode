@@ -1,5 +1,8 @@
 //! HIR facts lowered from the compiled Rules IR.
 use parser::ParsedFile;
+mod prefix;
+mod roots;
+pub(crate) use prefix::PrefixMemo;
 use rules::ir::{
     DefName, FieldId, Matcher, MatcherId, RefTarget, RootRule, RulesIr, SchemaId, Shape,
     SubtypeSet, SymbolFacts, TypeId,
@@ -11,8 +14,53 @@ use crate::{
     ScopeFact, ScopeState, ScopeValue,
 };
 
+#[derive(Clone, Default)]
+struct LocalDefinitions {
+    names: std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
+    sites: std::collections::BTreeSet<(String, String, TextRange)>,
+    subtypes: std::collections::BTreeSet<(String, String)>,
+}
+impl LocalDefinitions {
+    fn fold(value: &str) -> std::borrow::Cow<'_, str> {
+        if value.bytes().any(|c| c.is_ascii_uppercase()) {
+            value.to_ascii_lowercase().into()
+        } else {
+            value.into()
+        }
+    }
+    fn member(&self, kind: &str, name: &str) -> bool {
+        self.names
+            .get(Self::fold(kind).as_ref())
+            .is_some_and(|names| names.contains(Self::fold(name).as_ref()))
+    }
+    fn attribute_member(&self, name: &str, subtype: &str) -> bool {
+        self.subtypes
+            .contains(&(name.to_ascii_lowercase(), subtype.to_ascii_lowercase()))
+    }
+    fn insert_attributes(&mut self, attributes: &crate::DefinitionAttributes) {
+        for subtype in &attributes.subtypes {
+            self.subtypes.insert((
+                attributes.name.to_ascii_lowercase(),
+                subtype.to_ascii_lowercase(),
+            ));
+        }
+    }
+    fn insert(&mut self, definition: &HirDefinition) {
+        let kind = definition.kind.to_ascii_lowercase();
+        let name = definition.name.to_ascii_lowercase();
+        self.names
+            .entry(kind.clone())
+            .or_default()
+            .insert(name.clone());
+        self.sites.insert((kind, name, definition.range));
+    }
+}
+
 #[derive(Clone)]
 pub(super) struct IrFacts {
+    pub prefix_memo: Option<PrefixMemo>,
+    root_memo: Option<std::sync::Arc<roots::RootMemo>>,
+    fork_generation: usize,
     query_context: crate::query::OwnedQueryContext,
     query_depth: usize,
     pub analysis_coverage: crate::analysis::AnalysisCoverage,
@@ -26,12 +74,31 @@ pub(super) struct IrFacts {
     pub field_facts: Vec<FieldFact>,
     pub scope_facts: Vec<ScopeFact>,
     pub definitions: Vec<HirDefinition>,
+    local_definitions: LocalDefinitions,
     pub references: Vec<HirReference>,
     pub binding_references: Vec<HirReference>,
     pub definition_attributes: Vec<crate::DefinitionAttributes>,
-    pub template_kinds: std::collections::BTreeSet<String>,
+    pub template_kinds: std::sync::Arc<std::collections::BTreeSet<String>>,
     pub runtime_parameter_guards: Vec<(TextRange, Option<TextRange>)>,
 }
+impl IrFacts {
+    fn has_templates(&self) -> bool {
+        self.template_kinds
+            .iter()
+            .any(|kind| self.local_definitions.names.contains_key(kind))
+    }
+    fn in_template(&self, range: TextRange) -> bool {
+        self.has_templates()
+            && self.definitions.iter().any(|definition| {
+                definition.range.start() <= range.start()
+                    && range.end() <= definition.range.end()
+                    && self
+                        .template_kinds
+                        .contains(&definition.kind.to_ascii_lowercase())
+            })
+    }
+}
+
 struct FactsRef<'a>(Option<&'a dyn SymbolFacts>, &'a std::cell::Cell<bool>);
 impl SymbolFacts for FactsRef<'_> {
     fn template_accepts_no_arguments(
@@ -70,6 +137,9 @@ pub(super) fn lower(
 ) -> IrFacts {
     let children = crate::scope::property_children(props);
     let mut out = IrFacts {
+        prefix_memo: None,
+        root_memo: None,
+        fork_generation: 0,
         query_context: Default::default(),
         query_depth: 0,
         analysis_coverage: Default::default(),
@@ -83,6 +153,7 @@ pub(super) fn lower(
         field_facts: vec![],
         scope_facts: vec![],
         definitions: vec![],
+        local_definitions: LocalDefinitions::default(),
         references: vec![],
         binding_references: vec![],
         definition_attributes: vec![],
@@ -93,6 +164,9 @@ pub(super) fn lower(
     let Some((_, file)) = ir.file_rule(path) else {
         return out;
     };
+    if matches!(file.root, RootRule::Schema(_)) {
+        out.root_memo = facts.and_then(roots::for_facts);
+    }
     let roots: Vec<(SchemaId, Vec<usize>, SubtypeSet, ScopeState)> = match &file.root {
         RootRule::Schema(schema) => vec![(
             *schema,
@@ -229,19 +303,24 @@ fn merge_attribute_summaries(attributes: &mut Vec<crate::DefinitionAttributes>) 
     *attributes = merged;
 }
 
-fn template_kinds(ir: &RulesIr) -> std::collections::BTreeSet<String> {
+fn template_kinds(ir: &RulesIr) -> std::sync::Arc<std::collections::BTreeSet<String>> {
+    if let Some(kinds) = ir.prepared_template_kinds() {
+        return kinds;
+    }
     let Some(template) = ir.trait_by_name("Template") else {
         return Default::default();
     };
-    ir.types
-        .iter()
-        .filter(|ty| {
-            ty.trait_impls
-                .iter()
-                .any(|implementation| implementation.trait_id == template)
-        })
-        .map(|ty| ir.strings().resolve(ty.name).to_ascii_lowercase())
-        .collect()
+    std::sync::Arc::new(
+        ir.types
+            .iter()
+            .filter(|ty| {
+                ty.trait_impls
+                    .iter()
+                    .any(|implementation| implementation.trait_id == template)
+            })
+            .map(|ty| ir.strings().resolve(ty.name).to_ascii_lowercase())
+            .collect(),
+    )
 }
 
 fn subtype_names_from_set(ir: &RulesIr, ty: TypeId, set: &SubtypeSet) -> Vec<std::sync::Arc<str>> {
@@ -265,10 +344,14 @@ pub(super) fn lower_schema_fragment(
     facts: &dyn SymbolFacts,
     root_range: Option<TextRange>,
     unknown_ranges: &[TextRange],
+    prefix_memo: Option<PrefixMemo>,
 ) -> IrFacts {
     let children = crate::scope::property_children(props);
     let root_range = root_range.unwrap_or(syntax.root().range());
     let mut out = IrFacts {
+        prefix_memo,
+        root_memo: None,
+        fork_generation: 0,
         query_context: Default::default(),
         query_depth: 0,
         analysis_coverage: Default::default(),
@@ -287,6 +370,7 @@ pub(super) fn lower_schema_fragment(
         field_facts: vec![],
         scope_facts: vec![],
         definitions: vec![],
+        local_definitions: LocalDefinitions::default(),
         references: vec![],
         binding_references: vec![],
         definition_attributes: vec![],
@@ -360,16 +444,22 @@ fn descend(
     container_range: TextRange,
     branch_self_schema: Option<SchemaId>,
 ) {
-    let query_context = crate::query::PropertyQueryContext::from_indices(props, &indices)
-        .with_unknown_ranges(&out.unknown_ranges)
-        .defer_templates(out.definitions.iter().any(|definition| {
-            definition.range.start() <= container_range.start()
-                && container_range.end() <= definition.range.end()
-                && out
-                    .template_kinds
-                    .contains(&definition.kind.to_ascii_lowercase())
-        }))
-        .to_owned();
+    let needs_query=ir.prepared_schema_queries(schema).unwrap_or_else(|| {
+        ir.schema(schema).items.is_some_and(|matcher|matcher_contains_query(ir,matcher))
+            || ir.fields(schema).iter().any(|id| {
+                let field=ir.field(*id);
+                matcher_contains_query(ir,field.key)
+                    || matches!(field.value,rules::ir::FieldValue::Scalar(matcher) if matcher_contains_query(ir,matcher))
+            })
+    });
+    let query_context = if needs_query {
+        crate::query::PropertyQueryContext::from_indices(props, &indices)
+            .with_unknown_ranges(&out.unknown_ranges)
+            .defer_templates(out.in_template(container_range))
+            .to_owned()
+    } else {
+        Default::default()
+    };
     out.query_context = query_context.clone();
     if let Some(matcher) = ir.schema(schema).items {
         // Only direct list members use this matcher. Nested properties own
@@ -389,25 +479,80 @@ fn descend(
     for index in indices {
         out.query_context = query_context.clone();
         let p = &props[index];
+        let root_memo = if p.top_level && !needs_query {
+            out.root_memo.clone()
+        } else {
+            None
+        };
+        let root_metadata = root_memo.as_ref().map(|_| roots::Metadata::take(out));
+        if let (Some(memo), Some(facts)) = (&root_memo, facts)
+            && let Some(delta) =
+                memo.lookup(path, source, p, schema, &subtypes, &state, out, seen, facts)
+        {
+            delta.apply(out, seen);
+            if let Some(metadata) = root_metadata {
+                metadata.restore(out);
+            }
+            continue;
+        }
+        let root_capture = root_memo
+            .as_ref()
+            .and_then(|memo| memo.capture(path, source, p, schema, &subtypes, &state, out, seen));
+        let recording = root_capture
+            .as_ref()
+            .and_then(|_| facts.map(crate::memo_facts::RecordingFacts::new));
+        let facts = recording
+            .as_ref()
+            .map(|facts| facts as &dyn SymbolFacts)
+            .or(facts);
+        if let Some(hit) = out.prefix_memo.as_ref().and_then(|memo| {
+            memo.lookup(
+                props,
+                bare_values,
+                p,
+                schema,
+                &subtypes,
+                &state,
+                branch_self_schema,
+                out,
+                seen,
+            )
+        }) {
+            if let Some(memo) = &mut out.prefix_memo {
+                memo.hits += 1;
+            }
+            hit.apply(out, seen);
+            if let Some(metadata) = root_metadata {
+                metadata.restore(out);
+            }
+            continue;
+        }
+        let capture = out.prefix_memo.as_ref().and_then(|memo| {
+            memo.capture(
+                ir,
+                props,
+                bare_values,
+                p,
+                schema,
+                &subtypes,
+                &state,
+                branch_self_schema,
+                out,
+                seen,
+            )
+        });
         let shape = if p.scalar.is_some() {
             Shape::Scalar
         } else {
             Shape::Block
         };
-        let candidates = ir.lookup(schema, &p.key, shape).collect::<Vec<_>>();
-        let exact_candidates = candidates
-            .iter()
-            .copied()
-            .filter(|id| is_exact_key_match(ir, schema, *id, &p.key))
-            .collect::<Vec<_>>();
+        let exact_candidates = ir.lookup_exact(schema, &p.key, shape).collect::<Vec<_>>();
         let candidates = if exact_candidates.is_empty() {
-            candidates
-                .into_iter()
+            ir.lookup(schema, &p.key, shape)
                 .filter(|id| matcher_accepts_key(ir, ir.field(*id).key, &p.key, facts, out))
                 .collect()
         } else {
-            // An exact field shadows patterns. Avoid asking workspace symbol
-            // facts for every pattern when none of them can be selected.
+            // Exact dispatch entries shadow patterns of this value shape.
             exact_candidates
         };
         let scoped = candidates
@@ -486,13 +631,7 @@ fn descend(
         };
         let mut fork = false;
         if p.scalar.is_none() && candidates.len() > 1 {
-            let template_text = out.definitions.iter().any(|definition| {
-                definition.range.start() <= p.range.start()
-                    && p.range.end() <= definition.range.end()
-                    && out
-                        .template_kinds
-                        .contains(&definition.kind.to_ascii_lowercase())
-            });
+            let template_text = out.in_template(p.range);
             let checked = crate::block_checking::select_overloads::<std::convert::Infallible>(
                 ir,
                 props,
@@ -547,13 +686,7 @@ fn descend(
         if candidates.is_empty()
             && shape == Shape::Block
             && !crate::parameters::delimited_parameters(&p.key, p.key_range, '$').is_empty()
-            && out.definitions.iter().any(|definition| {
-                definition.range.start() <= p.range.start()
-                    && p.range.end() <= definition.range.end()
-                    && out
-                        .template_kinds
-                        .contains(&definition.kind.to_ascii_lowercase())
-            })
+            && out.in_template(p.range)
         {
             // A replacement can supply a scope key. Retain symbols reachable through the
             // declared link body with unknown current scope; this is not a concrete field
@@ -616,10 +749,37 @@ fn descend(
             });
         }
         if fork {
-            let base = out.clone();
+            out.fork_generation += 1;
+            // Branches read definition ancestry and the current query context,
+            // but all other fact vectors are append-only within this property.
+            // Share that prefix in `out` instead of cloning it for every branch.
+            let definition_prefix = out.definitions.len();
             let mut branches = Vec::new();
             for id in candidates {
-                let mut branch = base.clone();
+                let mut branch = IrFacts {
+                    prefix_memo: None,
+                    root_memo: None,
+                    fork_generation: 0,
+                    query_context: out.query_context.clone(),
+                    query_depth: out.query_depth,
+                    analysis_coverage: out.analysis_coverage.clone(),
+                    pattern_ambiguous: out.pattern_ambiguous.clone(),
+                    pattern_search_incomplete: out.pattern_search_incomplete.clone(),
+                    overload_facts: Vec::new(),
+                    unknown_ranges: out.unknown_ranges.clone(),
+                    retain_validation_facts: out.retain_validation_facts,
+                    symbol_facts_dependency: out.symbol_facts_dependency.clone(),
+                    schema_facts: Vec::new(),
+                    field_facts: Vec::new(),
+                    scope_facts: Vec::new(),
+                    definitions: out.definitions.clone(),
+                    local_definitions: out.local_definitions.clone(),
+                    references: Vec::new(),
+                    binding_references: Vec::new(),
+                    definition_attributes: Vec::new(),
+                    template_kinds: out.template_kinds.clone(),
+                    runtime_parameter_guards: Vec::new(),
+                };
                 let mut branch_seen = seen.clone();
                 lower_field_candidate(
                     ir,
@@ -644,35 +804,52 @@ fn descend(
             if let Some(first) = branches.first() {
                 macro_rules! common {
                     ($field:ident) => {
-                        // Every branch starts with the identical immutable prefix.
-                        // Intersect only its additions; comparing the whole prefix
-                        // per overload made large files pay quadratic scan costs.
-                        let prefix = base.$field.len();
-                        out.$field.extend(
-                            first.$field[prefix..]
-                                .iter()
-                                .filter(|item| {
-                                    base.$field.contains(item)
-                                        || branches
-                                            .iter()
-                                            .all(|branch| branch.$field[prefix..].contains(item))
-                                })
-                                .cloned(),
-                        );
+                        common!($field, 0)
+                    };
+                    ($field:ident,$prefix:expr) => {
+                        let additions = first.$field[$prefix..]
+                            .iter()
+                            .filter(|item| {
+                                out.$field.contains(item)
+                                    || branches
+                                        .iter()
+                                        .all(|branch| branch.$field[$prefix..].contains(item))
+                            })
+                            .cloned()
+                            .collect::<Vec<_>>();
+                        out.$field.extend(additions);
                     };
                 }
                 common!(field_facts);
                 common!(scope_facts);
-                common!(definitions);
+                let definitions = first.definitions[definition_prefix..]
+                    .iter()
+                    .filter(|item| {
+                        out.definitions.contains(item)
+                            || branches.iter().all(|branch| {
+                                branch.definitions[definition_prefix..].contains(item)
+                            })
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
+                for definition in &definitions {
+                    out.local_definitions.insert(definition);
+                }
+                out.definitions.extend(definitions);
                 common!(references);
                 common!(binding_references);
+                let attribute_start = out.definition_attributes.len();
                 common!(definition_attributes);
+                for attributes in &out.definition_attributes[attribute_start..] {
+                    out.local_definitions.insert_attributes(attributes);
+                }
                 common!(runtime_parameter_guards);
                 common!(overload_facts);
-                out.schema_facts = branches
-                    .iter()
-                    .flat_map(|branch| branch.schema_facts.iter().cloned())
-                    .collect();
+                out.schema_facts.extend(
+                    branches
+                        .iter()
+                        .flat_map(|branch| branch.schema_facts.iter().cloned()),
+                );
                 out.schema_facts
                     .sort_by_key(|fact| (fact.range, fact.schema.index()));
                 out.schema_facts.dedup();
@@ -707,6 +884,18 @@ fn descend(
                     id,
                 );
             }
+        }
+        if let Some(capture) = capture
+            && let Some(mut memo) = out.prefix_memo.take()
+        {
+            memo.remember(capture, out, seen);
+            out.prefix_memo = Some(memo);
+        }
+        if let (Some(memo), Some(capture), Some(recording)) = (root_memo, root_capture, recording) {
+            memo.remember(capture, out, seen, recording.finish());
+        }
+        if let Some(metadata) = root_metadata {
+            metadata.restore(out);
         }
     }
 }
@@ -957,14 +1146,15 @@ fn lower_template_arguments(
 ) {
     // Unknown definition-side bindings remain holes. Concrete siblings still
     // contribute independently provable references.
-    let symbolic_context = out.definitions.iter().any(|definition| {
-        children.iter().any(|index| {
-            definition.range.start() <= props[*index].range.start()
-                && props[*index].range.end() <= definition.range.end()
-        }) && out
-            .template_kinds
-            .contains(&definition.kind.to_ascii_lowercase())
-    });
+    let symbolic_context = out.has_templates()
+        && out.definitions.iter().any(|definition| {
+            children.iter().any(|index| {
+                definition.range.start() <= props[*index].range.start()
+                    && props[*index].range.end() <= definition.range.end()
+            }) && out
+                .template_kinds
+                .contains(&definition.kind.to_ascii_lowercase())
+        });
     let Some(ty) = ir.type_by_name(kind) else {
         return;
     };
@@ -1105,12 +1295,14 @@ fn lower_template_arguments(
         let mut projected = definition.clone();
         projected.range = range;
         projected.selection_range = selection;
+        out.local_definitions.insert(&projected);
         out.definitions.push(projected);
     }
     for attributes in body.hir.definition_attributes() {
         if let Some(range) = origins.get(&attributes.definition_range) {
             let mut attrs = attributes.clone();
             attrs.definition_range = *range;
+            out.local_definitions.insert_attributes(&attrs);
             out.definition_attributes.push(attrs);
         }
     }
@@ -1269,20 +1461,6 @@ pub(super) fn scope_value_allows(
     }
 }
 
-fn is_exact_key_match(
-    ir: &RulesIr,
-    schema: SchemaId,
-    field: rules::ir::FieldId,
-    key: &str,
-) -> bool {
-    ir.strings().lookup_folded(key).is_some_and(|symbol| {
-        ir.schema(schema)
-            .exact
-            .get(&symbol)
-            .is_some_and(|fields| fields.contains(&field))
-    })
-}
-
 fn matcher_accepts_key(
     ir: &RulesIr,
     matcher_id: MatcherId,
@@ -1335,20 +1513,13 @@ fn matcher_accepts_key(
             let Some(key) = reference_symbol_name(ir, key, *strip_prefix) else {
                 return false;
             };
-            let local = out.definitions.iter().any(|definition| {
-                definition
-                    .kind
-                    .eq_ignore_ascii_case(ir.strings().resolve(ir.type_info(*type_id).name))
-                    && definition.name.eq_ignore_ascii_case(&key)
-            });
+            let local = out
+                .local_definitions
+                .member(ir.strings().resolve(ir.type_info(*type_id).name), &key);
             if local {
                 return subtype.is_none_or(|required| {
-                    out.definition_attributes.iter().any(|attrs| {
-                        attrs.name.eq_ignore_ascii_case(&key)
-                            && attrs.subtypes.iter().any(|name| {
-                                name.eq_ignore_ascii_case(ir.strings().resolve(required))
-                            })
-                    })
+                    out.local_definitions
+                        .attribute_member(&key, ir.strings().resolve(required))
                 });
             }
             out.symbol_facts_dependency.set(true);
@@ -1593,26 +1764,30 @@ fn push_definition(
     subtypes: Vec<std::sync::Arc<str>>,
 ) {
     let kind = ir.strings().resolve(ir.type_info(ty).name).to_owned();
-    if out.definitions.iter().any(|definition| {
-        definition.name.eq_ignore_ascii_case(&name)
-            && definition.kind.eq_ignore_ascii_case(&kind)
-            && definition.range == range
-    }) {
+    if out.local_definitions.sites.contains(&(
+        kind.to_ascii_lowercase(),
+        name.to_ascii_lowercase(),
+        range,
+    )) {
         return;
     }
-    out.definitions.push(HirDefinition {
+    let definition = HirDefinition {
         kind: kind.clone().into(),
         name: name.clone(),
         range,
         selection_range: selection,
-    });
-    out.definition_attributes.push(crate::DefinitionAttributes {
+    };
+    out.local_definitions.insert(&definition);
+    out.definitions.push(definition);
+    let attributes = crate::DefinitionAttributes {
         kind: kind.into(),
         name,
         definition_range: range,
         attribute_keys: attribute_keys.into_iter().map(Into::into).collect(),
         subtypes,
-    });
+    };
+    out.local_definitions.insert_attributes(&attributes);
+    out.definition_attributes.push(attributes);
 }
 fn subtype_names(
     ir: &RulesIr,
@@ -2048,19 +2223,13 @@ fn reference_matches(
             let Some(value) = reference_symbol_name(ir, value, *strip_prefix) else {
                 return false;
             };
-            if out.definitions.iter().any(|def| {
-                def.kind
-                    .eq_ignore_ascii_case(ir.strings().resolve(ir.type_info(*type_id).name))
-                    && def.name.eq_ignore_ascii_case(&value)
-            }) {
+            if out
+                .local_definitions
+                .member(ir.strings().resolve(ir.type_info(*type_id).name), &value)
+            {
                 return subtype.is_none_or(|required| {
-                    out.definition_attributes.iter().any(|attrs| {
-                        attrs.name.eq_ignore_ascii_case(&value)
-                            && attrs
-                                .subtypes
-                                .iter()
-                                .any(|st| st.eq_ignore_ascii_case(ir.strings().resolve(required)))
-                    })
+                    out.local_definitions
+                        .attribute_member(&value, ir.strings().resolve(required))
                 });
             }
             out.symbol_facts_dependency.set(true);

@@ -38,6 +38,58 @@ pub struct OverlayFactTransaction {
     pub report: OverlayFactReport,
 }
 
+/// A changed overlay and the transitive readers of its outgoing declarations.
+pub struct OverlayReplay {
+    pub affected: BTreeSet<DocumentId>,
+    pub prepared_base: Option<DocumentId>,
+}
+
+/// Includes negative reads and generated-name wildcards. Expanding through
+/// each reader's outgoing facts removes self-supporting cycles with their seed.
+pub fn affected_overlay_fact_readers(
+    documents: &BTreeMap<DocumentId, DocumentSnapshot>,
+    changed: &[&HirFile],
+) -> BTreeSet<DocumentId> {
+    let mut changed = changed
+        .iter()
+        .flat_map(|hir| changes(hir, hir))
+        .collect::<BTreeSet<_>>();
+    // Synchronously opened documents may have no recorded read set yet.
+    // Include them conservatively until their first tracked replay completes.
+    let mut affected = documents
+        .iter()
+        .filter(|(_, doc)| {
+            doc.source == DocumentSource::Overlay
+                && doc.fact_dependencies.is_empty()
+                && doc
+                    .hir
+                    .as_ref()
+                    .is_some_and(|hir| hir.depends_on_symbol_facts())
+        })
+        .map(|(id, _)| id.clone())
+        .collect::<BTreeSet<_>>();
+    for id in &affected {
+        if let Some(hir) = documents.get(id).and_then(|doc| doc.hir.as_deref()) {
+            changed.extend(changes(hir, hir));
+        }
+    }
+    loop {
+        let new = readers(documents, &changed)
+            .difference(&affected)
+            .cloned()
+            .collect::<Vec<_>>();
+        if new.is_empty() {
+            return affected;
+        }
+        for id in new {
+            if let Some(hir) = documents.get(&id).and_then(|doc| doc.hir.as_deref()) {
+                changed.extend(changes(hir, hir));
+            }
+            affected.insert(id);
+        }
+    }
+}
+
 fn same_facts(a: &HirFile, b: &HirFile) -> bool {
     a.definitions() == b.definitions()
         && a.dynamic_templates() == b.dynamic_templates()
@@ -167,6 +219,37 @@ pub fn stabilize_overlay_facts(
     budget: OverlayFactBudget,
     cancellation: &WorkspaceScanToken,
 ) -> OverlayFactTransaction {
+    stabilize_overlay_facts_with_memo(
+        documents,
+        rules,
+        profile,
+        ir,
+        roots,
+        index,
+        excluded,
+        budget,
+        cancellation,
+        None,
+        None,
+    )
+}
+
+/// The same transaction with dependency-validated reuse between fact rounds.
+#[allow(clippy::too_many_arguments)]
+pub fn stabilize_overlay_facts_with_memo(
+    documents: &BTreeMap<DocumentId, DocumentSnapshot>,
+    rules: &RuleSet,
+    profile: &GameProfile,
+    ir: &RulesIr,
+    roots: &[SourceRoot],
+    index: &WorkspaceIndex,
+    excluded: &BTreeSet<SourceFileId>,
+    budget: OverlayFactBudget,
+    cancellation: &WorkspaceScanToken,
+    shared_memo: Option<Arc<rules::template::TemplateMemo>>,
+    replay: Option<OverlayReplay>,
+) -> OverlayFactTransaction {
+    let replay = replay.filter(|_| documents.values().all(|doc| doc.fact_coverage.is_known()));
     let mut base = documents.clone();
     let mut pending = BTreeSet::new();
     let mut report = OverlayFactReport::default();
@@ -176,6 +259,12 @@ pub fn stabilize_overlay_facts(
         // supply no overlay facts, and rebuilding them here makes each edit
         // pay for every document the editor has ever opened.
         if doc.source != DocumentSource::Overlay {
+            continue;
+        }
+        if replay
+            .as_ref()
+            .is_some_and(|plan| !plan.affected.contains(id))
+        {
             continue;
         }
         if cancellation.checkpoint().is_err() {
@@ -192,17 +281,22 @@ pub fn stabilize_overlay_facts(
                 failed = true;
                 break;
             }
-            *doc = crate::pipeline::relower_document_snapshot(
-                rules,
-                profile,
-                ir,
-                roots,
-                doc.clone(),
-                None,
-            );
+            if !replay
+                .as_ref()
+                .is_some_and(|plan| plan.prepared_base.as_ref() == Some(id))
+            {
+                *doc = crate::pipeline::relower_document_snapshot(
+                    rules,
+                    profile,
+                    ir,
+                    roots,
+                    doc.clone(),
+                    None,
+                );
+                report.lowers += 1;
+            }
             doc.fact_dependencies.clear();
             pending.insert(id.clone());
-            report.lowers += 1;
         }
     }
     let mut candidate = base.clone();
@@ -222,7 +316,10 @@ pub fn stabilize_overlay_facts(
             .filter(|doc| doc.source == DocumentSource::Overlay)
             .filter_map(|doc| doc.hir.clone())
             .collect::<Vec<_>>();
-        let facts = IndexSymbolFacts::with_overlay_files(ir, index, &overlays, excluded);
+        let mut facts = IndexSymbolFacts::with_overlay_files(ir, index, &overlays, excluded);
+        if let Some(memo) = &shared_memo {
+            facts = facts.with_shared_template_memo(memo.clone());
+        }
         let mut batch = Vec::new();
         for id in &pending {
             if cancellation.checkpoint().is_err() {
@@ -275,12 +372,47 @@ pub fn stabilize_overlay_facts(
             break;
         }
         pending = readers(&candidate, &changed);
+        if replay
+            .as_ref()
+            .is_some_and(|plan| pending.iter().any(|id| !plan.affected.contains(id)))
+        {
+            // New generated declarations reached a reader outside the old
+            // component. Restart from every document's base declarations.
+            return stabilize_overlay_facts_with_memo(
+                documents,
+                rules,
+                profile,
+                ir,
+                roots,
+                index,
+                excluded,
+                budget,
+                cancellation,
+                shared_memo,
+                None,
+            );
+        }
         if !pending.is_empty() {
             history_bytes = history_bytes.saturating_add(current.len().saturating_mul(64));
             history.push(current);
         }
     }
     if failed {
+        if replay.is_some() {
+            return stabilize_overlay_facts_with_memo(
+                documents,
+                rules,
+                profile,
+                ir,
+                roots,
+                index,
+                excluded,
+                budget,
+                cancellation,
+                shared_memo,
+                None,
+            );
+        }
         report.coverage.limits.insert(AnalysisLimit::FactStability);
         for doc in base
             .values_mut()

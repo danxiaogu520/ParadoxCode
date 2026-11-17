@@ -1,6 +1,7 @@
 //! Loss-aware CST fact collection.
 
 use parser::{CstKind, CstNode, ParsedFile};
+use std::sync::Arc;
 use text::TextRange;
 
 use super::{
@@ -8,11 +9,11 @@ use super::{
 };
 
 pub(super) struct CollectedFacts {
-    pub(super) properties: Vec<HirProperty>,
-    pub(super) localisation_entries: Vec<HirLocalisationEntry>,
-    pub(super) bare_values: Vec<HirScalar>,
-    pub(super) unknown_constructs: Vec<HirUnknownConstruct>,
-    pub(super) parameter_conditionals: Vec<HirParameterConditional>,
+    pub(super) properties: Arc<Vec<HirProperty>>,
+    pub(super) localisation_entries: Arc<Vec<HirLocalisationEntry>>,
+    pub(super) bare_values: Arc<Vec<HirScalar>>,
+    pub(super) unknown_constructs: Arc<Vec<HirUnknownConstruct>>,
+    pub(super) parameter_conditionals: Arc<Vec<HirParameterConditional>>,
 }
 
 struct FactCollector<'syntax> {
@@ -180,10 +181,10 @@ pub(super) fn collect(syntax: &ParsedFile) -> CollectedFacts {
     let mut collector = FactCollector::new(syntax);
     collector.collect(syntax.root(), true, false, &[]);
     CollectedFacts {
-        properties: collector.properties,
-        localisation_entries: collector.localisation_entries,
-        bare_values: collector.bare_values,
-        unknown_constructs: collector.unknown_constructs,
-        parameter_conditionals: collector.parameter_conditionals,
+        properties: Arc::new(collector.properties),
+        localisation_entries: Arc::new(collector.localisation_entries),
+        bare_values: Arc::new(collector.bare_values),
+        unknown_constructs: Arc::new(collector.unknown_constructs),
+        parameter_conditionals: Arc::new(collector.parameter_conditionals),
     }
 }

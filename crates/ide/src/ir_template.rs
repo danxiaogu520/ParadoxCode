@@ -13,6 +13,26 @@ use crate::types::{CancellationToken, Cancelled};
 pub(crate) use hir::template::Domain;
 
 pub(crate) type BodyAnalysis = hir::template_instance::TemplateInstance;
+mod body_memo;
+mod render_edit;
+pub(crate) use render_edit::boundary::prewarm as prewarm_template_boundary;
+
+#[cfg(test)]
+thread_local! {
+    static REUSE_RENDERING: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
+}
+
+#[cfg(test)]
+pub(crate) fn with_full_template_rendering<T>(run: impl FnOnce() -> T) -> T {
+    struct Reset(bool);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            REUSE_RENDERING.set(self.0);
+        }
+    }
+    let _reset = Reset(REUSE_RENDERING.replace(false));
+    run()
+}
 
 fn has_structural_reads(template: &hir::Template, snapshot: &AnalysisSnapshot) -> bool {
     use rules::template::{TemplateFragment, TemplateInstruction, TemplateOperand};
@@ -91,7 +111,16 @@ fn analyse_body_with_bindings(
         markers,
         None,
         cancellation,
+        None,
     )
+    .map(|body| {
+        body.map(|body| match body {
+            render_edit::RenderValidation::Body(body) => body,
+            render_edit::RenderValidation::Rejected(_) => {
+                unreachable!("ordinary validation retains its body")
+            }
+        })
+    })
 }
 
 struct ArgumentEdit {
@@ -100,6 +129,7 @@ struct ArgumentEdit {
     raw: String,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn analyse_body_with_argument_edit(
     snapshot: &AnalysisSnapshot,
     source: &hir::HirFile,
@@ -108,7 +138,8 @@ fn analyse_body_with_argument_edit(
     markers: &[String],
     edit: Option<&ArgumentEdit>,
     cancellation: &CancellationToken,
-) -> Result<Option<std::sync::Arc<BodyAnalysis>>, Cancelled> {
+    reject_parameter: Option<&str>,
+) -> Result<Option<render_edit::RenderValidation>, Cancelled> {
     let ir = snapshot.ir();
     let Some(field) = source.field_fact_at(invocation.key_range) else {
         return Ok(None);
@@ -187,21 +218,54 @@ fn analyse_body_with_argument_edit(
     if let (Some(memo), Some(key)) = (&memo, &key)
         && let Some(body) = memo.get::<BodyAnalysis>(key)
     {
-        return Ok(Some(body));
+        return Ok(Some(render_edit::RenderValidation::Body(body)));
     }
-    let body = std::sync::Arc::new(hir::template_instance::instantiate(
-        ir,
-        &facts,
-        template,
-        &bindings,
-        &raw,
-        &present,
-        schema,
-        state,
-        markers,
-        hir::template_instance::InstanceGoal::Validation,
-        &mut || cancellation.checkpoint(),
-    )?);
+    let shared_work = if let (Some(memo), Some(key)) = (&memo, &key) {
+        match body_memo::acquire(memo, key, cancellation)? {
+            body_memo::Claim::Ready(body) => {
+                return Ok(Some(render_edit::RenderValidation::Body(body)));
+            }
+            body_memo::Claim::Build(builder) => Some(builder),
+        }
+    } else {
+        None
+    };
+    let mut checkpoint = || cancellation.checkpoint();
+    let body = if let Some(parameter) = reject_parameter {
+        let Some(body) = hir::template_instance::instantiate_until_syntax_rejection(
+            ir,
+            &facts,
+            template,
+            &bindings,
+            &raw,
+            &present,
+            schema,
+            state,
+            markers,
+            parameter,
+            &mut checkpoint,
+        )?
+        else {
+            return Ok(Some(render_edit::RenderValidation::Rejected(
+                Default::default(),
+            )));
+        };
+        std::sync::Arc::new(body)
+    } else {
+        std::sync::Arc::new(hir::template_instance::instantiate(
+            ir,
+            &facts,
+            template,
+            &bindings,
+            &raw,
+            &present,
+            schema,
+            state,
+            markers,
+            hir::template_instance::InstanceGoal::Validation,
+            &mut || cancellation.checkpoint(),
+        )?)
+    };
     cancellation.checkpoint()?;
     if let (Some(memo), Some(key)) = (memo, key)
         && body.coverage.is_complete()
@@ -245,7 +309,10 @@ fn analyse_body_with_argument_edit(
             .sum::<usize>();
         memo.insert(key, body.clone(), bytes.saturating_add(trace_bytes));
     }
-    Ok(Some(body))
+    if let Some(builder) = shared_work {
+        builder.publish(body.clone());
+    }
+    Ok(Some(render_edit::RenderValidation::Body(body)))
 }
 
 pub(crate) fn evidence_dependencies(
@@ -1443,14 +1510,173 @@ pub(crate) fn consumption_at(
     Ok(None)
 }
 
-/// Rebinds the edited argument and checks all related uses in the original call context.
-pub(crate) fn validate_consumption_edit(
+/// Candidate trials reuse collision-checked marker prefixes. Their validation
+/// still rebinds the exact argument and checks every original consumption site.
+#[derive(Clone)]
+pub(crate) struct ConsumptionEditValidator<'a> {
+    snapshot: &'a AnalysisSnapshot,
+    input: &'a crate::support::ParsedInput,
+    projection: &'a ConsumptionProjection,
+    trial_prefixes: BTreeMap<u32, String>,
+    render_plan: Option<render_edit::RenderEdit<'a>>,
+}
+
+impl<'a> ConsumptionEditValidator<'a> {
+    #[cfg(test)]
+    pub(crate) fn has_render_plan(&self) -> bool {
+        self.render_plan.is_some()
+    }
+    pub(crate) fn new(
+        snapshot: &'a AnalysisSnapshot,
+        input: &'a crate::support::ParsedInput,
+        projection: &'a ConsumptionProjection,
+    ) -> Self {
+        Self {
+            snapshot,
+            input,
+            projection,
+            trial_prefixes: BTreeMap::new(),
+            render_plan: render_edit::RenderEdit::new(snapshot, input, projection),
+        }
+    }
+
+    pub(crate) fn validate(
+        &mut self,
+        item: &crate::CompletionItem,
+        interpretations: &mut Vec<crate::types::TemplateInterpretation>,
+        cancellation: &CancellationToken,
+    ) -> Result<Analysis<hir::analysis::Validation>, Cancelled> {
+        validate_consumption_edit(
+            self.snapshot,
+            self.input,
+            self.projection,
+            item,
+            interpretations,
+            &mut self.trial_prefixes,
+            self.render_plan.as_mut(),
+            cancellation,
+            false,
+        )
+    }
+    pub(crate) fn validate_with_known_frontier(
+        &mut self,
+        item: &crate::CompletionItem,
+        interpretations: &mut Vec<crate::types::TemplateInterpretation>,
+        cancellation: &CancellationToken,
+    ) -> Result<Analysis<hir::analysis::Validation>, Cancelled> {
+        if self.render_plan.as_mut().is_some_and(|plan| {
+            plan.reject_encoded(
+                self.snapshot,
+                self.input,
+                self.projection,
+                item,
+                self.trial_prefixes
+                    .get(&item.replacement_range.start())
+                    .map(String::as_str),
+            )
+        }) {
+            return Ok(Analysis {
+                value: hir::analysis::Validation::Invalid,
+                coverage: Default::default(),
+            });
+        }
+        let epoch = self
+            .render_plan
+            .as_ref()
+            .map_or(0, |plan| plan.syntax_epoch());
+        let checked = validate_consumption_edit(
+            self.snapshot,
+            self.input,
+            self.projection,
+            item,
+            interpretations,
+            &mut self.trial_prefixes,
+            self.render_plan.as_mut(),
+            cancellation,
+            true,
+        )?;
+        if let Some(plan) = &mut self.render_plan
+            && plan.syntax_epoch() != epoch
+        {
+            plan.remember_encoded(item);
+        }
+        Ok(checked)
+    }
+}
+
+// A single closed quoted token cannot create a parse frontier or another
+// property. Avoid building a throwaway CST before decoding this common carrier;
+// malformed, unquoted and long edits retain the ordinary bounded parse.
+fn closed_argument_value(raw: &str) -> Option<String> {
+    if raw.len() > 64 * 1024 {
+        return None;
+    }
+    let mut chars = raw.char_indices();
+    if chars.next()?.1 != '"' {
+        return None;
+    }
+    while let Some((offset, ch)) = chars.next() {
+        if ch == '\\' {
+            chars.next()?;
+        } else if ch == '"' {
+            return (offset + 1 == raw.len())
+                .then(|| parser::decode_quoted_script(raw).map(|(value, _)| value))
+                .flatten();
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod argument_tests {
+    use super::*;
+    #[test]
+    fn closed_carrier_matches_full_parser_including_unicode_and_escapes() {
+        let alphabet = ['a', '"', '\\', '\n', '中', '😀', '$', '{', '=', '}'];
+        let mut seed = 17u64;
+        for n in 0..4096 {
+            let mut raw = String::from("\"");
+            for _ in 0..n % 24 {
+                seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                raw.push(alphabet[(seed >> 32) as usize % alphabet.len()]);
+            }
+            raw.push('"');
+            let Some(value) = closed_argument_value(&raw) else {
+                continue;
+            };
+            let source = format!("value = {raw}");
+            let parsed = parser::parse(parser::FileFormat::Script, &source);
+            assert!(parsed.errors().is_empty(), "{raw:?}");
+            let quoted = parsed
+                .tokens()
+                .iter()
+                .find(|token| token.kind() == parser::TokenKind::Quoted)
+                .unwrap();
+            assert_eq!(parsed.text(quoted.range()), Some(raw.as_str()));
+            assert_eq!(
+                value,
+                parser::decode_quoted_script(parsed.text(quoted.range()).unwrap())
+                    .unwrap()
+                    .0
+            );
+        }
+        for raw in ["\"unterminated", "\"a\" extra", "not_quoted"] {
+            assert!(closed_argument_value(raw).is_none());
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_consumption_edit(
     snapshot: &AnalysisSnapshot,
     input: &crate::support::ParsedInput,
     projection: &ConsumptionProjection,
     item: &crate::CompletionItem,
     interpretations: &mut Vec<crate::types::TemplateInterpretation>,
+    trial_prefixes: &mut BTreeMap<u32, String>,
+    render_plan: Option<&mut render_edit::RenderEdit<'_>>,
     cancellation: &CancellationToken,
+    known_incomplete: bool,
 ) -> Result<Analysis<hir::analysis::Validation>, Cancelled> {
     use hir::analysis::Validation;
     cancellation.checkpoint()?;
@@ -1484,16 +1710,20 @@ pub(crate) fn validate_consumption_edit(
         });
     }
     let mut raw = input.source_text(range).unwrap_or_default().to_owned();
-    let mut salt = 0;
-    let prefix = loop {
-        let prefix = format!("__pdc_trial_{}_{}", item.replacement_range.start(), salt);
-        if !input.source.contains(&prefix) {
-            break prefix;
-        }
-        salt += 1;
-    };
+    let prefix = trial_prefixes
+        .entry(item.replacement_range.start())
+        .or_insert_with(|| {
+            let mut salt = 0;
+            loop {
+                let prefix = format!("__pdc_trial_{}_{}", item.replacement_range.start(), salt);
+                if !input.source.contains(&prefix) {
+                    break prefix;
+                }
+                salt += 1;
+            }
+        });
     let (text, markers) = if item.is_snippet {
-        crate::insertion::snippet_trial(&item.insert_text, &prefix)
+        crate::insertion::snippet_trial(&item.insert_text, prefix)
     } else {
         (item.insert_text.clone(), Vec::new())
     };
@@ -1511,64 +1741,96 @@ pub(crate) fn validate_consumption_edit(
             ..(item.replacement_range.end() - range.start()) as usize,
         &text,
     );
-    let source = format!("value = {raw}");
-    let parsed = match parser::parse_script_bounded(&source, Default::default(), &mut || {
-        cancellation.checkpoint()
-    })? {
-        Ok(parsed) => parsed,
-        Err(limit) => {
+    let (raw, value) = if let Some(value) = closed_argument_value(&raw) {
+        (raw, value)
+    } else {
+        let source = format!("value = {raw}");
+        let parsed = match parser::parse_script_bounded(&source, Default::default(), &mut || {
+            cancellation.checkpoint()
+        })? {
+            Ok(parsed) => parsed,
+            Err(limit) => {
+                return Ok(Analysis {
+                    value: Validation::Unknown,
+                    coverage: hir::analysis::AnalysisCoverage {
+                        limits: BTreeSet::from([hir::template_text::parse_limit(limit)]),
+                        residuals: Default::default(),
+                    },
+                });
+            }
+        };
+        let scalar = parsed
+            .root()
+            .children()
+            .find(|node| node.kind() == parser::CstKind::Property)
+            .and_then(|node| {
+                node.children()
+                    .find(|node| node.kind() == parser::CstKind::Value)
+            })
+            .and_then(|node| {
+                node.children().find(|node| {
+                    matches!(
+                        node.kind(),
+                        parser::CstKind::BareValue | parser::CstKind::QuotedString
+                    )
+                })
+            });
+        let Some(scalar) = scalar else {
             return Ok(Analysis {
                 value: Validation::Unknown,
-                coverage: hir::analysis::AnalysisCoverage {
-                    limits: BTreeSet::from([hir::template_text::parse_limit(limit)]),
-                    residuals: Default::default(),
-                },
+                coverage: Default::default(),
             });
-        }
+        };
+        let raw = parsed.text(scalar.range()).unwrap_or_default().to_owned();
+        let value =
+            parser::decode_quoted_script(&raw).map_or_else(|| raw.clone(), |(value, _)| value);
+        (raw, value)
     };
-    let scalar = parsed
-        .root()
-        .children()
-        .find(|node| node.kind() == parser::CstKind::Property)
-        .and_then(|node| {
-            node.children()
-                .find(|node| node.kind() == parser::CstKind::Value)
-        })
-        .and_then(|node| {
-            node.children().find(|node| {
-                matches!(
-                    node.kind(),
-                    parser::CstKind::BareValue | parser::CstKind::QuotedString
-                )
-            })
-        });
-    let Some(scalar) = scalar else {
-        return Ok(Analysis {
-            value: Validation::Unknown,
-            coverage: Default::default(),
-        });
-    };
-    let raw = parsed.text(scalar.range()).unwrap_or_default().to_owned();
-    let value = parser::decode_quoted_script(&raw).map_or_else(|| raw.clone(), |(value, _)| value);
     let edit = ArgumentEdit {
         key_range: projection.argument,
         value,
         raw,
     };
-    let Some(body) = analyse_body_with_argument_edit(
-        snapshot,
-        original,
-        invocation,
-        &BTreeMap::new(),
-        &markers,
-        Some(&edit),
-        cancellation,
-    )?
-    else {
-        return Ok(Analysis {
-            value: Validation::Unknown,
-            coverage: Default::default(),
-        });
+    let reused = if let Some(plan) = render_plan {
+        plan.validate(
+            snapshot,
+            &edit,
+            &item.label,
+            &markers,
+            cancellation,
+            known_incomplete,
+        )?
+    } else {
+        None
+    };
+    let result = if reused.is_some() {
+        reused
+    } else {
+        analyse_body_with_argument_edit(
+            snapshot,
+            original,
+            invocation,
+            &BTreeMap::new(),
+            &markers,
+            Some(&edit),
+            cancellation,
+            known_incomplete.then_some(projection.parameter.as_str()),
+        )?
+    };
+    let body = match result {
+        Some(render_edit::RenderValidation::Rejected(coverage)) => {
+            return Ok(Analysis {
+                value: Validation::Invalid,
+                coverage,
+            });
+        }
+        Some(render_edit::RenderValidation::Body(body)) => body,
+        None => {
+            return Ok(Analysis {
+                value: Validation::Unknown,
+                coverage: Default::default(),
+            });
+        }
     };
     *interpretations = body_interpretations(&body, &projection.parameter);
     let rejected = body
@@ -1641,4 +1903,113 @@ pub(crate) fn for_each_consumption(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod encoded_rejection_tests {
+    use super::*;
+    use std::sync::Arc;
+    #[test]
+    fn encoded_preflight_matches_full_proofs_and_keeps_range_marker_and_budget_guards() {
+        let mut host = engine::AnalysisHost::with_ir(
+            game::eu4::runtime_rules().unwrap(),
+            game::eu4::profile(),
+            game::eu4::first_party_ir().unwrap(),
+        );
+        host.open_document(engine::DocumentId::new("file:///encoded/common/scripted_effects/wrappers.txt"), 1,
+            "prefix_shared={set_variable={which=counter value=1} while={limit={check_variable={which=counter value=1}} $BODY$ subtract_variable={which=counter value=1}}}".into(), None).unwrap();
+        let source = "# 中文😀\r\ncountry_event={immediate={prefix_shared={BODY=\"random_owned_province={limit={religion=shiite} @={type=religious_rebels size=1}}\"}}}";
+        let position = source.find('@').unwrap() as u32;
+        let id = engine::DocumentId::new("file:///encoded/events/sample.txt");
+        host.open_document(id.clone(), 1, source.replace('@', ""), None)
+            .unwrap();
+        let snapshot = host.snapshot();
+        let input = crate::support::input_for_document(&snapshot, &id).unwrap();
+        let projection = consumption_at(&snapshot, &input, position, &CancellationToken::new())
+            .unwrap()
+            .unwrap();
+        let point = &projection.positions[0];
+        let item = |label: &str, snippet: &str| {
+            let generated_range =
+                crate::support::word_range(&projection.body.rendered.text, point.generated);
+            let (range, text) = projection
+                .edit(point, generated_range, snippet, true)
+                .unwrap();
+            crate::CompletionItem {
+                label: label.into(),
+                insert_text: text,
+                replacement_range: range,
+                is_snippet: true,
+                kind: crate::CompletionKind::Key,
+                detail: String::new(),
+                documentation: None,
+                sort_score: 0,
+                deprecated: false,
+                resolve_data: None,
+                template_evidence: None,
+            }
+        };
+        let mut validator = ConsumptionEditValidator::new(&snapshot, &input, &projection);
+        assert!(validator.render_plan.is_some());
+        let reference = |candidate: &crate::CompletionItem| {
+            with_full_template_rendering(|| {
+                ConsumptionEditValidator::new(&snapshot, &input, &projection)
+                    .validate(candidate, &mut Vec::new(), &CancellationToken::new())
+                    .unwrap()
+            })
+        };
+        for label in ["add_base_tax", "add_base_manpower", "add_base_production"] {
+            let candidate = item(label, &format!("{label} = {{\n\t$0\n}}"));
+            let result = validator
+                .validate_with_known_frontier(
+                    &candidate,
+                    &mut Vec::new(),
+                    &CancellationToken::new(),
+                )
+                .unwrap();
+            assert_eq!(result.value, reference(&candidate).value, "{label}");
+            assert_eq!(result.value, hir::analysis::Validation::Invalid);
+        }
+        let hits = validator.render_plan.as_ref().unwrap().encoded_hits();
+        assert!(
+            hits > 0,
+            "the third identical carrier shape must skip decoding"
+        );
+        let mut changed = item("add_base_tax", "add_base_tax = $0");
+        let result = validator
+            .validate_with_known_frontier(&changed, &mut Vec::new(), &CancellationToken::new())
+            .unwrap();
+        assert_eq!(result.value, reference(&changed).value);
+        assert_eq!(validator.render_plan.as_ref().unwrap().encoded_hits(), hits);
+        changed = item("add_base_tax", "add_base_tax = {\n\t$0\n}");
+        changed.replacement_range = text::TextRange::new(
+            changed.replacement_range.start(),
+            changed.replacement_range.end() + 1,
+        )
+        .unwrap();
+        let result = validator
+            .validate_with_known_frontier(&changed, &mut Vec::new(), &CancellationToken::new())
+            .unwrap();
+        assert_eq!(result.value, reference(&changed).value);
+        assert_eq!(validator.render_plan.as_ref().unwrap().encoded_hits(), hits);
+        let candidate = item("add_base_tax", "add_base_tax = {\n\t$0\n}");
+        let prefix = validator
+            .trial_prefixes
+            .get(&candidate.replacement_range.start())
+            .unwrap()
+            .clone();
+        let plan = validator.render_plan.as_mut().unwrap();
+        let mut near_budget = input.clone();
+        near_budget.source = Arc::from("x".repeat(parser::ScriptParseBudget::default().bytes));
+        assert!(!plan.reject_encoded(
+            &snapshot,
+            &near_budget,
+            &projection,
+            &candidate,
+            Some(&prefix)
+        ));
+        let label = format!("{prefix}_0");
+        let collision = item(&label, &format!("{label} = {{\n\t$0\n}}"));
+        assert!(!plan.reject_encoded(&snapshot, &input, &projection, &collision, Some(&prefix)));
+    }
 }

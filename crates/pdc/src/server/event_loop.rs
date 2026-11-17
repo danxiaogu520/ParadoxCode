@@ -115,6 +115,9 @@ impl LspServer {
             let mut in_flight_initialize = None::<InFlightInitialize>;
             let mut initialize_progress_token = None::<String>;
             let mut ready_logged = false;
+            let mut prepared_completion = None::<Arc<rules::template::TemplateMemo>>;
+            let mut preparing_completion =
+                None::<(Arc<rules::template::TemplateMemo>, WorkspaceScanToken)>;
             let mut in_flight_index = None::<InFlightIndexSlot>;
             let mut index_progress_token = None::<String>;
             let mut in_flight_dependency = None::<InFlightDependencySlot>;
@@ -214,6 +217,67 @@ impl LspServer {
                 // rebuilds serve partial state instead of freezing the editor.
                 let vanilla_load_busy = in_flight_index.as_ref().is_some_and(|task| task.is_load);
                 let dependency_load_busy = in_flight_dependency.is_some();
+                let completion_inputs_ready = matches!(
+                    self.state,
+                    ServerState::Initialized | ServerState::ShuttingDown
+                ) && !initialize_busy
+                    && in_flight_index.is_none()
+                    && !dependency_load_busy
+                    && !scan_busy
+                    && !self.scan_pending
+                    && self.deferred_setup_events.events.is_empty();
+                if completion_inputs_ready {
+                    let snapshot = self.host.snapshot();
+                    let memo = snapshot.shared_template_memo();
+                    let prepared = self.state == ServerState::ShuttingDown
+                        || prepared_completion
+                            .as_ref()
+                            .is_some_and(|old| Arc::ptr_eq(old, &memo));
+                    if !prepared && preparing_completion.is_none() {
+                        let cancellation = WorkspaceScanToken::new();
+                        let worker_cancellation = cancellation.clone();
+                        preparing_completion = Some((memo.clone(), cancellation));
+                        let sender = event_sender.clone();
+                        let snapshot = snapshot.clone();
+                        scope.spawn(move || {
+                            let result =
+                                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                    ide::prewarm_completion(&snapshot, &mut || {
+                                        worker_cancellation.checkpoint()
+                                    })
+                                }))
+                                .unwrap_or_else(|_| {
+                                    Err(WorkspaceError::Io(io::Error::other(
+                                        "completion preparation worker failed",
+                                    )))
+                                });
+                            let _ =
+                                sender.send(TransportEvent::CompletionPrepared { memo, result });
+                        });
+                    }
+                    if prepared && !ready_logged {
+                        write_message(
+                            &mut output,
+                            &log_message_notification(
+                                MessageType::INFO,
+                                "pdc ready — workspace indexed".to_owned(),
+                            ),
+                        )?;
+                        write_message(
+                            &mut output,
+                            &ready_notification(snapshot.revision(), snapshot.source_files().len()),
+                        )?;
+                        ready_logged = true;
+                        self.arm_background_reindex();
+                        self.request_workspace_diagnostics();
+                    }
+                }
+                if self.state == ServerState::ShuttingDown
+                    && let Some((_, cancellation)) = &preparing_completion
+                {
+                    cancellation.cancel();
+                }
+                let completion_preparation_busy = preparing_completion.is_some();
                 // A deferred `exit` may only run once every queued publication
                 // and commit has landed — the same set the shutdown drain at
                 // the bottom of this loop waits on; keep the two in sync.
@@ -224,6 +288,7 @@ impl LspServer {
                 let front_deferred_exit =
                     deferred_messages.front().is_some_and(is_exit_notification);
                 let shutdown_owes_work = !self.pending_parses.is_empty()
+                    || completion_preparation_busy
                     || !in_flight_parses.is_empty()
                     || !self.pending_diagnostics.is_empty()
                     || !in_flight.is_empty()
@@ -241,6 +306,7 @@ impl LspServer {
                     || in_flight_reindex_command.is_some()
                     || in_flight_format_command.is_some();
                 let deferred_ready = !parse_busy
+                    && !completion_preparation_busy
                     && !initialize_busy
                     && !disk_changes_busy
                     && !scan_busy
@@ -359,7 +425,10 @@ impl LspServer {
                             && (((parse_busy || disk_changes_busy)
                                 && (is_snapshot_request_message(&message)
                                     || is_exit_notification(&message)))
-                                || ((scan_busy || vanilla_load_busy || dependency_load_busy)
+                                || ((scan_busy
+                                    || vanilla_load_busy
+                                    || dependency_load_busy
+                                    || completion_preparation_busy)
                                     && is_snapshot_request_message(&message))
                                 || execute_command_busy
                                 || ordered_after_deferred
@@ -624,37 +693,6 @@ impl LspServer {
                         index_progress_token = spawned.index_progress_token;
                         in_flight_dependency = spawned.dependency;
                         dependency_progress_token = spawned.dependency_progress_token;
-                        // Readiness requires idle workers and no scan still
-                        // to start or finish; a scheduled-but-unspawned scan
-                        // leaves every slot momentarily empty without the
-                        // workspace being complete.
-                        let setup_idle =
-                            !self.scan_pending && self.deferred_setup_events.events.is_empty();
-                        if in_flight_index.is_none()
-                            && in_flight_dependency.is_none()
-                            && in_flight_scan.is_none()
-                            && setup_idle
-                            && !ready_logged
-                        {
-                            write_message(
-                                &mut output,
-                                &log_message_notification(
-                                    MessageType::INFO,
-                                    "pdc ready — workspace indexed".to_owned(),
-                                ),
-                            )?;
-                            let snapshot = self.host.snapshot();
-                            write_message(
-                                &mut output,
-                                &ready_notification(
-                                    snapshot.revision(),
-                                    snapshot.source_files().len(),
-                                ),
-                            )?;
-                            ready_logged = true;
-                            self.arm_background_reindex();
-                            self.request_workspace_diagnostics();
-                        }
                     }
                     TransportEvent::Parse(result) => {
                         if in_flight_parses
@@ -671,6 +709,18 @@ impl LspServer {
                                 result.version,
                                 DIAGNOSTIC_DEBOUNCE,
                             );
+                        }
+                    }
+                    TransportEvent::CompletionPrepared { memo, result } => {
+                        if preparing_completion
+                            .as_ref()
+                            .is_some_and(|(current, _)| Arc::ptr_eq(current, &memo))
+                        {
+                            preparing_completion = None;
+                            // Failed preparation must not keep the transport in a retry loop.
+                            if result.is_ok() || self.state == ServerState::Initialized {
+                                prepared_completion = Some(memo);
+                            }
                         }
                     }
                     TransportEvent::Diagnostics(result) => {
@@ -889,30 +939,6 @@ impl LspServer {
                         for event in std::mem::take(&mut self.deferred_setup_events).events {
                             let _ = event_sender.send(event);
                         }
-                        if in_flight_index.is_none()
-                            && in_flight_dependency.is_none()
-                            && in_flight_scan.is_none()
-                            && !ready_logged
-                        {
-                            write_message(
-                                &mut output,
-                                &log_message_notification(
-                                    MessageType::INFO,
-                                    "pdc ready — workspace indexed".to_owned(),
-                                ),
-                            )?;
-                            let snapshot = self.host.snapshot();
-                            write_message(
-                                &mut output,
-                                &ready_notification(
-                                    snapshot.revision(),
-                                    snapshot.source_files().len(),
-                                ),
-                            )?;
-                            ready_logged = true;
-                            self.arm_background_reindex();
-                            self.request_workspace_diagnostics();
-                        }
                     }
                     TransportEvent::DependencySetup(result) => {
                         if self.scan_pending || in_flight_scan.is_some() {
@@ -1053,31 +1079,6 @@ impl LspServer {
                                 );
                             }
                         }
-                        if in_flight_index.is_none()
-                            && in_flight_dependency.is_none()
-                            && in_flight_scan.is_none()
-                            && !ready_logged
-                        {
-                            write_message(
-                                &mut output,
-                                &log_message_notification(
-                                    MessageType::INFO,
-                                    "pdc ready — workspace, Vanilla and dependency indexes loaded"
-                                        .to_owned(),
-                                ),
-                            )?;
-                            let snapshot = self.host.snapshot();
-                            write_message(
-                                &mut output,
-                                &ready_notification(
-                                    snapshot.revision(),
-                                    snapshot.source_files().len(),
-                                ),
-                            )?;
-                            ready_logged = true;
-                            self.arm_background_reindex();
-                            self.request_workspace_diagnostics();
-                        }
                     }
                     TransportEvent::VanillaSetup(result) => {
                         if self.scan_pending || in_flight_scan.is_some() {
@@ -1188,31 +1189,6 @@ impl LspServer {
                                 &mut output,
                                 &work_done_progress_end(&token, &outcome_message),
                             )?;
-                        }
-                        if in_flight_index.is_none()
-                            && in_flight_dependency.is_none()
-                            && in_flight_scan.is_none()
-                            && !ready_logged
-                        {
-                            write_message(
-                                &mut output,
-                                &log_message_notification(
-                                    MessageType::INFO,
-                                    "pdc ready — workspace, Vanilla and dependency indexes loaded"
-                                        .to_owned(),
-                                ),
-                            )?;
-                            let snapshot = self.host.snapshot();
-                            write_message(
-                                &mut output,
-                                &ready_notification(
-                                    snapshot.revision(),
-                                    snapshot.source_files().len(),
-                                ),
-                            )?;
-                            ready_logged = true;
-                            self.arm_background_reindex();
-                            self.request_workspace_diagnostics();
                         }
                     }
                     TransportEvent::BackgroundReindex(result) => {
@@ -1619,7 +1595,9 @@ impl LspServer {
                 }
 
                 let draining_shutdown = self.state == ServerState::ShuttingDown
-                    && (!self.pending_parses.is_empty()
+                    && ((!ready_logged && self.deferred_setup_events.events.is_empty())
+                        || preparing_completion.is_some()
+                        || !self.pending_parses.is_empty()
                         || !in_flight_parses.is_empty()
                         || !self.pending_diagnostics.is_empty()
                         || !in_flight.is_empty()
