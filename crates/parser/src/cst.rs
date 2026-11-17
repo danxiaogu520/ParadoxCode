@@ -86,6 +86,17 @@ impl SyntaxTree {
         }
     }
 
+    pub(crate) fn try_map_ranges(
+        &self,
+        mut map: impl FnMut(TextRange) -> Option<TextRange>,
+    ) -> Option<Self> {
+        let mut tree = self.clone();
+        for core in &mut tree.cores {
+            core.range = map(core.range)?;
+        }
+        Some(tree)
+    }
+
     /// Returns the number of nodes in the tree, including the root.
     #[must_use]
     pub fn node_count(&self) -> usize {

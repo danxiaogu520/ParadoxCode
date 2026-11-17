@@ -34,7 +34,9 @@ pub struct IndexSymbolFacts<'a> {
     overlays: &'a [Arc<HirFile>],
     excluded_file_ids: Option<&'a BTreeSet<SourceFileId>>,
     template_memo: Arc<rules::template::TemplateMemo>,
+    shared_memo: Option<Arc<rules::template::TemplateMemo>>,
     templates: OnceLock<BTreeMap<String, crate::FlagWriteIndex>>,
+    overlay_symbols: OnceLock<crate::OverlaySymbols>,
 }
 
 impl<'a> IndexSymbolFacts<'a> {
@@ -50,7 +52,9 @@ impl<'a> IndexSymbolFacts<'a> {
             overlays,
             excluded_file_ids: None,
             template_memo: Arc::new(Default::default()),
+            shared_memo: None,
             templates: OnceLock::new(),
+            overlay_symbols: OnceLock::new(),
         }
     }
 
@@ -67,8 +71,16 @@ impl<'a> IndexSymbolFacts<'a> {
             overlays,
             excluded_file_ids: Some(excluded_file_ids),
             template_memo: Arc::new(Default::default()),
+            shared_memo: None,
             templates: OnceLock::new(),
+            overlay_symbols: OnceLock::new(),
         }
+    }
+
+    /// Reuses computations only after validating their complete read receipts.
+    pub fn with_shared_template_memo(mut self, memo: Arc<rules::template::TemplateMemo>) -> Self {
+        self.shared_memo = Some(memo);
+        self
     }
 
     fn has_member(&self, kind: &str, name: &str) -> bool {
@@ -80,19 +92,17 @@ impl<'a> IndexSymbolFacts<'a> {
                         .excluded_file_ids
                         .is_none_or(|files| !files.contains(&definition.file_id))
             })
-            || self.overlays.iter().any(|hir| {
-                hir.definitions().iter().any(|definition| {
-                    definition.kind.eq_ignore_ascii_case(kind)
-                        && definition.name.eq_ignore_ascii_case(name)
-                })
-            })
+            || self
+                .overlay_symbols
+                .get_or_init(|| crate::OverlaySymbols::new(self.overlays))
+                .member(kind, name)
             || self.template_member(kind, name)
     }
 
     fn template_member(&self, kind: &str, name: &str) -> bool {
         let templates = self.templates.get_or_init(|| {
             let mut templates = BTreeMap::<String, crate::FlagWriteIndex>::new();
-            for (definition, active) in self.index.definition_identities() {
+            for (definition, active) in self.index.pattern_definition_identities() {
                 if active
                     && definition.name.contains('$')
                     && self
@@ -151,20 +161,17 @@ impl<'a> IndexSymbolFacts<'a> {
                         })
                     })
             })
-            || self.overlays.iter().any(|hir| {
-                hir.definition_attributes().iter().any(|attrs| {
-                    attrs.kind.eq_ignore_ascii_case(kind)
-                        && attrs.name.eq_ignore_ascii_case(instance)
-                        && attrs
-                            .subtypes
-                            .iter()
-                            .any(|candidate| candidate.eq_ignore_ascii_case(subtype))
-                })
-            })
+            || self
+                .overlay_symbols
+                .get_or_init(|| crate::OverlaySymbols::new(self.overlays))
+                .subtype(kind, instance, subtype)
     }
 }
 
 impl rules::ir::SymbolFacts for IndexSymbolFacts<'_> {
+    fn shared_template_memo(&self) -> Option<Arc<rules::template::TemplateMemo>> {
+        self.shared_memo.clone()
+    }
     fn template_accepts_no_arguments(
         &self,
         type_id: rules::ir::TypeId,
@@ -184,20 +191,12 @@ impl rules::ir::SymbolFacts for IndexSymbolFacts<'_> {
         name: &str,
     ) -> Option<Arc<rules::template::Template>> {
         let kind = self.ir.strings.resolve(self.ir.type_info(type_id).name);
-        let mut overlay = None;
-        for hir in self.overlays {
-            for definition in hir.definitions().iter().filter(|definition| {
-                definition.kind.eq_ignore_ascii_case(kind)
-                    && definition.name.eq_ignore_ascii_case(name)
-            }) {
-                if overlay.is_some() {
-                    return None;
-                }
-                overlay = Some(hir.dynamic_template(kind, name, definition.range));
-            }
-        }
-        if let Some(template) = overlay {
-            return template.cloned().map(Arc::new);
+        if let Some(template) = self
+            .overlay_symbols
+            .get_or_init(|| crate::OverlaySymbols::new(self.overlays))
+            .template(kind, name)
+        {
+            return template;
         }
         let definition = self.index.active_definition(kind, name)?;
         if self
@@ -467,6 +466,46 @@ pub fn prepare_document_snapshot_with_ir(
     prepare_document_snapshot_impl(rules, profile, Some(ir), None, roots, document)
 }
 
+/// Uses an immutable base from the same analysis context for isolated scalar edits.
+pub fn prepare_document_snapshot_incremental_with_ir(
+    rules: &RuleSet,
+    profile: &GameProfile,
+    ir: &RulesIr,
+    roots: &[SourceRoot],
+    mut document: DocumentSnapshot,
+    previous: &HirFile,
+) -> DocumentSnapshot {
+    let Some((ParserKind::Script, Some(path))) = parser_for_document(
+        Some(ir),
+        rules,
+        profile,
+        roots,
+        &document.id,
+        document.path.as_deref(),
+    ) else {
+        return prepare_document_snapshot_with_ir(rules, profile, ir, roots, document);
+    };
+    let edit = parser::prepare_script_quoted_edit(previous.syntax(), document.text.clone());
+    let parsed = edit.as_ref().map_or_else(
+        || {
+            record_pipeline_parse();
+            Arc::new(parse(FileFormat::Script, &document.text))
+        },
+        |edit| edit.parsed(),
+    );
+    let hir = edit
+        .as_ref()
+        .and_then(|edit| hir::rebase_ignored_quoted_edit(previous, edit))
+        .or_else(|| hir::rebase_ignored_quoted_scalar(previous, parsed.clone()))
+        .unwrap_or_else(|| {
+            record_pipeline_lower();
+            lower_shared_with_ir(parsed.clone(), &path, rules, profile, ir)
+        });
+    document.parsed = Some(ParsedSource::Text(parsed));
+    document.hir = Some(Arc::new(hir));
+    document
+}
+
 /// Prepares a document using schema IR and candidate workspace symbol facts.
 pub fn prepare_document_snapshot_with_ir_and_facts(
     rules: &RuleSet,
@@ -545,12 +584,14 @@ pub(crate) fn relower_document_snapshot(
         return document;
     };
     record_pipeline_lower();
-    document.hir = Some(Arc::new(match facts {
-        Some(facts) => {
-            lower_shared_with_ir_and_facts(parsed.clone(), &path, rules, profile, ir, facts)
-        }
-        None => lower_shared_with_ir(parsed.clone(), &path, rules, profile, ir),
-    }));
+    document.hir = Some(Arc::new(hir::relower_shared_with_ir(
+        parsed.clone(),
+        document.hir.as_deref(),
+        &path,
+        profile,
+        ir,
+        facts,
+    )));
     document
 }
 

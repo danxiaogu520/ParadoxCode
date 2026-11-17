@@ -241,12 +241,33 @@ pub struct RulesIr {
 }
 
 /// Name → id indexes, built once at the end of lowering.
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 struct Lookups {
     schemas: FxHashMap<Symbol, SchemaId>,
     types: FxHashMap<Symbol, TypeId>,
     traits: FxHashMap<Symbol, TraitId>,
     enums: FxHashMap<Symbol, EnumId>,
+    prepared: std::sync::OnceLock<PreparedRules>,
+}
+
+impl Clone for Lookups {
+    fn clone(&self) -> Self {
+        Self {
+            schemas: self.schemas.clone(),
+            types: self.types.clone(),
+            traits: self.traits.clone(),
+            enums: self.enums.clone(),
+            prepared: Default::default(),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct PreparedRules {
+    owner: std::sync::Weak<RulesIr>,
+    groups: Vec<Vec<Vec<FieldId>>>,
+    schema_queries: Vec<bool>,
+    template_kinds: std::sync::Arc<std::collections::BTreeSet<String>>,
 }
 
 /// One `files` entry: which documents a rule selects and how their root is
@@ -648,16 +669,21 @@ impl ScopeModel {
             if !register.chain {
                 return None;
             }
-            let name = name.replace('_', "");
-            let base = base.replace('_', "");
-            (!base.is_empty()
-                && name.len().is_multiple_of(base.len())
-                && !name.is_empty()
+            let mut base_bytes = base.bytes().filter(|byte| *byte != b'_');
+            let first = base_bytes.next()?;
+            let mut name_bytes = name.bytes().filter(|byte| *byte != b'_');
+            if !name_bytes.next()?.eq_ignore_ascii_case(&first) {
+                return None;
+            }
+            let base_len = 1 + base_bytes.count();
+            let name_len = 1 + name_bytes.count();
+            (name_len.is_multiple_of(base_len)
                 && name
-                    .as_bytes()
-                    .chunks(base.len())
-                    .all(|part| part.eq_ignore_ascii_case(base.as_bytes())))
-            .then(|| (register, name.len() / base.len()))
+                    .bytes()
+                    .filter(|byte| *byte != b'_')
+                    .zip(base.bytes().filter(|byte| *byte != b'_').cycle())
+                    .all(|(actual, expected)| actual.eq_ignore_ascii_case(&expected)))
+            .then_some((register, name_len / base_len))
         })
     }
 
@@ -777,6 +803,16 @@ impl GameConfig {
 /// A `ref<…>` matcher may name a symbol that only the
 /// workspace index knows, so the IR asks for it instead of guessing.
 pub trait SymbolFacts {
+    /// A dependency-validated memo that may outlive this fact view. Consumers
+    /// must validate and replay every recorded read before reusing its values.
+    fn shared_template_memo(&self) -> Option<std::sync::Arc<crate::template::TemplateMemo>> {
+        None
+    }
+    /// The same immutable answers without dependency recording, for speculative
+    /// cache validation. A successful hit must replay its reads through `self`.
+    fn untracked_view(&self) -> Option<&dyn SymbolFacts> {
+        None
+    }
     /// False when a related discovery transaction has not committed stable facts.
     fn facts_complete(&self) -> bool {
         true
@@ -880,7 +916,7 @@ pub struct Candidates<'ir> {
     ir: &'ir RulesIr,
     exact: std::slice::Iter<'ir, FieldId>,
     patterns: std::slice::Iter<'ir, FieldId>,
-    shape: Shape,
+    shape: Option<Shape>,
 }
 
 impl Iterator for Candidates<'_> {
@@ -888,12 +924,18 @@ impl Iterator for Candidates<'_> {
 
     fn next(&mut self) -> Option<FieldId> {
         for id in self.exact.by_ref() {
-            if self.ir.shape(*id) == Some(self.shape) {
+            if self
+                .shape
+                .is_none_or(|shape| self.ir.shape(*id) == Some(shape))
+            {
                 return Some(*id);
             }
         }
         for id in self.patterns.by_ref() {
-            if self.ir.shape(*id) == Some(self.shape) {
+            if self
+                .shape
+                .is_none_or(|shape| self.ir.shape(*id) == Some(shape))
+            {
                 return Some(*id);
             }
         }
@@ -922,6 +964,52 @@ impl RulesIr {
     /// Compiler-owned mutable arenas continue to use `rule_hash` directly.
     #[must_use]
     pub fn shared_rule_hash(ir: &std::sync::Arc<Self>) -> crate::RuleHash {
+        ir.lookups.prepared.get_or_init(|| {
+            let groups = ir
+                .schemas
+                .iter()
+                .map(|schema| {
+                    let mut groups = std::collections::BTreeMap::<usize, Vec<FieldId>>::new();
+                    for id in schema
+                        .exact
+                        .values()
+                        .flatten()
+                        .chain(schema.patterns.iter())
+                        .copied()
+                    {
+                        groups.entry(ir.field(id).key.index()).or_default().push(id);
+                    }
+                    groups
+                        .into_values()
+                        .filter_map(|mut ids| {
+                            ids.sort_unstable();
+                            ids.dedup();
+                            ids.iter()
+                                .any(|id| {
+                                    let card = ir.field(*id).card;
+                                    card.min > 0 || card.max.is_some()
+                                })
+                                .then_some(ids)
+                        })
+                        .collect()
+                })
+                .collect();
+            PreparedRules {
+                owner: std::sync::Arc::downgrade(ir),
+                schema_queries: ir.schemas.iter().map(|schema| {
+                    schema.items.is_some_and(|matcher|ir.matcher_uses_query(matcher))
+                        || schema.exact.values().flatten().chain(schema.patterns.iter()).any(|id| {
+                            let field=ir.field(*id);
+                            ir.matcher_uses_query(field.key) || matches!(field.value,FieldValue::Scalar(matcher) if ir.matcher_uses_query(matcher))
+                        })
+                }).collect(),
+                groups,
+                template_kinds: std::sync::Arc::new(ir.trait_by_name("Template").map_or_else(Default::default, |template| {
+                    ir.types.iter().filter(|ty| ty.trait_impls.iter().any(|implementation| implementation.trait_id == template))
+                        .map(|ty| ir.strings().resolve(ty.name).to_ascii_lowercase()).collect()
+                })),
+            }
+        });
         type Entry = (std::sync::Weak<RulesIr>, crate::RuleHash);
         static IDENTITIES: std::sync::Mutex<Vec<Entry>> = std::sync::Mutex::new(Vec::new());
         let mut identities = IDENTITIES.lock().expect("rules identity lock poisoned");
@@ -939,6 +1027,47 @@ impl RulesIr {
         }
         identities.push((owner, hash));
         hash
+    }
+
+    /// Shared constraints are valid only in the allocation frozen by
+    /// `shared_rule_hash`. Clones and weak-dissociating `Arc::make_mut` calls
+    /// must use current mutable fields instead of an old prepared plan.
+    #[must_use]
+    pub fn constrained_field_families(&self, schema: SchemaId) -> Option<&[Vec<FieldId>]> {
+        let prepared = self.lookups.prepared.get()?;
+        (std::ptr::eq(prepared.owner.as_ptr(), self) && prepared.owner.strong_count() > 0)
+            .then(|| prepared.groups.get(schema.index()).map(Vec::as_slice))
+            .flatten()
+    }
+
+    /// Whether selecting a direct field or list item can inspect siblings.
+    /// A mutable or cloned arena must compute this from its current fields.
+    #[must_use]
+    pub fn prepared_schema_queries(&self, schema: SchemaId) -> Option<bool> {
+        let prepared = self.lookups.prepared.get()?;
+        (std::ptr::eq(prepared.owner.as_ptr(), self) && prepared.owner.strong_count() > 0)
+            .then(|| prepared.schema_queries.get(schema.index()).copied())
+            .flatten()
+    }
+    fn matcher_uses_query(&self, matcher: MatcherId) -> bool {
+        match self.matcher(matcher) {
+            Matcher::Query(_) => true,
+            Matcher::Union(parts) => parts.iter().any(|id| self.matcher_uses_query(*id)),
+            Matcher::Pattern(parts) => parts
+                .iter()
+                .any(|part| matches!(part,PatternPart::Hole(id) if self.matcher_uses_query(*id))),
+            _ => false,
+        }
+    }
+
+    /// Template kind names prepared in the same immutable arena as constraints.
+    #[must_use]
+    pub fn prepared_template_kinds(
+        &self,
+    ) -> Option<std::sync::Arc<std::collections::BTreeSet<String>>> {
+        let prepared = self.lookups.prepared.get()?;
+        (std::ptr::eq(prepared.owner.as_ptr(), self) && prepared.owner.strong_count() > 0)
+            .then(|| prepared.template_kinds.clone())
     }
 
     /// Returns a stable SHA-256 fingerprint of the compiled rules-v2 content.
@@ -1031,6 +1160,7 @@ impl RulesIr {
             }
         }
         let lookups = Lookups {
+            prepared: Default::default(),
             schemas: schema_lookup,
             types: types
                 .iter()
@@ -1339,6 +1469,23 @@ impl RulesIr {
     /// order, then the schema's patterns in written order.
     #[must_use]
     pub fn lookup(&self, schema: SchemaId, key: &str, shape: Shape) -> Candidates<'_> {
+        let mut candidates = self.lookup_key(schema, key);
+        candidates.shape = Some(shape);
+        candidates
+    }
+
+    /// Exact dispatch entries only, with the ordinary shape filter.
+    #[must_use]
+    pub fn lookup_exact(&self, schema: SchemaId, key: &str, shape: Shape) -> Candidates<'_> {
+        let mut candidates = self.lookup(schema, key, shape);
+        candidates.patterns = [].iter();
+        candidates
+    }
+
+    /// Exact overloads for this key followed by patterns, regardless of value
+    /// shape. Unrelated exact literals cannot match and need no scalar search.
+    #[must_use]
+    pub fn lookup_key(&self, schema: SchemaId, key: &str) -> Candidates<'_> {
         let schema = self.schema(schema);
         let exact = self
             .strings
@@ -1349,7 +1496,7 @@ impl RulesIr {
             ir: self,
             exact: exact.iter(),
             patterns: schema.patterns.iter(),
-            shape,
+            shape: None,
         }
     }
 
@@ -1537,6 +1684,162 @@ impl RulesIr {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn allocation_free_register_chains_match_the_original_folding() {
+        let mut ir = RulesIr::empty();
+        fn old<'a>(
+            model: &'a ScopeModel,
+            strings: &Interner,
+            name: &str,
+        ) -> Option<(&'a RegisterInfo, usize)> {
+            model.registers.iter().find_map(|register| {
+                let base = strings.resolve(register.name);
+                if name.eq_ignore_ascii_case(base) {
+                    return Some((register, 1));
+                }
+                if !register.chain {
+                    return None;
+                }
+                let name = name.replace('_', "");
+                let base = base.replace('_', "");
+                (!base.is_empty()
+                    && !name.is_empty()
+                    && name.len().is_multiple_of(base.len())
+                    && name
+                        .as_bytes()
+                        .chunks(base.len())
+                        .all(|part| part.eq_ignore_ascii_case(base.as_bytes())))
+                .then(|| (register, name.len() / base.len()))
+            })
+        }
+        for base in ["", "_", "ROOT", "pre_v", "é", "foo"] {
+            let name = ir.strings.intern_folded(base);
+            ir.scopes.registers = vec![RegisterInfo {
+                name,
+                role: crate::source::RegisterRole::Previous,
+                chain: true,
+            }]
+            .into_boxed_slice();
+            for candidate in [
+                "",
+                "_",
+                "ROOT",
+                "root",
+                "rootroot",
+                "_ROOT_root_",
+                "prev",
+                "pre_v",
+                "PREVprev",
+                "é",
+                "é_é",
+                "É",
+                "foo",
+                "foofoo",
+                "xfoo",
+                "foox",
+            ] {
+                assert_eq!(
+                    ir.scopes.register(&ir.strings, candidate),
+                    old(&ir.scopes, &ir.strings, candidate),
+                    "{base:?}/{candidate:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn prepared_cardinalities_do_not_survive_mutable_arena_changes() {
+        let source = serde_json::from_str(
+            r#"{
+            "files":{"sample":{"path":"common/sample","root":"sample"}},
+            "schemas":{"sample":{"fields":{
+                "alpha":{"value":"scalar","card":"1"},
+                "omega":{"value":"scalar","card":"0..*"}
+            }}}
+        }"#,
+        )
+        .unwrap();
+        let mut ir = std::sync::Arc::new(
+            crate::lower::lower(&[("sample.json".into(), source)], GameConfig::default()).unwrap(),
+        );
+        let schema = ir.schema_by_name("sample").unwrap();
+        let alpha = ir.lookup(schema, "alpha", Shape::Scalar).next().unwrap();
+        let _ = RulesIr::shared_rule_hash(&ir);
+        assert_eq!(
+            ir.constrained_field_families(schema).unwrap(),
+            &[vec![alpha]]
+        );
+        let mut cloned = (*ir).clone();
+        cloned.fields[alpha.index()].card = Card { min: 0, max: None };
+        assert!(cloned.constrained_field_families(schema).is_none());
+        let cloned = std::sync::Arc::new(cloned);
+        let _ = RulesIr::shared_rule_hash(&cloned);
+        assert!(
+            cloned
+                .constrained_field_families(schema)
+                .unwrap()
+                .is_empty()
+        );
+        // With only weak owners, make_mut moves the arena without invoking
+        // Clone. Its old prepared plan must still become unavailable.
+        let before = std::sync::Arc::as_ptr(&ir);
+        std::sync::Arc::make_mut(&mut ir).fields[alpha.index()].card = Card { min: 0, max: None };
+        assert_ne!(before, std::sync::Arc::as_ptr(&ir));
+        assert!(ir.constrained_field_families(schema).is_none());
+    }
+
+    #[test]
+    fn key_lookup_preserves_pattern_matches_across_value_shapes() {
+        let source = serde_json::json!({
+            "files": {"sample": {"path": "common/sample", "root": "sample"}},
+            "schemas": {"sample": {
+                "fields": {
+                    "alpha": {"value": "scalar", "card": "0..1"},
+                    "omega": {"body": "sample", "card": "0..1"}
+                },
+                "patterns": [{"key": "int", "value": "scalar", "card": "0..1"}]
+            }}
+        });
+        let ir = crate::lower::lower(
+            &[(
+                "sample.json".to_owned(),
+                serde_json::from_value(source).unwrap(),
+            )],
+            GameConfig::default(),
+        )
+        .unwrap();
+        let schema = ir.schema_by_name("sample").unwrap();
+        for key in ["alpha", "ALPHA", "omega", "1234", "missing"] {
+            let matches = |id: &FieldId| {
+                ir.scalar_outcome(ir.field(*id).key, key, &NoSymbolFacts) != Some(false)
+            };
+            let mut reference = ir
+                .fields(schema)
+                .into_iter()
+                .filter(matches)
+                .collect::<Vec<_>>();
+            let mut indexed = ir
+                .lookup_key(schema, key)
+                .filter(matches)
+                .collect::<Vec<_>>();
+            reference.sort_unstable();
+            indexed.sort_unstable();
+            assert_eq!(indexed, reference, "key {key}");
+            for shape in [Shape::Scalar, Shape::Block] {
+                assert_eq!(
+                    ir.lookup(schema, key, shape).collect::<Vec<_>>(),
+                    ir.lookup_key(schema, key)
+                        .filter(|id| ir.shape(*id) == Some(shape))
+                        .collect::<Vec<_>>()
+                );
+            }
+        }
+        assert_eq!(ir.lookup_key(schema, "alpha").count(), 2);
+        assert_eq!(ir.lookup_key(schema, "omega").count(), 2);
+        assert_eq!(ir.lookup(schema, "omega", Shape::Block).count(), 1);
+        assert_eq!(ir.lookup_key(schema, "missing").count(), 1);
+    }
 
     #[test]
     fn shared_identity_cannot_survive_mutation_or_alias_another_arena() {

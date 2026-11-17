@@ -73,10 +73,122 @@ fn environment_identity(snapshot: &AnalysisSnapshot) -> Option<String> {
     Some(identity.0)
 }
 
+#[derive(Clone, Copy)]
 pub(crate) struct SnapshotSymbolFacts<'a> {
     pub(crate) snapshot: &'a AnalysisSnapshot,
 }
+
+struct OverlayView {
+    symbols: engine::OverlaySymbols,
+    hidden: std::collections::BTreeSet<engine::SourceFileId>,
+    patterns: std::collections::BTreeMap<String, engine::FlagWriteIndex>,
+}
+#[derive(Default)]
+struct LocalFactsCache {
+    identity: (u64, u64),
+    overlays: Option<Arc<OverlayView>>,
+    members: rustc_hash::FxHashMap<TypeId, rustc_hash::FxHashMap<String, bool>>,
+    size: usize,
+}
+thread_local! {
+    static LOCAL_FACTS: std::cell::RefCell<LocalFactsCache> = Default::default();
+}
+fn local_facts<T>(snapshot: &AnalysisSnapshot, read: impl FnOnce(&mut LocalFactsCache) -> T) -> T {
+    LOCAL_FACTS.with_borrow_mut(|cache| {
+        let identity = (snapshot.host_identity(), snapshot.revision());
+        if cache.identity != identity {
+            *cache = LocalFactsCache {
+                identity,
+                ..Default::default()
+            };
+        }
+        read(cache)
+    })
+}
+
+impl SnapshotSymbolFacts<'_> {
+    fn overlays(&self) -> Arc<OverlayView> {
+        const KEY: &str = "ir:overlay-symbols";
+        let snapshot = self.snapshot;
+        if let Some(view) = local_facts(snapshot, |cache| cache.overlays.clone()) {
+            return view;
+        }
+        if let Some(view) = snapshot.query_cache().get(snapshot.revision(), KEY) {
+            local_facts(snapshot, |cache| cache.overlays = Some(Arc::clone(&view)));
+            return view;
+        }
+        let documents = snapshot
+            .documents()
+            .values()
+            .filter(|doc| doc.source() == DocumentSource::Overlay)
+            .collect::<Vec<_>>();
+        let hirs = documents
+            .iter()
+            .filter_map(|doc| doc.hir_handle())
+            .collect::<Vec<_>>();
+        let hidden = documents
+            .iter()
+            .filter_map(|doc| {
+                doc.path()
+                    .and_then(|path| snapshot.source_file_id_for_path(path))
+            })
+            .collect::<std::collections::BTreeSet<_>>();
+        let mut patterns = std::collections::BTreeMap::<String, engine::FlagWriteIndex>::new();
+        for (definition, active) in snapshot.index().pattern_definition_identities() {
+            if active && !hidden.contains(&definition.file_id) {
+                patterns
+                    .entry(definition.kind.to_ascii_lowercase())
+                    .or_default()
+                    .record(&definition.name);
+            }
+        }
+        let view = Arc::new(OverlayView {
+            symbols: engine::OverlaySymbols::new(&hirs),
+            hidden,
+            patterns,
+        });
+        snapshot.query_cache().insert(
+            snapshot.revision(),
+            engine::CacheDomain::Documents,
+            KEY.into(),
+            view.clone(),
+        );
+        let view = snapshot
+            .query_cache()
+            .get(snapshot.revision(), KEY)
+            .unwrap_or(view);
+        local_facts(snapshot, |cache| cache.overlays = Some(view.clone()));
+        view
+    }
+
+    fn member_uncached(&self, type_id: TypeId, name: &str) -> bool {
+        let snapshot = self.snapshot;
+        let ir = snapshot.ir();
+        let info = ir.type_info(type_id);
+        if info.open
+            || info
+                .builtin
+                .iter()
+                .any(|member| ir.strings.resolve(*member).eq_ignore_ascii_case(name))
+        {
+            return true;
+        }
+        let kind = ir.strings.resolve(info.name);
+        let overlays = self.overlays();
+        overlays.symbols.member(kind, name)
+            || snapshot
+                .index()
+                .definitions_with_state_iter(kind, name)
+                .any(|(definition, active)| {
+                    active && !overlays.hidden.contains(&definition.file_id)
+                })
+            || template_member(kind, name, &overlays)
+    }
+}
 impl SymbolFacts for SnapshotSymbolFacts<'_> {
+    fn shared_template_memo(&self) -> Option<Arc<rules::template::TemplateMemo>> {
+        Some(self.snapshot.shared_template_memo())
+    }
     fn facts_complete(&self) -> bool {
         self.snapshot
             .documents()
@@ -194,180 +306,77 @@ impl SymbolFacts for SnapshotSymbolFacts<'_> {
     }
 
     fn type_member(&self, type_id: TypeId, name: &str) -> bool {
-        let snapshot = self.snapshot;
-        let ir = snapshot.ir();
-        let info = ir.type_info(type_id);
-        if info.open
-            || info
-                .builtin
-                .iter()
-                .any(|member| ir.strings.resolve(*member).eq_ignore_ascii_case(name))
-        {
-            return true;
+        let folded = if name.bytes().any(|b| b.is_ascii_uppercase()) {
+            std::borrow::Cow::Owned(name.to_ascii_lowercase())
+        } else {
+            std::borrow::Cow::Borrowed(name)
+        };
+        if let Some(answer) = local_facts(self.snapshot, |cache| {
+            cache
+                .members
+                .get(&type_id)
+                .and_then(|names| names.get(folded.as_ref()))
+                .copied()
+        }) {
+            return answer;
         }
-        let kind = ir.strings.resolve(info.name);
-        let overlays = snapshot
-            .documents()
-            .values()
-            .filter(|document| document.source() == DocumentSource::Overlay)
-            .collect::<Vec<_>>();
-        if overlays
-            .iter()
-            .filter_map(|document| document.hir())
-            .any(|hir| {
-                hir.definitions().iter().any(|definition| {
-                    definition.kind.eq_ignore_ascii_case(kind)
-                        && definition.name.eq_ignore_ascii_case(name)
-                })
-            })
-        {
-            return true;
-        }
-        snapshot
-            .index()
-            .definitions_with_state(kind, name)
-            .into_iter()
-            .filter(|(_, active)| *active)
-            .any(|(definition, _)| {
-                !overlays.iter().any(|document| {
-                    document
-                        .path()
-                        .and_then(|path| snapshot.source_file_id_for_path(path))
-                        == Some(definition.file_id)
-                })
-            })
-            || template_member(snapshot, kind, name)
+        let answer = self.member_uncached(type_id, name);
+        local_facts(self.snapshot, |cache| {
+            if cache.size >= 8192 {
+                cache.members.clear();
+                cache.size = 0;
+            }
+            cache
+                .members
+                .entry(type_id)
+                .or_default()
+                .insert(folded.into_owned(), answer);
+            cache.size += 1;
+        });
+        answer
     }
+
     fn type_subtype_member(&self, type_id: TypeId, subtype: Symbol, name: &str) -> bool {
         let snapshot = self.snapshot;
         let ir = snapshot.ir();
         let kind = ir.strings.resolve(ir.type_info(type_id).name);
         let subtype = ir.strings.resolve(subtype);
-        let overlays = snapshot
-            .documents()
-            .values()
-            .filter(|document| document.source() == DocumentSource::Overlay)
-            .collect::<Vec<_>>();
-        if overlays
-            .iter()
-            .filter_map(|document| document.hir())
-            .any(|hir| {
-                hir.definition_attributes().iter().any(|attributes| {
-                    attributes.kind.eq_ignore_ascii_case(kind)
-                        && attributes.name.eq_ignore_ascii_case(name)
-                        && attributes
-                            .subtypes
-                            .iter()
-                            .any(|known| known.eq_ignore_ascii_case(subtype))
+        let overlays = self.overlays();
+        overlays.symbols.subtype(kind, name, subtype)
+            || snapshot
+                .index()
+                .definitions_with_state_iter(kind, name)
+                .filter(|(definition, active)| {
+                    *active && !overlays.hidden.contains(&definition.file_id)
                 })
-            })
-        {
-            return true;
-        }
-        snapshot
-            .index()
-            .definitions_with_state(kind, name)
-            .into_iter()
-            .filter(|(_, active)| *active)
-            .any(|(definition, _)| {
-                if overlays.iter().any(|document| {
-                    document
-                        .path()
-                        .and_then(|path| snapshot.source_file_id_for_path(path))
-                        == Some(definition.file_id)
-                }) {
-                    return false;
-                }
-                snapshot
-                    .index()
-                    .shard(definition.file_id)
-                    .is_some_and(|shard| {
-                        shard.definition_attributes.iter().any(|attributes| {
-                            attributes.kind.eq_ignore_ascii_case(kind)
-                                && attributes.name.eq_ignore_ascii_case(name)
-                                && attributes.definition_range == definition.range
-                                && attributes
-                                    .subtypes
-                                    .iter()
-                                    .any(|known| known.eq_ignore_ascii_case(subtype))
+                .any(|(definition, _)| {
+                    snapshot
+                        .index()
+                        .shard(definition.file_id)
+                        .is_some_and(|shard| {
+                            shard.definition_attributes.iter().any(|attributes| {
+                                attributes.kind.eq_ignore_ascii_case(kind)
+                                    && attributes.name.eq_ignore_ascii_case(name)
+                                    && attributes.definition_range == definition.range
+                                    && attributes
+                                        .subtypes
+                                        .iter()
+                                        .any(|known| known.eq_ignore_ascii_case(subtype))
+                            })
                         })
-                    })
-            })
+                })
     }
 }
 
 /// Scalar `def<T>` sites inside parameterised scripts can name runtime
 /// expansions. Retain their reachable name patterns without inventing literal
 /// definitions or falling back to a game-specific write-command table.
-fn template_member(snapshot: &AnalysisSnapshot, kind: &str, name: &str) -> bool {
-    type Templates = std::collections::BTreeMap<
-        String,
-        std::collections::BTreeMap<engine::SourceFileId, engine::FlagWriteIndex>,
-    >;
-    let revision = snapshot.revision();
-    const KEY: &str = "ir-symbol-templates";
-    let templates = snapshot
-        .query_cache()
-        .get::<Templates>(revision, KEY)
-        .unwrap_or_else(|| {
-            let mut templates = Templates::new();
-            for (definition, active) in snapshot.index().definition_identities() {
-                if active && definition.name.contains('$') {
-                    templates
-                        .entry(definition.kind.to_ascii_lowercase())
-                        .or_default()
-                        .entry(definition.file_id)
-                        .or_default()
-                        .record(&definition.name);
-                }
-            }
-            let templates = std::sync::Arc::new(templates);
-            snapshot.query_cache().insert(
-                revision,
-                // Only immutable index patterns are cached. Overlay patterns
-                // and hidden files are evaluated against the current snapshot.
-                engine::CacheDomain::Index,
-                KEY.to_owned(),
-                templates.clone(),
-            );
-            templates
-        });
-    let overlays = snapshot
-        .documents()
-        .values()
-        .filter(|document| document.source() == DocumentSource::Overlay)
-        .collect::<Vec<_>>();
-    let hidden = overlays
-        .iter()
-        .filter_map(|document| {
-            document
-                .path()
-                .and_then(|path| snapshot.source_file_id_for_path(path))
-        })
-        .collect::<std::collections::BTreeSet<_>>();
-    templates
+fn template_member(kind: &str, name: &str, overlays: &OverlayView) -> bool {
+    overlays
+        .patterns
         .get(&kind.to_ascii_lowercase())
-        .is_some_and(|files| {
-            files.iter().any(|(file, patterns)| {
-                !hidden.contains(file)
-                    && patterns.membership(name) != engine::FlagWriteMembership::Unknown
-            })
-        })
-        || overlays
-            .iter()
-            .filter_map(|document| document.hir())
-            .any(|hir| {
-                hir.definitions()
-                    .iter()
-                    .filter(|definition| {
-                        definition.kind.eq_ignore_ascii_case(kind) && definition.name.contains('$')
-                    })
-                    .any(|definition| {
-                        let mut pattern = engine::FlagWriteIndex::default();
-                        pattern.record(&definition.name);
-                        pattern.membership(name) != engine::FlagWriteMembership::Unknown
-                    })
-            })
+        .is_some_and(|patterns| patterns.membership(name) != engine::FlagWriteMembership::Unknown)
+        || overlays.symbols.pattern_member(kind, name)
 }
 
 /// Modifier applications use the referenced type's schema and retained attributes.

@@ -1636,3 +1636,115 @@ impl rules::ir::SymbolFacts for FixtureMembers<'_> {
         }
     }
 }
+
+#[test]
+fn relowering_reuses_only_matching_syntax_and_checks_negative_symbol_receipts() {
+    struct Facts(bool);
+    impl rules::ir::SymbolFacts for Facts {
+        fn type_member(&self, _: rules::ir::TypeId, _: &str) -> bool {
+            self.0
+        }
+    }
+    let ir = first_party_ir().unwrap();
+    let catalog = RuleSet::from_ir_catalog(&ir);
+    let path = LogicalPath::parse("events/reuse.txt").unwrap();
+    let text = "country_event = { id = test.1 trigger = { religion = missing_religion } }";
+    let parsed = Arc::new(parse(FileFormat::Script, text));
+    let original = super::lower_shared_with_ir_and_facts(
+        parsed.clone(),
+        &path,
+        &catalog,
+        &ir.game.profile,
+        &ir,
+        &Facts(false),
+    );
+    assert!(original.depends_on_symbol_facts());
+    assert!(original.symbol_facts_match(&Facts(false)));
+    assert!(!original.symbol_facts_match(&Facts(true)));
+    let replay = super::relower_shared_with_ir(
+        parsed.clone(),
+        Some(&original),
+        &path,
+        &ir.game.profile,
+        &ir,
+        Some(&Facts(true)),
+    );
+    let fresh = super::lower_shared_with_ir_and_facts(
+        parsed,
+        &path,
+        &catalog,
+        &ir.game.profile,
+        &ir,
+        &Facts(true),
+    );
+    assert_eq!(replay, fresh);
+    assert!(Arc::ptr_eq(&replay.properties, &original.properties));
+    let changed = Arc::new(parse(
+        FileFormat::Script,
+        &text.replace("missing_religion", "different"),
+    ));
+    let replay = super::relower_shared_with_ir(
+        changed.clone(),
+        Some(&original),
+        &path,
+        &ir.game.profile,
+        &ir,
+        Some(&Facts(false)),
+    );
+    let fresh = super::lower_shared_with_ir_and_facts(
+        changed,
+        &path,
+        &catalog,
+        &ir.game.profile,
+        &ir,
+        &Facts(false),
+    );
+    assert_eq!(replay, fresh);
+    assert!(!Arc::ptr_eq(&replay.properties, &original.properties));
+}
+
+#[test]
+fn ambiguous_branches_keep_preceding_local_subtype_attributes() {
+    let ir=rules::lower::lower(&[("branches.json".into(),serde_json::from_value(serde_json::json!({
+        "files":{"sample":{"path":"sample","root":"root"}},
+        "types":{"entity":{"subtypes":{"special":{}}}},
+        "schemas":{
+            "root":{"fields":{"declare":{"value":"def<entity.special>","card":"0..*"},"choice":[
+                {"body":"child_a","card":"0..*"},{"body":"child_b","card":"0..*"}]}},
+            "child_a":{"fields":{"a":{"value":"bool","card":"1"}},"patterns":[{"key":"ref<entity.special>","value":"bool","card":"0..*"}]},
+            "child_b":{"fields":{"b":{"value":"bool","card":"1"}},"patterns":[{"key":"ref<entity.special>","value":"bool","card":"0..*"}]}
+        }
+    })).unwrap())],Default::default()).unwrap();
+    let hir = lower_shared_with_ir(
+        Arc::new(parse(
+            FileFormat::Script,
+            "declare = present choice = { present = yes }",
+        )),
+        &LogicalPath::parse("sample/test.txt").unwrap(),
+        &RuleSet::from_ir_catalog(&ir),
+        &ir.game.profile,
+        &ir,
+    );
+    let property = hir
+        .properties()
+        .iter()
+        .find(|p| p.key == "present")
+        .unwrap();
+    assert!(
+        hir.references()
+            .iter()
+            .any(|reference| reference.name == "present" && reference.range == property.key_range)
+    );
+    assert!(
+        hir.overload_facts()
+            .iter()
+            .any(|fact| fact.validation == super::analysis::Validation::Invalid)
+    );
+    assert_eq!(
+        hir.definition_attributes()
+            .iter()
+            .filter(|d| d.name == "present")
+            .count(),
+        1
+    );
+}

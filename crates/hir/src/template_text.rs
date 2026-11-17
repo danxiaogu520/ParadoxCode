@@ -84,12 +84,69 @@ pub struct RenderedTemplate {
     pub coverage: AnalysisCoverage,
 }
 
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 struct FrameKey {
     schema: rules::ir::SchemaId,
     state: crate::ScopeState,
     holes: Vec<text::TextRange>,
     text: String,
+}
+
+fn dispatch_memo(
+    facts: &dyn rules::ir::SymbolFacts,
+) -> Option<std::sync::Arc<rules::template::TemplateMemo>> {
+    const KEY: &str = "template:dispatch-frames";
+    const BYTES: usize = 32 * 1024 * 1024;
+    let memo = facts.shared_template_memo()?;
+    if let Some(cache) = memo.get::<rules::template::TemplateMemo>(KEY) {
+        return Some(cache);
+    }
+    let cache = std::sync::Arc::new(rules::template::TemplateMemo::with_max_bytes(BYTES));
+    memo.insert(KEY.into(), cache.clone(), BYTES);
+    Some(memo.get(KEY).unwrap_or(cache))
+}
+
+struct SharedFrame {
+    key: FrameKey,
+    hir: std::sync::Arc<crate::HirFile>,
+    reads: crate::memo_facts::Receipts,
+}
+fn shared_frame_key(key: &FrameKey, byte_limit: usize) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut hash = std::collections::hash_map::DefaultHasher::new();
+    key.hash(&mut hash);
+    byte_limit.hash(&mut hash);
+    format!("template:dispatch-frame:{:x}", hash.finish())
+}
+fn shared_frame<E>(
+    memo: &rules::template::TemplateMemo,
+    key: &str,
+    frame: &FrameKey,
+    facts: &dyn rules::ir::SymbolFacts,
+    checkpoint: &mut dyn FnMut() -> Result<(), E>,
+) -> Result<Option<std::sync::Arc<crate::HirFile>>, E> {
+    let Some(cached) = memo.get::<SharedFrame>(key) else {
+        return Ok(None);
+    };
+    // Hashes select a bucket only; the full frame proves identity.
+    if cached.key != *frame {
+        return Ok(None);
+    }
+    if let Some(probe) = facts.untracked_view()
+        && !cached
+            .reads
+            .validate_and_replay(&DispatchFacts(probe), checkpoint)?
+    {
+        return Ok(None);
+    }
+    if cached
+        .reads
+        .validate_and_replay(&DispatchFacts(facts), checkpoint)?
+    {
+        Ok(Some(cached.hir.clone()))
+    } else {
+        Ok(None)
+    }
 }
 
 #[derive(Eq, Hash, PartialEq)]
@@ -394,6 +451,81 @@ fn render_with_views(
 /// Classifies each program block/schema pair once. Overloads can converge on
 /// the same child schema; revisiting it duplicates both workspace lookups and
 /// every descendant traversal without adding any source positions.
+struct BindingUses {
+    // An address in the memo key remains unique while its entry owns the template.
+    _owner: std::sync::Arc<Template>,
+    scalar: BTreeSet<u32>,
+    raw: BTreeSet<u32>,
+    script: BTreeSet<u32>,
+}
+
+fn binding_uses(
+    ir: &rules::ir::RulesIr,
+    template: &std::sync::Arc<Template>,
+    bindings: &BTreeMap<String, String>,
+    schema: rules::ir::SchemaId,
+    facts: &dyn rules::ir::SymbolFacts,
+) -> std::sync::Arc<BindingUses> {
+    use rules::template::{TemplateFragment, TemplateInstruction};
+    let memo = facts.template_memo();
+    let key = memo.as_ref().map(|_| {
+        // Classification reads dispatch keys, never the inserted value text,
+        // raw carriers, presence flags or scope. Value edits can reuse this plan.
+        let mut keys = BTreeMap::new();
+        for block in &template.program.blocks {
+            for instruction in block.iter() {
+                if let TemplateInstruction::Dispatch(property) = instruction {
+                    for part in &property.key.fragments {
+                        if let TemplateFragment::Parameter { name, .. } = part {
+                            let name = name.to_ascii_lowercase();
+                            let value = bindings.get(&name);
+                            keys.insert(name, value);
+                        }
+                    }
+                }
+            }
+        }
+        format!(
+            "binding-uses:{:p}:{schema:?}:{keys:?}",
+            std::sync::Arc::as_ptr(template)
+        )
+    });
+    if let (Some(memo), Some(key)) = (&memo, &key)
+        && let Some(uses) = memo.get::<BindingUses>(key)
+    {
+        return uses;
+    }
+    let (scalar, raw, script) =
+        binding_use_positions(ir, template, bindings, schema, &DispatchFacts(facts));
+    let uses = std::sync::Arc::new(BindingUses {
+        _owner: template.clone(),
+        scalar,
+        raw,
+        script,
+    });
+    if let (Some(memo), Some(key)) = (memo, key) {
+        let bytes = template
+            .source
+            .len()
+            .saturating_mul(128)
+            .saturating_add(
+                template
+                    .program
+                    .blocks
+                    .iter()
+                    .map(|b| b.len())
+                    .sum::<usize>()
+                    .saturating_mul(512),
+            )
+            .saturating_add(
+                (uses.scalar.len() + uses.raw.len() + uses.script.len()).saturating_mul(64),
+            )
+            .saturating_add(1024);
+        memo.insert(key, uses.clone(), bytes);
+    }
+    uses
+}
+
 fn binding_use_positions(
     ir: &rules::ir::RulesIr,
     template: &Template,
@@ -712,31 +844,30 @@ fn render_expanded_impl<E>(
                 let mut rendered = if let Some(cached) = frame_renders.get(&render_key) {
                     cached.rendered.clone()
                 } else {
-                    let (scalar_uses, raw_scalar_uses, script_uses) =
-                        if template.program.parameters.is_empty() && !template.source.contains('$')
-                        {
-                            // Literal bodies have no insertion whose consumption
-                            // kind needs classification. Their ordinary dispatch
-                            // and transitive calls are still lowered below.
-                            (BTreeSet::new(), BTreeSet::new(), BTreeSet::new())
-                        } else {
-                            binding_use_positions(
-                                ir,
-                                &template,
-                                &bindings,
-                                schema,
-                                &DispatchFacts(facts),
-                            )
-                        };
+                    let uses = if template.program.parameters.is_empty()
+                        && !template.source.contains('$')
+                    {
+                        // Literal bodies have no insertion whose consumption
+                        // kind needs classification. Their ordinary dispatch
+                        // and transitive calls are still lowered below.
+                        std::sync::Arc::new(BindingUses {
+                            _owner: template.clone(),
+                            scalar: BTreeSet::new(),
+                            raw: BTreeSet::new(),
+                            script: BTreeSet::new(),
+                        })
+                    } else {
+                        binding_uses(ir, &template, &bindings, schema, facts)
+                    };
                     let mut interrupted = None;
                     let rendered = render_with_views(
                         &template,
                         &bindings,
                         &present,
                         &raw,
-                        &scalar_uses,
-                        &raw_scalar_uses,
-                        &script_uses,
+                        &uses.scalar,
+                        &uses.raw,
+                        &uses.script,
                         byte_limit,
                         &mut || match checkpoint() {
                             Ok(()) => true,
@@ -864,8 +995,24 @@ fn render_expanded_impl<E>(
                     holes: rendered.trial_holes.clone(),
                     text: rendered.text.clone(),
                 };
+                // The dispatch model depends only on this exact frame and its
+                // observed facts. Reuse callee frames across candidate trials;
+                // the caller-specific root remains transient.
+                let shared = (frames > 1 && rendered.text.len() <= 64 * 1024)
+                    .then(|| dispatch_memo(facts))
+                    .flatten();
+                let shared_key = shared
+                    .as_ref()
+                    .map(|_| shared_frame_key(&frame_key, byte_limit));
+                let shared_hit = if let (Some(memo), Some(key)) = (&shared, &shared_key) {
+                    shared_frame(memo, key, &frame_key, facts, checkpoint)?
+                } else {
+                    None
+                };
                 let hir = if let Some(cached) = frame_hirs.get(&frame_key) {
                     std::sync::Arc::clone(cached)
+                } else if let Some(cached) = shared_hit {
+                    cached
                 } else {
                     let progress = parser::parse_script_prefix_bounded(
                         &rendered.text,
@@ -890,13 +1037,19 @@ fn render_expanded_impl<E>(
                         break;
                     };
                     let parsed = std::sync::Arc::new(parsed);
+                    let dispatch = DispatchFacts(facts);
+                    let recording = shared
+                        .as_ref()
+                        .map(|_| crate::memo_facts::RecordingFacts::new(&dispatch));
+                    let lower_facts: &dyn rules::ir::SymbolFacts =
+                        recording.as_ref().map_or(&dispatch, |facts| facts);
                     let hir = crate::lower_ir_schema_with_holes(
                         parsed,
                         ir,
                         schema,
                         Default::default(),
                         state.clone(),
-                        &DispatchFacts(facts),
+                        lower_facts,
                         &rendered.trial_holes,
                     );
                     let hir = std::sync::Arc::new(hir);
@@ -910,6 +1063,25 @@ fn render_expanded_impl<E>(
                                 .saturating_mul(std::mem::size_of::<crate::ScopeValue>()),
                         )
                         .saturating_add(hir.properties().len().saturating_mul(2048));
+                    if progress.frontier.is_none()
+                        && hir.analysis_coverage().is_complete()
+                        && let (Some(memo), Some(key), Some(recording)) =
+                            (&shared, shared_key, recording)
+                    {
+                        let reads = recording.finish();
+                        let cost = bytes.saturating_add(reads.bytes());
+                        if cost <= 4 * 1024 * 1024 {
+                            memo.insert(
+                                key,
+                                std::sync::Arc::new(SharedFrame {
+                                    key: frame_key.clone(),
+                                    hir: hir.clone(),
+                                    reads,
+                                }),
+                                cost,
+                            );
+                        }
+                    }
                     // Partial parses add frontiers to this rendering operation;
                     // keep them transient so a hit cannot omit that evidence.
                     if progress.frontier.is_none()
@@ -1262,6 +1434,91 @@ mod frontier_tests {
 #[cfg(test)]
 mod value_context_tests {
     use super::*;
+
+    #[test]
+    fn binding_plans_reuse_value_edits_and_distinguish_dispatch_keys_and_bodies() {
+        struct Facts(std::sync::Arc<rules::template::TemplateMemo>);
+        impl rules::ir::SymbolFacts for Facts {
+            fn template_memo(&self) -> Option<std::sync::Arc<rules::template::TemplateMemo>> {
+                Some(self.0.clone())
+            }
+        }
+        let ir = game::eu4::first_party_ir().unwrap();
+        let catalog = rules::RuleSet::from_ir_catalog(&ir);
+        let definition = crate::lower_shared_with_ir(
+            std::sync::Arc::new(parser::parse(
+                parser::FileFormat::Script,
+                "sample = { $COMMAND$ = $VALUE$ $BODY$ }",
+            )),
+            &text::LogicalPath::parse("common/scripted_effects/plan.txt").unwrap(),
+            &catalog,
+            &ir.game.profile,
+            &ir,
+        );
+        let template = std::sync::Arc::new(definition.dynamic_templates()[0].clone());
+        let schema =
+            crate::template::template_body(&ir, ir.type_by_name("scripted_effect").unwrap())
+                .unwrap();
+        let facts = Facts(Default::default());
+        let mut bindings = BTreeMap::from([
+            ("command".into(), "add_prestige".into()),
+            ("value".into(), "1".into()),
+            ("body".into(), "add_stability = 1".into()),
+        ]);
+        let scalar = binding_uses(&ir, &template, &bindings, schema, &facts);
+        assert!(!scalar.scalar.is_empty());
+        bindings.insert("value".into(), "2".into());
+        bindings.insert(
+            "body".into(),
+            "hidden_effect = { add_stability = 2 }".into(),
+        );
+        assert!(std::sync::Arc::ptr_eq(
+            &scalar,
+            &binding_uses(&ir, &template, &bindings, schema, &facts),
+        ));
+        bindings.insert("command".into(), "hidden_effect".into());
+        let script = binding_uses(&ir, &template, &bindings, schema, &facts);
+        assert!(!std::sync::Arc::ptr_eq(&scalar, &script));
+        assert!(script.scalar.is_empty());
+        assert!(script.script.len() > scalar.script.len());
+        for command in [Some("add_prestige"), Some("hidden_effect"), Some(""), None] {
+            if let Some(command) = command {
+                bindings.insert("command".into(), command.into());
+            } else {
+                bindings.remove("command");
+            }
+            let cached = binding_uses(&ir, &template, &bindings, schema, &facts);
+            let uncached =
+                binding_use_positions(&ir, &template, &bindings, schema, &DispatchFacts(&facts));
+            assert_eq!(
+                (&cached.scalar, &cached.raw, &cached.script),
+                (&uncached.0, &uncached.1, &uncached.2)
+            );
+        }
+        bindings.insert("command".into(), "add_prestige".into());
+        let other_view = binding_uses(
+            &ir,
+            &template,
+            &bindings,
+            schema,
+            &Facts(Default::default()),
+        );
+        assert!(!std::sync::Arc::ptr_eq(&scalar, &other_view));
+        let mut changed = (*template).clone();
+        changed.program = std::sync::Arc::new(rules::template::TemplateProgram {
+            blocks: vec![std::sync::Arc::from([])],
+            parameters: Default::default(),
+        });
+        let changed = binding_uses(
+            &ir,
+            &std::sync::Arc::new(changed),
+            &bindings,
+            schema,
+            &facts,
+        );
+        assert!(changed.scalar.is_empty() && changed.script.is_empty());
+    }
+
     #[test]
     fn composite_scalars_decode_carriers_and_bound_block_keys_retain_script_uncertainty() {
         let ir = game::eu4::first_party_ir().unwrap();
@@ -1332,8 +1589,12 @@ mod frame_reuse_tests {
         templates: BTreeMap<String, Arc<Template>>,
         reads: RefCell<BTreeSet<(TypeId, String)>>,
         members: Cell<usize>,
+        shared: Option<Arc<rules::template::TemplateMemo>>,
     }
     impl SymbolFacts for Facts {
+        fn shared_template_memo(&self) -> Option<Arc<rules::template::TemplateMemo>> {
+            self.shared.clone()
+        }
         fn type_member(&self, ty: TypeId, name: &str) -> bool {
             self.members.set(self.members.get() + 1);
             self.reads
@@ -1384,6 +1645,7 @@ mod frame_reuse_tests {
                 templates,
                 reads: Default::default(),
                 members: Default::default(),
+                shared: None,
             },
         )
     }
@@ -1408,6 +1670,29 @@ mod frame_reuse_tests {
             &mut || Ok(()),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn shared_dispatch_frames_revalidate_negative_members_and_replay_all_reads() {
+        let (ir, mut facts) = fixture();
+        let cold = expand(&ir, &facts, 4096, 0);
+        let reads = facts.reads.take();
+        facts.shared = Some(Arc::new(rules::template::TemplateMemo::with_max_bytes(
+            64 * 1024 * 1024,
+        )));
+        for _ in 0..2 {
+            let actual = expand(&ir, &facts, 4096, 0);
+            assert_eq!(format!("{cold:?}"), format!("{actual:?}"));
+            assert_eq!(reads, facts.reads.take());
+        }
+        let absent = facts.templates["leaf"].clone();
+        facts.templates.insert("absent".into(), absent);
+        let shared = expand(&ir, &facts, 4096, 0);
+        let shared_reads = facts.reads.take();
+        facts.shared = None;
+        let fresh = expand(&ir, &facts, 4096, 0);
+        assert_eq!(format!("{fresh:?}"), format!("{shared:?}"));
+        assert_eq!(shared_reads, facts.reads.take());
     }
 
     #[test]

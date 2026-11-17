@@ -3,6 +3,32 @@ use crate::MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS;
 use crate::uri::FileUri;
 use std::fs;
 
+// Whole-document paint and hint queries share one CPU slot. Completion and
+// explicit navigation queries bypass it; queued paints observe cancellation promptly.
+struct PaintPermit;
+static PAINT_BUSY: AtomicBool = AtomicBool::new(false);
+impl PaintPermit {
+    fn acquire(cancellation: &CancellationToken) -> Result<Self, RpcError> {
+        loop {
+            if cancellation.is_cancelled() {
+                return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
+            }
+            if PAINT_BUSY
+                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Relaxed)
+                .is_ok()
+            {
+                return Ok(Self);
+            }
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+}
+impl Drop for PaintPermit {
+    fn drop(&mut self) {
+        PAINT_BUSY.store(false, Ordering::Release);
+    }
+}
+
 /// Serializes workspace diagnostics once and hashes the bytes so the publish
 /// loop can diff by hash and reuse the payload without rebuilding a Value tree.
 fn encode_workspace_publication<T: serde::Serialize>(
@@ -1135,14 +1161,22 @@ impl LspServer {
         // Mirrors the event loop's inline dispatch: stage the disk text for
         // scanned files no editor opened before snapshotting the host.
         self.ensure_snapshot_request_document(object.get("params"));
+        let snapshot = self.host.snapshot();
         let context = SnapshotRequestContext::new(
-            self.host.snapshot(),
+            snapshot,
             cancellation.clone(),
             self.client_snippet_support,
             Arc::clone(&self.ignored_diagnostic_codes),
             Arc::clone(&self.diagnostic_severity_overrides),
             Arc::clone(&self.transparent_script_globs),
             Arc::clone(&self.semantic_tokens_cache),
+        );
+        let automatic = matches!(
+            method,
+            "textDocument/semanticTokens/full"
+                | "textDocument/semanticTokens/full/delta"
+                | "textDocument/semanticTokens/range"
+                | "textDocument/inlayHint"
         );
         let method = method.to_owned();
         let params = object.get("params").cloned();
@@ -1159,6 +1193,9 @@ impl LspServer {
                 Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"))
             } else {
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    let _paint = automatic
+                        .then(|| PaintPermit::acquire(&cancellation))
+                        .transpose()?;
                     context.dispatch(&method, params.as_ref())
                 }))
                 .unwrap_or_else(|_| {

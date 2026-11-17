@@ -10,9 +10,13 @@ use text::LogicalPath;
 
 pub mod analysis;
 pub mod block_checking;
+mod cardinality;
 pub mod checking;
 mod collector;
+mod incremental;
 mod ir_lowering;
+pub use incremental::{rebase_ignored_quoted_edit, rebase_ignored_quoted_scalar};
+mod memo_facts;
 mod model;
 mod parameters;
 pub mod query;
@@ -222,7 +226,42 @@ fn lower_ir_schema_range_impl(
     holes: &[text::TextRange],
 ) -> HirFile {
     let collected = collector::collect(&syntax);
-    let ir_facts = ir_lowering::lower_schema_fragment(
+    lower_ir_schema_collected(
+        syntax, ir, schema, subtypes, state, facts, range, holes, collected,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn lower_ir_schema_collected(
+    syntax: Arc<ParsedFile>,
+    ir: &rules::ir::RulesIr,
+    schema: rules::ir::SchemaId,
+    subtypes: rules::ir::SubtypeSet,
+    state: ScopeState,
+    facts: &dyn rules::ir::SymbolFacts,
+    range: Option<text::TextRange>,
+    holes: &[text::TextRange],
+    collected: collector::CollectedFacts,
+) -> HirFile {
+    lower_ir_schema_collected_with_memo(
+        syntax, ir, schema, subtypes, state, facts, range, holes, collected, &mut None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn lower_ir_schema_collected_with_memo(
+    syntax: Arc<ParsedFile>,
+    ir: &rules::ir::RulesIr,
+    schema: rules::ir::SchemaId,
+    subtypes: rules::ir::SubtypeSet,
+    state: ScopeState,
+    facts: &dyn rules::ir::SymbolFacts,
+    range: Option<text::TextRange>,
+    holes: &[text::TextRange],
+    collected: collector::CollectedFacts,
+    prefix_memo: &mut Option<ir_lowering::PrefixMemo>,
+) -> HirFile {
+    let mut ir_facts = ir_lowering::lower_schema_fragment(
         ir,
         &syntax,
         &collected.properties,
@@ -233,7 +272,9 @@ fn lower_ir_schema_range_impl(
         facts,
         range,
         holes,
+        prefix_memo.take(),
     );
+    *prefix_memo = ir_facts.prefix_memo.take();
     let template_definitions = ir_facts
         .definitions
         .iter()
@@ -271,6 +312,7 @@ fn lower_ir_schema_range_impl(
             .insert(analysis::AnalysisLimit::UnavailableTemplate);
     }
     HirFile {
+        symbol_reads: None,
         analysis_coverage,
         overload_facts: ir_facts.overload_facts,
         syntax,
@@ -306,6 +348,95 @@ fn lower_shared_impl(
     retain_validation_facts: bool,
 ) -> HirFile {
     let collected = collector::collect(&syntax);
+    lower_shared_recorded(
+        syntax,
+        logical_path,
+        profile,
+        ir,
+        symbol_facts,
+        retain_validation_facts,
+        collected,
+    )
+}
+
+fn lower_shared_recorded(
+    syntax: Arc<ParsedFile>,
+    logical_path: Option<&LogicalPath>,
+    profile: Option<&GameProfile>,
+    ir: Option<&rules::ir::RulesIr>,
+    facts: Option<&dyn rules::ir::SymbolFacts>,
+    retain_validation_facts: bool,
+    collected: collector::CollectedFacts,
+) -> HirFile {
+    if let Some(facts) = facts {
+        let recorded = memo_facts::RecordingFacts::new(facts);
+        let mut hir = lower_shared_collected_impl(
+            syntax,
+            logical_path,
+            profile,
+            ir,
+            Some(&recorded),
+            retain_validation_facts,
+            collected,
+        );
+        hir.symbol_reads = Some(Arc::new(recorded.finish()));
+        hir
+    } else {
+        lower_shared_collected_impl(
+            syntax,
+            logical_path,
+            profile,
+            ir,
+            None,
+            retain_validation_facts,
+            collected,
+        )
+    }
+}
+
+/// Reuses only lexical facts belonging to the identical immutable syntax tree.
+/// All scope, symbol, template and reference facts are recomputed.
+#[must_use]
+#[allow(clippy::too_many_arguments)]
+pub fn relower_shared_with_ir(
+    syntax: Arc<ParsedFile>,
+    previous: Option<&HirFile>,
+    logical_path: &LogicalPath,
+    profile: &GameProfile,
+    ir: &rules::ir::RulesIr,
+    facts: Option<&dyn rules::ir::SymbolFacts>,
+) -> HirFile {
+    let collected = if let Some(previous) = previous.filter(|p| Arc::ptr_eq(&p.syntax, &syntax)) {
+        collector::CollectedFacts {
+            properties: previous.properties.clone(),
+            localisation_entries: previous.localisation_entries.clone(),
+            bare_values: previous.bare_values.clone(),
+            unknown_constructs: previous.unknown_constructs.clone(),
+            parameter_conditionals: previous.parameter_conditionals.clone(),
+        }
+    } else {
+        collector::collect(&syntax)
+    };
+    lower_shared_recorded(
+        syntax,
+        Some(logical_path),
+        Some(profile),
+        Some(ir),
+        facts,
+        true,
+        collected,
+    )
+}
+
+fn lower_shared_collected_impl(
+    syntax: Arc<ParsedFile>,
+    logical_path: Option<&LogicalPath>,
+    profile: Option<&GameProfile>,
+    ir: Option<&rules::ir::RulesIr>,
+    symbol_facts: Option<&dyn rules::ir::SymbolFacts>,
+    retain_validation_facts: bool,
+    collected: collector::CollectedFacts,
+) -> HirFile {
     let empty = rules::ir::RulesIr::empty();
     let selected = ir.unwrap_or(&empty);
     let anonymous = LogicalPath::parse("anonymous.txt").expect("logical path");
@@ -381,6 +512,7 @@ fn lower_shared_impl(
             .insert(analysis::AnalysisLimit::UnavailableTemplate);
     }
     HirFile {
+        symbol_reads: None,
         analysis_coverage,
         overload_facts: facts.overload_facts,
         syntax,

@@ -77,10 +77,11 @@ pub(crate) fn input_for_document(
     let parsed = match parsed {
         ParsedSource::Text(parsed) => ParsedContent::Text(Arc::clone(parsed)),
     };
-    let hir = if let Some(hir) = document
-        .hir_handle()
-        .filter(|hir| !hir.depends_on_symbol_facts() || !document.fact_coverage.is_known())
-    {
+    let hir = if let Some(hir) = document.hir_handle().filter(|hir| {
+        !hir.depends_on_symbol_facts()
+            || !document.fact_coverage.is_known()
+            || hir.symbol_facts_match(&crate::ir_queries::SnapshotSymbolFacts { snapshot })
+    }) {
         Some(hir)
     } else if !snapshot.ir().schemas.is_empty() {
         let ParsedContent::Text(parsed) = &parsed;

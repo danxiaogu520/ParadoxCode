@@ -7,6 +7,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Completion after edits reuses unaffected syntax and semantic facts, shares bounded
+  Template and constraint work, and preserves candidate ordering, insertion text and
+  validation evidence with Vanilla and dependency indexes enabled.
+
 ## [0.5.5] - 2026-11-06
 
 ### Fixed

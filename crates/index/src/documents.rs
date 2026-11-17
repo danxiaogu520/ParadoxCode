@@ -192,9 +192,53 @@ pub struct DocumentSnapshot {
 #[derive(Clone, Debug)]
 pub struct PreparedDocument {
     pub document: DocumentSnapshot,
+    base_hir: Option<Arc<HirFile>>,
+    base_context: (
+        Arc<rules::ir::RulesIr>,
+        Arc<rules::RuleSet>,
+        Arc<rules::GameProfile>,
+        Arc<[vfs::SourceRoot]>,
+    ),
 }
 
 impl PreparedDocument {
+    /// Records a frontend prepared without workspace facts. If a caller later
+    /// changes its HIR, the base proof no longer applies.
+    pub fn from_base(
+        document: DocumentSnapshot,
+        ir: Arc<rules::ir::RulesIr>,
+        rules: Arc<rules::RuleSet>,
+        profile: Arc<rules::GameProfile>,
+        roots: Arc<[vfs::SourceRoot]>,
+    ) -> Self {
+        Self {
+            base_hir: document.hir.clone(),
+            document,
+            base_context: (ir, rules, profile, roots),
+        }
+    }
+
+    pub fn has_base_hir(
+        &self,
+        ir: &Arc<rules::ir::RulesIr>,
+        rules: &Arc<rules::RuleSet>,
+        profile: &Arc<rules::GameProfile>,
+        roots: &Arc<[vfs::SourceRoot]>,
+    ) -> bool {
+        Arc::ptr_eq(&self.base_context.0, ir)
+            && Arc::ptr_eq(&self.base_context.1, rules)
+            && Arc::ptr_eq(&self.base_context.2, profile)
+            && Arc::ptr_eq(&self.base_context.3, roots)
+            && self
+                .base_hir
+                .as_ref()
+                .zip(self.document.hir.as_ref())
+                .is_some_and(|(base, current)| {
+                    Arc::ptr_eq(base, current)
+                        && current.syntax().source() == self.document.text.as_ref()
+                })
+    }
+
     /// Returns the document identity carried by this candidate.
     #[must_use]
     pub const fn id(&self) -> &DocumentId {

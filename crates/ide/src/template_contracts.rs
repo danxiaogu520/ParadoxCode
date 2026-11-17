@@ -321,6 +321,18 @@ fn contract_entry(
         return Ok(entry);
     }
     let facts = crate::ir_semantic::WorkspaceFacts { snapshot };
+    let memo = rules::ir::SymbolFacts::template_memo(&facts);
+    if let Some(memo) = &memo
+        && let Some(entry) = memo.get::<ContractEntry>(&key)
+    {
+        snapshot.query_cache().insert(
+            snapshot.revision(),
+            engine::CacheDomain::Documents,
+            key,
+            entry.clone(),
+        );
+        return Ok(entry);
+    }
     let checked =
         hir::template_scope::entry_scopes(snapshot.ir(), &facts, kind, name, &mut || {
             cancellation.checkpoint()
@@ -343,6 +355,19 @@ fn contract_entry(
         dynamic: checked.value.dynamic,
         conditions: checked.value.conditions,
     });
+    // The environment memo includes all overlay definitions, template bodies,
+    // membership and fact coverage. Caller-only edits do not change this result.
+    if checked.coverage.is_complete()
+        && let Some(memo) = memo
+    {
+        let bytes = entry.conditions.iter().map(|s| s.len() + 64).sum::<usize>()
+            + match &entry.contract {
+                ScopeContract::Scopes(scopes) => scopes.iter().map(|s| s.len() + 32).sum(),
+                _ => 0,
+            }
+            + 256;
+        memo.insert(key.clone(), entry.clone(), bytes);
+    }
     snapshot.query_cache().insert(
         snapshot.revision(),
         engine::CacheDomain::Documents,
@@ -454,4 +479,70 @@ fn build_contract_report(
         report.contracts.insert(key, entry.contract.clone());
     }
     Ok(report)
+}
+
+#[cfg(test)]
+mod memo_tests {
+    use super::*;
+
+    #[test]
+    fn entry_contracts_survive_caller_edits_and_refresh_after_definition_edits() {
+        let mut host = engine::AnalysisHost::with_ir(
+            game::eu4::runtime_rules().unwrap(),
+            game::eu4::profile(),
+            game::eu4::first_party_ir().unwrap(),
+        );
+        let definition = engine::DocumentId::new("file:///memo/common/scripted_effects/test.txt");
+        let caller = engine::DocumentId::new("file:///memo/events/test.txt");
+        host.open_document(
+            definition.clone(),
+            1,
+            "sample = { add_prestige = 1 }".into(),
+            None,
+        )
+        .unwrap();
+        host.open_document(
+            caller.clone(),
+            1,
+            "country_event = { immediate = { sample = yes } }".into(),
+            None,
+        )
+        .unwrap();
+        let token = CancellationToken::new();
+        let old_snapshot = host.snapshot();
+        let first = contract_entry(&old_snapshot, "scripted_effect", "sample", &token).unwrap();
+        assert!(
+            matches!(&first.contract, ScopeContract::Scopes(scopes) if scopes.iter().any(|s| s == "country"))
+        );
+        host.apply_document_changes(
+            &caller,
+            2,
+            &[engine::TextChange {
+                range: None,
+                text: "country_event = { immediate = { sample = no } }".into(),
+            }],
+        )
+        .unwrap();
+        let reused = contract_entry(&host.snapshot(), "scripted_effect", "sample", &token).unwrap();
+        assert!(Arc::ptr_eq(&first, &reused));
+        host.apply_document_changes(
+            &definition,
+            2,
+            &[engine::TextChange {
+                range: None,
+                text: "sample = { add_base_tax = 1 }".into(),
+            }],
+        )
+        .unwrap();
+        let changed =
+            contract_entry(&host.snapshot(), "scripted_effect", "sample", &token).unwrap();
+        assert!(!Arc::ptr_eq(&first, &changed));
+        assert!(
+            matches!(&changed.contract, ScopeContract::Scopes(scopes) if scopes.iter().any(|s| s == "province") && !scopes.iter().any(|s| s == "country"))
+        );
+        let old = contract_entry(&old_snapshot, "scripted_effect", "sample", &token).unwrap();
+        assert_eq!(old.contract, first.contract);
+        token.cancel();
+        assert!(contract_entry(&host.snapshot(), "scripted_effect", "sample", &token).is_err());
+    }
 }

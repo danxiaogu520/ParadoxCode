@@ -3,6 +3,97 @@ use text::AbsPath;
 use super::*;
 
 #[test]
+fn prepared_quoted_base_rebasing_keeps_generated_fact_replay_identical() {
+    let mut host = eu4_host();
+    let owner = DocumentId::new("file:///rebasing/common/scripted_effects/defs.txt");
+    host.open_document(owner, 1, "emit = { $BODY$ }".into(), None)
+        .unwrap();
+    let id = DocumentId::new("file:///rebasing/events/caller.txt");
+    host.stage_open_document(
+        id.clone(),
+        1,
+        "country_event = { immediate = { emit = { BODY = \"set_country_flag = old_flag\" } } }"
+            .into(),
+        None,
+    )
+    .unwrap();
+    let prepared = host.snapshot().prepare_document(&id).unwrap();
+    assert!(host.commit_prepared_document(prepared));
+    for (i, value) in [
+        "set_global_flag = new_flag",
+        "set_country_flag = 中😀",
+        "add_stability = 1",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let source =
+            format!("country_event = {{ immediate = {{ emit = {{ BODY = \"{value}\" }} }} }}");
+        host.stage_document_text(&id, (i + 2) as i64, source)
+            .unwrap();
+        let prepared = host.snapshot().prepare_document(&id).unwrap();
+        assert!(host.commit_prepared_document(prepared));
+        let incremental = host.snapshot().documents().clone();
+        host.audit_full_overlay_replay();
+        assert_eq!(host.snapshot().documents(), &incremental, "{value}");
+    }
+}
+
+#[test]
+fn staged_incremental_facts_match_full_replay_after_edits_and_seed_removal() {
+    let mut host = eu4_host();
+    let owner = DocumentId::new("file:///incremental/common/scripted_effects/owner.txt");
+    let reader = DocumentId::new("file:///incremental/events/reader.txt");
+    let unrelated = DocumentId::new("file:///incremental/events/unrelated.txt");
+    host.open_document(
+        owner.clone(),
+        1,
+        "emit = { set_country_flag = $NAME$ }".into(),
+        None,
+    )
+    .unwrap();
+    host.open_document(
+        reader.clone(),
+        1,
+        "country_event = { immediate = { emit = { NAME = old_flag } } }".into(),
+        None,
+    )
+    .unwrap();
+    host.open_document(
+        unrelated,
+        1,
+        "country_event = { immediate = { add_stability = 1 } }".into(),
+        None,
+    )
+    .unwrap();
+    let cases = [
+        (
+            &reader,
+            "country_event = { immediate = { emit = { NAME = new_flag } } }",
+        ),
+        (&owner, "emit = { set_global_flag = $NAME$ }"),
+        (&owner, "renamed = { set_country_flag = $NAME$ }"),
+        (&owner, "emit = { set_country_flag = $NAME$ }"),
+    ];
+    for (i, (id, source)) in cases.into_iter().enumerate() {
+        host.stage_document_text(id, (i + 2) as i64, source.into())
+            .unwrap();
+        let staged = host.snapshot().documents().clone();
+        host.audit_full_overlay_replay();
+        assert_eq!(host.snapshot().documents(), &staged, "staged case {i}");
+        let prepared = host.snapshot().prepare_document(id).unwrap();
+        assert!(host.commit_prepared_document(prepared));
+        let incremental = host.snapshot().documents().clone();
+        host.audit_full_overlay_replay();
+        assert_eq!(
+            host.snapshot().documents(),
+            &incremental,
+            "committed case {i}"
+        );
+    }
+}
+
+#[test]
 fn staging_an_overlay_does_not_relower_cached_disk_documents() {
     let root = temp_root("closed-document-staging");
     fs::create_dir_all(root.join("common/scripted_effects")).unwrap();

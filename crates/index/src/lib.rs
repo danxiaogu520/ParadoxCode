@@ -14,9 +14,12 @@ pub use fact_stabilization::{
 };
 mod index;
 mod overlay_facts;
+mod overlay_symbols;
+pub use overlay_symbols::OverlaySymbols;
 mod pipeline;
 pub use overlay_facts::{
-    OverlayFactBudget, OverlayFactReport, OverlayFactTransaction, stabilize_overlay_facts,
+    OverlayFactBudget, OverlayFactReport, OverlayFactTransaction, OverlayReplay,
+    affected_overlay_fact_readers, stabilize_overlay_facts, stabilize_overlay_facts_with_memo,
 };
 
 pub use documents::{DocumentSnapshot, FileState, ParsedSource, PreparedDocument};
@@ -29,9 +32,9 @@ pub use pipeline::{
     IndexSymbolFacts, SourceLoadContext, SourceReadJob, build_file_state,
     build_file_state_with_cache, build_file_state_with_ir, build_file_state_with_ir_and_facts,
     empty_file_state, load_source_files, parse_source, position_ranges_for_state,
-    prepare_document_snapshot, prepare_document_snapshot_with_ir,
-    prepare_document_snapshot_with_ir_and_facts, shard_for_source, staged_overlay_document,
-    unparsed_document,
+    prepare_document_snapshot, prepare_document_snapshot_incremental_with_ir,
+    prepare_document_snapshot_with_ir, prepare_document_snapshot_with_ir_and_facts,
+    shard_for_source, staged_overlay_document, unparsed_document,
 };
 
 thread_local! {
