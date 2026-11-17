@@ -71,6 +71,12 @@ impl TrackingFacts<'_> {
     }
 }
 impl SymbolFacts for TrackingFacts<'_> {
+    fn shared_template_memo(&self) -> Option<Arc<rules::template::TemplateMemo>> {
+        self.facts.shared_template_memo()
+    }
+    fn untracked_view(&self) -> Option<&dyn SymbolFacts> {
+        Some(self.facts)
+    }
     fn template_accepts_no_arguments(
         &self,
         type_id: TypeId,

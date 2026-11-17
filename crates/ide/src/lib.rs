@@ -30,7 +30,36 @@ mod template_recursion;
 mod transcode;
 mod types;
 
-pub use completion::{complete, complete_with_cancellation, completion, completion_resolve};
+pub use completion::{
+    complete, complete_for_protocol_with_cancellation, complete_with_cancellation, completion,
+    completion_resolve,
+};
+
+/// Compiles entry constraints while the workspace is being prepared. Later
+/// edits validate each cached result's positive and negative fact receipts.
+pub fn prewarm_completion<E>(
+    snapshot: &engine::AnalysisSnapshot,
+    checkpoint: &mut impl FnMut() -> Result<(), E>,
+) -> Result<usize, E> {
+    let mut definitions = std::collections::BTreeSet::new();
+    for definition in snapshot.index().definitions_iter() {
+        checkpoint()?;
+        if semantic::dynamic_definition_type(snapshot, &definition.kind) {
+            definitions.insert((
+                definition.kind.to_ascii_lowercase(),
+                definition.name.to_ascii_lowercase(),
+            ));
+        }
+    }
+    let facts = ir_semantic::WorkspaceFacts { snapshot };
+    for (kind, name) in &definitions {
+        checkpoint()?;
+        hir::template_scope::entry_scopes(snapshot.ir(), &facts, kind, name, checkpoint)?;
+        ir_template::prewarm_template_boundary(snapshot, kind, name, checkpoint)?;
+        semantic::prewarm_definition_snippet(snapshot, kind, name);
+    }
+    Ok(definitions.len())
+}
 pub use diagnostics::{
     analyze, analyze_document, analyze_source_file, diagnostics, diagnostics_with_cancellation,
     source_file_diagnostics_with_cancellation, text_diagnostics_with_cancellation,

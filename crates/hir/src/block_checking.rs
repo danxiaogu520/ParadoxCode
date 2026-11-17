@@ -395,14 +395,8 @@ fn check<E>(
                 {
                     add(&mut nodes, target, Node::Value(Validation::Invalid));
                 }
-                let mut families = BTreeMap::<usize, Vec<FieldId>>::new();
-                for field in ir.fields(context.schema) {
-                    families
-                        .entry(ir.field(field).key.index())
-                        .or_default()
-                        .push(field);
-                }
-                for family in families.values() {
+                let families = crate::cardinality::families(ir, context.schema);
+                for family in families.iter() {
                     let applicable = family
                         .iter()
                         .copied()

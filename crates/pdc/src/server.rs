@@ -677,6 +677,10 @@ pub(crate) enum TransportEvent {
     VanillaSetup(IndexSetupResult),
     DependencySetup(DependencySetupResult),
     ScanSetup(ScanSetupResult),
+    CompletionPrepared {
+        memo: Arc<rules::template::TemplateMemo>,
+        result: Result<usize, WorkspaceError>,
+    },
     BackgroundReindex(BackgroundReindexResult),
     ReindexCommand(ReindexCommandResult),
     FormatCommand(FormatCommandResult),

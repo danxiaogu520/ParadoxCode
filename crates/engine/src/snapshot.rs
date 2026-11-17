@@ -34,6 +34,7 @@ pub struct AnalysisSnapshot {
     pub(crate) roots: Arc<[SourceRoot]>,
     pub(crate) workspace_root: Option<AbsPath>,
     pub(crate) documents: Arc<BTreeMap<DocumentId, DocumentSnapshot>>,
+    pub(crate) prepared_bases: Arc<BTreeMap<DocumentId, PreparedDocument>>,
     pub(crate) source_files: Arc<BTreeMap<SourceFileId, SourceFile>>,
     pub(crate) source_file_paths: Arc<HashMap<AbsPath, SourceFileId>>,
     pub(crate) file_states: Arc<BTreeMap<SourceFileId, Arc<FileState>>>,
@@ -194,15 +195,35 @@ impl AnalysisSnapshot {
         if document.source != DocumentSource::Overlay {
             return None;
         }
-        Some(PreparedDocument {
-            document: prepare_document_snapshot_with_ir(
-                self.rules.as_ref(),
-                self.profile.as_ref(),
-                self.ir.as_ref(),
+        let previous = self.prepared_bases.get(id).filter(|base| {
+            base.document.path == document.path
+                && base.has_base_hir(&self.ir, &self.rules, &self.profile, &self.roots)
+        });
+        let candidate = if let Some(base) = previous.and_then(|base| base.document.hir()) {
+            index::prepare_document_snapshot_incremental_with_ir(
+                &self.rules,
+                &self.profile,
+                &self.ir,
                 &self.roots,
                 document.clone(),
-            ),
-        })
+                base,
+            )
+        } else {
+            prepare_document_snapshot_with_ir(
+                &self.rules,
+                &self.profile,
+                &self.ir,
+                &self.roots,
+                document.clone(),
+            )
+        };
+        Some(PreparedDocument::from_base(
+            candidate,
+            self.ir.clone(),
+            self.rules.clone(),
+            self.profile.clone(),
+            self.roots.clone(),
+        ))
     }
 
     /// Returns one current document candidate.
@@ -280,6 +301,25 @@ impl AnalysisSnapshot {
     #[must_use]
     pub fn query_cache(&self) -> &SnapshotQueryCache {
         &self.query_cache
+    }
+
+    /// Shared computations validate their fact receipts before crossing a
+    /// document revision. Index/rule replacement drops the entire cache domain.
+    pub fn shared_template_memo(&self) -> Arc<rules::template::TemplateMemo> {
+        const KEY: &str = "template:validated-instances";
+        if let Some(memo) = self.query_cache.get(self.revision, KEY) {
+            return memo;
+        }
+        let memo = Arc::new(rules::template::TemplateMemo::with_max_bytes(
+            256 * 1024 * 1024,
+        ));
+        self.query_cache.insert(
+            self.revision,
+            crate::CacheDomain::Index,
+            KEY.into(),
+            memo.clone(),
+        );
+        self.query_cache.get(self.revision, KEY).unwrap_or(memo)
     }
 
     /// Returns the identity of the analysis state that produced this snapshot.

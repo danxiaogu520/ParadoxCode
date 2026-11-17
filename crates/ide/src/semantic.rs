@@ -167,54 +167,108 @@ fn dynamic_summary_in_hir(
 /// effectively-required parameter, the last of which doubles as the final
 /// cursor position. An invocation block only accepts parameter assignments,
 /// so the skeleton carries no trailing placeholder line.
+#[cfg(test)]
 pub(crate) fn scripted_definition_snippet(
     snapshot: &AnalysisSnapshot,
     kind_name: &str,
     definition_name: &str,
 ) -> String {
-    let Some(summary) = dynamic_definition_summary(snapshot, kind_name, definition_name) else {
-        return format!(
+    definition_snippet_if_present(snapshot, kind_name, definition_name).unwrap_or_else(|| {
+        format!(
             "{} = {{\n\t$0\n}}",
             crate::insertion::snippet_literal(definition_name)
-        );
-    };
-    if summary.parameters.is_empty() {
-        return format!("{definition_name} = yes");
+        )
+    })
+}
+
+enum DefinitionSnippet {
+    Scalar,
+    Block(String),
+}
+
+fn definition_snippet_plan(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+    name: &str,
+) -> Arc<Option<DefinitionSnippet>> {
+    let kind = kind.to_ascii_lowercase();
+    let name = name.to_ascii_lowercase();
+    let revision = snapshot.revision();
+    if let Some(plan) = probe_query_cache(
+        snapshot,
+        revision,
+        &["definition-snippet:", &kind, ":", &name],
+    ) {
+        return plan;
     }
-    let tabstops = summary
-        .parameters
-        .iter()
-        .filter(|parameter| {
-            crate::template_presence::parameter_effectively_required(snapshot, &summary, parameter)
+    let plan = dynamic_definition_summary(snapshot, &kind, &name).map(|summary| {
+        if summary.parameters.is_empty() {
+            return DefinitionSnippet::Scalar;
+        }
+        // This set depends only on the immutable definition. Walk its program
+        // once rather than once per parameter and once per field overload.
+        let unconditional = summary
+            .template
+            .as_ref()
+            .map(|template| template.program.unconditional_reads());
+        let tabstops = summary
+            .parameters
+            .iter()
+            .filter(|parameter| {
+                unconditional.as_ref().map_or(parameter.required, |reads| {
+                    reads.contains(&parameter.name.to_ascii_lowercase())
+                })
+            })
+            .map(|parameter| parameter.name.as_str())
+            .collect::<Vec<_>>();
+        if tabstops.is_empty() {
+            return DefinitionSnippet::Block("\t$0\n".into());
+        }
+        let last = tabstops.len() - 1;
+        let mut body = String::new();
+        for (index, name) in tabstops.iter().enumerate() {
+            let stop = if index == last {
+                "$0".to_owned()
+            } else {
+                format!("${}", index + 1)
+            };
+            body.push_str(&format!(
+                "\t{} = {stop}\n",
+                crate::insertion::snippet_literal(name)
+            ));
+        }
+        DefinitionSnippet::Block(body)
+    });
+    let plan = Arc::new(plan);
+    // Parameter names, guards, source and missing definitions all advance this
+    // domain. Ordinary edits keep the exact signature plan and caller spelling.
+    snapshot.query_cache().insert(
+        revision,
+        engine::CacheDomain::Definitions,
+        format!("definition-snippet:{kind}:{name}"),
+        plan.clone(),
+    );
+    plan
+}
+
+pub(crate) fn prewarm_definition_snippet(snapshot: &AnalysisSnapshot, kind: &str, name: &str) {
+    definition_snippet_plan(snapshot, kind, name);
+}
+
+pub(crate) fn definition_snippet_if_present(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+    name: &str,
+) -> Option<String> {
+    definition_snippet_plan(snapshot, kind, name)
+        .as_ref()
+        .as_ref()
+        .map(|plan| match plan {
+            DefinitionSnippet::Scalar => format!("{name} = yes"),
+            DefinitionSnippet::Block(body) => {
+                format!("{} = {{\n{body}}}", crate::insertion::snippet_literal(name))
+            }
         })
-        .map(|parameter| parameter.name.as_str())
-        .collect::<Vec<_>>();
-    if tabstops.is_empty() {
-        return format!(
-            "{} = {{\n\t$0\n}}",
-            crate::insertion::snippet_literal(definition_name)
-        );
-    }
-    let inner_indent = "\t";
-    let last = tabstops.len() - 1;
-    let mut body = String::new();
-    for (index, name) in tabstops.iter().enumerate() {
-        // Tabstop numbering runs over the prefilled parameters only; the
-        // final one doubles as the cursor's resting position.
-        let stop = if index == last {
-            "$0".to_owned()
-        } else {
-            format!("${}", index + 1)
-        };
-        body.push_str(&format!(
-            "{inner_indent}{} = {stop}\n",
-            crate::insertion::snippet_literal(name)
-        ));
-    }
-    format!(
-        "{} = {{\n{body}}}",
-        crate::insertion::snippet_literal(definition_name)
-    )
 }
 
 /// Field-level value semantics of one construct context, as declared by the
@@ -1067,5 +1121,83 @@ mod tests {
                     <= 2)
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod snippet_cache_tests {
+    use super::*;
+    #[test]
+    fn plans_keep_case_and_survive_unrelated_edits_but_revalidate_definition_changes() {
+        let mut host = engine::AnalysisHost::with_ir(
+            game::eu4::runtime_rules().unwrap(),
+            game::eu4::profile(),
+            game::eu4::first_party_ir().unwrap(),
+        );
+        assert!(
+            definition_snippet_if_present(&host.snapshot(), "scripted_effect", "Sample").is_none()
+        );
+        let id =
+            engine::DocumentId::new("file:///snippet-cache/common/scripted_effects/sample.txt");
+        host.open_document(
+            id.clone(),
+            1,
+            "Sample={ add_stability=$VALUE$ [[FLAG] add_prestige=$EXTRA$ ] }".into(),
+            None,
+        )
+        .unwrap();
+        let old = host.snapshot();
+        prewarm_definition_snippet(&old, "scripted_effect", "sample");
+        assert_eq!(
+            definition_snippet_if_present(&old, "scripted_effect", "SaMpLe").unwrap(),
+            "SaMpLe = {\n\tVALUE = $0\n}"
+        );
+        let plan = definition_snippet_plan(&old, "scripted_effect", "Sample");
+        let event = engine::DocumentId::new("file:///snippet-cache/events/other.txt");
+        host.open_document(
+            event.clone(),
+            1,
+            "country_event={id=other.1 immediate={add_stability=1}}".into(),
+            None,
+        )
+        .unwrap();
+        assert!(Arc::ptr_eq(
+            &plan,
+            &definition_snippet_plan(&host.snapshot(), "scripted_effect", "sample")
+        ));
+        host.apply_document_changes(
+            &event,
+            2,
+            &[engine::TextChange {
+                range: None,
+                text: "country_event={id=other.1 immediate={add_stability=2}}".into(),
+            }],
+        )
+        .unwrap();
+        assert!(Arc::ptr_eq(
+            &plan,
+            &definition_snippet_plan(&host.snapshot(), "scripted_effect", "sample")
+        ));
+        host.apply_document_changes(
+            &id,
+            2,
+            &[engine::TextChange {
+                range: None,
+                text: "Sample={ [[VALUE] add_stability=$VALUE$ ] }".into(),
+            }],
+        )
+        .unwrap();
+        assert_eq!(
+            definition_snippet_if_present(&host.snapshot(), "scripted_effect", "Sample").unwrap(),
+            "Sample = {\n\t$0\n}"
+        );
+        assert_eq!(
+            definition_snippet_if_present(&old, "scripted_effect", "Sample").unwrap(),
+            "Sample = {\n\tVALUE = $0\n}"
+        );
+        host.close_document(&id).unwrap();
+        assert!(
+            definition_snippet_if_present(&host.snapshot(), "scripted_effect", "Sample").is_none()
+        );
     }
 }

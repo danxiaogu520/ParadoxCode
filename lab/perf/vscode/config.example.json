@@ -1,0 +1,26 @@
+{
+  "vscode": "C:/path/to/Code.exe",
+  "extension": "C:/path/to/paradoxcode-vscode-extension",
+  "workspace": "C:/mods/MyMod",
+  "vanillaCache": "C:/indices/eu4.pdcindex",
+  "dependencies": [
+    {
+      "id": "dependency",
+      "path": "C:/mods/Dependency",
+      "index": "C:/indices/dependency.pdcindex"
+    }
+  ],
+  "servers": {
+    "baseline": "C:/binaries/baseline/paradoxcode.exe",
+    "candidate": "C:/binaries/candidate/paradoxcode.exe"
+  },
+  "expectedIndexedFiles": 22656,
+  "editRepetitions": 5,
+  "seed": 1701,
+  "cases": [
+    {
+      "path": "events/example.txt",
+      "needle": "spawn_rebels"
+    }
+  ]
+}

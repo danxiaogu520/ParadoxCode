@@ -338,6 +338,65 @@ pub fn required_parameters_with_inputs<E>(
     state: ScopeState,
     checkpoint: &mut dyn FnMut() -> Result<(), E>,
 ) -> Result<Analysis<RequiredParameters>, E> {
+    checkpoint()?;
+    let Some(memo) = facts.shared_template_memo() else {
+        return required_parameters_uncached(ir, facts, kind, name, inputs, state, checkpoint);
+    };
+    let key = format!(
+        "required:{}:{}:{inputs:?}:{state:?}",
+        kind.to_ascii_lowercase(),
+        name.to_ascii_lowercase()
+    );
+    if let Some(cached) = memo.get::<CachedRequired>(&key)
+        && cached.reads.validate_and_replay(facts, checkpoint)?
+    {
+        return Ok(cached.checked.clone());
+    }
+    let recording = crate::memo_facts::RecordingFacts::new(facts);
+    let checked =
+        required_parameters_uncached(ir, &recording, kind, name, inputs, state, checkpoint)?;
+    let reads = recording.finish();
+    checkpoint()?;
+    if checked.coverage.is_complete() {
+        let bytes = reads
+            .bytes()
+            .saturating_add(
+                checked
+                    .value
+                    .missing
+                    .iter()
+                    .chain(&checked.value.unconditional)
+                    .map(|s| s.len() + 64)
+                    .sum::<usize>(),
+            )
+            .saturating_add(512);
+        memo.replace(
+            key,
+            Arc::new(CachedRequired {
+                checked: checked.clone(),
+                reads,
+            }),
+            bytes,
+        );
+    }
+    Ok(checked)
+}
+
+struct CachedRequired {
+    checked: Analysis<RequiredParameters>,
+    reads: crate::memo_facts::Receipts,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn required_parameters_uncached<E>(
+    ir: &rules::ir::RulesIr,
+    facts: &dyn rules::ir::SymbolFacts,
+    kind: &str,
+    name: &str,
+    inputs: &BindingInputs,
+    state: ScopeState,
+    checkpoint: &mut dyn FnMut() -> Result<(), E>,
+) -> Result<Analysis<RequiredParameters>, E> {
     let suppressed = RequirednessFacts {
         facts,
         dependent: std::cell::Cell::new(false),
