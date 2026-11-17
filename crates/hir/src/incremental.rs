@@ -305,7 +305,7 @@ mod tests {
         };
         let base = lower(source);
         for value in [
-            "spaw = { size = 1 }",
+            "spawn = { size = 1 }",
             " = { size = 1 }",
             "中😀 = yes",
             r#"a = \"quoted\""#,
