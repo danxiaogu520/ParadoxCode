@@ -3,7 +3,7 @@ use crate::MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS;
 use crate::uri::FileUri;
 use std::fs;
 
-// Whole-document paint and hint queries share one CPU slot. Completion and
+// Whole-document semantic-token queries share one CPU slot. Completion and
 // explicit navigation queries bypass it; queued paints observe cancellation promptly.
 struct PaintPermit;
 static PAINT_BUSY: AtomicBool = AtomicBool::new(false);
@@ -1176,7 +1176,6 @@ impl LspServer {
             "textDocument/semanticTokens/full"
                 | "textDocument/semanticTokens/full/delta"
                 | "textDocument/semanticTokens/range"
-                | "textDocument/inlayHint"
         );
         let method = method.to_owned();
         let params = object.get("params").cloned();

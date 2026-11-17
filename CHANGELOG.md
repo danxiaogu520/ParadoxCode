@@ -7,6 +7,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Removed
+
+- Scope-transition inlay hints and the `textDocument/inlayHint` LSP provider.
+
 ### Fixed
 
 - Completion after edits reuses unaffected syntax and semantic facts, shares bounded

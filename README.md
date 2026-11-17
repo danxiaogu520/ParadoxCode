@@ -14,7 +14,7 @@ shared language mechanisms from the EU4 rule package; EU4 is the supported game 
 ## What it does
 
 - Diagnostics, completion, hover, definitions, references, and conflict-aware rename.
-- Error-tolerant parsing, semantic highlighting, scope hints, and conservative formatting.
+- Error-tolerant parsing, semantic highlighting, and conservative formatting.
 - Workspace analysis across your Mod, dependencies, and a local Vanilla index.
 - Mission-tree preview and manual Chinese localisation encoding/decoding in VS Code;
   experimental transparent decoded views are available by opt-in.

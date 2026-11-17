@@ -1265,7 +1265,7 @@ fn semantic_tokens_are_advertised_and_encoded_in_relative_order() {
 }
 
 #[test]
-fn inlay_hints_expose_rule_proven_scope_transitions() {
+fn scope_inlay_hints_are_not_advertised_or_supported() {
     let (root, root_uri) = temp_workspace_dir();
     let uri = format!("{root_uri}/events/inlay.txt");
     let text = "country_event = { immediate = { capital_scope = { add_base_tax = 1 } } }\n";
@@ -1287,17 +1287,17 @@ fn inlay_hints_expose_rule_proven_scope_transitions() {
         .iter()
         .find(|value| value["id"] == 1)
         .expect("initialize response");
-    assert_eq!(
-        initialize["result"]["capabilities"]["inlayHintProvider"],
-        json!(true)
+    assert!(
+        initialize["result"]["capabilities"]
+            .get("inlayHintProvider")
+            .is_none()
     );
-    let hints: Vec<lsp_types::InlayHint> = typed_result(&responses, 2);
-    assert!(hints.iter().any(|hint| {
-        matches!(&hint.label, lsp_types::InlayHintLabel::String(label) if label == "→ province")
-    }));
-    assert!(hints.iter().all(|hint| {
-        !matches!(&hint.label, lsp_types::InlayHintLabel::String(label) if label == "→ country")
-    }));
+    let response = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("unsupported inlay hint response");
+    assert_eq!(response["error"]["code"], json!(crate::METHOD_NOT_FOUND));
+    assert!(response.get("result").is_none());
     fs::remove_dir_all(root).expect("cleanup");
 }
 

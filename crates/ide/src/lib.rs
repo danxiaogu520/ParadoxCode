@@ -7,7 +7,6 @@ mod completion;
 mod diagnostics;
 mod hover;
 mod hover_card;
-mod inlay;
 mod insertion;
 mod ir_queries;
 mod ir_semantic;
@@ -69,7 +68,6 @@ pub use hover_card::{
     EventCardAssets, HoverCard, HoverCardAsset, HoverCardEvent, HoverCardEventOption,
     HoverCardMission, MissionCardAssets, hover_card_with_cancellation,
 };
-pub use inlay::{MAX_SCOPE_INLAY_HINTS, scope_inlay_hints_with_cancellation};
 pub use localisation::{
     LocalisationKeyMatch, LocalisationSearchHit, LocalisationSearchResult,
     localisation_search_page_with_cancellation, localisation_search_with_cancellation,
@@ -97,7 +95,7 @@ pub use types::{
     AnalysisResult, CancellationToken, Cancelled, CompletionItem, CompletionKind, CompletionResult,
     Diagnostic, DiagnosticCertainty, DiagnosticCode, DiagnosticProvenance, DiagnosticTag,
     FileAnalysis, Hover, Location, PrepareRenameResult, QuickFix, ReferenceInfo, RelatedLocation,
-    RenameError, RenameFailure, ScopeInlayHint, SemanticToken, SemanticTokenType, Severity, Symbol,
+    RenameError, RenameFailure, SemanticToken, SemanticTokenType, Severity, Symbol,
     WorkspaceEditPlan, WorkspaceSymbol, WorkspaceTextEdit,
 };
 

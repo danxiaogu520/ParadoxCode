@@ -120,7 +120,6 @@ pub(crate) fn is_snapshot_request(method: &str) -> bool {
             | "textDocument/rename"
             | "textDocument/codeAction"
             | "textDocument/documentSymbol"
-            | "textDocument/inlayHint"
             | "textDocument/semanticTokens/full"
             | "textDocument/semanticTokens/full/delta"
             | "textDocument/semanticTokens/range"
@@ -838,9 +837,9 @@ mod tests {
     use lsp_types::request::Request;
     use lsp_types::request::{
         CodeActionRequest, Completion, DocumentSymbolRequest, Formatting, GotoDefinition,
-        HoverRequest, InlayHintRequest, PrepareRenameRequest, References, Rename,
-        ResolveCompletionItem, SemanticTokensFullDeltaRequest, SemanticTokensFullRequest,
-        SemanticTokensRangeRequest, WorkspaceSymbolRequest,
+        HoverRequest, PrepareRenameRequest, References, Rename, ResolveCompletionItem,
+        SemanticTokensFullDeltaRequest, SemanticTokensFullRequest, SemanticTokensRangeRequest,
+        WorkspaceSymbolRequest,
     };
     use lsp_types::{CompletionItemKind, NumberOrString};
     use text::TextRange;
@@ -860,7 +859,6 @@ mod tests {
             SemanticTokensFullRequest::METHOD,
             SemanticTokensFullDeltaRequest::METHOD,
             SemanticTokensRangeRequest::METHOD,
-            InlayHintRequest::METHOD,
             HoverRequest::METHOD,
             GotoDefinition::METHOD,
             References::METHOD,
@@ -878,6 +876,7 @@ mod tests {
         }
         // The bare, non-spec request name must not be mistaken for the full-token request.
         assert!(!is_snapshot_request("textDocument/semanticTokens"));
+        assert!(!is_snapshot_request("textDocument/inlayHint"));
     }
 
     #[test]

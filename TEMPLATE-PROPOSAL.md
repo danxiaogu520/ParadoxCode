@@ -34,7 +34,7 @@
 | 来源或候选输出不足会污染语义完成状态 | 分开语义检查、事实发现与结果投影的覆盖；已证明结论不因 UI 输出预算耗尽而被抹掉 |
 | 拼接补全只有原则，缺少可执行算法 | 按调用与光标特化，采用有限候选逆映射、单变量重复拼接反解、关联约束与结构重解析 |
 | 多孔洞分别生成候选后求交会丢失关联 | 在所有相关位置共享同一绑定见证，先组合关系再投影焦点；不能暗中补齐缺失实参 |
-| “共用模型”尚未覆盖全部现有语言功能 | 固定按需查询与结果契约，纳入 semantic tokens、scope inlay、symbols、resolve 和代码修复 |
+| “共用模型”尚未覆盖全部现有语言功能 | 固定按需查询与结果契约，纳入 semantic tokens、symbols、resolve 和代码修复 |
 | 只约束完整性不足以防止长期降级 | 按有限场景、编辑轨迹和真实语料验收完成率；普通支持场景持续 Unknown 也是切换阻塞 |
 | 性能验收只看求解时间会漏掉交互阻塞 | 同时记录排队、来源投影、协议编码、取消与索引并发；基础共享和预算前移到核心阶段 |
 
@@ -483,7 +483,6 @@ hover、snippet 和必填参数说明读取相同 `RequireBinding`/`When` 模型
 | prepare rename / rename | 符号身份、完整相关引用闭包、逆向编辑与影响范围 | 闭包完整且映射可逆、版本有效、无其他消费冲突才返回编辑；不能仅因可导航就允许重命名 |
 | quick fix / code action | 诊断证据、实际规则候选、可逆编辑与修复后验证 | 修复目标问题且不制造相关确定错误；不能把近似来源范围当作精确编辑范围 |
 | semantic tokens | 当前源码范围对应的语义分类及条件 | 多个消费解释无法一致分类时保留词法/参数分类；不在虚拟展开偏移上发送 token，不重复覆盖同一源片段 |
-| scope inlay hints | 已证明的 scope 转换、条件与源码锚点 | 只展示确定的转换；范围查询不展开整个工作区；与同处 hover 的 scope 证据一致 |
 | document/workspace symbols | 声明身份、物理来源、生成实例和发现状态 | 文档结构保持实际源码归属，不把重复展开全部塞入物理层级；工作区符号按现有发现政策显示 |
 
 共享核心与 IDE DTO 必须先承载覆盖、条件和来源精度；不能在 pdc 适配时重新猜测。当前 `CompletionResult` 只有 revision/items、`Hover` 只有内容和范围，不足以自动兑现上述契约，需要同步设计内部结果扩展。CLI/audit 读取同一机器可读状态；普通 LSP 无法直接表达的详细状态，由已有提示/详情能力呈现，不伪造符号位置或协议字段。
@@ -492,7 +491,7 @@ hover、snippet 和必填参数说明读取相同 `RequireBinding`/`When` 模型
 
 引用结果部分可用不意味着 rename 可用；跨文件编辑核对所有受影响文档版本/磁盘身份，按客户端能力使用版本化 WorkspaceEdit。版本变化后重新验证或拒绝旧编辑，不静默应用到新内容；协议无法提供原子版本保护的能力降级应明确，不宣称消除了客户端应用时的竞争。取消和过期响应不转换为“已完成但无结果”。
 
-一致性验收以同一输入快照和编辑轨迹横向检查所有消费者，而不是只分别跑各功能单测。补全接受后诊断应认可其焦点约束；hover 应能解释候选及拒绝；导航与 rename 使用同一符号；高亮、inlay 和 symbols 不得通过旁路生成普通字符串内部的脚本事实。
+一致性验收以同一输入快照和编辑轨迹横向检查所有消费者，而不是只分别跑各功能单测。补全接受后诊断应认可其焦点约束；hover 应能解释候选及拒绝；导航与 rename 使用同一符号；高亮和 symbols 不得通过旁路生成普通字符串内部的脚本事实。
 
 ## 增量依赖、缓存与资源
 
@@ -594,7 +593,7 @@ Cancelled 不作为结果缓存。Incomplete 可保留可复用的确定证据�
 | 并发与缓存 | 同时 miss、旧快照迟到、独立请求取消、字节淘汰及无缓存重算一致 |
 | 试算隔离与混合负载 | 编辑失效的旧生成事实不支撑候选，新事实互不污染，取消不遗留临时声明；后台索引/诊断不使补全与 hover 无界排队；前台持续请求不饿死后台 |
 | 索引稳定 | 生成符号的回边、非单调选择及震荡；删除触发源后无自我支撑旧事实；乱序/并发与从零重建相同，取消/预算不足不提交候选索引 |
-| IDE 与 LSP | 全部消费者矩阵走真实协议；补全接受后焦点诊断、hover 解释、导航/引用身份、高亮/inlay/symbols 一致；UTF-16、resolve 淘汰/过期、版本化编辑及不支持客户端能力时的降级正确 |
+| IDE 与 LSP | 全部消费者矩阵走真实协议；补全接受后焦点诊断、hover 解释、导航/引用身份、高亮/symbols 一致；UTF-16、resolve 淘汰/过期、版本化编辑及不支持客户端能力时的降级正确 |
 
 统一模型的验收将同一脚本内容分别作为命名 Template body 与被消费的匿名 Template 输入，在相同 schema/scope 下比较诊断、候选及符号结果；只有来源身份和位置可以不同。消费边界的否定样例检查所有消费者，而不只检查诊断；普通字符串内即使出现真实符号名，也不能因此生成脚本导航或重命名编辑。旧名称仅可留在迁移说明或明确的拒绝测试中，不能在新规则和生产语义入口中继续工作。
 
@@ -750,7 +749,7 @@ target/template-after/tools audit diff \
 | 1 完成状态与结果契约 | 现有 Callable/replay 和 quoted 查询显式返回逐目标覆盖/限制；扩展 IDE 结果、协议/审计适配；被丢弃的定义记为未知 | 深度/条目/quoted 限制可观察；短链末端拒绝、长链未完成和低预算保留证据均有 owned 回归；初步消费者矩阵不丢失状态 |
 | 2 统一命名与共享核心 | Callable trait/API → Template、静态 matcher → Pattern；共享字段/Block/matcher/scope 及只读环境接口；lossless/Error/Hole、When/Dispatch/Call、依赖闭包与显式任务栈；基础查询内共享、预算和单未知量反解 | first-party 与 compiler/runtime 名称一致；固定结构、存在条件、转发、重复拼接与参照一致；真实诊断/补全/hover 切片及恢复查询通过；参数长链确实检查末端 |
 | 3 消费边界、结构与事实 | Template 专属 quoted 消费；移除通用 quoted 入口；Splice、容器摘要、虚拟 Hole 重解析、来源及编辑逆投影、scope/overload 后续状态、engine 事实工作队列与试算隔离 | 消费/拒绝边界和整容器与参照一致；跨词法边界、有限再调用/未知状态正确；生成/撤销事实原子提交；候选试写不污染权威索引 |
-| 4 关系补全与全部 IDE 投影 | 多未知关系、候选源检索与实际编辑验证；统一消费者矩阵全部接入，含 resolve、quick fix、semantic tokens、inlay 与 symbols；移除独立 quoted 探测 | 有限域穷举与条件见证通过；所有消费者共享证据与消费上下文；普通字符串无脚本事实；跨功能编辑轨迹、版本/取消和 real LSP 通过 |
+| 4 关系补全与全部 IDE 投影 | 多未知关系、候选源检索与实际编辑验证；统一消费者矩阵全部接入，含 resolve、quick fix、semantic tokens 与 symbols；移除独立 quoted 探测 | 有限域穷举与条件见证通过；所有消费者共享证据与消费上下文；普通字符串无脚本事实；跨功能编辑轨迹、版本/取消和 real LSP 通过 |
 | 5 缓存与交互优化 | 从保守域失效精化正负依赖，特化计划/候选缓存、字节淘汰、调度公平性；按测量决定并发合并与索引加速，遵守发布 version 约定 | 编辑失效/无缓存及从零索引对照、旧版重建、冷热/混合负载/端到端延迟和内存达标；细粒度依赖须证明减少重算 |
 | 6 默认切换与清理 | 全量 Vanilla 与全部 LSP/完成率/性能验收；移除重复推导、replay、旧名称适配及普通 quoted 消费；更新权威组件文档 | 唯一 Template 概念和生产路径；quoted 仅由 Template 消费；支持范围无未解释的 Unknown/候选遗漏；所有行为差异可解释，无资源/性能阻塞 |
 
@@ -762,7 +761,7 @@ target/template-after/tools audit diff \
 
 `Callable` → `Template`、字面量 matcher → `Pattern`、mission quoted 重载移除和通用 quoted 规则接口删除都是本次必做事项，按上述阶段分 PR 审阅，在默认切换前全部完成。内部图实现的性能比较与规则范围变化分别报告；行为 PR 必须解释被移除入口造成的 Vanilla 差异。不能把统一名称或消费边界继续留作核心验收后的可选工作。
 
-迁移清单按功能确认替代关系：[template_presence](crates/ide/src/template_presence.rs) 的 presence、[template_contracts](crates/ide/src/template_contracts.rs) 的 scope、[template_recursion](crates/ide/src/template_recursion.rs) 的递归覆盖、[hir::template](crates/hir/src/template.rs) 的共享程序遍历、[ir_template](crates/ide/src/ir_template.rs) 的参数域，以及 ir_semantic/completion/hover/ir_lowering 的专用遍历。逐一核对 [IDE 公共查询](crates/ide/src/lib.rs)、[结果 DTO](crates/ide/src/types.rs)与 [LSP 适配](crates/pdc/src/requests.rs)，包括导航、修复、tokens、inlay、symbols 和 resolve 的 Template 分支。已经退役的 `dynamic_constraints` 不再次列入工作；普通静态字面量模式、Block 检查和 source-map 工具按独立职责保留。
+迁移清单按功能确认替代关系：[template_presence](crates/ide/src/template_presence.rs) 的 presence、[template_contracts](crates/ide/src/template_contracts.rs) 的 scope、[template_recursion](crates/ide/src/template_recursion.rs) 的递归覆盖、[hir::template](crates/hir/src/template.rs) 的共享程序遍历、[ir_template](crates/ide/src/ir_template.rs) 的参数域，以及 ir_semantic/completion/hover/ir_lowering 的专用遍历。逐一核对 [IDE 公共查询](crates/ide/src/lib.rs)、[结果 DTO](crates/ide/src/types.rs)与 [LSP 适配](crates/pdc/src/requests.rs)，包括导航、修复、tokens、symbols 和 resolve 的 Template 分支。已经退役的 `dynamic_constraints` 不再次列入工作；普通静态字面量模式、Block 检查和 source-map 工具按独立职责保留。
 
 每个行为 PR 先运行 focused owned tests 和 [贡献指南](CONTRIBUTING.md#validation)要求的受影响 gate。语义/规则/index 改变时执行 [tools audit](crates/tools/README.md#diagnostics-and-semantic-evidence) 的完整本地 Vanilla 对照；性能 PR 使用 [perf 工具](crates/tools/README.md#performance-measurements) 留下配对数据，结果和游戏来源留在 ignored target 下。更新 [规则语言](crates/rules/LANGUAGE.md)、[诊断指南](crates/ide/DIAGNOSTICS.md)、[服务器与缓存指南](crates/pdc/README.md)及生成视图，并通过 `tools documentation check`。仓库已完成的 RulesIr 迁移与历史验收见 [PR #141](https://github.com/danxiaogu520/ParadoxCode/pull/141)，本提案不恢复已删除的阶段日志作为当前权威。
 

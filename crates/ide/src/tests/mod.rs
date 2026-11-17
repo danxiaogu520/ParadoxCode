@@ -4,7 +4,6 @@ mod field_queries;
 mod golden;
 mod hover;
 mod hover_improvements;
-mod inlay;
 mod ir;
 mod localisation;
 mod navigation;
