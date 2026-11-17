@@ -149,7 +149,7 @@ than silently choosing the reference's provisional behavior as an engine guarant
 
 The [editing trace](src/audit/templates/queries.json) freezes source and UTF-16 cursor anchors.
 Each state queries completion, hover, definition, references, rename, code actions, symbols,
-semantic tokens, inlay hints, text diagnostics and completion resolve when a candidate exists.
+semantic tokens, text diagnostics and completion resolve when a candidate exists.
 Rename rejection is retained as an observed RPC result. Every other request failure fails the run;
 missing/deduplicated diagnostic publication is recorded without inventing a zero latency.
 The first request is separated from warmed samples. Repeated-response stability, fixture and

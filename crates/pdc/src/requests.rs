@@ -12,19 +12,17 @@ use ide::{
     definition_with_cancellation, document_symbols_with_cancellation, hover_with_cancellation,
     localisation_search_page_with_cancellation, localisation_values_by_key,
     prepare_rename_with_cancellation, quick_fixes_with_cancellation, references_with_cancellation,
-    rename_with_cancellation, scope_inlay_hints_with_cancellation,
-    semantic_tokens_in_range_with_cancellation, semantic_tokens_with_cancellation,
-    source_file_diagnostics_with_cancellation, symbol_kinds_for_name,
-    symbol_references_with_cancellation, text_diagnostics_with_cancellation,
+    rename_with_cancellation, semantic_tokens_in_range_with_cancellation,
+    semantic_tokens_with_cancellation, source_file_diagnostics_with_cancellation,
+    symbol_kinds_for_name, symbol_references_with_cancellation, text_diagnostics_with_cancellation,
     workspace_symbols_with_cancellation,
 };
 use lsp_types::{
     CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, CodeActionResponse,
     CompletionItem, CompletionList, CompletionResponse, CompletionTextEdit,
     DocumentFormattingParams, DocumentSymbol as LspDocumentSymbol, DocumentSymbolParams,
-    Documentation, Hover as LspHover, HoverContents, InlayHint, InlayHintKind, InlayHintLabel,
-    InlayHintParams, InsertTextFormat, MarkupContent, MarkupKind, PrepareRenameResponse,
-    ReferenceParams, RenameParams, SemanticToken as LspSemanticToken,
+    Documentation, Hover as LspHover, HoverContents, InsertTextFormat, MarkupContent, MarkupKind,
+    PrepareRenameResponse, ReferenceParams, RenameParams, SemanticToken as LspSemanticToken,
     SemanticTokens as LspSemanticTokens, SemanticTokensDelta, SemanticTokensDeltaParams,
     SemanticTokensEdit, SemanticTokensFullDeltaResult, SemanticTokensParams,
     SemanticTokensRangeParams, SemanticTokensRangeResult, SymbolInformation,
@@ -339,7 +337,6 @@ impl SnapshotRequestContext {
             "textDocument/rename" => self.rename(params),
             "textDocument/codeAction" => self.code_action(params),
             "textDocument/documentSymbol" => self.document_symbols(params),
-            "textDocument/inlayHint" => self.inlay_hints(params),
             "textDocument/semanticTokens/full" => self.semantic_tokens(params),
             "textDocument/semanticTokens/full/delta" => self.semantic_tokens_delta(params),
             "textDocument/semanticTokens/range" => self.semantic_tokens_range(params),
@@ -1806,43 +1803,6 @@ impl SnapshotRequestContext {
             },
             "semantic tokens response",
         )
-    }
-
-    fn inlay_hints(&self, params: Option<&Value>) -> Result<Value, RpcError> {
-        let params = typed_params::<InlayHintParams>(params, "inlay hints")?;
-        let id = DocumentId::new(params.text_document.uri.as_str());
-        let document = self
-            .snapshot
-            .document(&id)
-            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
-        let range = lsp_range_to_text_range(&params.range, document.line_index(), document.text())?;
-        let hints = scope_inlay_hints_with_cancellation(
-            &self.snapshot,
-            &id,
-            Some(range),
-            &self.cancellation,
-        )
-        .map_err(cancelled_error)?;
-        let converted = hints
-            .into_iter()
-            .filter_map(|hint| {
-                let position = document
-                    .line_index()
-                    .position(document.text(), hint.position)?;
-                Some(InlayHint {
-                    position: lsp_types::Position::new(position.line, position.character),
-                    label: InlayHintLabel::String(format!("→ {}", hint.scope)),
-                    kind: Some(InlayHintKind::TYPE),
-                    text_edits: None,
-                    tooltip: None,
-                    padding_left: Some(true),
-                    padding_right: None,
-                    data: None,
-                })
-            })
-            .collect::<Vec<_>>();
-        self.ensure_active()?;
-        typed_value(converted, "inlay hints response")
     }
 
     fn semantic_tokens_delta(&self, params: Option<&Value>) -> Result<Value, RpcError> {

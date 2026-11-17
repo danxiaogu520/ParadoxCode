@@ -2,8 +2,7 @@ pub(crate) use crate::{
     CancellationToken, Cancelled, CompletionKind, DiagnosticCode, RenameError, RenameFailure,
     complete, complete_with_cancellation, definition, diagnostics, diagnostics_with_cancellation,
     document_symbols, hover, input_for_document, prepare_rename, references, rename,
-    rename_with_cancellation, scope_inlay_hints_with_cancellation, workspace_symbols,
-    workspace_symbols_with_cancellation,
+    rename_with_cancellation, workspace_symbols, workspace_symbols_with_cancellation,
 };
 pub(crate) use engine::{
     AnalysisHost, AnalysisSnapshot, DocumentId, IndexCache, SourceRoot, SourceRootId,
