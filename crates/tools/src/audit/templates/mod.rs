@@ -294,15 +294,6 @@ fn baseline(
             ("workspace/symbol", json!({"query":"stage0"}), false),
             ("textDocument/semanticTokens/full", document.clone(), false),
             (
-                "textDocument/inlayHint",
-                {
-                    let mut v = document.clone();
-                    v["range"] = range.clone();
-                    v
-                },
-                false,
-            ),
-            (
                 "textDocument/codeAction",
                 {
                     let mut v = document;
