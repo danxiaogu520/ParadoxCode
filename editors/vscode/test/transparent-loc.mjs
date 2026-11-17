@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
@@ -60,7 +60,7 @@ function host(root, settings = {}) {
         workspace: {
             textDocuments: [],
             getConfiguration: () => ({ get: (key, fallback) => settings[key] ?? fallback }),
-            getWorkspaceFolder: (uri) => uri.fsPath.startsWith(`${root}/`) ? { uri: Uri.file(root) } : undefined,
+            getWorkspaceFolder: (uri) => uri.fsPath.startsWith(`${root}${sep}`) ? { uri: Uri.file(root) } : undefined,
             registerFileSystemProvider(scheme, provider) {
                 state.providers.push({ scheme, provider }); return { dispose() {} };
             },
