@@ -179,17 +179,6 @@ impl LspServer {
                     || in_flight_background_reindex.is_some()
                     || in_flight_reindex_command.is_some()
                     || in_flight_format_command.is_some();
-                self.spawn_pending_workspace_diagnostics(
-                    scope,
-                    &event_sender,
-                    &mut in_flight_workspace_diagnostics,
-                    background_busy,
-                );
-                // Queries read immutable snapshots. They must not indefinitely starve
-                // pending closed-file validation; mutation workers still gate its start.
-                background_busy = background_busy
-                    || !in_flight_requests.is_empty()
-                    || in_flight_workspace_diagnostics.is_some();
                 if let Some(task) = in_flight_reindex_command.as_ref()
                     && self.cancelled.contains(&task.request_id)
                 {
@@ -272,6 +261,17 @@ impl LspServer {
                         self.request_workspace_diagnostics();
                     }
                 }
+                // Start the pass queued by readiness before waiting for another input event.
+                // Snapshot queries can run alongside validation; mutations still gate its start.
+                self.spawn_pending_workspace_diagnostics(
+                    scope,
+                    &event_sender,
+                    &mut in_flight_workspace_diagnostics,
+                    background_busy,
+                );
+                background_busy = background_busy
+                    || !in_flight_requests.is_empty()
+                    || in_flight_workspace_diagnostics.is_some();
                 if self.state == ServerState::ShuttingDown
                     && let Some((_, cancellation)) = &preparing_completion
                 {
