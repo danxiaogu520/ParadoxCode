@@ -249,6 +249,30 @@ impl SymbolFacts for ModifierFacts<'_> {
     }
 }
 
+fn government_power_commands_accept_fractional_values() {
+    let ir = ir();
+    for (root, command) in [
+        ("trigger", "has_government_power"),
+        ("effect", "add_government_power_scaled_to_seats"),
+    ] {
+        let root = schema(ir, root);
+        let body = ir
+            .child(exact(ir, root, command, Shape::Block), root)
+            .expect("government power command body");
+        let field = exact(ir, body, "value", Shape::Scalar);
+        let rules::ir::FieldValue::Scalar(matcher) = ir.field(field).value else {
+            panic!("expected scalar value for {command}");
+        };
+        for accepted in ["0.01", "-0.01", "25"] {
+            assert!(
+                ir.scalar_matches(matcher, accepted, &NoSymbolFacts),
+                "{command} must accept {accepted}"
+            );
+        }
+        assert!(!ir.scalar_matches(matcher, "invalid", &NoSymbolFacts));
+    }
+}
+
 fn modifier_key_queries_preserve_all_dynamic_families_and_scopes() {
     let ir = ir();
     let facts = ModifierFacts(ir);
@@ -289,5 +313,6 @@ fn first_party_behavior_contracts() {
     predicates_iterators_and_weighted_branches_keep_their_behavior();
     nested_definitions_use_their_actual_body_and_name_source();
     inherited_modifiers_and_numeric_trigger_domains_validate_values();
+    government_power_commands_accept_fractional_values();
     modifier_key_queries_preserve_all_dynamic_families_and_scopes();
 }
