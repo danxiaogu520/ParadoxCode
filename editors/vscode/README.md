@@ -31,6 +31,9 @@ Vanilla discovery and indexing are guided by the walkthrough. The `paradoxcode.v
 control whether local Vanilla data is discovered or an existing cache is required. Configured
 exclusions prune generated files before indexing. Use the reference for exact properties and defaults.
 
+Expand **ParadoxCode Loaded Files** in the Explorer to fetch the indexed file list. The view starts collapsed
+in new workspaces and reuses its list until you refresh it or restart the server.
+
 ## Diagnostics and language features
 
 The [diagnostic guide](../../crates/ide/DIAGNOSTICS.md) explains stable codes and remedies.

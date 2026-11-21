@@ -377,6 +377,7 @@
         {
           "id": "paradoxcode.loadedFiles",
           "name": "%views.loadedFiles.name%",
+          "visibility": "collapsed",
           "when": "paradoxcodeServerRunning"
         }
       ]

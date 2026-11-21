@@ -502,6 +502,7 @@ pub fn execute(arguments: &[String]) -> Result<String, String> {
             } else {
                 for name in [
                     "assets.mjs",
+                    "loaded-files.mjs",
                     "preview.mjs",
                     "icon-picker.mjs",
                     "loc-format.mjs",

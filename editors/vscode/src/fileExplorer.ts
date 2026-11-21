@@ -55,25 +55,38 @@ function rootLabel(root: WorkspaceFileRoot): string {
  * state, while opening the physical URI only on explicit user action. */
 export class LoadedFilesProvider implements vscode.TreeDataProvider<ExplorerNode> {
     private readonly changed = new vscode.EventEmitter<ExplorerNode | undefined | null | void>();
-    private roots: WorkspaceFileRoot[] = [];
-    private files: WorkspaceFileItem[] = [];
+    private readonly view: vscode.TreeView<ExplorerNode>;
+    private client?: LanguageClient;
+    private data?: WorkspaceFilesResponse;
+    private pending?: Promise<WorkspaceFilesResponse | undefined>;
 
     public readonly onDidChangeTreeData = this.changed.event;
 
+    public constructor() {
+        this.view = vscode.window.createTreeView('paradoxcode.loadedFiles', { treeDataProvider: this });
+        this.view.onDidChangeVisibility(({ visible }) => {
+            if (visible) {
+                void this.loadIfVisible();
+            }
+        });
+    }
+
     public dispose(): void {
+        this.client = undefined;
+        this.pending = undefined;
+        this.view.dispose();
         this.changed.dispose();
     }
 
-    public clear(): void {
-        this.roots = [];
-        this.files = [];
+    public setClient(client: LanguageClient | undefined): void {
+        if (this.client === client) {
+            return;
+        }
+        this.client = client;
+        this.pending = undefined;
+        this.data = undefined;
         this.changed.fire();
-    }
-
-    public setData(response: WorkspaceFilesResponse): void {
-        this.roots = Array.isArray(response.roots) ? response.roots : [];
-        this.files = Array.isArray(response.files) ? response.files : [];
-        this.changed.fire();
+        void this.loadIfVisible();
     }
 
     public getTreeItem(node: ExplorerNode): vscode.TreeItem {
@@ -105,28 +118,38 @@ export class LoadedFilesProvider implements vscode.TreeDataProvider<ExplorerNode
 
     public getChildren(node?: ExplorerNode): ExplorerNode[] {
         if (!node) {
-            return this.roots.map((root) => ({ kind: 'root', root }));
+            const roots = this.data?.roots;
+            return Array.isArray(roots) ? roots.map((root) => ({ kind: 'root', root })) : [];
         }
-        if (node.kind === 'root') {
-            return this.files
+        if (node.kind === 'root' && Array.isArray(this.data?.files)) {
+            return this.data.files
                 .filter((file) => file.rootId === node.root.id)
                 .map((file) => ({ kind: 'file', file }));
         }
         return [];
     }
 
-    public async refresh(client: LanguageClient | undefined): Promise<void> {
-        if (!client) {
-            this.clear();
+    public refresh(): Promise<void> {
+        this.data = undefined;
+        if (!this.view.visible) {
+            // Fetch a fresh snapshot on reveal even if an older request is still finishing.
+            this.pending = undefined;
+        }
+        return this.loadIfVisible();
+    }
+
+    private async loadIfVisible(): Promise<void> {
+        if (!this.view.visible || !this.client || this.data) {
             return;
         }
-        try {
-            const response = await client.sendRequest<WorkspaceFilesResponse>('pdc/workspaceFiles');
-            this.setData(response);
-        } catch {
-            // A server that is stopping or an older binary without this optional request should
-            // not make the Explorer noisy. The empty state explains itself in the view title.
-            this.clear();
+        const request = this.pending ??= this.client.sendRequest<WorkspaceFilesResponse>('pdc/workspaceFiles')
+            .catch(() => undefined);
+        const response = await request;
+        // A stopped or replaced client must not repopulate the tree with an old listing.
+        if (this.pending === request) {
+            this.pending = undefined;
+            this.data = response;
+            this.changed.fire();
         }
     }
 }
