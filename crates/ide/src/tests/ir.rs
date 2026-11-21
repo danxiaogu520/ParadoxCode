@@ -520,6 +520,127 @@ fn ir_country_tag_hover_resolves_optional_name_and_adjective() {
 }
 
 #[test]
+fn localisation_hover_keeps_nested_cultures_out_of_the_group_preview() {
+    let mut host = host();
+    open(
+        &mut host,
+        "localisation/cultures_l_english.yml",
+        "l_english:\n sample_group:0 \"Group label\"\n sample_culture:0 \"Culture label\"\n",
+    );
+    let source = "sample_group = { sample_culture = {} }";
+    let id = open(&mut host, "common/cultures/labels.txt", source);
+    let trigger = "sample = { culture_group = sample_group }";
+    let trigger_id = open(&mut host, "common/scripted_triggers/labels.txt", trigger);
+    let snapshot = host.snapshot();
+
+    for (document, source, key, expected, unrelated) in [
+        (&id, source, "sample_group", "Group label", "Culture label"),
+        (
+            &id,
+            source,
+            "sample_culture",
+            "Culture label",
+            "Group label",
+        ),
+        (
+            &trigger_id,
+            trigger,
+            "sample_group",
+            "Group label",
+            "Culture label",
+        ),
+    ] {
+        let position = source.find(key).unwrap() as u32 + 1;
+        let result = hover(&snapshot, document, position).expect("culture hover");
+        assert!(
+            result.contents.contains(expected) && !result.contents.contains(unrelated),
+            "{key}: {}",
+            result.contents
+        );
+    }
+}
+
+#[test]
+fn localisation_hover_uses_the_event_declaration_under_the_cursor() {
+    let mut host = host();
+    open(
+        &mut host,
+        "localisation/events_l_english.yml",
+        "l_english:\n alternate_title:0 \"Alternate title\"\n original_title:0 \"Original title\"\n",
+    );
+    let alternate = "country_event = { id = sample.1 title = alternate_title }";
+    let original = "country_event = { id = sample.1 title = original_title }";
+    let alternate_id = open(&mut host, "events/alternate.txt", alternate);
+    let original_id = open(&mut host, "events/original.txt", original);
+    let caller =
+        "country_event = { id = caller.1 immediate = { country_event = { id = sample.1 } } }";
+    let caller_id = open(&mut host, "events/caller.txt", caller);
+    let snapshot = host.snapshot();
+
+    for (document, source, title, unrelated) in [
+        (
+            &alternate_id,
+            alternate,
+            "Alternate title",
+            "Original title",
+        ),
+        (&original_id, original, "Original title", "Alternate title"),
+    ] {
+        let position = source.find("sample.1").unwrap() as u32 + 1;
+        let result = hover(&snapshot, document, position).expect("event declaration hover");
+        assert!(result.contents.contains(title), "{}", result.contents);
+        assert!(!result.contents.contains(unrelated), "{}", result.contents);
+        let preview = result.preview.expect("event preview target");
+        assert_eq!(preview.title.as_deref(), Some(title));
+        assert_eq!(preview.location.document.as_ref(), Some(document));
+    }
+
+    let position = caller.find("sample.1").unwrap() as u32 + 1;
+    let result = hover(&snapshot, &caller_id, position).expect("ambiguous event reference hover");
+    assert!(
+        result.contents.contains("ambiguous event symbol"),
+        "{}",
+        result.contents
+    );
+    assert!(
+        !result.contents.contains("Localisation preview"),
+        "{}",
+        result.contents
+    );
+    assert!(result.preview.is_none());
+}
+
+#[test]
+fn localisation_hover_matches_the_whole_quoted_enum_value() {
+    let mut host = host();
+    open(
+        &mut host,
+        "localisation/attitudes_l_english.yml",
+        "l_english:\n attitude_friendly:0 \"Friendly label\"\n",
+    );
+    for (path, value, expected_label) in [
+        ("valid.txt", "attitude_friendly", true),
+        ("invalid.txt", "attitude_friendly extra", false),
+    ] {
+        let source =
+            format!("sample = {{ ai_attitude = {{ who = ROOT attitude = \"{value}\" }} }}");
+        let id = open(
+            &mut host,
+            &format!("common/scripted_triggers/{path}"),
+            &source,
+        );
+        let position = source.find("attitude_friendly").unwrap() as u32 + 1;
+        let result = hover(&host.snapshot(), &id, position).expect("enum value hover");
+        assert_eq!(
+            result.contents.contains("Friendly label"),
+            expected_label,
+            "{value}: {}",
+            result.contents
+        );
+    }
+}
+
+#[test]
 fn ir_hover_preserves_every_binding_label_for_identical_localisation_text() {
     let mut host = host();
     open(

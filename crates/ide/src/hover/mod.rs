@@ -116,42 +116,45 @@ pub fn hover_with_cancellation(
         model.push_section(section);
         return Ok(Some(model.into_hover_with_range(reference.name_range)));
     }
-    let range = word_range(&input.source, position);
-    if input.format == parser::FileFormat::Localisation
-        && let Some((fragment_range, name)) =
-            crate::localisation::localisation_key_reference_fragment(&input, position)
+    if let Some(crate::localisation::LocalisationFragment {
+        range,
+        name,
+        format,
+    }) = crate::localisation::localisation_fragment_at(&input, position)
     {
-        // A `$NAME$` inside a localisation value: a nested key reference
-        // when the name resolves as one, a scripted localisation when the
-        // name matches, otherwise a placeholder bound by whatever displays
-        // the text.
-        let resolves_as_key =
-            !symbol_candidates_for_hover(snapshot, "localisation", &name, cancellation)?.is_empty();
-        let scripted = !resolves_as_key
-            && crate::localisation::scripted_localisation_names_with_cancellation(
-                snapshot,
-                cancellation,
-            )?
-            .iter()
-            .any(|scripted| scripted.eq_ignore_ascii_case(&name));
-        if resolves_as_key || scripted {
-            let kind = if resolves_as_key {
-                "localisation"
-            } else {
-                "defined_text"
-            };
-            let model =
-                symbol::hover_for_symbol(snapshot, kind, &name, fragment_range, cancellation)?;
-            return Ok(Some(model.into_hover_with_range(fragment_range)));
+        if format.is_none() && !input.profile.localisation_runtime_parameters.contains(name) {
+            let resolves_as_key =
+                !symbol_candidates_for_hover(snapshot, "localisation", name, cancellation)?
+                    .is_empty();
+            let scripted = !resolves_as_key
+                && crate::localisation::scripted_localisation_names_with_cancellation(
+                    snapshot,
+                    cancellation,
+                )?
+                .iter()
+                .any(|scripted| scripted.eq_ignore_ascii_case(name));
+            if resolves_as_key || scripted {
+                let kind = if resolves_as_key {
+                    "localisation"
+                } else {
+                    "defined_text"
+                };
+                let model = symbol::hover_for_symbol(snapshot, kind, name, None, cancellation)?;
+                return Ok(Some(model.into_hover_with_range(range)));
+            }
         }
-        let mut model = HoverModel::new(format!("### {}", code_span(&name)));
+        let mut model = HoverModel::new(format!("### {}", code_span(name)));
         model.push_section(
             "- Localisation variable placeholder: filled in by whatever displays this text \
              (a referencing context or the engine)"
                 .to_owned(),
         );
-        return Ok(Some(model.into_hover_with_range(fragment_range)));
+        if let Some(format) = format {
+            model.push_section(format!("- Format: {}", code_span(format)));
+        }
+        return Ok(Some(model.into_hover_with_range(range)));
     }
+    let range = word_range(&input.source, position);
     let Some(word) = input
         .source_text(range)
         .map(|word| word.trim_matches('"').to_owned())
@@ -170,28 +173,13 @@ pub fn hover_with_cancellation(
                 || (definition.kind == "event"
                     && definition.symbol.location.range.start() == range.start()))
     }) {
-        let mut model = symbol::hover_for_symbol(
+        let model = symbol::hover_for_symbol(
             snapshot,
             &definition.kind,
             &definition.name,
-            range,
+            Some(definition),
             cancellation,
         )?;
-        if matches!(definition.kind.as_str(), "event" | "mission") {
-            let location =
-                crate::support::local_location(&input, definition.symbol.selection_range);
-            let title = model
-                .preview
-                .take()
-                .filter(|target| target.location == location)
-                .and_then(|target| target.title);
-            model.preview = Some(crate::PreviewTarget {
-                title,
-                kind: definition.kind.clone(),
-                id: definition.name.clone(),
-                location,
-            });
-        }
         return Ok(Some(model.into_hover_with_range(range)));
     }
     // Bare prerequisite list members may have no semantic reference. Use the
@@ -213,7 +201,7 @@ pub fn hover_with_cancellation(
             snapshot,
             &spec.symbol_kind,
             &member.value,
-            member.range,
+            None,
             cancellation,
         )?;
         return Ok(Some(model.into_hover_with_range(member.range)));
@@ -223,14 +211,14 @@ pub fn hover_with_cancellation(
     });
     if let Some(first) = references.next() {
         let mut best =
-            symbol::hover_for_symbol(snapshot, &first.kind, &first.name, range, cancellation)?;
+            symbol::hover_for_symbol(snapshot, &first.kind, &first.name, None, cancellation)?;
         if !best.has_localisation_preview {
             for reference in references {
                 let hover = symbol::hover_for_symbol(
                     snapshot,
                     &reference.kind,
                     &reference.name,
-                    range,
+                    None,
                     cancellation,
                 )?;
                 if hover.has_localisation_preview {

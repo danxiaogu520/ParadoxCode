@@ -242,6 +242,16 @@ fn ir_field_hover(
     let Some(hir) = input.hir.as_deref() else {
         return Ok(None);
     };
+    let value_property = if key {
+        None
+    } else {
+        hir.properties().iter().find(|property| {
+            property
+                .scalar
+                .as_ref()
+                .is_some_and(|scalar| contains(scalar.range, position))
+        })
+    };
     let fact = if key {
         // Quoted-script key facts already carry ranges mapped into the
         // containing document, even though the outer property list is flat.
@@ -249,15 +259,7 @@ fn ir_field_hover(
             .iter()
             .find(|fact| contains(fact.range, position))
     } else {
-        hir.properties()
-            .iter()
-            .find(|property| {
-                property
-                    .scalar
-                    .as_ref()
-                    .is_some_and(|scalar| contains(scalar.range, position))
-            })
-            .and_then(|property| hir.field_fact_at(property.key_range))
+        value_property.and_then(|property| hir.field_fact_at(property.key_range))
     };
     let Some(fact) = fact else {
         return Ok(None);
@@ -266,19 +268,9 @@ fn ir_field_hover(
     if fact.fields.is_empty() {
         return Ok(None);
     }
-    let property_key = if key {
-        word
-    } else {
-        hir.properties()
-            .iter()
-            .find(|property| {
-                property
-                    .scalar
-                    .as_ref()
-                    .is_some_and(|scalar| contains(scalar.range, position))
-            })
-            .map_or(word, |property| property.key.as_str())
-    };
+    let property_key = value_property.map_or(word, |property| property.key.as_str());
+    let scalar = value_property.and_then(|property| property.scalar.as_ref());
+    let spelling = scalar.map_or(word, |scalar| scalar.value.as_str());
     let mut fields = ir
         .lookup(
             fact.schema,
@@ -328,7 +320,7 @@ fn ir_field_hover(
     for id in &fields {
         cancellation.checkpoint()?;
         let field = ir.field(*id);
-        display_keys.extend(ir.field_localisation_keys(*id, key, word));
+        display_keys.extend(ir.field_localisation_keys(*id, key, spelling));
         let value = match field.value {
             rules::ir::FieldValue::Scalar(matcher) => crate::ir_semantic::describe(ir, matcher),
             rules::ir::FieldValue::Block(schema) => {
@@ -443,21 +435,10 @@ fn ir_field_hover(
             && matches!(field.value, rules::ir::FieldValue::Scalar(matcher)
             if matches!(ir.matcher(matcher), rules::ir::Matcher::Path(_)))
         {
-            let value = hir
-                .properties()
-                .iter()
-                .filter_map(|property| property.scalar.as_ref())
-                .find(|scalar| contains(scalar.range, position))
-                .map_or(word, |scalar| scalar.value.as_str());
-            model.push_section(texture_resolution_section(snapshot, value));
+            model.push_section(texture_resolution_section(snapshot, spelling));
         }
     }
-    if !key
-        && let Some(scalar) = hir
-            .properties()
-            .iter()
-            .filter_map(|property| property.scalar.as_ref())
-            .find(|scalar| contains(scalar.range, position))
+    if let Some(scalar) = scalar
         && !fields.iter().any(|id| match ir.field(*id).value {
             rules::ir::FieldValue::Scalar(matcher) => match state {
                 Some(state) => crate::ir_semantic::matcher_matches_with_state(

@@ -18,7 +18,7 @@ use crate::resolution::{
     semantic_data_with_cancellation, symbol_candidates_for_hover, text_range_within,
 };
 use crate::support::{
-    ParsedContent, ParsedInput, input_for_document, input_for_source_file,
+    ParsedContent, ParsedInput, contains, input_for_document, input_for_source_file,
     truncate_localisation_preview,
 };
 use crate::types::{CancellationToken, Cancelled};
@@ -289,40 +289,79 @@ pub fn localisation_search_page_with_cancellation(
     Ok(LocalisationSearchResult { hits, truncated })
 }
 
-/// The `$NAME$` fragment at a position inside a localisation value. The inner
-/// text is either a nested localisation key reference or a placeholder the
-/// displaying context binds (`$WHO$`, `$VAL$` — vanilla binds these in the
-/// engine, not in script). Returns the full fragment including both `$`
-/// delimiters and the inner name; `$$` escapes and fragment bodies with
-/// whitespace or command syntax are rejected.
-pub(crate) fn localisation_key_reference_fragment(
+/// A `$NAME$` or `$NAME|format$` substitution inside a localisation value.
+pub(crate) struct LocalisationFragment<'a> {
+    pub(crate) range: TextRange,
+    pub(crate) name: &'a str,
+    pub(crate) format: Option<&'a str>,
+}
+
+/// Finds the substitution at the cursor, including both delimiters in its range.
+/// Empty dollar pairs and bodies with whitespace or command syntax are rejected.
+pub(crate) fn localisation_fragment_at(
     input: &ParsedInput,
     position: TextSize,
-) -> Option<(TextRange, String)> {
+) -> Option<LocalisationFragment<'_>> {
     if input.format != FileFormat::Localisation {
         return None;
     }
-    let offset = usize::try_from(position).ok()?.min(input.source.len());
-    if !input.source.is_char_boundary(offset) {
-        return None;
+    let ParsedContent::Text(parsed) = &input.parsed;
+    let entry = parsed
+        .root()
+        .children()
+        .find(|node| contains(node.range(), position))?;
+    let value = entry.children().find(|node| {
+        matches!(
+            node.kind(),
+            CstKind::LocalisationString | CstKind::UnquotedValue
+        ) && contains(node.range(), position)
+    })?;
+    let source = parsed.text(value.range())?;
+    let offset = usize::try_from(position - value.range().start()).ok()?;
+    let mut start = 0;
+    // Pair delimiters from the start of the value, including empty pairs and
+    // adjacent substitutions like `$FIRST$$SECOND$`.
+    while let Some(open) = source[start..].find('$').map(|open| start + open) {
+        if offset < open {
+            return None;
+        }
+        let close = open + 1 + source[open + 1..].find('$')?;
+        if offset <= close {
+            let body = &source[open + 1..close];
+            let (name, format) = body
+                .split_once('|')
+                .map_or((body, None), |(name, format)| (name, Some(format)));
+            if name.is_empty()
+                || body.len() > 128
+                || !name
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.'))
+                || format.is_some_and(|format| {
+                    !format.split('|').all(|part| {
+                        !part.is_empty()
+                            && part.chars().all(|character| {
+                                character.is_ascii_alphanumeric()
+                                    || matches!(character, '+' | '-' | '%' | '=' | '&' | '¤')
+                            })
+                    })
+                })
+            {
+                return None;
+            }
+            let base = value.range().start();
+            let range = TextRange::new(
+                base + u32::try_from(open).ok()?,
+                base + u32::try_from(close + 1).ok()?,
+            )?;
+            return Some(LocalisationFragment {
+                range,
+                name,
+                format,
+            });
+        }
+        start = close + 1;
     }
-    let open = input.source[..offset].rfind('$')?;
-    if input.source[open + 1..offset].contains('$') {
-        return None;
-    }
-    let close = offset + input.source[offset..].find('$')?;
-    let name = input.source.get(open + 1..close)?;
-    if name.is_empty() || name.len() > 128 {
-        return None;
-    }
-    if !name
-        .chars()
-        .all(|character| character.is_ascii_alphanumeric() || character == '_' || character == '.')
-    {
-        return None;
-    }
-    let range = TextRange::new(u32::try_from(open).ok()?, u32::try_from(close + 1).ok()?)?;
-    Some((range, name.to_owned()))
+    None
 }
 
 /// Renders the preview value of a localisation definition, preferring the snapshot cache and
@@ -472,7 +511,8 @@ const MAX_PREVIEW_FIELDS: usize = 6;
 /// Finds the localisation previews for a non-localisation symbol definition.
 ///
 /// Type-instance localisation mappings are indexed as ordinary localisation references at the
-/// instance's source range.  Looking those references up from the resolved definition lets a
+/// instance's source range. Each definition previews the references it owns, excluding references
+/// within nested definitions. Looking those references up from the resolved definition lets a
 /// hover over `event = foo.1` (or another typed symbol use) show the same preview as hovering its
 /// generated localisation key. Only declared bindings generate keys — a type carries the
 /// same-name convention exactly when its JSON declares a self binding — and the coverage
@@ -500,37 +540,50 @@ pub(crate) fn symbol_localisation_preview(
 
     let full_range = definition.location.range;
     let selection_range = definition.selection_range;
-    let mut references = Vec::<(String, TextRange)>::new();
-    let mut label_input = None;
-    if let Some(document) = definition.location.document.as_ref() {
-        if let Some(input) = input_for_document(snapshot, document) {
-            references.extend(localisation_references_for_hover(
-                snapshot,
-                &input,
-                cancellation,
-            )?);
-            label_input = Some(input);
-        }
-    } else if let Some(file) = definition.location.file {
-        if let Some(input) = input_for_source_file(snapshot, file) {
-            references.extend(localisation_references_for_hover(
-                snapshot,
-                &input,
-                cancellation,
-            )?);
-            label_input = Some(input);
-        } else {
-            references.extend(
-                snapshot
-                    .index()
-                    .references(file)
+    let file = definition.location.file;
+    let label_input = match definition.location.document.as_ref() {
+        Some(document) => input_for_document(snapshot, document),
+        None => file.and_then(|file| input_for_source_file(snapshot, file)),
+    };
+    let is_nested =
+        |range: &TextRange| *range != full_range && text_range_within(*range, full_range);
+    let mut nested_ranges = Vec::new();
+    let mut references = if let Some(input) = label_input.as_ref() {
+        if let Some(hir) = input.hir.as_deref() {
+            nested_ranges.extend(
+                hir.definitions()
                     .iter()
-                    .filter(|reference| reference.kind.eq_ignore_ascii_case("localisation"))
-                    .map(|reference| (reference.name.to_string(), reference.range)),
+                    .map(|def| def.range)
+                    .filter(is_nested),
             );
         }
-    }
-    references.retain(|(_, range)| text_range_within(*range, full_range));
+        localisation_references_for_hover(snapshot, input, cancellation)?
+    } else if let Some(file) = file {
+        if let Some(shard) = snapshot.index().shard(file) {
+            nested_ranges.extend(
+                shard
+                    .definitions
+                    .iter()
+                    .map(|def| def.range)
+                    .filter(is_nested),
+            );
+        }
+        snapshot
+            .index()
+            .references(file)
+            .iter()
+            .filter(|reference| reference.kind.eq_ignore_ascii_case("localisation"))
+            .map(|reference| (reference.name.to_string(), reference.range))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    references.retain(|(_, range)| {
+        text_range_within(*range, full_range)
+            && !nested_ranges
+                .iter()
+                .any(|nested| text_range_within(*range, *nested))
+    });
     references.sort_by_key(|(_, range)| {
         (
             if *range == selection_range { 0 } else { 1 },
