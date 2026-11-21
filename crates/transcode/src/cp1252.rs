@@ -38,6 +38,10 @@ pub const CP1252_MAP: [(u8, u32); 27] = [
 /// Returns the single CP1252 byte for one of the 27 mapped code points (`ä`-class
 /// characters stay single bytes in script files), or `None` for everything else.
 pub(crate) fn mapped_byte(code_point: u32) -> Option<u8> {
+    // The inverse map is only needed for a few European letters and symbols.
+    if !(0x100..=0x2122).contains(&code_point) {
+        return None;
+    }
     CP1252_MAP
         .iter()
         .find(|(_, mapped_code_point)| *mapped_code_point == code_point)
@@ -48,12 +52,22 @@ pub(crate) fn mapped_byte(code_point: u32) -> Option<u8> {
 /// for the CP1252 high range, the byte value itself everywhere else (including the
 /// five undefined C1 slots).
 pub(crate) fn byte_to_char(byte: u8) -> u32 {
-    for (mapped, code_point) in CP1252_MAP {
-        if mapped == byte {
-            return code_point;
+    const DECODE: [u32; 256] = {
+        let mut table = [0; 256];
+        let mut i = 0;
+        while i < table.len() {
+            table[i] = i as u32;
+            i += 1;
         }
-    }
-    u32::from(byte)
+        let mut i = 0;
+        while i < CP1252_MAP.len() {
+            let (byte, scalar) = CP1252_MAP[i];
+            table[byte as usize] = scalar;
+            i += 1;
+        }
+        table
+    };
+    DECODE[usize::from(byte)]
 }
 
 /// Inverse of [`byte_to_char`] for escape-triple members: table entries reverse,

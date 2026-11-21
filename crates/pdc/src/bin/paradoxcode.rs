@@ -1,9 +1,56 @@
+// This byte stream deliberately bypasses workspace indexing and JSON-RPC frame limits.
+fn transcode_stdio(profile: &str, direction: &str) -> Result<(), pdc::LspError> {
+    use std::io::{Read, Write};
+    use transcode::{Direction, EscapeSet, FileConversionError, Profile};
+    let profile = match profile {
+        "localisation" => Profile::Localisation,
+        "script" => Profile::Script,
+        _ => return Err(pdc::LspError::Protocol("unknown transcode profile".into())),
+    };
+    let direction = match direction {
+        "encode" => Direction::Encode(EscapeSet::Paratranz),
+        "decode" => Direction::Decode,
+        _ => {
+            return Err(pdc::LspError::Protocol(
+                "unknown transcode direction".into(),
+            ));
+        }
+    };
+    let mut input = Vec::new();
+    std::io::stdin().lock().read_to_end(&mut input)?;
+    match transcode::convert_editor_buffer(&input, profile, direction) {
+        Ok(bytes) => std::io::stdout().lock().write_all(&bytes)?,
+        Err(error) => {
+            let refusal = match error {
+                FileConversionError::InvalidUtf8 => serde_json::json!({"refused":"invalidUtf8"}),
+                FileConversionError::BrokenEscape { byte_index } => {
+                    serde_json::json!({"refused":"brokenEscape","offsets":[byte_index]})
+                }
+                FileConversionError::Unencodable { error } => {
+                    let points: Vec<_> = error.unencodable.iter().take(8).map(|point|
+                        serde_json::json!({"codePoint":point.code_point,"byteIndex":point.byte_index})
+                    ).collect();
+                    serde_json::json!({"refused":"unencodable","count":error.unencodable.len(),"points":points})
+                }
+            };
+            eprintln!("{refusal}");
+            std::process::exit(2);
+        }
+    }
+    Ok(())
+}
+
 fn main() -> Result<(), pdc::LspError> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if let [command, profile, direction] = args.as_slice()
+        && command == "--transcode-stdio"
+    {
+        return transcode_stdio(profile, direction);
+    }
     let started = std::time::Instant::now();
     let process_message = format!("paradoxcode process started (pid {})", std::process::id());
     eprintln!("paradoxcode: {process_message}");
     let mut startup_messages = vec![process_message];
-    let args: Vec<String> = std::env::args().skip(1).collect();
     if args
         .iter()
         .any(|argument| argument == "--version" || argument == "-V")

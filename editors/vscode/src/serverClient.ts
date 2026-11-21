@@ -8,10 +8,16 @@ import { State, type LanguageClient } from 'vscode-languageclient/node';
  */
 
 let activeClient: LanguageClient | undefined;
+let executable: string | undefined;
+
+export function serverExecutable(): string | undefined {
+    return executable;
+}
 
 /** Publishes the current client. Pass `undefined` while the server is stopped or restarting. */
-export function setServerClient(client: LanguageClient | undefined): void {
+export function setServerClient(client: LanguageClient | undefined, command?: string): void {
     activeClient = client;
+    executable = command;
 }
 
 /** Thrown when no running client is available; editor features report this to the user. */

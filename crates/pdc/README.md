@@ -21,6 +21,17 @@ Use [VS Code's generated configuration reference](../../editors/vscode/REFERENCE
 as a guide to shared `paradoxcode` settings, while respecting the server's initialization contract.
 Editor defaults need not equal defaults for an independent LSP client.
 
+## Editor transcoding
+
+The VS Code extension starts the matched server executable with
+`--transcode-stdio <localisation|script> <encode|decode>`. This mode reads the input
+bytes from stdin and writes converted bytes to stdout without loading game rules or an index.
+Multiline inputs of 512 KiB or more can use up to four threads, including the calling thread.
+Chunks end at line boundaries and are joined in source order. Small inputs use a single thread.
+A content refusal exits with status 2 and structured JSON on stderr. The extension validates
+the result before changing a buffer or replacing a file. Existing LSP conversion requests
+remain available to other clients.
+
 ## External MCP integration
 
 MCP is maintained in the independent `ParadoxCodeMCP` project. Its `paradoxcode-mcp`
