@@ -23,6 +23,9 @@ jobs:
     name: Promote verified candidate
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      release_tag: ${{ steps.promote.outputs.release_tag }}
+      vsix_sha256: ${{ steps.promote.outputs.vsix_sha256 }}
     permissions:
       actions: read
       checks: read
@@ -38,7 +41,66 @@ jobs:
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Verify candidate, audit and staging uploads before final publication
+        id: promote
         env:
           GH_TOKEN: ${{ github.token }}
           CANDIDATE_RUN: ${{ inputs.candidate_run }}
         run: cargo run --locked -p tools --no-default-features -- ci promote --candidate-run "$CANDIDATE_RUN"
+
+  marketplace:
+    name: Publish ${{ needs.publish.outputs.release_tag }} to Marketplace
+    needs: publish
+    if: github.repository == 'danxiaogu520/ParadoxCode' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: marketplace
+      url: ${{ format('{0}/{1}/releases/tag/{2}', github.server_url, github.repository, needs.publish.outputs.release_tag) }}
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - name: Confirm deployment protection
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh api "repos/$GITHUB_REPOSITORY/environments/marketplace" | jq -e '
+            .can_admins_bypass == false and
+            any(.protection_rules[]; .type == "required_reviewers" and (.reviewers | length) > 0)
+          ' > /dev/null; then
+            echo 'Marketplace requires deployment reviewers and disabled administrator bypass.' >&2
+            exit 1
+          fi
+      - name: Download the verified Release VSIX
+        id: vsix
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.publish.outputs.release_tag }}
+          VSIX_SHA256: ${{ needs.publish.outputs.vsix_sha256 }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$VSIX_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          vsix="paradoxcode-vscode-${RELEASE_TAG#v}.vsix"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern "$vsix" --dir "$RUNNER_TEMP"
+          printf '%s  %s\n' "$VSIX_SHA256" "$RUNNER_TEMP/$vsix" | sha256sum --check
+          printf 'path=%s\n' "$RUNNER_TEMP/$vsix" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Install locked Marketplace tooling
+        run: npm ci --prefix editors/vscode --ignore-scripts --no-audit --no-fund
+      - name: Publish and verify the public extension
+        env:
+          RELEASE_TAG: ${{ needs.publish.outputs.release_tag }}
+          VSIX_PATH: ${{ steps.vsix.outputs.path }}
+          VSIX_SHA256: ${{ needs.publish.outputs.vsix_sha256 }}
+        run: node .github/scripts/publish-marketplace.mjs

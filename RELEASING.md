@@ -4,7 +4,8 @@ ParadoxCode releases the server and editor extension as one immutable version. T
 [distribution manifest](editors/vscode/server-distribution.json) owns the five native targets,
 archive layouts and size limits. GitHub publication promotes an already verified candidate;
 it does not rebuild the server or VSIX. Licensed game files and local Vanilla output never
-enter Actions or public releases. Marketplace publication remains a separate manual step.
+enter Actions or public releases. Marketplace publication follows GitHub promotion and requires
+approval in GitHub Actions.
 
 ## Publisher and repository setup
 
@@ -14,7 +15,19 @@ enter Actions or public releases. Marketplace publication remains a separate man
   formal `v*` tags cannot be moved or deleted.
 - Workflow changes require appropriate `workflow` permission. Check that capability before
   preparing process changes; normal publishing uses short-lived `GITHUB_TOKEN` permissions.
-- Keep Marketplace credentials outside the repository and GitHub build jobs.
+- Configure the `marketplace` GitHub Environment with required reviewers, a `main` branch rule,
+  and administrator bypass disabled. Release dispatches and deployment approvals are recorded in
+  Actions. While there is one maintainer, allow that maintainer to approve their own deployment.
+- Under the existing `paradoxcode` publisher, create a
+  [Trusted Publishing policy](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#publish-with-github-actions-and-trusted-publishing)
+  for owner `danxiaogu520`, repository `ParadoxCode`, workflow `release.yml` and Environment
+  `marketplace`. The Marketplace job alone can request an OIDC token. The Environment needs zero
+  stored secrets.
+- Marketplace credentials expire after 15 minutes and are issued per publish attempt. To change
+  the trusted workflow or Environment, revoke the old policy in the publisher dashboard and
+  create a policy for the new binding before resuming publication. If a credential or workflow
+  is compromised, revoke the affected policy immediately and review Marketplace and Actions
+  history before restoring it.
 
 ## Prepare the reviewed source
 
@@ -106,6 +119,15 @@ for the exact candidate commit, then reassign the prepared draft to that tag and
 immutable and latest. These are the final mutations. Tag pushes do not start builds or another
 CI suite. Published releases, assets and formal tags are never replaced.
 
+## Publish to Marketplace
+
+After GitHub promotion succeeds, select **Review deployments** in that Actions run. Check the
+version and immutable Release linked by the `marketplace` deployment, then approve it.
+The Marketplace job downloads the Release VSIX, checks its SHA-256 against the promoted candidate,
+and uploads that package with Trusted Publishing. The job succeeds once the public Marketplace
+API confirms the exact stable version of `paradoxcode.paradoxcode-vscode`. Its summary records
+the version, package digest, public listing and whether the version was uploaded or already public.
+
 ## Recover interruptions
 
 - For a failure before tag creation, correct the candidate source or retry transient infrastructure.
@@ -123,16 +145,34 @@ CI suite. Published releases, assets and formal tags are never replaced.
 - Source or release metadata changes after a formal tag is reserved require a new patch version.
 - Missing, expired or rerun-attempt-mismatched candidate evidence requires a new successful candidate;
   an existing formal tag can only be reused for its original exact source commit.
+- For a Marketplace failure after GitHub publication, inspect the existing version in the publisher
+  dashboard, then rerun the Marketplace job from the original Actions run. A version already visible
+  in the public gallery passes verification without a second upload. If the dashboard shows a pending
+  validation, wait for it to finish before rerunning the job.
+- For manual Marketplace recovery, download the exact Release VSIX and verify it against the
+  immutable Release's recorded SHA-256. Substitute the intended version and run from the repository.
+
+  ```sh
+  tag=vX.Y.Z
+  vsix="paradoxcode-vscode-${tag#v}.vsix"
+  gh release download "$tag" --pattern "$vsix"
+  digest=$(gh api "repos/danxiaogu520/ParadoxCode/releases/tags/$tag" --jq \
+    "select(.immutable and (.draft | not) and (.prerelease | not)) | .assets[] | select(.name == \"$vsix\") | .digest")
+  printf '%s  %s\n' "${digest#sha256:}" "$vsix" | sha256sum --check
+  ```
+
+  Once the checksum passes, upload the VSIX to the existing extension in the `paradoxcode` publisher dashboard,
+  confirm the exact version is public, and record the Actions run and the manual upload outcome in
+  the release acceptance record.
 
 ## Verify public delivery
 
-1. Confirm the Release workflow succeeded, the public Release is immutable and all eleven assets
+1. Confirm the promotion job succeeded, the public Release is immutable and all eleven assets
    match the sealed inventory: five server archives, five checksum files and the VSIX.
 2. Download and verify the published files. From a separate VS Code profile with an empty server
    cache, install the VSIX and check automatic download, checksum-backed startup, completion and
    actual editor diagnostics.
-3. For Marketplace delivery, sign in to the existing `paradoxcode` publisher, upload the released
-   VSIX, wait for validation and verify the public version. Install that Marketplace version in
+3. Confirm the Marketplace job verified the public version. Install that Marketplace version in
    another clean profile and repeat the delivery checks.
 4. Record public links and verification outcomes in the release issue or local acceptance record.
    Keep licensed content, raw game reports and credentials out of public records.

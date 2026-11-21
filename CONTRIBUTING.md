@@ -82,7 +82,8 @@ Each validation class has one authority:
 | Merge gate | [CI](.github/workflows/quick-ci.yml) | Required `Conclusion` check on the reviewed commit |
 | Scheduled audit | [Security](.github/workflows/security.yml), [Performance](.github/workflows/performance.yml) | Advisory refresh and optimized benchmark runs |
 | Release gate | [Candidate workflow](.github/workflows/release-candidate.yml), [promotion](.github/workflows/release.yml) | Verify complete artifacts before creating a formal tag, then publish those same bytes |
-| Manual acceptance | Maintainer following [RELEASING.md](RELEASING.md) | Clean-profile install and Marketplace publication |
+| Marketplace delivery | [Release workflow](.github/workflows/release.yml) | Approve publication of the immutable Release VSIX and verify the public version |
+| Manual acceptance | Maintainer following [RELEASING.md](RELEASING.md) | Clean-profile installation and delivery checks |
 
 Select the affected local group with `cargo run --locked -p tools -- gates GROUP`.
 The available groups and their commands are implemented in
