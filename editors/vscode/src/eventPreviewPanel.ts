@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import * as vscode from 'vscode';
 import type { Location } from 'vscode-languageserver-protocol';
 import type { LanguageClient } from 'vscode-languageclient/node';
-import { pngDataUrl } from './gameAssets';
-import { composeEventCard, isPreviewLocation, parseHoverCardResponse, parseLocFormat, type HoverCardWire } from './hoverCards';
+import type { TextureImageData } from './gameAssets';
+import { EVENT_DESC_COLORS, isPreviewLocation, parseHoverCardResponse, parseLocFormat, type HoverCardWire } from './hoverCards';
 import { MissionPreviewPanel } from './previewPanel';
 import { openTextDocumentForNavigation } from './transparentLoc';
 
@@ -28,58 +28,101 @@ function escapeHtml(text: string): string {
     return text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 }
 
-async function eventPage(card: HoverCardWire, generation: number) {
+async function eventPage(card: HoverCardWire, generation: number, uri: string) {
     const event = card.event!;
     const store = MissionPreviewPanel.store();
     const assets = card.cardAssets ?? {};
-    const load = (a?: HoverCardWire['asset']) => a && !a.archiveMember ? store.textureRaster(a.path) : undefined;
-    const [backgroundTop, picture] = await Promise.all([load(assets.backgroundTop), load(card.asset)]);
-    const locations: Location[] = [];
-    const button = (label: string, location?: Location, style = '') => {
-        const formatted = parseLocFormat(label);
-        const text = formatted.segments.map(s => s.color
-            ? '<span style="color:' + s.color + '">' + escapeHtml(s.text) + '</span>' : escapeHtml(s.text)).join('');
-        if (!location) return style ? '' : '<span>' + text + '</span>';
-        const i = locations.push(location) - 1;
-        return '<button data-index="' + i + '" ' + style + '>' + (style ? escapeHtml(formatted.plain) : text) + '</button>';
-    };
-    const source = (key?: string | null) => key && event.sources && Object.hasOwn(event.sources, key) ? event.sources[key] : undefined;
-    const desc = event.desc?.value || event.descKey || '';
-    const title = event.title?.value || event.titleKey || event.id;
-    let body: string | undefined;
-    // Arbitrarily long mod text stays readable as HTML without creating an unbounded bitmap.
-    if ((backgroundTop || picture) && desc.length <= 8192 && event.options.length <= 64) {
-        const fonts = await store.loadFontRasters();
-        const canDraw = [title, desc, ...event.options.map(o => o.name?.value || o.nameKey)].every(label =>
-            [...parseLocFormat(label).plain].every(char => /\s/.test(char) ||
-                fonts.chinese?.chars.has(char.codePointAt(0)!) || fonts.english?.chars.has(char.codePointAt(0)!)));
-        if (canDraw) {
-            const [backgroundMiddle, backgroundBottomS, backgroundBottomM, backgroundBottomL, optionButton] = await Promise.all([
-                load(assets.backgroundMiddle), load(assets.backgroundBottomS), load(assets.backgroundBottomM),
-                load(assets.backgroundBottomL), load(assets.optionButton)]);
-            const zones: { key: string; label: string; top: number; height: number }[] = [];
-            const raster = composeEventCard(event, { backgroundTop, backgroundMiddle, backgroundBottomS, backgroundBottomM,
-                backgroundBottomL, optionButton, picture, fonts }, (key, label, top, height) => zones.push({ key, label, top, height }));
-            if (raster) body = '<div class="window"><img alt="' + escapeHtml(title) + '" src="' + pngDataUrl(raster) + '">' +
-                zones.filter(z => z.height > 0).map(z => button(z.label, source(z.key), 'class="area" style="top:' +
-                    (100 * z.top / raster.height) + '%;height:' + (100 * z.height / raster.height) + '%"')).join('') + '</div>';
+    const title = parseLocFormat(event.title?.value || event.titleKey || event.id);
+    const desc = parseLocFormat(event.desc?.value || event.descKey || '', EVENT_DESC_COLORS);
+    const options = event.options.map(option => parseLocFormat(option.name?.value || option.nameKey));
+    const tags = new Set<string>();
+    for (const label of [title, desc, ...options]) {
+        for (const { flag } of label.segments) {
+            if (flag) tags.add(flag);
         }
     }
-    if (body === undefined) {
-        body = '<h2>' + button(title, source(event.titleKey)) + '</h2>' +
-            (picture ? '<img alt="" src="' + pngDataUrl(picture) + '">' : '') +
-            '<p>' + button(desc, source(event.descKey)) + '</p>' + event.options.map(o =>
-                '<p>' + button(o.name?.value || o.nameKey, source(o.nameKey)) + '</p>').join('');
-    }
-    if (event.conditionalDesc) body += '<p>' + button(vscode.l10n.t('Conditional description — open script'), event.conditionalDesc) + '</p>';
+    const load = (asset?: HoverCardWire['asset']) => asset && !asset.archiveMember ? store.textureFile(asset.path) : undefined;
+    const preferred = event.options.length <= 2 ? 0 : event.options.length <= 4 ? 1 : 2;
+    const [top, middle, bottoms, optionButton, picture, flags] = await Promise.all([
+        load(assets.backgroundTop), load(assets.backgroundMiddle),
+        Promise.all([assets.backgroundBottomS, assets.backgroundBottomM, assets.backgroundBottomL].map(load)),
+        load(assets.optionButton), load(card.asset),
+        store.flagUrls(tags),
+    ]);
+    const bottom = bottoms[preferred] ?? bottoms.find(Boolean);
+    const locations: Location[] = [];
+    const button = (label: ReturnType<typeof parseLocFormat>, location?: Location) => {
+        const text = label.segments.map(segment => {
+            const flag = segment.flag && flags.get(segment.flag);
+            if (flag) return `<img class="loc-flag" alt="${segment.text}" src="${flag}">`;
+            const content = escapeHtml(segment.text);
+            return segment.color ? `<span style="color:${segment.color}">${content}</span>` : content;
+        }).join('');
+        if (!location) return text;
+        return `<button data-index="${locations.push(location) - 1}">${text}</button>`;
+    };
+    const source = (key?: string | null) => key && event.sources && Object.hasOwn(event.sources, key) ? event.sources[key] : undefined;
+    // The original chrome extends beyond the 564px text window. Preserve its
+    // scale and tile the middle behind the entire description and options.
+    const chrome = (image: TextureImageData, repeat = 'no-repeat') =>
+        `background:url('${image.url}') center top / ${100 * image.width / 564}% auto ${repeat}`;
+    const cap = (image: TextureImageData) => `${chrome(image)};aspect-ratio:564/${image.height}`;
+    const optionStyle = optionButton ? ` style="background:url('${optionButton.url}') center / 100% 100% no-repeat"` : '';
+    const optionClass = optionButton ? 'event-option textured' : 'event-option';
+    const eventKey = escapeHtml(JSON.stringify([uri, event.id]));
     const nonce = randomUUID();
     const html = `<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'">
-<style>body{font-family:var(--vscode-font-family);max-width:564px;margin:1em auto;padding:0 1em}img{display:block;max-width:100%}
-.window{position:relative}.window img{width:100%}p{white-space:pre-wrap}button{font:inherit;white-space:inherit;text-align:inherit;color:var(--vscode-textLink-foreground);background:none;border:0;padding:0;cursor:pointer}
-button:hover{text-decoration:underline}.area{position:absolute;left:2%;width:96%;color:transparent;overflow:hidden}
-.area:hover,.area:focus-visible{outline:2px solid var(--vscode-focusBorder)}</style></head><body>${body}
-<script nonce="${nonce}">const vscode=acquireVsCodeApi();document.addEventListener('click',e=>{const b=e.target.closest('button');if(b)vscode.postMessage({generation:${generation},index:Number(b.dataset.index)});});</script></body></html>`;
+<style>
+body{font-family:var(--vscode-font-family,sans-serif);max-width:564px;margin:1em auto;padding:0 1em}
+.event-content{position:relative;isolation:isolate;display:flow-root}
+.event-chrome{position:absolute;z-index:-1;inset:0;display:flex;flex-direction:column;pointer-events:none}
+.chrome-top{flex:none}
+.chrome-middle{flex:1}
+.event-header{box-sizing:border-box;text-align:center;padding:8px 5% 0}
+.event-header.textured{padding-top:6%;min-height:clamp(115px,39vw,223px);color:#fff;text-shadow:1px 1px #000}
+h2{margin:0;line-height:1.15;font-size:clamp(18px,5vw,29px)}
+.picture{display:block;max-width:100%;height:auto;margin:9px auto 0}
+.event-desc{margin:7px 5.5% 14px;font-size:16px;line-height:1.35}
+.event-desc.textured{color:#000}
+.event-options{margin:0 1.5%;display:grid;gap:1px}
+.event-option{padding:4px 8px;text-align:center;min-height:23px;line-height:1.35}
+.event-option.textured{color:#fff;text-shadow:1px 1px #000}
+h2,.event-desc,.event-option{white-space:pre-wrap;overflow-wrap:anywhere}
+.loc-flag{display:inline-block;height:1em;width:auto;vertical-align:-.1em}
+button{display:block;width:100%;color:inherit;font:inherit;white-space:inherit;overflow-wrap:inherit;text-align:inherit;
+    background:none;border:0;padding:0;cursor:pointer}
+button:hover{text-decoration:underline}
+button:focus-visible{outline:2px solid var(--vscode-focusBorder)}
+</style></head><body data-event="${eventKey}">
+<article>
+<div class="event-content">
+<div class="event-chrome" aria-hidden="true">
+${top ? `<div class="chrome-top" style="${cap(top)}"></div>` : ''}
+${middle ? `<div class="chrome-middle" style="${chrome(middle, 'repeat-y')}"></div>` : ''}
+</div>
+<header class="event-header${top ? ' textured' : ''}">
+<h2>${button(title, source(event.titleKey))}</h2>
+${picture ? `<img class="picture" width="${picture.width}" height="${picture.height}" alt="" src="${picture.url}">` : ''}
+</header>
+<p class="event-desc${middle ? ' textured' : ''}">${button(desc, source(event.descKey))}</p>
+<div class="event-options">${options.map((option, i) =>
+        `<div class="${optionClass}"${optionStyle}>${button(option, source(event.options[i].nameKey))}</div>`).join('')}</div>
+</div>
+${bottom ? `<div aria-hidden="true" style="${cap(bottom)}"></div>` : ''}
+</article>
+${event.conditionalDesc ? `<p>${button(parseLocFormat(vscode.l10n.t('Conditional description — open script')), event.conditionalDesc)}</p>` : ''}
+<script nonce="${nonce}">
+const vscode=acquireVsCodeApi();
+const eventKey=document.body.dataset.event;
+const saved=vscode.getState();
+if(saved?.eventKey===eventKey) window.scrollTo(0,saved.scrollTop);
+window.addEventListener('scroll',()=>vscode.setState({eventKey,scrollTop:window.scrollY}),{passive:true});
+document.addEventListener('click',e=>{
+    const button=e.target.closest('button[data-index]');
+    if(button) vscode.postMessage({generation:${generation},index:Number(button.dataset.index)});
+});
+</script></body></html>`;
     return { html, locations };
 }
 
@@ -157,7 +200,7 @@ export class EventPreviewPanel {
             if (request.token.isCancellationRequested) return;
             const card = parseHoverCardResponse(result)?.card;
             if (card?.kind !== 'event' || !card.event) throw new Error(vscode.l10n.t('Event {0} could not be found unambiguously in its source file.', target.id));
-            const page = await eventPage(card, generation);
+            const page = await eventPage(card, generation, target.location.uri);
             if (generation !== this.generation) return;
             this.locations = page.locations;
             panel.webview.html = page.html;

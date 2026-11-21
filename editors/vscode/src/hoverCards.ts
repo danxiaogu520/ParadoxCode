@@ -16,8 +16,15 @@ import { pathToFileURL } from 'url';
 import { BmChar, DecodedImage, FontBook, FontRaster } from './gameAssets';
 import type { Location } from 'vscode-languageserver-protocol';
 
+interface LocSegment {
+    text: string;
+    color: string | null;
+    flag?: string;
+}
+
 interface LocFormatApi {
-    parseLocFormat(text: string): { segments: { text: string; color: string | null }[]; plain: string };
+    EVENT_DESC_COLORS: Readonly<Record<string, string>>;
+    parseLocFormat(text: string, colors?: Readonly<Record<string, string>>): { segments: LocSegment[]; plain: string };
 }
 
 // The §-colour parser ships as a UMD the webview loads via <script>; from
@@ -25,6 +32,7 @@ interface LocFormatApi {
 const locFormat = require('../media/loc-format') as LocFormatApi;
 
 export const parseLocFormat = locFormat.parseLocFormat;
+export const EVENT_DESC_COLORS = locFormat.EVENT_DESC_COLORS;
 
 // --- wire types -------------------------------------------------------------
 
@@ -377,9 +385,10 @@ export function styledTitleLines(
     font: FontRaster,
     fonts: FontBook,
     maxWidth: number = TITLE_WIDTH,
+    colors?: Readonly<Record<string, string>>,
 ): StyledToken[][] {
     const result: StyledToken[][] = [];
-    for (const line of segmentLines(locFormat.parseLocFormat(label).segments)) {
+    for (const line of segmentLines(parseLocFormat(label, colors).segments)) {
         result.push(...wrapStyledLine(line, maxWidth, font, fonts));
     }
     return result;
@@ -562,7 +571,7 @@ export function composeEventCard(event: HoverCardEventWire, parts: EventCardPart
     const font = eventFont(event, fonts);
     const lineHeight = font ? font.lineHeight : 0;
     const descLines = font && event.desc
-        ? styledTitleLines(event.desc.value, font, fonts, EVENT_DESC_WIDTH)
+        ? styledTitleLines(event.desc.value, font, fonts, EVENT_DESC_WIDTH, EVENT_DESC_COLORS)
         : [];
     const descBottom = EVENT_DESC_Y + descLines.length * lineHeight;
     const optionsStart = Math.max(descBottom, EVENT_DESC_Y) + EVENT_OPTIONS_GAP;

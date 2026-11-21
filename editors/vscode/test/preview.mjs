@@ -32,8 +32,10 @@ const vscode = {
 };
 class Store {
     async spriteUrls() { return {}; }
+    async flagUrls(tags) { return tags.has('FRA') ? new Map([['FRA', flagUrl]]) : new Map(); }
     async loadFonts() { return {}; }
 }
+const flagUrl = 'data:image/png;base64,flag';
 const module = { exports: {} };
 const imports = id => {
     if (id === 'vscode') return vscode;
@@ -43,6 +45,7 @@ const imports = id => {
         findChineseFontMod: () => { fontDiscoveries++; return '/font'; },
     };
     if (id === './transparentLoc') return { realUriOf: doc => doc.uri };
+    if (id === './hoverCards') return realRequire(join(extension, 'out/hoverCards.js'));
     if (id === './webviewI18n' || id === 'vscode-languageclient/node') return {};
     return realRequire(id);
 };
@@ -83,11 +86,13 @@ console.log('mission preview discovery and cancellation checks passed');
 export function createRenderer(script) {
     let measures = 0;
     const painted = [];
+    const images = [];
     const handlers = new Map();
     const frames = [];
     const canvasContext = new Proxy({
         measureText: text => { measures++; return { width: text.length * 7 }; },
         fillText: (...args) => painted.push(args),
+        drawImage: (...args) => images.push(args),
     }, { get: (target, name) => target[name] ?? (() => {}) });
     class Element {
         constructor() {
@@ -121,7 +126,11 @@ export function createRenderer(script) {
     runInNewContext(script, { window, document: doc,
         acquireVsCodeApi: () => ({ postMessage() {}, getState: () => ({}), setState() {} }),
         getComputedStyle: () => ({ fontFamily: 'sans-serif', color: '#ffffff', getPropertyValue: () => '' }),
-        Image: class {},
+        Image: class {
+            complete = true;
+            naturalWidth = 32;
+            naturalHeight = 32;
+        },
     });
     const flush = () => { while (frames.length) frames.shift()(); };
     flush();
@@ -129,7 +138,7 @@ export function createRenderer(script) {
         click: id => { elements.get(id).events.get('click')({}); flush(); },
         message: data => { handlers.get('message')({ data }); flush(); },
         resize: () => { handlers.get('resize')(); flush(); },
-        painted, get measures() { return measures; },
+        painted, images, get measures() { return measures; },
     };
 }
 
@@ -162,14 +171,32 @@ view.message({ type: 'preview', payload: focusPayload, focusMission: 0 });
 assert.ok(view.painted.some(([text, x, y]) => text === 'Zed' && Math.abs(x - 800) < 100 && Math.abs(y - 800) < 100),
     'locating a node reveals its hidden series and centers it on the canvas');
 
-// Exercise the event panel's actual webview navigation (including the text-only fallback).
+const formatted = { ...focusPayload, nodes: [{ ...nodes[0], title: { value: 'First\\n@FRA' } }] };
+const formattedView = createRenderer(readFileSync(join(extension, 'media/renderer.js'), 'utf8'));
+formattedView.message({ type: 'preview', payload: formatted });
+assert.ok(formattedView.painted.find(([text]) => text === 'First')[2] <
+    formattedView.painted.find(([text]) => text === '@FRA')[2], 'escaped newline puts the tag on the next line');
+formattedView.painted.length = 0;
+formattedView.message({ type: 'assets', textures: { '@FRA': flagUrl } });
+assert.ok(formattedView.images.some(([image, _x, _y, width, height]) => image.src === flagUrl && width === height && height > 0));
+assert.ok(formattedView.painted.every(([text]) => text !== '@FRA'));
+formattedView.painted.length = 0;
+formattedView.message({ type: 'options', showTextures: false });
+assert.ok(formattedView.painted.some(([text]) => text === '@FRA'), 'texture visibility restores the text fallback');
+const fourth = panelClass.refresh(client);
+pending[3].resolve({ ...formatted, documentVersion: document.version });
+await fourth;
+await new Promise(resolve => setImmediate(resolve));
+assert.equal(messages.find(message => message.type === 'assets')?.textures['@FRA'], flagUrl);
+
+// Exercise the event panel's HTML, text-only fallback, and source navigation.
 {
     const htmlLocation = { uri: 'file:///mod/localisation/a.yml', range: { start: { line: 3, character: 2 }, end: { line: 3, character: 5 } } };
     const eventLocation = { ...htmlLocation, uri: 'file:///mod/events/a.txt' };
     const received = {};
     const listen = name => callback => { received[name] = callback; return { dispose() { delete received[name]; } }; };
     const panel = { visible: true, viewColumn: 2, webview: { html: '', onDidReceiveMessage: listen('message') },
-        onDidDispose: listen('close'), onDidChangeViewState: listen('visible'), dispose() { received.close(); } };
+        onDidDispose: listen('close'), onDidChangeViewState: listen('visible'), reveal() {}, dispose() { received.close(); } };
     const uri = value => ({ toString: () => value });
     let opened;
     const api = { ...vscode, Uri: { parse: uri }, ViewColumn: { One: 1, Beside: -2 },
@@ -178,15 +205,16 @@ assert.ok(view.painted.some(([text, x, y]) => text === 'Zed' && Math.abs(x - 800
         workspace: { openTextDocument: async uri => ({ uri }), onDidChangeTextDocument: listen('edit') },
         window: { createWebviewPanel: () => panel, visibleTextEditors: [], showTextDocument(doc, options) { opened = { doc, options }; } } };
     const exports = {};
-    const card = { kind: 'event', event: { id: 'a.1', titleKey: 'a.t', title: { value: '<Title>' },
+    const card = { kind: 'event', event: { id: 'a.1', titleKey: 'a.t', title: { value: '§G<Title>§!' },
         descKey: 'a.d', desc: { value: 'Description' }, conditionalDesc: eventLocation,
         sources: { 'a.t': htmlLocation, 'a.d': htmlLocation }, options: [] } };
+    const store = new Store();
+    store.textureFile = async () => ({ url: 'data:image/png;base64,chrome', width: 656, height: 223 });
     const imports = id => {
         if (id === 'vscode') return api;
-        if (id === './previewPanel') return { MissionPreviewPanel: { store: () => ({ loadFontRasters: () => ({}) }) } };
+        if (id === './previewPanel') return { MissionPreviewPanel: { store: () => store } };
         if (id === './hoverCards') return realRequire(join(extension, 'out/hoverCards.js'));
         if (id === './transparentLoc') return { openTextDocumentForNavigation: async uri => ({ uri }) };
-        if (id === './gameAssets') return {};
         return realRequire(id);
     };
     runInNewContext(readFileSync(join(extension, 'out/eventPreviewPanel.js'), 'utf8'),
@@ -201,6 +229,17 @@ assert.ok(view.painted.some(([text, x, y]) => text === 'Zed' && Math.abs(x - 800
     assert.equal(opened.options.selection.start.line, 3);
     await received.message({ generation, index: 2 });
     assert.equal(opened.doc.uri.toString(), eventLocation.uri);
+
+    card.cardAssets = { backgroundTop: { path: '/top' }, backgroundMiddle: { path: '/middle' } };
+    card.event.desc.value = '§GFirst @FRA\\n\\nSecond @ZZZ§!\\n' + 'long text\\n'.repeat(900) + 'Last description line';
+    card.event.options.push({ nameKey: 'a.opt', name: { value: 'Continue' } });
+    await controller.show({ kind: 'event', id: 'a.1', location: eventLocation });
+    assert.ok(panel.webview.html.includes('style="color:#2cab32">&lt;Title&gt;'));
+    assert.ok(panel.webview.html.includes('style="color:#18701a">First </span><img class="loc-flag" alt="@FRA"'));
+    assert.match(panel.webview.html, /\n\nSecond <\/span><span style="color:#18701a">@ZZZ/,
+        'blank lines and missing flag text survive formatting');
+    assert.ok(panel.webview.html.includes('repeat-y'), 'long events keep their game background');
+    assert.ok(panel.webview.html.indexOf('Last description line') < panel.webview.html.indexOf('Continue'));
     controller.dispose();
     assert.equal(received.edit, undefined);
 }
