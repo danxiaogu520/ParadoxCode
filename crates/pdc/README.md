@@ -21,6 +21,14 @@ Use [VS Code's generated configuration reference](../../editors/vscode/REFERENCE
 as a guide to shared `paradoxcode` settings, while respecting the server's initialization contract.
 Editor defaults need not equal defaults for an independent LSP client.
 
+## On-demand event and mission previews
+
+A resolved event or mission can add a `pdcPreview` field to a standard hover result. It carries
+the symbol kind, ID, localised title when available, and the definition location and logical path.
+The editor opens the corresponding mission tree or explicitly requests `pdc/eventPreview` with
+`textDocument` and the event ID. The event response includes the effective localisation source
+locations. Direct sprite or texture hovers can use `pdc/hoverCard` with `textureOnly: true`.
+
 ## Editor transcoding
 
 The VS Code extension starts the matched server executable with

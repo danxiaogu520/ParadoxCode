@@ -1247,12 +1247,17 @@
         const node = preview.nodes[nodeIndex];
         postJump({ kind: 'node', node, index: nodeIndex });
         if (isTreeVisible(node.tree)) {
-            pan.x = canvas.clientWidth / 2 - (node.x + NODE_WIDTH / 2) * zoom;
-            pan.y = canvas.clientHeight / 2 - (node.y + NODE_HEIGHT / 2) * zoom;
-            hovered = { kind: 'node', index: nodeIndex, node, rect: null };
-            keyboardIndex = nodeIndex;
-            scheduleDraw();
+            centerMission(nodeIndex);
         }
+    }
+
+    function centerMission(index) {
+        const node = preview.nodes[index];
+        pan.x = canvas.clientWidth / 2 - (node.x + NODE_WIDTH / 2) * zoom;
+        pan.y = canvas.clientHeight / 2 - (node.y + NODE_HEIGHT / 2) * zoom;
+        hovered = { kind: 'node', index, node, rect: null };
+        keyboardIndex = index;
+        scheduleDraw();
     }
 
     searchInput?.addEventListener('input', runSearch);
@@ -1474,6 +1479,10 @@
             setFileBadge(message.payload.documentUri);
             syncSeriesState();
             keyboardIndex = -1;
+            if (Number.isInteger(message.focusMission) && preview.nodes[message.focusMission]) {
+                hiddenTreeIds.delete(treeIds[preview.nodes[message.focusMission].tree]);
+                centerMission(message.focusMission);
+            }
             hideStatus();
             scheduleDraw();
             runSearch();
@@ -1604,4 +1613,5 @@
 
     window.addEventListener('resize', resize);
     resize();
+    vscode.postMessage({ type: 'ready' });
 })();

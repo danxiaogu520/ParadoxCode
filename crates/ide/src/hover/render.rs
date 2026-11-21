@@ -1,6 +1,6 @@
 //! Structured hover content and the Markdown atoms shared by every hover producer.
 
-use crate::types::Hover;
+use crate::types::{Hover, PreviewTarget};
 use text::TextRange;
 
 /// Structured hover content before Markdown rendering.
@@ -10,6 +10,7 @@ use text::TextRange;
 /// blank lines. Facts callers need to branch on (such as whether a localisation preview
 /// attached) ride along as fields so callers never string-match rendered output.
 pub(crate) struct HoverModel {
+    pub(crate) preview: Option<PreviewTarget>,
     pub(crate) title: String,
     pub(crate) sections: Vec<String>,
     pub(crate) has_localisation_preview: bool,
@@ -19,6 +20,7 @@ pub(crate) struct HoverModel {
 impl HoverModel {
     pub(crate) fn new(title: String) -> Self {
         Self {
+            preview: None,
             title,
             sections: Vec::new(),
             has_localisation_preview: false,
@@ -41,6 +43,7 @@ impl HoverModel {
     pub(crate) fn into_hover_with_range(self, range: TextRange) -> Hover {
         Hover {
             contents: self.render(),
+            preview: self.preview,
             range: Some(range),
             coverage: self.coverage,
         }

@@ -66,7 +66,8 @@ pub use diagnostics::{
 pub use hover::{hover, hover_with_cancellation};
 pub use hover_card::{
     EventCardAssets, HoverCard, HoverCardAsset, HoverCardEvent, HoverCardEventOption,
-    HoverCardMission, MissionCardAssets, hover_card_with_cancellation,
+    HoverCardMission, MissionCardAssets, event_preview_with_cancellation,
+    hover_card_with_cancellation, texture_preview_with_cancellation,
 };
 pub use localisation::{
     LocalisationKeyMatch, LocalisationSearchHit, LocalisationSearchResult,
@@ -94,9 +95,9 @@ pub use hir::analysis::Validation as TemplateValidation;
 pub use types::{
     AnalysisResult, CancellationToken, Cancelled, CompletionItem, CompletionKind, CompletionResult,
     Diagnostic, DiagnosticCertainty, DiagnosticCode, DiagnosticProvenance, DiagnosticTag,
-    FileAnalysis, Hover, Location, PrepareRenameResult, QuickFix, ReferenceInfo, RelatedLocation,
-    RenameError, RenameFailure, SemanticToken, SemanticTokenType, Severity, Symbol,
-    WorkspaceEditPlan, WorkspaceSymbol, WorkspaceTextEdit,
+    FileAnalysis, Hover, Location, PrepareRenameResult, PreviewTarget, QuickFix, ReferenceInfo,
+    RelatedLocation, RenameError, RenameFailure, SemanticToken, SemanticTokenType, Severity,
+    Symbol, WorkspaceEditPlan, WorkspaceSymbol, WorkspaceTextEdit,
 };
 
 // These crate-visible re-exports keep the existing in-crate test and helper paths stable while

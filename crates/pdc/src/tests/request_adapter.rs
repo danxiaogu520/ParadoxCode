@@ -1813,6 +1813,8 @@ fn hover_card_serves_mission_sprite_and_texture_payloads() {
         json!({"jsonrpc":"2.0","id":7,"method":"pdc/hoverCard","params":{"textDocument":{"uri":mission_uri},"position":{"line":6,"character":16}}}),
         // On the `icon` value: the sprite card, not the mission card.
         json!({"jsonrpc":"2.0","id":8,"method":"pdc/hoverCard","params":{"textDocument":{"uri":mission_uri},"position":{"line":4,"character":10}}}),
+        json!({"jsonrpc":"2.0","id":10,"method":"textDocument/hover","params":{"textDocument":{"uri":mission_uri},"position":{"line":5,"character":26}}}),
+        json!({"jsonrpc":"2.0","id":11,"method":"pdc/hoverCard","params":{"textureOnly":true,"textDocument":{"uri":mission_uri},"position":{"line":4,"character":10}}}),
         json!({"jsonrpc":"2.0","id":9,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
     ]);
@@ -1829,6 +1831,11 @@ fn hover_card_serves_mission_sprite_and_texture_payloads() {
             .unwrap_or_else(|| panic!("hover card response {id}"))["result"]
             .clone()
     };
+
+    assert_eq!(card(10)["pdcPreview"]["kind"], "mission");
+    assert_eq!(card(10)["pdcPreview"]["location"]["uri"], upstream_uri);
+    assert_eq!(card(10)["pdcPreview"]["id"], "probe_upstream");
+    assert_eq!(card(11)["card"]["kind"], "sprite");
 
     // Mission card: the icon asset plus the fixed node chrome, all resolved
     // through the workspace catalog with project provenance.
@@ -1981,11 +1988,18 @@ country_event = {\n\
 }\n";
     let gfx_uri = format!("{root_uri}/interface/test_event_sprites.gfx");
     let event_uri = format!("{root_uri}/events/test_events.txt");
+    let loc_uri = format!("{root_uri}/localisation/test_l_english.yml");
+    let long_desc = "Long event text ".repeat(64);
+    let loc_text = format!("l_english:\n demo_event.1.d:0 \"{long_desc}\"\n");
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":gfx_uri,"languageId":"eu4","version":1,"text":gfx_text}}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":event_uri,"languageId":"eu4","version":1,"text":event_text}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":loc_uri,"languageId":"localisation","version":1,"text":loc_text}}}),
+        json!({"jsonrpc":"2.0","id":10,"method":"textDocument/hover","params":{"textDocument":{"uri":event_uri},"position":{"line":2,"character":9}}}),
+        json!({"jsonrpc":"2.0","id":11,"method":"pdc/eventPreview","params":{"textDocument":{"uri":event_uri},"id":"demo_event.1"}}),
+        json!({"jsonrpc":"2.0","id":12,"method":"textDocument/hover","params":{"textDocument":{"uri":event_uri},"position":{"line":9,"character":event_text.lines().nth(9).unwrap().find("demo_event.2").unwrap()+1}}}),
         // On the first block's `country_event` token: its event card.
         json!({"jsonrpc":"2.0","id":2,"method":"pdc/hoverCard","params":{"textDocument":{"uri":event_uri},"position":{"line":1,"character":5}}}),
         // On the second block's `country_event` token: picture resolves only
@@ -2014,6 +2028,14 @@ country_event = {\n\
             .unwrap_or_else(|| panic!("hover card response {id}"))["result"]
             .clone()
     };
+
+    assert_eq!(card(10)["pdcPreview"]["id"], "demo_event.1");
+    assert_eq!(card(12)["pdcPreview"]["id"], "demo_event.2");
+    assert_eq!(card(11)["card"]["event"]["desc"]["value"], long_desc);
+    assert_eq!(
+        card(11)["card"]["event"]["sources"]["demo_event.1.d"]["uri"],
+        loc_uri
+    );
 
     // Event card: fields in source order, the picture asset, and the fixed
     // window chrome, all resolved through the workspace catalog.

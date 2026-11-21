@@ -9,6 +9,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Event hovers open a pinned event preview on demand. Mission hovers locate the referenced node
+  in the mission tree. Regular script hovers return text without loading card artwork.
+
 - Localisation YML uses automatic encoding management by default. In Manual mode, encoding and decoding apply one undoable edit to the current buffer, including unsaved text. TXT conversion operates on the selected range. Encoded localisation YML includes a UTF-8 BOM. File saves use a binary codec process independent of workspace analysis.
 - Large multiline buffers can use up to four threads for conversion. Manual YML commands replace
   the span of changed lines. Opening or editing a YML buffer above the analysis size limit keeps

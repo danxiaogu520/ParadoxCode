@@ -3,6 +3,8 @@ import * as path from 'path';
 import {
     LanguageClient,
     LanguageClientOptions,
+    HoverRequest,
+    type Hover as ProtocolHover,
     LogMessageNotification,
     RevealOutputChannelOn,
     ServerOptions,
@@ -16,6 +18,7 @@ import { LoadedFilesProvider } from './fileExplorer';
 import { localisationSync } from './localisationSync';
 import { SearchPanel } from './searchPanel';
 import { MissionPreviewPanel } from './previewPanel';
+import { EventPreviewPanel, parsePreviewTarget } from './eventPreviewPanel';
 import { MissionIconPickerPanel } from './iconPickerPanel';
 import {
     PDCLOC_SCHEME,
@@ -27,7 +30,7 @@ import {
     attachSpritePreviewDocumentation,
     FOLLOWUP_COMPLETION_TRIGGER_COMMAND,
 } from './completionMiddleware';
-import { normalizeTexturePath, pngDataUrl } from './gameAssets';
+import { normalizeTexturePath } from './gameAssets';
 import {
     appendTextureSection,
     extractSpriteHoverName,
@@ -35,20 +38,7 @@ import {
     texturefileHoverMarkdown,
     texturefileValueAt,
 } from './hoverTextures';
-import {
-    cachedCardDataUrl,
-    composeEventCard,
-    composeMissionCard,
-    eventCardMarkdown,
-    missionCardMarkdown,
-    parseHoverCardResponse,
-} from './hoverCards';
-import type {
-    HoverCardAssetWire,
-    HoverCardEventWire,
-    HoverCardMissionWire,
-    HoverCardWire,
-} from './hoverCards';
+import { parseHoverCardResponse, type HoverCardWire } from './hoverCards';
 import { findExecutableOnPath } from './serverPath';
 import { globToRegExp, pathRelative } from './paths';
 import {
@@ -699,10 +689,38 @@ function clientMiddleware(getClient: () => LanguageClient): NonNullable<Language
                 return resolved;
             });
         },
-        provideHover(document, position, token, next) {
-            return Promise.resolve(next(document, position, token)).then((hover) =>
-                augmentHoverTexturePreview(document, position, hover, token),
-            );
+        async provideHover(document, position, token) {
+            const languageClient = getClient();
+            let result;
+            try {
+                result = await languageClient.sendRequest(HoverRequest.type,
+                    languageClient.code2ProtocolConverter.asTextDocumentPositionParams(document, position), token);
+            } catch (error) {
+                return languageClient.handleFailedRequest(HoverRequest.type, token, error, null);
+            }
+            if (token.isCancellationRequested) return null;
+            const hover = languageClient.protocol2CodeConverter.asHover(result);
+            const target = parsePreviewTarget((result as (ProtocolHover & { pdcPreview?: unknown }) | null)?.pdcPreview);
+            const config = vscode.workspace.getConfiguration('paradoxcode.hover', document.uri);
+            if (target && hover) {
+                if (config.get(target.kind === 'event' ? 'eventCard' : 'missionCard', true)) {
+                    const command = target.kind === 'event' ? 'paradoxcode.previewEvent' : 'paradoxcode.locateMission';
+                    const label = target.kind === 'event' ? vscode.l10n.t('Preview Event') : vscode.l10n.t('Locate in Mission Tree');
+                    const args = encodeURIComponent(JSON.stringify([target])).replace(/[()]/g, c => '%' + c.charCodeAt(0).toString(16));
+                    const link = new vscode.MarkdownString(`[${label}](command:${command}?${args})`);
+                    link.isTrusted = { enabledCommands: [command] };
+                    const summary = new vscode.MarkdownString().appendText(target.id);
+                    if (target.title) summary.appendMarkdown('\n\n').appendText(target.title);
+                    return new vscode.Hover([summary, link], hover.range);
+                }
+                return hover;
+            }
+            if (!config.get('texturePreview', true)) return hover;
+            const range = document.getWordRangeAtPosition(position, /"[^"\r\n]+\.(?:dds|tga|png|bmp|fx)"|[\w.\/\\-]+/i);
+            const word = range && document.getText(range).replace(/^"|"$/g, '');
+            const sprite = hover && extractSpriteHoverName(hoverMarkdownString(hover)?.value ?? '');
+            if (!sprite && !(word && (/^GFX_/i.test(word) || /\.(?:dds|tga|png|bmp|fx)$/i.test(word)))) return hover;
+            return augmentHoverTexturePreview(document, position, hover, token);
         },
         handleDiagnostics(uri, diagnostics, next) {
             const config = vscode.workspace.getConfiguration('paradoxcode');
@@ -755,13 +773,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     });
 }
 
-/**
- * Asks the server for a structured hover card (`pdc/hoverCard`): the
- * mission/sprite/texture at this position with server-resolved texture
- * paths. Any failure — old server without the method, cancellation,
- * timeout, malformed payload — yields `undefined` so the caller falls
- * back to the legacy hover paths.
- */
+/** Look up the texture for a direct sprite or file reference, including dependency overrides. */
 async function requestHoverCard(
     document: vscode.TextDocument,
     position: vscode.Position,
@@ -774,6 +786,7 @@ async function requestHoverCard(
     try {
         const payload = await withTimeout(
             server.sendRequest('pdc/hoverCard', {
+                textureOnly: true,
                 textDocument: { uri: document.uri.toString() },
                 position: { line: position.line, character: position.character },
             }, token),
@@ -793,7 +806,6 @@ function combineHoverMarkdown(
     const markdown = hover ? hoverMarkdownString(hover) : undefined;
     if (hover && markdown) {
         const augmented = new vscode.MarkdownString(`${markdown.value}\n\n${section}`);
-        augmented.isTrusted = true;
         return new vscode.Hover(augmented, hover.range);
     }
     if (hover) {
@@ -801,38 +813,15 @@ function combineHoverMarkdown(
         return hover;
     }
     const standalone = new vscode.MarkdownString(section);
-    standalone.isTrusted = true;
     return new vscode.Hover(standalone);
 }
 
-/**
- * Renders the server's structured hover card: mission positions get the
- * composed game-look mission card, event positions the composed event
- * window, sprite and texture positions a single-texture preview. Returns
- * `undefined` when this card cannot be rendered, letting the caller fall
- * back to the legacy hover paths.
- */
+/** Render the resolved texture inline, with the legacy resolver as a fallback. */
 async function augmentHoverWithCard(
     hover: vscode.Hover | null | undefined,
     card: HoverCardWire,
 ): Promise<vscode.Hover | null | undefined> {
-    if (card.kind === 'mission') {
-        if (!card.mission) {
-            return undefined;
-        }
-        const section = await missionCardSection(card.mission, card.asset, card.cardAssets ?? {});
-        // A mission card that could not compose degrades to the plain
-        // server hover — the legacy paths have nothing for mission spans.
-        return section ? combineHoverMarkdown(hover, section) : hover ?? null;
-    }
-    if (card.kind === 'event') {
-        if (!card.event) {
-            return undefined;
-        }
-        const section = await eventCardSection(card.event, card.asset, card.cardAssets ?? {});
-        // Same degradation contract as the mission card.
-        return section ? combineHoverMarkdown(hover, section) : hover ?? null;
-    }
+    if (card.kind !== 'sprite' && card.kind !== 'texture') return undefined;
     const asset = card.asset;
     if (!asset) {
         return undefined;
@@ -852,107 +841,6 @@ async function augmentHoverWithCard(
 }
 
 /**
- * Composes the game-look mission card — frame, icon underneath,
- * §-coloured title — and returns its markdown image section. `undefined`
- * when no decodable assets are left.
- */
-async function missionCardSection(
-    mission: HoverCardMissionWire,
-    asset: HoverCardAssetWire | undefined,
-    cardAssets: NonNullable<HoverCardWire['cardAssets']>,
-): Promise<string | undefined> {
-    const store = MissionPreviewPanel.store();
-    const load = (candidate: HoverCardAssetWire | undefined) =>
-        candidate ? store.textureRaster(candidate.path) : Promise.resolve(undefined);
-    const [frame, icon, fonts] = await Promise.all([
-        load(cardAssets.frame),
-        load(asset),
-        store.loadFontRasters(),
-    ]);
-    if (!frame && !icon) {
-        return undefined;
-    }
-    // Recompose only when the mission or any input asset changed: the key
-    // folds the mission identity and every asset path plus its mtime.
-    const stampAssets = [cardAssets.frame, asset];
-    const cacheKey = [
-        mission.id,
-        mission.title?.value ?? '',
-        ...stampAssets.map((candidate) => (candidate ? `${candidate.path}@${store.mtimeOf(candidate.path) ?? '?'}` : '-')),
-    ].join('\0');
-    const dataUrl = cachedCardDataUrl(cacheKey, () =>
-        pngDataUrl(composeMissionCard(mission, {
-            frame,
-            icon,
-            iconFrames: asset?.frames,
-            fonts,
-        })),
-    );
-    return missionCardMarkdown(dataUrl);
-}
-
-/**
- * Composes the game-look event window — stacked background chrome, picture
- * banner, §-coloured title/description, one button row per option — and
- * returns its markdown image section. `undefined` when no decodable assets
- * are left.
- */
-async function eventCardSection(
-    event: HoverCardEventWire,
-    asset: HoverCardAssetWire | undefined,
-    cardAssets: NonNullable<HoverCardWire['cardAssets']>,
-): Promise<string | undefined> {
-    const store = MissionPreviewPanel.store();
-    const load = (candidate: HoverCardAssetWire | undefined) =>
-        candidate ? store.textureRaster(candidate.path) : Promise.resolve(undefined);
-    const [backgroundTop, backgroundMiddle, bottomS, bottomM, bottomL, optionButton, picture, fonts] =
-        await Promise.all([
-            load(cardAssets.backgroundTop),
-            load(cardAssets.backgroundMiddle),
-            load(cardAssets.backgroundBottomS),
-            load(cardAssets.backgroundBottomM),
-            load(cardAssets.backgroundBottomL),
-            load(cardAssets.optionButton),
-            load(asset),
-            store.loadFontRasters(),
-        ]);
-    if (!backgroundTop && !picture) {
-        return undefined;
-    }
-    // Recompose only when the event text or any input asset changed: the
-    // key folds the text payload and every asset path plus its mtime.
-    const stampAssets = [
-        cardAssets.backgroundTop,
-        cardAssets.backgroundMiddle,
-        cardAssets.backgroundBottomS,
-        cardAssets.backgroundBottomM,
-        cardAssets.backgroundBottomL,
-        cardAssets.optionButton,
-        asset,
-    ];
-    const cacheKey = [
-        event.id,
-        event.title?.value ?? '',
-        event.desc?.value ?? '',
-        ...event.options.map((option) => option.name?.value ?? option.nameKey),
-        ...stampAssets.map((candidate) => (candidate ? `${candidate.path}@${store.mtimeOf(candidate.path) ?? '?'}` : '-')),
-    ].join('\0');
-    const dataUrl = cachedCardDataUrl(cacheKey, () =>
-        pngDataUrl(composeEventCard(event, {
-            backgroundTop,
-            backgroundMiddle,
-            backgroundBottomS: bottomS,
-            backgroundBottomM: bottomM,
-            backgroundBottomL: bottomL,
-            optionButton,
-            picture,
-            fonts,
-        })),
-    );
-    return eventCardMarkdown(dataUrl);
-}
-
-/**
  * Appends decoded texture previews to hovers. The server's structured
  * hover card (mission/sprite/texture) is preferred; when the protocol is
  * unavailable the legacy paths take over: sprite symbol hovers get a
@@ -967,26 +855,11 @@ async function augmentHoverTexturePreview(
     hover: vscode.Hover | null | undefined,
     token: vscode.CancellationToken,
 ): Promise<vscode.Hover | null | undefined> {
-    const hoverConfig = vscode.workspace.getConfiguration('paradoxcode.hover');
-    const texturePreview = hoverConfig.get<boolean>('texturePreview', true);
-    const missionCard = hoverConfig.get<boolean>('missionCard', true);
-    const eventCard = hoverConfig.get<boolean>('eventCard', true);
-    if (texturePreview || missionCard || eventCard) {
-        const card = await requestHoverCard(document, position, token);
-        const kindEnabled = card?.kind === 'mission'
-            ? missionCard
-            : card?.kind === 'event'
-                ? eventCard
-                : texturePreview;
-        if (card && kindEnabled) {
-            const handled = await augmentHoverWithCard(hover, card);
-            if (handled !== undefined) {
-                return handled;
-            }
-        }
-    }
-    if (!texturePreview) {
-        return hover;
+    const card = await requestHoverCard(document, position, token);
+    if (token.isCancellationRequested) return null;
+    if (card) {
+        const handled = await augmentHoverWithCard(hover, card);
+        if (handled !== undefined) return handled;
     }
     if (document.uri.fsPath.toLowerCase().endsWith('.gfx')) {
         const value = texturefileValueAt(document.lineAt(position.line).text, position.character);
@@ -1002,19 +875,7 @@ async function augmentHoverTexturePreview(
                     url: image.url,
                     width: image.width,
                 });
-                const markdown = hover ? hoverMarkdownString(hover) : undefined;
-                if (hover && markdown) {
-                    const augmented = new vscode.MarkdownString(`${markdown.value}\n\n${section}`);
-                    augmented.isTrusted = true;
-                    return new vscode.Hover(augmented, hover.range);
-                }
-                if (hover) {
-                    // A non-markdown server hover keeps its own shape untouched.
-                    return hover;
-                }
-                const standalone = new vscode.MarkdownString(section);
-                standalone.isTrusted = true;
-                return new vscode.Hover(standalone);
+                return combineHoverMarkdown(hover, section);
             }
             // No decodable preview (missing or unhandled format): the server
             // hover already reports resolution, so pass it through.
@@ -1046,7 +907,6 @@ async function augmentHoverTexturePreview(
                 width: image.width,
             }),
         );
-        augmented.isTrusted = true;
         return new vscode.Hover(augmented, hover.range);
     }
     return hover ?? null;
@@ -1677,6 +1537,20 @@ export function activate(context: vscode.ExtensionContext): void {
             });
     };
 
+    const eventPreview = new EventPreviewPanel(() => client);
+    context.subscriptions.push(eventPreview,
+        vscode.commands.registerCommand('paradoxcode.previewEvent', async (value: unknown) => {
+            const target = parsePreviewTarget(value);
+            if (target?.kind === 'event') await eventPreview.show(target);
+        }),
+        vscode.commands.registerCommand('paradoxcode.locateMission', async (value: unknown) => {
+            const target = parsePreviewTarget(value);
+            if (target?.kind !== 'mission') return;
+            const document = await vscode.workspace.openTextDocument(vscode.Uri.parse(target.location.uri));
+            await vscode.window.showTextDocument(document, { preview: true, preserveFocus: false });
+            MissionPreviewPanel.show(context.extensionUri, client, target);
+        }),
+    );
     searchPanel = new SearchPanel(context.extensionUri, () => client, () => serverReady);
     context.subscriptions.push(
         searchPanel,
