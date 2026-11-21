@@ -362,6 +362,7 @@ pub(crate) fn resolve_source_roots(
             AbsPath::normalize(&path),
         );
         root.order = order;
+        root.name = Some(id);
         match index {
             Some(index_path) => dependency_caches.push(DependencyIndexCache { root, index_path }),
             None => roots.push(root),

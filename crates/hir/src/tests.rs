@@ -296,6 +296,10 @@ fn ir_scope_transitions_update_root_this_registers_and_respect_link_from_scopes(
         &ir,
         "fromfromfrom"
     ));
+    assert!(is_ir_scope_link(&ir, "PREV_PREV"));
+    assert!(!is_ir_scope_link(&ir, "PREV__PREV"));
+    assert!(!is_ir_scope_link(&ir, &["PREV", "PREV"].concat()));
+    assert!(!is_ir_scope_link(&ir, "FROM_FROM"));
     assert!(!super::ir_lowering::link_or_register_matches(
         &ir,
         "fromgarbage"

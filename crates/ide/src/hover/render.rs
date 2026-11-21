@@ -1,6 +1,7 @@
 //! Structured hover content and the Markdown atoms shared by every hover producer.
 
-use crate::types::{Hover, PreviewTarget};
+use crate::types::{Hover, HoverLink, Location, PreviewTarget};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use text::TextRange;
 
 /// Structured hover content before Markdown rendering.
@@ -15,6 +16,7 @@ pub(crate) struct HoverModel {
     pub(crate) sections: Vec<String>,
     pub(crate) has_localisation_preview: bool,
     pub(crate) coverage: hir::analysis::AnalysisCoverage,
+    links: Vec<HoverLink>,
 }
 
 impl HoverModel {
@@ -25,11 +27,51 @@ impl HoverModel {
             sections: Vec::new(),
             has_localisation_preview: false,
             coverage: Default::default(),
+            links: Vec::new(),
         }
     }
 
     pub(crate) fn push_section(&mut self, section: String) {
         self.sections.push(section);
+    }
+
+    pub(crate) fn push_model(&mut self, other: Self) {
+        self.sections.push(other.render());
+        self.links.extend(other.links);
+        self.coverage.merge(&other.coverage);
+    }
+
+    pub(crate) fn source_link(&mut self, label: &str, location: Location) -> String {
+        let label = label
+            .replace(['\n', '\r'], " ")
+            .replace('\\', "\\\\")
+            .replace('[', "\\[")
+            .replace(']', "\\]")
+            .replace('|', "\\|");
+        let mut hash = DefaultHasher::new();
+        location.hash(&mut hash);
+        let destination = format!("pdc-hover:{:x}", hash.finish());
+        let markdown = format!("[{label}]({destination})");
+        self.links.push(HoverLink {
+            label,
+            destination,
+            location,
+        });
+        markdown
+    }
+
+    pub(crate) fn push_localisation(
+        &mut self,
+        rows: &[crate::localisation::LocalisationPreviewRow],
+    ) {
+        if rows.is_empty() {
+            return;
+        }
+        self.has_localisation_preview |= rows.iter().any(|row| row.location.is_some());
+        let section = crate::localisation::localisation_preview_section(rows, |label, location| {
+            self.source_link(label, location)
+        });
+        self.push_section(section);
     }
 
     /// Renders the title and sections joined by blank lines.
@@ -45,6 +87,7 @@ impl HoverModel {
             contents: self.render(),
             preview: self.preview,
             range: Some(range),
+            links: self.links,
             coverage: self.coverage,
         }
     }

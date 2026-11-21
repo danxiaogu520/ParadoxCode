@@ -80,12 +80,6 @@ pub(crate) fn ir_invocation_parameter_hover(
         cancellation,
     )?;
     model.coverage.merge(&sites.coverage);
-    if !sites.coverage.is_complete() {
-        section.push_str(&format!(
-            "\n- Analysis incomplete: {}",
-            sites.coverage.limit_description()
-        ));
-    }
     if let Some(lines) = ir_parameter_contract_lines(snapshot, &summary, &parameter.name, &sites) {
         section.push('\n');
         section.push_str(&lines);
@@ -108,14 +102,18 @@ pub(crate) fn ir_invocation_parameter_hover(
             cancellation,
         )?;
         model.coverage.merge(&body.coverage);
-        let status = if rejected || body.value == hir::analysis::Validation::Invalid {
-            "invalid"
-        } else if !model.coverage.is_known() || body.value == hir::analysis::Validation::Unknown {
-            "unknown"
-        } else {
-            "valid"
-        };
-        section.push_str(&format!("\n- Current binding: `{status}`"));
+        if rejected || body.value == hir::analysis::Validation::Invalid {
+            model.push_section(format!(
+                "**Invalid argument.** {} fails a constraint where the script uses this parameter.",
+                code_span(&scalar.value),
+            ));
+        }
+    }
+    if !model.coverage.is_complete() {
+        section.push_str(&format!(
+            "\n- Analysis incomplete: {}",
+            model.coverage.limit_description()
+        ));
     }
     model.push_section(section);
     Ok(Some(model))
@@ -185,14 +183,14 @@ fn ir_parameter_contract_lines(
         .any(|site| matches!(site.domain, Domain::Template { .. }))
     {
         lines.push(
-            "- Payload: quoted script (the caller's raw text is spliced into the body)".into(),
+            "- Pass script inside quotes. Its contents are inserted into the script body.".into(),
         );
     }
     if sites
         .iter()
         .any(|site| matches!(site.domain, Domain::Key { .. }))
     {
-        lines.push("- Dispatch: rendered as a statement key in the body".into());
+        lines.push("- This parameter becomes a statement key in the script body.".into());
     }
     let mut values = Vec::new();
     for site in sites {
@@ -230,10 +228,7 @@ fn ir_parameter_contract_lines(
             values.join("; ")
         ));
     }
-    if lines.is_empty() {
-        lines.push("- Inferred value constraints: none".into());
-    }
-    Some(lines.join("\n"))
+    (!lines.is_empty()).then(|| lines.join("\n"))
 }
 
 fn ir_parameter_value_label(ir: &rules::ir::RulesIr, id: rules::ir::MatcherId) -> String {

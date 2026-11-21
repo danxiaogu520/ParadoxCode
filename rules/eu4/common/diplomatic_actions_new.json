@@ -147,6 +147,13 @@
           "card": "0..1",
           "control": {
             "kind": "guard"
+          },
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "country",
+              "this": "country"
+            }
           }
         },
         "multiply_variable": {

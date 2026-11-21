@@ -378,6 +378,7 @@ One scope register.
 | Field | Required | Source default | Shape | Meaning |
 | --- | --- | --- | --- | --- |
 | `chain` | no | `null` | `{"type":["boolean","null"]}` | Whether the register chains (`prev_prev`, `fromfrom`, …). |
+| `chain_separator` | no | — | `{"type":["string","null"]}` | Exact separator between repeated names. An empty string joins names directly. |
 | `role` | yes | — | `{"$ref":"#/$defs/RegisterRole"}` | Runtime register selected by this declared spelling. |
 
 ## RootSpec

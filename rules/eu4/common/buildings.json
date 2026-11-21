@@ -114,6 +114,7 @@
           "override": true,
           "scope": {
             "set": {
+              "from": "country",
               "root": "province",
               "this": "province"
             }
@@ -126,6 +127,7 @@
           "override": true,
           "scope": {
             "set": {
+              "from": "country",
               "root": "province",
               "this": "province"
             }

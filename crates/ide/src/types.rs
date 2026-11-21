@@ -587,7 +587,7 @@ impl Diagnostic {
 }
 
 /// An editor-neutral source location.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Location {
     /// The open document containing the location, when applicable.
     pub document: Option<DocumentId>,
@@ -701,6 +701,16 @@ pub struct CompletionResult {
 pub struct PreviewTarget {
     /// Localised title already resolved for the text hover, when present.
     pub title: Option<String>,
+    /// The key and exact location supplying the localized title.
+    pub title_source: Option<(String, Location)>,
+    /// Required localisation keys missing in the preview language.
+    pub missing_localisation: Vec<String>,
+    /// Event scope declared by the definition, when available.
+    pub event_type: Option<String>,
+    /// Source layer and dependency identity of the definition.
+    pub source_name: String,
+    /// Prerequisite ID and whether multiple definitions share its priority.
+    pub prerequisite_issues: Vec<(String, bool)>,
     /// Event or mission symbol kind.
     pub kind: String,
     /// Identity within the definition file.
@@ -716,10 +726,19 @@ pub struct Hover {
     pub preview: Option<PreviewTarget>,
     /// Plain-text content; clients may render it as Markdown.
     pub contents: String,
+    /// Source links whose ranges are converted by the editor protocol adapter.
+    pub links: Vec<HoverLink>,
     /// Token range that produced the hover.
     pub range: Option<TextRange>,
     /// Coverage of the constraints explained by this hover.
     pub coverage: hir::analysis::AnalysisCoverage,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HoverLink {
+    pub label: String,
+    pub destination: String,
+    pub location: Location,
 }
 
 /// One source-ranged semantic token produced by the editor-neutral highlighting query.

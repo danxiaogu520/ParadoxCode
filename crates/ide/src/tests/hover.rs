@@ -10,7 +10,7 @@ fn symbol_hover_does_not_materialize_the_full_workspace() {
 
     crate::ALL_SEMANTICS_CALLS.with(|calls| calls.set(0));
     let hover = hover(&snapshot, &id, position).expect("symbol hover");
-    assert!(hover.contents.contains("Resolved definition"));
+    assert_eq!(hover.links.len(), 1);
     crate::ALL_SEMANTICS_CALLS.with(|calls| {
         assert_eq!(
             calls.get(),
@@ -62,6 +62,7 @@ fn symbol_hover_explains_active_and_shadowed_source_roots() {
         SourceRoot {
             id: SourceRootId::new(1),
             kind: SourceRootKind::Vanilla,
+            name: None,
             path: AbsPath::normalize(&vanilla),
             order: 0,
             writable: false,
@@ -69,6 +70,7 @@ fn symbol_hover_explains_active_and_shadowed_source_roots() {
         SourceRoot {
             id: SourceRootId::new(2),
             kind: SourceRootKind::Project,
+            name: None,
             path: AbsPath::normalize(&current),
             order: 1,
             writable: true,
@@ -82,15 +84,14 @@ fn symbol_hover_explains_active_and_shadowed_source_roots() {
         .expect("open reference");
     let position = u32::try_from(text.find("shared.1").expect("reference") + 1).expect("position");
     let hover = hover(&host.snapshot(), &id, position).expect("source hover");
+    assert!(hover.contents.contains("Project · [events/definitions.txt"));
     assert!(
         hover
             .contents
-            .contains("#### Resolved definition\n\n- Source root:")
+            .contains("Overrides 1 lower-priority definition")
     );
-    assert!(hover.contents.contains("Source root: Project"));
-    assert!(hover.contents.contains("#### Shadowed definitions:"));
-    assert!(hover.contents.contains("Shadowed definitions:"));
-    assert!(hover.contents.contains("Vanilla"));
+    assert!(!hover.contents.contains("Vanilla"));
+    assert_eq!(hover.links.len(), 1);
     fs::remove_dir_all(root).expect("cleanup");
 }
 
@@ -112,12 +113,43 @@ fn semantic_hover_explains_scope_transition() {
     let position =
         u32::try_from(text.find("capital_scope").expect("scope link") + 1).expect("position");
     let hover = hover(&host.snapshot(), &id, position).expect("scope hover");
-    assert!(hover.contents.contains("#### Scope\n\n- here: `country`"));
-    assert!(hover.contents.contains("`capital_scope` enters `province`"));
-    assert!(!hover.contents.contains("scope registers:"));
-    assert!(!hover.contents.contains("scope registers after:"));
-    assert!(!hover.contents.contains("child context:"));
-    assert!(!hover.contents.contains("context:"));
+    assert!(
+        hover.contents.contains(concat!(
+            "#### Scope inside this block\n\n",
+            "| Register | Scope |\n",
+            "| --- | --- |\n",
+            "| `ROOT` | `country` |\n",
+            "| `THIS` | `province` |\n",
+            "| `PREV` | `country` |"
+        )),
+        "{hover:?}"
+    );
+    assert!(!hover.contents.contains("`FROM`"));
+    assert!(!hover.contents.contains("`PREV_PREV`"));
+}
+
+#[test]
+fn eu4_hover_shows_known_scope_registers_from_building_rules() {
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("load first-party rules"));
+    let id = DocumentId::new("file:///tmp/common/buildings/hover.txt");
+    let text = "fixture = { on_construction_started = { owner = { capital_scope = { add_base_tax = 1 } } } }";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .unwrap();
+    let pos = u32::try_from(text.find("add_base_tax").unwrap()).unwrap();
+    let hover = hover(&host.snapshot(), &id, pos).expect("building effect hover");
+    assert!(
+        hover.contents.contains(concat!(
+            "#### Scope at this position\n\n",
+            "| Register | Scope |\n",
+            "| --- | --- |\n",
+            "| `ROOT` | `province` |\n",
+            "| `FROM` | `country` |\n",
+            "| `THIS` | `province` |\n",
+            "| `PREV` | `country` |\n",
+            "| `PREV_PREV` | `province` |"
+        )),
+        "{hover:?}"
+    );
 }
 
 #[test]
@@ -147,7 +179,7 @@ fn decision_hover_skips_type_instance_wrapper() {
     let result = hover(&host.snapshot(), &id, position).expect("decision semantic hover");
     assert!(
         result.contents.contains("### Decision `potential`")
-            && result.contents.contains("`potential` enters `country`"),
+            && result.contents.contains("| `THIS` | `country` |"),
         "{}",
         result.contents
     );
@@ -186,10 +218,12 @@ fn semantic_hover_keeps_multiple_matching_rule_meanings() {
         .expect("open ambiguous rule fixture");
     let position = u32::try_from(text.find("choice").expect("choice") + 1).expect("position");
     let hover = hover(&host.snapshot(), &id, position).expect("ambiguous rule hover");
-    assert!(hover.contents.contains("#### Allowed value types (2)"));
+    assert!(hover.contents.contains(concat!(
+        "| Valid scopes | Allowed values |\n",
+        "| --- | --- |\n",
+        "| Any | `yes` or `no` · integer from 1 to 3 |"
+    )));
     assert!(!hover.contents.contains("##### Candidate 1"));
-    assert!(hover.contents.contains("yes or no"));
-    assert!(hover.contents.contains("integer from 1 to 3"));
 }
 
 #[test]
@@ -204,28 +238,20 @@ fn semantic_hover_groups_value_types_by_scope() {
     let position = u32::try_from(text.find("choice").expect("choice") + 1).expect("position");
     let hover = hover(&host.snapshot(), &id, position).expect("scope-split rule hover");
     assert!(
-        hover.contents.contains("valid scopes: `country`"),
+        hover.contents.contains(concat!(
+            "| Valid scopes | Allowed values |\n",
+            "| --- | --- |\n",
+            "| `country` | `yes` or `no` |\n",
+            "| `province` | `fallback` |"
+        )),
         "{}",
         hover.contents
     );
-    assert!(
-        hover.contents.contains("valid scopes: `province`"),
-        "{}",
-        hover.contents
-    );
-    assert!(hover.contents.contains("yes or no"));
-    assert!(hover.contents.contains("`fallback`"));
-    // The bare `trigger` block carries no tracked scope, so nothing may be
-    // reported as unavailable here.
-    assert!(
-        !hover.contents.contains("unavailable in current scope"),
-        "{}",
-        hover.contents
-    );
+    assert!(!hover.contents.contains("Invalid scope"));
 }
 
 #[test]
-fn semantic_hover_marks_scope_mismatched_value_groups_unavailable() {
+fn semantic_hover_keeps_scope_specific_alternatives_on_the_key() {
     let mut host = eu4_host(game::eu4::runtime_rules().expect("load first-party rules"));
     let id = DocumentId::new("file:///tmp/events/add_claim_hover.txt");
     let text = "country_event = { immediate = { add_claim = 123 } }\n";
@@ -236,18 +262,85 @@ fn semantic_hover_marks_scope_mismatched_value_groups_unavailable() {
     let hover = hover(&host.snapshot(), &id, position).expect("add_claim semantic hover");
 
     assert!(
-        hover.contents.contains("Allowed value types (2)"),
+        hover.contents.contains(concat!(
+            "| `country` | `province_id` · `province` scope |\n",
+            "| `province` | `country_tag` · `country` scope |"
+        )),
         "{}",
         hover.contents
+    );
+    assert!(hover.contents.contains("| `THIS` | `country` |"));
+}
+
+#[test]
+fn semantic_hover_combines_shared_scopes_and_alternative_shapes() {
+    let text = concat!(
+        "province_event = { immediate = {\n",
+        "  change_religion = catholic\n",
+        "  add_core_construction = yes\n",
+        "} }\n"
+    );
+    let (host, id) = snapshot(text);
+    let analysis = host.snapshot();
+    let at_key = |key: &str| {
+        let position = u32::try_from(text.find(key).expect("key") + 1).expect("position");
+        hover(&analysis, &id, position).expect("key hover").contents
+    };
+    let religion = at_key("change_religion");
+    assert!(
+        religion
+            .lines()
+            .any(|row| row.starts_with("| `country`, `province` |")
+                && row.contains("`religion`")
+                && !row.contains("`country_tag`")),
+        "{religion}"
     );
     assert!(
-        hover
-            .contents
-            .contains("a `province` scope or a `province_id` instance"),
-        "{}",
-        hover.contents
+        religion.contains("| `province` | `country_tag` |"),
+        "{religion}"
     );
-    assert!(hover.contents.contains("a `country` scope or a `country_tag` instance; unavailable in current scope `country`; valid scopes: `province`"), "{}", hover.contents);
+
+    let construction = at_key("add_core_construction");
+    assert!(
+        construction.contains("| `province` | `yes` · script block |"),
+        "{construction}"
+    );
+}
+
+#[test]
+fn semantic_value_hover_checks_only_alternatives_in_the_current_scope() {
+    let mut host = fixture_host(serde_json::json!({"schemas": {"trigger": {"fields": {
+        "choice": [
+            {"value": "bool", "scope": {"in": ["country"]}},
+            {"value": "int", "scope": {"in": ["province"]}}
+        ],
+        "restricted": {"value": "bool", "scope": {"in": ["province"]}}
+    }}}}));
+    let id = DocumentId::new("file:///tmp/choice.txt");
+    let text = "country_event = { trigger = { choice = 2 restricted = no } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open scope-specific values");
+    let analysis = host.snapshot();
+    let choice = u32::try_from(text.find('2').expect("choice value")).expect("position");
+    let value_hover = hover(&analysis, &id, choice)
+        .expect("choice hover")
+        .contents;
+    assert!(
+        value_hover.contains("**Invalid value.** `2` must be yes or no."),
+        "{value_hover}"
+    );
+    assert!(value_hover.contains("| `country` | `yes` or `no` |"));
+    assert!(!value_hover.contains("| `province` | integer |"));
+
+    let restricted = u32::try_from(text.find("no").expect("restricted value")).expect("position");
+    let value_hover = hover(&analysis, &id, restricted)
+        .expect("restricted hover")
+        .contents;
+    assert!(
+        value_hover.contains("**Invalid scope.** `restricted` requires `province`."),
+        "{value_hover}"
+    );
+    assert!(value_hover.contains("| `province` | `yes` or `no` |"));
 }
 
 #[test]
@@ -260,8 +353,7 @@ fn semantic_hover_collapses_repeated_first_party_rule_rows() {
     let position =
         u32::try_from(text.find("events").expect("events key") + 1).expect("hover position");
     let hover = hover(&host.snapshot(), &id, position).expect("repeated-rule hover");
-    assert_eq!(hover.contents.matches("- value:").count(), 1);
-    assert!(!hover.contents.contains("Allowed value types"));
+    assert_eq!(hover.contents.matches("| Any | script block |").count(), 1);
 }
 
 #[test]
@@ -659,6 +751,7 @@ fn localisation_values_by_key_apply_the_layer_then_read_order_total_order() {
         SourceRoot {
             id: SourceRootId::new(1),
             kind: SourceRootKind::Vanilla,
+            name: None,
             path: AbsPath::normalize(&vanilla),
             order: 0,
             writable: false,
@@ -666,6 +759,7 @@ fn localisation_values_by_key_apply_the_layer_then_read_order_total_order() {
         SourceRoot {
             id: SourceRootId::new(2),
             kind: SourceRootKind::Dependency,
+            name: None,
             path: AbsPath::normalize(&dependency),
             order: 1,
             writable: false,
@@ -673,6 +767,7 @@ fn localisation_values_by_key_apply_the_layer_then_read_order_total_order() {
         SourceRoot {
             id: SourceRootId::new(3),
             kind: SourceRootKind::Project,
+            name: None,
             path: AbsPath::normalize(&current),
             order: 2,
             writable: true,
@@ -1468,8 +1563,10 @@ fn semantic_hover_infers_modifier_kind_from_workspace_membership() {
         result.contents
     );
     assert!(
-        result.contents.contains("Allowed value types")
-            && result.contents.contains("does not match"),
+        result
+            .contents
+            .contains("| Valid scopes | Allowed values |")
+            && result.contents.contains("Invalid value"),
         "{}",
         result.contents
     );

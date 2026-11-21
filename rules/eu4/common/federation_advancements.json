@@ -5,16 +5,34 @@
         "ai_chance": {
           "body": "federation_advancements_body__ai_chance",
           "card": "1",
-          "doc": "AI weighting block for options: factor = base relative weight."
+          "doc": "AI weighting block for options: factor = base relative weight.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
         },
         "can_pick": {
           "body": "trigger",
-          "card": "1"
+          "card": "1",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
         },
         "effect": {
           "body": "federation_advancements_body__effect",
           "card": "0..1",
-          "doc": "Block of effects executed by the containing entry."
+          "doc": "Block of effects executed by the containing entry.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
         },
         "gfx": {
           "card": "1",

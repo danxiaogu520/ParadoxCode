@@ -1072,7 +1072,13 @@
         {
           "body": "disaster_body",
           "card": "0..1",
-          "key": "def<disaster>"
+          "key": "def<disaster>",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
         }
       ]
     },
@@ -1081,7 +1087,13 @@
         {
           "body": "estate_agenda_body",
           "card": "0..1",
-          "key": "def<estate_agenda>"
+          "key": "def<estate_agenda>",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
         }
       ]
     },
@@ -1110,7 +1122,13 @@
         {
           "body": "estate_privilege_body",
           "card": "0..1",
-          "key": "def<estate_privilege>"
+          "key": "def<estate_privilege>",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
         }
       ]
     },
@@ -1564,6 +1582,49 @@
       ]
     },
     "common_scripted_functions_file": {
+      "fields": {
+        "can_add_province_to_hre": {
+          "body": "scripted_function_body",
+          "card": "0..1",
+          "def": {
+            "type": "scripted_function"
+          },
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        },
+        "can_join_hre_league": {
+          "body": "scripted_function_body",
+          "card": "0..1",
+          "def": {
+            "type": "scripted_function"
+          },
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
+        },
+        "can_remove_province_from_hre": {
+          "body": "scripted_function_body",
+          "card": "0..1",
+          "def": {
+            "type": "scripted_function"
+          },
+          "scope": {
+            "set": {
+              "from": "country",
+              "root": "province",
+              "this": "province"
+            }
+          }
+        }
+      },
       "patterns": [
         {
           "body": "scripted_function_body",
@@ -1732,6 +1793,11 @@
           "def": {
             "name": "field:name",
             "type": "custom_button"
+          },
+          "scope": {
+            "set": {
+              "from": "country"
+            }
           }
         },
         "custom_icon": {
@@ -1740,6 +1806,11 @@
           "def": {
             "name": "field:name",
             "type": "custom_icon"
+          },
+          "scope": {
+            "set": {
+              "from": "country"
+            }
           }
         },
         "custom_shield": {
@@ -1748,6 +1819,11 @@
           "def": {
             "name": "field:name",
             "type": "custom_shield"
+          },
+          "scope": {
+            "set": {
+              "from": "country"
+            }
           }
         },
         "custom_text_box": {
@@ -1756,6 +1832,11 @@
           "def": {
             "name": "field:name",
             "type": "custom_text_box"
+          },
+          "scope": {
+            "set": {
+              "from": "country"
+            }
           }
         },
         "custom_window": {
@@ -1764,6 +1845,11 @@
           "def": {
             "name": "field:name",
             "type": "custom_window"
+          },
+          "scope": {
+            "set": {
+              "from": "country"
+            }
           }
         }
       }

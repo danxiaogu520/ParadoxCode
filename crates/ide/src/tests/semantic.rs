@@ -147,6 +147,7 @@ fn eu4_scripted_effect_params_are_owner_qualified() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
         kind: SourceRootKind::Project,
+        name: None,
         path: AbsPath::normalize(&root),
         order: 0,
         writable: true,

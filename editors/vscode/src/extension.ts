@@ -18,11 +18,13 @@ import { LoadedFilesProvider } from './fileExplorer';
 import { localisationSync } from './localisationSync';
 import { SearchPanel } from './searchPanel';
 import { MissionPreviewPanel } from './previewPanel';
-import { EventPreviewPanel, parsePreviewTarget } from './eventPreviewPanel';
+import { EventPreviewPanel, parsePreviewTarget, type PreviewTarget } from './eventPreviewPanel';
 import { MissionIconPickerPanel } from './iconPickerPanel';
 import {
     PDCLOC_SCHEME,
     activateTransparentLocalisation,
+    navigationUri,
+    openTextDocumentForNavigation,
     realUriOf,
 } from './transparentLoc';
 import {
@@ -700,6 +702,19 @@ function clientMiddleware(getClient: () => LanguageClient): NonNullable<Language
             }
             if (token.isCancellationRequested) return null;
             const hover = languageClient.protocol2CodeConverter.asHover(result);
+            const markdown = hover && hoverMarkdownString(hover);
+            if (markdown) {
+                // Server source links use a line fragment. Choose the decoded document before
+                // VS Code opens the link so the automatic tab switch cannot race the selection.
+                markdown.value = markdown.value.replace(/\]\(((?:file|pdcloc):[^\s)]+)\)/g, (link, destination: string) => {
+                    const source = vscode.Uri.parse(destination);
+                    if (!/^L\d+(?:,\d+)?$/.test(source.fragment)) return link;
+                    const target = navigationUri(source.with({ fragment: '' }));
+                    return target.scheme === PDCLOC_SCHEME
+                        ? `](${hoverSourceUrl(markdown, target.with({ fragment: source.fragment }))})`
+                        : link;
+                });
+            }
             const target = parsePreviewTarget((result as (ProtocolHover & { pdcPreview?: unknown }) | null)?.pdcPreview);
             const config = vscode.workspace.getConfiguration('paradoxcode.hover', document.uri);
             if (target && hover) {
@@ -710,7 +725,24 @@ function clientMiddleware(getClient: () => LanguageClient): NonNullable<Language
                     const link = new vscode.MarkdownString(`[${label}](command:${command}?${args})`);
                     link.isTrusted = { enabledCommands: [command] };
                     const summary = new vscode.MarkdownString().appendText(target.id);
+                    if (target.eventType === 'country_event') summary.appendText(' · ' + vscode.l10n.t('Country event'));
+                    if (target.eventType === 'province_event') summary.appendText(' · ' + vscode.l10n.t('Province event'));
+                    for (const key of target.missingLocalisation?.slice(0, 6) ?? []) {
+                        summary.appendMarkdown('\n\n').appendText(vscode.l10n.t('Missing localisation ({0}): {1}', target.language ?? '', key));
+                    }
+                    for (const [id, ambiguous] of target.prerequisiteIssues?.slice(0, 8) ?? []) {
+                        summary.appendMarkdown('\n\n').appendText(ambiguous
+                            ? vscode.l10n.t('Ambiguous prerequisite: {0}', id)
+                            : vscode.l10n.t('Missing prerequisite: {0}', id));
+                    }
                     if (target.title) summary.appendMarkdown('\n\n').appendText(target.title);
+                    if (target.titleSource) {
+                        summary.appendText(' · ');
+                        appendHoverSource(summary, target.titleSource.key, target.titleSource.location);
+                    }
+                    summary.appendMarkdown('\n\n');
+                    if (target.sourceName) summary.appendText(target.sourceName + ' · ');
+                    appendHoverSource(summary, target.path ?? path.basename(vscode.Uri.parse(target.location.uri).fsPath), target.location);
                     return new vscode.Hover([summary, link], hover.range);
                 }
                 return hover;
@@ -746,6 +778,37 @@ function clientMiddleware(getClient: () => LanguageClient): NonNullable<Language
             next(uri, filtered);
         },
     };
+}
+
+const OPEN_HOVER_LOCALISATION = 'paradoxcode.localisation.openHoverSource';
+
+function appendHoverSource(markdown: vscode.MarkdownString, label: string, location: PreviewTarget['location']): void {
+    const { line, character } = location.range.start;
+    const uri = navigationUri(vscode.Uri.parse(location.uri)).with({ fragment: `L${line + 1},${character + 1}` });
+    markdown.appendMarkdown('[').appendText(label).appendMarkdown(`](${hoverSourceUrl(markdown, uri)})`);
+}
+
+function hoverSourceUrl(markdown: vscode.MarkdownString, uri: vscode.Uri): string {
+    if (uri.scheme === PDCLOC_SCHEME) {
+        markdown.isTrusted = { enabledCommands: [OPEN_HOVER_LOCALISATION] };
+        const args = encodeURIComponent(JSON.stringify([uri.toString()]));
+        return `command:${OPEN_HOVER_LOCALISATION}?${args.replaceAll('(', '%28').replaceAll(')', '%29')}`;
+    }
+    return uri.toString().replaceAll('(', '%28').replaceAll(')', '%29');
+}
+
+async function openHoverLocalisation(value: unknown): Promise<void> {
+    if (typeof value !== 'string') return;
+    const uri = vscode.Uri.parse(value);
+    const real = realUriOf(uri.with({ fragment: '' }));
+    const match = /^L(\d+)(?:,(\d+))?$/.exec(uri.fragment);
+    if (!real || !match || !/(?:^|\/)localisation\/.*\.yml$/i.test(real.path)) return;
+    const line = Number(match[1]);
+    const column = Number(match[2] ?? 1);
+    if (!Number.isSafeInteger(line) || line < 1 || !Number.isSafeInteger(column) || column < 1) return;
+    const document = await openTextDocumentForNavigation(real);
+    const position = new vscode.Position(line - 1, column - 1);
+    await vscode.window.showTextDocument(document, { selection: new vscode.Range(position, position) });
 }
 
 /** Returns the markdown string of a hover whose contents the language
@@ -833,7 +896,8 @@ async function augmentHoverWithCard(
     }
     const section = texturefileHoverMarkdown({
         name: asset.sprite ?? path.basename(asset.path),
-        rel: asset.path,
+        rel: asset.logicalPath ?? path.basename(asset.path),
+        origin: asset.sourceName ?? (asset.rootKind === 'project' ? 'Project' : asset.rootKind === 'dependency' ? 'Dependency' : 'Vanilla'),
         url: image.url,
         width: image.width,
     });
@@ -902,7 +966,6 @@ async function augmentHoverTexturePreview(
             appendTextureSection(markdown.value, {
                 name,
                 rel: entry.textureFile,
-                frames: entry.frames,
                 url: image.url,
                 width: image.width,
             }),
@@ -1261,9 +1324,7 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
             }
             // Errors and warnings are basic output; the INFO/LOG trail (index
             // phases, quiet scans, worker reports) belongs to the debug
-            // channel. Parsing and the status-bar mirror must keep running
-            // for every message: the Vanilla walkthrough state machine reacts
-            // to INFO message text.
+            // channel. The Vanilla walkthrough also reacts to INFO messages.
             if (params.type <= MESSAGE_TYPE_WARNING) {
                 log.appendLine(`[pdc] ${params.message}`);
             } else if (debugModeEnabled()) {
@@ -1271,7 +1332,6 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
                 // timestamp, aligning with the timestamped protocol trace.
                 debugLog.info(`[pdc] ${params.message}`);
             }
-            statusBar.tooltip = vscode.l10n.t('ParadoxCode: {0}', params.message);
             updateVanillaContext(params.message);
         });
         currentClient.onNotification('pdc/trace', (params: unknown) => {
@@ -1540,6 +1600,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
     const eventPreview = new EventPreviewPanel(() => client);
     context.subscriptions.push(eventPreview,
+        vscode.commands.registerCommand(OPEN_HOVER_LOCALISATION, openHoverLocalisation),
         vscode.commands.registerCommand('paradoxcode.previewEvent', async (value: unknown) => {
             const target = parsePreviewTarget(value);
             if (target?.kind === 'event') await eventPreview.show(target);

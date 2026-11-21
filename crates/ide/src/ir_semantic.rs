@@ -75,8 +75,8 @@ pub(crate) fn describe(ir: &RulesIr, matcher: MatcherId) -> String {
         Matcher::Scalar => "any scalar".into(),
         Matcher::Literal(value) => format!("`{}`", ir.strings().resolve(*value)),
         Matcher::Pattern(parts) => format!("template `{}`", pattern_text(ir, parts)),
-        Matcher::Int { min, max } => describe_range("integer", *min, *max),
-        Matcher::Float { min, max } => describe_range("number", *min, *max),
+        Matcher::Int { min, max } => describe_range("an integer", *min, *max),
+        Matcher::Float { min, max } => describe_range("a number", *min, *max),
         Matcher::Bool => "yes or no".into(),
         Matcher::Date => "a campaign date".into(),
         Matcher::Loc => "a localisation key".into(),
@@ -708,10 +708,10 @@ fn describe_type(ir: &RulesIr, type_id: TypeId, subtype: Option<rules::ir::Symbo
 
 fn describe_range<T: std::fmt::Display>(name: &str, min: Option<T>, max: Option<T>) -> String {
     match (min, max) {
-        (Some(min), Some(max)) => format!("a {name} from {min} to {max}"),
-        (Some(min), None) => format!("a {name} of at least {min}"),
-        (None, Some(max)) => format!("a {name} of at most {max}"),
-        (None, None) => format!("a {name}"),
+        (Some(min), Some(max)) => format!("{name} from {min} to {max}"),
+        (Some(min), None) => format!("{name} of at least {min}"),
+        (None, Some(max)) => format!("{name} of at most {max}"),
+        (None, None) => name.to_owned(),
     }
 }
 

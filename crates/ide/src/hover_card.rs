@@ -57,8 +57,12 @@ pub struct HoverCardAsset {
     /// Absolute path of the serving file on this machine. For a DLC archive
     /// member this is the `.zip` itself; `archive_member` names the entry.
     pub path: String,
+    /// Game-relative path used in hover text.
+    pub logical_path: String,
     /// Kind of the source root serving the file (`project`/`dependency`/`vanilla`).
     pub root_kind: String,
+    /// Configured identity of the dependency that supplies this texture.
+    pub source_name: Option<String>,
     /// The `.tga`/`.dds` extension drift fallback saved this reference.
     pub extension_fallback: bool,
     /// In-archive spelling when `path` is a DLC zip; the card cannot decode
@@ -592,7 +596,7 @@ fn texture_card(
     let resolution = snapshot.resolve_texture_path(&value.value)?;
     Some(HoverCard {
         kind: "texture",
-        asset: Some(asset_from(&resolution, None, None)),
+        asset: Some(asset_from(snapshot, &resolution, None, None)),
         mission: None,
         card_assets: None,
         event: None,
@@ -1112,7 +1116,7 @@ fn sprite_asset(
             continue;
         };
         if let Some(resolution) = snapshot.resolve_texture_path(&texturefile) {
-            return Ok(Some(asset_from(&resolution, Some(name), frames)));
+            return Ok(Some(asset_from(snapshot, &resolution, Some(name), frames)));
         }
     }
     Ok(None)
@@ -1192,6 +1196,7 @@ fn strip_key<'line>(line: &'line str, key: &str) -> Option<&'line str> {
 }
 
 fn asset_from(
+    snapshot: &AnalysisSnapshot,
     resolution: &engine::TextureResolution,
     sprite: Option<&str>,
     frames: Option<u32>,
@@ -1199,12 +1204,18 @@ fn asset_from(
     HoverCardAsset {
         sprite: sprite.map(str::to_owned),
         path: resolution.hit.path.as_path().to_string_lossy().into_owned(),
+        logical_path: resolution.logical_path.clone(),
         root_kind: match resolution.hit.root_kind {
             SourceRootKind::Project => "project",
             SourceRootKind::Dependency => "dependency",
             SourceRootKind::Vanilla => "vanilla",
         }
         .to_owned(),
+        source_name: snapshot
+            .source_roots()
+            .iter()
+            .find(|root| root.id == resolution.hit.root_id)
+            .and_then(|root| root.name.clone()),
         extension_fallback: resolution.extension_fallback,
         archive_member: resolution.hit.archive_member.clone(),
         frames,

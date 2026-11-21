@@ -211,13 +211,17 @@ function commandResource(uri: vscode.Uri | undefined): vscode.Uri | undefined {
  */
 const manualRawViews = new Set<string>();
 
-/** Search follows the chosen YML mode and preserves existing dirty buffers. */
-export async function openTextDocumentForNavigation(uri: vscode.Uri): Promise<vscode.TextDocument> {
+/** Navigation follows the chosen YML mode and preserves existing dirty buffers. */
+export function navigationUri(uri: vscode.Uri): vscode.Uri {
     if (uri.scheme === 'file' && isLocalisationFile(uri.fsPath) && automaticMode()
         && !manualRawViews.has(uri.toString()) && !hasDirtyDocument(uri)) {
-        return vscode.workspace.openTextDocument(decodedUriOf(uri));
+        return decodedUriOf(uri);
     }
-    return vscode.workspace.openTextDocument(uri);
+    return uri;
+}
+
+export async function openTextDocumentForNavigation(uri: vscode.Uri): Promise<vscode.TextDocument> {
+    return vscode.workspace.openTextDocument(navigationUri(uri));
 }
 
 interface TextTabSlot {

@@ -453,7 +453,8 @@ function tgaHeader(width, height, bpp, descriptor) {
     // A frame-strip sprite wider than the hover cap carries |width=400.
     const preview = { name: 'GFX_x', rel: 'gfx/interface/x.dds', frames: 4, url: 'data:image/png;base64,AAA', width: 800 };
     const appended = hover.appendTextureSection('### sprite `GFX_x`', preview);
-    assert.ok(appended.startsWith('### sprite `GFX_x`\n\n#### Texture\n\n- Path: `gfx/interface/x.dds`\n- Frames: 4\n\n'));
+    assert.ok(appended.startsWith('### sprite `GFX_x`\n\n#### Texture\n\n- Path: `gfx/interface/x.dds`\n\n'));
+    assert.ok(!appended.includes('Frames:'));
     assert.ok(appended.endsWith('![GFX_x](data:image/png;base64,AAA|width=400)'));
     // Single-frame, narrow sprites render at natural size without a suffix.
     const single = hover.appendTextureSection('m', { name: 'GFX_y', rel: 'y.dds', url: 'data:image/png;base64,BBB', width: 90 });

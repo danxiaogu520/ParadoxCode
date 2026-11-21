@@ -162,10 +162,12 @@
     "registers": {
       "from": {
         "chain": true,
+        "chain_separator": "",
         "role": "from"
       },
       "prev": {
         "chain": true,
+        "chain_separator": "_",
         "role": "previous"
       },
       "root": {

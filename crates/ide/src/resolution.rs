@@ -736,7 +736,9 @@ pub fn localisation_values_by_key<'a>(
         else {
             continue;
         };
-        if crate::localisation::preview_language_is_target(language.as_deref(), target) {
+        if !value.is_empty()
+            && crate::localisation::preview_language_is_target(language.as_deref(), target)
+        {
             resolved.insert(key.to_owned(), (language, value));
         }
     }
