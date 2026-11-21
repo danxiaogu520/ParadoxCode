@@ -7,6 +7,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+
+- Update bundled SQLite to 3.54.1 to fix the local information disclosure
+  vulnerability CVE-2026-119375 (RUSTSEC-2026-0459). Building ParadoxCode now
+  requires Rust 1.89 or later.
+
 ## [0.6.0] - 2026-11-22
 
 ### Changed

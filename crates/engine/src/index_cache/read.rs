@@ -107,9 +107,9 @@ fn load_cancellable_with(
     if cancellation.is_cancelled() {
         return Err(IndexCacheError::Cancelled);
     }
-    let connection = open_connection(path)?;
+    let mut connection = open_connection(path)?;
     let cancellation = cancellation.clone();
-    let _ = connection.progress_handler(1_000, Some(move || cancellation.is_cancelled()));
+    connection.progress_handler(1_000, Some(move || cancellation.is_cancelled()))?;
     load_connection(
         &connection,
         build_lookup_maps,
