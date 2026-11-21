@@ -335,7 +335,7 @@ fn semantic_hover_combines_shared_scopes_and_alternative_shapes() {
         "{religion}"
     );
     assert!(
-        religion.contains("| `province` | `country` |"),
+        religion.contains("| `province` | `country_tag` |"),
         "{religion}"
     );
 
