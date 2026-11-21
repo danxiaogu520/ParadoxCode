@@ -412,7 +412,12 @@
                 continue;
             }
             changed = true;
-            textureUrls[name] = url;
+            if (url) {
+                textureUrls[name] = url;
+            } else {
+                delete textureUrls[name];
+            }
+            if (name.startsWith('@')) titleLayouts = new WeakMap();
             textureImages.delete(name);
             failedTextures.delete(name);
         }
@@ -440,8 +445,12 @@
         let image = textureImages.get(name);
         if (!image) {
             image = new Image();
-            image.onload = () => scheduleDraw();
+            image.onload = () => {
+                if (name.startsWith('@')) titleLayouts = new WeakMap();
+                scheduleDraw();
+            };
             image.onerror = () => {
+                if (textureImages.get(name) !== image) return;
                 failedTextures.add(name);
                 textureImages.delete(name);
                 scheduleDraw();
@@ -610,6 +619,15 @@
         return width;
     }
 
+    function flagImage(token) {
+        return token.flag ? textureImage(token.text) : null;
+    }
+
+    function measureToken(token, layout) {
+        const flag = flagImage(token);
+        return flag ? layout.flagHeight * flag.naturalWidth / flag.naturalHeight : measureStyled(layout, token.text);
+    }
+
     // Splits styled runs into wrap tokens: CJK characters break individually,
     // Latin words stay whole and wrap at word boundaries — whitespace opens a
     // new token (leading the word it precedes, stripped when that word starts
@@ -618,6 +636,12 @@
         const tokens = [];
         let word = null;
         for (const run of line) {
+            if (run.flag) {
+                if (word) tokens.push(word);
+                word = null;
+                tokens.push(run);
+                continue;
+            }
             for (const ch of run.text) {
                 if (CJK_RE.test(ch)) {
                     if (word) {
@@ -657,21 +681,19 @@
         let current = [];
         let width = 0;
         for (let token of tokenizeStyled(line)) {
-            if (current.length > 0 && width + measureStyled(layout, token.text) > maxWidth) {
+            if (current.length > 0 && width + measureToken(token, layout) > maxWidth) {
                 lines.push(current);
                 current = [];
                 width = 0;
-                const trimmed = token.text.replace(/^\s+/, '');
-                token = { text: trimmed, color: token.color };
-            } else if (current.length === 0) {
-                const trimmed = token.text.replace(/^\s+/, '');
-                token = { text: trimmed, color: token.color };
+            }
+            if (current.length === 0 && !token.flag) {
+                token = { text: token.text.trimStart(), color: token.color };
             }
             if (!token.text) {
                 continue;
             }
             current.push(token);
-            width += measureStyled(layout, token.text);
+            width += measureToken(token, layout);
         }
         if (current.length > 0 || lines.length === 0) {
             lines.push(current);
@@ -683,6 +705,10 @@
     function segmentLines(segments) {
         const lines = [[]];
         for (const segment of segments) {
+            if (segment.flag) {
+                lines[lines.length - 1].push(segment);
+                continue;
+            }
             const parts = segment.text.split('\n');
             parts.forEach((part, index) => {
                 if (index > 0) {
@@ -708,7 +734,7 @@
     function lineWidth(tokens, layout) {
         let width = 0;
         for (const token of tokens) {
-            width += measureStyled(layout, token.text);
+            width += measureToken(token, layout);
         }
         return width;
     }
@@ -734,6 +760,16 @@
             run = null;
         };
         for (const token of tokens) {
+            const flag = flagImage(token);
+            if (flag) {
+                flushRun();
+                const height = layout.flagHeight;
+                const width = height * flag.naturalWidth / flag.naturalHeight;
+                ctx.drawImage(flag, pen, lineTop + layout.baseline - height, width, height);
+                pen += width;
+                prev = 0;
+                continue;
+            }
             const color = token.color ?? null;
             for (const ch of token.text) {
                 const codePoint = ch.codePointAt(0);
@@ -978,6 +1014,7 @@
                     zoom,
                     defaultColor: COLORS.texturedText,
                     baseline: font.base * zoom,
+                    flagHeight: font.base * zoom,
                     sysFont: `${Math.max(8, font.base * zoom)}px ${FONT_FAMILY}`,
                 }
                 : {
@@ -985,6 +1022,7 @@
                     zoom,
                     defaultColor: COLORS.texturedText,
                     baseline: 8 * zoom,
+                    flagHeight: Math.max(8, 10 * zoom),
                     sysFont: `bold ${Math.max(8, 10 * zoom)}px ${FONT_FAMILY}`,
                 };
             const lineHeight = (font ? font.lineHeight : 11) * zoom;
@@ -1001,6 +1039,7 @@
                 zoom,
                 defaultColor: COLORS.text,
                 baseline: font.base * zoom,
+                flagHeight: font.base * zoom,
                 sysFont: `${Math.max(9, font.base * zoom)}px ${FONT_FAMILY}`,
             }
             : {
@@ -1008,6 +1047,7 @@
                 zoom,
                 defaultColor: COLORS.text,
                 baseline: 9 * zoom,
+                flagHeight: Math.max(9, 11 * zoom),
                 sysFont: `${Math.max(9, 11 * zoom)}px ${FONT_FAMILY}`,
             };
         const lineHeight = (font ? font.lineHeight : 13) * zoom;
@@ -1418,6 +1458,15 @@
             const titleLine = document.createElement('div');
             const label = (node.title && node.title.value) || node.id;
             for (const segment of parseLocFormat(label).segments) {
+                const flag = options.showTextures && segment.flag && textureUrls[segment.text];
+                if (flag) {
+                    const image = document.createElement('img');
+                    image.className = 'loc-flag';
+                    image.alt = segment.text;
+                    image.src = flag;
+                    titleLine.appendChild(image);
+                    continue;
+                }
                 const span = document.createElement('span');
                 span.textContent = segment.text;
                 if (segment.color) {
@@ -1498,6 +1547,7 @@
         } else if (message.type === 'assets') {
             setAssets(message);
         } else if (message.type === 'options') {
+            if (options.showTextures !== (message.showTextures !== false)) titleLayouts = new WeakMap();
             options = {
                 zoomSensitivity: Math.min(2, Math.max(0.5, Number(message.zoomSensitivity) || 1)),
                 showTextures: message.showTextures !== false,

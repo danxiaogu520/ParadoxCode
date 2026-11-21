@@ -1042,6 +1042,22 @@ export class GameAssetStore {
         return undefined;
     }
 
+    /** Decodes the flags referenced by localisation, using the normal texture lookup and cache. */
+    public async flagUrls(tags: ReadonlySet<string>): Promise<Map<string, string>> {
+        const urls = new Map<string, string>();
+        for (const tag of tags) {
+            if (!/^[A-Z0-9]{3}$/.test(tag)) {
+                continue;
+            }
+            const file = this.resolveTexture(`gfx/flags/${tag}.tga`);
+            const image = file ? await this.textureFile(file) : undefined;
+            if (image) {
+                urls.set(tag, image.url);
+            }
+        }
+        return urls;
+    }
+
     /**
      * Decodes one texture file to a PNG data URL with its pixel size, cached
      * by mtime. Missing or undecodable files yield `undefined` — a preview
