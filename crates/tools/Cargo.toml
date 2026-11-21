@@ -7,19 +7,29 @@ license.workspace = true
 rust-version.workspace = true
 description = "Development, CI, and release tooling for the ParadoxCode repository."
 authors.workspace = true
-homepage.workspace = true
 repository.workspace = true
 readme.workspace = true
 publish = false
 
 [features]
 default = ["analysis"]
-analysis = ["dep:text", "dep:parser", "dep:pdc", "dep:rules", "dep:game", "dep:engine", "dep:ide", "dep:rusqlite"]
+analysis = [
+    "dep:text",
+    "dep:parser",
+    "dep:dunce",
+    "dep:pdc",
+    "dep:rules",
+    "dep:game",
+    "dep:engine",
+    "dep:ide",
+    "dep:rusqlite",
+    "dep:regex",
+]
 
 [dependencies]
 text = { path = "../text", optional = true }
 parser = { path = "../parser", optional = true }
-dunce = "1.0"
+dunce = { version = "1.0", optional = true }
 pdc = { path = "../pdc", optional = true }
 rules = { path = "../rules", optional = true }
 game = { path = "../game", optional = true }
@@ -36,7 +46,7 @@ serde_json = "1.0"
 encoding_rs = "0.8"
 rusqlite = { version = "0.40", features = ["bundled"], optional = true }
 tempfile = "3"
-regex = "1"
+regex = { version = "1", optional = true }
 
 [lints]
 workspace = true
