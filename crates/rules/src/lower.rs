@@ -1302,18 +1302,18 @@ impl<'a> Lowering<'a> {
         let name = match source.name.as_deref().map(str::trim) {
             None | Some("key") => DefName::Key,
             Some("file") => DefName::File,
-            Some(other)
-                if let Some((field, separator)) = crate::compile::ordinal_name_parts(other) =>
-            {
-                DefName::Ordinal {
-                    field: self.strings.intern_folded(field),
-                    separator: self.strings.intern_verbatim(separator),
+            Some(other) => {
+                if let Some((field, separator)) = crate::compile::ordinal_name_parts(other) {
+                    DefName::Ordinal {
+                        field: self.strings.intern_folded(field),
+                        separator: self.strings.intern_verbatim(separator),
+                    }
+                } else if let Some(field) = other.strip_prefix("field:") {
+                    DefName::Field(self.strings.intern_folded(field.trim()))
+                } else {
+                    DefName::Key
                 }
             }
-            Some(other) => match other.strip_prefix("field:") {
-                Some(field) => DefName::Field(self.strings.intern_folded(field.trim())),
-                None => DefName::Key,
-            },
         };
         let strip_prefix = source
             .strip_prefix
