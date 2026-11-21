@@ -77,6 +77,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A unified ParadoxCode search panel for rules, definitions, localisation values/keys and full
   text, with independent tab state, source and override filters, references, pagination and
   precise navigation. Searches include unsaved buffers and preserve existing decoded views.
+  See the [original design and acceptance record](https://github.com/danxiaogu520/ParadoxCode/blob/5f8a9a7b825f1ddb028f2a6d34ddabe3955f1f15/SEARCH-PROPOSAL.md).
 
 - Editor-title **Decode Quoted Text** and **Encode Quoted Text** buttons for eligible localisation YML
   and configured script files. Manual conversion keeps the ordinary file view and writes
@@ -121,8 +122,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - EU4 modifier selectors now validate country/province modifier keys, including dynamic families.
   Export and switch domains reuse schema queries and support workspace scripted triggers through
   their scalar boolean form when no arguments are required. Export modifier spelling is checked;
-  effective `who` scope filtering
-  remains deferred. See [the migration inventory](FIELD-QUERY-MIGRATION.md) for compatibility limits.
+  effective `who` scope filtering remains deferred.
+  See the [field-query migration record](https://github.com/danxiaogu520/ParadoxCode/blob/c5eff65e659a66e7ffb0fce95f04b8205a161551/FIELD-QUERY-MIGRATION.md).
 
 - PR and main CI use a reduced Linux core gate targeting roughly two-minute feedback. Full CI
   remains a pre-release gate targeting roughly five minutes with a smaller representative suite,
