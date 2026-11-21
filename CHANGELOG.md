@@ -45,6 +45,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Complex Script blocks inside single-line quoted arguments expand during formatting.
 
+- EU4 government power thresholds and gains scaled by parliament seats accept fractional values
+  such as `0.01`.
+
 ## [0.5.6] - 2026-11-17
 
 ### Removed
