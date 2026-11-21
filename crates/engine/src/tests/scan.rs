@@ -116,7 +116,7 @@ fn recoverable_file_failures_do_not_abort_the_workspace_scan() {
     let events = root.join("events");
     fs::create_dir_all(&events).expect("event directory");
     fs::write(events.join("good.txt"), "country_event = { id = safe.1 }\n").expect("valid event");
-    fs::write(events.join("invalid.txt"), [0xff, 0xfe]).expect("invalid UTF-8 event");
+    fs::write(events.join("invalid.txt"), [0xff, 0xfe, b'=']).expect("truncated UTF-16 event");
     fs::write(
         events.join("undefined-windows1252.txt"),
         b"country_event = { id = invalid.1 }\n# \x81\n",
@@ -166,13 +166,14 @@ fn recoverable_file_failures_do_not_abort_the_workspace_scan() {
 }
 
 #[test]
-fn eu4_legacy_windows1252_text_is_decoded_before_indexing() {
-    let root = temp_root("windows1252");
+fn eu4_script_encoding_is_detected_on_initial_scan_and_disk_change() {
+    let root = temp_root("source-encoding");
     let events = root.join("events");
+    let event = events.join("legacy.txt");
     fs::create_dir_all(&events).expect("event directory");
     fs::write(
-        events.join("legacy.txt"),
-        b"country_event = { id = legacy.1 }\n# caf\xe9\n",
+        &event,
+        b"country_event = { id = legacy.1 }\n# caf\xe9 \x80\n",
     )
     .expect("legacy event");
 
@@ -198,7 +199,7 @@ fn eu4_legacy_windows1252_text_is_decoded_before_indexing() {
         .id;
     assert_eq!(
         host.snapshot().source_text(file_id),
-        Some("country_event = { id = legacy.1 }\n# café\n")
+        Some("country_event = { id = legacy.1 }\n# café €\n")
     );
     assert_eq!(
         host.snapshot()
@@ -206,6 +207,32 @@ fn eu4_legacy_windows1252_text_is_decoded_before_indexing() {
             .definitions("event", "legacy.1")
             .len(),
         1
+    );
+
+    let updated = "country_event = { id = unicode.2 }\n# 中文 🌍\n";
+    let bytes: Vec<_> = std::iter::once(0xfeff)
+        .chain(updated.encode_utf16())
+        .flat_map(u16::to_le_bytes)
+        .collect();
+    fs::write(&event, bytes).expect("rewrite event in UTF-16LE");
+    host.apply_disk_file_changes(&[DiskFileChange::new(
+        AbsPath::normalize(&event),
+        DiskFileChangeKind::Changed,
+    )])
+    .expect("apply encoding change");
+    let snapshot = host.snapshot();
+    assert_eq!(snapshot.source_text(file_id), Some(updated));
+    assert!(
+        snapshot
+            .index()
+            .active_definition("event", "unicode.2")
+            .is_some()
+    );
+    assert!(
+        snapshot
+            .index()
+            .active_definition("event", "legacy.1")
+            .is_none()
     );
     fs::remove_dir_all(root).expect("cleanup");
 }

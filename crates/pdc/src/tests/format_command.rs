@@ -6,13 +6,7 @@ use super::*;
 
 /// One whole `pdc/formatWorkspace` pass over a mixed Project workspace.
 ///
-/// The five script fixtures pin every summary bucket and the on-disk outcome:
-/// a messy file is rewritten to canonical text, an asset-path file has its
-/// separators normalized to forward slashes, an already-canonical file is
-/// left untouched (unchanged), a syntactically broken file is refused
-/// (unsafe skip, bytes preserved), and a legacy-encoded file is refused
-/// (legacy skip, bytes preserved). The localisation file is out of scope by
-/// design and must not be counted or touched.
+/// Formatting preserves each supported encoding and skips damaged input.
 #[test]
 fn format_workspace_rewrites_scripts_and_reports_a_summary() {
     let (root, root_uri) = temp_workspace_dir();
@@ -24,8 +18,23 @@ fn format_workspace_rewrites_scripts_and_reports_a_summary() {
     let paths = events.join("paths.txt");
     let canonical = events.join("canonical.txt");
     let broken = events.join("broken.txt");
-    let legacy = events.join("legacy.txt");
+    let windows1252 = events.join("windows1252.txt");
+    let utf8_bom = events.join("utf8-bom.txt");
+    let utf16_le = events.join("utf16-le.txt");
+    let utf16_be = events.join("utf16-be.txt");
+    let invalid_encoding = events.join("invalid-encoding.txt");
     let localised = localisation.join("test_l_english.yml");
+    let utf16 = |text: &str, little_endian: bool| {
+        let units = std::iter::once(0xfeff).chain(text.encode_utf16());
+        if little_endian {
+            units.flat_map(u16::to_le_bytes).collect::<Vec<_>>()
+        } else {
+            units.flat_map(u16::to_be_bytes).collect::<Vec<_>>()
+        }
+    };
+    let messy_unicode = "root = {\r\n  child=\"中文 🌍\"\r\n}\r\n";
+    let formatted_unicode = "ROOT = { child = \"中文 🌍\" }\n";
+    let invalid_bytes = b"\xef\xbb\xbfroot = { child = \"\xe9\" }\n";
     fs::write(&messy, "root = {\r\n  child = yes\r\n}\r\n").expect("messy source");
     fs::write(
         &paths,
@@ -34,7 +43,15 @@ fn format_workspace_rewrites_scripts_and_reports_a_summary() {
     .expect("asset-path source");
     fs::write(&canonical, "ROOT = { child = yes }\n").expect("canonical source");
     fs::write(&broken, "broken = \"unfinished").expect("broken source");
-    fs::write(&legacy, b"caf\xE9 = yes\n").expect("legacy-encoded source");
+    fs::write(
+        &windows1252,
+        b"root = {\r\n  child=\"caf\xe9 \x80 \x93prix\x94\"\r\n}\r\n",
+    )
+    .expect("Windows-1252 source");
+    fs::write(&utf8_bom, format!("\u{feff}{messy_unicode}")).expect("UTF-8 BOM source");
+    fs::write(&utf16_le, utf16(messy_unicode, true)).expect("UTF-16LE source");
+    fs::write(&utf16_be, utf16(messy_unicode, false)).expect("UTF-16BE source");
+    fs::write(&invalid_encoding, invalid_bytes).expect("invalid UTF-8 BOM source");
     fs::write(&localised, "l_english:\nkey:0 \"value\"\n").expect("localisation source");
 
     let input = frames([
@@ -82,8 +99,8 @@ fn format_workspace_rewrites_scripts_and_reports_a_summary() {
         .find(|value| value["id"] == 2)
         .expect("format response");
     assert_eq!(format["error"], Value::Null);
-    assert_eq!(format["result"]["totalFiles"], 5);
-    assert_eq!(format["result"]["formattedFiles"], 2);
+    assert_eq!(format["result"]["totalFiles"], 9);
+    assert_eq!(format["result"]["formattedFiles"], 6);
     assert_eq!(format["result"]["unchangedFiles"], 1);
     assert_eq!(format["result"]["skippedUnsafeFiles"], 1);
     assert_eq!(format["result"]["skippedLegacyEncodingFiles"], 1);
@@ -106,9 +123,19 @@ fn format_workspace_rewrites_scripts_and_reports_a_summary() {
         b"broken = \"unfinished"
     );
     assert_eq!(
-        fs::read(&legacy).expect("legacy survives"),
-        b"caf\xE9 = yes\n"
+        fs::read(&windows1252).expect("Windows-1252 output"),
+        b"ROOT = { child = \"caf\xe9 \x80 \x93prix\x94\" }\n"
     );
+    assert_eq!(
+        fs::read_to_string(&utf8_bom).unwrap(),
+        format!("\u{feff}{formatted_unicode}")
+    );
+    assert_eq!(fs::read(&utf16_le).unwrap(), utf16(formatted_unicode, true));
+    assert_eq!(
+        fs::read(&utf16_be).unwrap(),
+        utf16(formatted_unicode, false)
+    );
+    assert_eq!(fs::read(&invalid_encoding).unwrap(), invalid_bytes);
     assert_eq!(
         fs::read_to_string(&localised).expect("localisation survives"),
         "l_english:\nkey:0 \"value\"\n"

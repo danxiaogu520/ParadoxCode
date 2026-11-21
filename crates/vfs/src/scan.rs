@@ -5,10 +5,10 @@ use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 
-use encoding_rs::WINDOWS_1252;
 use rules::{GameProfile, SourceEncoding};
 use text::{AbsPath, LogicalPath};
 
+use crate::encoding::{DiskSourceEncoding, looks_like_legacy_text};
 use crate::model::{
     SourceFile, SourceFileId, SourceRoot, SourceRootId, WorkspaceError, WorkspaceScanFilters,
     WorkspaceScanIssue, WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanReport,
@@ -803,38 +803,27 @@ fn decode_source_bytes(
     limits: WorkspaceScanLimits,
     report: &mut WorkspaceScanReport,
 ) -> Option<String> {
-    let mut legacy = false;
-    let mut encoding_recovered = false;
-    let text = match String::from_utf8(bytes.to_vec()) {
-        Ok(text) => text,
-        Err(error) => {
-            let detail = error.to_string();
-            let bytes = error.into_bytes();
-            if source_encoding == SourceEncoding::Windows1252 && looks_like_legacy_text(&bytes) {
-                let (text, had_errors) = WINDOWS_1252.decode_without_bom_handling(&bytes);
-                legacy = true;
-                encoding_recovered = had_errors;
-                text.into_owned()
-            } else if looks_like_legacy_text(&bytes) {
-                encoding_recovered = true;
-                String::from_utf8_lossy(&bytes).into_owned()
-            } else {
-                record_scan_issue(
-                    report,
-                    limits,
-                    WorkspaceScanIssueKind::InvalidUtf8,
-                    path.to_owned(),
-                    detail,
-                );
-                return None;
+    let (text, encoding_recovered) = match DiskSourceEncoding::decode(bytes, source_encoding) {
+        Some((text, encoding)) => {
+            if encoding == DiskSourceEncoding::Windows1252 {
+                report.legacy_encoded_files = report.legacy_encoded_files.saturating_add(1);
             }
+            (text, false)
+        }
+        None if looks_like_legacy_text(bytes) => (String::from_utf8_lossy(bytes), true),
+        None => {
+            record_scan_issue(
+                report,
+                limits,
+                WorkspaceScanIssueKind::InvalidUtf8,
+                path.to_owned(),
+                "invalid UTF-8, BOM-marked UTF-16, or profile fallback encoding".to_owned(),
+            );
+            return None;
         }
     };
-    let (text, sanitized) = sanitize_recovered_text(text);
-    if sanitized {
-        encoding_recovered = true;
-    }
-    if encoding_recovered {
+    let (text, sanitized) = sanitize_recovered_text(text.into_owned());
+    if encoding_recovered || sanitized {
         record_scan_notice(
             report,
             limits,
@@ -843,9 +832,6 @@ fn decode_source_bytes(
             "one or more encoded source spans were replaced with whitespace; surrounding syntax was retained"
                 .to_owned(),
         );
-    }
-    if legacy {
-        report.legacy_encoded_files = report.legacy_encoded_files.saturating_add(1);
     }
     Some(text)
 }
@@ -1130,13 +1116,6 @@ fn quoted_spans(chars: &[char]) -> Vec<(usize, usize)> {
         spans.push((start, chars.len()));
     }
     spans
-}
-
-fn looks_like_legacy_text(bytes: &[u8]) -> bool {
-    !bytes.contains(&0)
-        && bytes
-            .iter()
-            .any(|byte| matches!(*byte, b'=' | b'{' | b'}' | b'#' | b'\n' | b':'))
 }
 
 pub fn stable_file_id(root: SourceRootId, logical: &LogicalPath) -> u64 {

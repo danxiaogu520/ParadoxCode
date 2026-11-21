@@ -1,6 +1,8 @@
 use super::*;
 use crate::MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS;
 use crate::uri::FileUri;
+use engine::DiskSourceEncoding;
+use rules::SourceEncoding;
 use std::fs;
 
 // Whole-document semantic-token queries share one CPU slot. Completion and
@@ -564,8 +566,7 @@ enum WorkspaceFileFormatOutcome {
     /// The parser reported errors or the rewrite failed safety validation; the
     /// file is left untouched.
     SkippedUnsafe,
-    /// The on-disk bytes are not valid UTF-8 (legacy encoding). Rewriting the
-    /// decoded text would silently re-encode the file, so it is left untouched.
+    /// The file could not be decoded or re-encoded losslessly.
     SkippedLegacyEncoding,
     Failed,
 }
@@ -588,20 +589,19 @@ fn apply_format_edits(source: &str, edits: &[parser::format::TextEdit]) -> Strin
 /// Formats one on-disk script file in place.
 ///
 /// The file is re-read from disk rather than taken from the snapshot so the
-/// rewrite always reflects the bytes the game sees. Files that are not valid
-/// UTF-8 are skipped instead of re-encoded, and the formatter's own safety
-/// pipeline (no parse errors, token equivalence, idempotence) gates every
-/// write.
+/// rewrite reflects the current file and preserves its encoding. The formatter's
+/// safety pipeline (no parse errors, token equivalence, idempotence) gates every write.
 fn format_workspace_file(
     path: &AbsPath,
     logical_path: &text::LogicalPath,
     ir: &rules::ir::RulesIr,
+    source_encoding: SourceEncoding,
 ) -> WorkspaceFileFormatOutcome {
     let bytes = match fs::read(path.as_path()) {
         Ok(bytes) => bytes,
         Err(_) => return WorkspaceFileFormatOutcome::Failed,
     };
-    let Ok(text) = String::from_utf8(bytes) else {
+    let Some((text, encoding)) = DiskSourceEncoding::decode(&bytes, source_encoding) else {
         return WorkspaceFileFormatOutcome::SkippedLegacyEncoding;
     };
     let parsed = parser::parse(parser::FileFormat::Script, &text);
@@ -613,7 +613,10 @@ fn format_workspace_file(
         return WorkspaceFileFormatOutcome::Unchanged;
     }
     let formatted = apply_format_edits(&text, &result.edits);
-    match fs::write(path.as_path(), formatted.as_bytes()) {
+    let Some(formatted_bytes) = encoding.encode(&formatted) else {
+        return WorkspaceFileFormatOutcome::SkippedLegacyEncoding;
+    };
+    match fs::write(path.as_path(), formatted_bytes) {
         Ok(()) => WorkspaceFileFormatOutcome::Formatted,
         Err(_) => WorkspaceFileFormatOutcome::Failed,
     }
@@ -687,6 +690,7 @@ fn format_workspace_files(
                         &file.physical_path,
                         &file.logical_path,
                         snapshot.ir(),
+                        snapshot.game_profile().source_encoding,
                     );
                     outcomes.lock().expect("format outcome lock poisoned")[index] = Some(outcome);
                     let done = completed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;

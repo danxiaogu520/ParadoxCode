@@ -2119,26 +2119,30 @@ country_event = {\n\
 }
 
 #[test]
-fn hover_card_serves_icon_bound_definition() {
+fn hover_card_serves_icon_bound_definition_from_utf16_disk_source() {
     let (root, root_uri) = temp_workspace_dir();
     // One holy-order sprite with its texture on disk; the holy order
     // definition binds it through the icon binding family.
     let textures = root.join("gfx").join("interface").join("holy_orders");
     fs::create_dir_all(&textures).expect("create texture directory");
     fs::write(textures.join("golden_order_icon.dds"), b"placeholder").expect("texture file");
-    let gfx_text = "spriteTypes = {\n\
+    let gfx_text = "# Éléments 🌍\nspriteTypes = {\n\
 \t\tspriteType = {\n\
 \t\t\tname = \"golden_order_icon\"\n\
 \t\t\ttexturefile = \"gfx/interface/holy_orders/golden_order_icon.dds\"\n\
 \t\t}\n\
 }\n";
+    fs::create_dir_all(root.join("interface")).expect("create interface directory");
+    let gfx_bytes: Vec<_> = std::iter::once(0xfeff)
+        .chain(gfx_text.encode_utf16())
+        .flat_map(u16::to_be_bytes)
+        .collect();
+    fs::write(root.join("interface/test_icons.gfx"), gfx_bytes).expect("UTF-16BE sprites");
     let holy_text = "golden_order = {\n\ticon = golden_order_icon\n}\n";
-    let gfx_uri = format!("{root_uri}/interface/test_icons.gfx");
     let holy_uri = format!("{root_uri}/common/holy_orders/holy.txt");
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":gfx_uri,"languageId":"eu4","version":1,"text":gfx_text}}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":holy_uri,"languageId":"eu4","version":1,"text":holy_text}}}),
         // On the `golden_order` definition token: the generic icon card.
         json!({"jsonrpc":"2.0","id":2,"method":"pdc/hoverCard","params":{"textDocument":{"uri":holy_uri},"position":{"line":0,"character":3}}}),

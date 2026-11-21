@@ -58,11 +58,11 @@ pub struct ProfileMissionNodeFields {
     pub effect: String,
 }
 
-/// Text encoding policy selected by a game profile for source files.
+/// Fallback policy for source files without a BOM or valid UTF-8.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum SourceEncoding {
-    /// Strict UTF-8 source, which is the generic engine default.
+    /// No legacy encoding fallback, which is the generic engine default.
     #[default]
     Utf8,
     /// Legacy Windows-1252 source decoded to UTF-8 before parsing.
